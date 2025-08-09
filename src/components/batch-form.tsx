@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ChartContainer, ChartDonutContent, ChartLegend, ChartStyle } from '@/components/ui/chart';
+import { ChartContainer, ChartDonutContent, ChartLegend, ChartLegendContent, ChartStyle } from '@/components/ui/chart';
 import * as Recharts from 'recharts';
 
 const logEntrySchema = z.object({
