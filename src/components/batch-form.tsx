@@ -32,8 +32,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ChartContainer, ChartDonutContent, ChartLegend, ChartLegendContent, ChartStyle } from '@/components/ui/chart';
-import * as Recharts from 'recharts';
+import { BatchDistributionBar } from './batch-distribution-bar';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -123,18 +122,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, nurseryLoca
     } else {
         onSubmit({ ...data, status: finalStatus, initialQuantity: data.quantity });
     }
-  };
-
-  const chartData = distribution ? [
-      { name: 'inStock', value: distribution.inStock, fill: 'var(--color-inStock)' },
-      { name: 'transplanted', value: distribution.transplanted, fill: 'var(--color-transplanted)' },
-      { name: 'lost', value: distribution.lost, fill: 'var(--color-lost)' },
-  ] : [];
-
-  const chartConfig = {
-      inStock: { label: 'In Stock', color: 'hsl(var(--chart-1))' },
-      transplanted: { label: 'Transplanted', color: 'hsl(var(--chart-2))' },
-      lost: { label: 'Lost', color: 'hsl(var(--chart-5))' },
   };
   
   return (
@@ -364,16 +351,13 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, nurseryLoca
           </div>
           
           <div className="md:col-span-1 space-y-4">
-            {distribution && (batch?.initialQuantity ?? 0) > 0 && (
+            {distribution && batch && (batch.initialQuantity > 0) && (
                 <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
                     <h3 className="flex items-center font-semibold mb-2"><PieChart className="mr-2 h-4 w-4"/>Batch Distribution</h3>
-                    <ChartContainer config={chartConfig} className="mx-auto aspect-square h-48">
-                        <Recharts.PieChart>
-                            <Recharts.Tooltip content={<ChartDonutContent />} />
-                            <Recharts.Pie data={chartData} dataKey="value" nameKey="name" innerRadius={50} />
-                            <Recharts.Legend content={<ChartLegendContent />} />
-                        </Recharts.PieChart>
-                    </ChartContainer>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        A breakdown of where the initial {batch.initialQuantity} units have gone.
+                    </p>
+                    <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
                 </div>
             )}
           </div>
