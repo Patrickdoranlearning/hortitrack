@@ -24,15 +24,29 @@ import { Textarea } from '@/components/ui/textarea';
 import type { Batch } from '@/lib/types';
 import { useState } from 'react';
 
-const formSchema = z.object({
-  actionType: z.enum(['log', 'move', 'split', 'Batch Spaced', 'Batch Trimmed']),
+const formSchema = (maxQuantity: number) => z.object({
+  actionType: z.enum(['log', 'move', 'split', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
   logMessage: z.string().optional(),
   newLocation: z.string().optional(),
   splitQuantity: z.number().positive().optional(),
   newBatchPlantingDate: z.string().optional(),
+  adjustQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
+  adjustReason: z.string().min(1, 'A reason is required for adjustments.').optional(),
+}).refine(data => {
+    if (data.actionType === 'split') {
+        return !!data.splitQuantity && !!data.newLocation && !!data.newBatchPlantingDate;
+    }
+    if (data.actionType === 'adjust') {
+        return !!data.adjustQuantity && !!data.adjustReason;
+    }
+    return true;
+}, {
+    message: "All fields for the selected action are required.",
+    path: ["actionType"],
 });
 
-type ActionLogFormValues = z.infer<typeof formSchema>;
+
+type ActionLogFormValues = z.infer<ReturnType<typeof formSchema>>;
 
 interface ActionLogFormProps {
   batch: Batch | null;
@@ -51,13 +65,15 @@ export function ActionLogForm({
   const [actionType, setActionType] = useState('log');
   
   const form = useForm<ActionLogFormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema(batch?.quantity ?? 0)),
     defaultValues: {
         actionType: 'log',
         logMessage: '',
         newLocation: '',
         splitQuantity: 0,
         newBatchPlantingDate: new Date().toISOString().split('T')[0],
+        adjustQuantity: 1,
+        adjustReason: '',
     },
   });
 
@@ -67,7 +83,7 @@ export function ActionLogForm({
   
   const handleActionTypeChange = (value: string) => {
     setActionType(value);
-    form.setValue('actionType', value as 'log' | 'move' | 'split' | 'Batch Spaced' | 'Batch Trimmed');
+    form.setValue('actionType', value as 'log' | 'move' | 'split' | 'adjust' | 'Batch Spaced' | 'Batch Trimmed');
   }
 
   return (
@@ -91,6 +107,7 @@ export function ActionLogForm({
                   <SelectItem value="log">General Log</SelectItem>
                   <SelectItem value="move">Move Batch</SelectItem>
                   <SelectItem value="split">Split Batch</SelectItem>
+                  <SelectItem value="adjust">Adjust Stock (Losses)</SelectItem>
                   <SelectItem value="Batch Spaced">Batch Spaced</SelectItem>
                   <SelectItem value="Batch Trimmed">Batch Trimmed</SelectItem>
                 </SelectContent>
@@ -193,6 +210,38 @@ export function ActionLogForm({
             />
           </>
         )}
+        
+        {actionType === 'adjust' && (
+          <>
+            <FormField
+                control={form.control}
+                name="adjustQuantity"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Quantity to Remove</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="e.g., 10" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+            <FormField
+              control={form.control}
+              name="adjustReason"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Reason for Adjustment</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Dumping, Pest Damage, etc." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>

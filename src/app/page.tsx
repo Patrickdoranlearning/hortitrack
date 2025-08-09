@@ -9,7 +9,7 @@ import {
   Settings,
   ScanLine,
 } from 'lucide-react';
-import type { Batch, LogHistory } from '@/lib/types';
+import type { Batch, LogEntry } from '@/lib/types';
 import { INITIAL_BATCHES } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ import { INITIAL_NURSERY_LOCATIONS, INITIAL_PLANT_SIZES } from '@/lib/constants'
 import Link from 'next/link';
 import { ScannerDialog } from '@/components/scanner-dialog';
 import { useToast } from '@/hooks/use-toast';
+import type { TransplantFormData } from '@/lib/types';
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
@@ -144,7 +145,7 @@ export default function DashboardPage() {
     setIsTransplantFormOpen(true);
   };
 
-  const handleTransplantFormSubmit = (data: Omit<Batch, 'id'>) => {
+  const handleTransplantFormSubmit = (data: TransplantFormData) => {
     const nextBatchNumStr = getNextBatchNumber();
 
     const batchNumberPrefix = {
@@ -157,7 +158,7 @@ export default function DashboardPage() {
 
     const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
 
-    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber } as Batch;
+    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber };
 
     const updatedBatches = batches.map(b => {
       if (b.batchNumber === data.transplantedFrom) {
@@ -215,7 +216,7 @@ export default function DashboardPage() {
             const updatedBatchesForSplit = batches.map(b => {
                 if (b.id === actionLogBatch.id) {
                     const newQuantity = b.quantity - data.splitQuantity;
-                    const newLog: LogHistory = { date: today, action: `Split ${data.splitQuantity} units to new batch #${newBatch.batchNumber}` };
+                    const newLog: LogEntry = { date: today, action: `Split ${data.splitQuantity} units to new batch #${newBatch.batchNumber}` };
                     return { ...b, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status, logHistory: [newLog, ...b.logHistory]};
                 }
                 return b;
@@ -225,16 +226,28 @@ export default function DashboardPage() {
             setIsActionLogFormOpen(false);
             setActionLogBatch(null);
             return; // Exit early as state is set
+        case 'adjust':
+            logMessage = `Adjusted quantity by -${data.adjustQuantity}. Reason: ${data.adjustReason}`;
+            const updatedBatchesForAdjust = batches.map(b => {
+                if (b.id === actionLogBatch.id) {
+                    const newQuantity = b.quantity - data.adjustQuantity;
+                    const newLog: LogEntry = { date: today, action: logMessage };
+                    return { ...b, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status, logHistory: [newLog, ...b.logHistory]};
+                }
+                return b;
+            });
+             setBatches(updatedBatchesForAdjust);
+             break;
         case 'Batch Spaced':
         case 'Batch Trimmed':
             logMessage = data.actionType;
             break;
     }
 
-    if (logMessage) {
+    if (logMessage && data.actionType !== 'adjust') {
         const updatedBatches = batches.map(b => {
             if (b.id === actionLogBatch.id) {
-                const newLog: LogHistory = { date: today, action: logMessage };
+                const newLog: LogEntry = { date: today, action: logMessage };
                 const updatedBatch = { ...b, logHistory: [newLog, ...b.logHistory] };
                 if (data.actionType === 'move') {
                     updatedBatch.location = data.newLocation;
@@ -261,6 +274,7 @@ export default function DashboardPage() {
         description: `No batch found with code: ${scannedData}`,
       });
     }
+    setIsScannerOpen(false);
   };
 
   return (
@@ -377,7 +391,7 @@ export default function DashboardPage() {
       </Dialog>
 
       <Dialog open={isTransplantFormOpen} onOpenChange={setIsTransplantFormOpen}>
-        <DialogContent className="max-w-2.xl">
+        <DialogContent className="max-w-2xl">
           <TransplantForm
             batch={transplantingBatch}
             onSubmit={handleTransplantFormSubmit}

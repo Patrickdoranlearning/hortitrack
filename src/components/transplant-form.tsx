@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch } from '@/lib/types';
+import type { Batch, TransplantFormData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -54,7 +54,7 @@ const transplantFormSchema = (maxQuantity: number) => z.object({
 
 interface TransplantFormProps {
   batch: Batch | null;
-  onSubmit: (data: Omit<Batch, 'id'>) => void;
+  onSubmit: (data: TransplantFormData) => void;
   onCancel: () => void;
   nurseryLocations: string[];
   plantSizes: string[];
@@ -76,14 +76,13 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
           location: '',
           size: '',
           transplantedFrom: batch.batchNumber,
-          logHistory: [{date: new Date().toISOString(), action: `Transplanted from batch #${batch.batchNumber}`}]
+          logHistory: [{date: new Date().toISOString().split('T')[0], action: `Transplanted from batch #${batch.batchNumber}`}]
         }
       : undefined,
   });
 
   const handleFormSubmit = (data: z.infer<ReturnType<typeof transplantFormSchema>>) => {
-    const { id, ...rest } = data;
-    onSubmit({...rest, initialQuantity: data.quantity });
+    onSubmit({...data, initialQuantity: data.quantity });
   };
   
   return (
@@ -222,7 +221,7 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a status" />
-                      </SelectTrigger>
+                      </Trigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
@@ -244,7 +243,7 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a new size" />
-                      </SelectTrigger>
+                      </Trigger>
                     </FormControl>
                     <SelectContent>
                       {plantSizes.map((size) => (

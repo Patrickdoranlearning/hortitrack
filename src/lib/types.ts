@@ -18,17 +18,6 @@ export type Batch = {
   transplantedFrom?: string;
 };
 
-export type TransplantFormData = {
-  id: string;
-  batchNumber: string;
-  plantFamily: string;
-  plantVariety: string;
-  plantingDate: string;
-  initialQuantity: number;
-  quantity: number;
-  status: 'Plugs/Liners' | 'Potted' | 'Ready for Sale';
-  location: string;
-  size: string;
-  logHistory: LogEntry[];
-  transplantedFrom: string;
+export type TransplantFormData = Omit<Batch, 'id' | 'initialQuantity'> & {
+    initialQuantity: number;
 };
