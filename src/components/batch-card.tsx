@@ -1,5 +1,5 @@
 
-import { Badge, badgeVariants } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText, Trash2 } from 'lucide-react';
+import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText, Archive } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -18,7 +18,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
 
 
 interface BatchCardProps {
@@ -33,16 +32,16 @@ interface BatchCardProps {
 export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
 
-  const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
     switch (status) {
       case 'Ready for Sale':
       case 'Looking Good':
-        return 'default';
+        return 'accent';
       case 'Propagation':
       case 'Plugs/Liners':
-        return 'secondary';
+        return 'info';
       case 'Potted':
-        return 'outline';
+        return 'default';
       case 'Archived':
         return 'destructive';
       default:
