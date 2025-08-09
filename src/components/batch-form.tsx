@@ -40,10 +40,11 @@ const logEntrySchema = z.object({
 
 const batchSchema = z.object({
   id: z.string(),
+  batchNumber: z.string().min(1, 'Batch number is required.'),
   plantType: z.string().min(1, 'Plant type is required.'),
   plantingDate: z.string().min(1, 'Planting date is required.'),
   quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
-  status: z.enum(['Seeding', 'Growing', 'Ready for Sale']),
+  status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale']),
   location: z.string().min(1, 'Location is required.'),
   logHistory: z.array(logEntrySchema),
 });
@@ -63,10 +64,11 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
       ? { ...batch, plantingDate: batch.plantingDate }
       : {
           id: Date.now().toString(),
+          batchNumber: '',
           plantType: '',
           plantingDate: new Date().toISOString(),
           quantity: 1,
-          status: 'Seeding',
+          status: 'Propagation',
           location: '',
           logHistory: [],
         },
@@ -78,7 +80,14 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
   });
 
   const handleFormSubmit = (data: BatchFormValues) => {
-    onSubmit(data);
+    const batchNumberPrefix = {
+      'Propagation': '1',
+      'Plugs/Liners': '2',
+      'Potted': '3',
+      'Ready for Sale': '4'
+    };
+    const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${data.batchNumber}`;
+    onSubmit({ ...data, batchNumber: prefixedBatchNumber });
   };
   
   return (
@@ -92,6 +101,19 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="batchNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Batch Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., 12345" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="plantType"
@@ -182,8 +204,9 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Seeding">Seeding</SelectItem>
-                      <SelectItem value="Growing">Growing</SelectItem>
+                      <SelectItem value="Propagation">Propagation</SelectItem>
+                      <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                      <SelectItem value="Potted">Potted</SelectItem>
                       <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
                     </SelectContent>
                   </Select>

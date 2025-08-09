@@ -5,10 +5,12 @@ export type LogEntry = {
 
 export type Batch = {
   id: string;
+  batchNumber: string;
   plantType: string;
   plantingDate: string;
   quantity: number;
-  status: 'Seeding' | 'Growing' | 'Ready for Sale';
+  status: 'Propagation' | 'Plugs/Liners' | 'Potted' | 'Ready for Sale';
   location: string;
   logHistory: LogEntry[];
+  transplantedFrom?: string;
 };
