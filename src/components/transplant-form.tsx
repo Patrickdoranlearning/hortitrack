@@ -60,7 +60,7 @@ const transplantFormSchema = (maxQuantity: number) =>
         action: z.string(),
       })
     ),
-    archiveRemaining: z.boolean(),
+    logRemainingAsLoss: z.boolean(),
   });
 
 interface TransplantFormProps {
@@ -100,7 +100,7 @@ export function TransplantForm({
               action: `Transplanted from batch #${batch.batchNumber}`,
             },
           ],
-          archiveRemaining: false,
+          logRemainingAsLoss: false,
         }
       : undefined,
   });
@@ -321,7 +321,7 @@ export function TransplantForm({
           
           <FormField
               control={form.control}
-              name="archiveRemaining"
+              name="logRemainingAsLoss"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                   <FormControl>
@@ -332,10 +332,10 @@ export function TransplantForm({
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>
-                      Archive remaining units from original batch
+                      Log remaining units as loss and archive
                     </FormLabel>
                     <FormDescription>
-                      If checked, the original batch will be marked as Archived. This is for when the remaining units are not viable.
+                      If checked, any units not transplanted will be logged as a loss, and the original batch will be archived.
                     </FormDescription>
                   </div>
                 </FormItem>

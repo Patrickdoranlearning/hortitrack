@@ -179,13 +179,21 @@ export default function DashboardPage() {
       supplier: 'Doran Nurseries',
     };
 
+    const today = new Date().toISOString().split('T')[0];
+
     const updatedBatches = batches.map((b) => {
       if (b.batchNumber === data.transplantedFrom) {
-        if (data.archiveRemaining) {
+        if (data.logRemainingAsLoss) {
+          const lossQuantity = b.quantity - data.quantity;
+          const lossLog: LogEntry = {
+            date: today,
+            action: `Logged ${lossQuantity} units as loss during transplant.`,
+          };
           return {
             ...b,
-            quantity: b.quantity - data.quantity, // This will become 0 if all are transplanted
+            quantity: data.quantity, 
             status: 'Archived',
+            logHistory: [lossLog, ...b.logHistory],
           };
         }
         const newQuantity = b.quantity - data.quantity;

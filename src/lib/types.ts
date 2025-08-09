@@ -25,7 +25,7 @@ export type Batch = z.infer<typeof BatchSchema>;
 
 export type TransplantFormData = Omit<Batch, 'id' | 'initialQuantity'> & {
     initialQuantity: number;
-    archiveRemaining: boolean;
+    logRemainingAsLoss: boolean;
 };
 
 // Moved from ai/flows/production-protocol.ts to avoid 'use server' export errors.
