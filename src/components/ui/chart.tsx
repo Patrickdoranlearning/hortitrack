@@ -363,20 +363,20 @@ const ChartDonutContent = React.forwardRef<
     active?: boolean
     payload?: any[]
   }
->(({ className, nameKey = "name", labelKey = "value", ...props }, ref) => {
+>(({ className, nameKey = "name", active, payload, ...props }, ref) => {
   const { config } = useChart()
 
   return (
     <div ref={ref} className={cn("grid gap-1", className)} {...props}>
-      {props.active && props.payload && props.payload.length ? (
+      {active && payload && payload.length ? (
         <>
           <ChartTooltipContent
             hideIndicator
-            label={props.payload[0].payload[nameKey]}
+            label={payload[0].payload[nameKey]}
             formatter={(value) => {
               const itemConfig =
                 config[
-                  props.payload![0].payload[
+                  payload![0].payload[
                     nameKey
                   ] as keyof typeof config
                 ]
@@ -387,7 +387,7 @@ const ChartDonutContent = React.forwardRef<
                     <itemConfig.icon className="mr-2 size-3.5" />
                   ) : null}
                   {itemConfig?.label ||
-                    props.payload[0].payload[nameKey]}
+                    payload[0].payload[nameKey]}
                   <div className="ml-auto flex items-baseline gap-0.5">
                     {value}
                     <span className="font-normal text-muted-foreground">
