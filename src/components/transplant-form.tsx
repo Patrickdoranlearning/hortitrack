@@ -254,6 +254,7 @@ export function TransplantForm({
                       onChange={(e) => {
                           const value = e.target.value;
                           field.onChange(value === '' ? undefined : parseInt(value, 10));
+                          form.setValue('initialQuantity', value === '' ? 0 : parseInt(value, 10));
                       }}
                     />
                   </FormControl>
@@ -355,3 +356,5 @@ export function TransplantForm({
     </>
   );
 }
+
+    

@@ -191,7 +191,7 @@ export default function DashboardPage() {
           };
           return {
             ...b,
-            quantity: data.quantity, 
+            quantity: 0, 
             status: 'Archived',
             logHistory: [lossLog, ...b.logHistory],
           };
@@ -500,3 +500,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
