@@ -1,5 +1,5 @@
 
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
+import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText, Trash2 } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 
 interface BatchCardProps {
@@ -30,7 +31,24 @@ interface BatchCardProps {
 }
 
 export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
-  const stockPercentage = (batch.quantity / batch.initialQuantity) * 100;
+  const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
+
+  const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case 'Ready for Sale':
+      case 'Looking Good':
+        return 'default';
+      case 'Propagation':
+      case 'Plugs/Liners':
+        return 'secondary';
+      case 'Potted':
+        return 'outline';
+      case 'Archived':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
   
   return (
     <Card>
@@ -75,7 +93,7 @@ export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, o
         )}
         <div>
           <span className="font-semibold">Status:</span>{' '}
-          <Badge>{batch.status}</Badge>
+          <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
         </div>
         {batch.transplantedFrom && (
             <p className="text-sm text-muted-foreground">
@@ -117,7 +135,7 @@ export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, o
             </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={() => onTransplant(batch)} disabled={batch.quantity === 0}>
+                    <Button variant="outline" size="icon" onClick={() => onTransplant(batch)} disabled={batch.quantity === 0 || batch.status === 'Archived'}>
                         <MoveRight className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
