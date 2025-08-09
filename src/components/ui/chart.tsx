@@ -355,6 +355,57 @@ function getPayloadConfigFromPayload(
     : config[key as keyof typeof config]
 }
 
+const ChartDonutContent = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & {
+    nameKey?: string
+    labelKey?: string
+    active?: boolean
+    payload?: any[]
+  }
+>(({ className, nameKey = "name", labelKey = "value", ...props }, ref) => {
+  const { config } = useChart()
+
+  return (
+    <div ref={ref} className={cn("grid gap-1", className)} {...props}>
+      {props.active && props.payload && props.payload.length ? (
+        <>
+          <ChartTooltipContent
+            hideIndicator
+            label={props.payload[0].payload[nameKey]}
+            formatter={(value) => {
+              const itemConfig =
+                config[
+                  props.payload![0].payload[
+                    nameKey
+                  ] as keyof typeof config
+                ]
+
+              return (
+                <div className="flex min-w-32 items-center text-xs text-muted-foreground">
+                  {itemConfig?.icon ? (
+                    <itemConfig.icon className="mr-2 size-3.5" />
+                  ) : null}
+                  {itemConfig?.label ||
+                    props.payload[0].payload[nameKey]}
+                  <div className="ml-auto flex items-baseline gap-0.5">
+                    {value}
+                    <span className="font-normal text-muted-foreground">
+                      units
+                    </span>
+                  </div>
+                </div>
+              )
+            }}
+          />
+        </>
+      ) : null}
+    </div>
+  )
+})
+ChartDonutContent.displayName = "ChartDonutContent"
+
+
 export {
   ChartContainer,
   ChartTooltip,
@@ -362,4 +413,5 @@ export {
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
+  ChartDonutContent,
 }

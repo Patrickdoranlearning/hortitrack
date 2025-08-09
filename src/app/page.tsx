@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { BatchCard } from '@/components/batch-card';
-import { BatchForm } from '@/components/batch-form';
+import { BatchForm, type BatchDistribution } from '@/components/batch-form';
 import { CareRecommendationsDialog } from '@/components/care-recommendations-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
@@ -66,6 +66,8 @@ export default function DashboardPage() {
 
   const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
   const [protocolBatch, setProtocolBatch] = useState<Batch | null>(null);
+  
+  const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
 
   useEffect(() => {
     const storedLocations = localStorage.getItem('nurseryLocations');
@@ -111,10 +113,28 @@ export default function DashboardPage() {
 
   const handleNewBatch = () => {
     setEditingBatch(null);
+    setBatchDistribution(null);
     setIsFormOpen(true);
   };
 
   const handleEditBatch = (batch: Batch) => {
+    // Calculate distribution data for the chart
+    const transplantedQuantity = batches.filter(b => b.transplantedFrom === batch.batchNumber).reduce((sum, b) => sum + b.initialQuantity, 0);
+    const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)/;
+    const lostQuantity = batch.logHistory.reduce((sum, log) => {
+      const match = log.action.match(lossLogRegex);
+      if (match) {
+        return sum + (parseInt(match[1], 10) || parseInt(match[2], 10));
+      }
+      return sum;
+    }, 0);
+    const remainingInStock = batch.quantity;
+    
+    setBatchDistribution({
+      inStock: remainingInStock,
+      transplanted: transplantedQuantity,
+      lost: lostQuantity,
+    });
     setEditingBatch(batch);
     setIsFormOpen(true);
   };
@@ -144,6 +164,7 @@ export default function DashboardPage() {
     }
     setIsFormOpen(false);
     setEditingBatch(null);
+    setBatchDistribution(null);
   };
 
   const handleGetRecommendations = (batch: Batch) => {
@@ -416,9 +437,10 @@ export default function DashboardPage() {
       </main>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <BatchForm
             batch={editingBatch}
+            distribution={batchDistribution}
             onSubmit={handleFormSubmit}
             onCancel={() => setIsFormOpen(false)}
             nurseryLocations={nurseryLocations}
@@ -500,5 +522,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
