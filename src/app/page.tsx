@@ -7,6 +7,7 @@ import {
   Search,
   Filter,
   Settings,
+  ScanLine,
 } from 'lucide-react';
 import type { Batch } from '@/lib/types';
 import { INITIAL_BATCHES } from '@/lib/data';
@@ -27,6 +28,8 @@ import { Logo } from '@/components/logo';
 import { TransplantForm } from '@/components/transplant-form';
 import { INITIAL_NURSERY_LOCATIONS, INITIAL_PLANT_SIZES } from '@/lib/constants';
 import Link from 'next/link';
+import { ScannerDialog } from '@/components/scanner-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
@@ -44,6 +47,9 @@ export default function DashboardPage() {
 
   const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
   const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
+  
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const { toast } = useToast();
 
   const [nurseryLocations, setNurseryLocations] = useState<string[]>([]);
   const [plantSizes, setPlantSizes] = useState<string[]>([]);
@@ -168,6 +174,19 @@ export default function DashboardPage() {
     setTransplantingBatch(null);
   }
 
+  const handleScanSuccess = (scannedData: string) => {
+    const foundBatch = batches.find(b => b.batchNumber === scannedData);
+    if (foundBatch) {
+      handleEditBatch(foundBatch);
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Batch not found',
+        description: `No batch found with code: ${scannedData}`,
+      });
+    }
+  };
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-10 flex h-auto flex-col gap-4 border-b bg-background/80 px-4 py-4 backdrop-blur-sm sm:px-6">
@@ -179,6 +198,10 @@ export default function DashboardPage() {
                     <Settings />
                     Settings
                 </Link>
+            </Button>
+            <Button variant="outline" onClick={() => setIsScannerOpen(true)}>
+                <ScanLine />
+                Scan Code
             </Button>
             <Button onClick={handleNewBatch} size="lg">
                 <PlusCircle />
@@ -292,6 +315,12 @@ export default function DashboardPage() {
         open={isAiDialogOpen}
         onOpenChange={setIsAiDialogOpen}
         batch={aiBatch}
+      />
+
+      <ScannerDialog 
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScanSuccess={handleScanSuccess}
       />
     </div>
   );
