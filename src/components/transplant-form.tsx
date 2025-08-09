@@ -32,7 +32,6 @@ import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { NURSERY_LOCATIONS, PLANT_SIZES } from '@/lib/constants';
 
 const transplantFormSchema = (maxQuantity: number) => z.object({
   id: z.string(),
@@ -57,9 +56,11 @@ interface TransplantFormProps {
   batch: Batch | null;
   onSubmit: (data: Omit<Batch, 'id'>) => void;
   onCancel: () => void;
+  nurseryLocations: string[];
+  plantSizes: string[];
 }
 
-export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProps) {
+export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, plantSizes }: TransplantFormProps) {
   const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
     resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
@@ -148,7 +149,7 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            {NURSERY_LOCATIONS.map(location => (
+                            {nurseryLocations.map(location => (
                                 <SelectItem key={location} value={location}>{location}</SelectItem>
                             ))}
                         </SelectContent>
@@ -246,7 +247,7 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {PLANT_SIZES.map((size) => (
+                      {plantSizes.map((size) => (
                         <SelectItem key={size} value={size}>
                           {size}
                         </SelectItem>

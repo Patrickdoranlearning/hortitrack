@@ -1,6 +1,6 @@
 // A central place for "golden data" to be used as templates across the app.
 
-export const NURSERY_LOCATIONS = [
+export const INITIAL_NURSERY_LOCATIONS = [
     'Greenhouse 1',
     'Greenhouse 2',
     'Greenhouse 3',
@@ -25,7 +25,7 @@ export const NURSERY_LOCATIONS = [
     'Quarantine Zone',
 ];
 
-export const PLANT_SIZES = [
+export const INITIAL_PLANT_SIZES = [
     '4-inch pot',
     '6-inch pot',
     '1-gallon pot',

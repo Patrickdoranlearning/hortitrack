@@ -32,7 +32,6 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { NURSERY_LOCATIONS, PLANT_SIZES } from '@/lib/constants';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -59,9 +58,11 @@ interface BatchFormProps {
   batch: Batch | null;
   onSubmit: (data: Omit<Batch, 'id'>) => void;
   onCancel: () => void;
+  nurseryLocations: string[];
+  plantSizes: string[];
 }
 
-export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
+export function BatchForm({ batch, onSubmit, onCancel, nurseryLocations, plantSizes }: BatchFormProps) {
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
     defaultValues: batch
@@ -175,7 +176,7 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            {NURSERY_LOCATIONS.map(location => (
+                            {nurseryLocations.map(location => (
                                 <SelectItem key={location} value={location}>{location}</SelectItem>
                             ))}
                         </SelectContent>
@@ -272,7 +273,7 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            {PLANT_SIZES.map(size => (
+                            {plantSizes.map(size => (
                                 <SelectItem key={size} value={size}>{size}</SelectItem>
                             ))}
                         </SelectContent>

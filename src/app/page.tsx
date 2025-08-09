@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   PlusCircle,
   Search,
   Filter,
+  Settings,
 } from 'lucide-react';
 import type { Batch } from '@/lib/types';
 import { INITIAL_BATCHES } from '@/lib/data';
@@ -24,7 +25,8 @@ import { CareRecommendationsDialog } from '@/components/care-recommendations-dia
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
 import { TransplantForm } from '@/components/transplant-form';
-
+import { INITIAL_NURSERY_LOCATIONS, INITIAL_PLANT_SIZES } from '@/lib/constants';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
@@ -43,6 +45,24 @@ export default function DashboardPage() {
   const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
   const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
 
+  const [nurseryLocations, setNurseryLocations] = useState<string[]>([]);
+  const [plantSizes, setPlantSizes] = useState<string[]>([]);
+
+  useEffect(() => {
+    const storedLocations = localStorage.getItem('nurseryLocations');
+    if (storedLocations) {
+      setNurseryLocations(JSON.parse(storedLocations));
+    } else {
+      setNurseryLocations(INITIAL_NURSERY_LOCATIONS);
+    }
+
+    const storedSizes = localStorage.getItem('plantSizes');
+    if (storedSizes) {
+      setPlantSizes(JSON.parse(storedSizes));
+    } else {
+      setPlantSizes(INITIAL_PLANT_SIZES);
+    }
+  }, []);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived'], []);
@@ -153,10 +173,18 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-10 flex h-auto flex-col gap-4 border-b bg-background/80 px-4 py-4 backdrop-blur-sm sm:px-6">
         <div className="flex items-center justify-between">
           <Logo />
-          <Button onClick={handleNewBatch} size="lg">
-            <PlusCircle />
-            New Batch
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+                <Link href="/settings">
+                    <Settings />
+                    Settings
+                </Link>
+            </Button>
+            <Button onClick={handleNewBatch} size="lg">
+                <PlusCircle />
+                New Batch
+            </Button>
+          </div>
         </div>
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
             <h1 className="text-3xl font-headline text-foreground/80">
@@ -242,6 +270,8 @@ export default function DashboardPage() {
             batch={editingBatch}
             onSubmit={handleFormSubmit}
             onCancel={() => setIsFormOpen(false)}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
           />
         </DialogContent>
       </Dialog>
@@ -252,6 +282,8 @@ export default function DashboardPage() {
             batch={transplantingBatch}
             onSubmit={handleTransplantFormSubmit}
             onCancel={() => setIsTransplantFormOpen(false)}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
           />
         </DialogContent>
       </Dialog>
