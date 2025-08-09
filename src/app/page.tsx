@@ -160,34 +160,48 @@ export default function DashboardPage() {
     const nextBatchNumStr = getNextBatchNumber();
 
     const batchNumberPrefix = {
-        'Propagation': '1',
-        'Plugs/Liners': '2',
-        'Potted': '3',
-        'Ready for Sale': '4',
-        'Looking Good': '6',
-        'Archived': '5'
+      'Propagation': '1',
+      'Plugs/Liners': '2',
+      'Potted': '3',
+      'Ready for Sale': '4',
+      'Looking Good': '6',
+      'Archived': '5',
     };
 
-    const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
+    const prefixedBatchNumber = `${
+      batchNumberPrefix[data.status]
+    }-${nextBatchNumStr}`;
 
-    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber, supplier: 'Doran Nurseries' };
+    const newBatch: Batch = {
+      ...data,
+      id: Date.now().toString(),
+      batchNumber: prefixedBatchNumber,
+      supplier: 'Doran Nurseries',
+    };
 
-    const updatedBatches = batches.map(b => {
+    const updatedBatches = batches.map((b) => {
       if (b.batchNumber === data.transplantedFrom) {
+        if (data.archiveRemaining) {
+          return {
+            ...b,
+            quantity: b.quantity - data.quantity, // This will become 0 if all are transplanted
+            status: 'Archived',
+          };
+        }
         const newQuantity = b.quantity - data.quantity;
-        return { 
-            ...b, 
-            quantity: newQuantity,
-            status: newQuantity === 0 ? 'Archived' : b.status 
+        return {
+          ...b,
+          quantity: newQuantity,
+          status: newQuantity === 0 ? 'Archived' : b.status,
         };
       }
       return b;
     });
 
-    setBatches([ newBatch, ...updatedBatches]);
+    setBatches([newBatch, ...updatedBatches]);
     setIsTransplantFormOpen(false);
     setTransplantingBatch(null);
-  }
+  };
 
   const handleLogAction = (batch: Batch) => {
     setActionLogBatch(batch);

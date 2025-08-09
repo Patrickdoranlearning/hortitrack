@@ -32,6 +32,7 @@ import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Checkbox } from './ui/checkbox';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -59,6 +60,7 @@ const transplantFormSchema = (maxQuantity: number) =>
         action: z.string(),
       })
     ),
+    archiveRemaining: z.boolean(),
   });
 
 interface TransplantFormProps {
@@ -98,6 +100,7 @@ export function TransplantForm({
               action: `Transplanted from batch #${batch.batchNumber}`,
             },
           ],
+          archiveRemaining: false,
         }
       : undefined,
   });
@@ -315,6 +318,29 @@ export function TransplantForm({
               )}
             />
           </div>
+          
+          <FormField
+              control={form.control}
+              name="archiveRemaining"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Archive remaining units from original batch
+                    </FormLabel>
+                    <FormDescription>
+                      If checked, the original batch will be marked as Archived. This is for when the remaining units are not viable.
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
 
           <div className="flex justify-end gap-4">
             <Button type="button" variant="ghost" onClick={onCancel}>
