@@ -25,31 +25,27 @@ export const INITIAL_NURSERY_LOCATIONS = [
     'Quarantine Zone',
 ];
 
-export const PLANT_SIZES_DATA = [
-  { size: '286', type: 'Propagation' },
-  { size: '273', type: 'Propagation' },
-  { size: '150', type: 'Propagation' },
-  { size: '104', type: 'Propagation' },
-  { size: '336', type: 'Propagation' },
-  { size: '54', type: 'Plugs/Liners' },
-  { size: '35', type: 'Plugs/Liners' },
-  { size: '77', type: 'Plugs/Liners' },
-  { size: '28', type: 'Plugs/Liners' },
-  { size: '50', type: 'Plugs/Liners' },
-  { size: '100', type: 'Plugs/Liners' },
-  { size: '24', type: 'Plugs/Liners' },
-  { size: '9', type: 'Plugs/Liners' }, // Liner maps to Plugs/Liners
-  { size: '10.5', type: 'Potted' },
-  { size: '13', type: 'Potted' },
-  { size: '15', type: 'Potted' },
-  { size: '17', type: 'Potted' },
-  { size: '19', type: 'Potted' },
+export const INITIAL_PLANT_SIZES = [
+  '9',
+  '10.5',
+  '13',
+  '15',
+  '17',
+  '19',
+  '24',
+  '28',
+  '35',
+  '50',
+  '54',
+  '77',
+  '100',
+  '104',
+  '150',
+  '273',
+  '286',
+  '336',
+  'Bareroot',
 ];
 
-export const INITIAL_PLANT_SIZES = PLANT_SIZES_DATA.map(item => item.size);
-
-export const SIZE_TO_STATUS_MAP: Record<string, 'Propagation' | 'Plugs/Liners' | 'Potted'> = 
-  PLANT_SIZES_DATA.reduce((acc, item) => {
-    acc[item.size] = item.type as 'Propagation' | 'Plugs/Liners' | 'Potted';
-    return acc;
-  }, {} as Record<string, 'Propagation' | 'Plugs/Liners' | 'Potted'>);
+// Placeholder for future logic
+export const SIZE_TO_STATUS_MAP: Record<string, 'Propagation' | 'Plugs/Liners' | 'Potted'> = {};

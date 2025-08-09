@@ -51,7 +51,7 @@ const transplantFormSchema = (maxQuantity: number) =>
         maxQuantity,
         `Quantity cannot exceed remaining stock of ${maxQuantity}.`
       ),
-    status: z.enum(['Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good']),
+    status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
     location: z.string().min(1, 'Location is required.'),
     size: z.string().min(1, 'Size is required.'),
     transplantedFrom: z.string(),
@@ -116,7 +116,7 @@ export function TransplantForm({
   const handleSizeChange = (size: string) => {
     form.setValue('size', size);
     const newStatus = SIZE_TO_STATUS_MAP[size];
-    if (newStatus && (newStatus === 'Potted' || newStatus === 'Plugs/Liners')) {
+    if (newStatus && (newStatus === 'Potted' || newStatus === 'Plugs/Liners' || newStatus === 'Propagation')) {
       form.setValue('status', newStatus);
     }
   };
@@ -314,12 +314,14 @@ export function TransplantForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="Propagation">Propagation</SelectItem>
                       <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
                       <SelectItem value="Potted">Potted</SelectItem>
                       <SelectItem value="Ready for Sale">
                         Ready for Sale
                       </SelectItem>
                       <SelectItem value="Looking Good">Looking Good</SelectItem>
+                      <SelectItem value="Archived">Archived</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
