@@ -44,8 +44,8 @@ const batchSchema = z.object({
   plantType: z.string().min(1, 'Plant type is required.'),
   plantingDate: z.string().min(1, 'Planting date is required.'),
   initialQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
-  quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
-  status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale']),
+  quantity: z.coerce.number().min(0, 'Quantity must be at least 0.'),
+  status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived']),
   location: z.string().min(1, 'Location is required.'),
   logHistory: z.array(logEntrySchema),
 });
@@ -86,10 +86,14 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
       'Propagation': '1',
       'Plugs/Liners': '2',
       'Potted': '3',
-      'Ready for Sale': '4'
+      'Ready for Sale': '4',
+      'Archived': '5'
     };
     const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${data.batchNumber}`;
-    onSubmit({ ...data, batchNumber: prefixedBatchNumber, initialQuantity: data.quantity });
+
+    const finalStatus = data.quantity === 0 ? 'Archived' : data.status;
+
+    onSubmit({ ...data, batchNumber: prefixedBatchNumber, initialQuantity: data.quantity, status: finalStatus });
   };
   
   return (
@@ -210,6 +214,7 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
                       <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
                       <SelectItem value="Potted">Potted</SelectItem>
                       <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                      <SelectItem value="Archived" disabled>Archived</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

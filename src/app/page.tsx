@@ -45,7 +45,7 @@ export default function DashboardPage() {
 
 
   const plantTypes = useMemo(() => ['all', ...Array.from(new Set(INITIAL_BATCHES.map((b) => b.plantType)))], []);
-  const statuses = useMemo(() => ['all', 'Seeding', 'Growing', 'Ready for Sale'], []);
+  const statuses = useMemo(() => ['all', 'Seeding', 'Growing', 'Ready for Sale', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
     return batches
@@ -111,7 +111,8 @@ export default function DashboardPage() {
         'Propagation': '1',
         'Plugs/Liners': '2',
         'Potted': '3',
-        'Ready for Sale': '4'
+        'Ready for Sale': '4',
+        'Archived': '5'
     };
 
     const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
@@ -122,7 +123,12 @@ export default function DashboardPage() {
     // Update the source batch's quantity
     const updatedBatches = batches.map(b => {
       if (b.batchNumber === data.transplantedFrom) {
-        return { ...b, quantity: b.quantity - data.quantity };
+        const newQuantity = b.quantity - data.quantity;
+        return { 
+            ...b, 
+            quantity: newQuantity,
+            status: newQuantity === 0 ? 'Archived' : b.status 
+        };
       }
       return b;
     });
