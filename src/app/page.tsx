@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
 
 
-  const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(INITIAL_BATCHES.map((b) => b.plantFamily)))], []);
+  const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
