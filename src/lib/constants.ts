@@ -26,10 +26,10 @@ export const INITIAL_NURSERY_LOCATIONS = [
 ];
 
 export const INITIAL_PLANT_SIZES = [
-  '54',
-  '35',
-  '77',
-  '28',
+  '28 (Plug Tray)',
+  '54 (Plug Tray)',
+  '35 (Plug Tray)',
+  '77 (Plug Tray)',
   '9',
   '10.5',
   '13',
