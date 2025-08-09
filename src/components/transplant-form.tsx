@@ -36,7 +36,8 @@ import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/di
 const transplantFormSchema = (maxQuantity: number) => z.object({
   id: z.string(),
   batchNumber: z.string(),
-  plantType: z.string(),
+  plantFamily: z.string(),
+  plantVariety: z.string(),
   plantingDate: z.string().min(1, 'Planting date is required.'),
   initialQuantity: z.coerce.number(),
   quantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Quantity cannot exceed remaining stock of ${maxQuantity}.`),
@@ -64,7 +65,8 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
       ? {
           id: '',
           batchNumber: '',
-          plantType: batch.plantType,
+          plantFamily: batch.plantFamily,
+          plantVariety: batch.plantVariety,
           plantingDate: new Date().toISOString(),
           initialQuantity: batch.quantity,
           quantity: batch.quantity,
@@ -108,10 +110,23 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
             />
             <FormField
               control={form.control}
-              name="plantType"
+              name="plantFamily"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Plant Type</FormLabel>
+                  <FormLabel>Plant Family</FormLabel>
+                  <FormControl>
+                    <Input {...field} disabled />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="plantVariety"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plant Variety</FormLabel>
                   <FormControl>
                     <Input {...field} disabled />
                   </FormControl>

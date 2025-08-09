@@ -4,7 +4,8 @@ export const INITIAL_BATCHES: Batch[] = [
   {
     id: '1',
     batchNumber: '1-98765',
-    plantType: 'Lavender',
+    plantFamily: 'Lavender',
+    plantVariety: 'Hidcote',
     plantingDate: '2024-05-15',
     initialQuantity: 100,
     quantity: 100,
@@ -25,7 +26,8 @@ export const INITIAL_BATCHES: Batch[] = [
   {
     id: '2',
     batchNumber: '2-54321',
-    plantType: 'Rose',
+    plantFamily: 'Rose',
+    plantVariety: 'David Austin',
     plantingDate: '2024-04-20',
     initialQuantity: 50,
     quantity: 50,
@@ -46,7 +48,8 @@ export const INITIAL_BATCHES: Batch[] = [
   {
     id: '3',
     batchNumber: '3-13579',
-    plantType: 'Tulip',
+    plantFamily: 'Tulip',
+    plantVariety: 'Queen of Night',
     plantingDate: '2024-03-10',
     initialQuantity: 200,
     quantity: 200,

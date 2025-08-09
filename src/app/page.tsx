@@ -30,9 +30,9 @@ export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<{
-    plantType: string;
+    plantFamily: string;
     status: string;
-  }>({ plantType: 'all', status: 'all' });
+  }>({ plantFamily: 'all', status: 'all' });
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
@@ -44,17 +44,17 @@ export default function DashboardPage() {
   const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
 
 
-  const plantTypes = useMemo(() => ['all', ...Array.from(new Set(INITIAL_BATCHES.map((b) => b.plantType)))], []);
+  const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(INITIAL_BATCHES.map((b) => b.plantFamily)))], []);
   const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
     return batches
       .filter((batch) =>
-        batch.plantType.toLowerCase().includes(searchQuery.toLowerCase())
+        `${batch.plantFamily} ${batch.plantVariety}`.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .filter(
         (batch) =>
-          filters.plantType === 'all' || batch.plantType === filters.plantType
+          filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
       )
       .filter(
         (batch) =>
@@ -165,7 +165,7 @@ export default function DashboardPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by plant name..."
+              placeholder="Search by plant family or variety..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -174,18 +174,18 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <Filter className="text-muted-foreground" />
             <Select
-              value={filters.plantType}
+              value={filters.plantFamily}
               onValueChange={(value) =>
-                setFilters({ ...filters, plantType: value })
+                setFilters({ ...filters, plantFamily: value })
               }
             >
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder="Filter by family" />
               </SelectTrigger>
               <SelectContent>
-                {plantTypes.map((type) => (
+                {plantFamilies.map((type) => (
                   <SelectItem key={type} value={type}>
-                    {type === 'all' ? 'All Plant Types' : type}
+                    {type === 'all' ? 'All Plant Families' : type}
                   </SelectItem>
                 ))}
               </SelectContent>

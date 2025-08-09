@@ -74,7 +74,7 @@ export function CareRecommendationsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-headline text-2xl">
             <Sparkles className="text-primary" />
-            AI Care for {batch?.plantType}
+            AI Care for {batch?.plantFamily} - {batch?.plantVariety}
           </DialogTitle>
           <DialogDescription>
             AI-powered recommendations based on batch info and local conditions.

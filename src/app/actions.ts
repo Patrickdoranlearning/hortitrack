@@ -17,7 +17,8 @@ export async function getCareRecommendationsAction(batch: Batch) {
 
     const recommendations = await careRecommendations({
       batchInfo: {
-        plantType: batch.plantType,
+        plantFamily: batch.plantFamily,
+        plantVariety: batch.plantVariety,
         plantingDate: batch.plantingDate,
       },
       logHistory: logHistoryStrings,

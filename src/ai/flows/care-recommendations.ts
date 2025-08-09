@@ -9,7 +9,7 @@
  * ```typescript
  * // Example usage:
  * const recommendations = await careRecommendations({
- *   batchInfo: { plantType: 'Roses', plantingDate: '2024-01-01' },
+ *   batchInfo: { plantFamily: 'Roses', plantVariety: 'Peace', plantingDate: '2024-01-01' },
  *   logHistory: ['Watered on 2024-03-01', 'Fertilized on 2024-02-15'],
  *   weatherInfo: { temperature: 20, humidity: 70 },
  * });
@@ -24,7 +24,8 @@ import {z} from 'genkit';
 const CareRecommendationsInputSchema = z.object({
   batchInfo: z
     .object({
-      plantType: z.string().describe('The type of plant in the batch.'),
+      plantFamily: z.string().describe('The family of the plant in the batch.'),
+      plantVariety: z.string().describe('The variety of the plant in the batch.'),
       plantingDate: z.string().describe('The date the batch was planted.'),
     })
     .describe('Information about the plant batch.'),
@@ -55,7 +56,8 @@ const getContextualWeatherInfo = ai.defineTool({
   name: 'getContextualWeatherInfo',
   description: 'Retrieves detailed, contextual weather information including temperature, humidity, and precipitation forecasts.',
   inputSchema: z.object({
-    plantType: z.string().describe('The type of plant for which weather information is needed.'),
+    plantFamily: z.string().describe('The family of plant for which weather information is needed.'),
+    plantVariety: z.string().describe('The variety of plant for which weather information is needed.'),
   }),
   outputSchema: z.object({
     temperature: z.number().describe('The current temperature in Celsius.'),
@@ -63,7 +65,8 @@ const getContextualWeatherInfo = ai.defineTool({
     precipitationForecast: z.string().describe('The precipitation forecast.'),
   }),
 }, async (input) => {
-  console.log('Plant type is ', input.plantType)
+  console.log('Plant family is ', input.plantFamily);
+  console.log('Plant variety is ', input.plantVariety);
   // Simulate fetching weather information. In a real application, this
   // would call an external weather API.
   return {
@@ -84,7 +87,8 @@ const careRecommendationsPrompt = ai.definePrompt({
   Based on the following batch information, recent log history, and weather information, provide a list of care activities to optimize plant health and yield.
 
   Batch Information:
-  Plant Type: {{{batchInfo.plantType}}}
+  Plant Family: {{{batchInfo.plantFamily}}}
+  Plant Variety: {{{batchInfo.plantVariety}}}
   Planting Date: {{{batchInfo.plantingDate}}}
 
   Log History:

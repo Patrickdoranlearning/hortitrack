@@ -3,7 +3,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch, LogEntry } from '@/lib/types';
+import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -41,7 +41,8 @@ const logEntrySchema = z.object({
 const batchSchema = z.object({
   id: z.string(),
   batchNumber: z.string(),
-  plantType: z.string().min(1, 'Plant type is required.'),
+  plantFamily: z.string().min(1, 'Plant family is required.'),
+  plantVariety: z.string().min(1, 'Plant variety is required.'),
   plantingDate: z.string().min(1, 'Planting date is required.'),
   initialQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
   quantity: z.coerce.number().min(0, 'Quantity must be at least 0.'),
@@ -67,7 +68,8 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
       : {
           id: Date.now().toString(),
           batchNumber: '',
-          plantType: '',
+          plantFamily: '',
+          plantVariety: '',
           plantingDate: new Date().toISOString(),
           initialQuantity: 1,
           quantity: 1,
@@ -133,14 +135,27 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
                 </FormItem>
               )}
             />
-            <FormField
+             <FormField
               control={form.control}
-              name="plantType"
+              name="plantFamily"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Plant Type</FormLabel>
+                  <FormLabel>Plant Family</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., Lavender" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="plantVariety"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plant Variety</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Hidcote" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

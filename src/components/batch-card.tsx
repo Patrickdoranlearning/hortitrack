@@ -34,9 +34,9 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
     <Card>
       <CardHeader>
         <CardTitle className="font-headline text-xl">
-          {batch.plantType}
+          {batch.plantFamily}
         </CardTitle>
-        <CardDescription>Batch #{batch.batchNumber}</CardDescription>
+        <CardDescription>{batch.plantVariety} | Batch #{batch.batchNumber}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         <div>

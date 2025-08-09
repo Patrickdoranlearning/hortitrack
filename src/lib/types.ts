@@ -6,7 +6,8 @@ export type LogEntry = {
 export type Batch = {
   id: string;
   batchNumber: string;
-  plantType: string;
+  plantFamily: string;
+  plantVariety: string;
   plantingDate: string;
   initialQuantity: number;
   quantity: number;
@@ -20,7 +21,8 @@ export type Batch = {
 export type TransplantFormData = {
   id: string;
   batchNumber: string;
-  plantType: string;
+  plantFamily: string;
+  plantVariety: string;
   plantingDate: string;
   initialQuantity: number;
   quantity: number;
