@@ -32,6 +32,7 @@ import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { NURSERY_LOCATIONS, PLANT_SIZES } from '@/lib/constants';
 
 const transplantFormSchema = (maxQuantity: number) => z.object({
   id: z.string(),
@@ -140,9 +141,18 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>New Location</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Shady Area" {...field} />
-                  </FormControl>
+                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a new location" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {NURSERY_LOCATIONS.map(location => (
+                                <SelectItem key={location} value={location}>{location}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -229,9 +239,20 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>New Size</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., 2-gallon pot" {...field} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a new size" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PLANT_SIZES.map((size) => (
+                        <SelectItem key={size} value={size}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

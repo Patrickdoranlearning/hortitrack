@@ -1,0 +1,42 @@
+// A central place for "golden data" to be used as templates across the app.
+
+export const NURSERY_LOCATIONS = [
+    'Greenhouse 1',
+    'Greenhouse 2',
+    'Greenhouse 3',
+    'Greenhouse 4',
+    'Greenhouse 5',
+    'Shade House 1',
+    'Shade House 2',
+    'Propagation House',
+    'Field A1',
+    'Field A2',
+    'Field A3',
+    'Field B1',
+    'Field B2',
+    'Field C1',
+    'Potting Area',
+    'Sales Area - North',
+    'Sales Area - South',
+    'Sales Area - West',
+    'Sales Area - East',
+    'Holding Area 1',
+    'Holding Area 2',
+    'Quarantine Zone',
+];
+
+export const PLANT_SIZES = [
+    '4-inch pot',
+    '6-inch pot',
+    '1-gallon pot',
+    '2-gallon pot',
+    '5-gallon pot',
+    '15-gallon pot',
+    '24-inch box',
+    '36-inch box',
+    'Liner tray (72 cells)',
+    'Liner tray (128 cells)',
+    'Plug tray (50 cells)',
+    'Plug tray (98 cells)',
+    'Bare root',
+];
