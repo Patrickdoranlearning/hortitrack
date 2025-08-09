@@ -66,7 +66,7 @@ export default function DashboardPage() {
     const maxBatchNum = batches.reduce((max, b) => {
         const numPart = parseInt(b.batchNumber.split('-')[1] || '0');
         return numPart > max ? numPart : max;
-    }, 0);
+    }, -1);
     return (maxBatchNum + 1).toString().padStart(6, '0');
   }
 
