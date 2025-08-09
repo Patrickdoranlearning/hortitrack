@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { Batch } from '@/lib/types';
 import { useState } from 'react';
+import { DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 
 const formSchema = (maxQuantity: number) => z.object({
   actionType: z.enum(['log', 'move', 'split', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
@@ -87,169 +88,176 @@ export function ActionLogForm({
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        <h2 className="text-2xl font-bold">Log Action for Batch #{batch?.batchNumber}</h2>
-        
-        <FormField
-          control={form.control}
-          name="actionType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Action Type</FormLabel>
-              <Select onValueChange={handleActionTypeChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an action type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="log">General Log</SelectItem>
-                  <SelectItem value="move">Move Batch</SelectItem>
-                  <SelectItem value="split">Split Batch</SelectItem>
-                  <SelectItem value="adjust">Adjust Stock (Losses)</SelectItem>
-                  <SelectItem value="Batch Spaced">Batch Spaced</SelectItem>
-                  <SelectItem value="Batch Trimmed">Batch Trimmed</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {actionType === 'log' && (
-           <FormField
+    <>
+      <DialogHeader>
+        <DialogTitle>Log Action for Batch #{batch?.batchNumber}</DialogTitle>
+        <DialogDescription>
+          Record a new activity or update for this batch. The action will be added to the log history.
+        </DialogDescription>
+      </DialogHeader>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+          
+          <FormField
             control={form.control}
-            name="logMessage"
+            name="actionType"
             render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Log Message</FormLabel>
+              <FormItem>
+                <FormLabel>Action Type</FormLabel>
+                <Select onValueChange={handleActionTypeChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an action type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="log">General Log</SelectItem>
+                    <SelectItem value="move">Move Batch</SelectItem>
+                    <SelectItem value="split">Split Batch</SelectItem>
+                    <SelectItem value="adjust">Adjust Stock (Losses)</SelectItem>
+                    <SelectItem value="Batch Spaced">Batch Spaced</SelectItem>
+                    <SelectItem value="Batch Trimmed">Batch Trimmed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {actionType === 'log' && (
+             <FormField
+              control={form.control}
+              name="logMessage"
+              render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Log Message</FormLabel>
+                      <FormControl>
+                          <Textarea placeholder="e.g., 'Pruned dead leaves', 'Applied fertilizer', etc." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                  </FormItem>
+              )}
+             />
+          )}
+          
+          {actionType === 'move' && (
+              <FormField
+                control={form.control}
+                name="newLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select new location" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map(location => (
+                          <SelectItem key={location} value={location}>{location}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+          )}
+
+          {actionType === 'split' && (
+            <>
+              <FormField
+                  control={form.control}
+                  name="splitQuantity"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Quantity to Split</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="e.g., 25" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                control={form.control}
+                name="newLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Location for Split Batch</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select new location" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map(location => (
+                          <SelectItem key={location} value={location}>{location}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                  control={form.control}
+                  name="newBatchPlantingDate"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Planting Date for New Batch</FormLabel>
+                          <FormControl>
+                              <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
+            </>
+          )}
+          
+          {actionType === 'adjust' && (
+            <>
+              <FormField
+                  control={form.control}
+                  name="adjustQuantity"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Quantity to Remove</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="e.g., 10" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
+              <FormField
+                control={form.control}
+                name="adjustReason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason for Adjustment</FormLabel>
                     <FormControl>
-                        <Textarea placeholder="e.g., 'Pruned dead leaves', 'Applied fertilizer', etc." {...field} />
+                      <Input placeholder="e.g. Dumping, Pest Damage, etc." {...field} />
                     </FormControl>
                     <FormMessage />
-                </FormItem>
-            )}
-           />
-        )}
-        
-        {actionType === 'move' && (
-            <FormField
-              control={form.control}
-              name="newLocation"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Location</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select new location" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {nurseryLocations.map(location => (
-                        <SelectItem key={location} value={location}>{location}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-        )}
-
-        {actionType === 'split' && (
-          <>
-            <FormField
-                control={form.control}
-                name="splitQuantity"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Quantity to Split</FormLabel>
-                        <FormControl>
-                            <Input type="number" placeholder="e.g., 25" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
+                  </FormItem>
                 )}
-            />
-            <FormField
-              control={form.control}
-              name="newLocation"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Location for Split Batch</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select new location" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {nurseryLocations.map(location => (
-                        <SelectItem key={location} value={location}>{location}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-                control={form.control}
-                name="newBatchPlantingDate"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Planting Date for New Batch</FormLabel>
-                        <FormControl>
-                            <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-          </>
-        )}
-        
-        {actionType === 'adjust' && (
-          <>
-            <FormField
-                control={form.control}
-                name="adjustQuantity"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Quantity to Remove</FormLabel>
-                        <FormControl>
-                            <Input type="number" placeholder="e.g., 10" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-              control={form.control}
-              name="adjustReason"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Reason for Adjustment</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Dumping, Pest Damage, etc." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </>
-        )}
+              />
+            </>
+          )}
 
 
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit">Log Action</Button>
-        </div>
-      </form>
-    </Form>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit">Log Action</Button>
+          </div>
+        </form>
+      </Form>
+    </>
   );
 }
