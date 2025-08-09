@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Trash2, Sparkles, MoveRight } from 'lucide-react';
+import { Pencil, Trash2, Sparkles, MoveRight, ClipboardList } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -25,9 +25,10 @@ interface BatchCardProps {
   onDelete: (batchId: string) => void;
   onGetRecommendations: (batch: Batch) => void;
   onTransplant: (batch: Batch) => void;
+  onLogAction: (batch: Batch) => void;
 }
 
-export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTransplant }: BatchCardProps) {
+export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTransplant, onLogAction }: BatchCardProps) {
   const stockPercentage = (batch.quantity / batch.initialQuantity) * 100;
   
   return (
@@ -77,6 +78,16 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
       </CardContent>
       <CardFooter className="flex justify-end gap-2">
         <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={() => onLogAction(batch)}>
+                        <ClipboardList className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Log Action</p>
+                </TooltipContent>
+            </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button variant="outline" size="icon" onClick={() => onGetRecommendations(batch)}>

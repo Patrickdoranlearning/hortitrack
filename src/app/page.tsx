@@ -9,7 +9,7 @@ import {
   Settings,
   ScanLine,
 } from 'lucide-react';
-import type { Batch } from '@/lib/types';
+import type { Batch, LogHistory } from '@/lib/types';
 import { INITIAL_BATCHES } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ import { CareRecommendationsDialog } from '@/components/care-recommendations-dia
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
 import { TransplantForm } from '@/components/transplant-form';
+import { ActionLogForm } from '@/components/action-log-form';
 import { INITIAL_NURSERY_LOCATIONS, INITIAL_PLANT_SIZES } from '@/lib/constants';
 import Link from 'next/link';
 import { ScannerDialog } from '@/components/scanner-dialog';
@@ -48,6 +49,9 @@ export default function DashboardPage() {
   const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
   const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
   
+  const [isActionLogFormOpen, setIsActionLogFormOpen] = useState(false);
+  const [actionLogBatch, setActionLogBatch] = useState<Batch | null>(null);
+
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { toast } = useToast();
 
@@ -153,10 +157,8 @@ export default function DashboardPage() {
 
     const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
 
-    // Create the new transplanted batch
     const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber } as Batch;
 
-    // Update the source batch's quantity
     const updatedBatches = batches.map(b => {
       if (b.batchNumber === data.transplantedFrom) {
         const newQuantity = b.quantity - data.quantity;
@@ -174,10 +176,84 @@ export default function DashboardPage() {
     setTransplantingBatch(null);
   }
 
+  const handleLogAction = (batch: Batch) => {
+    setActionLogBatch(batch);
+    setIsActionLogFormOpen(true);
+  };
+  
+  const handleActionLogFormSubmit = (data: any) => {
+    if (!actionLogBatch) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    let logMessage = '';
+
+    switch (data.actionType) {
+        case 'log':
+            logMessage = data.logMessage;
+            break;
+        case 'move':
+            logMessage = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
+            break;
+        case 'split':
+            const nextBatchNumStr = getNextBatchNumber();
+            const batchNumberPrefix = '3'; // Potted
+            const prefixedBatchNumber = `${batchNumberPrefix}-${nextBatchNumStr}`;
+            
+            const newBatch: Batch = {
+                ...actionLogBatch,
+                id: Date.now().toString(),
+                batchNumber: prefixedBatchNumber,
+                initialQuantity: data.splitQuantity,
+                quantity: data.splitQuantity,
+                location: data.newLocation,
+                plantingDate: data.newBatchPlantingDate,
+                logHistory: [{ date: today, action: `Split from batch #${actionLogBatch.batchNumber}` }],
+                transplantedFrom: actionLogBatch.batchNumber,
+            };
+
+            const updatedBatchesForSplit = batches.map(b => {
+                if (b.id === actionLogBatch.id) {
+                    const newQuantity = b.quantity - data.splitQuantity;
+                    const newLog: LogHistory = { date: today, action: `Split ${data.splitQuantity} units to new batch #${newBatch.batchNumber}` };
+                    return { ...b, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status, logHistory: [newLog, ...b.logHistory]};
+                }
+                return b;
+            });
+
+            setBatches([newBatch, ...updatedBatchesForSplit]);
+            setIsActionLogFormOpen(false);
+            setActionLogBatch(null);
+            return; // Exit early as state is set
+        case 'Batch Spaced':
+        case 'Batch Trimmed':
+            logMessage = data.actionType;
+            break;
+    }
+
+    if (logMessage) {
+        const updatedBatches = batches.map(b => {
+            if (b.id === actionLogBatch.id) {
+                const newLog: LogHistory = { date: today, action: logMessage };
+                const updatedBatch = { ...b, logHistory: [newLog, ...b.logHistory] };
+                if (data.actionType === 'move') {
+                    updatedBatch.location = data.newLocation;
+                }
+                return updatedBatch;
+            }
+            return b;
+        });
+        setBatches(updatedBatches);
+    }
+    
+    setIsActionLogFormOpen(false);
+    setActionLogBatch(null);
+  };
+
   const handleScanSuccess = (scannedData: string) => {
     const foundBatch = batches.find(b => b.batchNumber === scannedData);
     if (foundBatch) {
-      handleEditBatch(foundBatch);
+      handleLogAction(foundBatch);
     } else {
       toast({
         variant: 'destructive',
@@ -272,6 +348,7 @@ export default function DashboardPage() {
                 onDelete={handleDeleteBatch}
                 onGetRecommendations={handleGetRecommendations}
                 onTransplant={handleTransplantBatch}
+                onLogAction={handleLogAction}
               />
             ))}
           </div>
@@ -300,11 +377,23 @@ export default function DashboardPage() {
       </Dialog>
 
       <Dialog open={isTransplantFormOpen} onOpenChange={setIsTransplantFormOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2.xl">
           <TransplantForm
             batch={transplantingBatch}
             onSubmit={handleTransplantFormSubmit}
             onCancel={() => setIsTransplantFormOpen(false)}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
+          />
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isActionLogFormOpen} onOpenChange={setIsActionLogFormOpen}>
+        <DialogContent className="max-w-2xl">
+          <ActionLogForm
+            batch={actionLogBatch}
+            onSubmit={handleActionLogFormSubmit}
+            onCancel={() => setIsActionLogFormOpen(false)}
             nurseryLocations={nurseryLocations}
             plantSizes={plantSizes}
           />
