@@ -8,6 +8,7 @@ import {
   Filter,
   Settings,
   ScanLine,
+  LayoutDashboard,
 } from 'lucide-react';
 import type { Batch, LogEntry } from '@/lib/types';
 import { INITIAL_BATCHES } from '@/lib/data';
@@ -198,6 +199,7 @@ export default function DashboardPage() {
       id: Date.now().toString(),
       batchNumber: prefixedBatchNumber,
       supplier: 'Doran Nurseries',
+      initialQuantity: data.quantity,
     };
 
     const today = new Date().toISOString().split('T')[0];
@@ -340,6 +342,12 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+                <Link href="/dashboard">
+                    <LayoutDashboard />
+                    Dashboard
+                </Link>
+            </Button>
             <Button asChild variant="outline">
                 <Link href="/settings">
                     <Settings />
