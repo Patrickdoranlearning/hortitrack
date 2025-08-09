@@ -136,7 +136,7 @@ export default function DashboardPage() {
       const nextBatchNumStr = getNextBatchNumber();
       const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
       
-      setBatches([{ ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber } as Batch, ...batches]);
+      setBatches([{ ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber, supplier: data.supplier || 'Doran Nurseries' } as Batch, ...batches]);
     }
     setIsFormOpen(false);
     setEditingBatch(null);
@@ -194,78 +194,73 @@ export default function DashboardPage() {
     if (!actionLogBatch) return;
 
     const today = new Date().toISOString().split('T')[0];
-
     let logMessage = '';
 
+    const createLogEntry = (batch: Batch, message: string, locationUpdate?: string) => {
+      const newLog: LogEntry = { date: today, action: message };
+      const updatedBatch = { ...batch, logHistory: [newLog, ...batch.logHistory] };
+      if (locationUpdate) {
+        updatedBatch.location = locationUpdate;
+      }
+      return updatedBatch;
+    };
+
     switch (data.actionType) {
-        case 'log':
-            logMessage = data.logMessage;
-            break;
-        case 'move':
-            logMessage = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
-            break;
-        case 'split':
-            const nextBatchNumStr = getNextBatchNumber();
-            const batchNumberPrefix = '3'; // Potted
-            const prefixedBatchNumber = `${batchNumberPrefix}-${nextBatchNumStr}`;
-            
-            const newBatch: Batch = {
-                ...actionLogBatch,
-                id: Date.now().toString(),
-                batchNumber: prefixedBatchNumber,
-                initialQuantity: data.splitQuantity,
-                quantity: data.splitQuantity,
-                location: data.newLocation,
-                plantingDate: data.newBatchPlantingDate,
-                logHistory: [{ date: today, action: `Split from batch #${actionLogBatch.batchNumber}` }],
-                transplantedFrom: actionLogBatch.batchNumber,
-                supplier: 'Doran Nurseries',
-            };
+      case 'log':
+        logMessage = data.logMessage;
+        setBatches(batches.map(b => b.id === actionLogBatch.id ? createLogEntry(b, logMessage) : b));
+        break;
+      case 'move':
+        logMessage = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
+        setBatches(batches.map(b => b.id === actionLogBatch.id ? createLogEntry(b, logMessage, data.newLocation) : b));
+        break;
+      case 'split':
+        const nextBatchNumStr = getNextBatchNumber();
+        const batchNumberPrefix = '3'; // Potted
+        const prefixedBatchNumber = `${batchNumberPrefix}-${nextBatchNumStr}`;
+        
+        const newBatch: Batch = {
+            ...actionLogBatch,
+            id: Date.now().toString(),
+            batchNumber: prefixedBatchNumber,
+            initialQuantity: data.splitQuantity,
+            quantity: data.splitQuantity,
+            location: data.newLocation,
+            plantingDate: data.newBatchPlantingDate,
+            logHistory: [{ date: today, action: `Split from batch #${actionLogBatch.batchNumber}` }],
+            transplantedFrom: actionLogBatch.batchNumber,
+            supplier: 'Doran Nurseries',
+        };
 
-            const updatedBatchesForSplit = batches.map(b => {
-                if (b.id === actionLogBatch.id) {
-                    const newQuantity = b.quantity - data.splitQuantity;
-                    const newLog: LogEntry = { date: today, action: `Split ${data.splitQuantity} units to new batch #${newBatch.batchNumber}` };
-                    return { ...b, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status, logHistory: [newLog, ...b.logHistory]};
-                }
-                return b;
-            });
-
-            setBatches([newBatch, ...updatedBatchesForSplit]);
-            setIsActionLogFormOpen(false);
-            setActionLogBatch(null);
-            return; // Exit early as state is set
-        case 'adjust':
-            logMessage = `Adjusted quantity by -${data.adjustQuantity}. Reason: ${data.adjustReason}`;
-            const updatedBatchesForAdjust = batches.map(b => {
-                if (b.id === actionLogBatch.id) {
-                    const newQuantity = b.quantity - data.adjustQuantity;
-                    const newLog: LogEntry = { date: today, action: logMessage };
-                    return { ...b, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status, logHistory: [newLog, ...b.logHistory]};
-                }
-                return b;
-            });
-             setBatches(updatedBatchesForAdjust);
-             break;
-        case 'Batch Spaced':
-        case 'Batch Trimmed':
-            logMessage = data.actionType;
-            break;
-    }
-
-    if (logMessage && data.actionType !== 'adjust') {
-        const updatedBatches = batches.map(b => {
+        const updatedBatchesForSplit = batches.map(b => {
             if (b.id === actionLogBatch.id) {
-                const newLog: LogEntry = { date: today, action: logMessage };
-                const updatedBatch = { ...b, logHistory: [newLog, ...b.logHistory] };
-                if (data.actionType === 'move') {
-                    updatedBatch.location = data.newLocation;
-                }
-                return updatedBatch;
+                const newQuantity = b.quantity - data.splitQuantity;
+                const message = `Split ${data.splitQuantity} units to new batch #${newBatch.batchNumber}`;
+                const updatedBatch = createLogEntry(b, message);
+                return { ...updatedBatch, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status};
             }
             return b;
         });
-        setBatches(updatedBatches);
+
+        setBatches([newBatch, ...updatedBatchesForSplit]);
+        break;
+      case 'adjust':
+        logMessage = `Adjusted quantity by -${data.adjustQuantity}. Reason: ${data.adjustReason}`;
+        const updatedBatchesForAdjust = batches.map(b => {
+            if (b.id === actionLogBatch.id) {
+                const newQuantity = b.quantity - data.adjustQuantity;
+                const updatedBatch = createLogEntry(b, logMessage);
+                return { ...updatedBatch, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status };
+            }
+            return b;
+        });
+        setBatches(updatedBatchesForAdjust);
+        break;
+      case 'Batch Spaced':
+      case 'Batch Trimmed':
+        logMessage = data.actionType;
+        setBatches(batches.map(b => b.id === actionLogBatch.id ? createLogEntry(b, logMessage) : b));
+        break;
     }
     
     setIsActionLogFormOpen(false);
