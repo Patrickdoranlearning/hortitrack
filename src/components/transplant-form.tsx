@@ -206,7 +206,7 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
                 <FormItem>
                   <FormLabel>Quantity to Transplant</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))}/>
                   </FormControl>
                   <FormDescription>
                     Max available: {batch?.quantity}
