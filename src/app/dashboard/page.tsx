@@ -18,6 +18,8 @@ import {
   PlusSquare,
   ArrowLeft,
   Filter,
+  Search,
+  TrendingDown,
 } from 'lucide-react';
 import { INITIAL_BATCHES } from '@/lib/data';
 import * as Recharts from 'recharts';
@@ -30,9 +32,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import type { Batch } from '@/lib/types';
 
 export default function DashboardOverviewPage() {
-  const [batches] = useState(INITIAL_BATCHES);
+  const [batches] = useState<Batch[]>(INITIAL_BATCHES);
+  const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     status: 'all',
     size: 'all',
@@ -52,8 +57,26 @@ export default function DashboardOverviewPage() {
     [batches]
   );
 
+  const calculateLosses = (batch: Batch) => {
+    const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)/;
+    const lostQuantity = batch.logHistory.reduce((sum, log) => {
+      const match = log.action.match(lossLogRegex);
+      if (match) {
+        return sum + (parseInt(match[1], 10) || parseInt(match[2], 10));
+      }
+      return sum;
+    }, 0);
+    return lostQuantity;
+  }
+
   const filteredBatches = useMemo(() => {
     return batches
+      .filter(
+        (batch) =>
+          `${batch.plantFamily} ${batch.plantVariety} ${batch.batchNumber}`
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+      )
       .filter(
         (batch) => filters.status === 'all' || batch.status === filters.status
       )
@@ -62,7 +85,7 @@ export default function DashboardOverviewPage() {
         (batch) =>
           filters.location === 'all' || batch.location === filters.location
       );
-  }, [batches, filters]);
+  }, [batches, filters, searchQuery]);
 
   const totalPlantsInStock = useMemo(() => {
     return filteredBatches
@@ -109,17 +132,52 @@ export default function DashboardOverviewPage() {
     }));
   }, [filteredBatches]);
 
+  const plantSizeData = useMemo(() => {
+    const sizeCounts = filteredBatches.reduce((acc, batch) => {
+        if (batch.status !== 'Archived') {
+            acc[batch.size] = (acc[batch.size] || 0) + batch.quantity;
+        }
+        return acc;
+    }, {} as Record<string, number>);
+    return Object.entries(sizeCounts).map(([name, value]) => ({ name, value }));
+  }, [filteredBatches]);
+
+  const lossData = useMemo(() => {
+    const lossByFamily = filteredBatches.reduce((acc, batch) => {
+        const loss = calculateLosses(batch);
+        if (loss > 0) {
+            acc[batch.plantFamily] = (acc[batch.plantFamily] || 0) + loss;
+        }
+        return acc;
+    }, {} as Record<string, number>);
+    return Object.entries(lossByFamily).map(([name, value]) => ({ name, value }));
+  }, [filteredBatches]);
+
+
   const chartConfig = {
     value: {
       label: 'Plants',
     },
     ...plantFamilyData.reduce((acc, { name }) => {
-      // Create a deterministic but varied color for each family
       const hash = name
         .split('')
         .reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
       const hue = hash % 360;
       acc[name] = { label: name, color: `hsl(${hue}, 70%, 50%)` };
+      return acc;
+    }, {} as any),
+  };
+  
+  const sizeChartConfig = {
+    value: {
+      label: 'Plants',
+    },
+    ...plantSizeData.reduce((acc, { name }) => {
+      const hash = name
+        .split('')
+        .reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+      const hue = hash % 360;
+      acc[name] = { label: name, color: `hsl(${hue}, 60%, 60%)` };
       return acc;
     }, {} as any),
   };
@@ -141,10 +199,19 @@ export default function DashboardOverviewPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter />
-            Filters
+            Filters & Search
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by family, variety, or batch #..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <Select
             value={filters.status}
             onValueChange={(value) => setFilters({ ...filters, status: value })}
@@ -332,7 +399,73 @@ export default function DashboardOverviewPage() {
             </ChartContainer>
           </CardContent>
         </Card>
+        <Card className="col-span-3">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                <RechartsPieChart />
+                Plant Size Distribution
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ChartContainer
+                config={sizeChartConfig}
+                className="min-h-[300px] w-full"
+                >
+                <Recharts.PieChart>
+                    <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+                    <Recharts.Pie
+                    data={plantSizeData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    labelLine={false}
+                    >
+                    {plantSizeData.map((entry, index) => (
+                        <Recharts.Cell
+                        key={`cell-${index}`}
+                        fill={sizeChartConfig[entry.name]?.color || '#ccc'}
+                        />
+                    ))}
+                    </Recharts.Pie>
+                </Recharts.PieChart>
+                </ChartContainer>
+            </CardContent>
+        </Card>
+        <Card className="col-span-4">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                <TrendingDown />
+                Losses by Plant Family
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="pl-2">
+                <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
+                <Recharts.BarChart accessibilityLayer data={lossData}>
+                    <Recharts.XAxis
+                    dataKey="name"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    />
+                    <Recharts.YAxis />
+                    <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent hideLabel />}
+                    />
+                    <Recharts.Bar
+                    dataKey="value"
+                    fill="var(--color-destructive)"
+                    radius={8}
+                    />
+                </Recharts.BarChart>
+                </ChartContainer>
+            </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
+
+    
