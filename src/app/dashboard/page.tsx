@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
@@ -36,13 +36,22 @@ import { Input } from '@/components/ui/input';
 import type { Batch } from '@/lib/types';
 
 export default function DashboardOverviewPage() {
-  const [batches] = useState<Batch[]>(INITIAL_BATCHES);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     status: 'all',
     size: 'all',
     location: 'all',
   });
+
+  useEffect(() => {
+    const storedBatches = localStorage.getItem('batches');
+    if (storedBatches) {
+        setBatches(JSON.parse(storedBatches));
+    } else {
+        setBatches(INITIAL_BATCHES);
+    }
+  }, []);
 
   const statuses = useMemo(
     () => ['all', ...Array.from(new Set(batches.map((b) => b.status)))],

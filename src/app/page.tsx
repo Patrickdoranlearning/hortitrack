@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -37,7 +38,7 @@ import { ScannedBatchActionsDialog } from '@/components/scanned-batch-actions-di
 import { ProductionProtocolDialog } from '@/components/production-protocol-dialog';
 
 export default function DashboardPage() {
-  const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<{
     plantFamily: string;
@@ -69,8 +70,18 @@ export default function DashboardPage() {
   const [protocolBatch, setProtocolBatch] = useState<Batch | null>(null);
   
   const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
+  
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+    const storedBatches = localStorage.getItem('batches');
+    if (storedBatches) {
+      setBatches(JSON.parse(storedBatches));
+    } else {
+      setBatches(INITIAL_BATCHES);
+    }
+    
     const storedLocations = localStorage.getItem('nurseryLocations');
     if (storedLocations) {
       setNurseryLocations(JSON.parse(storedLocations));
@@ -85,6 +96,12 @@ export default function DashboardPage() {
       setPlantSizes(INITIAL_PLANT_SIZES);
     }
   }, []);
+  
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem('batches', JSON.stringify(batches));
+    }
+  }, [batches, isClient]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived'], []);
@@ -335,6 +352,10 @@ export default function DashboardPage() {
     setProtocolBatch(batch);
     setIsProtocolDialogOpen(true);
   };
+
+  if (!isClient) {
+    return null; // or a loading spinner
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col">
