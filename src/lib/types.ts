@@ -24,8 +24,9 @@ export type TransplantFormData = {
   plantingDate: string;
   initialQuantity: number;
   quantity: number;
-  status: 'Potted' | 'Ready for Sale';
+  status: 'Plugs/Liners' | 'Potted' | 'Ready for Sale';
   location: string;
+  size: string;
   logHistory: LogEntry[];
   transplantedFrom: string;
 };

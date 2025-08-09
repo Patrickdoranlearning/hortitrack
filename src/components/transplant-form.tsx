@@ -40,8 +40,9 @@ const transplantFormSchema = (maxQuantity: number) => z.object({
   plantingDate: z.string().min(1, 'Planting date is required.'),
   initialQuantity: z.coerce.number(),
   quantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Quantity cannot exceed remaining stock of ${maxQuantity}.`),
-  status: z.enum(['Potted', 'Ready for Sale']),
+  status: z.enum(['Plugs/Liners', 'Potted', 'Ready for Sale']),
   location: z.string().min(1, 'Location is required.'),
+  size: z.string().min(1, 'Size is required.'),
   transplantedFrom: z.string(),
   logHistory: z.array(z.object({
     date: z.string(),
@@ -69,6 +70,7 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
           quantity: batch.quantity,
           status: 'Potted',
           location: '',
+          size: '',
           transplantedFrom: batch.batchNumber,
           logHistory: [{date: new Date().toISOString(), action: `Transplanted from batch #${batch.batchNumber}`}]
         }
@@ -197,10 +199,24 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
                       <SelectItem value="Potted">Potted</SelectItem>
                       <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="size"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New Size</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., 2-gallon pot" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

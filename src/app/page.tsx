@@ -86,7 +86,7 @@ export default function DashboardPage() {
 
   const handleFormSubmit = (data: Omit<Batch, 'id'>) => {
     if (editingBatch) {
-      setBatches(batches.map((b) => (b.id === data.id ? data : b)));
+      setBatches(batches.map((b) => (b.id === data.id ? data as Batch : b)));
     } else {
        const batchNumberPrefix = {
         'Propagation': '1',
@@ -98,7 +98,7 @@ export default function DashboardPage() {
       const nextBatchNumStr = getNextBatchNumber();
       const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
       
-      setBatches([{ ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber }, ...batches]);
+      setBatches([{ ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber } as Batch, ...batches]);
     }
     setIsFormOpen(false);
     setEditingBatch(null);
@@ -128,7 +128,7 @@ export default function DashboardPage() {
     const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
 
     // Create the new transplanted batch
-    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber };
+    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber } as Batch;
 
     // Update the source batch's quantity
     const updatedBatches = batches.map(b => {
