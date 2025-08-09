@@ -296,7 +296,7 @@ export default function DashboardPage() {
                     Settings
                 </Link>
             </Button>
-            <Button variant="outline" onClick={() => setIsScannerOpen(true)}>
+            <Button onClick={() => setIsScannerOpen(true)} size="lg">
                 <ScanLine />
                 Scan Code
             </Button>
