@@ -85,6 +85,10 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
     onSubmit({...data, initialQuantity: data.quantity });
   };
   
+  if (!batch) {
+    return null;
+  }
+
   return (
     <>
       <DialogHeader>
