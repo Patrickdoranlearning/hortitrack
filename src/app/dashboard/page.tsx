@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/chart';
 import {
   BarChart,
-  PieChart as RechartsPieChart,
   Users,
   ShoppingCart,
   Archive,
@@ -20,6 +19,7 @@ import {
   Filter,
   Search,
   TrendingDown,
+  PieChart as PieIcon,
 } from 'lucide-react';
 import { INITIAL_BATCHES } from '@/lib/data';
 import * as Recharts from 'recharts';
@@ -112,20 +112,6 @@ export default function DashboardOverviewPage() {
 
   const readyForSaleCount = readyForSaleBatches.length;
 
-  const batchStatusData = useMemo(() => {
-    const statusCounts = filteredBatches.reduce((acc, batch) => {
-      if (batch.status !== 'Archived') {
-        acc[batch.status] = (acc[batch.status] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
-    return Object.entries(statusCounts).map(([name, value]) => ({
-      name,
-      value,
-    }));
-  }, [filteredBatches]);
-
   const plantFamilyData = useMemo(() => {
     const familyCounts = filteredBatches.reduce((acc, batch) => {
       if (batch.status !== 'Archived') {
@@ -167,28 +153,6 @@ export default function DashboardOverviewPage() {
     value: {
       label: 'Plants',
     },
-    ...plantFamilyData.reduce((acc, { name }) => {
-      const hash = name
-        .split('')
-        .reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
-      const hue = hash % 360;
-      acc[name] = { label: name, color: `hsl(${hue}, 70%, 50%)` };
-      return acc;
-    }, {} as any),
-  };
-  
-  const sizeChartConfig = {
-    value: {
-      label: 'Plants',
-    },
-    ...plantSizeData.reduce((acc, { name }) => {
-      const hash = name
-        .split('')
-        .reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
-      const hue = hash % 360;
-      acc[name] = { label: name, color: `hsl(${hue}, 60%, 60%)` };
-      return acc;
-    }, {} as any),
   };
 
   return (
@@ -343,41 +307,11 @@ export default function DashboardOverviewPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart />
-              Batch Status Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
-              <Recharts.BarChart accessibilityLayer data={batchStatusData}>
-                <Recharts.XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <Recharts.YAxis />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent hideLabel />}
-                />
-                <Recharts.Bar
-                  dataKey="value"
-                  fill="var(--color-primary)"
-                  radius={8}
-                />
-              </Recharts.BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RechartsPieChart />
+              <PieIcon />
               Plant Family Distribution
             </CardTitle>
           </CardHeader>
@@ -386,63 +320,47 @@ export default function DashboardOverviewPage() {
               config={chartConfig}
               className="min-h-[300px] w-full"
             >
-              <Recharts.PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                <Recharts.Pie
-                  data={plantFamilyData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  labelLine={false}
-                >
-                  {plantFamilyData.map((entry, index) => (
-                    <Recharts.Cell
-                      key={`cell-${index}`}
-                      fill={chartConfig[entry.name]?.color || '#ccc'}
-                    />
-                  ))}
-                </Recharts.Pie>
-              </Recharts.PieChart>
+              <Recharts.BarChart accessibilityLayer data={plantFamilyData}>
+                <Recharts.XAxis
+                  dataKey="name"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                />
+                <Recharts.YAxis />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Recharts.Bar dataKey="value" fill="var(--color-primary)" radius={8} />
+              </Recharts.BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
-        <Card className="col-span-3">
+        <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                <RechartsPieChart />
+                <PieIcon />
                 Plant Size Distribution
                 </CardTitle>
             </CardHeader>
             <CardContent>
                 <ChartContainer
-                config={sizeChartConfig}
+                config={chartConfig}
                 className="min-h-[300px] w-full"
                 >
-                <Recharts.PieChart>
-                    <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                    <Recharts.Pie
-                    data={plantSizeData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    labelLine={false}
-                    >
-                    {plantSizeData.map((entry, index) => (
-                        <Recharts.Cell
-                        key={`cell-${index}`}
-                        fill={sizeChartConfig[entry.name]?.color || '#ccc'}
-                        />
-                    ))}
-                    </Recharts.Pie>
-                </Recharts.PieChart>
+                  <Recharts.BarChart accessibilityLayer data={plantSizeData}>
+                    <Recharts.XAxis
+                      dataKey="name"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                    />
+                    <Recharts.YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Recharts.Bar dataKey="value" fill="var(--color-primary)" radius={8} />
+                  </Recharts.BarChart>
                 </ChartContainer>
             </CardContent>
         </Card>
-        <Card className="col-span-4">
+        <Card className="col-span-1 md:col-span-2">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                 <TrendingDown />
@@ -476,7 +394,3 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
-
-    
-
-    
