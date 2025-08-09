@@ -12,6 +12,7 @@ export const INITIAL_BATCHES: Batch[] = [
     status: 'Propagation',
     location: 'Greenhouse A',
     size: '4-inch pot',
+    supplier: 'Doran Nurseries',
     logHistory: [
       {
         date: '2024-05-15',
@@ -34,6 +35,7 @@ export const INITIAL_BATCHES: Batch[] = [
     status: 'Plugs/Liners',
     location: 'Greenhouse B',
     size: 'Liner tray',
+    supplier: 'External Supplier Inc.',
     logHistory: [
       {
         date: '2024-04-20',
@@ -56,6 +58,7 @@ export const INITIAL_BATCHES: Batch[] = [
     status: 'Potted',
     location: 'Field 1',
     size: '1-gallon pot',
+    supplier: 'Doran Nurseries',
     logHistory: [
       {
         date: '2024-03-10',

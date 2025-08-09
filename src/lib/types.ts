@@ -16,6 +16,7 @@ export type Batch = {
   size: string;
   logHistory: LogEntry[];
   transplantedFrom?: string;
+  supplier?: string;
 };
 
 export type TransplantFormData = Omit<Batch, 'id' | 'initialQuantity'> & {

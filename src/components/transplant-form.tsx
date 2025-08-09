@@ -52,6 +52,7 @@ const transplantFormSchema = (maxQuantity: number) =>
     location: z.string().min(1, 'Location is required.'),
     size: z.string().min(1, 'Size is required.'),
     transplantedFrom: z.string(),
+    supplier: z.string().optional(),
     logHistory: z.array(
       z.object({
         date: z.string(),
@@ -90,6 +91,7 @@ export function TransplantForm({
           location: '',
           size: '',
           transplantedFrom: batch.batchNumber,
+          supplier: 'Doran Nurseries',
           logHistory: [
             {
               date: new Date().toISOString().split('T')[0],

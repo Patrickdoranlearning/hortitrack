@@ -85,7 +85,7 @@ export default function DashboardPage() {
   const filteredBatches = useMemo(() => {
     return batches
       .filter((batch) =>
-        `${batch.plantFamily} ${batch.plantVariety}`.toLowerCase().includes(searchQuery.toLowerCase())
+        `${batch.plantFamily} ${batch.plantVariety} ${batch.supplier || ''}`.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .filter(
         (batch) =>
@@ -166,7 +166,7 @@ export default function DashboardPage() {
 
     const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
 
-    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber };
+    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber, supplier: 'Doran Nurseries' };
 
     const updatedBatches = batches.map(b => {
       if (b.batchNumber === data.transplantedFrom) {
@@ -219,6 +219,7 @@ export default function DashboardPage() {
                 plantingDate: data.newBatchPlantingDate,
                 logHistory: [{ date: today, action: `Split from batch #${actionLogBatch.batchNumber}` }],
                 transplantedFrom: actionLogBatch.batchNumber,
+                supplier: 'Doran Nurseries',
             };
 
             const updatedBatchesForSplit = batches.map(b => {
@@ -315,7 +316,7 @@ export default function DashboardPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by plant family or variety..."
+              placeholder="Search by plant, variety, or supplier..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

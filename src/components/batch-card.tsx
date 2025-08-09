@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Trash2, Sparkles, MoveRight, ClipboardList } from 'lucide-react';
+import { Pencil, Trash2, Sparkles, MoveRight, ClipboardList, Factory } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -66,6 +66,12 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
         <p>
           <span className="font-semibold">Size:</span> {batch.size}
         </p>
+        {batch.supplier && (
+          <p className="flex items-center gap-2">
+            <Factory className="h-4 w-4 text-muted-foreground" />
+            <span className="font-semibold">Supplier:</span> {batch.supplier}
+          </p>
+        )}
         <div>
           <span className="font-semibold">Status:</span>{' '}
           <Badge>{batch.status}</Badge>

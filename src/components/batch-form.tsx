@@ -49,6 +49,7 @@ const batchSchema = z.object({
   status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
   location: z.string().min(1, 'Location is required.'),
   size: z.string().min(1, 'Size is required.'),
+  supplier: z.string().min(1, 'Supplier is required.'),
   logHistory: z.array(logEntrySchema),
 });
 
@@ -66,7 +67,7 @@ export function BatchForm({ batch, onSubmit, onCancel, nurseryLocations, plantSi
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
     defaultValues: batch
-      ? { ...batch, plantingDate: batch.plantingDate }
+      ? { ...batch, plantingDate: batch.plantingDate, supplier: batch.supplier || 'Doran Nurseries' }
       : {
           id: Date.now().toString(),
           batchNumber: '',
@@ -78,6 +79,7 @@ export function BatchForm({ batch, onSubmit, onCancel, nurseryLocations, plantSi
           status: 'Propagation',
           location: '',
           size: '',
+          supplier: 'Doran Nurseries',
           logHistory: [],
         },
   });
@@ -164,6 +166,19 @@ export function BatchForm({ batch, onSubmit, onCancel, nurseryLocations, plantSi
                 </FormItem>
               )}
             />
+             <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Doran Nurseries" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <FormField
               control={form.control}
               name="location"
