@@ -46,7 +46,7 @@ const batchSchema = z.object({
   plantingDate: z.string().min(1, 'Planting date is required.'),
   initialQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
   quantity: z.coerce.number().min(0, 'Quantity must be at least 0.'),
-  status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived']),
+  status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
   location: z.string().min(1, 'Location is required.'),
   size: z.string().min(1, 'Size is required.'),
   logHistory: z.array(logEntrySchema),
@@ -96,6 +96,7 @@ export function BatchForm({ batch, onSubmit, onCancel, nurseryLocations, plantSi
         'Plugs/Liners': '2',
         'Potted': '3',
         'Ready for Sale': '4',
+        'Looking Good': '6',
         'Archived': '5'
       };
       // For existing batches, we might need to update the prefix if the status changes
@@ -253,6 +254,7 @@ export function BatchForm({ batch, onSubmit, onCancel, nurseryLocations, plantSi
                       <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
                       <SelectItem value="Potted">Potted</SelectItem>
                       <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                      <SelectItem value="Looking Good">Looking Good</SelectItem>
                       <SelectItem value="Archived" disabled>Archived</SelectItem>
                     </SelectContent>
                   </Select>

@@ -48,7 +48,7 @@ const transplantFormSchema = (maxQuantity: number) =>
         maxQuantity,
         `Quantity cannot exceed remaining stock of ${maxQuantity}.`
       ),
-    status: z.enum(['Plugs/Liners', 'Potted', 'Ready for Sale']),
+    status: z.enum(['Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good']),
     location: z.string().min(1, 'Location is required.'),
     size: z.string().min(1, 'Size is required.'),
     transplantedFrom: z.string(),
@@ -278,6 +278,7 @@ export function TransplantForm({
                       <SelectItem value="Ready for Sale">
                         Ready for Sale
                       </SelectItem>
+                      <SelectItem value="Looking Good">Looking Good</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

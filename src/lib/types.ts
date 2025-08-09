@@ -11,7 +11,7 @@ export type Batch = {
   plantingDate: string;
   initialQuantity: number;
   quantity: number;
-  status: 'Propagation' | 'Plugs/Liners' | 'Potted' | 'Ready for Sale' | 'Archived';
+  status: 'Propagation' | 'Plugs/Liners' | 'Potted' | 'Ready for Sale' | 'Looking Good' | 'Archived';
   location: string;
   size: string;
   logHistory: LogEntry[];

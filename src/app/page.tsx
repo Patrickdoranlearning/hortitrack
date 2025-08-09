@@ -80,7 +80,7 @@ export default function DashboardPage() {
   }, []);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
-  const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived'], []);
+  const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
     return batches
@@ -130,6 +130,7 @@ export default function DashboardPage() {
         'Plugs/Liners': '2',
         'Potted': '3',
         'Ready for Sale': '4',
+        'Looking Good': '6',
         'Archived': '5'
       };
       const nextBatchNumStr = getNextBatchNumber();
@@ -159,6 +160,7 @@ export default function DashboardPage() {
         'Plugs/Liners': '2',
         'Potted': '3',
         'Ready for Sale': '4',
+        'Looking Good': '6',
         'Archived': '5'
     };
 
