@@ -16,6 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Progress } from '@/components/ui/progress';
 
 
 interface BatchCardProps {
@@ -27,6 +28,8 @@ interface BatchCardProps {
 }
 
 export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTransplant }: BatchCardProps) {
+  const stockPercentage = (batch.quantity / batch.initialQuantity) * 100;
+  
   return (
     <Card>
       <CardHeader>
@@ -36,9 +39,22 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
         <CardDescription>Batch #{batch.batchNumber}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p>
-          <span className="font-semibold">Quantity:</span> {batch.quantity}
-        </p>
+        <div>
+          <div className="flex justify-between text-sm font-semibold mb-1">
+            <span>Stock</span>
+            <span>{batch.quantity} / {batch.initialQuantity}</span>
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Progress value={stockPercentage} />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{Math.round(stockPercentage)}% remaining</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <p>
           <span className="font-semibold">Planting Date:</span>{' '}
           {new Date(batch.plantingDate).toISOString().split('T')[0]}
@@ -70,12 +86,12 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
             </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={() => onTransplant(batch)}>
+                    <Button variant="outline" size="icon" onClick={() => onTransplant(batch)} disabled={batch.quantity === 0}>
                         <MoveRight className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>Transplant Batch</p>
+                    <p>{batch.quantity > 0 ? 'Transplant Batch' : 'Out of stock'}</p>
                 </TooltipContent>
             </Tooltip>
             <Tooltip>

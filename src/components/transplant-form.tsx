@@ -3,11 +3,12 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch, TransplantFormData } from '@/lib/types';
+import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -32,12 +33,13 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
-const transplantFormSchema = z.object({
+const transplantFormSchema = (maxQuantity: number) => z.object({
   id: z.string(),
   batchNumber: z.string(),
   plantType: z.string(),
   plantingDate: z.string().min(1, 'Planting date is required.'),
-  quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
+  initialQuantity: z.coerce.number(),
+  quantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Quantity cannot exceed remaining stock of ${maxQuantity}.`),
   status: z.enum(['Potted', 'Ready for Sale']),
   location: z.string().min(1, 'Location is required.'),
   transplantedFrom: z.string(),
@@ -47,7 +49,6 @@ const transplantFormSchema = z.object({
   })),
 });
 
-type TransplantFormValues = z.infer<typeof transplantFormSchema>;
 
 interface TransplantFormProps {
   batch: Batch | null;
@@ -56,14 +57,15 @@ interface TransplantFormProps {
 }
 
 export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProps) {
-  const form = useForm<TransplantFormValues>({
-    resolver: zodResolver(transplantFormSchema),
+  const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
+    resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
       ? {
           id: '',
           batchNumber: '',
           plantType: batch.plantType,
           plantingDate: new Date().toISOString(),
+          initialQuantity: batch.quantity,
           quantity: batch.quantity,
           status: 'Potted',
           location: '',
@@ -73,9 +75,9 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
       : undefined,
   });
 
-  const handleFormSubmit = (data: TransplantFormValues) => {
+  const handleFormSubmit = (data: z.infer<ReturnType<typeof transplantFormSchema>>) => {
     const { id, ...rest } = data;
-    onSubmit(rest);
+    onSubmit({...rest, initialQuantity: data.quantity });
   };
   
   return (
@@ -171,10 +173,13 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quantity</FormLabel>
+                  <FormLabel>Quantity to Transplant</FormLabel>
                   <FormControl>
                     <Input type="number" {...field} />
                   </FormControl>
+                  <FormDescription>
+                    Max available: {batch?.quantity}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

@@ -8,6 +8,7 @@ export type Batch = {
   batchNumber: string;
   plantType: string;
   plantingDate: string;
+  initialQuantity: number;
   quantity: number;
   status: 'Propagation' | 'Plugs/Liners' | 'Potted' | 'Ready for Sale';
   location: string;
@@ -20,6 +21,7 @@ export type TransplantFormData = {
   batchNumber: string;
   plantType: string;
   plantingDate: string;
+  initialQuantity: number;
   quantity: number;
   status: 'Potted' | 'Ready for Sale';
   location: string;

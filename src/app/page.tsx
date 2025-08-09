@@ -116,7 +116,18 @@ export default function DashboardPage() {
 
     const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
 
-    setBatches([ { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber }, ...batches]);
+    // Create the new transplanted batch
+    const newBatch: Batch = { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber };
+
+    // Update the source batch's quantity
+    const updatedBatches = batches.map(b => {
+      if (b.batchNumber === data.transplantedFrom) {
+        return { ...b, quantity: b.quantity - data.quantity };
+      }
+      return b;
+    });
+
+    setBatches([ newBatch, ...updatedBatches]);
     setIsTransplantFormOpen(false);
     setTransplantingBatch(null);
   }
