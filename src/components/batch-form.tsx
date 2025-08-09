@@ -44,7 +44,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog"
+  } from "@/components/ui/alert-dialog";
+import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -134,6 +135,14 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
        onSubmit({ ...data, batchNumber: finalBatchNumber, status: finalStatus, initialQuantity: batch.initialQuantity });
     } else {
         onSubmit({ ...data, status: finalStatus, initialQuantity: data.quantity });
+    }
+  };
+
+  const handleSizeChange = (size: string) => {
+    form.setValue('size', size);
+    const newStatus = SIZE_TO_STATUS_MAP[size];
+    if (newStatus) {
+      form.setValue('status', newStatus);
     }
   };
   
@@ -276,11 +285,33 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               />
               <FormField
                 control={form.control}
+                name="size"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Size</FormLabel>
+                      <Select onValueChange={handleSizeChange} value={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select a size" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              {plantSizes.map(size => (
+                                  <SelectItem key={size} value={size}>{size}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="status"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a status" />
@@ -295,28 +326,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         <SelectItem value="Archived" disabled>Archived</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Size</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select a size" />
-                              </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                              {plantSizes.map(size => (
-                                  <SelectItem key={size} value={size}>{size}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
                     <FormMessage />
                   </FormItem>
                 )}

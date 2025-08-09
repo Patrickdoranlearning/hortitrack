@@ -25,18 +25,31 @@ export const INITIAL_NURSERY_LOCATIONS = [
     'Quarantine Zone',
 ];
 
-export const INITIAL_PLANT_SIZES = [
-    '4-inch pot',
-    '6-inch pot',
-    '1-gallon pot',
-    '2-gallon pot',
-    '5-gallon pot',
-    '15-gallon pot',
-    '24-inch box',
-    '36-inch box',
-    'Liner tray (72 cells)',
-    'Liner tray (128 cells)',
-    'Plug tray (50 cells)',
-    'Plug tray (98 cells)',
-    'Bare root',
+export const PLANT_SIZES_DATA = [
+  { size: '286', type: 'Propagation' },
+  { size: '273', type: 'Propagation' },
+  { size: '150', type: 'Propagation' },
+  { size: '104', type: 'Propagation' },
+  { size: '336', type: 'Propagation' },
+  { size: '54', type: 'Plugs/Liners' },
+  { size: '35', type: 'Plugs/Liners' },
+  { size: '77', type: 'Plugs/Liners' },
+  { size: '28', type: 'Plugs/Liners' },
+  { size: '50', type: 'Plugs/Liners' },
+  { size: '100', type: 'Plugs/Liners' },
+  { size: '24', type: 'Plugs/Liners' },
+  { size: '9', type: 'Plugs/Liners' }, // Liner maps to Plugs/Liners
+  { size: '10.5', type: 'Potted' },
+  { size: '13', type: 'Potted' },
+  { size: '15', type: 'Potted' },
+  { size: '17', type: 'Potted' },
+  { size: '19', type: 'Potted' },
 ];
+
+export const INITIAL_PLANT_SIZES = PLANT_SIZES_DATA.map(item => item.size);
+
+export const SIZE_TO_STATUS_MAP: Record<string, 'Propagation' | 'Plugs/Liners' | 'Potted'> = 
+  PLANT_SIZES_DATA.reduce((acc, item) => {
+    acc[item.size] = item.type as 'Propagation' | 'Plugs/Liners' | 'Potted';
+    return acc;
+  }, {} as Record<string, 'Propagation' | 'Plugs/Liners' | 'Potted'>);

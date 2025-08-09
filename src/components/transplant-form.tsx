@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from './ui/checkbox';
+import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -111,6 +112,15 @@ export function TransplantForm({
   ) => {
     onSubmit({ ...data, initialQuantity: data.quantity });
   };
+  
+  const handleSizeChange = (size: string) => {
+    form.setValue('size', size);
+    const newStatus = SIZE_TO_STATUS_MAP[size];
+    if (newStatus && (newStatus === 'Potted' || newStatus === 'Plugs/Liners')) {
+      form.setValue('status', newStatus);
+    }
+  };
+
 
   if (!batch) {
     return null;
@@ -263,13 +273,40 @@ export function TransplantForm({
             />
             <FormField
               control={form.control}
+              name="size"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New Size</FormLabel>
+                  <Select
+                    onValueChange={handleSizeChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a new size" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {plantSizes.map((size) => (
+                        <SelectItem key={size} value={size}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="status"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>New Status</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -283,33 +320,6 @@ export function TransplantForm({
                         Ready for Sale
                       </SelectItem>
                       <SelectItem value="Looking Good">Looking Good</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="size"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Size</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a new size" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {plantSizes.map((size) => (
-                        <SelectItem key={size} value={size}>
-                          {size}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
