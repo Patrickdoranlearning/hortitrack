@@ -1,6 +1,7 @@
 'use server';
 
 import { careRecommendations } from '@/ai/flows/care-recommendations';
+import { productionProtocol } from '@/ai/flows/production-protocol';
 import type { Batch } from '@/lib/types';
 
 export async function getCareRecommendationsAction(batch: Batch) {
@@ -28,5 +29,15 @@ export async function getCareRecommendationsAction(batch: Batch) {
   } catch (error) {
     console.error('Error getting care recommendations:', error);
     return { success: false, error: 'Failed to get AI recommendations.' };
+  }
+}
+
+export async function getProductionProtocolAction(batch: Batch) {
+  try {
+    const protocol = await productionProtocol(batch);
+    return { success: true, data: protocol };
+  } catch (error) {
+    console.error('Error getting production protocol:', error);
+    return { success: false, error: 'Failed to generate AI production protocol.' };
   }
 }

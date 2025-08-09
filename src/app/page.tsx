@@ -33,6 +33,7 @@ import { ScannerDialog } from '@/components/scanner-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { TransplantFormData } from '@/lib/types';
 import { ScannedBatchActionsDialog } from '@/components/scanned-batch-actions-dialog';
+import { ProductionProtocolDialog } from '@/components/production-protocol-dialog';
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
@@ -62,6 +63,9 @@ export default function DashboardPage() {
 
   const [nurseryLocations, setNurseryLocations] = useState<string[]>([]);
   const [plantSizes, setPlantSizes] = useState<string[]>([]);
+
+  const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
+  const [protocolBatch, setProtocolBatch] = useState<Batch | null>(null);
 
   useEffect(() => {
     const storedLocations = localStorage.getItem('nurseryLocations');
@@ -282,6 +286,11 @@ export default function DashboardPage() {
     setIsScannerOpen(false);
   };
 
+  const handleGenerateProtocol = (batch: Batch) => {
+    setProtocolBatch(batch);
+    setIsProtocolDialogOpen(true);
+  };
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-10 flex h-auto flex-col gap-4 border-b bg-background/80 px-4 py-4 backdrop-blur-sm sm:px-6">
@@ -368,6 +377,7 @@ export default function DashboardPage() {
                 onGetRecommendations={handleGetRecommendations}
                 onTransplant={handleTransplantBatch}
                 onLogAction={handleLogAction}
+                onGenerateProtocol={handleGenerateProtocol}
               />
             ))}
           </div>
@@ -424,6 +434,12 @@ export default function DashboardPage() {
         onOpenChange={setIsAiDialogOpen}
         batch={aiBatch}
       />
+      
+      <ProductionProtocolDialog
+        open={isProtocolDialogOpen}
+        onOpenChange={setIsProtocolDialogOpen}
+        batch={protocolBatch}
+      />
 
       <ScannerDialog 
         open={isScannerOpen}
@@ -453,6 +469,10 @@ export default function DashboardPage() {
         }}
         onDelete={() => {
             if (scannedBatch) handleDeleteBatch(scannedBatch.id);
+        }}
+        onGenerateProtocol={() => {
+            setIsScannedActionsOpen(false);
+            if (scannedBatch) handleGenerateProtocol(scannedBatch);
         }}
       />
     </div>

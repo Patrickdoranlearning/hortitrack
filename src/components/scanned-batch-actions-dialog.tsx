@@ -15,6 +15,7 @@ import {
   Sparkles,
   Pencil,
   Trash2,
+  FileText,
 } from 'lucide-react';
 
 interface ScannedBatchActionsDialogProps {
@@ -26,6 +27,7 @@ interface ScannedBatchActionsDialogProps {
   onGetRecommendations: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onGenerateProtocol: () => void;
 }
 
 export function ScannedBatchActionsDialog({
@@ -37,6 +39,7 @@ export function ScannedBatchActionsDialog({
   onGetRecommendations,
   onEdit,
   onDelete,
+  onGenerateProtocol,
 }: ScannedBatchActionsDialogProps) {
   if (!batch) {
     return null;
@@ -70,11 +73,15 @@ export function ScannedBatchActionsDialog({
             <Sparkles />
             AI Tips
           </Button>
+          <Button onClick={onGenerateProtocol} variant="outline">
+            <FileText />
+            Gen. Protocol
+          </Button>
           <Button onClick={onEdit} variant="outline">
             <Pencil />
             Edit Batch
           </Button>
-          <Button onClick={onDelete} variant="destructive" className="col-span-2">
+          <Button onClick={onDelete} variant="destructive">
             <Trash2 />
             Delete Batch
           </Button>

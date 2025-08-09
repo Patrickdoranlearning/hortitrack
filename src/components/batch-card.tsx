@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Trash2, Sparkles, MoveRight, ClipboardList, Factory } from 'lucide-react';
+import { Pencil, Trash2, Sparkles, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -26,9 +26,10 @@ interface BatchCardProps {
   onGetRecommendations: (batch: Batch) => void;
   onTransplant: (batch: Batch) => void;
   onLogAction: (batch: Batch) => void;
+  onGenerateProtocol: (batch: Batch) => void;
 }
 
-export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTransplant, onLogAction }: BatchCardProps) {
+export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
   const stockPercentage = (batch.quantity / batch.initialQuantity) * 100;
   
   return (
@@ -102,6 +103,16 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
                 </TooltipTrigger>
                 <TooltipContent>
                     <p>Get AI Recommendations</p>
+                </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={() => onGenerateProtocol(batch)}>
+                        <FileText className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Generate Protocol</p>
                 </TooltipContent>
             </Tooltip>
             <Tooltip>
