@@ -29,20 +29,41 @@ const formSchema = (maxQuantity: number) => z.object({
   actionType: z.enum(['log', 'move', 'split', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
   logMessage: z.string().optional(),
   newLocation: z.string().optional(),
-  splitQuantity: z.number().positive().optional(),
+  splitQuantity: z.coerce.number().positive('Quantity must be positive.').optional(),
   newBatchPlantingDate: z.string().optional(),
   adjustQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
   adjustReason: z.string().min(1, 'A reason is required for adjustments.').optional(),
 }).refine(data => {
+    if (data.actionType === 'log') {
+        return !!data.logMessage && data.logMessage.trim().length > 0;
+    }
+    return true;
+}, {
+    message: "A log message is required.",
+    path: ["logMessage"],
+}).refine(data => {
+    if (data.actionType === 'move') {
+        return !!data.newLocation;
+    }
+    return true;
+}, {
+    message: "A new location is required.",
+    path: ["newLocation"],
+}).refine(data => {
     if (data.actionType === 'split') {
         return !!data.splitQuantity && !!data.newLocation && !!data.newBatchPlantingDate;
     }
+    return true;
+}, {
+    message: "All fields for splitting a batch are required.",
+    path: ["actionType"],
+}).refine(data => {
     if (data.actionType === 'adjust') {
         return !!data.adjustQuantity && !!data.adjustReason;
     }
     return true;
 }, {
-    message: "All fields for the selected action are required.",
+    message: "Quantity and reason are required for adjustments.",
     path: ["actionType"],
 });
 
@@ -71,9 +92,7 @@ export function ActionLogForm({
         actionType: 'log',
         logMessage: '',
         newLocation: '',
-        splitQuantity: 0,
         newBatchPlantingDate: new Date().toISOString().split('T')[0],
-        adjustQuantity: 1,
         adjustReason: '',
     },
   });
@@ -85,6 +104,7 @@ export function ActionLogForm({
   const handleActionTypeChange = (value: string) => {
     setActionType(value);
     form.setValue('actionType', value as 'log' | 'move' | 'split' | 'adjust' | 'Batch Spaced' | 'Batch Trimmed');
+    form.clearErrors();
   }
 
   return (
@@ -174,7 +194,7 @@ export function ActionLogForm({
                       <FormItem>
                           <FormLabel>Quantity to Split</FormLabel>
                           <FormControl>
-                              <Input type="number" placeholder="e.g., 25" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                              <Input type="number" placeholder="e.g., 25" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
                           </FormControl>
                           <FormMessage />
                       </FormItem>
