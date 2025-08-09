@@ -14,3 +14,15 @@ export type Batch = {
   logHistory: LogEntry[];
   transplantedFrom?: string;
 };
+
+export type TransplantFormData = {
+  id: string;
+  batchNumber: string;
+  plantType: string;
+  plantingDate: string;
+  quantity: number;
+  status: 'Potted' | 'Ready for Sale';
+  location: string;
+  logHistory: LogEntry[];
+  transplantedFrom: string;
+};

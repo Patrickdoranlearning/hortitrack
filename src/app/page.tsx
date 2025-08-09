@@ -23,6 +23,8 @@ import { BatchForm } from '@/components/batch-form';
 import { CareRecommendationsDialog } from '@/components/care-recommendations-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
+import { TransplantForm } from '@/components/transplant-form';
+
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
@@ -37,6 +39,10 @@ export default function DashboardPage() {
 
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
   const [aiBatch, setAiBatch] = useState<Batch | null>(null);
+
+  const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
+  const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
+
 
   const plantTypes = useMemo(() => ['all', ...Array.from(new Set(INITIAL_BATCHES.map((b) => b.plantType)))], []);
   const statuses = useMemo(() => ['all', 'Seeding', 'Growing', 'Ready for Sale'], []);
@@ -84,6 +90,17 @@ export default function DashboardPage() {
     setAiBatch(batch);
     setIsAiDialogOpen(true);
   };
+
+  const handleTransplantBatch = (batch: Batch) => {
+    setTransplantingBatch(batch);
+    setIsTransplantFormOpen(true);
+  };
+
+  const handleTransplantFormSubmit = (data: Omit<Batch, 'id'>) => {
+    setBatches([ { ...data, id: Date.now().toString() }, ...batches]);
+    setIsTransplantFormOpen(false);
+    setTransplantingBatch(null);
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -157,6 +174,7 @@ export default function DashboardPage() {
                 onEdit={handleEditBatch}
                 onDelete={handleDeleteBatch}
                 onGetRecommendations={handleGetRecommendations}
+                onTransplant={handleTransplantBatch}
               />
             ))}
           </div>
@@ -178,6 +196,16 @@ export default function DashboardPage() {
             batch={editingBatch}
             onSubmit={handleFormSubmit}
             onCancel={() => setIsFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isTransplantFormOpen} onOpenChange={setIsTransplantFormOpen}>
+        <DialogContent className="max-w-2xl">
+          <TransplantForm
+            batch={transplantingBatch}
+            onSubmit={handleTransplantFormSubmit}
+            onCancel={() => setIsTransplantFormOpen(false)}
           />
         </DialogContent>
       </Dialog>
