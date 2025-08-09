@@ -41,7 +41,7 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
         </p>
         <p>
           <span className="font-semibold">Planting Date:</span>{' '}
-          {new Date(batch.plantingDate).toLocaleDateString()}
+          {new Date(batch.plantingDate).toISOString().split('T')[0]}
         </p>
         <p>
           <span className="font-semibold">Location:</span> {batch.location}
