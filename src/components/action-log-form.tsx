@@ -29,7 +29,7 @@ const formSchema = (maxQuantity: number) => z.object({
   actionType: z.enum(['log', 'move', 'split', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
   logMessage: z.string().optional(),
   newLocation: z.string().optional(),
-  splitQuantity: z.coerce.number().positive('Quantity must be positive.').optional(),
+  splitQuantity: z.coerce.number().positive('Quantity must be positive.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
   newBatchPlantingDate: z.string().optional(),
   adjustQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
   adjustReason: z.string().min(1, 'A reason is required for adjustments.').optional(),
@@ -92,7 +92,9 @@ export function ActionLogForm({
         actionType: 'log',
         logMessage: '',
         newLocation: '',
+        splitQuantity: undefined,
         newBatchPlantingDate: new Date().toISOString().split('T')[0],
+        adjustQuantity: undefined,
         adjustReason: '',
     },
   });
@@ -194,7 +196,7 @@ export function ActionLogForm({
                       <FormItem>
                           <FormLabel>Quantity to Split</FormLabel>
                           <FormControl>
-                              <Input type="number" placeholder="e.g., 25" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
+                              <Input type="number" placeholder="e.g., 25" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
                           </FormControl>
                           <FormMessage />
                       </FormItem>
@@ -247,7 +249,7 @@ export function ActionLogForm({
                       <FormItem>
                           <FormLabel>Quantity to Remove</FormLabel>
                           <FormControl>
-                              <Input type="number" placeholder="e.g., 10" {...field} />
+                              <Input type="number" placeholder="e.g., 10" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
                           </FormControl>
                           <FormMessage />
                       </FormItem>
