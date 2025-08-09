@@ -62,6 +62,14 @@ export default function DashboardPage() {
       );
   }, [batches, searchQuery, filters]);
 
+  const getNextBatchNumber = () => {
+    const maxBatchNum = batches.reduce((max, b) => {
+        const numPart = parseInt(b.batchNumber.split('-')[1] || '0');
+        return numPart > max ? numPart : max;
+    }, 0);
+    return (maxBatchNum + 1).toString().padStart(6, '0');
+  }
+
   const handleNewBatch = () => {
     setEditingBatch(null);
     setIsFormOpen(true);
@@ -76,11 +84,21 @@ export default function DashboardPage() {
     setBatches(batches.filter((b) => b.id !== id));
   };
 
-  const handleFormSubmit = (data: Batch) => {
+  const handleFormSubmit = (data: Omit<Batch, 'id'>) => {
     if (editingBatch) {
       setBatches(batches.map((b) => (b.id === data.id ? data : b)));
     } else {
-      setBatches([{ ...data, id: Date.now().toString() }, ...batches]);
+       const batchNumberPrefix = {
+        'Propagation': '1',
+        'Plugs/Liners': '2',
+        'Potted': '3',
+        'Ready for Sale': '4',
+        'Archived': '5'
+      };
+      const nextBatchNumStr = getNextBatchNumber();
+      const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
+      
+      setBatches([{ ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber }, ...batches]);
     }
     setIsFormOpen(false);
     setEditingBatch(null);
@@ -95,14 +113,6 @@ export default function DashboardPage() {
     setTransplantingBatch(batch);
     setIsTransplantFormOpen(true);
   };
-
-  const getNextBatchNumber = () => {
-    const maxBatchNum = batches.reduce((max, b) => {
-        const numPart = parseInt(b.batchNumber.split('-')[1] || '0');
-        return numPart > max ? numPart : max;
-    }, 0);
-    return (maxBatchNum + 1).toString().padStart(5, '0');
-  }
 
   const handleTransplantFormSubmit = (data: Omit<Batch, 'id'>) => {
     const nextBatchNumStr = getNextBatchNumber();

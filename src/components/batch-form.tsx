@@ -40,7 +40,7 @@ const logEntrySchema = z.object({
 
 const batchSchema = z.object({
   id: z.string(),
-  batchNumber: z.string().min(1, 'Batch number is required.'),
+  batchNumber: z.string(),
   plantType: z.string().min(1, 'Plant type is required.'),
   plantingDate: z.string().min(1, 'Planting date is required.'),
   initialQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
@@ -55,7 +55,7 @@ type BatchFormValues = z.infer<typeof batchSchema>;
 
 interface BatchFormProps {
   batch: Batch | null;
-  onSubmit: (data: Batch) => void;
+  onSubmit: (data: Omit<Batch, 'id'>) => void;
   onCancel: () => void;
 }
 
@@ -84,18 +84,29 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
   });
 
   const handleFormSubmit = (data: BatchFormValues) => {
-    const batchNumberPrefix = {
-      'Propagation': '1',
-      'Plugs/Liners': '2',
-      'Potted': '3',
-      'Ready for Sale': '4',
-      'Archived': '5'
-    };
-    const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${data.batchNumber}`;
-
     const finalStatus = data.quantity === 0 ? 'Archived' : data.status;
 
-    onSubmit({ ...data, batchNumber: prefixedBatchNumber, initialQuantity: data.quantity, status: finalStatus });
+    if (batch) {
+      const batchNumberPrefix = {
+        'Propagation': '1',
+        'Plugs/Liners': '2',
+        'Potted': '3',
+        'Ready for Sale': '4',
+        'Archived': '5'
+      };
+      // For existing batches, we might need to update the prefix if the status changes
+      const currentPrefix = batch.batchNumber.split('-')[0];
+      const newPrefix = batchNumberPrefix[data.status];
+      let finalBatchNumber = batch.batchNumber;
+      if (currentPrefix !== newPrefix) {
+        const numberPart = batch.batchNumber.split('-')[1] || '0';
+        finalBatchNumber = `${newPrefix}-${numberPart}`;
+      }
+
+       onSubmit({ ...data, batchNumber: finalBatchNumber, status: finalStatus, initialQuantity: batch.initialQuantity });
+    } else {
+        onSubmit({ ...data, status: finalStatus, initialQuantity: data.quantity });
+    }
   };
   
   return (
@@ -116,7 +127,7 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
                 <FormItem>
                   <FormLabel>Batch Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 12345" {...field} />
+                    <Input placeholder="Auto-generated" {...field} disabled />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
