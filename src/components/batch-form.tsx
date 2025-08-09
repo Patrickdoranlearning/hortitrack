@@ -1,0 +1,245 @@
+'use client';
+
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import type { Batch, LogEntry } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
+import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+
+const logEntrySchema = z.object({
+  date: z.string().min(1, "Date is required."),
+  action: z.string().min(1, "Action is required."),
+});
+
+const batchSchema = z.object({
+  id: z.string(),
+  plantType: z.string().min(1, 'Plant type is required.'),
+  plantingDate: z.string().min(1, 'Planting date is required.'),
+  quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
+  status: z.enum(['Seeding', 'Growing', 'Ready for Sale']),
+  location: z.string().min(1, 'Location is required.'),
+  logHistory: z.array(logEntrySchema),
+});
+
+type BatchFormValues = z.infer<typeof batchSchema>;
+
+interface BatchFormProps {
+  batch: Batch | null;
+  onSubmit: (data: Batch) => void;
+  onCancel: () => void;
+}
+
+export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
+  const form = useForm<BatchFormValues>({
+    resolver: zodResolver(batchSchema),
+    defaultValues: batch
+      ? { ...batch, plantingDate: batch.plantingDate }
+      : {
+          id: Date.now().toString(),
+          plantType: '',
+          plantingDate: new Date().toISOString(),
+          quantity: 1,
+          status: 'Seeding',
+          location: '',
+          logHistory: [],
+        },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'logHistory',
+  });
+
+  const handleFormSubmit = (data: BatchFormValues) => {
+    onSubmit(data);
+  };
+  
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="font-headline text-2xl">{batch ? 'Edit Batch' : 'Create New Batch'}</DialogTitle>
+        <DialogDescription>
+          {batch ? 'Update the details for this nursery stock batch.' : 'Enter the details for the new nursery stock batch.'}
+        </DialogDescription>
+      </DialogHeader>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="plantType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plant Type</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Lavender" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Location</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Greenhouse A" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="plantingDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Planting Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={'outline'}
+                          className={cn(
+                            'w-full pl-3 text-left font-normal',
+                            !field.value && 'text-muted-foreground'
+                          )}
+                        >
+                          {field.value ? (
+                            format(new Date(field.value), 'PPP')
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ? new Date(field.value) : undefined}
+                        onSelect={(date) => field.onChange(date?.toISOString())}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="quantity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quantity</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Seeding">Seeding</SelectItem>
+                      <SelectItem value="Growing">Growing</SelectItem>
+                      <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div>
+             <FormLabel>Log History</FormLabel>
+             <div className="space-y-2 pt-2">
+                {fields.map((field, index) => (
+                    <div key={field.id} className="flex items-start gap-2">
+                         <FormField
+                            control={form.control}
+                            name={`logHistory.${index}.date`}
+                            render={({ field }) => (
+                                <FormItem className="w-1/3">
+                                <FormControl>
+                                    <Input type="date" {...field} />
+                                </FormControl>
+                                </FormItem>
+                            )}
+                            />
+                        <FormField
+                            control={form.control}
+                            name={`logHistory.${index}.action`}
+                            render={({ field }) => (
+                                <FormItem className="flex-1">
+                                <FormControl>
+                                    <Textarea placeholder="Describe the action taken..." {...field} className="min-h-[40px]"/>
+                                </FormControl>
+                                </FormItem>
+                            )}
+                            />
+                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString().split('T')[0], action: '' })}>
+                    <Plus className="h-4 w-4 mr-2"/>
+                    Add Log Entry
+                </Button>
+             </div>
+          </div>
+
+          <div className="flex justify-end gap-4">
+            <Button type="button" variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit">{batch ? 'Save Changes' : 'Create Batch'}</Button>
+          </div>
+        </form>
+      </Form>
+    </>
+  );
+}

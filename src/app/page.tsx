@@ -1,3 +1,192 @@
-export default function Home() {
-  return <></>;
+'use client';
+
+import * as React from 'react';
+import { useState, useMemo } from 'react';
+import {
+  PlusCircle,
+  Search,
+  Filter,
+} from 'lucide-react';
+import type { Batch } from '@/lib/types';
+import { INITIAL_BATCHES } from '@/lib/data';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { BatchCard } from '@/components/batch-card';
+import { BatchForm } from '@/components/batch-form';
+import { CareRecommendationsDialog } from '@/components/care-recommendations-dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Logo } from '@/components/logo';
+
+export default function DashboardPage() {
+  const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<{
+    plantType: string;
+    status: string;
+  }>({ plantType: 'all', status: 'all' });
+
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+
+  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+  const [aiBatch, setAiBatch] = useState<Batch | null>(null);
+
+  const plantTypes = useMemo(() => ['all', ...Array.from(new Set(INITIAL_BATCHES.map((b) => b.plantType)))], []);
+  const statuses = useMemo(() => ['all', 'Seeding', 'Growing', 'Ready for Sale'], []);
+
+  const filteredBatches = useMemo(() => {
+    return batches
+      .filter((batch) =>
+        batch.plantType.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .filter(
+        (batch) =>
+          filters.plantType === 'all' || batch.plantType === filters.plantType
+      )
+      .filter(
+        (batch) =>
+          filters.status === 'all' || batch.status === filters.status
+      );
+  }, [batches, searchQuery, filters]);
+
+  const handleNewBatch = () => {
+    setEditingBatch(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditBatch = (batch: Batch) => {
+    setEditingBatch(batch);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteBatch = (id: string) => {
+    setBatches(batches.filter((b) => b.id !== id));
+  };
+
+  const handleFormSubmit = (data: Batch) => {
+    if (editingBatch) {
+      setBatches(batches.map((b) => (b.id === data.id ? data : b)));
+    } else {
+      setBatches([{ ...data, id: Date.now().toString() }, ...batches]);
+    }
+    setIsFormOpen(false);
+    setEditingBatch(null);
+  };
+
+  const handleGetRecommendations = (batch: Batch) => {
+    setAiBatch(batch);
+    setIsAiDialogOpen(true);
+  };
+
+  return (
+    <div className="flex min-h-screen w-full flex-col">
+      <header className="sticky top-0 z-10 flex h-auto flex-col gap-4 border-b bg-background/80 px-4 py-4 backdrop-blur-sm sm:px-6">
+        <div className="flex items-center justify-between">
+          <Logo />
+          <Button onClick={handleNewBatch} size="lg">
+            <PlusCircle />
+            New Batch
+          </Button>
+        </div>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <h1 className="text-3xl font-headline text-foreground/80">
+                Nursery Stock
+            </h1>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by plant name..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="text-muted-foreground" />
+            <Select
+              value={filters.plantType}
+              onValueChange={(value) =>
+                setFilters({ ...filters, plantType: value })
+              }
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                {plantTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type === 'all' ? 'All Plant Types' : type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.status}
+              onValueChange={(value) =>
+                setFilters({ ...filters, status: value })
+              }
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                {statuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status === 'all' ? 'All Statuses' : status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </header>
+      <main className="flex-1 p-4 sm:p-6">
+        {filteredBatches.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredBatches.map((batch) => (
+              <BatchCard
+                key={batch.id}
+                batch={batch}
+                onEdit={handleEditBatch}
+                onDelete={handleDeleteBatch}
+                onGetRecommendations={handleGetRecommendations}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex h-[50vh] flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-card/50">
+            <p className="text-lg font-medium text-muted-foreground">
+              No batches found.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Try adjusting your search or filters, or create a new batch.
+            </p>
+          </div>
+        )}
+      </main>
+
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-w-2xl">
+          <BatchForm
+            batch={editingBatch}
+            onSubmit={handleFormSubmit}
+            onCancel={() => setIsFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <CareRecommendationsDialog
+        open={isAiDialogOpen}
+        onOpenChange={setIsAiDialogOpen}
+        batch={aiBatch}
+      />
+    </div>
+  );
 }
