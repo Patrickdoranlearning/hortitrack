@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'Verdant Vista',
-  description: 'Nursery stock production and crop management',
+  title: 'HortiTrack',
+  description: 'Nursery stock production and crop management for Doran Nurseries',
 };
 
 export default function RootLayout({
