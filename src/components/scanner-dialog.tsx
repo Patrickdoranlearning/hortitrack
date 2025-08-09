@@ -12,7 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { CameraOff } from 'lucide-react';
+import { CameraOff, Send } from 'lucide-react';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { Separator } from './ui/separator';
 
 interface ScannerDialogProps {
   open: boolean;
@@ -24,6 +27,7 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [manualBatchNumber, setManualBatchNumber] = useState('');
   const { toast } = useToast();
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -35,7 +39,10 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setManualBatchNumber('');
+      return;
+    };
 
     const getCameraPermission = async () => {
       try {
@@ -86,7 +93,7 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
     if (open) {
         requestAnimationFrame(tick);
     }
-  }, [open, onScanSuccess]);
+  }, [open, onScanSuccess, handleOpenChange]);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -94,9 +101,18 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
         animationFrameId = requestAnimationFrame(tick);
     }
     return () => {
-        cancelAnimationFrame(animationFrameId);
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+        }
     }
   }, [open, hasCameraPermission, tick]);
+
+  const handleManualSubmit = () => {
+    if (manualBatchNumber.trim()) {
+      onScanSuccess(manualBatchNumber.trim());
+      handleOpenChange(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -125,6 +141,22 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
                 </Alert>
             </div>
           )}
+        </div>
+        <Separator />
+        <div>
+          <p className="mb-2 text-center text-sm text-muted-foreground">Or enter manually</p>
+          <div className="flex gap-2">
+            <Input 
+              placeholder="Enter batch number..."
+              value={manualBatchNumber}
+              onChange={(e) => setManualBatchNumber(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
+            />
+            <Button onClick={handleManualSubmit} disabled={!manualBatchNumber.trim()}>
+              <Send />
+              Submit
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

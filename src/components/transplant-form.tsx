@@ -33,24 +33,32 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
-const transplantFormSchema = (maxQuantity: number) => z.object({
-  id: z.string(),
-  batchNumber: z.string(),
-  plantFamily: z.string(),
-  plantVariety: z.string(),
-  plantingDate: z.string().min(1, 'Planting date is required.'),
-  initialQuantity: z.coerce.number(),
-  quantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Quantity cannot exceed remaining stock of ${maxQuantity}.`),
-  status: z.enum(['Plugs/Liners', 'Potted', 'Ready for Sale']),
-  location: z.string().min(1, 'Location is required.'),
-  size: z.string().min(1, 'Size is required.'),
-  transplantedFrom: z.string(),
-  logHistory: z.array(z.object({
-    date: z.string(),
-    action: z.string(),
-  })),
-});
-
+const transplantFormSchema = (maxQuantity: number) =>
+  z.object({
+    id: z.string(),
+    batchNumber: z.string(),
+    plantFamily: z.string(),
+    plantVariety: z.string(),
+    plantingDate: z.string().min(1, 'Planting date is required.'),
+    initialQuantity: z.coerce.number(),
+    quantity: z.coerce
+      .number()
+      .min(1, 'Quantity must be at least 1.')
+      .max(
+        maxQuantity,
+        `Quantity cannot exceed remaining stock of ${maxQuantity}.`
+      ),
+    status: z.enum(['Plugs/Liners', 'Potted', 'Ready for Sale']),
+    location: z.string().min(1, 'Location is required.'),
+    size: z.string().min(1, 'Size is required.'),
+    transplantedFrom: z.string(),
+    logHistory: z.array(
+      z.object({
+        date: z.string(),
+        action: z.string(),
+      })
+    ),
+  });
 
 interface TransplantFormProps {
   batch: Batch | null;
@@ -60,7 +68,13 @@ interface TransplantFormProps {
   plantSizes: string[];
 }
 
-export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, plantSizes }: TransplantFormProps) {
+export function TransplantForm({
+  batch,
+  onSubmit,
+  onCancel,
+  nurseryLocations,
+  plantSizes,
+}: TransplantFormProps) {
   const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
     resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
@@ -76,15 +90,22 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
           location: '',
           size: '',
           transplantedFrom: batch.batchNumber,
-          logHistory: [{date: new Date().toISOString().split('T')[0], action: `Transplanted from batch #${batch.batchNumber}`}]
+          logHistory: [
+            {
+              date: new Date().toISOString().split('T')[0],
+              action: `Transplanted from batch #${batch.batchNumber}`,
+            },
+          ],
         }
       : undefined,
   });
 
-  const handleFormSubmit = (data: z.infer<ReturnType<typeof transplantFormSchema>>) => {
-    onSubmit({...data, initialQuantity: data.quantity });
+  const handleFormSubmit = (
+    data: z.infer<ReturnType<typeof transplantFormSchema>>
+  ) => {
+    onSubmit({ ...data, initialQuantity: data.quantity });
   };
-  
+
   if (!batch) {
     return null;
   }
@@ -92,13 +113,19 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="font-headline text-2xl">Transplant Batch</DialogTitle>
+        <DialogTitle className="font-headline text-2xl">
+          Transplant Batch
+        </DialogTitle>
         <DialogDescription>
-          Create a new batch from an existing one. Original batch is #{batch?.batchNumber}.
+          Create a new batch from an existing one. Original batch is #
+          {batch?.batchNumber}.
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit(handleFormSubmit)}
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -145,18 +172,23 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>New Location</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a new location" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {nurseryLocations.map(location => (
-                                <SelectItem key={location} value={location}>{location}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a new location" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {nurseryLocations.map((location) => (
+                        <SelectItem key={location} value={location}>
+                          {location}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -189,8 +221,12 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={field.value ? new Date(field.value) : undefined}
-                        onSelect={(date) => field.onChange(date?.toISOString())}
+                        selected={
+                          field.value ? new Date(field.value) : undefined
+                        }
+                        onSelect={(date) =>
+                          field.onChange(date?.toISOString())
+                        }
                         initialFocus
                       />
                     </PopoverContent>
@@ -199,14 +235,20 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
                 </FormItem>
               )}
             />
-             <FormField
+            <FormField
               control={form.control}
               name="quantity"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Quantity to Transplant</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))}/>
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(e) =>
+                        field.onChange(parseInt(e.target.value, 10))
+                      }
+                    />
                   </FormControl>
                   <FormDescription>
                     Max available: {batch?.quantity}
@@ -221,33 +263,41 @@ export function TransplantForm({ batch, onSubmit, onCancel, nurseryLocations, pl
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>New Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a status" />
-                      </Trigger>
+                      </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
                       <SelectItem value="Potted">Potted</SelectItem>
-                      <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                      <SelectItem value="Ready for Sale">
+                        Ready for Sale
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-             <FormField
+            <FormField
               control={form.control}
               name="size"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>New Size</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a new size" />
-                      </Trigger>
+                      </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {plantSizes.map((size) => (
