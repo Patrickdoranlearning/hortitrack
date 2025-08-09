@@ -45,7 +45,7 @@ export default function DashboardPage() {
 
 
   const plantTypes = useMemo(() => ['all', ...Array.from(new Set(INITIAL_BATCHES.map((b) => b.plantType)))], []);
-  const statuses = useMemo(() => ['all', 'Seeding', 'Growing', 'Ready for Sale', 'Archived'], []);
+  const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
     return batches

@@ -62,6 +62,9 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
         <p>
           <span className="font-semibold">Location:</span> {batch.location}
         </p>
+        <p>
+          <span className="font-semibold">Size:</span> {batch.size}
+        </p>
         <div>
           <span className="font-semibold">Status:</span>{' '}
           <Badge>{batch.status}</Badge>

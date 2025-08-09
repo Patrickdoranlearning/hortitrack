@@ -12,6 +12,7 @@ export type Batch = {
   quantity: number;
   status: 'Propagation' | 'Plugs/Liners' | 'Potted' | 'Ready for Sale' | 'Archived';
   location: string;
+  size: string;
   logHistory: LogEntry[];
   transplantedFrom?: string;
 };

@@ -10,6 +10,7 @@ export const INITIAL_BATCHES: Batch[] = [
     quantity: 100,
     status: 'Propagation',
     location: 'Greenhouse A',
+    size: '4-inch pot',
     logHistory: [
       {
         date: '2024-05-15',
@@ -30,6 +31,7 @@ export const INITIAL_BATCHES: Batch[] = [
     quantity: 50,
     status: 'Plugs/Liners',
     location: 'Greenhouse B',
+    size: 'Liner tray',
     logHistory: [
       {
         date: '2024-04-20',
@@ -50,6 +52,7 @@ export const INITIAL_BATCHES: Batch[] = [
     quantity: 200,
     status: 'Potted',
     location: 'Field 1',
+    size: '1-gallon pot',
     logHistory: [
       {
         date: '2024-03-10',

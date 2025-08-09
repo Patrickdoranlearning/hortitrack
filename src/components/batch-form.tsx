@@ -47,6 +47,7 @@ const batchSchema = z.object({
   quantity: z.coerce.number().min(0, 'Quantity must be at least 0.'),
   status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Archived']),
   location: z.string().min(1, 'Location is required.'),
+  size: z.string().min(1, 'Size is required.'),
   logHistory: z.array(logEntrySchema),
 });
 
@@ -72,6 +73,7 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
           quantity: 1,
           status: 'Propagation',
           location: '',
+          size: '',
           logHistory: [],
         },
   });
@@ -217,6 +219,19 @@ export function BatchForm({ batch, onSubmit, onCancel }: BatchFormProps) {
                       <SelectItem value="Archived" disabled>Archived</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="size"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Size</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., 1-gallon pot" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
