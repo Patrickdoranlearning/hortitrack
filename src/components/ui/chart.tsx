@@ -357,12 +357,13 @@ function getPayloadConfigFromPayload(
 
 const ChartDonutContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    nameKey?: string
-    labelKey?: string
-    active?: boolean
-    payload?: any[]
-  }
+  React.ComponentProps<"div"> &
+    Pick<
+      React.ComponentProps<typeof ChartTooltipContent>,
+      "active" | "payload"
+    > & {
+      nameKey?: string
+    }
 >(({ className, nameKey = "name", active, payload, ...props }, ref) => {
   const { config } = useChart()
 
