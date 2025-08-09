@@ -202,63 +202,63 @@ export default function DashboardOverviewPage() {
             Filters & Search
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by family, variety, or batch #..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <Select
-            value={filters.status}
-            onValueChange={(value) => setFilters({ ...filters, status: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              {statuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status === 'all' ? 'All Statuses' : status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.size}
-            onValueChange={(value) => setFilters({ ...filters, size: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by size" />
-            </SelectTrigger>
-            <SelectContent>
-              {sizes.map((size) => (
-                <SelectItem key={size} value={size}>
-                  {size === 'all' ? 'All Sizes' : size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.location}
-            onValueChange={(value) =>
-              setFilters({ ...filters, location: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by location" />
-            </SelectTrigger>
-            <SelectContent>
-              {locations.map((location) => (
-                <SelectItem key={location} value={location}>
-                  {location === 'all' ? 'All Locations' : location}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative md:col-span-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                placeholder="Search by family, variety, or batch #..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+            <Select
+                value={filters.status}
+                onValueChange={(value) => setFilters({ ...filters, status: value })}
+            >
+                <SelectTrigger>
+                <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                {statuses.map((status) => (
+                    <SelectItem key={status} value={status}>
+                    {status === 'all' ? 'All Statuses' : status}
+                    </SelectItem>
+                ))}
+                </SelectContent>
+            </Select>
+            <Select
+                value={filters.size}
+                onValueChange={(value) => setFilters({ ...filters, size: value })}
+            >
+                <SelectTrigger>
+                <SelectValue placeholder="Filter by size" />
+                </SelectTrigger>
+                <SelectContent>
+                {sizes.map((size) => (
+                    <SelectItem key={size} value={size}>
+                    {size === 'all' ? 'All Sizes' : size}
+                    </SelectItem>
+                ))}
+                </SelectContent>
+            </Select>
+            <Select
+                value={filters.location}
+                onValueChange={(value) =>
+                setFilters({ ...filters, location: value })
+                }
+            >
+                <SelectTrigger>
+                <SelectValue placeholder="Filter by location" />
+                </SelectTrigger>
+                <SelectContent>
+                {locations.map((location) => (
+                    <SelectItem key={location} value={location}>
+                    {location === 'all' ? 'All Locations' : location}
+                    </SelectItem>
+                ))}
+                </SelectContent>
+            </Select>
         </CardContent>
       </Card>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -467,5 +467,7 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
+
+    
 
     
