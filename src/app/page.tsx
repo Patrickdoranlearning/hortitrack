@@ -96,8 +96,27 @@ export default function DashboardPage() {
     setIsTransplantFormOpen(true);
   };
 
+  const getNextBatchNumber = () => {
+    const maxBatchNum = batches.reduce((max, b) => {
+        const numPart = parseInt(b.batchNumber.split('-')[1] || '0');
+        return numPart > max ? numPart : max;
+    }, 0);
+    return (maxBatchNum + 1).toString().padStart(5, '0');
+  }
+
   const handleTransplantFormSubmit = (data: Omit<Batch, 'id'>) => {
-    setBatches([ { ...data, id: Date.now().toString() }, ...batches]);
+    const nextBatchNumStr = getNextBatchNumber();
+
+    const batchNumberPrefix = {
+        'Propagation': '1',
+        'Plugs/Liners': '2',
+        'Potted': '3',
+        'Ready for Sale': '4'
+    };
+
+    const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
+
+    setBatches([ { ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber }, ...batches]);
     setIsTransplantFormOpen(false);
     setTransplantingBatch(null);
   }

@@ -34,7 +34,7 @@ import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/di
 
 const transplantFormSchema = z.object({
   id: z.string(),
-  batchNumber: z.string().min(1, 'Batch number is required.'),
+  batchNumber: z.string(),
   plantType: z.string(),
   plantingDate: z.string().min(1, 'Planting date is required.'),
   quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
@@ -74,13 +74,8 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
   });
 
   const handleFormSubmit = (data: TransplantFormValues) => {
-    const batchNumberPrefix = {
-      'Potted': '3',
-      'Ready for Sale': '4'
-    };
-    const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${data.batchNumber}`;
     const { id, ...rest } = data;
-    onSubmit({ ...rest, batchNumber: prefixedBatchNumber });
+    onSubmit(rest);
   };
   
   return (
@@ -101,7 +96,7 @@ export function TransplantForm({ batch, onSubmit, onCancel }: TransplantFormProp
                 <FormItem>
                   <FormLabel>New Batch Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 54321" {...field} />
+                    <Input placeholder="Auto-generated" {...field} disabled />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
