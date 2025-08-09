@@ -153,6 +153,12 @@ export default function DashboardOverviewPage() {
     value: {
       label: 'Plants',
     },
+    primary: {
+      color: "hsl(var(--primary))",
+    },
+    destructive: {
+      color: "hsl(var(--destructive))",
+    }
   };
 
   return (
@@ -394,3 +400,5 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
+
+    
