@@ -32,6 +32,7 @@ import Link from 'next/link';
 import { ScannerDialog } from '@/components/scanner-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { TransplantFormData } from '@/lib/types';
+import { ScannedBatchActionsDialog } from '@/components/scanned-batch-actions-dialog';
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
@@ -55,6 +56,9 @@ export default function DashboardPage() {
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { toast } = useToast();
+  
+  const [scannedBatch, setScannedBatch] = useState<Batch | null>(null);
+  const [isScannedActionsOpen, setIsScannedActionsOpen] = useState(false);
 
   const [nurseryLocations, setNurseryLocations] = useState<string[]>([]);
   const [plantSizes, setPlantSizes] = useState<string[]>([]);
@@ -113,6 +117,8 @@ export default function DashboardPage() {
 
   const handleDeleteBatch = (id: string) => {
     setBatches(batches.filter((b) => b.id !== id));
+    setIsScannedActionsOpen(false);
+    setScannedBatch(null);
   };
 
   const handleFormSubmit = (data: Omit<Batch, 'id'>) => {
@@ -266,7 +272,8 @@ export default function DashboardPage() {
   const handleScanSuccess = (scannedData: string) => {
     const foundBatch = batches.find(b => b.batchNumber === scannedData);
     if (foundBatch) {
-      handleLogAction(foundBatch);
+      setScannedBatch(foundBatch);
+      setIsScannedActionsOpen(true);
     } else {
       toast({
         variant: 'destructive',
@@ -424,6 +431,31 @@ export default function DashboardPage() {
         open={isScannerOpen}
         onOpenChange={setIsScannerOpen}
         onScanSuccess={handleScanSuccess}
+      />
+      
+      <ScannedBatchActionsDialog
+        open={isScannedActionsOpen}
+        onOpenChange={setIsScannedActionsOpen}
+        batch={scannedBatch}
+        onLogAction={() => {
+            setIsScannedActionsOpen(false);
+            if (scannedBatch) handleLogAction(scannedBatch);
+        }}
+        onTransplant={() => {
+            setIsScannedActionsOpen(false);
+            if (scannedBatch) handleTransplantBatch(scannedBatch);
+        }}
+        onGetRecommendations={() => {
+            setIsScannedActionsOpen(false);
+            if (scannedBatch) handleGetRecommendations(scannedBatch);
+        }}
+        onEdit={() => {
+            setIsScannedActionsOpen(false);
+            if (scannedBatch) handleEditBatch(scannedBatch);
+        }}
+        onDelete={() => {
+            if (scannedBatch) handleDeleteBatch(scannedBatch.id);
+        }}
       />
     </div>
   );
