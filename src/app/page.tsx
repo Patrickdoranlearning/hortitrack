@@ -136,13 +136,12 @@ export default function DashboardPage() {
   };
 
   const handleEditBatch = (batch: Batch) => {
-    // Calculate distribution data for the chart
     const transplantedQuantity = batches.filter(b => b.transplantedFrom === batch.batchNumber).reduce((sum, b) => sum + b.initialQuantity, 0);
-    const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)/;
+    const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)|Archived with loss of (\d+)/;
     const lostQuantity = batch.logHistory.reduce((sum, log) => {
       const match = log.action.match(lossLogRegex);
       if (match) {
-        return sum + (parseInt(match[1], 10) || parseInt(match[2], 10));
+        return sum + (parseInt(match[1], 10) || parseInt(match[2], 10) || parseInt(match[3], 10));
       }
       return sum;
     }, 0);
@@ -157,11 +156,27 @@ export default function DashboardPage() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteBatch = (id: string) => {
-    setBatches(batches.filter((b) => b.id !== id));
-    setIsScannedActionsOpen(false);
-    setScannedBatch(null);
-  };
+  const handleArchiveBatch = (batchId: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    setBatches(batches.map(b => {
+        if (b.id === batchId) {
+            const lossQuantity = b.quantity;
+            const lossLog: LogEntry = {
+                date: today,
+                action: `Archived with loss of ${lossQuantity} units.`,
+            };
+            return {
+                ...b,
+                quantity: 0,
+                status: 'Archived',
+                logHistory: [lossLog, ...b.logHistory],
+            };
+        }
+        return b;
+    }));
+    setIsFormOpen(false);
+    setEditingBatch(null);
+  }
 
   const handleFormSubmit = (data: Omit<Batch, 'id'>) => {
     if (editingBatch) {
@@ -223,6 +238,15 @@ export default function DashboardPage() {
 
     const updatedBatches = batches.map((b) => {
       if (b.batchNumber === data.transplantedFrom) {
+        const transplantLog: LogEntry = {
+          date: today,
+          action: `Transplanted ${data.quantity} units to new batch #${newBatch.batchNumber}.`,
+        };
+        const updatedBatch = {
+            ...b,
+            logHistory: [transplantLog, ...b.logHistory],
+        };
+
         if (data.logRemainingAsLoss) {
           const lossQuantity = b.quantity - data.quantity;
           const lossLog: LogEntry = {
@@ -230,15 +254,15 @@ export default function DashboardPage() {
             action: `Logged ${lossQuantity} units as loss during transplant.`,
           };
           return {
-            ...b,
+            ...updatedBatch,
             quantity: 0, 
             status: 'Archived',
-            logHistory: [lossLog, ...b.logHistory],
+            logHistory: [lossLog, ...updatedBatch.logHistory],
           };
         }
         const newQuantity = b.quantity - data.quantity;
         return {
-          ...b,
+          ...updatedBatch,
           quantity: newQuantity,
           status: newQuantity === 0 ? 'Archived' : b.status,
         };
@@ -445,7 +469,6 @@ export default function DashboardPage() {
                 key={batch.id}
                 batch={batch}
                 onEdit={handleEditBatch}
-                onDelete={handleDeleteBatch}
                 onGetRecommendations={handleGetRecommendations}
                 onTransplant={handleTransplantBatch}
                 onLogAction={handleLogAction}
@@ -472,6 +495,7 @@ export default function DashboardPage() {
             distribution={batchDistribution}
             onSubmit={handleFormSubmit}
             onCancel={() => setIsFormOpen(false)}
+            onArchive={handleArchiveBatch}
             nurseryLocations={nurseryLocations}
             plantSizes={plantSizes}
           />
@@ -539,9 +563,6 @@ export default function DashboardPage() {
         onEdit={() => {
             setIsScannedActionsOpen(false);
             if (scannedBatch) handleEditBatch(scannedBatch);
-        }}
-        onDelete={() => {
-            if (scannedBatch) handleDeleteBatch(scannedBatch.id);
         }}
         onGenerateProtocol={() => {
             setIsScannedActionsOpen(false);

@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Batch } from '@/lib/types';
@@ -14,7 +15,6 @@ import {
   MoveRight,
   Sparkles,
   Pencil,
-  Trash2,
   FileText,
 } from 'lucide-react';
 
@@ -26,7 +26,6 @@ interface ScannedBatchActionsDialogProps {
   onTransplant: () => void;
   onGetRecommendations: () => void;
   onEdit: () => void;
-  onDelete: () => void;
   onGenerateProtocol: () => void;
 }
 
@@ -38,7 +37,6 @@ export function ScannedBatchActionsDialog({
   onTransplant,
   onGetRecommendations,
   onEdit,
-  onDelete,
   onGenerateProtocol,
 }: ScannedBatchActionsDialogProps) {
   if (!batch) {
@@ -80,10 +78,6 @@ export function ScannedBatchActionsDialog({
           <Button onClick={onEdit} variant="outline">
             <Pencil />
             Edit Batch
-          </Button>
-          <Button onClick={onDelete} variant="destructive">
-            <Trash2 />
-            Delete Batch
           </Button>
         </div>
       </DialogContent>

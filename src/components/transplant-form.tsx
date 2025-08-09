@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -330,10 +331,10 @@ export function TransplantForm({
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>
-                      Log remaining units as loss and archive
+                      Log remaining units as loss and archive original batch
                     </FormLabel>
                     <FormDescription>
-                      If checked, any units not transplanted will be logged as a loss, and the original batch will be archived.
+                      If checked, any units not transplanted will be logged as a loss, and the original batch #{batch.batchNumber} will be archived.
                     </FormDescription>
                   </div>
                 </FormItem>

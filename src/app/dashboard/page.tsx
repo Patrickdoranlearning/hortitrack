@@ -10,7 +10,6 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import {
-  BarChart,
   Users,
   ShoppingCart,
   Archive,
@@ -67,11 +66,11 @@ export default function DashboardOverviewPage() {
   );
 
   const calculateLosses = (batch: Batch) => {
-    const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)/;
+    const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)|Archived with loss of (\d+)/;
     const lostQuantity = batch.logHistory.reduce((sum, log) => {
       const match = log.action.match(lossLogRegex);
       if (match) {
-        return sum + (parseInt(match[1], 10) || parseInt(match[2], 10));
+        return sum + (parseInt(match[1], 10) || parseInt(match[2], 10) || parseInt(match[3], 10));
       }
       return sum;
     }, 0);
@@ -400,5 +399,3 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
-
-    

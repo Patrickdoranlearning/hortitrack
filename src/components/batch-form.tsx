@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -27,12 +28,23 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Plus, Trash2, PieChart } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, PieChart, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { BatchDistributionBar } from './batch-distribution-bar';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+  } from "@/components/ui/alert-dialog"
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -67,11 +79,12 @@ interface BatchFormProps {
   distribution: BatchDistribution | null;
   onSubmit: (data: Omit<Batch, 'id'>) => void;
   onCancel: () => void;
+  onArchive: (batchId: string) => void;
   nurseryLocations: string[];
   plantSizes: string[];
 }
 
-export function BatchForm({ batch, distribution, onSubmit, onCancel, nurseryLocations, plantSizes }: BatchFormProps) {
+export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes }: BatchFormProps) {
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
     defaultValues: batch
@@ -362,11 +375,39 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, nurseryLoca
             )}
           </div>
           
-          <div className="md:col-span-3 flex justify-end gap-4">
-            <Button type="button" variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit">{batch ? 'Save Changes' : 'Create Batch'}</Button>
+          <div className="md:col-span-3 flex justify-between">
+            <div>
+              {batch && batch.status !== 'Archived' && (
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button type="button" variant="destructive">
+                            <Archive className="mr-2 h-4 w-4" />
+                            Archive Batch
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will archive the batch, setting its quantity to 0. The remaining {batch.quantity} units will be logged as a loss. This action cannot be undone.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onArchive(batch.id)}>
+                            Yes, archive it
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+            <div className="flex gap-4">
+                <Button type="button" variant="ghost" onClick={onCancel}>
+                Cancel
+                </Button>
+                <Button type="submit">{batch ? 'Save Changes' : 'Create Batch'}</Button>
+            </div>
           </div>
         </form>
       </Form>

@@ -1,3 +1,4 @@
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Trash2, Sparkles, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
+import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -22,14 +23,13 @@ import { Progress } from '@/components/ui/progress';
 interface BatchCardProps {
   batch: Batch;
   onEdit: (batch: Batch) => void;
-  onDelete: (batchId: string) => void;
   onGetRecommendations: (batch: Batch) => void;
   onTransplant: (batch: Batch) => void;
   onLogAction: (batch: Batch) => void;
   onGenerateProtocol: (batch: Batch) => void;
 }
 
-export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
+export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
   const stockPercentage = (batch.quantity / batch.initialQuantity) * 100;
   
   return (
@@ -133,16 +133,6 @@ export function BatchCard({ batch, onEdit, onDelete, onGetRecommendations, onTra
                 </TooltipTrigger>
                 <TooltipContent>
                     <p>Edit Batch</p>
-                </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="destructive" size="icon" onClick={() => onDelete(batch.id)}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Delete Batch</p>
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
