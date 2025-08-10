@@ -46,6 +46,8 @@ import {
     AlertDialogTrigger,
   } from "@/components/ui/alert-dialog";
 import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
+import { VARIETIES } from '@/lib/varieties';
+import { Combobox } from './ui/combobox';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -148,6 +150,17 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
   
+  const handleVarietyChange = (varietyName: string) => {
+    form.setValue('plantVariety', varietyName);
+    const selectedVariety = VARIETIES.find(v => v.name.toLowerCase() === varietyName.toLowerCase());
+    if (selectedVariety) {
+      form.setValue('plantFamily', selectedVariety.family);
+      form.setValue('category', selectedVariety.category);
+    }
+  };
+
+  const varietyOptions = VARIETIES.map(v => ({ value: v.name, label: v.name }));
+
   return (
     <>
       <DialogHeader>
@@ -173,14 +186,20 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-              <FormField
+               <FormField
                 control={form.control}
-                name="category"
+                name="plantVariety"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
+                    <FormLabel>Plant Variety</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Shrub, Perennial" {...field} />
+                      <Combobox
+                        options={varietyOptions}
+                        value={field.value}
+                        onChange={handleVarietyChange}
+                        placeholder="Select or type a variety..."
+                        emptyMessage="No matching variety found."
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -201,12 +220,12 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               />
               <FormField
                 control={form.control}
-                name="plantVariety"
+                name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Plant Variety</FormLabel>
+                    <FormLabel>Category</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Hidcote" {...field} />
+                      <Input placeholder="e.g., Shrub, Perennial" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
