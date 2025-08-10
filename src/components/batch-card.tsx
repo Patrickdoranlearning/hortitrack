@@ -53,9 +53,12 @@ export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, o
     <Card>
       <CardHeader>
         <CardTitle className="font-headline text-xl">
-          {batch.plantVariety}
+          {batch.plantVariety}{' '}
+          <span className="text-lg font-normal text-muted-foreground font-body">
+            ({batch.plantFamily})
+          </span>
         </CardTitle>
-        <CardDescription>{batch.plantFamily} | Batch #{batch.batchNumber}</CardDescription>
+        <CardDescription>Batch #{batch.batchNumber}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         <div>
