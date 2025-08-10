@@ -277,6 +277,8 @@ export default function DashboardPage() {
     if (!actionLogBatch) return;
 
     let logMessage = '';
+    let quantityChange: number | null = null;
+    let newLocation: string | null = null;
 
     switch (data.actionType) {
       case 'log':
@@ -284,9 +286,11 @@ export default function DashboardPage() {
         break;
       case 'move':
         logMessage = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
+        newLocation = data.newLocation;
         break;
       case 'adjust':
         logMessage = `Adjusted quantity by -${data.adjustQuantity}. Reason: ${data.adjustReason}`;
+        quantityChange = -data.adjustQuantity;
         break;
       case 'Batch Spaced':
       case 'Batch Trimmed':
@@ -297,7 +301,7 @@ export default function DashboardPage() {
         return;
     }
 
-    const result = await logAction(actionLogBatch.id, logMessage);
+    const result = await logAction(actionLogBatch.id, logMessage, quantityChange, newLocation);
 
     if (result.success) {
       toast({ title: 'Action Logged', description: 'The action has been successfully logged.' });
@@ -570,3 +574,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

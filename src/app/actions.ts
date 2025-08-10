@@ -1,3 +1,4 @@
+
 'use server';
 
 import { careRecommendations } from '@/ai/flows/care-recommendations';
@@ -7,7 +8,7 @@ import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, addDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, addDoc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
 
 const dataFilePath = join(process.cwd(), 'src', 'lib', 'data.json');
 
@@ -126,13 +127,23 @@ export async function updateBatchAction(updatedBatch: Batch) {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const batches = (await getBatchesAction()).data;
-    if (!batches) return null;
-    return batches.find(b => b.id === batchId) || null;
+    try {
+        const batchRef = doc(db, "batches", batchId);
+        const docSnap = await getDoc(batchRef);
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() } as Batch;
+        } else {
+            console.log("No such document!");
+            return null;
+        }
+    } catch (error) {
+        console.error("Error getting batch by ID:", error);
+        return null;
+    }
 }
 
 
-export async function logAction(batchId: string, action: string) {
+export async function logAction(batchId: string, action: string, quantityChange: number | null = null, newLocation: string | null = null) {
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -140,14 +151,20 @@ export async function logAction(batchId: string, action: string) {
     }
     batch.logHistory.push({ date: new Date().toISOString(), action });
 
-    const quantityMatch = action.match(/Adjusted quantity by -(\d+)/);
-    if (quantityMatch) {
-      const change = parseInt(quantityMatch[1], 10);
-      batch.quantity -= change;
+    if (quantityChange) {
+      batch.quantity += quantityChange; // e.g. quantityChange is -10 for a loss
+    }
+    
+    if (newLocation) {
+        batch.location = newLocation;
     }
 
-    await updateBatchAction(batch);
-    return { success: true, data: batch };
+    const result = await updateBatchAction(batch);
+    if (result.success) {
+      return { success: true, data: result.data };
+    } else {
+      return { success: false, error: result.error };
+    }
   } catch (error) {
     console.error('Error logging action:', error);
     return { success: false, error: 'Failed to log action.' };
@@ -163,6 +180,7 @@ export async function archiveBatchAction(batchId: string, loss: number) {
     batch.status = 'Archived';
     const action = `Archived with loss of ${loss} units. Final quantity: ${batch.quantity}.`;
     batch.logHistory.push({ date: new Date().toISOString(), action });
+    batch.quantity = 0; // Set quantity to 0 on archive
 
     await updateBatchAction(batch);
     return { success: true, data: batch };
@@ -231,3 +249,5 @@ export async function batchChatAction(batch: Batch, query: string) {
       return { success: false, error: 'Failed to get AI chat response.' };
     }
 }
+
+    

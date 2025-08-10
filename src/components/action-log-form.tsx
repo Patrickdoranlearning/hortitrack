@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,11 +27,9 @@ import { useState } from 'react';
 import { DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 
 const formSchema = (maxQuantity: number) => z.object({
-  actionType: z.enum(['log', 'move', 'split', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
+  actionType: z.enum(['log', 'move', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
   logMessage: z.string().optional(),
   newLocation: z.string().optional(),
-  splitQuantity: z.coerce.number().positive('Quantity must be positive.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
-  newBatchPlantingDate: z.string().optional(),
   adjustQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
   adjustReason: z.string().min(1, 'A reason is required for adjustments.').optional(),
 }).refine(data => {
@@ -50,21 +49,13 @@ const formSchema = (maxQuantity: number) => z.object({
     message: "A new location is required.",
     path: ["newLocation"],
 }).refine(data => {
-    if (data.actionType === 'split') {
-        return !!data.splitQuantity && !!data.newLocation && !!data.newBatchPlantingDate;
-    }
-    return true;
-}, {
-    message: "All fields for splitting a batch are required.",
-    path: ["actionType"],
-}).refine(data => {
     if (data.actionType === 'adjust') {
         return !!data.adjustQuantity && !!data.adjustReason;
     }
     return true;
 }, {
     message: "Quantity and reason are required for adjustments.",
-    path: ["actionType"],
+    path: ["adjustQuantity"],
 });
 
 
@@ -72,7 +63,7 @@ type ActionLogFormValues = z.infer<ReturnType<typeof formSchema>>;
 
 interface ActionLogFormProps {
   batch: Batch | null;
-  onSubmit: (data: ActionLogFormValues) => void;
+  onSubmit: (data: any) => void;
   onCancel: () => void;
   nurseryLocations: string[];
   plantSizes: string[];
@@ -92,8 +83,6 @@ export function ActionLogForm({
         actionType: 'log',
         logMessage: '',
         newLocation: '',
-        splitQuantity: undefined,
-        newBatchPlantingDate: new Date().toISOString().split('T')[0],
         adjustQuantity: undefined,
         adjustReason: '',
     },
@@ -105,7 +94,7 @@ export function ActionLogForm({
   
   const handleActionTypeChange = (value: string) => {
     setActionType(value);
-    form.setValue('actionType', value as 'log' | 'move' | 'split' | 'adjust' | 'Batch Spaced' | 'Batch Trimmed');
+    form.setValue('actionType', value as 'log' | 'move' | 'adjust' | 'Batch Spaced' | 'Batch Trimmed');
     form.clearErrors();
   }
 
@@ -135,7 +124,6 @@ export function ActionLogForm({
                   <SelectContent>
                     <SelectItem value="log">General Log</SelectItem>
                     <SelectItem value="move">Move Batch</SelectItem>
-                    <SelectItem value="split">Split Batch</SelectItem>
                     <SelectItem value="adjust">Adjust Stock (Losses)</SelectItem>
                     <SelectItem value="Batch Spaced">Batch Spaced</SelectItem>
                     <SelectItem value="Batch Trimmed">Batch Trimmed</SelectItem>
@@ -186,59 +174,6 @@ export function ActionLogForm({
                 )}
               />
           )}
-
-          {actionType === 'split' && (
-            <>
-              <FormField
-                  control={form.control}
-                  name="splitQuantity"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Quantity to Split</FormLabel>
-                          <FormControl>
-                              <Input type="number" placeholder="e.g., 25" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
-                          </FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                control={form.control}
-                name="newLocation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Location for Split Batch</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select new location" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {nurseryLocations.map(location => (
-                          <SelectItem key={location} value={location}>{location}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                  control={form.control}
-                  name="newBatchPlantingDate"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Planting Date for New Batch</FormLabel>
-                          <FormControl>
-                              <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )}
-              />
-            </>
-          )}
           
           {actionType === 'adjust' && (
             <>
@@ -283,3 +218,5 @@ export function ActionLogForm({
     </>
   );
 }
+
+    
