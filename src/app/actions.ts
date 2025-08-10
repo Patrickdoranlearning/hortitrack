@@ -8,7 +8,7 @@ import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { db, auth as clientAuth } from '@/lib/firebase';
-import { auth as adminAuth } from '@/lib/firebase-admin';
+import { auth as adminAuth, firestore as adminFirestore } from '@/lib/firebase-admin';
 
 import { 
   collection, 
@@ -112,19 +112,18 @@ export async function getBatchesAction(): Promise<{
 }
 
 export async function addBatchAction(
-  newBatch: Omit<Batch, 'id' | 'logHistory'>
+  newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
   try {
-    const batchWithHistory = {
-      ...newBatch,
+    const newBatch: Omit<Batch, 'id'> = {
+      ...newBatchData,
       logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
     }
     
-    const newBatchForFirestore = { ...batchWithHistory };
-    const docRef = await addDoc(collection(db, "batches"), newBatchForFirestore);
+    const docRef = await addDoc(collection(db, "batches"), newBatch);
     
     const batchWithId: Batch = {
-        ...batchWithHistory,
+        ...newBatch,
         id: docRef.id,
     }
     
@@ -135,13 +134,13 @@ export async function addBatchAction(
   }
 }
 
-export async function updateBatchAction(updatedBatch: Batch) {
+export async function updateBatchAction(batchToUpdate: Batch) {
   try {
-    const batchRef = doc(db, "batches", updatedBatch.id);
-    const dataToUpdate = { ...updatedBatch };
+    const batchRef = doc(db, "batches", batchToUpdate.id);
+    const dataToUpdate = { ...batchToUpdate };
     delete (dataToUpdate as any).id; // Never write the ID as a field in the document
-    await setDoc(batchRef, dataToUpdate, { merge: true });
-    return { success: true, data: updatedBatch };
+    await updateDoc(batchRef, dataToUpdate);
+    return { success: true, data: batchToUpdate };
   } catch (error) {
     console.error('Error updating batch:', error);
     return { success: false, error: 'Failed to update batch.' };
@@ -222,9 +221,20 @@ export async function archiveBatchAction(batchId: string, loss: number) {
   }
 }
 
+const getNextBatchNumber = async () => {
+    const batchesSnapshot = await getDocs(collection(db, 'batches'));
+    const maxBatchNum = batchesSnapshot.docs.reduce((max, doc) => {
+        const batch = doc.data() as Batch;
+        const numPart = parseInt(batch.batchNumber.split('-')[1] || '0', 10);
+        return numPart > max ? numPart : max;
+    }, 0); // Start with 0 in case there are no batches
+    return (maxBatchNum + 1).toString().padStart(6, '0');
+};
+
+
 export async function transplantBatchAction(
   sourceBatchId: string,
-  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom'>,
+  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber'>,
   transplantQuantity: number
 ) {
   try {
@@ -255,9 +265,23 @@ export async function transplantBatchAction(
 
     // Prepare the new batch document
     const newBatchRef = doc(collection(db, 'batches'));
+    
+    // Generate the next batch number
+    const batchNumberPrefix = {
+        'Propagation': '1',
+        'Plugs/Liners': '2',
+        'Potted': '3',
+        'Ready for Sale': '4',
+        'Looking Good': '6',
+        'Archived': '5'
+    };
+    const nextBatchNumStr = await getNextBatchNumber();
+    const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
+
     const newBatch: Batch = {
       ...(newBatchData as any),
       id: newBatchRef.id,
+      batchNumber: prefixedBatchNumber,
       initialQuantity: transplantQuantity,
       quantity: transplantQuantity,
       transplantedFrom: sourceBatch.batchNumber, // Use batchNumber not id
