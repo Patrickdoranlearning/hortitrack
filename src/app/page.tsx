@@ -269,7 +269,12 @@ export default function DashboardPage() {
   const handleTransplantFormSubmit = async (data: TransplantFormData) => {
     if (!transplantingBatch) return;
 
-    const result = await transplantBatchAction(transplantingBatch.id, data, data.quantity);
+    const result = await transplantBatchAction(
+      transplantingBatch.id,
+      data,
+      data.quantity,
+      data.logRemainingAsLoss
+    );
     
     if (result.success) {
       toast({ title: 'Transplant Successful', description: `New batch #${result.data?.newBatch.batchNumber} created.` });

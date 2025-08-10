@@ -10,7 +10,7 @@ import { join } from 'path';
 
 import { z } from 'zod';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getApp, initializeApp, cert } from 'firebase-admin/app';
+import admin from 'firebase-admin';
 
 
 // Helper to initialize Firebase Admin SDK
@@ -21,13 +21,12 @@ function getAdminFirestore() {
     }
     const serviceAccount = JSON.parse(serviceAccountKey);
 
-    try {
-        return getApp().firestore();
-    } catch {
-        return initializeApp({
-            credential: cert(serviceAccount)
-        }).firestore();
+    if (admin.apps.length === 0) {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
     }
+    return getFirestore();
 }
 
 
@@ -243,83 +242,102 @@ const getNextBatchNumber = async () => {
 export async function transplantBatchAction(
   sourceBatchId: string,
   newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber'>,
-  transplantQuantity: number
+  transplantQuantity: number,
+  logRemainingAsLoss: boolean
 ) {
   try {
     const db = getAdminFirestore();
     const sourceBatchDocRef = db.collection('batches').doc(sourceBatchId);
-    const sourceBatchSnap = await sourceBatchDocRef.get();
-
-    if (!sourceBatchSnap.exists) {
-      return { success: false, error: 'Source batch not found.' };
-    }
-
-    const sourceBatch = { id: sourceBatchSnap.id, ...sourceBatchSnap.data() } as Batch;
-
-    if (sourceBatch.quantity < transplantQuantity) {
-      return { success: false, error: 'Insufficient quantity in source batch.' };
-    }
-
-    // Prepare the updates for the source batch
-    const sourceBatchUpdate = {
-      quantity: sourceBatch.quantity - transplantQuantity,
-      logHistory: [
-        ...sourceBatch.logHistory,
-        {
-          date: new Date().toISOString(),
-          action: `Transplanted ${transplantQuantity} units to new batch.`,
-        },
-      ],
-    };
-
-    // Prepare the new batch document
-    const newBatchRef = db.collection('batches').doc();
     
-    // Generate the next batch number
-    const batchNumberPrefix = {
-        'Propagation': '1',
-        'Plugs/Liners': '2',
-        'Potted': '3',
-        'Ready for Sale': '4',
-        'Looking Good': '6',
-        'Archived': '5'
-    };
-    const nextBatchNumStr = await getNextBatchNumber();
-    const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
+    // Use a transaction to ensure atomicity
+    const { sourceBatch, newBatch } = await db.runTransaction(async (transaction) => {
+      const sourceBatchSnap = await transaction.get(sourceBatchDocRef);
+      if (!sourceBatchSnap.exists) {
+        throw new Error('Source batch not found.');
+      }
+      
+      const sourceBatch = { id: sourceBatchSnap.id, ...sourceBatchSnap.data() } as Batch;
 
-    const newBatch: Batch = {
-      ...(newBatchData as any),
-      id: newBatchRef.id,
-      batchNumber: prefixedBatchNumber,
-      initialQuantity: transplantQuantity,
-      quantity: transplantQuantity,
-      transplantedFrom: sourceBatch.batchNumber, // Use batchNumber not id
-      logHistory: [
-        {
-          date: new Date().toISOString(),
-          action: `Created from transplant of ${transplantQuantity} units from batch ${sourceBatch.batchNumber}.`,
-        },
-      ],
-    };
+      if (sourceBatch.quantity < transplantQuantity) {
+        throw new Error('Insufficient quantity in source batch.');
+      }
+
+      // Prepare the updates for the source batch
+      const sourceBatchUpdate: any = {
+        quantity: sourceBatch.quantity - transplantQuantity,
+        logHistory: [
+          ...sourceBatch.logHistory,
+          {
+            date: new Date().toISOString(),
+            action: `Transplanted ${transplantQuantity} units to new batch.`,
+          },
+        ],
+      };
+
+      if (logRemainingAsLoss) {
+        const remaining = sourceBatch.quantity - transplantQuantity;
+        if (remaining > 0) {
+            sourceBatchUpdate.logHistory.push({
+                date: new Date().toISOString(),
+                action: `Archived with loss of ${remaining} units.`
+            });
+        }
+        sourceBatchUpdate.status = 'Archived';
+        sourceBatchUpdate.quantity = 0;
+      }
+
+      // Prepare the new batch document
+      const newBatchRef = db.collection('batches').doc();
+      
+      const batchNumberPrefix = {
+          'Propagation': '1',
+          'Plugs/Liners': '2',
+          'Potted': '3',
+          'Ready for Sale': '4',
+          'Looking Good': '6',
+          'Archived': '5'
+      };
+      const allBatchesSnapshot = await db.collection('batches').get();
+      const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
+          const batch = doc.data() as Batch;
+          const numPart = parseInt(batch.batchNumber.split('-')[1] || '0', 10);
+          return numPart > max ? numPart : max;
+      }, 0);
+      const nextBatchNumStr = (maxBatchNum + 1).toString().padStart(6, '0');
+      const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
+
+      const newBatch: Batch = {
+        ...(newBatchData as any),
+        id: newBatchRef.id,
+        batchNumber: prefixedBatchNumber,
+        initialQuantity: transplantQuantity,
+        quantity: transplantQuantity,
+        transplantedFrom: sourceBatch.batchNumber,
+        logHistory: [
+          {
+            date: new Date().toISOString(),
+            action: `Created from transplant of ${transplantQuantity} units from batch ${sourceBatch.batchNumber}.`,
+          },
+        ],
+      };
+      
+      const newBatchForFirestore = { ...newBatch };
+      delete (newBatchForFirestore as any).id;
+
+      transaction.update(sourceBatchDocRef, sourceBatchUpdate);
+      transaction.set(newBatchRef, newBatchForFirestore);
+
+      return {
+        sourceBatch: { ...sourceBatch, ...sourceBatchUpdate },
+        newBatch,
+      };
+    });
     
-    const newBatchForFirestore = { ...newBatch };
-    delete (newBatchForFirestore as any).id;
+    return { success: true, data: { sourceBatch, newBatch } };
 
-
-    // Use a write batch to perform atomic operation
-    const batch = db.batch();
-    batch.update(sourceBatchDocRef, sourceBatchUpdate);
-    batch.set(newBatchRef, newBatchForFirestore);
-    
-    await batch.commit();
-
-    // Return both updated source and new batch for UI updates
-    const updatedSourceBatch: Batch = { ...sourceBatch, ...sourceBatchUpdate };
-
-    return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error transplanting batch:', error);
-    return { success: false, error: 'Failed to transplant batch.' };
+    return { success: false, error: error.message || 'Failed to transplant batch.' };
   }
 }
 
