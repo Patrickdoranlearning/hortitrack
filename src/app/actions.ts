@@ -7,8 +7,25 @@ import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, addDoc, updateDoc, writeBatch as firestoreWriteBatch, getDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  writeBatch as firestoreWriteBatch, 
+  getDoc,
+  query,
+  where
+} from 'firebase/firestore';
+import { 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword,
+} from 'firebase/auth';
+import { z } from 'zod';
+
 
 const dataFilePath = join(process.cwd(), 'src', 'lib', 'data.json');
 
@@ -103,7 +120,8 @@ export async function addBatchAction(
       ...newBatch,
       logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
     }
-    const docRef = await addDoc(collection(db, "batches"), batchWithHistory);
+    const { id, ...newBatchForFirestore } = batchWithHistory;
+    const docRef = await addDoc(collection(db, "batches"), newBatchForFirestore);
     
     // Return the full batch object including the generated ID
     const batchWithId: Batch = {
@@ -282,5 +300,37 @@ export async function batchChatAction(batch: Batch, query: string) {
     } catch (error) {
       console.error('Error in batch chat action:', error);
       return { success: false, error: 'Failed to get AI chat response.' };
+    }
+}
+
+// AUTHENTICATION ACTIONS
+
+const signupSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
+});
+
+export async function signupAction(values: z.infer<typeof signupSchema>) {
+    try {
+        const { email, password } = signupSchema.parse(values);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        return { success: true, data: { uid: userCredential.user.uid } };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+const loginSchema = z.object({
+    email: z.string().email(),
+    password: z.string(),
+});
+
+export async function loginAction(values: z.infer<typeof loginSchema>) {
+    try {
+        const { email, password } = loginSchema.parse(values);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        return { success: true, data: { uid: userCredential.user.uid } };
+    } catch (error: any) {
+        return { success: false, error: error.message };
     }
 }

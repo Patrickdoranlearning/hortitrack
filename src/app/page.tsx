@@ -10,6 +10,7 @@ import {
   ScanLine,
   LayoutDashboard,
   Database,
+  LogOut,
 } from 'lucide-react';
 import type { Batch, LogEntry } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -45,10 +46,15 @@ import {
 } from '@/app/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BatchChatDialog } from '@/components/batch-chat-dialog';
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
+  const { user, loading, logout } = useAuth();
+  const router = useRouter();
+
   const [batches, setBatches] = useState<Batch[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<{
     plantFamily: string;
@@ -86,21 +92,29 @@ export default function DashboardPage() {
 
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
   const [chatBatch, setChatBatch] = useState<Batch | null>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
   
   const loadBatches = useCallback(async () => {
-    setIsLoading(true);
+    setIsDataLoading(true);
     const { success, data, error } = await getBatchesAction();
     if (success && data) {
       setBatches(data);
     } else {
       toast({ variant: 'destructive', title: 'Error loading batches', description: error });
     }
-    setIsLoading(false);
+    setIsDataLoading(false);
   }, [toast]);
 
   useEffect(() => {
     setIsClient(true);
-    loadBatches();
+    if (user) {
+        loadBatches();
+    }
     
     const storedLocationsRaw = localStorage.getItem('nurseryLocations');
     if (storedLocationsRaw) {
@@ -125,7 +139,7 @@ export default function DashboardPage() {
     } else {
       setPlantSizes(INITIAL_PLANT_SIZES);
     }
-  }, [loadBatches]);
+  }, [loadBatches, user]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
@@ -339,14 +353,17 @@ export default function DashboardPage() {
     setIsChatDialogOpen(true);
   };
 
-  if (!isClient) {
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+    toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+  }
+
+  if (loading || !user) {
      return (
-        <div className="flex min-h-screen w-full flex-col p-6">
-            <Skeleton className="h-10 w-1/3 mb-4" />
-            <Skeleton className="h-8 w-full mb-6" />
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
-            </div>
+        <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
+            <Logo />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
     );
   }
@@ -368,6 +385,10 @@ export default function DashboardPage() {
                     <Database />
                     Manage Data
                 </Link>
+            </Button>
+            <Button onClick={handleLogout} variant="outline">
+                <LogOut />
+                Logout
             </Button>
             <Button onClick={() => setIsScannerOpen(true)} size="lg">
                 <ScanLine />
@@ -449,7 +470,7 @@ export default function DashboardPage() {
         </div>
       </header>
       <main className="flex-1 p-4 sm:p-6">
-        {isLoading ? (
+        {isDataLoading ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
             </div>
@@ -574,5 +595,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
