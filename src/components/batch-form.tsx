@@ -55,6 +55,7 @@ const logEntrySchema = z.object({
 const batchSchema = z.object({
   id: z.string(),
   batchNumber: z.string(),
+  category: z.string().min(1, 'Category is required.'),
   plantFamily: z.string().min(1, 'Plant family is required.'),
   plantVariety: z.string().min(1, 'Plant variety is required.'),
   plantingDate: z.string().min(1, 'Planting date is required.'),
@@ -93,6 +94,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       : {
           id: Date.now().toString(),
           batchNumber: '',
+          category: '',
           plantFamily: '',
           plantVariety: '',
           plantingDate: new Date().toISOString(),
@@ -166,6 +168,19 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                     <FormLabel>Batch Number</FormLabel>
                     <FormControl>
                       <Input placeholder="Auto-generated" {...field} disabled />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Shrub, Perennial" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -9,6 +9,7 @@ export type LogEntry = z.infer<typeof LogEntrySchema>;
 export const BatchSchema = z.object({
   id: z.string(),
   batchNumber: z.string(),
+  category: z.string(),
   plantFamily: z.string(),
   plantVariety: z.string(),
   plantingDate: z.string(),

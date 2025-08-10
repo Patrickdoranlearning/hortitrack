@@ -43,7 +43,8 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState<{
     plantFamily: string;
     status: string;
-  }>({ plantFamily: 'all', status: 'all' });
+    category: string;
+  }>({ plantFamily: 'all', status: 'all', category: 'all' });
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
@@ -114,16 +115,21 @@ export default function DashboardPage() {
   }, [batches, isClient]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
+  const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
   const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
     return batches
       .filter((batch) =>
-        `${batch.plantFamily} ${batch.plantVariety} ${batch.supplier || ''}`.toLowerCase().includes(searchQuery.toLowerCase())
+        `${batch.plantFamily} ${batch.plantVariety} ${batch.category} ${batch.supplier || ''}`.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .filter(
         (batch) =>
           filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
+      )
+      .filter(
+        (batch) =>
+          filters.category === 'all' || batch.category === filters.category
       )
       .filter(
         (batch) =>
@@ -426,7 +432,7 @@ export default function DashboardPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by plant, variety, or supplier..."
+              placeholder="Search by category, family, variety, or supplier..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -434,6 +440,23 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Filter className="text-muted-foreground" />
+            <Select
+              value={filters.category}
+              onValueChange={(value) =>
+                setFilters({ ...filters, category: value })
+              }
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type === 'all' ? 'All Categories' : type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select
               value={filters.plantFamily}
               onValueChange={(value) =>

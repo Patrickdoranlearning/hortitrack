@@ -40,6 +40,7 @@ const transplantFormSchema = (maxQuantity: number) =>
   z.object({
     id: z.string(),
     batchNumber: z.string(),
+    category: z.string(),
     plantFamily: z.string(),
     plantVariety: z.string(),
     plantingDate: z.string().min(1, 'Planting date is required.'),
@@ -86,6 +87,7 @@ export function TransplantForm({
       ? {
           id: '',
           batchNumber: '',
+          category: batch.category,
           plantFamily: batch.plantFamily,
           plantVariety: batch.plantVariety,
           plantingDate: new Date().toISOString(),
@@ -156,6 +158,19 @@ export function TransplantForm({
                 </FormItem>
               )}
             />
+            <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Input {...field} disabled />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <FormField
               control={form.control}
               name="plantFamily"

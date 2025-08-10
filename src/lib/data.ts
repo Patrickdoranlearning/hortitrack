@@ -4,6 +4,7 @@ export const INITIAL_BATCHES: Batch[] = [
   {
     id: '1',
     batchNumber: '1-000001',
+    category: 'Perennial',
     plantFamily: 'Lavender',
     plantVariety: 'Hidcote',
     plantingDate: '2024-03-15',
@@ -21,6 +22,7 @@ export const INITIAL_BATCHES: Batch[] = [
   {
     id: '2',
     batchNumber: '2-000002',
+    category: 'Shrub',
     plantFamily: 'Rose',
     plantVariety: 'Peace',
     plantingDate: '2024-04-01',
@@ -35,6 +37,7 @@ export const INITIAL_BATCHES: Batch[] = [
   {
     id: '3',
     batchNumber: '3-000003',
+    category: 'Shrub',
     plantFamily: 'Hydrangea',
     plantVariety: 'Annabelle',
     plantingDate: '2024-02-10',
@@ -53,6 +56,7 @@ export const INITIAL_BATCHES: Batch[] = [
     {
     id: '4',
     batchNumber: '4-000004',
+    category: 'Shrub',
     plantFamily: 'Boxwood',
     plantVariety: 'Winter Gem',
     plantingDate: '2023-09-01',

@@ -78,6 +78,9 @@ export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, o
           </TooltipProvider>
         </div>
         <p>
+          <span className="font-semibold">Category:</span> {batch.category}
+        </p>
+        <p>
           <span className="font-semibold">Planting Date:</span>{' '}
           {new Date(batch.plantingDate).toISOString().split('T')[0]}
         </p>
