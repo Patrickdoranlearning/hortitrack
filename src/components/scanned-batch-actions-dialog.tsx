@@ -16,6 +16,7 @@ import {
   Sparkles,
   Pencil,
   FileText,
+  MessageSquare,
 } from 'lucide-react';
 
 interface ScannedBatchActionsDialogProps {
@@ -27,6 +28,7 @@ interface ScannedBatchActionsDialogProps {
   onGetRecommendations: () => void;
   onEdit: () => void;
   onGenerateProtocol: () => void;
+  onChat: () => void;
 }
 
 export function ScannedBatchActionsDialog({
@@ -38,6 +40,7 @@ export function ScannedBatchActionsDialog({
   onGetRecommendations,
   onEdit,
   onGenerateProtocol,
+  onChat,
 }: ScannedBatchActionsDialogProps) {
   if (!batch) {
     return null;
@@ -55,6 +58,10 @@ export function ScannedBatchActionsDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-4 py-4">
+          <Button onClick={onChat} variant="outline">
+            <MessageSquare />
+            Chat with AI
+          </Button>
           <Button onClick={onLogAction} variant="outline">
             <ClipboardList />
             Log Action

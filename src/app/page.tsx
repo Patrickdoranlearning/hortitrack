@@ -44,6 +44,7 @@ import {
   logAction
 } from '@/app/actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BatchChatDialog } from '@/components/batch-chat-dialog';
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -82,6 +83,9 @@ export default function DashboardPage() {
   const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
   
   const [isClient, setIsClient] = useState(false);
+
+  const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
+  const [chatBatch, setChatBatch] = useState<Batch | null>(null);
   
   const loadBatches = useCallback(async () => {
     setIsLoading(true);
@@ -325,6 +329,11 @@ export default function DashboardPage() {
     setProtocolBatch(batch);
     setIsProtocolDialogOpen(true);
   };
+  
+  const handleOpenChat = (batch: Batch) => {
+    setChatBatch(batch);
+    setIsChatDialogOpen(true);
+  };
 
   if (!isClient) {
      return (
@@ -451,6 +460,7 @@ export default function DashboardPage() {
                 onTransplant={handleTransplantBatch}
                 onLogAction={handleLogAction}
                 onGenerateProtocol={handleGenerateProtocol}
+                onChat={handleOpenChat}
               />
             ))}
           </div>
@@ -516,6 +526,12 @@ export default function DashboardPage() {
         batch={protocolBatch}
       />
 
+       <BatchChatDialog
+        open={isChatDialogOpen}
+        onOpenChange={setIsChatDialogOpen}
+        batch={chatBatch}
+      />
+
       <ScannerDialog 
         open={isScannerOpen}
         onOpenChange={setIsScannerOpen}
@@ -545,6 +561,10 @@ export default function DashboardPage() {
         onGenerateProtocol={() => {
             setIsScannedActionsOpen(false);
             if (scannedBatch) handleGenerateProtocol(scannedBatch);
+        }}
+        onChat={() => {
+            setIsScannedActionsOpen(false);
+            if (scannedBatch) handleOpenChat(scannedBatch);
         }}
       />
     </div>

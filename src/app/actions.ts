@@ -2,6 +2,7 @@
 
 import { careRecommendations } from '@/ai/flows/care-recommendations';
 import { productionProtocol } from '@/ai/flows/production-protocol';
+import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -129,10 +130,10 @@ export async function logAction(batchId: string, action: string) {
     }
     batch.logHistory.push({ date: new Date().toISOString(), action });
 
-    const quantityMatch = action.match(/Adjusted quantity by (-?\d+)/);
+    const quantityMatch = action.match(/Adjusted quantity by -(\d+)/);
     if (quantityMatch) {
       const change = parseInt(quantityMatch[1], 10);
-      batch.quantity += change;
+      batch.quantity -= change;
     }
 
     await saveBatches(batches);
@@ -206,4 +207,14 @@ export async function transplantBatchAction(
     console.error('Error transplanting batch:', error);
     return { success: false, error: 'Failed to transplant batch.' };
   }
+}
+
+export async function batchChatAction(batch: Batch, query: string) {
+    try {
+      const result = await batchChat({ batch, query });
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('Error in batch chat action:', error);
+      return { success: false, error: 'Failed to get AI chat response.' };
+    }
 }
