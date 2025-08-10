@@ -7,7 +7,9 @@ import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { db, auth } from '@/lib/firebase';
+import { db, auth as clientAuth } from '@/lib/firebase';
+import { auth as adminAuth } from '@/lib/firebase-admin';
+
 import { 
   collection, 
   getDocs, 
@@ -20,10 +22,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
-import { 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword,
-} from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { z } from 'zod';
 
 
@@ -317,10 +316,16 @@ const signupSchema = z.object({
 export async function signupAction(values: z.infer<typeof signupSchema>) {
     try {
         const { email, password } = signupSchema.parse(values);
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        return { success: true, data: { uid: userCredential.user.uid } };
+        const userRecord = await adminAuth.createUser({
+            email,
+            password,
+        });
+        return { success: true, data: { uid: userRecord.uid } };
     } catch (error: any) {
-        return { success: false, error: error.message };
+        if (error.code === 'auth/email-already-exists') {
+            return { success: false, error: 'An account with this email address already exists.' };
+        }
+        return { success: false, error: error.message || 'An unknown error occurred during signup.' };
     }
 }
 
@@ -332,9 +337,16 @@ const loginSchema = z.object({
 export async function loginAction(values: z.infer<typeof loginSchema>) {
     try {
         const { email, password } = loginSchema.parse(values);
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // Note: We use the client auth here to sign the user in on the client-side
+        // after verifying credentials. Server-side validation isn't as direct
+        // with email/password without more complex setups. This is a hybrid approach.
+        const userCredential = await signInWithEmailAndPassword(clientAuth, email, password);
         return { success: true, data: { uid: userCredential.user.uid } };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (error: any)
+     {
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+             return { success: false, error: 'Invalid email or password. Please try again.'};
+        }
+        return { success: false, error: error.message || 'An unknown error occurred during login.' };
     }
 }
