@@ -3,15 +3,20 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowLeft, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { VARIETIES, type Variety } from '@/lib/varieties';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { VarietyForm } from '@/components/variety-form';
+import { useToast } from '@/hooks/use-toast';
 
 export default function VarietiesPage() {
   const [varieties, setVarieties] = useState<Variety[]>([]);
   const [isClient, setIsClient] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
@@ -35,7 +40,22 @@ export default function VarietiesPage() {
       localStorage.setItem('varieties', JSON.stringify(varieties));
     }
   }, [varieties, isClient]);
+
+  const handleAddVariety = () => {
+    setIsFormOpen(true);
+  };
   
+  const handleFormSubmit = (newVariety: Variety) => {
+    const isDuplicate = varieties.some(v => v.name.toLowerCase() === newVariety.name.toLowerCase());
+    if (isDuplicate) {
+        toast({ variant: 'destructive', title: 'Duplicate Variety', description: `The variety "${newVariety.name}" already exists.` });
+        return;
+    }
+    setVarieties(prev => [...prev, newVariety].sort((a,b) => a.name.localeCompare(b.name)));
+    toast({ title: 'Variety Added', description: `Successfully added "${newVariety.name}".` });
+    setIsFormOpen(false);
+  };
+
   if (!isClient) {
     return null; // Or a loading spinner
   }
@@ -54,9 +74,9 @@ export default function VarietiesPage() {
                     Back to Data Management
                 </Link>
             </Button>
-            <Button disabled>
+            <Button onClick={handleAddVariety}>
                 <Plus />
-                Add New Variety (Coming Soon)
+                Add New Variety
             </Button>
         </div>
       </div>
@@ -64,6 +84,7 @@ export default function VarietiesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Varieties Golden Table</CardTitle>
+          <CardDescription>This is the master list of varieties used for auto-completing new batch forms.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -72,6 +93,7 @@ export default function VarietiesPage() {
                 <TableHead>Variety Name</TableHead>
                 <TableHead>Plant Family</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -80,12 +102,24 @@ export default function VarietiesPage() {
                   <TableCell className="font-medium">{variety.name}</TableCell>
                   <TableCell>{variety.family}</TableCell>
                   <TableCell>{variety.category}</TableCell>
+                  <TableCell>
+                    {/* Placeholder for future edit/delete actions */}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+      
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent>
+            <VarietyForm
+                onSubmit={handleFormSubmit}
+                onCancel={() => setIsFormOpen(false)}
+            />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
