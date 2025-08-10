@@ -10,9 +10,8 @@ import {
   ScanLine,
   LayoutDashboard,
   Database,
-  LogOut,
 } from 'lucide-react';
-import type { Batch, LogEntry } from '@/lib/types';
+import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -46,13 +45,8 @@ import {
 } from '@/app/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BatchChatDialog } from '@/components/batch-chat-dialog';
-import { useAuth } from '@/context/auth-context';
-import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
-  const { user, loading, logout } = useAuth();
-  const router = useRouter();
-
   const [batches, setBatches] = useState<Batch[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,12 +87,6 @@ export default function DashboardPage() {
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
   const [chatBatch, setChatBatch] = useState<Batch | null>(null);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
-  
   const loadBatches = useCallback(async () => {
     setIsDataLoading(true);
     const { success, data, error } = await getBatchesAction();
@@ -112,9 +100,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setIsClient(true);
-    if (user) {
-        loadBatches();
-    }
+    loadBatches();
     
     const storedLocationsRaw = localStorage.getItem('nurseryLocations');
     if (storedLocationsRaw) {
@@ -139,7 +125,7 @@ export default function DashboardPage() {
     } else {
       setPlantSizes(INITIAL_PLANT_SIZES);
     }
-  }, [loadBatches, user]);
+  }, [loadBatches]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
@@ -358,13 +344,7 @@ export default function DashboardPage() {
     setIsChatDialogOpen(true);
   };
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
-    toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
-  }
-
-  if (loading || !user) {
+  if (isDataLoading) {
      return (
         <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
             <Logo />
@@ -390,10 +370,6 @@ export default function DashboardPage() {
                     <Database />
                     Manage Data
                 </Link>
-            </Button>
-            <Button onClick={handleLogout} variant="outline">
-                <LogOut />
-                Logout
             </Button>
             <Button onClick={() => setIsScannerOpen(true)} size="lg">
                 <ScanLine />
