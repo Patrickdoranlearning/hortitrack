@@ -1,0 +1,91 @@
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { VARIETIES, type Variety } from '@/lib/varieties';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+export default function VarietiesPage() {
+  const [varieties, setVarieties] = useState<Variety[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    // In a real app, this would be a database call.
+    // For now, we'll use localStorage to simulate persistence.
+    const storedVarietiesRaw = localStorage.getItem('varieties');
+    if (storedVarietiesRaw) {
+      const storedVarieties = JSON.parse(storedVarietiesRaw);
+      if (storedVarieties && storedVarieties.length > 0) {
+        setVarieties(storedVarieties);
+      } else {
+        setVarieties(VARIETIES);
+      }
+    } else {
+      setVarieties(VARIETIES);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem('varieties', JSON.stringify(varieties));
+    }
+  }, [varieties, isClient]);
+  
+  if (!isClient) {
+    return null; // Or a loading spinner
+  }
+
+  return (
+    <div className="container mx-auto max-w-6xl p-4 sm:p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+            <h1 className="mb-1 font-headline text-4xl">Plant Varieties</h1>
+            <p className="text-muted-foreground">The master list of all plant varieties.</p>
+        </div>
+        <div className="flex gap-2">
+            <Button asChild variant="outline">
+                <Link href="/settings">
+                    <ArrowLeft />
+                    Back to Data Management
+                </Link>
+            </Button>
+            <Button disabled>
+                <Plus />
+                Add New Variety (Coming Soon)
+            </Button>
+        </div>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Varieties Golden Table</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Variety Name</TableHead>
+                <TableHead>Plant Family</TableHead>
+                <TableHead>Category</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {varieties.map((variety) => (
+                <TableRow key={variety.name}>
+                  <TableCell className="font-medium">{variety.name}</TableCell>
+                  <TableCell>{variety.family}</TableCell>
+                  <TableCell>{variety.category}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

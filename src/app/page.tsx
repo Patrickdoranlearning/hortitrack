@@ -10,6 +10,7 @@ import {
   Settings,
   ScanLine,
   LayoutDashboard,
+  Database,
 } from 'lucide-react';
 import type { Batch, LogEntry } from '@/lib/types';
 import { INITIAL_BATCHES } from '@/lib/data';
@@ -411,8 +412,8 @@ export default function DashboardPage() {
             </Button>
             <Button asChild variant="outline">
                 <Link href="/settings">
-                    <Settings />
-                    Settings
+                    <Database />
+                    Manage Data
                 </Link>
             </Button>
             <Button onClick={() => setIsScannerOpen(true)} size="lg">
