@@ -8,7 +8,7 @@ import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, addDoc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, addDoc, updateDoc, writeBatch as firestoreWriteBatch, getDoc } from 'firebase/firestore';
 
 const dataFilePath = join(process.cwd(), 'src', 'lib', 'data.json');
 
@@ -16,7 +16,7 @@ async function seedData() {
     const fileContent = await fs.readFile(dataFilePath, 'utf-8');
     const batchesFromFile = JSON.parse(fileContent) as Batch[];
 
-    const firestoreBatch = writeBatch(db);
+    const firestoreBatch = firestoreWriteBatch(db);
     batchesFromFile.forEach((batch) => {
         // Use the existing ID from the file for the document ID in Firestore
         const docRef = doc(db, 'batches', batch.id);
@@ -149,17 +149,20 @@ export async function logAction(batchId: string, action: string, quantityChange:
     if (!batch) {
       return { success: false, error: 'Batch not found.' };
     }
-    batch.logHistory.push({ date: new Date().toISOString(), action });
+    
+    const updatedBatch = { ...batch };
 
-    if (quantityChange) {
-      batch.quantity += quantityChange; // e.g. quantityChange is -10 for a loss
+    updatedBatch.logHistory = [...updatedBatch.logHistory, { date: new Date().toISOString(), action }];
+
+    if (quantityChange !== null) {
+      updatedBatch.quantity += quantityChange;
     }
     
-    if (newLocation) {
-        batch.location = newLocation;
+    if (newLocation !== null) {
+        updatedBatch.location = newLocation;
     }
 
-    const result = await updateBatchAction(batch);
+    const result = await updateBatchAction(updatedBatch);
     if (result.success) {
       return { success: true, data: result.data };
     } else {
@@ -196,23 +199,36 @@ export async function transplantBatchAction(
   transplantQuantity: number
 ) {
   try {
-    const sourceBatch = await getBatchById(sourceBatchId);
-    if (!sourceBatch) {
+    const sourceBatchDocRef = doc(db, 'batches', sourceBatchId);
+    const sourceBatchSnap = await getDoc(sourceBatchDocRef);
+
+    if (!sourceBatchSnap.exists()) {
       return { success: false, error: 'Source batch not found.' };
     }
+
+    const sourceBatch = { id: sourceBatchSnap.id, ...sourceBatchSnap.data() } as Batch;
 
     if (sourceBatch.quantity < transplantQuantity) {
       return { success: false, error: 'Insufficient quantity in source batch.' };
     }
 
-    sourceBatch.quantity -= transplantQuantity;
-    sourceBatch.logHistory.push({
-      date: new Date().toISOString(),
-      action: `Transplanted ${transplantQuantity} units to new batch.`,
-    });
+    // Prepare the updates for the source batch
+    const sourceBatchUpdate = {
+      quantity: sourceBatch.quantity - transplantQuantity,
+      logHistory: [
+        ...sourceBatch.logHistory,
+        {
+          date: new Date().toISOString(),
+          action: `Transplanted ${transplantQuantity} units to new batch.`,
+        },
+      ],
+    };
 
-    const newBatch: Omit<Batch, 'id'> = {
+    // Prepare the new batch document
+    const newBatchRef = doc(collection(db, 'batches'));
+    const newBatch: Batch = {
       ...newBatchData,
+      id: newBatchRef.id,
       initialQuantity: transplantQuantity,
       quantity: transplantQuantity,
       transplantedFrom: sourceBatchId,
@@ -224,21 +240,23 @@ export async function transplantBatchAction(
       ],
     };
 
-    // Add new batch to the database
-    const newBatchResult = await addBatchAction(newBatch);
-    if (!newBatchResult.success || !newBatchResult.data) {
-        throw new Error('Failed to create new batch during transplant.');
-    }
+    // Use a write batch to perform atomic operation
+    const batch = firestoreWriteBatch(db);
+    batch.update(sourceBatchDocRef, sourceBatchUpdate);
+    batch.set(newBatchRef, newBatch);
     
-    // Update the source batch
-    await updateBatchAction(sourceBatch);
+    await batch.commit();
 
-    return { success: true, data: { sourceBatch, newBatch: newBatchResult.data } };
+    // Return both updated source and new batch for UI updates
+    const updatedSourceBatch: Batch = { ...sourceBatch, ...sourceBatchUpdate };
+
+    return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };
   } catch (error) {
     console.error('Error transplanting batch:', error);
     return { success: false, error: 'Failed to transplant batch.' };
   }
 }
+
 
 export async function batchChatAction(batch: Batch, query: string) {
     try {
@@ -249,5 +267,3 @@ export async function batchChatAction(batch: Batch, query: string) {
       return { success: false, error: 'Failed to get AI chat response.' };
     }
 }
-
-    
