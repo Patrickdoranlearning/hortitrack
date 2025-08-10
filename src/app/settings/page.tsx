@@ -43,7 +43,11 @@ export default function SettingsPage() {
             <CardDescription>Add or remove nursery locations like greenhouses, fields, or shade houses.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button disabled>Manage Locations (Coming Soon)</Button>
+            <Button asChild>
+                <Link href="/locations">
+                    Manage Locations
+                </Link>
+            </Button>
           </CardContent>
         </Card>
 
@@ -53,7 +57,11 @@ export default function SettingsPage() {
             <CardDescription>Maintain the list of standard container and plug sizes for your stock.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button disabled>Manage Sizes (Coming Soon)</Button>
+            <Button asChild>
+                <Link href="/sizes">
+                    Manage Sizes
+                </Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
