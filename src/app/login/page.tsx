@@ -18,9 +18,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { loginAction } from '@/app/actions';
 import { Logo } from '@/components/logo';
 import { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth as clientAuth } from '@/lib/firebase';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
@@ -44,18 +45,24 @@ export default function LoginPage() {
 
   const handleSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
-    const result = await loginAction(values);
-    setIsLoading(false);
-
-    if (result.success) {
+    try {
+      const userCredential = await signInWithEmailAndPassword(clientAuth, values.email, values.password);
       toast({ title: 'Login Successful', description: "Welcome back!" });
       router.push('/');
-    } else {
+    } catch (error: any) {
+      let errorMessage = 'An unknown error occurred.';
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        errorMessage = 'Invalid email or password. Please try again.';
+      } else {
+        errorMessage = error.message;
+      }
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: result.error || 'An unknown error occurred.',
+        description: errorMessage,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 

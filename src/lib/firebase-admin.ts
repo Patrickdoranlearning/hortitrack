@@ -4,23 +4,24 @@ import { App, getApp, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
-function getFirebaseAdmin(): App {
-  if (getApps().length > 0) {
-    return getApp();
-  }
+let app: App;
 
-  return initializeApp({
+try {
+  app = getApp();
+} catch (e) {
+  app = initializeApp({
     credential: admin.credential.applicationDefault(),
   });
 }
 
+
+const adminAuth = getAuth(app);
+const adminFirestore = getFirestore(app);
+
 export function getAdminAuth() {
-  return getAuth(getFirebaseAdmin());
+  return adminAuth;
 }
 
 export function getAdminFirestore() {
-  return getFirestore(getFirebaseAdmin());
+  return adminFirestore;
 }
-
-export const auth = getAdminAuth();
-export const firestore = getAdminFirestore();

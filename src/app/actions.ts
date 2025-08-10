@@ -7,10 +7,8 @@ import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { auth as clientAuth } from '@/lib/firebase';
 import { getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin';
 
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { z } from 'zod';
 
 
@@ -322,8 +320,7 @@ export async function batchChatAction(batch: Batch, query: string) {
 const signupSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
-    confirmPassword: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
+}).refine(data => data.password, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
 });
@@ -342,27 +339,5 @@ export async function signupAction(values: z.infer<typeof signupSchema>) {
             return { success: false, error: 'An account with this email address already exists.' };
         }
         return { success: false, error: error.message || 'An unknown error occurred during signup.' };
-    }
-}
-
-const loginSchema = z.object({
-    email: z.string().email(),
-    password: z.string(),
-});
-
-export async function loginAction(values: z.infer<typeof loginSchema>) {
-    try {
-        const { email, password } = loginSchema.parse(values);
-        // Note: We use the client auth here to sign the user in on the client-side
-        // after verifying credentials. Server-side validation isn't as direct
-        // with email/password without more complex setups. This is a hybrid approach.
-        const userCredential = await signInWithEmailAndPassword(clientAuth, email, password);
-        return { success: true, data: { uid: userCredential.user.uid } };
-    } catch (error: any)
-     {
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-             return { success: false, error: 'Invalid email or password. Please try again.'};
-        }
-        return { success: false, error: error.message || 'An unknown error occurred during login.' };
     }
 }
