@@ -121,7 +121,8 @@ export async function addBatchAction(
       logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
     }
     
-    const docRef = await addDoc(collection(db, "batches"), { ...batchWithHistory });
+    const newBatchForFirestore = { ...batchWithHistory };
+    const docRef = await addDoc(collection(db, "batches"), newBatchForFirestore);
     
     const batchWithId: Batch = {
         ...batchWithHistory,
@@ -255,13 +256,12 @@ export async function transplantBatchAction(
 
     // Prepare the new batch document
     const newBatchRef = doc(collection(db, 'batches'));
-    const { id, ...newBatchDataWithoutId } = newBatchData; // Exclude id from data
     const newBatch: Batch = {
-      ...newBatchDataWithoutId,
+      ...(newBatchData as any),
       id: newBatchRef.id,
       initialQuantity: transplantQuantity,
       quantity: transplantQuantity,
-      transplantedFrom: sourceBatchId,
+      transplantedFrom: sourceBatch.batchNumber, // Use batchNumber not id
       logHistory: [
         {
           date: new Date().toISOString(),
@@ -338,5 +338,3 @@ export async function loginAction(values: z.infer<typeof loginSchema>) {
         return { success: false, error: error.message };
     }
 }
-
-    
