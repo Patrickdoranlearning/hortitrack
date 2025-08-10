@@ -36,18 +36,18 @@ export const INITIAL_PLANT_SIZES = [
     'Bareroot'
 ];
 
-export const SIZE_TO_STATUS_MAP: Record<string, 'Propagation' | 'Plugs/Liners' | 'Potted'> = {
+export const SIZE_TO_STATUS_MAP: Record<string, 'Propagation' | 'Potted'> = {
     '286': 'Propagation',
     '273': 'Propagation',
     '150': 'Propagation',
     '104': 'Propagation',
     '336': 'Propagation',
     '100': 'Propagation',
-    '54': 'Plugs/Liners',
-    '35': 'Plugs/Liners',
-    '77': 'Plugs/Liners',
-    '28': 'Plugs/Liners',
-    '9': 'Potted',
+    '54': 'Plug',
+    '35': 'Plug',
+    '77': 'Plug',
+    '28': 'Plug',
+    '9': 'Liner',
     '10.5': 'Potted',
     '13': 'Potted',
     '15': 'Potted',

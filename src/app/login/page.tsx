@@ -21,7 +21,7 @@ import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/logo';
 import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth as clientAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
@@ -46,7 +46,7 @@ export default function LoginPage() {
   const handleSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(clientAuth, values.email, values.password);
+      await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({ title: 'Login Successful', description: "Welcome back!" });
       router.push('/');
     } catch (error: any) {

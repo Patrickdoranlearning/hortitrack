@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { Batch } from '@/lib/types';
 import { useState } from 'react';
-import { DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 
 const formSchema = (maxQuantity: number) => z.object({
   actionType: z.enum(['log', 'move', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
@@ -206,13 +206,12 @@ export function ActionLogForm({
             </>
           )}
 
-
-          <div className="flex justify-end gap-2">
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
             </Button>
             <Button type="submit">Log Action</Button>
-          </div>
+          </DialogFooter>
         </form>
       </Form>
     </>
