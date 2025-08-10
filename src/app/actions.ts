@@ -6,31 +6,25 @@ import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, setDoc, addDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 const dataFilePath = join(process.cwd(), 'src', 'lib', 'data.json');
 
-async function getBatches(): Promise<Batch[]> {
-  try {
+async function seedData() {
     const fileContent = await fs.readFile(dataFilePath, 'utf-8');
-    return JSON.parse(fileContent) as Batch[];
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
-    }
-    console.error('Error reading data file:', error);
-    throw new Error('Could not read data file.');
-  }
+    const batchesFromFile = JSON.parse(fileContent) as Batch[];
+
+    const firestoreBatch = writeBatch(db);
+    batchesFromFile.forEach((batch) => {
+        // Use the existing ID from the file for the document ID in Firestore
+        const docRef = doc(db, 'batches', batch.id);
+        firestoreBatch.set(docRef, batch);
+    });
+    await firestoreBatch.commit();
+    console.log('Successfully seeded data to Firestore.');
 }
 
-async function saveBatches(batches: Batch[]) {
-  try {
-    const data = JSON.stringify(batches, null, 2);
-    await fs.writeFile(dataFilePath, data, 'utf-8');
-  } catch (error) {
-    console.error('Error saving data file:', error);
-    throw new Error('Could not save data file.');
-  }
-}
 
 export async function getCareRecommendationsAction(batch: Batch) {
   try {
@@ -78,7 +72,19 @@ export async function getBatchesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const batches = await getBatches();
+    const batchesCollection = collection(db, 'batches');
+    const snapshot = await getDocs(batchesCollection);
+
+    if (snapshot.empty) {
+        // If the collection is empty, seed it from the local file
+        await seedData();
+        // Re-fetch after seeding
+        const seededSnapshot = await getDocs(batchesCollection);
+        const batches = seededSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Batch));
+        return { success: true, data: batches };
+    }
+
+    const batches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Batch));
     return { success: true, data: batches };
   } catch (error) {
     console.error('Error getting batches:', error);
@@ -90,14 +96,17 @@ export async function addBatchAction(
   newBatch: Omit<Batch, 'id' | 'logHistory'>
 ) {
   try {
-    const batches = await getBatches();
-    const batchWithId: Batch = {
+    const batchWithHistory = {
       ...newBatch,
-      id: Date.now().toString(),
       logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
-    };
-    const updatedBatches = [...batches, batchWithId];
-    await saveBatches(updatedBatches);
+    }
+    const docRef = await addDoc(collection(db, "batches"), batchWithHistory);
+    const batchWithId: Batch = {
+        ...batchWithHistory,
+        id: docRef.id,
+    }
+    await updateDoc(docRef, { id: docRef.id }); // Add the ID to the document itself
+    
     return { success: true, data: batchWithId };
   } catch (error) {
     console.error('Error adding batch:', error);
@@ -107,13 +116,8 @@ export async function addBatchAction(
 
 export async function updateBatchAction(updatedBatch: Batch) {
   try {
-    const batches = await getBatches();
-    const index = batches.findIndex((b) => b.id === updatedBatch.id);
-    if (index === -1) {
-      return { success: false, error: 'Batch not found.' };
-    }
-    batches[index] = updatedBatch;
-    await saveBatches(batches);
+    const batchRef = doc(db, "batches", updatedBatch.id);
+    await setDoc(batchRef, updatedBatch, { merge: true });
     return { success: true, data: updatedBatch };
   } catch (error) {
     console.error('Error updating batch:', error);
@@ -121,10 +125,16 @@ export async function updateBatchAction(updatedBatch: Batch) {
   }
 }
 
+async function getBatchById(batchId: string): Promise<Batch | null> {
+    const batches = (await getBatchesAction()).data;
+    if (!batches) return null;
+    return batches.find(b => b.id === batchId) || null;
+}
+
+
 export async function logAction(batchId: string, action: string) {
   try {
-    const batches = await getBatches();
-    const batch = batches.find((b) => b.id === batchId);
+    const batch = await getBatchById(batchId);
     if (!batch) {
       return { success: false, error: 'Batch not found.' };
     }
@@ -136,7 +146,7 @@ export async function logAction(batchId: string, action: string) {
       batch.quantity -= change;
     }
 
-    await saveBatches(batches);
+    await updateBatchAction(batch);
     return { success: true, data: batch };
   } catch (error) {
     console.error('Error logging action:', error);
@@ -146,8 +156,7 @@ export async function logAction(batchId: string, action: string) {
 
 export async function archiveBatchAction(batchId: string, loss: number) {
   try {
-    const batches = await getBatches();
-    const batch = batches.find((b) => b.id === batchId);
+    const batch = await getBatchById(batchId);
     if (!batch) {
       return { success: false, error: 'Batch not found.' };
     }
@@ -155,7 +164,7 @@ export async function archiveBatchAction(batchId: string, loss: number) {
     const action = `Archived with loss of ${loss} units. Final quantity: ${batch.quantity}.`;
     batch.logHistory.push({ date: new Date().toISOString(), action });
 
-    await saveBatches(batches);
+    await updateBatchAction(batch);
     return { success: true, data: batch };
   } catch (error) {
     console.error('Error archiving batch:', error);
@@ -169,8 +178,7 @@ export async function transplantBatchAction(
   transplantQuantity: number
 ) {
   try {
-    const batches = await getBatches();
-    const sourceBatch = batches.find((b) => b.id === sourceBatchId);
+    const sourceBatch = await getBatchById(sourceBatchId);
     if (!sourceBatch) {
       return { success: false, error: 'Source batch not found.' };
     }
@@ -185,9 +193,8 @@ export async function transplantBatchAction(
       action: `Transplanted ${transplantQuantity} units to new batch.`,
     });
 
-    const newBatch: Batch = {
+    const newBatch: Omit<Batch, 'id'> = {
       ...newBatchData,
-      id: Date.now().toString(),
       initialQuantity: transplantQuantity,
       quantity: transplantQuantity,
       transplantedFrom: sourceBatchId,
@@ -199,10 +206,16 @@ export async function transplantBatchAction(
       ],
     };
 
-    const updatedBatches = [...batches, newBatch];
-    await saveBatches(updatedBatches);
+    // Add new batch to the database
+    const newBatchResult = await addBatchAction(newBatch);
+    if (!newBatchResult.success || !newBatchResult.data) {
+        throw new Error('Failed to create new batch during transplant.');
+    }
+    
+    // Update the source batch
+    await updateBatchAction(sourceBatch);
 
-    return { success: true, data: { sourceBatch, newBatch } };
+    return { success: true, data: { sourceBatch, newBatch: newBatchResult.data } };
   } catch (error) {
     console.error('Error transplanting batch:', error);
     return { success: false, error: 'Failed to transplant batch.' };
