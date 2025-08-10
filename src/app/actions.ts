@@ -120,10 +120,9 @@ export async function addBatchAction(
       ...newBatch,
       logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
     }
-    const { id, ...newBatchForFirestore } = batchWithHistory;
-    const docRef = await addDoc(collection(db, "batches"), newBatchForFirestore);
     
-    // Return the full batch object including the generated ID
+    const docRef = await addDoc(collection(db, "batches"), { ...batchWithHistory });
+    
     const batchWithId: Batch = {
         ...batchWithHistory,
         id: docRef.id,
@@ -339,3 +338,5 @@ export async function loginAction(values: z.infer<typeof loginSchema>) {
         return { success: false, error: error.message };
     }
 }
+
+    
