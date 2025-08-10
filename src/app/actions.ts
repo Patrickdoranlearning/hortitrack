@@ -7,21 +7,9 @@ import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { db, auth as clientAuth } from '@/lib/firebase';
-import { auth as adminAuth, firestore as adminFirestore, getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin';
+import { auth as clientAuth } from '@/lib/firebase';
+import { getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin';
 
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  setDoc, 
-  addDoc, 
-  updateDoc, 
-  writeBatch as firestoreWriteBatch, 
-  getDoc,
-  query,
-  where
-} from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { z } from 'zod';
 
@@ -32,9 +20,10 @@ async function seedData() {
     const fileContent = await fs.readFile(dataFilePath, 'utf-8');
     const batchesFromFile = JSON.parse(fileContent) as Batch[];
 
-    const batch = firestoreWriteBatch(getAdminFirestore());
+    const db = getAdminFirestore();
+    const batch = db.batch();
     batchesFromFile.forEach((batchData) => {
-        const docRef = doc(db, 'batches', batchData.id);
+        const docRef = db.collection('batches').doc(batchData.id);
         const data = { ...batchData };
         delete (data as any).id;
         batch.set(docRef, data);
@@ -90,12 +79,13 @@ export async function getBatchesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const batchesCollection = collection(getAdminFirestore(), 'batches');
-    const snapshot = await getDocs(batchesCollection);
+    const db = getAdminFirestore();
+    const batchesCollection = db.collection('batches');
+    const snapshot = await batchesCollection.get();
 
     if (snapshot.empty) {
         await seedData();
-        const seededSnapshot = await getDocs(batchesCollection);
+        const seededSnapshot = await batchesCollection.get();
         const batches = seededSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Batch));
         return { success: true, data: batches };
     }
@@ -112,12 +102,13 @@ export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
   try {
+    const db = getAdminFirestore();
     const newBatch: Omit<Batch, 'id'> = {
       ...newBatchData,
       logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
     }
     
-    const docRef = await addDoc(collection(getAdminFirestore(), "batches"), newBatch);
+    const docRef = await db.collection("batches").add(newBatch);
     
     const batchWithId: Batch = {
         ...newBatch,
@@ -133,10 +124,11 @@ export async function addBatchAction(
 
 export async function updateBatchAction(batchToUpdate: Batch) {
   try {
-    const batchRef = doc(getAdminFirestore(), "batches", batchToUpdate.id);
+    const db = getAdminFirestore();
+    const batchRef = db.collection("batches").doc(batchToUpdate.id);
     const dataToUpdate = { ...batchToUpdate };
     delete (dataToUpdate as any).id; // Never write the ID as a field in the document
-    await updateDoc(batchRef, dataToUpdate);
+    await batchRef.update(dataToUpdate);
     return { success: true, data: batchToUpdate };
   } catch (error) {
     console.error('Error updating batch:', error);
@@ -146,9 +138,10 @@ export async function updateBatchAction(batchToUpdate: Batch) {
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
     try {
-        const batchRef = doc(getAdminFirestore(), "batches", batchId);
-        const docSnap = await getDoc(batchRef);
-        if (docSnap.exists()) {
+        const db = getAdminFirestore();
+        const batchRef = db.collection("batches").doc(batchId);
+        const docSnap = await batchRef.get();
+        if (docSnap.exists) {
             return { id: docSnap.id, ...docSnap.data() } as Batch;
         } else {
             console.log("No such document!");
@@ -219,7 +212,8 @@ export async function archiveBatchAction(batchId: string, loss: number) {
 }
 
 const getNextBatchNumber = async () => {
-    const batchesSnapshot = await getDocs(collection(getAdminFirestore(), 'batches'));
+    const db = getAdminFirestore();
+    const batchesSnapshot = await db.collection('batches').get();
     const maxBatchNum = batchesSnapshot.docs.reduce((max, doc) => {
         const batch = doc.data() as Batch;
         const numPart = parseInt(batch.batchNumber.split('-')[1] || '0', 10);
@@ -235,10 +229,11 @@ export async function transplantBatchAction(
   transplantQuantity: number
 ) {
   try {
-    const sourceBatchDocRef = doc(getAdminFirestore(), 'batches', sourceBatchId);
-    const sourceBatchSnap = await getDoc(sourceBatchDocRef);
+    const db = getAdminFirestore();
+    const sourceBatchDocRef = db.collection('batches').doc(sourceBatchId);
+    const sourceBatchSnap = await sourceBatchDocRef.get();
 
-    if (!sourceBatchSnap.exists()) {
+    if (!sourceBatchSnap.exists) {
       return { success: false, error: 'Source batch not found.' };
     }
 
@@ -261,7 +256,7 @@ export async function transplantBatchAction(
     };
 
     // Prepare the new batch document
-    const newBatchRef = doc(collection(getAdminFirestore(), 'batches'));
+    const newBatchRef = db.collection('batches').doc();
     
     // Generate the next batch number
     const batchNumberPrefix = {
@@ -295,7 +290,7 @@ export async function transplantBatchAction(
 
 
     // Use a write batch to perform atomic operation
-    const batch = firestoreWriteBatch(getAdminFirestore());
+    const batch = db.batch();
     batch.update(sourceBatchDocRef, sourceBatchUpdate);
     batch.set(newBatchRef, newBatchForFirestore);
     
