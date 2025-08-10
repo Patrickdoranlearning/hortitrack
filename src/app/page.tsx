@@ -2,18 +2,16 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   PlusCircle,
   Search,
   Filter,
-  Settings,
   ScanLine,
   LayoutDashboard,
   Database,
 } from 'lucide-react';
 import type { Batch, LogEntry } from '@/lib/types';
-import { INITIAL_BATCHES } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -37,9 +35,19 @@ import { useToast } from '@/hooks/use-toast';
 import type { TransplantFormData } from '@/lib/types';
 import { ScannedBatchActionsDialog } from '@/components/scanned-batch-actions-dialog';
 import { ProductionProtocolDialog } from '@/components/production-protocol-dialog';
+import { 
+  getBatchesAction, 
+  addBatchAction, 
+  updateBatchAction, 
+  archiveBatchAction, 
+  transplantBatchAction,
+  logAction
+} from '@/app/actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<{
     plantFamily: string;
@@ -74,15 +82,21 @@ export default function DashboardPage() {
   const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
   
   const [isClient, setIsClient] = useState(false);
+  
+  const loadBatches = useCallback(async () => {
+    setIsLoading(true);
+    const { success, data, error } = await getBatchesAction();
+    if (success && data) {
+      setBatches(data);
+    } else {
+      toast({ variant: 'destructive', title: 'Error loading batches', description: error });
+    }
+    setIsLoading(false);
+  }, [toast]);
 
   useEffect(() => {
     setIsClient(true);
-    const storedBatches = localStorage.getItem('batches');
-    if (storedBatches) {
-      setBatches(JSON.parse(storedBatches));
-    } else {
-      setBatches(INITIAL_BATCHES);
-    }
+    loadBatches();
     
     const storedLocationsRaw = localStorage.getItem('nurseryLocations');
     if (storedLocationsRaw) {
@@ -107,13 +121,7 @@ export default function DashboardPage() {
     } else {
       setPlantSizes(INITIAL_PLANT_SIZES);
     }
-  }, []);
-  
-  useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('batches', JSON.stringify(batches));
-    }
-  }, [batches, isClient]);
+  }, [loadBatches]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
@@ -140,7 +148,7 @@ export default function DashboardPage() {
 
   const getNextBatchNumber = () => {
     const maxBatchNum = batches.reduce((max, b) => {
-        const numPart = parseInt(b.batchNumber.split('-')[1] || '0');
+        const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
         return numPart > max ? numPart : max;
     }, -1);
     return (maxBatchNum + 1).toString().padStart(6, '0');
@@ -153,7 +161,7 @@ export default function DashboardPage() {
   };
 
   const handleEditBatch = (batch: Batch) => {
-    const transplantedQuantity = batches.filter(b => b.transplantedFrom === batch.batchNumber).reduce((sum, b) => sum + b.initialQuantity, 0);
+    const transplantedQuantity = batches.filter(b => b.transplantedFrom === batch.id).reduce((sum, b) => sum + b.initialQuantity, 0);
     const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)|Archived with loss of (\d+)/;
     const lostQuantity = batch.logHistory.reduce((sum, log) => {
       const match = log.action.match(lossLogRegex);
@@ -162,10 +170,9 @@ export default function DashboardPage() {
       }
       return sum;
     }, 0);
-    const remainingInStock = batch.quantity;
     
     setBatchDistribution({
-      inStock: remainingInStock,
+      inStock: batch.quantity,
       transplanted: transplantedQuantity,
       lost: lostQuantity,
     });
@@ -173,33 +180,34 @@ export default function DashboardPage() {
     setIsFormOpen(true);
   };
 
-  const handleArchiveBatch = (batchId: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    setBatches(batches.map(b => {
-        if (b.id === batchId) {
-            const lossQuantity = b.quantity;
-            const lossLog: LogEntry = {
-                date: today,
-                action: `Archived with loss of ${lossQuantity} units.`,
-            };
-            return {
-                ...b,
-                quantity: 0,
-                status: 'Archived',
-                logHistory: [lossLog, ...b.logHistory],
-            };
-        }
-        return b;
-    }));
+  const handleArchiveBatch = async (batchId: string) => {
+    const batchToArchive = batches.find(b => b.id === batchId);
+    if (!batchToArchive) return;
+    
+    const loss = batchToArchive.quantity;
+    const result = await archiveBatchAction(batchId, loss);
+
+    if (result.success) {
+      toast({ title: "Success", description: `Batch #${batchToArchive.batchNumber} has been archived.` });
+      await loadBatches();
+    } else {
+      toast({ variant: 'destructive', title: 'Error archiving batch', description: result.error });
+    }
+    
     setIsFormOpen(false);
     setEditingBatch(null);
   }
 
-  const handleFormSubmit = (data: Omit<Batch, 'id'>) => {
+  const handleFormSubmit = async (data: Omit<Batch, 'id' | 'batchNumber'> & { id?: string; batchNumber?: string }) => {
     if (editingBatch) {
-      setBatches(batches.map((b) => (b.id === data.id ? data as Batch : b)));
+      const result = await updateBatchAction(data as Batch);
+      if (result.success) {
+        toast({ title: 'Batch Updated', description: `Batch #${result.data?.batchNumber} saved.`});
+      } else {
+        toast({ variant: 'destructive', title: 'Update Failed', description: result.error });
+      }
     } else {
-       const batchNumberPrefix = {
+      const batchNumberPrefix = {
         'Propagation': '1',
         'Plugs/Liners': '2',
         'Potted': '3',
@@ -210,8 +218,21 @@ export default function DashboardPage() {
       const nextBatchNumStr = getNextBatchNumber();
       const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
       
-      setBatches([{ ...data, id: Date.now().toString(), batchNumber: prefixedBatchNumber, supplier: data.supplier || 'Doran Nurseries' } as Batch, ...batches]);
+      const newBatchData = { 
+        ...data, 
+        batchNumber: prefixedBatchNumber, 
+        supplier: data.supplier || 'Doran Nurseries',
+        initialQuantity: data.quantity, 
+      };
+
+      const result = await addBatchAction(newBatchData);
+      if (result.success) {
+        toast({ title: 'Batch Created', description: `Batch #${result.data?.batchNumber} added.`});
+      } else {
+        toast({ variant: 'destructive', title: 'Create Failed', description: result.error });
+      }
     }
+    await loadBatches();
     setIsFormOpen(false);
     setEditingBatch(null);
     setBatchDistribution(null);
@@ -227,67 +248,18 @@ export default function DashboardPage() {
     setIsTransplantFormOpen(true);
   };
 
-  const handleTransplantFormSubmit = (data: TransplantFormData) => {
-    const nextBatchNumStr = getNextBatchNumber();
+  const handleTransplantFormSubmit = async (data: TransplantFormData) => {
+    if (!transplantingBatch) return;
 
-    const batchNumberPrefix = {
-      'Propagation': '1',
-      'Plugs/Liners': '2',
-      'Potted': '3',
-      'Ready for Sale': '4',
-      'Looking Good': '6',
-      'Archived': '5',
-    };
-
-    const prefixedBatchNumber = `${
-      batchNumberPrefix[data.status]
-    }-${nextBatchNumStr}`;
-
-    const newBatch: Batch = {
-      ...data,
-      id: Date.now().toString(),
-      batchNumber: prefixedBatchNumber,
-      supplier: 'Doran Nurseries',
-      initialQuantity: data.quantity,
-    };
-
-    const today = new Date().toISOString().split('T')[0];
-
-    const updatedBatches = batches.map((b) => {
-      if (b.batchNumber === data.transplantedFrom) {
-        const transplantLog: LogEntry = {
-          date: today,
-          action: `Transplanted ${data.quantity} units to new batch #${newBatch.batchNumber}.`,
-        };
-        const updatedBatch = {
-            ...b,
-            logHistory: [transplantLog, ...b.logHistory],
-        };
-
-        if (data.logRemainingAsLoss) {
-          const lossQuantity = b.quantity - data.quantity;
-          const lossLog: LogEntry = {
-            date: today,
-            action: `Logged ${lossQuantity} units as loss during transplant.`,
-          };
-          return {
-            ...updatedBatch,
-            quantity: 0, 
-            status: 'Archived',
-            logHistory: [lossLog, ...updatedBatch.logHistory],
-          };
-        }
-        const newQuantity = b.quantity - data.quantity;
-        return {
-          ...updatedBatch,
-          quantity: newQuantity,
-          status: newQuantity === 0 ? 'Archived' : b.status,
-        };
-      }
-      return b;
-    });
-
-    setBatches([newBatch, ...updatedBatches]);
+    const result = await transplantBatchAction(transplantingBatch.id, data, data.quantity);
+    
+    if (result.success) {
+      toast({ title: 'Transplant Successful', description: `New batch #${result.data?.newBatch.batchNumber} created.` });
+      await loadBatches();
+    } else {
+      toast({ variant: 'destructive', title: 'Transplant Failed', description: result.error });
+    }
+    
     setIsTransplantFormOpen(false);
     setTransplantingBatch(null);
   };
@@ -297,77 +269,37 @@ export default function DashboardPage() {
     setIsActionLogFormOpen(true);
   };
   
-  const handleActionLogFormSubmit = (data: any) => {
+  const handleActionLogFormSubmit = async (data: any) => {
     if (!actionLogBatch) return;
 
-    const today = new Date().toISOString().split('T')[0];
     let logMessage = '';
-
-    const createLogEntry = (batch: Batch, message: string, locationUpdate?: string) => {
-      const newLog: LogEntry = { date: today, action: message };
-      const updatedBatch = { ...batch, logHistory: [newLog, ...batch.logHistory] };
-      if (locationUpdate) {
-        updatedBatch.location = locationUpdate;
-      }
-      return updatedBatch;
-    };
 
     switch (data.actionType) {
       case 'log':
         logMessage = data.logMessage;
-        setBatches(batches.map(b => b.id === actionLogBatch.id ? createLogEntry(b, logMessage) : b));
         break;
       case 'move':
         logMessage = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
-        setBatches(batches.map(b => b.id === actionLogBatch.id ? createLogEntry(b, logMessage, data.newLocation) : b));
-        break;
-      case 'split':
-        const nextBatchNumStr = getNextBatchNumber();
-        const batchNumberPrefix = '3'; // Potted
-        const prefixedBatchNumber = `${batchNumberPrefix}-${nextBatchNumStr}`;
-        
-        const newBatch: Batch = {
-            ...actionLogBatch,
-            id: Date.now().toString(),
-            batchNumber: prefixedBatchNumber,
-            initialQuantity: data.splitQuantity,
-            quantity: data.splitQuantity,
-            location: data.newLocation,
-            plantingDate: data.newBatchPlantingDate,
-            logHistory: [{ date: today, action: `Split from batch #${actionLogBatch.batchNumber}` }],
-            transplantedFrom: actionLogBatch.batchNumber,
-            supplier: 'Doran Nurseries',
-        };
-
-        const updatedBatchesForSplit = batches.map(b => {
-            if (b.id === actionLogBatch.id) {
-                const newQuantity = b.quantity - data.splitQuantity;
-                const message = `Split ${data.splitQuantity} units to new batch #${newBatch.batchNumber}`;
-                const updatedBatch = createLogEntry(b, message);
-                return { ...updatedBatch, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status};
-            }
-            return b;
-        });
-
-        setBatches([newBatch, ...updatedBatchesForSplit]);
         break;
       case 'adjust':
         logMessage = `Adjusted quantity by -${data.adjustQuantity}. Reason: ${data.adjustReason}`;
-        const updatedBatchesForAdjust = batches.map(b => {
-            if (b.id === actionLogBatch.id) {
-                const newQuantity = b.quantity - data.adjustQuantity;
-                const updatedBatch = createLogEntry(b, logMessage);
-                return { ...updatedBatch, quantity: newQuantity, status: newQuantity === 0 ? 'Archived' : b.status };
-            }
-            return b;
-        });
-        setBatches(updatedBatchesForAdjust);
         break;
       case 'Batch Spaced':
       case 'Batch Trimmed':
         logMessage = data.actionType;
-        setBatches(batches.map(b => b.id === actionLogBatch.id ? createLogEntry(b, logMessage) : b));
         break;
+      default:
+        toast({ variant: 'destructive', title: 'Invalid Action', description: 'The selected action is not supported.' });
+        return;
+    }
+
+    const result = await logAction(actionLogBatch.id, logMessage);
+
+    if (result.success) {
+      toast({ title: 'Action Logged', description: 'The action has been successfully logged.' });
+      await loadBatches();
+    } else {
+      toast({ variant: 'destructive', title: 'Logging Failed', description: result.error });
     }
     
     setIsActionLogFormOpen(false);
@@ -395,7 +327,15 @@ export default function DashboardPage() {
   };
 
   if (!isClient) {
-    return null; // or a loading spinner
+     return (
+        <div className="flex min-h-screen w-full flex-col p-6">
+            <Skeleton className="h-10 w-1/3 mb-4" />
+            <Skeleton className="h-8 w-full mb-6" />
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
+            </div>
+        </div>
+    );
   }
 
   return (
@@ -496,7 +436,11 @@ export default function DashboardPage() {
         </div>
       </header>
       <main className="flex-1 p-4 sm:p-6">
-        {filteredBatches.length > 0 ? (
+        {isLoading ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
+            </div>
+        ) : filteredBatches.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredBatches.map((batch) => (
               <BatchCard
