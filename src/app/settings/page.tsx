@@ -20,16 +20,26 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const storedLocations = localStorage.getItem('nurseryLocations');
-    if (storedLocations) {
-      setLocations(JSON.parse(storedLocations));
+    const storedLocationsRaw = localStorage.getItem('nurseryLocations');
+    if (storedLocationsRaw) {
+      const storedLocations = JSON.parse(storedLocationsRaw);
+      if (storedLocations && storedLocations.length > 0) {
+        setLocations(storedLocations);
+      } else {
+        setLocations(INITIAL_NURSERY_LOCATIONS);
+      }
     } else {
       setLocations(INITIAL_NURSERY_LOCATIONS);
     }
 
-    const storedSizes = localStorage.getItem('plantSizes');
-    if (storedSizes) {
-      setSizes(JSON.parse(storedSizes));
+    const storedSizesRaw = localStorage.getItem('plantSizes');
+    if (storedSizesRaw) {
+      const storedSizes = JSON.parse(storedSizesRaw);
+      if (storedSizes && storedSizes.length > 0) {
+        setSizes(storedSizes);
+      } else {
+        setSizes(INITIAL_PLANT_SIZES);
+      }
     } else {
       setSizes(INITIAL_PLANT_SIZES);
     }
