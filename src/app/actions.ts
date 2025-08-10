@@ -308,7 +308,12 @@ export async function batchChatAction(batch: Batch, query: string) {
 const signupSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
+    confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
 });
+
 
 export async function signupAction(values: z.infer<typeof signupSchema>) {
     try {
