@@ -20,7 +20,9 @@ async function seedData() {
     batchesFromFile.forEach((batch) => {
         // Use the existing ID from the file for the document ID in Firestore
         const docRef = doc(db, 'batches', batch.id);
-        firestoreBatch.set(docRef, batch);
+        const batchData = { ...batch };
+        delete (batchData as any).id; // Don't save the ID as a field
+        firestoreBatch.set(docRef, batchData);
     });
     await firestoreBatch.commit();
     console.log('Successfully seeded data to Firestore.');
@@ -102,11 +104,12 @@ export async function addBatchAction(
       logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
     }
     const docRef = await addDoc(collection(db, "batches"), batchWithHistory);
+    
+    // Return the full batch object including the generated ID
     const batchWithId: Batch = {
         ...batchWithHistory,
         id: docRef.id,
     }
-    await updateDoc(docRef, { id: docRef.id }); // Add the ID to the document itself
     
     return { success: true, data: batchWithId };
   } catch (error) {
@@ -118,7 +121,9 @@ export async function addBatchAction(
 export async function updateBatchAction(updatedBatch: Batch) {
   try {
     const batchRef = doc(db, "batches", updatedBatch.id);
-    await setDoc(batchRef, updatedBatch, { merge: true });
+    const dataToUpdate = { ...updatedBatch };
+    delete (dataToUpdate as any).id; // Never write the ID as a field in the document
+    await setDoc(batchRef, dataToUpdate, { merge: true });
     return { success: true, data: updatedBatch };
   } catch (error) {
     console.error('Error updating batch:', error);
@@ -180,13 +185,20 @@ export async function archiveBatchAction(batchId: string, loss: number) {
     if (!batch) {
       return { success: false, error: 'Batch not found.' };
     }
-    batch.status = 'Archived';
-    const action = `Archived with loss of ${loss} units. Final quantity: ${batch.quantity}.`;
-    batch.logHistory.push({ date: new Date().toISOString(), action });
-    batch.quantity = 0; // Set quantity to 0 on archive
+    
+    const updatedBatch = { ...batch };
+    
+    updatedBatch.status = 'Archived';
+    const action = `Archived with loss of ${loss} units. Final quantity: ${batch.quantity - loss}.`;
+    updatedBatch.logHistory.push({ date: new Date().toISOString(), action });
+    updatedBatch.quantity = 0;
 
-    await updateBatchAction(batch);
-    return { success: true, data: batch };
+    const result = await updateBatchAction(updatedBatch);
+    if (result.success) {
+        return { success: true, data: result.data };
+    } else {
+        return { success: false, error: result.error };
+    }
   } catch (error) {
     console.error('Error archiving batch:', error);
     return { success: false, error: 'Failed to archive batch.' };
@@ -226,8 +238,9 @@ export async function transplantBatchAction(
 
     // Prepare the new batch document
     const newBatchRef = doc(collection(db, 'batches'));
+    const { id, ...newBatchDataWithoutId } = newBatchData; // Exclude id from data
     const newBatch: Batch = {
-      ...newBatchData,
+      ...newBatchDataWithoutId,
       id: newBatchRef.id,
       initialQuantity: transplantQuantity,
       quantity: transplantQuantity,
@@ -239,11 +252,15 @@ export async function transplantBatchAction(
         },
       ],
     };
+    
+    const newBatchForFirestore = { ...newBatch };
+    delete (newBatchForFirestore as any).id;
+
 
     // Use a write batch to perform atomic operation
     const batch = firestoreWriteBatch(db);
     batch.update(sourceBatchDocRef, sourceBatchUpdate);
-    batch.set(newBatchRef, newBatch);
+    batch.set(newBatchRef, newBatchForFirestore);
     
     await batch.commit();
 
