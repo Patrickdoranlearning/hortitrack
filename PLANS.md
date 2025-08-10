@@ -1,0 +1,70 @@
+# HortiTrack Future Feature Roadmap
+
+This document outlines the planned features and ideas for the HortiTrack application, as discussed.
+
+## 1. Batch Photos
+
+A system to attach photos to batches, enhancing visual tracking and sales capabilities.
+
+### Sub-Features:
+
+*   **Dual Photo Types:**
+    *   **Grower Photos:** For internal use. A visual log to track the batch's progress, health, and size over its lifecycle. Helps standardize production techniques.
+    *   **Sales Photos:** "Glamour shots" of market-ready batches to be used by the sales team and shown to customers in a future portal.
+*   **Implementation:**
+    *   Add a "Take Photo" option after scanning a batch or from the batch details screen.
+    *   Use the device's camera.
+    *   Store images securely using a cloud service like Firebase Storage.
+
+### AI Enhancements:
+
+*   **AI-Powered Growth Rate Analysis:**
+    *   Use a multi-modal AI (like Gemini) to compare two "Grower Photos" from different dates.
+    *   The AI will analyze and report on changes in size, biomass, and foliage density, providing quantifiable growth data.
+    *   Requires consistent photo-taking, potentially using a reference object for scale.
+
+## 2. User Roles, Authentication & Ordering
+
+Transform the app into a multi-user platform with distinct roles and capabilities.
+
+### Sub-Features:
+
+*   **User Roles:**
+    *   **Nursery Operative:** Focused on batch management, logging actions, and completing assigned tasks.
+    *   **Sales Person:** Can view inventory, check what's ready for sale, and potentially create quotes or orders.
+    *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly.
+*   **Implementation:**
+    *   Use **Firebase Authentication** to manage user accounts, logins, and security.
+    *   Build different UI views and dashboards tailored to each user role.
+
+## 3. Task Management System
+
+An active, operational tool to assign and track nursery tasks.
+
+### Sub-Features:
+
+*   **Digital "Job Board":**
+    *   Create tasks with a title, assignee, associated batch, due date, and priority.
+    *   Operatives get a personalized "My Tasks" dashboard upon login.
+    *   Managers get a comprehensive view to track all tasks and overall progress.
+*   **Implementation:**
+    *   Build on top of the User Roles feature.
+    *   Use a real-time database like **Firestore** to store and sync tasks across devices instantly.
+
+### AI Enhancements:
+
+*   **AI-Assisted Task Creation:**
+    *   Add a "Create Tasks" button to the AI Care Recommendations feature. The AI's suggestions (e.g., "Watering needed") can be converted directly into assignable tasks.
+    *   AI could help prioritize tasks based on external data like weather forecasts.
+
+## 4. Label Printing
+
+Bridge the gap between digital data and physical inventory by printing labels directly from the application.
+
+### Sub-Features:
+
+*   **Print-Ready PDF Generation:**
+    *   Create a feature to generate a standardized, print-ready PDF for a selected batch.
+    *   The label would include the batch number, plant name, a scannable barcode/QR code, and other key details.
+*   **Direct Printer Integration:**
+    *   Investigate direct printing to specific hardware (e.g., Toshiba B-EXT1) for a more seamless workflow, potentially via a browser extension or a small network service.
