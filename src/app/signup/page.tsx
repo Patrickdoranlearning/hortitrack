@@ -18,9 +18,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { signupAction } from '@/app/actions';
 import { Logo } from '@/components/logo';
 import { useState } from 'react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth as clientAuth } from '@/lib/firebase';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
@@ -49,18 +50,24 @@ export default function SignupPage() {
 
   const handleSubmit = async (values: SignupFormValues) => {
     setIsLoading(true);
-    const result = await signupAction(values);
-    setIsLoading(false);
-
-    if (result.success) {
+    try {
+      await createUserWithEmailAndPassword(clientAuth, values.email, values.password);
       toast({ title: 'Signup Successful', description: 'You can now log in with your new account.' });
       router.push('/login');
-    } else {
+    } catch (error: any) {
+      let errorMessage = 'An unknown error occurred.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account with this email address already exists.';
+      } else {
+        errorMessage = error.message;
+      }
       toast({
         variant: 'destructive',
         title: 'Signup Failed',
-        description: result.error || 'An unknown error occurred.',
+        description: errorMessage,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 

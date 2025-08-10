@@ -7,9 +7,28 @@ import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin';
 
 import { z } from 'zod';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getApp, initializeApp, cert } from 'firebase-admin/app';
+
+
+// Helper to initialize Firebase Admin SDK
+function getAdminFirestore() {
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountKey) {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.");
+    }
+    const serviceAccount = JSON.parse(serviceAccountKey);
+
+    try {
+        return getApp().firestore();
+    } catch {
+        return initializeApp({
+            credential: cert(serviceAccount)
+        }).firestore();
+    }
+}
 
 
 const dataFilePath = join(process.cwd(), 'src', 'lib', 'data.json');
@@ -312,32 +331,5 @@ export async function batchChatAction(batch: Batch, query: string) {
     } catch (error) {
       console.error('Error in batch chat action:', error);
       return { success: false, error: 'Failed to get AI chat response.' };
-    }
-}
-
-// AUTHENTICATION ACTIONS
-
-const signupSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
-}).refine(data => data.password, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-});
-
-
-export async function signupAction(values: z.infer<typeof signupSchema>) {
-    try {
-        const { email, password } = signupSchema.parse(values);
-        const userRecord = await getAdminAuth().createUser({
-            email,
-            password,
-        });
-        return { success: true, data: { uid: userRecord.uid } };
-    } catch (error: any) {
-        if (error.code === 'auth/email-already-exists') {
-            return { success: false, error: 'An account with this email address already exists.' };
-        }
-        return { success: false, error: error.message || 'An unknown error occurred during signup.' };
     }
 }
