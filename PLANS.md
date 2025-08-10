@@ -1,6 +1,17 @@
 # HortiTrack Future Feature Roadmap
 
-This document outlines the planned features and ideas for the HortiTrack application, as discussed.
+This document outlines the planned features and ideas for the HortiTrack application, as discussed. The application will be developed using a modular architecture to ensure scalability and maintainability.
+
+## Core Modules
+
+*   **Production Module (Current Focus):** Core functionality for tracking plant batches from propagation to sale-ready status. Includes batch creation, logging, AI recommendations, and protocol generation.
+*   **Sales Module:** To be developed. Will handle customer-facing inventory, ordering, and salesperson tools.
+*   **Dispatch Module:** To be developed. Will manage preparing and shipping customer orders.
+*   **IPM (Integrated Pest Management) Module:** To be developed. Will track pest and disease issues and treatments.
+
+---
+
+## Planned Features
 
 ## 1. Batch Photos
 
@@ -23,21 +34,21 @@ A system to attach photos to batches, enhancing visual tracking and sales capabi
     *   The AI will analyze and report on changes in size, biomass, and foliage density, providing quantifiable growth data.
     *   Requires consistent photo-taking, potentially using a reference object for scale.
 
-## 2. User Roles, Authentication & Ordering
+## 2. User Roles, Authentication & Ordering (Sales Module)
 
 Transform the app into a multi-user platform with distinct roles and capabilities.
 
 ### Sub-Features:
 
 *   **User Roles:**
-    *   **Nursery Operative:** Focused on batch management, logging actions, and completing assigned tasks.
-    *   **Sales Person:** Can view inventory, check what's ready for sale, and potentially create quotes or orders.
-    *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly.
+    *   **Nursery Operative:** Focused on batch management, logging actions, and completing assigned tasks within the Production Module.
+    *   **Sales Person:** Can view inventory, check what's ready for sale, and potentially create quotes or orders in the Sales Module.
+    *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly in the Sales Module.
 *   **Implementation:**
     *   Use **Firebase Authentication** to manage user accounts, logins, and security.
     *   Build different UI views and dashboards tailored to each user role.
 
-## 3. Task Management System
+## 3. Task Management System (Production Module)
 
 An active, operational tool to assign and track nursery tasks.
 
@@ -57,7 +68,7 @@ An active, operational tool to assign and track nursery tasks.
     *   Add a "Create Tasks" button to the AI Care Recommendations feature. The AI's suggestions (e.g., "Watering needed") can be converted directly into assignable tasks.
     *   AI could help prioritize tasks based on external data like weather forecasts.
 
-## 4. Label Printing
+## 4. Label Printing (Production/Dispatch Module)
 
 Bridge the gap between digital data and physical inventory by printing labels directly from the application.
 
