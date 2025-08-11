@@ -63,14 +63,14 @@ const batchSchema = z.object({
   plantingDate: z.string().min(1, 'Planting date is required.'),
   initialQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
   quantity: z.coerce.number().min(0, 'Quantity must be at least 0.'),
-  status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
+  status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good']),
   location: z.string().min(1, 'Location is required.'),
   size: z.string().min(1, 'Size is required.'),
   supplier: z.string().min(1, 'Supplier is required.'),
   logHistory: z.array(logEntrySchema),
 });
 
-type BatchFormValues = z.infer<typeof batchSchema>;
+type BatchFormValues = Omit<z.infer<typeof batchSchema>, 'status'> & { status: z.infer<typeof batchSchema>['status'] | 'Archived' };
 
 export interface BatchDistribution {
   inStock: number;
@@ -134,9 +134,9 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
         finalBatchNumber = `${newPrefix}-${numberPart}`;
       }
 
-       onSubmit({ ...data, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity });
+       onSubmit({ ...data, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
     } else {
-        onSubmit({ ...data, initialQuantity: data.quantity });
+        onSubmit({ ...data, initialQuantity: data.quantity } as Batch);
     }
   };
 
@@ -341,7 +341,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a status" />
@@ -353,7 +353,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         <SelectItem value="Potted">Potted</SelectItem>
                         <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
                         <SelectItem value="Looking Good">Looking Good</SelectItem>
-                        <SelectItem value="Archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
