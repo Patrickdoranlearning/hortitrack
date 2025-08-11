@@ -150,9 +150,9 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
   
-  const handleVarietyChange = (varietyName: string) => {
-    form.setValue('plantVariety', varietyName);
-    const selectedVariety = VARIETIES.find(v => v.name.toLowerCase() === varietyName.toLowerCase());
+  const handleVarietyChange = (varietyValue: string) => {
+    form.setValue('plantVariety', varietyValue);
+    const selectedVariety = VARIETIES.find(v => v.name.toLowerCase() === varietyValue.toLowerCase());
     if (selectedVariety) {
       form.setValue('plantFamily', selectedVariety.family);
       form.setValue('category', selectedVariety.category);
@@ -190,17 +190,15 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 control={form.control}
                 name="plantVariety"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Plant Variety</FormLabel>
-                    <FormControl>
-                      <Combobox
+                    <Combobox
                         options={varietyOptions}
                         value={field.value}
                         onChange={handleVarietyChange}
-                        placeholder="Select or type a variety..."
+                        placeholder="Select variety..."
                         emptyMessage="No matching variety found."
                       />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
