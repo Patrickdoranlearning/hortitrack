@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText, MessageSquare } from 'lucide-react';
+import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -27,10 +27,9 @@ interface BatchCardProps {
   onTransplant: (batch: Batch) => void;
   onLogAction: (batch: Batch) => void;
   onGenerateProtocol: (batch: Batch) => void;
-  onChat: (batch: Batch) => void;
 }
 
-export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol, onChat }: BatchCardProps) {
+export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
 
   const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
@@ -109,16 +108,6 @@ export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, o
       </CardContent>
       <CardFooter className="flex justify-end gap-2">
         <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={() => onChat(batch)}>
-                        <MessageSquare className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Chat with AI</p>
-                </TooltipContent>
-            </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button variant="outline" size="icon" onClick={() => onLogAction(batch)}>

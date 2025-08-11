@@ -3,7 +3,6 @@
 
 import { careRecommendations } from '@/ai/flows/care-recommendations';
 import { productionProtocol } from '@/ai/flows/production-protocol';
-import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 
@@ -251,15 +250,4 @@ export async function transplantBatchAction(
     console.error('Error transplanting batch:', error);
     return { success: false, error: error.message || 'Failed to transplant batch.' };
   }
-}
-
-export async function batchChatAction(batch: Batch, query: string) {
-    const runtime = 'nodejs';
-    try {
-      const result = await batchChat({ batch, query });
-      return { success: true, data: result };
-    } catch (error) {
-      console.error('Error in batch chat action:', error);
-      return { success: false, error: 'Failed to get AI chat response.' };
-    }
 }
