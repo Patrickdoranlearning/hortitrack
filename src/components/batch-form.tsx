@@ -48,7 +48,7 @@ import {
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { VARIETIES } from '@/lib/varieties';
 import { Combobox } from './ui/combobox';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -120,6 +120,34 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     control: form.control,
     name: 'logHistory',
   });
+  
+  const customSizeSort = (a: PlantSize, b: PlantSize) => {
+    const typeOrder: Record<string, number> = { 'Pot': 1, 'Tray': 2, 'Bareroot': 3 };
+
+    const typeA = typeOrder[a.type] || 99;
+    const typeB = typeOrder[b.type] || 99;
+
+    if (typeA !== typeB) {
+      return typeA - typeB;
+    }
+
+    const sizeA = parseFloat(a.size);
+    const sizeB = parseFloat(b.size);
+
+    if (a.type === 'Pot') {
+      return sizeA - sizeB;
+    }
+
+    if (a.type === 'Tray') {
+      return sizeB - sizeA;
+    }
+
+    return a.size.localeCompare(b.size);
+  };
+  
+  const sortedPlantSizes = useMemo(() => {
+    return [...plantSizes].sort(customSizeSort);
+  }, [plantSizes]);
 
   const handleFormSubmit = (data: BatchFormValues) => {
     if (batch) {
@@ -249,7 +277,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {plantSizes.map(size => <SelectItem key={size.id} value={size.size}>{size.size}</SelectItem>)}
+                        {sortedPlantSizes.map(size => <SelectItem key={size.id} value={size.size}>{size.size} ({size.type})</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />

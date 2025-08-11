@@ -35,6 +35,7 @@ import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from './ui/checkbox';
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
+import { useMemo } from 'react';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -92,6 +93,34 @@ export function TransplantForm({
         }
       : undefined,
   });
+  
+  const customSizeSort = (a: PlantSize, b: PlantSize) => {
+    const typeOrder: Record<string, number> = { 'Pot': 1, 'Tray': 2, 'Bareroot': 3 };
+
+    const typeA = typeOrder[a.type] || 99;
+    const typeB = typeOrder[b.type] || 99;
+
+    if (typeA !== typeB) {
+      return typeA - typeB;
+    }
+
+    const sizeA = parseFloat(a.size);
+    const sizeB = parseFloat(b.size);
+
+    if (a.type === 'Pot') {
+      return sizeA - sizeB;
+    }
+
+    if (a.type === 'Tray') {
+      return sizeB - sizeA;
+    }
+
+    return a.size.localeCompare(b.size);
+  };
+
+  const sortedPlantSizes = useMemo(() => {
+    return [...plantSizes].sort(customSizeSort);
+  }, [plantSizes]);
 
   const handleFormSubmit = (
     data: z.infer<ReturnType<typeof transplantFormSchema>>
@@ -283,9 +312,9 @@ export function TransplantForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {plantSizes.map((size) => (
+                      {sortedPlantSizes.map((size) => (
                         <SelectItem key={size.id} value={size.size}>
-                          {size.size}
+                          {size.size} ({size.type})
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -87,7 +87,7 @@ export default function SizesPage() {
 
     if (isNew) {
       const newSizeWithId = { ...data, id: `size_${Date.now()}` };
-      setSizes(prev => [...prev, newSizeWithId].sort((a,b) => a.size.localeCompare(b.size)));
+      setSizes(prev => [...prev, newSizeWithId]);
       toast({ title: 'Size Added', description: `Successfully added "${data.size}".` });
     } else {
       setSizes(sizes.map(s => s.id === editingSize.id ? { ...s, ...data } : s));
@@ -159,6 +159,30 @@ export default function SizesPage() {
     reader.readAsText(file);
   };
   
+  const customSizeSort = (a: PlantSize, b: PlantSize) => {
+    const typeOrder: Record<string, number> = { 'Pot': 1, 'Tray': 2, 'Bareroot': 3 };
+
+    const typeA = typeOrder[a.type] || 99;
+    const typeB = typeOrder[b.type] || 99;
+
+    if (typeA !== typeB) {
+      return typeA - typeB;
+    }
+
+    const sizeA = parseFloat(a.size);
+    const sizeB = parseFloat(b.size);
+
+    if (a.type === 'Pot') {
+      return sizeA - sizeB;
+    }
+
+    if (a.type === 'Tray') {
+      return sizeB - sizeA;
+    }
+
+    return a.size.localeCompare(b.size);
+  };
+  
   if (!isClient) {
     return (
        <div className="flex items-center justify-center h-screen">
@@ -210,7 +234,7 @@ export default function SizesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sizes.sort((a,b) => a.size.localeCompare(b.size)).map((size) => (
+              {sizes.sort(customSizeSort).map((size) => (
                 <TableRow key={size.id}>
                   <TableCell className="font-medium">{size.size}</TableCell>
                   <TableCell>{size.type}</TableCell>
