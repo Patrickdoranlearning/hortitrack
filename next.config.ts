@@ -1,12 +1,7 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  /* config options here */
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
   experimental: {
-    allowedDevOrigins: [
-      'https://9004-firebase-studio-1754759437684.cluster-fbfjltn375c6wqxlhoehbz44sk.cloudworkstations.dev'
-    ],
-  },
-  devIndicators: {
     allowedDevOrigins: [
         '*.cloudworkstations.dev',
     ]
@@ -27,6 +22,6 @@ const nextConfig = {
       },
     ],
   },
-};
+}
 
-module.exports = nextConfig;
+export default nextConfig
