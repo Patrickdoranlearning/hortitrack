@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import type { NurseryLocation } from '@/lib/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { LocationSchema } from '@/lib/types';
 import { Form, FormField } from '@/components/ui/form';
 import {
     AlertDialog,
@@ -36,16 +35,21 @@ const INITIAL_LOCATIONS: NurseryLocation[] = [
     { id: 'sh1', name: 'Shade House 1', area: 800, isCovered: true },
 ];
 
+// Define the schema directly inside the client component file.
+const locationFormSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, 'Location name is required.'),
+  area: z.coerce.number().min(0, 'Area must be a positive number.'),
+  isCovered: z.boolean(),
+});
+type LocationFormValues = z.infer<typeof locationFormSchema>;
+
+
 export default function LocationsPage() {
   const [locations, setLocations] = useState<NurseryLocation[]>([]);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
-
-  // Define the schema inside the component or where it can be imported without 'use client' issues.
-  const locationFormSchema = LocationSchema;
-  type LocationFormValues = z.infer<typeof locationFormSchema>;
-
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(locationFormSchema),
@@ -243,5 +247,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-
-    
