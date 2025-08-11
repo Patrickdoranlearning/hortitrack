@@ -1,14 +1,16 @@
 // Only import on the server
 import 'server-only';
 
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
+import { getApps, initializeApp, cert, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { config } from 'dotenv';
-
-config();
 
 function initAdmin() {
+  // This function is not meant to be used in production.
+  // In production, the service account key should be set as an environment variable.
+  // The Firebase Admin SDK will automatically pick it up.
+  // This is for local development only.
+
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (serviceAccountKey) {
     try {
@@ -28,6 +30,7 @@ function initAdmin() {
   return initializeApp();
 }
 
-const app = getApps().length ? getApps()[0] : initAdmin();
+
+const app = getApps().length ? getApp() : initAdmin();
 export const db = getFirestore(app);
 export const adminAuth = getAuth(app);
