@@ -29,11 +29,7 @@ interface BatchCardProps {
 }
 
 const TransplantIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-down-to-dot">
-        <path d="M12 2v14"/>
-        <path d="m19 9-7 7-7-7"/>
-        <path d="M12 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/>
-    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sprout"><path d="M7 20h10"/><path d="M10 20v-2a2.4 2.4 0 0 1 .1-1 2 2 0 0 1 3.8 0 2.4 2.4 0 0 1 .1 1v2"/><path d="M12 15a2 2 0 0 0 2-2V4a2 2 0 0 0-4 0v9a2 2 0 0 0 2 2z"/><path d="M12 4a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/></svg>
 );
 
 
@@ -67,67 +63,70 @@ export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCa
         className="flex flex-col h-full w-full hover:border-primary transition-colors cursor-pointer"
         onClick={() => onClick(batch)}
       >
-        <CardHeader className="p-3 pb-2">
-          <CardTitle className="font-headline text-lg leading-tight">
-            {batch.plantVariety}
-          </CardTitle>
-          <CardDescription className="text-sm">Batch #{batch.batchNumber}</CardDescription>
-        </CardHeader>
-        <CardContent className="p-3 pt-0 space-y-2 flex-grow">
-          <div className="aspect-square w-full flex items-center justify-center bg-muted rounded-md mb-2">
-              <ImageIcon className="h-10 w-10 text-muted-foreground" />
+        <CardContent className="p-3 flex gap-3 items-start flex-grow">
+          <div className="aspect-square w-20 flex-shrink-0 flex items-center justify-center bg-muted rounded-md">
+              <ImageIcon className="h-8 w-8 text-muted-foreground" />
           </div>
-          <div>
-            <div className="flex justify-between text-xs font-semibold mb-1">
-              <span>Stock</span>
-              <span>{batch.quantity} / {batch.initialQuantity}</span>
+          <div className="flex-grow space-y-2">
+            <div>
+              <CardTitle className="font-headline text-lg leading-tight">
+                {batch.plantVariety}
+              </CardTitle>
+              <CardDescription className="text-xs">Batch #{batch.batchNumber}</CardDescription>
             </div>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Progress value={stockPercentage} />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{Math.round(stockPercentage)}% remaining</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <div className="text-sm">
-            <span className="font-semibold">Location:</span> {batch.location}
-          </div>
-          <div className="text-sm">
-            <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
+             <div>
+              <div className="flex justify-between text-xs font-semibold mb-1">
+                <span>Stock</span>
+                <span>{batch.quantity} / {batch.initialQuantity}</span>
+              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Progress value={stockPercentage} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{Math.round(stockPercentage)}% remaining</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <div className="text-sm">
+                <span className="font-semibold">Loc:</span> {batch.location}
+            </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end gap-1 p-2 pt-0">
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleActionClick(e, onLogAction)}>
-                            <ClipboardList className="h-4 w-4" />
-                            <span className="sr-only">Log Action</span>
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Log Action</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleActionClick(e, onTransplant)} disabled={batch.quantity === 0}>
-                            <TransplantIcon />
-                            <span className="sr-only">Transplant</span>
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Transplant</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+        <CardFooter className="flex justify-between items-center p-3 pt-0">
+            <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
+            <div className="flex gap-1">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleActionClick(e, onLogAction)}>
+                                <ClipboardList className="h-4 w-4" />
+                                <span className="sr-only">Log Action</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Log Action</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleActionClick(e, onTransplant)} disabled={batch.quantity === 0}>
+                                <TransplantIcon />
+                                <span className="sr-only">Transplant</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Transplant</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
         </CardFooter>
       </Card>
   );
 }
+
