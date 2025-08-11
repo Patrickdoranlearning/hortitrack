@@ -29,7 +29,13 @@ interface BatchCardProps {
 }
 
 const TransplantIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sprout"><path d="M7 20h10"/><path d="M10 20v-2a2.4 2.4 0 0 1 .1-1 2 2 0 0 1 3.8 0 2.4 2.4 0 0 1 .1 1v2"/><path d="M12 15a2 2 0 0 0 2-2V4a2 2 0 0 0-4 0v9a2 2 0 0 0 2 2z"/><path d="M12 4a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+        <path d="M6 14v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-4" />
+        <path d="M12 14V4" />
+        <path d="M12 4h.01" />
+        <path d="M10 6L7 9" />
+        <path d="M14 6l3 3" />
+    </svg>
 );
 
 
@@ -72,7 +78,8 @@ export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCa
               <CardTitle className="font-headline text-lg leading-tight">
                 {batch.plantVariety}
               </CardTitle>
-              <CardDescription className="text-xs">Batch #{batch.batchNumber}</CardDescription>
+              <CardDescription className="text-sm text-muted-foreground">{batch.plantFamily}</CardDescription>
+              <CardDescription className="text-xs pt-1">Batch #{batch.batchNumber}</CardDescription>
             </div>
              <div>
               <div className="flex justify-between text-xs font-semibold mb-1">
@@ -90,9 +97,6 @@ export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCa
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <div className="text-sm">
-                <span className="font-semibold">Loc:</span> {batch.location}
-            </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-between items-center p-3 pt-0">
@@ -101,8 +105,8 @@ export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCa
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleActionClick(e, onLogAction)}>
-                                <ClipboardList className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" onClick={(e) => handleActionClick(e, onLogAction)}>
+                                <ClipboardList className="h-5 w-5" />
                                 <span className="sr-only">Log Action</span>
                             </Button>
                         </TooltipTrigger>
@@ -114,7 +118,7 @@ export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCa
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleActionClick(e, onTransplant)} disabled={batch.quantity === 0}>
+                            <Button variant="ghost" size="icon" onClick={(e) => handleActionClick(e, onTransplant)} disabled={batch.quantity === 0}>
                                 <TransplantIcon />
                                 <span className="sr-only">Transplant</span>
                             </Button>
@@ -129,4 +133,3 @@ export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCa
       </Card>
   );
 }
-
