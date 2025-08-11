@@ -28,7 +28,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Plus, Trash2, PieChart, Archive } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, PieChart, Archive, Image as ImageIcon, Upload, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,7 +48,11 @@ import {
 import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
 import { VARIETIES } from '@/lib/varieties';
 import { Combobox } from './ui/combobox';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { app } from '@/lib/firebase';
+import Image from 'next/image';
+import { Progress } from './ui/progress';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -69,6 +73,8 @@ const batchSchema = z.object({
   size: z.string().min(1, 'Size is required.'),
   supplier: z.string().min(1, 'Supplier is required.'),
   logHistory: z.array(logEntrySchema),
+  growerPhotoUrl: z.string().optional(),
+  salesPhotoUrl: z.string().optional(),
 });
 
 type BatchFormValues = Omit<z.infer<typeof batchSchema>, 'status'> & { status: z.infer<typeof batchSchema>['status'] | 'Archived' };
@@ -89,14 +95,58 @@ interface BatchFormProps {
   plantSizes: string[];
 }
 
+const storage = getStorage(app);
+
+const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+
+            if (width > height) {
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+            } else {
+                if (height > maxHeight) {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return reject(new Error('Could not get canvas context.'));
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('Canvas to Blob conversion failed.'));
+                }
+            }, 'image/jpeg', 0.9);
+        };
+        img.onerror = (error) => reject(error);
+    });
+};
+
 export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
   const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   
+  const growerPhotoInputRef = useRef<HTMLInputElement>(null);
+  const salesPhotoInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
     defaultValues: batch
-      ? { ...batch, plantingDate: batch.plantingDate, supplier: batch.supplier || 'Doran Nurseries' }
+      ? { ...batch, supplier: batch.supplier || 'Doran Nurseries' }
       : {
           id: Date.now().toString(),
           batchNumber: '',
@@ -118,6 +168,30 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     control: form.control,
     name: 'logHistory',
   });
+  
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'growerPhotoUrl' | 'salesPhotoUrl') => {
+      const file = e.target.files?.[0];
+      if (!file || !batch) return;
+      
+      setUploadProgress(prev => ({ ...prev, [fieldName]: 0 }));
+      
+      try {
+        const resizedBlob = await resizeImage(file, 1024, 1024);
+        const storageRef = ref(storage, `batch-photos/${batch.id}/${fieldName}-${Date.now()}.jpg`);
+        
+        // This is a simplified progress simulation. For real progress, you would use uploadBytesResumable
+        setUploadProgress(prev => ({ ...prev, [fieldName]: 50 }));
+
+        const snapshot = await uploadBytes(storageRef, resizedBlob);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        form.setValue(fieldName, downloadURL, { shouldValidate: true });
+        setUploadProgress(prev => ({ ...prev, [fieldName]: 100 }));
+      } catch (error) {
+          console.error("Upload failed", error);
+          setUploadProgress(prev => ({ ...prev, [fieldName]: -1 }));
+      }
+  };
 
   const handleFormSubmit = (data: BatchFormValues) => {
     if (batch) {
@@ -168,6 +242,41 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
   const varietyOptions = VARIETIES.map(v => ({ value: v.name, label: v.name }));
 
+  const renderPhotoUploader = (fieldName: 'growerPhotoUrl' | 'salesPhotoUrl', label: string, ref: React.RefObject<HTMLInputElement>) => {
+    const url = form.watch(fieldName);
+    const progress = uploadProgress[fieldName];
+    const isUploading = progress > 0 && progress < 100;
+  
+    return (
+      <FormItem>
+        <FormLabel>{label}</FormLabel>
+        <div className="flex items-center gap-2">
+            {url ? (
+                <div className="relative w-24 h-24">
+                    <Image src={url} alt={`${label} preview`} layout="fill" objectFit="cover" className="rounded-md" />
+                    <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => form.setValue(fieldName, undefined)}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            ) : (
+                <div className="w-24 h-24 flex items-center justify-center bg-muted rounded-md">
+                    <ImageIcon className="text-muted-foreground" />
+                </div>
+            )}
+            <div className="flex-1">
+                <Input type="file" accept="image/*" className="hidden" ref={ref} onChange={(e) => handleImageUpload(e, fieldName)} disabled={isUploading || !batch} />
+                <Button type="button" onClick={() => ref.current?.click()} disabled={isUploading || !batch}>
+                    <Upload className="mr-2" /> {url ? 'Change' : 'Upload'}
+                </Button>
+                {!batch && <FormDescription className="mt-2">Save batch first to enable photo uploads.</FormDescription>}
+                {isUploading && <Progress value={progress} className="w-full mt-2" />}
+            </div>
+        </div>
+      </FormItem>
+    );
+  };
+
+
   return (
     <>
       <DialogHeader>
@@ -178,9 +287,9 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       </DialogHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8">
-            {/* Left Column Fields */}
-            <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+            {/* Left Column */}
+            <div className="space-y-4 md:flex md:flex-col">
               <FormField
                 control={form.control}
                 name="plantVariety"
@@ -198,51 +307,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="plantFamily"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Plant Family</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Size</FormLabel>
-                    <Select onValueChange={handleSizeChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
+               <FormField
                 control={form.control}
                 name="plantingDate"
                 render={({ field }) => (
@@ -276,11 +341,60 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="size"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Size</FormLabel>
+                    <Select onValueChange={handleSizeChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
             
-            {/* Right Column Fields */}
-            <div className="space-y-4">
-               <FormField
+            {/* Right Column */}
+            <div className="space-y-4 md:flex md:flex-col">
+              <FormField
                 control={form.control}
                 name="batchNumber"
                 render={({ field }) => (
@@ -295,12 +409,38 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               />
                <FormField
                 control={form.control}
+                name="plantFamily"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Plant Family</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
                 name="category"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <FormControl>
                       <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Doran Nurseries" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -330,40 +470,16 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="supplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Doran Nurseries" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            </div>
+            
+            {/* Full Span Items */}
+            <div className="md:col-span-2">
+              {renderPhotoUploader('growerPhotoUrl', 'Grower Photo', growerPhotoInputRef)}
+            </div>
+            <div className="md:col-span-2">
+              {renderPhotoUploader('salesPhotoUrl', 'Sales Photo', salesPhotoInputRef)}
             </div>
 
-            {/* Full Span Items */}
             <div className="md:col-span-2">
               {distribution && batch && (batch.initialQuantity > 0) && (
                   <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">

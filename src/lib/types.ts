@@ -21,6 +21,8 @@ export const BatchSchema = z.object({
   logHistory: z.array(LogEntrySchema),
   transplantedFrom: z.string().optional(),
   supplier: z.string().optional(),
+  growerPhotoUrl: z.string().optional(),
+  salesPhotoUrl: z.string().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 

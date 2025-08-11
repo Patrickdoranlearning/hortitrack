@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
+import { Pencil, MoveRight, ClipboardList, Factory, FileText, Image as ImageIcon } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
+import NextImage from 'next/image';
 
 
 interface BatchCardProps {
@@ -50,7 +51,7 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
   
   return (
     <Card className="flex flex-col h-full">
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="font-headline text-xl">
           {batch.plantVariety}{' '}
           <span className="text-lg font-normal text-muted-foreground font-body">
@@ -60,7 +61,16 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
         <CardDescription>Batch #{batch.batchNumber}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 flex-grow">
-        <div>
+        {batch.growerPhotoUrl ? (
+          <div className="relative aspect-video w-full rounded-md overflow-hidden">
+            <NextImage src={batch.growerPhotoUrl} alt={`Grower photo for ${batch.plantVariety}`} layout="fill" objectFit="cover" />
+          </div>
+        ) : (
+          <div className="aspect-video w-full flex items-center justify-center bg-muted rounded-md">
+            <ImageIcon className="h-12 w-12 text-muted-foreground" />
+          </div>
+        )}
+        <div className="pt-2">
           <div className="flex justify-between text-sm font-semibold mb-1">
             <span>Stock</span>
             <span>{batch.quantity} / {batch.initialQuantity}</span>

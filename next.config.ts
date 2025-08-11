@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
   experimental: {
     serverSourceMaps: false, // quiets the Firestore “Invalid source map” noise
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+      },
+    ],
+  },
 }
 
 export default nextConfig
