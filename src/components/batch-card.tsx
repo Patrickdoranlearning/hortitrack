@@ -63,7 +63,7 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
       <CardContent className="space-y-2 flex-grow">
         {batch.growerPhotoUrl ? (
           <div className="relative aspect-video w-full rounded-md overflow-hidden">
-            <NextImage src={batch.growerPhotoUrl} alt={`Grower photo for ${batch.plantVariety}`} fill style={{ objectFit: 'cover' }} />
+            <NextImage src={batch.growerPhotoUrl} alt={`Grower photo for ${batch.plantVariety}`} fill className="object-cover" />
           </div>
         ) : (
           <div className="aspect-video w-full flex items-center justify-center bg-muted rounded-md">

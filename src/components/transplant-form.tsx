@@ -118,7 +118,7 @@ export function TransplantForm({
   const handleSizeChange = (size: string) => {
     form.setValue('size', size);
     const newStatus = SIZE_TO_STATUS_MAP[size];
-    if (newStatus && (newStatus === 'Potted' || newStatus === 'Plugs/Liners' || newStatus === 'Propagation')) {
+    if (newStatus) {
       form.setValue('status', newStatus);
     }
   };
