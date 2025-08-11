@@ -18,22 +18,6 @@ export async function getProductionProtocolAction(batch: Batch) {
   }
 }
 
-export async function getBatchesAction(): Promise<{
-  success: boolean;
-  data?: Batch[];
-  error?: string;
-}> {
-  try {
-    const batchesCollection = db.collection('batches');
-    const snapshot = await batchesCollection.orderBy('batchNumber').get();
-    const batches = snapshot.docs.map(doc => ({...doc.data(), id: doc.id }) as Batch);
-    return { success: true, data: batches };
-  } catch (error: any) {
-    console.error('Error getting batches:', error);
-    return { success: false, error: 'Failed to get batches: ' + error.message };
-  }
-}
-
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {

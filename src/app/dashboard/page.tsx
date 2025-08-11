@@ -13,14 +13,12 @@ import {
   Users,
   ShoppingCart,
   Archive,
-  PlusSquare,
   ArrowLeft,
   Filter,
   Search,
   TrendingDown,
   PieChart as PieIcon,
 } from 'lucide-react';
-import { getBatchesAction } from '@/app/actions';
 import * as Recharts from 'recharts';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -33,6 +31,8 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import type { Batch } from '@/lib/types';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 export default function DashboardOverviewPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -45,15 +45,23 @@ export default function DashboardOverviewPage() {
   });
 
   useEffect(() => {
-    async function loadBatches() {
-      setIsLoading(true);
-      const { success, data } = await getBatchesAction();
-      if (success && data) {
-        setBatches(data);
+    const q = query(collection(db, 'batches'), orderBy('batchNumber'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const batchesData = snapshot.docs.map(
+          (doc) => ({ ...doc.data(), id: doc.id }) as Batch
+        );
+        setBatches(batchesData);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Failed to subscribe to batch updates:', error);
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    }
-    loadBatches();
+    );
+
+    return () => unsubscribe();
   }, []);
 
   const statuses = useMemo(
