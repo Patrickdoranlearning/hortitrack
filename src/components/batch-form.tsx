@@ -353,7 +353,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         <SelectItem value="Potted">Potted</SelectItem>
                         <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
                         <SelectItem value="Looking Good">Looking Good</SelectItem>
-                        <SelectItem value="Archived" disabled>Archived</SelectItem>
+                        <SelectItem value="Archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

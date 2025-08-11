@@ -6,7 +6,6 @@ import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 
 export async function getProductionProtocolAction(batch: Batch) {
-  const runtime = 'nodejs';
   try {
     const protocol = await productionProtocol(batch);
     return { success: true, data: protocol };
@@ -24,11 +23,10 @@ export async function getBatchesAction(): Promise<{
   data?: Batch[];
   error?: string;
 }> {
-  const runtime = 'nodejs';
   try {
     const batchesCollection = db.collection('batches');
     const snapshot = await batchesCollection.orderBy('batchNumber').get();
-    const batches = snapshot.docs.map(doc => doc.data() as Batch);
+    const batches = snapshot.docs.map(doc => ({...doc.data(), id: doc.id }) as Batch);
     return { success: true, data: batches };
   } catch (error: any) {
     console.error('Error getting batches:', error);
@@ -39,7 +37,6 @@ export async function getBatchesAction(): Promise<{
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
-  const runtime = 'nodejs';
   try {
     const batchesCollection = db.collection('batches');
     const newDocRef = batchesCollection.doc();
@@ -57,17 +54,18 @@ export async function addBatchAction(
 }
 
 export async function updateBatchAction(batchToUpdate: Batch) {
-  const runtime = 'nodejs';
   try {
     const updatedBatchData = { ...batchToUpdate };
 
-    if (updatedBatchData.quantity <= 0) {
-      if(updatedBatchData.status !== 'Archived') {
-        updatedBatchData.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
-      }
+    if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
+      updatedBatchData.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
       updatedBatchData.status = 'Archived';
-      updatedBatchData.quantity = 0;
     }
+    
+    if (updatedBatchData.status === 'Archived') {
+        updatedBatchData.quantity = 0;
+    }
+
 
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(updatedBatchData.id);
@@ -80,19 +78,17 @@ export async function updateBatchAction(batchToUpdate: Batch) {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const runtime = 'nodejs';
     const docRef = db.collection('batches').doc(batchId);
     const docSnap = await docRef.get();
 
     if (docSnap.exists) {
-        return docSnap.data() as Batch;
+        return { ...docSnap.data(), id: docSnap.id } as Batch;
     }
     return null;
 }
 
 
 export async function logAction(batchId: string, action: string, quantityChange: number | null = null, newLocation: string | null = null) {
-  const runtime = 'nodejs';
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -124,7 +120,6 @@ export async function logAction(batchId: string, action: string, quantityChange:
 }
 
 export async function archiveBatchAction(batchId: string, loss: number) {
-  const runtime = 'nodejs';
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -156,7 +151,6 @@ export async function transplantBatchAction(
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
-  const runtime = 'nodejs';
   try {
     return await db.runTransaction(async (transaction) => {
         const sourceBatchRef = db.collection('batches').doc(sourceBatchId);
@@ -165,7 +159,7 @@ export async function transplantBatchAction(
         if (!sourceBatchDoc.exists) {
             throw new Error('Source batch not found.');
         }
-        const sourceBatch = sourceBatchDoc.data() as Batch;
+        const sourceBatch = { ...sourceBatchDoc.data(), id: sourceBatchDoc.id } as Batch;
 
         if (sourceBatch.quantity < transplantQuantity) {
             throw new Error('Insufficient quantity in source batch.');
@@ -223,10 +217,8 @@ export async function transplantBatchAction(
         
         transaction.set(newDocRef, newBatch);
         
-        if (updatedSourceBatch.quantity <= 0) {
-            if(updatedSourceBatch.status !== 'Archived') {
-                updatedSourceBatch.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
-            }
+        if (updatedSourceBatch.quantity <= 0 && updatedSourceBatch.status !== 'Archived') {
+            updatedSourceBatch.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
             updatedSourceBatch.status = 'Archived';
             updatedSourceBatch.quantity = 0;
         }
