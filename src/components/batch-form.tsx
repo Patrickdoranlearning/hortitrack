@@ -28,7 +28,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Plus, Trash2, PieChart, Archive, Image as ImageIcon, Upload, X } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, PieChart, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,11 +48,7 @@ import {
 import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
 import { VARIETIES } from '@/lib/varieties';
 import { Combobox } from './ui/combobox';
-import { useState, useRef } from 'react';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { app } from '@/lib/firebase';
-import Image from 'next/image';
-import { Progress } from './ui/progress';
+import { useState } from 'react';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -73,8 +69,6 @@ const batchSchema = z.object({
   size: z.string().min(1, 'Size is required.'),
   supplier: z.string().min(1, 'Supplier is required.'),
   logHistory: z.array(logEntrySchema),
-  growerPhotoUrl: z.string().optional(),
-  salesPhotoUrl: z.string().optional(),
 });
 
 type BatchFormValues = z.infer<typeof batchSchema>;
@@ -95,53 +89,9 @@ interface BatchFormProps {
   plantSizes: string[];
 }
 
-const storage = getStorage(app);
-
-const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let { width, height } = img;
-
-            if (width > height) {
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-            } else {
-                if (height > maxHeight) {
-                    width = Math.round((width * maxHeight) / height);
-                    height = maxHeight;
-                }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                return reject(new Error('Could not get canvas context.'));
-            }
-            ctx.drawImage(img, 0, 0, width, height);
-            canvas.toBlob((blob) => {
-                if (blob) {
-                    resolve(blob);
-                } else {
-                    reject(new Error('Canvas to Blob conversion failed.'));
-                }
-            }, 'image/jpeg', 0.9);
-        };
-        img.onerror = (error) => reject(error);
-    });
-};
-
 export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
   const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
-  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
-  
-  const growerPhotoInputRef = useRef<HTMLInputElement>(null);
-  const salesPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
@@ -168,30 +118,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     control: form.control,
     name: 'logHistory',
   });
-  
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'growerPhotoUrl' | 'salesPhotoUrl') => {
-      const file = e.target.files?.[0];
-      if (!file || !batch) return;
-      
-      setUploadProgress(prev => ({ ...prev, [fieldName]: 0 }));
-      
-      try {
-        const resizedBlob = await resizeImage(file, 1024, 1024);
-        const storageRef = ref(storage, `batch-photos/${batch.id}/${fieldName}-${Date.now()}.jpg`);
-        
-        // This is a simplified progress simulation. For real progress, you would use uploadBytesResumable
-        setUploadProgress(prev => ({ ...prev, [fieldName]: 50 }));
-
-        const snapshot = await uploadBytes(storageRef, resizedBlob);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-
-        form.setValue(fieldName, downloadURL, { shouldValidate: true });
-        setUploadProgress(prev => ({ ...prev, [fieldName]: 100 }));
-      } catch (error) {
-          console.error("Upload failed", error);
-          setUploadProgress(prev => ({ ...prev, [fieldName]: -1 }));
-      }
-  };
 
   const handleFormSubmit = (data: BatchFormValues) => {
     if (batch) {
@@ -242,41 +168,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
   const varietyOptions = VARIETIES.map(v => ({ value: v.name, label: v.name }));
 
-  const renderPhotoUploader = (fieldName: 'growerPhotoUrl' | 'salesPhotoUrl', label: string, ref: React.RefObject<HTMLInputElement>) => {
-    const url = form.watch(fieldName);
-    const progress = uploadProgress[fieldName];
-    const isUploading = progress > 0 && progress < 100;
-  
-    return (
-      <FormItem>
-        <FormLabel>{label}</FormLabel>
-        <div className="flex items-center gap-2">
-            {url ? (
-                <div className="relative w-24 h-24">
-                    <Image src={url} alt={`${label} preview`} layout="fill" objectFit="cover" className="rounded-md" />
-                    <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => form.setValue(fieldName, undefined)}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-            ) : (
-                <div className="w-24 h-24 flex items-center justify-center bg-muted rounded-md">
-                    <ImageIcon className="text-muted-foreground" />
-                </div>
-            )}
-            <div className="flex-1">
-                <Input type="file" accept="image/*" className="hidden" ref={ref} onChange={(e) => handleImageUpload(e, fieldName)} disabled={isUploading || !batch} />
-                <Button type="button" onClick={() => ref.current?.click()} disabled={isUploading || !batch}>
-                    <Upload className="mr-2" /> {url ? 'Change' : 'Upload'}
-                </Button>
-                {!batch && <FormDescription className="mt-2">Save batch first to enable photo uploads.</FormDescription>}
-                {isUploading && <Progress value={progress} className="w-full mt-2" />}
-            </div>
-        </div>
-      </FormItem>
-    );
-  };
-
-
   return (
     <>
       <DialogHeader>
@@ -326,7 +217,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-              <div className="space-y-4 md:col-start-1">
+              <div className="space-y-4 md:col-start-1 md:row-start-2">
                 <FormField
                   control={form.control}
                   name="plantingDate"
@@ -363,7 +254,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-              <div className="space-y-4 md:col-start-2">
+              <div className="space-y-4 md:col-start-2 md:row-start-2">
                  <FormField
                   control={form.control}
                   name="plantFamily"
@@ -379,7 +270,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-              <div className="space-y-4 md:col-start-1">
+              <div className="space-y-4 md:col-start-1 md:row-start-3">
                  <FormField
                   control={form.control}
                   name="quantity"
@@ -395,7 +286,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-              <div className="space-y-4 md:col-start-2">
+              <div className="space-y-4 md:col-start-2 md:row-start-3">
                 <FormField
                   control={form.control}
                   name="category"
@@ -411,7 +302,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
               
-              <div className="space-y-4 md:col-start-1">
+              <div className="space-y-4 md:col-start-1 md:row-start-4">
                  <FormField
                   control={form.control}
                   name="size"
@@ -432,7 +323,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
               
-              <div className="space-y-4 md:col-start-2">
+              <div className="space-y-4 md:col-start-2 md:row-start-4">
                  <FormField
                   control={form.control}
                   name="supplier"
@@ -448,7 +339,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-              <div className="space-y-4 md:col-start-1">
+              <div className="space-y-4 md:col-start-1 md:row-start-5">
                  <FormField
                   control={form.control}
                   name="location"
@@ -469,7 +360,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-               <div className="space-y-4 md:col-start-2">
+               <div className="space-y-4 md:col-start-2 md:row-start-5">
                  <FormField
                   control={form.control}
                   name="status"
@@ -501,14 +392,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
             </div>
             
-            {/* Full Span Items */}
-            <div className="md:col-span-2">
-              {renderPhotoUploader('growerPhotoUrl', 'Grower Photo', growerPhotoInputRef)}
-            </div>
-            <div className="md:col-span-2">
-              {renderPhotoUploader('salesPhotoUrl', 'Sales Photo', salesPhotoInputRef)}
-            </div>
-
             <div className="md:col-span-2">
               {distribution && batch && (batch.initialQuantity > 0) && (
                   <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">

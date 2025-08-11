@@ -18,7 +18,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
-import NextImage from 'next/image';
 
 
 interface BatchCardProps {
@@ -61,15 +60,9 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
         <CardDescription>Batch #{batch.batchNumber}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 flex-grow">
-        {batch.growerPhotoUrl ? (
-          <div className="relative aspect-video w-full rounded-md overflow-hidden">
-            <NextImage src={batch.growerPhotoUrl} alt={`Grower photo for ${batch.plantVariety}`} fill className="object-cover" />
-          </div>
-        ) : (
-          <div className="aspect-video w-full flex items-center justify-center bg-muted rounded-md">
+        <div className="aspect-video w-full flex items-center justify-center bg-muted rounded-md">
             <ImageIcon className="h-12 w-12 text-muted-foreground" />
-          </div>
-        )}
+        </div>
         <div className="pt-2">
           <div className="flex justify-between text-sm font-semibold mb-1">
             <span>Stock</span>
