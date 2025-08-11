@@ -1,38 +1,9 @@
 
 'use server';
 
-import { careRecommendations } from '@/ai/flows/care-recommendations';
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
-
-export async function getCareRecommendationsAction(batch: Batch) {
-  const runtime = 'nodejs';
-  try {
-    const logHistoryStrings = batch.logHistory.map(
-      (log) => `${log.action} on ${new Date(log.date).toLocaleDateString()}`
-    );
-
-    const weatherInfo = {
-      temperature: 22,
-      humidity: 65,
-    };
-
-    const recommendations = await careRecommendations({
-      batchInfo: {
-        plantFamily: batch.plantFamily,
-        plantVariety: batch.plantVariety,
-        plantingDate: batch.plantingDate,
-      },
-      logHistory: logHistoryStrings,
-      weatherInfo: weatherInfo,
-    });
-    return { success: true, data: recommendations };
-  } catch (error) {
-    console.error('Error getting care recommendations:', error);
-    return { success: false, error: 'Failed to get AI recommendations.' };
-  }
-}
 
 export async function getProductionProtocolAction(batch: Batch) {
   const runtime = 'nodejs';

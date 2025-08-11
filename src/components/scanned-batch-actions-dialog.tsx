@@ -15,7 +15,6 @@ import { Button } from './ui/button';
 import {
   ClipboardList,
   MoveRight,
-  Sparkles,
   Pencil,
   FileText,
 } from 'lucide-react';
@@ -26,7 +25,6 @@ interface ScannedBatchActionsDialogProps {
   batch: Batch | null;
   onLogAction: () => void;
   onTransplant: () => void;
-  onGetRecommendations: () => void;
   onEdit: () => void;
   onGenerateProtocol: () => void;
   onChat: () => void;
@@ -38,7 +36,6 @@ export function ScannedBatchActionsDialog({
   batch,
   onLogAction,
   onTransplant,
-  onGetRecommendations,
   onEdit,
   onGenerateProtocol,
 }: ScannedBatchActionsDialogProps) {
@@ -69,10 +66,6 @@ export function ScannedBatchActionsDialog({
           >
             <MoveRight />
             Transplant
-          </Button>
-          <Button onClick={onGetRecommendations} variant="outline">
-            <Sparkles />
-            AI Tips
           </Button>
           <Button onClick={onGenerateProtocol} variant="outline">
             <FileText />

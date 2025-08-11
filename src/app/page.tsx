@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/select';
 import { BatchCard } from '@/components/batch-card';
 import { BatchForm, type BatchDistribution } from '@/components/batch-form';
-import { CareRecommendationsDialog } from '@/components/care-recommendations-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
 import { TransplantForm } from '@/components/transplant-form';
@@ -57,9 +56,6 @@ export default function DashboardPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
-
-  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
-  const [aiBatch, setAiBatch] = useState<Batch | null>(null);
 
   const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
   const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
@@ -236,11 +232,6 @@ export default function DashboardPage() {
     setIsFormOpen(false);
     setEditingBatch(null);
     setBatchDistribution(null);
-  };
-
-  const handleGetRecommendations = (batch: Batch) => {
-    setAiBatch(batch);
-    setIsAiDialogOpen(true);
   };
 
   const handleTransplantBatch = (batch: Batch) => {
@@ -453,7 +444,6 @@ export default function DashboardPage() {
                 <BatchCard
                   batch={batch}
                   onEdit={handleEditBatch}
-                  onGetRecommendations={handleGetRecommendations}
                   onTransplant={handleTransplantBatch}
                   onLogAction={handleLogAction}
                   onGenerateProtocol={handleGenerateProtocol}
@@ -510,12 +500,6 @@ export default function DashboardPage() {
           />
         </DialogContent>
       </Dialog>
-
-      <CareRecommendationsDialog
-        open={isAiDialogOpen}
-        onOpenChange={setIsAiDialogOpen}
-        batch={aiBatch}
-      />
       
       <ProductionProtocolDialog
         open={isProtocolDialogOpen}
@@ -540,10 +524,6 @@ export default function DashboardPage() {
         onTransplant={() => {
             setIsScannedActionsOpen(false);
             if (scannedBatch) handleTransplantBatch(scannedBatch);
-        }}
-        onGetRecommendations={() => {
-            setIsScannedActionsOpen(false);
-            if (scannedBatch) handleGetRecommendations(scannedBatch);
         }}
         onEdit={() => {
             setIsScannedActionsOpen(false);

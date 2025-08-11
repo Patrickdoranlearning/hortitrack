@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, Sparkles, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
+import { Pencil, MoveRight, ClipboardList, Factory, FileText } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -23,13 +23,12 @@ import { Progress } from '@/components/ui/progress';
 interface BatchCardProps {
   batch: Batch;
   onEdit: (batch: Batch) => void;
-  onGetRecommendations: (batch: Batch) => void;
   onTransplant: (batch: Batch) => void;
   onLogAction: (batch: Batch) => void;
   onGenerateProtocol: (batch: Batch) => void;
 }
 
-export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
+export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
 
   const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
@@ -116,16 +115,6 @@ export function BatchCard({ batch, onEdit, onGetRecommendations, onTransplant, o
                 </TooltipTrigger>
                 <TooltipContent>
                     <p>Log Action</p>
-                </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={() => onGetRecommendations(batch)}>
-                        <Sparkles className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Get AI Recommendations</p>
                 </TooltipContent>
             </Tooltip>
             <Tooltip>
