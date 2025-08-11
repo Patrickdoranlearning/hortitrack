@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import {
@@ -53,7 +53,7 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
   
   const handleInputChange = (search: string) => {
       setInputValue(search);
-      const match = options.find(option => option.label.toLowerCase().startsWith(search.toLowerCase()));
+      const match = options.find(option => option.label.toLowerCase().startsWith(search.toLowerCase()) && option.label.length > search.length);
       if (search.length > 0 && match) {
         setSuggestion(match.label);
       } else {
@@ -66,13 +66,11 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Tab" || e.key === "Enter") {
-        if (suggestion) {
-            const match = options.find(option => option.label === suggestion);
-            if (match) {
-                e.preventDefault();
-                handleSelect(match.value);
-            }
+    if ((e.key === "Tab" || e.key === "Enter" || e.key === "ArrowRight") && suggestion) {
+        const match = options.find(option => option.label === suggestion);
+        if (match) {
+            e.preventDefault();
+            handleSelect(match.value);
         }
     }
   };
@@ -82,71 +80,76 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
       setOpen(true);
     }
   }
+  
+  const handleBlur = () => {
+    const existingOption = options.find(option => option.label.toLowerCase() === inputValue.toLowerCase());
+    if (existingOption) {
+      onChange(existingOption.value)
+    } else if (value) {
+      const originalOption = options.find(option => option.value.toLowerCase() === value.toLowerCase());
+      setInputValue(originalOption?.label || "");
+    }
+    setSuggestion("");
+  }
+
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
+      <Command shouldFilter={false} className="overflow-visible bg-transparent">
         <div className="relative">
-             <Command shouldFilter={false} className="overflow-visible bg-transparent">
-                <div className="relative">
-                    <CommandInput 
-                        asChild
-                        value={inputValue}
-                        onValueChange={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        onBlur={() => {
-                            const existingOption = options.find(option => option.label.toLowerCase() === inputValue.toLowerCase());
-                            if (!existingOption && value) {
-                                const originalOption = options.find(option => option.value.toLowerCase() === value.toLowerCase());
-                                setInputValue(originalOption?.label || "");
-                            }
-                            setSuggestion("");
-                        }}
-                    >
-                        <Input 
-                            placeholder={placeholder}
-                            className="w-full bg-transparent relative z-10"
-                            onClick={handleInputClick}
-                        />
-                    </CommandInput>
-                    {suggestion && inputValue && (
-                        <Input
-                            className="absolute top-0 left-0 z-0 text-muted-foreground"
-                            value={suggestion}
-                            readOnly
-                        />
-                    )}
-                </div>
+           <CommandInput 
+                asChild
+                value={inputValue}
+                onValueChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onBlur={handleBlur}
+            >
+                <Input 
+                    placeholder={placeholder}
+                    className="w-full bg-transparent relative z-10"
+                    onClick={handleInputClick}
+                />
+            </CommandInput>
 
-                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                    onInteractOutside={(e) => {
-                        e.preventDefault();
-                        setOpen(false);
-                    }}
-                >
-                    <CommandList>
-                        <CommandEmpty>{emptyMessage || "No options found."}</CommandEmpty>
-                        <CommandGroup>
-                        {options.filter(option => option.label.toLowerCase().includes(inputValue.toLowerCase())).map((option) => (
-                            <CommandItem
-                                key={option.value}
-                                value={option.label}
-                                onSelect={() => handleSelect(option.value)}
-                            >
-                            <Check
-                                className={cn(
-                                "mr-2 h-4 w-4",
-                                value && value.toLowerCase() === option.value.toLowerCase() ? "opacity-100" : "opacity-0"
-                                )}
-                            />
-                            {option.label}
-                            </CommandItem>
-                        ))}
-                        </CommandGroup>
-                    </CommandList>
-                </PopoverContent>
-            </Command>
+            {suggestion && inputValue && suggestion.toLowerCase().startsWith(inputValue.toLowerCase()) && (
+              <div className="absolute inset-0 -z-10 flex items-center">
+                  <Input 
+                      value={`${inputValue}${suggestion.substring(inputValue.length)}`} 
+                      className="text-muted-foreground" 
+                      readOnly 
+                    />
+              </div>
+            )}
         </div>
+
+        <PopoverContent 
+          className="w-[var(--radix-popover-trigger-width)] p-0" 
+          align="start"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <CommandList>
+            <CommandEmpty>{emptyMessage || "No options found."}</CommandEmpty>
+            <CommandGroup>
+              {options.filter(option => option.label.toLowerCase().includes(inputValue.toLowerCase())).map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.label}
+                  onSelect={() => handleSelect(option.value)}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value && value.toLowerCase() === option.value.toLowerCase() ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </PopoverContent>
+      </Command>
     </Popover>
   )
 }
