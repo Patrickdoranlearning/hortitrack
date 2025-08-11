@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, MoveRight, ClipboardList } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -19,13 +19,16 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
+import { Button } from './ui/button';
 
 interface BatchCardProps {
   batch: Batch;
   onClick: (batch: Batch) => void;
+  onLogAction: (batch: Batch) => void;
+  onTransplant: (batch: Batch) => void;
 }
 
-export function BatchCard({ batch, onClick }: BatchCardProps) {
+export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCardProps) {
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
 
   const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
@@ -43,6 +46,11 @@ export function BatchCard({ batch, onClick }: BatchCardProps) {
       default:
         return 'outline';
     }
+  };
+  
+  const handleActionClick = (e: React.MouseEvent, action: (batch: Batch) => void) => {
+    e.stopPropagation();
+    action(batch);
   };
   
   return (
@@ -90,9 +98,36 @@ export function BatchCard({ batch, onClick }: BatchCardProps) {
             <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end gap-2">
-          {/* Actions are now on the detail page */}
+        <CardFooter className="flex justify-end gap-2 pt-4">
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={(e) => handleActionClick(e, onLogAction)}>
+                            <ClipboardList className="h-5 w-5" />
+                            <span className="sr-only">Log Action</span>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Log Action</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={(e) => handleActionClick(e, onTransplant)} disabled={batch.quantity === 0}>
+                            <MoveRight className="h-5 w-5" />
+                            <span className="sr-only">Transplant</span>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Transplant</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </CardFooter>
       </Card>
   );
 }
+
+    

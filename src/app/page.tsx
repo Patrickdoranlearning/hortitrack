@@ -39,7 +39,6 @@ import type { TransplantFormData } from '@/lib/types';
 import { ScannedBatchActionsDialog } from '@/components/scanned-batch-actions-dialog';
 import { ProductionProtocolDialog } from '@/components/production-protocol-dialog';
 import { 
-  getBatchesAction, 
   addBatchAction, 
   updateBatchAction, 
   archiveBatchAction, 
@@ -532,6 +531,8 @@ export default function DashboardPage() {
                 <BatchCard
                   batch={batch}
                   onClick={handleCardClick}
+                  onLogAction={handleLogAction}
+                  onTransplant={handleTransplantBatch}
                 />
               </div>
             ))}
@@ -632,3 +633,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
