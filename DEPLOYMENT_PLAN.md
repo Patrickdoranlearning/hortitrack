@@ -10,12 +10,12 @@ This phase focuses on non-negotiable prerequisites for going live.
 
 ### 1. Implement User Authentication & Security Rules
 
-*   **Status:** Not Started
+*   **Status:** Partially Complete
 *   **Priority:** **Critical**
 *   **Objective:** Secure the application and its data. Currently, the database is open to anyone with the configuration details. This step is essential before any live data is entered.
 *   **Action Items:**
-    *   Integrate **Firebase Authentication** to add a user login system (email/password).
-    *   Create a simple "Sign In" page.
+    *   Integrate **Firebase Authentication** to add a user login system (email/password). (DONE)
+    *   Create a simple "Sign In" page. (DONE)
     *   Implement **Firestore Security Rules** to restrict database access. Only authenticated users from your nursery will be able to read or write batch data.
     *   Protect all pages, redirecting unauthenticated users to the sign-in page.
 

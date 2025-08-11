@@ -7,13 +7,13 @@ This document outlines the planned features and ideas for the HortiTrack applica
 *   **Production Module (Current Focus):** Core functionality for tracking plant batches from propagation to sale-ready status. Includes batch creation, logging, AI recommendations, and protocol generation.
 *   **Sales Module:** To be developed. Will handle customer-facing inventory, ordering, and salesperson tools.
 *   **Dispatch Module:** To be developed. Will manage preparing and shipping customer orders.
-*   **IPM (Integrated Pest Management) Module:** To be developed. Will track pest and disease issues and treatments.
+*   **IPM (Integrated Pest Management) / Plant Health Module:** To be developed. Will track pest and disease issues, treatments, and perform advanced health analysis.
 
 ---
 
 ## Planned Features
 
-## 1. Batch Photos
+## 1. Batch Photos (Production & Sales Module)
 
 A system to attach photos to batches, enhancing visual tracking and sales capabilities.
 
@@ -27,10 +27,11 @@ A system to attach photos to batches, enhancing visual tracking and sales capabi
     *   Use the device's camera.
     *   Store images securely using a cloud service like Firebase Storage.
 
-### AI Enhancements:
+### AI Enhancements (IPM / Plant Health Module)
 
 *   **AI-Powered Growth Rate Analysis:**
-    *   Use a multi-modal AI (like Gemini) to compare two "Grower Photos" from different dates.
+    *   This feature will be part of the future **IPM / Plant Health Module**.
+    *   It will use a multi-modal AI (like Gemini) to compare two "Grower Photos" from different dates.
     *   The AI will analyze and report on changes in size, biomass, and foliage density, providing quantifiable growth data.
     *   Requires consistent photo-taking, potentially using a reference object for scale.
 
