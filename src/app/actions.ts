@@ -10,26 +10,28 @@ import { join } from 'path';
 import admin from 'firebase-admin';
 
 // Correct Firebase Admin SDK Initialization
-if (!admin.apps.length) {
-  try {
-    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (serviceAccountKey) {
-      const serviceAccount = JSON.parse(serviceAccountKey);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } else {
-      console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase dependant features may not work.');
+function initializeFirebaseAdmin() {
+    if (!admin.apps.length) {
+        try {
+            const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+            if (serviceAccountKey) {
+            const serviceAccount = JSON.parse(serviceAccountKey);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+            });
+            } else {
+            console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase dependant features may not work.');
+            }
+        } catch (error) {
+            console.error('Failed to initialize Firebase Admin SDK in actions.ts:', error);
+        }
     }
-  } catch (error) {
-    console.error('Failed to initialize Firebase Admin SDK in actions.ts:', error);
-  }
 }
-
-const db = admin.firestore();
 
 
 async function migrateData() {
+    initializeFirebaseAdmin();
+    const db = admin.firestore();
     console.log("Checking if data migration is needed...");
     const batchesRef = db.collection('batches');
     const snapshot = await batchesRef.limit(1).get();
@@ -69,6 +71,7 @@ async function migrateData() {
 
 
 export async function getCareRecommendationsAction(batch: Batch) {
+  initializeFirebaseAdmin();
   try {
     const logHistoryStrings = batch.logHistory.map(
       (log) => `${log.action} on ${new Date(log.date).toLocaleDateString()}`
@@ -96,6 +99,7 @@ export async function getCareRecommendationsAction(batch: Batch) {
 }
 
 export async function getProductionProtocolAction(batch: Batch) {
+  initializeFirebaseAdmin();
   try {
     const protocol = await productionProtocol(batch);
     return { success: true, data: protocol };
@@ -113,6 +117,8 @@ export async function getBatchesAction(): Promise<{
   data?: Batch[];
   error?: string;
 }> {
+  initializeFirebaseAdmin();
+  const db = admin.firestore();
   try {
     await migrateData();
     const batchesCollection = db.collection('batches');
@@ -128,6 +134,8 @@ export async function getBatchesAction(): Promise<{
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
+  initializeFirebaseAdmin();
+  const db = admin.firestore();
   try {
     const batchesCollection = db.collection('batches');
     const newDocRef = batchesCollection.doc();
@@ -145,6 +153,8 @@ export async function addBatchAction(
 }
 
 export async function updateBatchAction(batchToUpdate: Batch) {
+  initializeFirebaseAdmin();
+  const db = admin.firestore();
   try {
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(batchToUpdate.id);
@@ -157,6 +167,8 @@ export async function updateBatchAction(batchToUpdate: Batch) {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
+    initializeFirebaseAdmin();
+    const db = admin.firestore();
     const docRef = db.collection('batches').doc(batchId);
     const docSnap = await docRef.get();
 
@@ -168,6 +180,7 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
 
 
 export async function logAction(batchId: string, action: string, quantityChange: number | null = null, newLocation: string | null = null) {
+  initializeFirebaseAdmin();
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -199,6 +212,7 @@ export async function logAction(batchId: string, action: string, quantityChange:
 }
 
 export async function archiveBatchAction(batchId: string, loss: number) {
+  initializeFirebaseAdmin();
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -230,11 +244,11 @@ export async function transplantBatchAction(
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
+  initializeFirebaseAdmin();
+  const db = admin.firestore();
   try {
-    const batchesCollection = db.collection('batches');
-
     return await db.runTransaction(async (transaction) => {
-        const sourceBatchRef = batchesCollection.doc(sourceBatchId);
+        const sourceBatchRef = db.collection('batches').doc(sourceBatchId);
         const sourceBatchDoc = await transaction.get(sourceBatchRef);
 
         if (!sourceBatchDoc.exists) {
@@ -246,7 +260,7 @@ export async function transplantBatchAction(
             throw new Error('Insufficient quantity in source batch.');
         }
 
-        const allBatchesSnapshot = await transaction.get(batchesCollection);
+        const allBatchesSnapshot = await transaction.get(db.collection('batches'));
         const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
             const b = doc.data() as Batch;
             const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
@@ -260,7 +274,7 @@ export async function transplantBatchAction(
         };
         const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
 
-        const newDocRef = batchesCollection.doc();
+        const newDocRef = db.collection('batches').doc();
         const newBatch: Batch = {
             ...(newBatchData as any),
             id: newDocRef.id,
@@ -309,6 +323,7 @@ export async function transplantBatchAction(
 }
 
 export async function batchChatAction(batch: Batch, query: string) {
+    initializeFirebaseAdmin();
     try {
       const result = await batchChat({ batch, query });
       return { success: true, data: result };
@@ -317,5 +332,3 @@ export async function batchChatAction(batch: Batch, query: string) {
       return { success: false, error: 'Failed to get AI chat response.' };
     }
 }
-
-    
