@@ -4,13 +4,12 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  "projectId": "hortitrack",
-  "appId": "1:841216037830:web:58337596518973b00998c7",
-  "storageBucket": "hortitrack.firebasestorage.app",
-  "apiKey": "AIzaSyAsqgI_D4viEIh7q146pD2WSLdUxx_2Qa8",
-  "authDomain": "hortitrack.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "841216037830"
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
 };
 
 

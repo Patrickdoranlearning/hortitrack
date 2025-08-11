@@ -458,16 +458,17 @@ export default function DashboardPage() {
         ) : filteredBatches.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredBatches.map((batch) => (
-              <BatchCard
-                key={batch.id}
-                batch={batch}
-                onEdit={handleEditBatch}
-                onGetRecommendations={handleGetRecommendations}
-                onTransplant={handleTransplantBatch}
-                onLogAction={handleLogAction}
-                onGenerateProtocol={handleGenerateProtocol}
-                onChat={handleOpenChat}
-              />
+              <div key={batch.id}>
+                <BatchCard
+                  batch={batch}
+                  onEdit={handleEditBatch}
+                  onGetRecommendations={handleGetRecommendations}
+                  onTransplant={handleTransplantBatch}
+                  onLogAction={handleLogAction}
+                  onGenerateProtocol={handleGenerateProtocol}
+                  onChat={handleOpenChat}
+                />
+              </div>
             ))}
           </div>
         ) : (

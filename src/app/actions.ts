@@ -57,7 +57,7 @@ export async function getBatchesAction(): Promise<{
   const runtime = 'nodejs';
   try {
     const batchesCollection = db.collection('batches');
-    const snapshot = await batchesCollection.orderBy('batchNumber').get();
+    const snapshot = await batchesCollection.where('status', '!=', 'Archived').orderBy('status').orderBy('batchNumber').get();
     const batches = snapshot.docs.map(doc => doc.data() as Batch);
     return { success: true, data: batches };
   } catch (error: any) {
