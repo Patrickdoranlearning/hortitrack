@@ -37,20 +37,26 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
   const [inputValue, setInputValue] = React.useState(value || "")
 
   React.useEffect(() => {
-    setInputValue(value || "");
-  }, [value]);
+    const selectedOption = options.find(option => option.value.toLowerCase() === value?.toLowerCase());
+    setInputValue(selectedOption?.label || value || "");
+  }, [value, options]);
 
   const handleSelect = (currentValue: string) => {
-    const newValue = currentValue === value ? "" : currentValue;
+    const newValue = currentValue === value?.toLowerCase() ? "" : currentValue;
     onChange(newValue);
     const selectedOption = options.find(option => option.value.toLowerCase() === newValue.toLowerCase());
     setInputValue(selectedOption ? selectedOption.label : "");
     setOpen(false);
   }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-    onChange(e.target.value);
+  
+  const handleInputChange = (search: string) => {
+      setInputValue(search);
+      if (!open) {
+          setOpen(true);
+      }
+  }
+  
+  const handleInputClick = () => {
     if (!open) {
       setOpen(true);
     }
@@ -59,29 +65,37 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
   return (
     <Popover open={open} onOpenChange={setOpen}>
         <div className="relative">
-            <Command>
-                 <Input 
-                    placeholder={placeholder}
+             <Command shouldFilter={false} className="overflow-visible">
+                <CommandInput 
+                    asChild
                     value={inputValue}
-                    onChange={handleInputChange}
-                    onClick={() => setOpen(true)}
-                    className="w-full"
-                />
+                    onValueChange={handleInputChange}
+                    onBlur={() => {
+                        const existingOption = options.find(option => option.label.toLowerCase() === inputValue.toLowerCase());
+                        if (!existingOption && value) {
+                             const originalOption = options.find(option => option.value.toLowerCase() === value.toLowerCase());
+                             setInputValue(originalOption?.label || "");
+                        }
+                    }}
+                >
+                    <Input 
+                        placeholder={placeholder}
+                        className="w-full"
+                        onClick={handleInputClick}
+                    />
+                </CommandInput>
 
-                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                >
                     <CommandList>
-                        <CommandInput 
-                           placeholder="Search..."
-                           value={inputValue}
-                           onValueChange={setInputValue}
-                        />
                         <CommandEmpty>{emptyMessage || "No options found."}</CommandEmpty>
                         <CommandGroup>
                         {options.filter(option => option.label.toLowerCase().includes(inputValue.toLowerCase())).map((option) => (
                             <CommandItem
-                            key={option.value}
-                            value={option.label}
-                            onSelect={() => handleSelect(option.value)}
+                                key={option.value}
+                                value={option.label}
+                                onSelect={() => handleSelect(option.value)}
                             >
                             <Check
                                 className={cn(
