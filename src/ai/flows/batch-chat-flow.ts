@@ -42,7 +42,7 @@ const batchChatPrompt = ai.definePrompt({
   `,
   // Helper to stringify JSON in the prompt
   templateFormat: 'handlebars',
-  model: 'googleai/gemini-2.0-flash',
+  model: 'googleai/gemini-2.0-flash-preview',
   context: [
     {
       role: 'system',
