@@ -5,73 +5,27 @@ import { careRecommendations } from '@/ai/flows/care-recommendations';
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import admin from 'firebase-admin';
 
 // Correct Firebase Admin SDK Initialization
-function initializeFirebaseAdmin() {
+try {
     if (!admin.apps.length) {
-        try {
-            const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-            if (serviceAccountKey) {
-            const serviceAccount = JSON.parse(serviceAccountKey);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
-            });
-            } else {
-            console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase dependant features may not work.');
-            }
-        } catch (error) {
-            console.error('Failed to initialize Firebase Admin SDK in actions.ts:', error);
+        const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+        if (serviceAccountKey) {
+        const serviceAccount = JSON.parse(serviceAccountKey);
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+        } else {
+        console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase dependant features may not work.');
         }
     }
-}
-
-
-async function migrateData() {
-    initializeFirebaseAdmin();
-    const db = admin.firestore();
-    console.log("Checking if data migration is needed...");
-    const batchesRef = db.collection('batches');
-    const snapshot = await batchesRef.limit(1).get();
-
-    if (snapshot.empty) {
-        console.log("No batches found in Firestore. Migrating from data.json...");
-        const dataFilePath = join(process.cwd(), 'src', 'lib', 'data.json');
-        try {
-            const fileContent = await fs.readFile(dataFilePath, 'utf-8');
-            const batches: Batch[] = JSON.parse(fileContent);
-            
-            const firestoreBatch = db.batch();
-            batches.forEach(batch => {
-                const docRef = batchesRef.doc(batch.id);
-                firestoreBatch.set(docRef, batch);
-            });
-            
-            await firestoreBatch.commit();
-            console.log(`Successfully migrated ${batches.length} batches to Firestore.`);
-
-            // Rename the file to prevent re-migration
-            await fs.rename(dataFilePath, dataFilePath + '.migrated');
-            console.log("Renamed data.json to data.json.migrated");
-
-        } catch (error: any) {
-            if (error.code === 'ENOENT') {
-                 console.log("data.json not found, assuming already migrated.");
-            } else {
-                console.error('Error during data migration:', error);
-                throw new Error('Could not read or process data.json for migration.');
-            }
-        }
-    } else {
-        console.log("Firestore already contains data. Skipping migration.");
-    }
+} catch (error) {
+    console.error('Failed to initialize Firebase Admin SDK in actions.ts:', error);
 }
 
 
 export async function getCareRecommendationsAction(batch: Batch) {
-  initializeFirebaseAdmin();
   try {
     const logHistoryStrings = batch.logHistory.map(
       (log) => `${log.action} on ${new Date(log.date).toLocaleDateString()}`
@@ -99,7 +53,6 @@ export async function getCareRecommendationsAction(batch: Batch) {
 }
 
 export async function getProductionProtocolAction(batch: Batch) {
-  initializeFirebaseAdmin();
   try {
     const protocol = await productionProtocol(batch);
     return { success: true, data: protocol };
@@ -117,10 +70,8 @@ export async function getBatchesAction(): Promise<{
   data?: Batch[];
   error?: string;
 }> {
-  initializeFirebaseAdmin();
-  const db = admin.firestore();
   try {
-    await migrateData();
+    const db = admin.firestore();
     const batchesCollection = db.collection('batches');
     const snapshot = await batchesCollection.orderBy('batchNumber').get();
     const batches = snapshot.docs.map(doc => doc.data() as Batch);
@@ -134,9 +85,8 @@ export async function getBatchesAction(): Promise<{
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
-  initializeFirebaseAdmin();
-  const db = admin.firestore();
   try {
+    const db = admin.firestore();
     const batchesCollection = db.collection('batches');
     const newDocRef = batchesCollection.doc();
     const newBatch: Batch = {
@@ -153,9 +103,8 @@ export async function addBatchAction(
 }
 
 export async function updateBatchAction(batchToUpdate: Batch) {
-  initializeFirebaseAdmin();
-  const db = admin.firestore();
   try {
+    const db = admin.firestore();
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(batchToUpdate.id);
     await batchDoc.set(batchToUpdate, { merge: true });
@@ -167,7 +116,6 @@ export async function updateBatchAction(batchToUpdate: Batch) {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    initializeFirebaseAdmin();
     const db = admin.firestore();
     const docRef = db.collection('batches').doc(batchId);
     const docSnap = await docRef.get();
@@ -180,7 +128,6 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
 
 
 export async function logAction(batchId: string, action: string, quantityChange: number | null = null, newLocation: string | null = null) {
-  initializeFirebaseAdmin();
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -212,7 +159,6 @@ export async function logAction(batchId: string, action: string, quantityChange:
 }
 
 export async function archiveBatchAction(batchId: string, loss: number) {
-  initializeFirebaseAdmin();
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -244,7 +190,6 @@ export async function transplantBatchAction(
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
-  initializeFirebaseAdmin();
   const db = admin.firestore();
   try {
     return await db.runTransaction(async (transaction) => {
@@ -323,7 +268,6 @@ export async function transplantBatchAction(
 }
 
 export async function batchChatAction(batch: Batch, query: string) {
-    initializeFirebaseAdmin();
     try {
       const result = await batchChat({ batch, query });
       return { success: true, data: result };
