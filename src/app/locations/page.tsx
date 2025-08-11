@@ -228,7 +228,10 @@ export default function LocationsPage() {
   
   const handleDownloadTemplate = () => {
     const headers = ['name', 'nursery', 'type', 'area', 'isCovered'];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + '\n';
+    const sampleRow = ['T33', 'Main', 'Tunnel', '120', 'true'];
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + headers.join(',') + '\n'
+        + sampleRow.join(',') + '\n';
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -459,5 +462,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-
-    
