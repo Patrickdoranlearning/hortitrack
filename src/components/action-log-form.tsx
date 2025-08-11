@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { Batch, NurseryLocation } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
 import { useState } from 'react';
 import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 
@@ -66,7 +66,7 @@ interface ActionLogFormProps {
   onSubmit: (data: any) => void;
   onCancel: () => void;
   nurseryLocations: NurseryLocation[];
-  plantSizes: string[];
+  plantSizes: PlantSize[];
 }
 
 export function ActionLogForm({

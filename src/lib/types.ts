@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const LogEntrySchema = z.object({
@@ -53,3 +54,13 @@ export const LocationSchema = z.object({
   type: z.string().min(1, 'Type is required.'),
 });
 export type NurseryLocation = z.infer<typeof LocationSchema>;
+
+export const PlantSizeSchema = z.object({
+  id: z.string(),
+  size: z.string().min(1, 'Size name is required.'),
+  type: z.enum(['Tray', 'Pot', 'Bareroot']),
+  area: z.coerce.number().min(0, 'Area must be a positive number.'),
+  shelfQuantity: z.coerce.number().min(0, 'Shelf quantity must be a positive number.'),
+  multiple: z.coerce.number().min(0, 'Multiple must be a positive number.').optional(),
+});
+export type PlantSize = z.infer<typeof PlantSizeSchema>;

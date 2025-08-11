@@ -1,0 +1,121 @@
+
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import type { PlantSize } from '@/lib/types';
+import { PlantSizeSchema } from '@/lib/types';
+import { useEffect } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
+type SizeFormValues = PlantSize;
+
+interface SizeFormProps {
+  size: PlantSize | null;
+  onSubmit: (data: PlantSize) => void;
+  onCancel: () => void;
+}
+
+export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
+  const isEditing = !!size;
+
+  const form = useForm<SizeFormValues>({
+    resolver: zodResolver(PlantSizeSchema),
+    defaultValues: size || {
+        id: '',
+        size: '',
+        type: 'Pot',
+        area: 0,
+        shelfQuantity: 0,
+        multiple: 1,
+    },
+  });
+
+  useEffect(() => {
+    form.reset(size || {
+        id: '',
+        size: '',
+        type: 'Pot',
+        area: 0,
+        shelfQuantity: 0,
+        multiple: 1,
+    });
+  }, [size, form]);
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{isEditing ? 'Edit Size' : 'Add New Size'}</DialogTitle>
+        <DialogDescription>
+          {isEditing ? `Editing the details for the "${size.size}" size.` : 'Add a new plant size to your master list.'}
+        </DialogDescription>
+      </DialogHeader>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="size" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Size Name</FormLabel>
+                    <FormControl><Input placeholder="e.g., P9 or 54" {...field} /></FormControl>
+                    <FormMessage />
+                </FormItem>
+            )} />
+            <FormField control={form.control} name="type" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Type</FormLabel>
+                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Pot">Pot</SelectItem>
+                        <SelectItem value="Tray">Tray</SelectItem>
+                        <SelectItem value="Bareroot">Bareroot</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )} />
+            <FormField control={form.control} name="area" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Area (m²)</FormLabel>
+                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 0.01" {...field} /></FormControl>
+                    <FormMessage />
+                </FormItem>
+            )} />
+            <FormField control={form.control} name="shelfQuantity" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Shelf Quantity</FormLabel>
+                    <FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl>
+                    <FormMessage />
+                </FormItem>
+            )} />
+            <FormField control={form.control} name="multiple" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Multiple (for Trays)</FormLabel>
+                    <FormControl><Input type="number" placeholder="e.g., 54" {...field} /></FormControl>
+                    <FormMessage />
+                </FormItem>
+            )} />
+            
+          <DialogFooter className="pt-6">
+            <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+            </Button>
+            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Size'}</Button>
+          </DialogFooter>
+        </form>
+      </Form>
+    </>
+  );
+}

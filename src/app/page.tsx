@@ -13,7 +13,7 @@ import {
   LogOut,
   Menu,
 } from 'lucide-react';
-import type { Batch, NurseryLocation } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -84,7 +84,7 @@ export default function DashboardPage() {
   const [isScannedActionsOpen, setIsScannedActionsOpen] = useState(false);
 
   const [nurseryLocations, setNurseryLocations] = useState<NurseryLocation[]>([]);
-  const [plantSizes, setPlantSizes] = useState<string[]>([]);
+  const [plantSizes, setPlantSizes] = useState<PlantSize[]>([]);
 
   const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
   const [protocolBatch, setProtocolBatch] = useState<Batch | null>(null);

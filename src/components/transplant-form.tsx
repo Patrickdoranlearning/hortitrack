@@ -4,7 +4,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch, TransplantFormData, NurseryLocation } from '@/lib/types';
+import type { Batch, TransplantFormData, NurseryLocation, PlantSize } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from './ui/checkbox';
-import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
+import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -64,7 +64,7 @@ interface TransplantFormProps {
   onSubmit: (data: TransplantFormData) => void;
   onCancel: () => void;
   nurseryLocations: NurseryLocation[];
-  plantSizes: string[];
+  plantSizes: PlantSize[];
 }
 
 export function TransplantForm({
@@ -99,11 +99,14 @@ export function TransplantForm({
     onSubmit({ ...data, initialQuantity: data.quantity });
   };
   
-  const handleSizeChange = (size: string) => {
-    form.setValue('size', size);
-    const newStatus = SIZE_TO_STATUS_MAP[size];
-    if (newStatus) {
-      form.setValue('status', newStatus);
+  const handleSizeChange = (sizeValue: string) => {
+    form.setValue('size', sizeValue);
+    const selectedSize = plantSizes.find(s => s.size === sizeValue);
+    if (selectedSize) {
+      const newStatus = SIZE_TYPE_TO_STATUS_MAP[selectedSize.type];
+      if (newStatus) {
+        form.setValue('status', newStatus);
+      }
     }
   };
 
@@ -281,8 +284,8 @@ export function TransplantForm({
                     </FormControl>
                     <SelectContent>
                       {plantSizes.map((size) => (
-                        <SelectItem key={size} value={size}>
-                          {size}
+                        <SelectItem key={size.id} value={size.size}>
+                          {size.size}
                         </SelectItem>
                       ))}
                     </SelectContent>
