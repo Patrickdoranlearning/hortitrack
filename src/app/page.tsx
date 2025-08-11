@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Database,
   LogOut,
+  Menu,
 } from 'lucide-react';
 import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -362,10 +364,11 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col">
-      <header className="sticky top-0 z-10 flex h-auto flex-col gap-4 border-b bg-background/80 px-4 py-4 backdrop-blur-sm sm:px-6">
-        <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-30 flex h-auto flex-col gap-4 border-b bg-background/95 px-4 py-4 backdrop-blur-sm sm:px-6">
+        <div className="flex items-center justify-between gap-4">
           <Logo />
-          <div className="flex items-center gap-2">
+          {/* Desktop Menu */}
+          <div className="hidden items-center gap-2 md:flex">
             <Button asChild variant="outline">
                 <Link href="/dashboard">
                     <LayoutDashboard />
@@ -378,10 +381,6 @@ export default function DashboardPage() {
                     Manage Data
                 </Link>
             </Button>
-            <Button onClick={() => setIsScannerOpen(true)} size="lg">
-                <ScanLine />
-                Scan Code
-            </Button>
             <Button onClick={handleNewBatch} size="lg">
                 <PlusCircle />
                 New Batch
@@ -391,23 +390,72 @@ export default function DashboardPage() {
                 <span className="sr-only">Sign Out</span>
             </Button>
           </div>
+          {/* Mobile Menu */}
+          <div className="flex items-center gap-2 md:hidden">
+            <Button onClick={() => setIsScannerOpen(true)} size="icon" variant="outline">
+                <ScanLine />
+                <span className="sr-only">Scan</span>
+            </Button>
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="outline" size="icon">
+                        <Menu />
+                        <span className="sr-only">Open menu</span>
+                    </Button>
+                </SheetTrigger>
+                <SheetContent>
+                    <div className="flex flex-col gap-4">
+                        <SheetClose asChild>
+                            <Button onClick={handleNewBatch} className="w-full">
+                                <PlusCircle />
+                                New Batch
+                            </Button>
+                        </SheetClose>
+                        <SheetClose asChild>
+                             <Button asChild variant="outline" className="w-full">
+                                <Link href="/dashboard">
+                                    <LayoutDashboard />
+                                    Dashboard
+                                </Link>
+                            </Button>
+                        </SheetClose>
+                         <SheetClose asChild>
+                            <Button asChild variant="outline" className="w-full">
+                                <Link href="/settings">
+                                    <Database />
+                                    Manage Data
+                                </Link>
+                            </Button>
+                        </SheetClose>
+                        <SheetClose asChild>
+                            <Button onClick={handleSignOut} variant="ghost" className="w-full">
+                                <LogOut />
+                                Sign Out
+                            </Button>
+                        </SheetClose>
+                    </div>
+                </SheetContent>
+            </Sheet>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <h1 className="text-3xl font-headline text-foreground/80">
-                Nursery Stock
-            </h1>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by category, family, variety, or supplier..."
-              className="pl-10"
+              placeholder="Search by category, family, variety..."
+              className="pl-10 w-full"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setIsScannerOpen(true)} className="hidden sm:inline-flex md:hidden">
+                <ScanLine />
+                Scan Code
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="shrink-0">
+                <Button variant="outline" className="shrink-0 w-full sm:w-auto">
                   <Filter className="mr-2" />
                   Filter
                 </Button>
@@ -439,6 +487,7 @@ export default function DashboardPage() {
 
               </DropdownMenuContent>
             </DropdownMenu>
+          </div>
         </div>
       </header>
       <main className="flex-1 p-4 sm:p-6">
