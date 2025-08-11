@@ -449,7 +449,7 @@ export default function DashboardPage() {
             />
           </div>
           <div className="flex gap-2">
-             <Button onClick={() => setIsScannerOpen(true)} variant="outline" className="hidden sm:inline-flex">
+             <Button onClick={() => setIsScannerOpen(true)} className="hidden sm:inline-flex">
                 <ScanLine />
                 Scan Code
             </Button>
