@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import type { Variety } from '@/lib/varieties';
 import { ScrollArea } from './ui/scroll-area';
+import { useEffect } from 'react';
 
 const formSchema = z.object({
     name: z.string().min(1, 'Variety name is required.'),
@@ -34,14 +35,17 @@ const formSchema = z.object({
 type VarietyFormValues = z.infer<typeof formSchema>;
 
 interface VarietyFormProps {
+  variety: Variety | null;
   onSubmit: (data: Variety) => void;
   onCancel: () => void;
 }
 
-export function VarietyForm({ onSubmit, onCancel }: VarietyFormProps) {
+export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
+  const isEditing = !!variety;
+
   const form = useForm<VarietyFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
+    defaultValues: variety || {
         name: '',
         family: '',
         category: '',
@@ -55,6 +59,21 @@ export function VarietyForm({ onSubmit, onCancel }: VarietyFormProps) {
     },
   });
 
+  useEffect(() => {
+    form.reset(variety || {
+        name: '',
+        family: '',
+        category: '',
+        grouping: '',
+        commonName: '',
+        rating: '',
+        salesPeriod: '',
+        floweringPeriod: '',
+        flowerColour: '',
+        evergreen: '',
+    });
+  }, [variety, form]);
+
   const handleSubmit = (values: VarietyFormValues) => {
     onSubmit(values);
   };
@@ -62,9 +81,9 @@ export function VarietyForm({ onSubmit, onCancel }: VarietyFormProps) {
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Add New Variety</DialogTitle>
+        <DialogTitle>{isEditing ? 'Edit Variety' : 'Add New Variety'}</DialogTitle>
         <DialogDescription>
-          Add a new plant variety to your golden table with all its attributes.
+          {isEditing ? `Editing the details for "${variety.name}".` : 'Add a new plant variety to your golden table.'}
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
@@ -75,7 +94,7 @@ export function VarietyForm({ onSubmit, onCancel }: VarietyFormProps) {
                   <FormField control={form.control} name="name" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Variety Name</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Munstead'" {...field} /></FormControl>
+                          <FormControl><Input placeholder="e.g., 'Munstead'" {...field} disabled={isEditing} /></FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
@@ -149,7 +168,7 @@ export function VarietyForm({ onSubmit, onCancel }: VarietyFormProps) {
             <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
             </Button>
-            <Button type="submit">Add Variety</Button>
+            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Variety'}</Button>
           </DialogFooter>
         </form>
       </Form>

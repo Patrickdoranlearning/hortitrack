@@ -4,18 +4,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Plus, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, Download, Upload, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { VARIETIES, type Variety } from '@/lib/varieties';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { VarietyForm } from '@/components/variety-form';
 import { useToast } from '@/hooks/use-toast';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+  } from "@/components/ui/alert-dialog";
 
 export default function VarietiesPage() {
   const [varieties, setVarieties] = useState<Variety[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingVariety, setEditingVariety] = useState<Variety | null>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,17 +58,37 @@ export default function VarietiesPage() {
   }, [varieties, isClient]);
 
   const handleAddVariety = () => {
+    setEditingVariety(null);
     setIsFormOpen(true);
   };
   
-  const handleFormSubmit = (newVariety: Variety) => {
-    const isDuplicate = varieties.some(v => v.name.toLowerCase() === newVariety.name.toLowerCase());
-    if (isDuplicate) {
-        toast({ variant: 'destructive', title: 'Duplicate Variety', description: `The variety "${newVariety.name}" already exists.` });
-        return;
+  const handleEditVariety = (variety: Variety) => {
+    setEditingVariety(variety);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteVariety = (varietyNameToDelete: string) => {
+    setVarieties(prev => prev.filter(v => v.name !== varietyNameToDelete));
+    toast({ title: 'Variety Deleted', description: `Successfully deleted "${varietyNameToDelete}".` });
+  };
+  
+  const handleFormSubmit = (varietyData: Variety) => {
+    const isEditing = !!editingVariety;
+
+    if (isEditing) {
+        setVarieties(prev => prev.map(v => v.name === editingVariety.name ? varietyData : v));
+        toast({ title: 'Variety Updated', description: `Successfully updated "${varietyData.name}".` });
+    } else {
+        const isDuplicate = varieties.some(v => v.name.toLowerCase() === varietyData.name.toLowerCase());
+        if (isDuplicate) {
+            toast({ variant: 'destructive', title: 'Duplicate Variety', description: `The variety "${varietyData.name}" already exists.` });
+            return;
+        }
+        setVarieties(prev => [...prev, varietyData].sort((a,b) => a.name.localeCompare(b.name)));
+        toast({ title: 'Variety Added', description: `Successfully added "${varietyData.name}".` });
     }
-    setVarieties(prev => [...prev, newVariety].sort((a,b) => a.name.localeCompare(b.name)));
-    toast({ title: 'Variety Added', description: `Successfully added "${newVariety.name}".` });
+    
+    setEditingVariety(null);
     setIsFormOpen(false);
   };
 
@@ -161,29 +193,50 @@ export default function VarietiesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Variety Name</TableHead>
+                <TableHead>Common Name</TableHead>
                 <TableHead>Family</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Grouping</TableHead>
-                <TableHead>Common Name</TableHead>
                 <TableHead>Flowering Period</TableHead>
                 <TableHead>Flower Colour</TableHead>
                 <TableHead>Evergreen</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {varieties.map((variety, index) => (
                 <TableRow key={index}>
                   <TableCell className="font-medium">{variety.name}</TableCell>
+                  <TableCell>{variety.commonName}</TableCell>
                   <TableCell>{variety.family}</TableCell>
                   <TableCell>{variety.category}</TableCell>
                   <TableCell>{variety.grouping}</TableCell>
-                  <TableCell>{variety.commonName}</TableCell>
                   <TableCell>{variety.floweringPeriod}</TableCell>
                   <TableCell>{variety.flowerColour}</TableCell>
                   <TableCell>{variety.evergreen}</TableCell>
-                  <TableCell>
-                    {/* Placeholder for future edit/delete actions */}
+                  <TableCell className="text-right">
+                    <div className="flex gap-2 justify-end">
+                        <Button type="button" size="icon" variant="outline" onClick={() => handleEditVariety(variety)}><Edit /></Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete the "{variety.name}" variety. This action cannot be undone.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteVariety(variety.name)}>
+                                    Yes, delete it
+                                </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -195,8 +248,12 @@ export default function VarietiesPage() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl">
             <VarietyForm
+                variety={editingVariety}
                 onSubmit={handleFormSubmit}
-                onCancel={() => setIsFormOpen(false)}
+                onCancel={() => {
+                    setIsFormOpen(false);
+                    setEditingVariety(null);
+                }}
             />
         </DialogContent>
       </Dialog>
