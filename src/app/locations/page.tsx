@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import type { NurseryLocation } from '@/lib/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormField } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -134,17 +133,29 @@ export default function LocationsPage() {
     if (isEditingThisRow) {
       return (
         <TableRow key={location.id} className="bg-muted/50">
-            <Form {...form}>
-            <TableCell><FormField control={form.control} name="name" render={({ field }) => <Input {...field} />} /></TableCell>
-            <TableCell><FormField control={form.control} name="area" render={({ field }) => <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />} /></TableCell>
-            <TableCell><FormField control={form.control} name="isCovered" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} /></TableCell>
+           <Form {...form}>
+            <TableCell>
+                <FormField control={form.control} name="name" render={({ field }) => (
+                     <FormItem><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+            </TableCell>
+            <TableCell>
+                <FormField control={form.control} name="area" render={({ field }) => (
+                     <FormItem><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl></FormItem>
+                )} />
+            </TableCell>
+            <TableCell>
+                <FormField control={form.control} name="isCovered" render={({ field }) => (
+                    <FormItem><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
+                )} />
+            </TableCell>
             <TableCell className="text-right">
                 <div className="flex gap-2 justify-end">
                     <Button size="icon" onClick={form.handleSubmit(onSubmit)}><Check /></Button>
                     <Button size="icon" variant="ghost" onClick={handleCancelEdit}><X /></Button>
                 </div>
             </TableCell>
-            </Form>
+           </Form>
         </TableRow>
       );
     }
@@ -222,9 +233,21 @@ export default function LocationsPage() {
                     {editingLocationId === 'new' && (
                         <TableRow className="bg-muted/50">
                             <Form {...form}>
-                                <TableCell><FormField control={form.control} name="name" render={({ field }) => <Input {...field} placeholder="New Location Name" />} /></TableCell>
-                                <TableCell><FormField control={form.control} name="area" render={({ field }) => <Input type="number" {...field} placeholder="Area in m²" onChange={e => field.onChange(parseInt(e.target.value, 10))} /> }/></TableCell>
-                                <TableCell><FormField control={form.control} name="isCovered" render={({ field }) => <div className="flex items-center gap-2"><Switch checked={field.value} onCheckedChange={field.onChange} id="is-covered-new" /><Label htmlFor="is-covered-new">Covered</Label></div>} /></TableCell>
+                                <TableCell>
+                                    <FormField control={form.control} name="name" render={({ field }) => (
+                                        <FormItem><FormControl><Input {...field} placeholder="New Location Name" /></FormControl></FormItem>
+                                    )} />
+                                </TableCell>
+                                <TableCell>
+                                    <FormField control={form.control} name="area" render={({ field }) => (
+                                        <FormItem><FormControl><Input type="number" {...field} placeholder="Area in m²" onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl></FormItem>
+                                    )} />
+                                </TableCell>
+                                <TableCell>
+                                    <FormField control={form.control} name="isCovered" render={({ field }) => (
+                                        <FormItem><div className="flex items-center gap-2"><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} id="is-covered-new" /></FormControl><Label htmlFor="is-covered-new">Covered</Label></div></FormItem>
+                                    )} />
+                                </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex gap-2 justify-end">
                                     <Button size="icon" onClick={form.handleSubmit(onSubmit)}><Check /></Button>
