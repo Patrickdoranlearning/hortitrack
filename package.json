@@ -14,7 +14,8 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
-    "@genkit-ai/firebase": "^1.16.0",
+    "firebase": "^10.12.2",
+    "firebase-admin": "^12.1.1",
     "@genkit-ai/googleai": "^1.14.1",
     "@genkit-ai/next": "^1.14.1",
     "@genkit-ai/vertexai": "^1.16.0",
@@ -47,7 +48,6 @@
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
-    "firebase-admin": "^12.3.0",
     "genkit": "^1.14.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.475.0",
