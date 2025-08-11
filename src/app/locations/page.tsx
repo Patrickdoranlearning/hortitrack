@@ -29,8 +29,6 @@ import {
   } from "@/components/ui/alert-dialog";
 import * as z from 'zod';
 
-type LocationFormValues = z.infer<typeof LocationSchema>;
-
 const INITIAL_LOCATIONS: NurseryLocation[] = [
     { id: 'gh1', name: 'Greenhouse 1', area: 1000, isCovered: true },
     { id: 'gh2', name: 'Greenhouse 2', area: 1200, isCovered: true },
@@ -44,8 +42,13 @@ export default function LocationsPage() {
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
+  // Define the schema inside the component or where it can be imported without 'use client' issues.
+  const locationFormSchema = LocationSchema;
+  type LocationFormValues = z.infer<typeof locationFormSchema>;
+
+
   const form = useForm<LocationFormValues>({
-    resolver: zodResolver(LocationSchema),
+    resolver: zodResolver(locationFormSchema),
   });
 
   useEffect(() => {
@@ -240,3 +243,5 @@ export default function LocationsPage() {
     </div>
   );
 }
+
+    
