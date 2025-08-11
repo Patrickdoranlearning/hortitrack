@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import {
   Popover,
   PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover"
 import {
   Command,
@@ -96,32 +97,33 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Command shouldFilter={false} className="overflow-visible bg-transparent">
-        <div className="relative">
-           <CommandInput 
-                asChild
-                value={inputValue}
-                onValueChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onBlur={handleBlur}
-            >
-                <Input 
-                    placeholder={placeholder}
-                    className="w-full bg-transparent relative z-10"
-                    onClick={handleInputClick}
-                />
-            </CommandInput>
-
-            {suggestion && inputValue && suggestion.toLowerCase().startsWith(inputValue.toLowerCase()) && (
-              <div className="absolute inset-0 -z-10 flex items-center">
-                  <Input 
-                      value={`${inputValue}${suggestion.substring(inputValue.length)}`} 
-                      className="text-muted-foreground" 
-                      readOnly 
+        <PopoverTrigger asChild>
+          <div className="relative">
+             <CommandInput asChild>
+                <div className="relative">
+                    <Input 
+                        placeholder={placeholder}
+                        className="w-full bg-transparent relative z-10"
+                        onClick={handleInputClick}
+                        value={inputValue}
+                        onChange={(e) => handleInputChange(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onBlur={handleBlur}
                     />
-              </div>
-            )}
-        </div>
-
+                    {suggestion && inputValue && suggestion.toLowerCase().startsWith(inputValue.toLowerCase()) && (
+                    <div className="absolute inset-y-0 left-0 flex items-center -z-10">
+                        <Input 
+                            value={`${inputValue}${suggestion.substring(inputValue.length)}`} 
+                            className="text-muted-foreground border-none p-2" 
+                            style={{paddingLeft: '12px'}}
+                            readOnly 
+                        />
+                    </div>
+                    )}
+                </div>
+            </CommandInput>
+          </div>
+        </PopoverTrigger>
         <PopoverContent 
           className="w-[var(--radix-popover-trigger-width)] p-0" 
           align="start"
