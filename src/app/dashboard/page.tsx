@@ -18,6 +18,7 @@ import {
   Search,
   TrendingDown,
   PieChart as PieIcon,
+  Package,
 } from 'lucide-react';
 import * as Recharts from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -300,7 +301,7 @@ export default function DashboardOverviewPage() {
             <CardTitle className="text-sm font-medium">
               Active Batches
             </CardTitle>
-            <PlusSquare className="h-4 w-4 text-muted-foreground" />
+            <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeBatchesCount}</div>
@@ -449,3 +450,5 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
+
+    
