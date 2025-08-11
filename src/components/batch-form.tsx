@@ -90,8 +90,8 @@ interface BatchFormProps {
 }
 
 export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes }: BatchFormProps) {
-  const [isFamilySet, setIsFamilySet] = useState(false);
-  const [isCategorySet, setIsCategorySet] = useState(false);
+  const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
+  const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
   
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
@@ -179,9 +179,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-            
-            {/* Left Column: User Input */}
-            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="plantVariety"
@@ -199,93 +196,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-               <FormField
-                control={form.control}
-                name="plantingDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Planting Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={'outline'}
-                            className={cn(
-                              'w-full justify-start text-left font-normal',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(new Date(field.value), 'PPP') : <span>Pick a date</span>}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value ? new Date(field.value) : undefined}
-                          onSelect={(date) => field.onChange(date?.toISOString())}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Size</FormLabel>
-                    <Select onValueChange={handleSizeChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Right Column: Auto-populated/Derived */}
-            <div className="space-y-4">
                <FormField
                 control={form.control}
                 name="batchNumber"
@@ -325,20 +235,25 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-               <FormField
+              <FormField
                 control={form.control}
-                name="supplier"
+                name="size"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Supplier</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Doran Nurseries" {...field} />
-                    </FormControl>
+                    <FormLabel>Size</FormLabel>
+                    <Select onValueChange={handleSizeChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
+               <FormField
                 control={form.control}
                 name="status"
                 render={({ field }) => (
@@ -362,7 +277,85 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-            </div>
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Doran Nurseries" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="plantingDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Planting Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full justify-start text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(new Date(field.value), 'PPP') : <span>Pick a date</span>}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? new Date(field.value) : undefined}
+                          onSelect={(date) => field.onChange(date?.toISOString())}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+          </div>
             
             {/* Full Span Items */}
             <div className="md:col-span-2">
@@ -415,7 +408,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </Button>
                </div>
             </div>
-          </div>
+          
           
           <div className="flex justify-between items-center pt-4">
             <div>
@@ -456,3 +449,5 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     </>
   );
 }
+
+    
