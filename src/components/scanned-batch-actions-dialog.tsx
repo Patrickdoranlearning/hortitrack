@@ -27,7 +27,6 @@ interface ScannedBatchActionsDialogProps {
   onTransplant: () => void;
   onEdit: () => void;
   onGenerateProtocol: () => void;
-  onChat: () => void;
 }
 
 export function ScannedBatchActionsDialog({
@@ -85,3 +84,5 @@ export function ScannedBatchActionsDialog({
     </Dialog>
   );
 }
+
+    

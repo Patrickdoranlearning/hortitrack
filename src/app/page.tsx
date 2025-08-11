@@ -10,6 +10,7 @@ import {
   ScanLine,
   LayoutDashboard,
   Database,
+  LogOut,
 } from 'lucide-react';
 import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -43,8 +44,15 @@ import {
   logAction
 } from '@/app/actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  
   const [batches, setBatches] = useState<Batch[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +100,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setIsClient(true);
-    loadBatches();
+    if (user) {
+        loadBatches();
+    }
     
     const storedLocationsRaw = localStorage.getItem('nurseryLocations');
     if (storedLocationsRaw) {
@@ -117,7 +127,7 @@ export default function DashboardPage() {
     } else {
       setPlantSizes(INITIAL_PLANT_SIZES);
     }
-  }, [loadBatches]);
+  }, [loadBatches, user]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
@@ -327,7 +337,19 @@ export default function DashboardPage() {
     setIsProtocolDialogOpen(true);
   };
 
-  if (isDataLoading) {
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+    toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
+  };
+  
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) {
      return (
         <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
             <Logo />
@@ -361,6 +383,10 @@ export default function DashboardPage() {
             <Button onClick={handleNewBatch} size="lg">
                 <PlusCircle />
                 New Batch
+            </Button>
+            <Button onClick={handleSignOut} variant="ghost" size="icon">
+                <LogOut />
+                <span className="sr-only">Sign Out</span>
             </Button>
           </div>
         </div>
@@ -534,10 +560,9 @@ export default function DashboardPage() {
             setIsScannedActionsOpen(false);
             if (scannedBatch) handleGenerateProtocol(scannedBatch);
         }}
-        onChat={() => {
-            setIsScannedActionsOpen(false);
-        }}
       />
     </div>
   );
 }
+
+    
