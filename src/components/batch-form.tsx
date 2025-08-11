@@ -178,7 +178,9 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       </DialogHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8">
+            {/* Left Column Fields */}
+            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="plantVariety"
@@ -196,19 +198,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-               <FormField
-                control={form.control}
-                name="batchNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Batch Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Auto-generated" {...field} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="plantFamily"
@@ -216,20 +205,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Plant Family</FormLabel>
                     <FormControl>
-                      <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} />
+                      <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -253,30 +229,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-               <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Propagation">Propagation</SelectItem>
-                        <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-                        <SelectItem value="Potted">Potted</SelectItem>
-                        <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
-                        <SelectItem value="Looking Good">Looking Good</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="quantity"
@@ -285,19 +237,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                     <FormLabel>Quantity</FormLabel>
                     <FormControl>
                       <Input type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="supplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Doran Nurseries" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -337,6 +276,73 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
+            </div>
+            
+            {/* Right Column Fields */}
+            <div className="space-y-4">
+               <FormField
+                control={form.control}
+                name="batchNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Batch Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-generated" {...field} disabled />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Propagation">Propagation</SelectItem>
+                        <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                        <SelectItem value="Potted">Potted</SelectItem>
+                        <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                        <SelectItem value="Looking Good">Looking Good</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Doran Nurseries" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                <FormField
                 control={form.control}
                 name="location"
@@ -355,8 +361,8 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-          </div>
-            
+            </div>
+
             {/* Full Span Items */}
             <div className="md:col-span-2">
               {distribution && batch && (batch.initialQuantity > 0) && (
@@ -408,7 +414,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </Button>
                </div>
             </div>
-          
+          </div>
           
           <div className="flex justify-between items-center pt-4">
             <div>
@@ -449,5 +455,3 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     </>
   );
 }
-
-    
