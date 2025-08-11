@@ -8,6 +8,7 @@ import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 
 export async function getCareRecommendationsAction(batch: Batch) {
+  const runtime = 'nodejs';
   try {
     const logHistoryStrings = batch.logHistory.map(
       (log) => `${log.action} on ${new Date(log.date).toLocaleDateString()}`
@@ -35,6 +36,7 @@ export async function getCareRecommendationsAction(batch: Batch) {
 }
 
 export async function getProductionProtocolAction(batch: Batch) {
+  const runtime = 'nodejs';
   try {
     const protocol = await productionProtocol(batch);
     return { success: true, data: protocol };
@@ -52,6 +54,7 @@ export async function getBatchesAction(): Promise<{
   data?: Batch[];
   error?: string;
 }> {
+  const runtime = 'nodejs';
   try {
     const batchesCollection = db.collection('batches');
     const snapshot = await batchesCollection.orderBy('batchNumber').get();
@@ -66,6 +69,7 @@ export async function getBatchesAction(): Promise<{
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
+  const runtime = 'nodejs';
   try {
     const batchesCollection = db.collection('batches');
     const newDocRef = batchesCollection.doc();
@@ -83,6 +87,7 @@ export async function addBatchAction(
 }
 
 export async function updateBatchAction(batchToUpdate: Batch) {
+  const runtime = 'nodejs';
   try {
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(batchToUpdate.id);
@@ -95,6 +100,7 @@ export async function updateBatchAction(batchToUpdate: Batch) {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
+    const runtime = 'nodejs';
     const docRef = db.collection('batches').doc(batchId);
     const docSnap = await docRef.get();
 
@@ -106,6 +112,7 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
 
 
 export async function logAction(batchId: string, action: string, quantityChange: number | null = null, newLocation: string | null = null) {
+  const runtime = 'nodejs';
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -137,6 +144,7 @@ export async function logAction(batchId: string, action: string, quantityChange:
 }
 
 export async function archiveBatchAction(batchId: string, loss: number) {
+  const runtime = 'nodejs';
   try {
     const batch = await getBatchById(batchId);
     if (!batch) {
@@ -168,6 +176,7 @@ export async function transplantBatchAction(
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
+  const runtime = 'nodejs';
   try {
     return await db.runTransaction(async (transaction) => {
         const sourceBatchRef = db.collection('batches').doc(sourceBatchId);
@@ -245,6 +254,7 @@ export async function transplantBatchAction(
 }
 
 export async function batchChatAction(batch: Batch, query: string) {
+    const runtime = 'nodejs';
     try {
       const result = await batchChat({ batch, query });
       return { success: true, data: result };
