@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { Batch } from '@/lib/types';
+import type { Batch, NurseryLocation } from '@/lib/types';
 import { useState } from 'react';
 import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 
@@ -65,7 +65,7 @@ interface ActionLogFormProps {
   batch: Batch | null;
   onSubmit: (data: any) => void;
   onCancel: () => void;
-  nurseryLocations: string[];
+  nurseryLocations: NurseryLocation[];
   plantSizes: string[];
 }
 
@@ -165,7 +165,7 @@ export function ActionLogForm({
                       </FormControl>
                       <SelectContent>
                         {nurseryLocations.map(location => (
-                          <SelectItem key={location} value={location}>{location}</SelectItem>
+                          <SelectItem key={location.id} value={location.name}>{location.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -217,5 +217,3 @@ export function ActionLogForm({
     </>
   );
 }
-
-    

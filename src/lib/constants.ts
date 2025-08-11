@@ -1,19 +1,4 @@
 
-export const INITIAL_NURSERY_LOCATIONS = [
-    'Greenhouse 1',
-    'Greenhouse 2',
-    'Greenhouse 3',
-    'Greenhouse 4',
-    'Greenhouse 5',
-    'Field A1',
-    'Field A2',
-    'Field B1',
-    'Field B2',
-    'Shade House 1',
-    'Shade House 2',
-    'Potting Area',
-];
-  
 export const INITIAL_PLANT_SIZES = [
     '54',
     '35',

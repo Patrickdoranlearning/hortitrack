@@ -4,7 +4,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch } from '@/lib/types';
+import type { Batch, NurseryLocation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -69,6 +69,8 @@ const batchSchema = z.object({
   size: z.string().min(1, 'Size is required.'),
   supplier: z.string().min(1, 'Supplier is required.'),
   logHistory: z.array(logEntrySchema),
+  growerPhotoUrl: z.string().optional(),
+  salesPhotoUrl: z.string().optional(),
 });
 
 type BatchFormValues = z.infer<typeof batchSchema>;
@@ -85,7 +87,7 @@ interface BatchFormProps {
   onSubmit: (data: Omit<Batch, 'id' | 'batchNumber'> | Batch) => void;
   onCancel: () => void;
   onArchive: (batchId: string) => void;
-  nurseryLocations: string[];
+  nurseryLocations: NurseryLocation[];
   plantSizes: string[];
 }
 
@@ -350,7 +352,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                        {nurseryLocations.map(location => <SelectItem key={location.id} value={location.name}>{location.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -21,6 +21,8 @@ export const BatchSchema = z.object({
   logHistory: z.array(LogEntrySchema),
   transplantedFrom: z.string().optional(),
   supplier: z.string().optional(),
+  growerPhotoUrl: z.string().optional(),
+  salesPhotoUrl: z.string().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
@@ -41,3 +43,11 @@ export const ProductionProtocolOutputSchema = z.object({
   recommendations: z.array(z.string()).describe('Additional recommendations for optimizing future batches based on this protocol.'),
 });
 export type ProductionProtocolOutput = z.infer<typeof ProductionProtocolOutputSchema>;
+
+export const LocationSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, 'Location name is required.'),
+  area: z.coerce.number().min(0, 'Area must be a positive number.'),
+  isCovered: z.boolean(),
+});
+export type NurseryLocation = z.infer<typeof LocationSchema>;

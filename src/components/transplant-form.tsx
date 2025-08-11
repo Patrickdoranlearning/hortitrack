@@ -4,7 +4,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch, TransplantFormData } from '@/lib/types';
+import type { Batch, TransplantFormData, NurseryLocation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -55,13 +55,15 @@ const transplantFormSchema = (maxQuantity: number) =>
     transplantedFrom: z.string().optional(),
     supplier: z.string().optional(),
     logRemainingAsLoss: z.boolean(),
+    growerPhotoUrl: z.string().optional(),
+    salesPhotoUrl: z.string().optional(),
   });
 
 interface TransplantFormProps {
   batch: Batch | null;
   onSubmit: (data: TransplantFormData) => void;
   onCancel: () => void;
-  nurseryLocations: string[];
+  nurseryLocations: NurseryLocation[];
   plantSizes: string[];
 }
 
@@ -190,8 +192,8 @@ export function TransplantForm({
                     </FormControl>
                     <SelectContent>
                       {nurseryLocations.map((location) => (
-                        <SelectItem key={location} value={location}>
-                          {location}
+                        <SelectItem key={location.id} value={location.name}>
+                          {location.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

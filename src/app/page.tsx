@@ -13,7 +13,7 @@ import {
   LogOut,
   Menu,
 } from 'lucide-react';
-import type { Batch } from '@/lib/types';
+import type { Batch, NurseryLocation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -31,7 +31,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Logo } from '@/components/logo';
 import { TransplantForm } from '@/components/transplant-form';
 import { ActionLogForm } from '@/components/action-log-form';
-import { INITIAL_NURSERY_LOCATIONS, INITIAL_PLANT_SIZES } from '@/lib/constants';
+import { INITIAL_PLANT_SIZES } from '@/lib/constants';
 import Link from 'next/link';
 import { ScannerDialog } from '@/components/scanner-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -83,7 +83,7 @@ export default function DashboardPage() {
   const [scannedBatch, setScannedBatch] = useState<Batch | null>(null);
   const [isScannedActionsOpen, setIsScannedActionsOpen] = useState(false);
 
-  const [nurseryLocations, setNurseryLocations] = useState<string[]>([]);
+  const [nurseryLocations, setNurseryLocations] = useState<NurseryLocation[]>([]);
   const [plantSizes, setPlantSizes] = useState<string[]>([]);
 
   const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
@@ -128,15 +128,19 @@ export default function DashboardPage() {
     
     const storedLocationsRaw = localStorage.getItem('nurseryLocations');
     if (storedLocationsRaw) {
-      const storedLocations = JSON.parse(storedLocationsRaw);
-      if (storedLocations && storedLocations.length > 0) {
-        setNurseryLocations(storedLocations);
-      } else {
-        setNurseryLocations(INITIAL_NURSERY_LOCATIONS);
+      try {
+        const storedLocations = JSON.parse(storedLocationsRaw);
+        if (Array.isArray(storedLocations) && storedLocations.length > 0) {
+          setNurseryLocations(storedLocations);
+        }
+      } catch (e) {
+        console.error("Failed to parse nursery locations from localStorage", e);
+        setNurseryLocations([]); // Set to empty if parsing fails
       }
     } else {
-      setNurseryLocations(INITIAL_NURSERY_LOCATIONS);
+        setNurseryLocations([]);
     }
+
 
     const storedSizesRaw = localStorage.getItem('plantSizes');
     if (storedSizesRaw) {
@@ -633,5 +637,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

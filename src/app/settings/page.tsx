@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Boxes, Ruler } from 'lucide-react';
+import { ArrowLeft, Database, Boxes, Ruler, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -39,8 +39,8 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Boxes /> Nursery Locations</CardTitle>
-            <CardDescription>Add or remove nursery locations like greenhouses, fields, or shade houses.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><MapPin /> Nursery Locations</CardTitle>
+            <CardDescription>Add or remove nursery locations, and define their area and type.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
