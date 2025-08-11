@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -34,7 +35,6 @@ const INITIAL_LOCATIONS: NurseryLocation[] = [
     { id: 'sh1', name: 'Shade House 1', area: 800, isCovered: true },
 ];
 
-// Define the schema directly inside the client component file.
 const locationFormSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Location name is required.'),
@@ -55,7 +55,6 @@ export default function LocationsPage() {
   });
 
   useEffect(() => {
-    setIsClient(true);
     const storedLocationsRaw = localStorage.getItem('nurseryLocations');
     if (storedLocationsRaw) {
       try {
@@ -71,6 +70,7 @@ export default function LocationsPage() {
     } else {
       setLocations(INITIAL_LOCATIONS);
     }
+    setIsClient(true);
   }, []);
 
   useEffect(() => {
@@ -105,7 +105,7 @@ export default function LocationsPage() {
   const onSubmit = (data: LocationFormValues) => {
     const isNew = editingLocationId === 'new';
 
-    if (locations.some(loc => loc.name.toLowerCase() === data.name.toLowerCase() && (isNew || loc.id !== editingLocationId))) {
+    if (locations.some(loc => loc.name.toLowerCase() === data.name.toLowerCase() && (isNew || loc.id !== data.id))) {
         toast({ variant: 'destructive', title: 'Duplicate Name', description: 'A location with this name already exists.' });
         return;
     }
@@ -124,7 +124,11 @@ export default function LocationsPage() {
   
 
   if (!isClient) {
-    return null;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-2xl">Loading Locations...</div>
+      </div>
+    );
   }
 
   const renderLocationRow = (location: NurseryLocation) => {
@@ -133,68 +137,68 @@ export default function LocationsPage() {
     if (isEditingThisRow) {
       return (
         <TableRow key={location.id} className="bg-muted/50">
-           <Form {...form}>
+          <Form {...form}>
             <TableCell>
-                <FormField control={form.control} name="name" render={({ field }) => (
-                     <FormItem><FormControl><Input {...field} /></FormControl></FormItem>
-                )} />
+              <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem><FormControl><Input {...field} /></FormControl></FormItem>
+              )} />
             </TableCell>
             <TableCell>
-                <FormField control={form.control} name="area" render={({ field }) => (
-                     <FormItem><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl></FormItem>
-                )} />
+              <FormField control={form.control} name="area" render={({ field }) => (
+                  <FormItem><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl></FormItem>
+              )} />
             </TableCell>
             <TableCell>
-                <FormField control={form.control} name="isCovered" render={({ field }) => (
-                    <FormItem><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
-                )} />
+              <FormField control={form.control} name="isCovered" render={({ field }) => (
+                  <FormItem><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
+              )} />
             </TableCell>
             <TableCell className="text-right">
-                <div className="flex gap-2 justify-end">
-                    <Button size="icon" onClick={form.handleSubmit(onSubmit)}><Check /></Button>
-                    <Button size="icon" variant="ghost" onClick={handleCancelEdit}><X /></Button>
-                </div>
+              <div className="flex gap-2 justify-end">
+                  <Button size="icon" onClick={form.handleSubmit(onSubmit)}><Check /></Button>
+                  <Button size="icon" variant="ghost" onClick={handleCancelEdit}><X /></Button>
+              </div>
             </TableCell>
-           </Form>
+          </Form>
         </TableRow>
       );
     }
     
     return (
-        <TableRow key={location.id}>
-            <TableCell className="font-medium">{location.name}</TableCell>
-            <TableCell>{location.area.toLocaleString()} m²</TableCell>
-            <TableCell>
-                <div className="flex items-center gap-2">
-                    {location.isCovered ? <Sun className="text-amber-500" /> : <Wind className="text-blue-400" />}
-                    <span>{location.isCovered ? 'Covered' : 'Uncovered'}</span>
-                </div>
-            </TableCell>
-            <TableCell className="text-right">
-            <div className="flex gap-2 justify-end">
-                <Button size="icon" variant="outline" onClick={() => handleEdit(location)}><Edit /></Button>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button size="icon" variant="destructive"><Trash2 /></Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete the "{location.name}" location. This action cannot be undone.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(location.id)}>
-                            Yes, delete it
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+      <TableRow key={location.id}>
+        <TableCell className="font-medium">{location.name}</TableCell>
+        <TableCell>{location.area.toLocaleString()} m²</TableCell>
+        <TableCell>
+            <div className="flex items-center gap-2">
+                {location.isCovered ? <Sun className="text-amber-500" /> : <Wind className="text-blue-400" />}
+                <span>{location.isCovered ? 'Covered' : 'Uncovered'}</span>
             </div>
-            </TableCell>
-        </TableRow>
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex gap-2 justify-end">
+            <Button size="icon" variant="outline" onClick={() => handleEdit(location)}><Edit /></Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                  <Button size="icon" variant="destructive"><Trash2 /></Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This will permanently delete the "{location.name}" location. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDelete(location.id)}>
+                      Yes, delete it
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </TableCell>
+      </TableRow>
     );
   }
 
@@ -270,3 +274,5 @@ export default function LocationsPage() {
     </div>
   );
 }
+
+    

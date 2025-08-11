@@ -19,7 +19,6 @@ export default function VarietiesPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsClient(true);
     // In a real app, this would be a database call.
     // For now, we'll use localStorage to simulate persistence.
     const storedVarietiesRaw = localStorage.getItem('varieties');
@@ -33,6 +32,7 @@ export default function VarietiesPage() {
     } else {
       setVarieties(VARIETIES);
     }
+    setIsClient(true);
   }, []);
 
   useEffect(() => {
@@ -57,7 +57,11 @@ export default function VarietiesPage() {
   };
 
   if (!isClient) {
-    return null; // Or a loading spinner
+    return (
+       <div className="flex items-center justify-center h-screen">
+        <div className="text-2xl">Loading Varieties...</div>
+      </div>
+    );
   }
 
   return (
@@ -123,3 +127,5 @@ export default function VarietiesPage() {
     </div>
   );
 }
+
+    

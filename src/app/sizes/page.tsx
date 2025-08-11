@@ -18,7 +18,6 @@ export default function SizesPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsClient(true);
     const storedSizesRaw = localStorage.getItem('plantSizes');
     if (storedSizesRaw) {
       const storedSizes = JSON.parse(storedSizesRaw);
@@ -30,6 +29,7 @@ export default function SizesPage() {
     } else {
       setSizes(INITIAL_PLANT_SIZES);
     }
+    setIsClient(true);
   }, []);
 
   useEffect(() => {
@@ -61,7 +61,11 @@ export default function SizesPage() {
   };
   
   if (!isClient) {
-    return null; // Or a loading spinner
+    return (
+       <div className="flex items-center justify-center h-screen">
+        <div className="text-2xl">Loading Sizes...</div>
+      </div>
+    );
   }
 
   return (
@@ -123,3 +127,5 @@ export default function SizesPage() {
     </div>
   );
 }
+
+    
