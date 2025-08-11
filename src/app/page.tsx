@@ -52,7 +52,7 @@ export default function DashboardPage() {
     plantFamily: string;
     status: string;
     category: string;
-  }>({ plantFamily: 'all', status: 'all', category: 'all' });
+  }>({ plantFamily: 'all', status: 'Active', category: 'all' });
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
@@ -121,7 +121,7 @@ export default function DashboardPage() {
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
-  const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived'], []);
+  const statuses = useMemo(() => ['Active', 'all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
     return batches
@@ -136,10 +136,11 @@ export default function DashboardPage() {
         (batch) =>
           filters.category === 'all' || batch.category === filters.category
       )
-      .filter(
-        (batch) =>
-          filters.status === 'all' || batch.status === filters.status
-      );
+      .filter((batch) => {
+        if (filters.status === 'all') return true;
+        if (filters.status === 'Active') return batch.status !== 'Archived';
+        return batch.status === filters.status;
+      });
   }, [batches, searchQuery, filters]);
 
   const getNextBatchNumber = () => {
