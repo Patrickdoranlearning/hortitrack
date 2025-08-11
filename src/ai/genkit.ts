@@ -2,7 +2,7 @@
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { vertexAI } from '@genkit-ai/vertexai';
-import { adminAuth } from '@/lib/firebase-admin'; // Use the new centralized admin file
+import '@/lib/firebase-admin'; // Ensures firebase admin is initialized
 
 export const ai = genkit({
   plugins: [
