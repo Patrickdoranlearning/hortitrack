@@ -226,16 +226,20 @@ export default function LocationsPage() {
     form.reset();
   };
   
-  const handleDownloadTemplate = () => {
+  const handleDownloadData = () => {
     const headers = ['name', 'nursery', 'type', 'area', 'isCovered'];
-    const sampleRow = ['T33', 'Main', 'Tunnel', '120', 'true'];
+    const csvRows = locations.map(loc => 
+      [loc.name, loc.nursery, loc.type, loc.area, loc.isCovered].join(',')
+    );
+
     const csvContent = "data:text/csv;charset=utf-8," 
         + headers.join(',') + '\n'
-        + sampleRow.join(',') + '\n';
+        + csvRows.join('\n');
+    
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "locations_template.csv");
+    link.setAttribute("download", "locations_data.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -386,7 +390,7 @@ export default function LocationsPage() {
               <CardDescription>Add, edit, or remove locations from the master list.</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleDownloadTemplate}><Download /> Download Template</Button>
+              <Button variant="outline" onClick={handleDownloadData}><Download /> Download Data</Button>
               <Button onClick={() => fileInputRef.current?.click()}><Upload /> Upload CSV</Button>
               <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
             </div>
