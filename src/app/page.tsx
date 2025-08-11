@@ -48,10 +48,12 @@ import {
 } from '@/app/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -92,20 +94,33 @@ export default function DashboardPage() {
   const [isClient, setIsClient] = useState(false);
 
   const loadBatches = useCallback(async () => {
+    if (!user) return;
     setIsDataLoading(true);
-    const { success, data, error } = await getBatchesAction();
-    if (success && data) {
-      setBatches(data);
-    } else {
-      toast({ variant: 'destructive', title: 'Error loading batches', description: error });
-    }
-    setIsDataLoading(false);
-  }, [toast]);
+    
+    const q = query(collection(db, 'batches'), orderBy('batchNumber'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const batchesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Batch);
+      setBatches(batchesData);
+      setIsDataLoading(false);
+    }, (error) => {
+      console.error("Failed to subscribe to batch updates:", error);
+      toast({ variant: 'destructive', title: 'Error loading batches', description: error.message });
+      setIsDataLoading(false);
+    });
+
+    return unsubscribe;
+  }, [user, toast]);
 
   useEffect(() => {
     setIsClient(true);
+    let unsubscribe: (() => void) | undefined;
     if (user) {
-        loadBatches();
+        loadBatches().then(unsub => {
+          if (unsub) {
+            unsubscribe = unsub;
+          }
+        });
     }
     
     const storedLocationsRaw = localStorage.getItem('nurseryLocations');
@@ -131,6 +146,12 @@ export default function DashboardPage() {
     } else {
       setPlantSizes(INITIAL_PLANT_SIZES);
     }
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [loadBatches, user]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
@@ -200,7 +221,6 @@ export default function DashboardPage() {
 
     if (result.success) {
       toast({ title: "Success", description: `Batch #${batchToArchive.batchNumber} has been archived.` });
-      await loadBatches();
     } else {
       toast({ variant: 'destructive', title: 'Error archiving batch', description: result.error });
     }
@@ -243,7 +263,6 @@ export default function DashboardPage() {
         toast({ variant: 'destructive', title: 'Create Failed', description: result.error });
       }
     }
-    await loadBatches();
     setIsFormOpen(false);
     setEditingBatch(null);
     setBatchDistribution(null);
@@ -266,7 +285,6 @@ export default function DashboardPage() {
     
     if (result.success) {
       toast({ title: 'Transplant Successful', description: `New batch #${result.data?.newBatch.batchNumber} created.` });
-      await loadBatches();
     } else {
       toast({ variant: 'destructive', title: 'Transplant Failed', description: result.error });
     }
@@ -312,7 +330,6 @@ export default function DashboardPage() {
 
     if (result.success) {
       toast({ title: 'Action Logged', description: 'The action has been successfully logged.' });
-      await loadBatches();
     } else {
       toast({ variant: 'destructive', title: 'Logging Failed', description: result.error });
     }
@@ -595,3 +612,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
