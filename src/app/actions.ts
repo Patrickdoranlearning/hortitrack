@@ -10,35 +10,26 @@ import { join } from 'path';
 import admin from 'firebase-admin';
 
 // Correct Firebase Admin SDK Initialization
-function initializeFirebaseAdmin() {
-  if (!admin.apps.length) {
-    try {
-      const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-      if (!serviceAccountKey) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
-      }
+if (!admin.apps.length) {
+  try {
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (serviceAccountKey) {
       const serviceAccount = JSON.parse(serviceAccountKey);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
-    } catch (error) {
-      console.error('Failed to initialize Firebase Admin SDK:', error);
-      // We are not re-throwing the error to allow the app to run in environments
-      // where the service account key might not be available (e.g., local dev without .env).
-      // Functions that depend on Firebase will fail gracefully.
+    } else {
+      console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase dependant features may not work.');
     }
+  } catch (error) {
+    console.error('Failed to initialize Firebase Admin SDK in actions.ts:', error);
   }
-  return admin;
 }
 
-function getDb() {
-    initializeFirebaseAdmin();
-    return admin.firestore();
-}
+const db = admin.firestore();
 
 
 async function migrateData() {
-    const db = getDb();
     console.log("Checking if data migration is needed...");
     const batchesRef = db.collection('batches');
     const snapshot = await batchesRef.limit(1).get();
@@ -123,7 +114,6 @@ export async function getBatchesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const db = getDb();
     await migrateData();
     const batchesCollection = db.collection('batches');
     const snapshot = await batchesCollection.orderBy('batchNumber').get();
@@ -139,7 +129,6 @@ export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
   try {
-    const db = getDb();
     const batchesCollection = db.collection('batches');
     const newDocRef = batchesCollection.doc();
     const newBatch: Batch = {
@@ -157,7 +146,6 @@ export async function addBatchAction(
 
 export async function updateBatchAction(batchToUpdate: Batch) {
   try {
-    const db = getDb();
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(batchToUpdate.id);
     await batchDoc.set(batchToUpdate, { merge: true });
@@ -169,7 +157,6 @@ export async function updateBatchAction(batchToUpdate: Batch) {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const db = getDb();
     const docRef = db.collection('batches').doc(batchId);
     const docSnap = await docRef.get();
 
@@ -244,7 +231,6 @@ export async function transplantBatchAction(
   logRemainingAsLoss: boolean
 ) {
   try {
-    const db = getDb();
     const batchesCollection = db.collection('batches');
 
     return await db.runTransaction(async (transaction) => {
@@ -331,3 +317,5 @@ export async function batchChatAction(batch: Batch, query: string) {
       return { success: false, error: 'Failed to get AI chat response.' };
     }
 }
+
+    

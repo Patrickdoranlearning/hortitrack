@@ -7,11 +7,9 @@ import admin from 'firebase-admin';
 // Correct Firebase Admin SDK Initialization
 if (!admin.apps.length) {
   try {
-    // Ensure the environment variable is read correctly
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      const serviceAccount = JSON.parse(
-        process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-      );
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (serviceAccountKey) {
+      const serviceAccount = JSON.parse(serviceAccountKey);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
@@ -32,3 +30,5 @@ export const ai = genkit({
   traceSinks: ['firebase'],
   enableTracingAndMetrics: true,
 });
+
+    
