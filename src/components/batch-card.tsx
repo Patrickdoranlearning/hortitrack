@@ -1,6 +1,7 @@
 
+'use client';
+
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -10,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { Pencil, MoveRight, ClipboardList, FileText, Image as ImageIcon } from 'lucide-react';
+import { ImageIcon } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -18,18 +19,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
-import Link from 'next/link';
-
 
 interface BatchCardProps {
   batch: Batch;
-  onEdit: (batch: Batch) => void;
-  onTransplant: (batch: Batch) => void;
-  onLogAction: (batch: Batch) => void;
-  onGenerateProtocol: (batch: Batch) => void;
+  onClick: (batch: Batch) => void;
 }
 
-export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerateProtocol }: BatchCardProps) {
+export function BatchCard({ batch, onClick }: BatchCardProps) {
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
 
   const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
@@ -50,8 +46,10 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
   };
   
   return (
-    <Link href={`/batch/${batch.id}`} className="flex h-full">
-      <Card className="flex flex-col h-full w-full hover:border-primary transition-colors">
+      <Card 
+        className="flex flex-col h-full w-full hover:border-primary transition-colors cursor-pointer"
+        onClick={() => onClick(batch)}
+      >
         <CardHeader className="pb-2">
           <CardTitle className="font-headline text-xl">
             {batch.plantVariety}{' '}
@@ -96,8 +94,5 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
           {/* Actions are now on the detail page */}
         </CardFooter>
       </Card>
-    </Link>
   );
 }
-
-    

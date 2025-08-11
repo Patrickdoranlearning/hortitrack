@@ -2,6 +2,7 @@
 'use server';
 
 import { productionProtocol } from '@/ai/flows/production-protocol';
+import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 
@@ -28,6 +29,18 @@ export async function getProductionProtocolAction(batch: Batch) {
     };
   }
 }
+
+export async function batchChatAction(batch: Batch, query: string) {
+  try {
+    const input: BatchChatInput = { batch, query };
+    const result = await batchChat(input);
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error('Error in batch chat action:', error);
+    return { success: false, error: 'Failed to get AI response.' };
+  }
+}
+
 
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>

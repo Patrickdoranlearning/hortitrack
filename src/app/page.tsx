@@ -53,6 +53,7 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { BatchDetailDialog } from '@/components/batch-detail-dialog';
 
 
 export default function DashboardPage() {
@@ -92,6 +93,9 @@ export default function DashboardPage() {
   const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
   
   const [isClient, setIsClient] = useState(false);
+  
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
 
   const loadBatches = useCallback(async () => {
     if (!user) return;
@@ -210,6 +214,7 @@ export default function DashboardPage() {
     });
     setEditingBatch(batch);
     setIsFormOpen(true);
+    setIsDetailDialogOpen(false);
   };
 
   const handleArchiveBatch = async (batchId: string) => {
@@ -271,6 +276,7 @@ export default function DashboardPage() {
   const handleTransplantBatch = (batch: Batch) => {
     setTransplantingBatch(batch);
     setIsTransplantFormOpen(true);
+    setIsDetailDialogOpen(false);
   };
 
   const handleTransplantFormSubmit = async (data: TransplantFormData) => {
@@ -296,6 +302,7 @@ export default function DashboardPage() {
   const handleLogAction = (batch: Batch) => {
     setActionLogBatch(batch);
     setIsActionLogFormOpen(true);
+    setIsDetailDialogOpen(false);
   };
   
   const handleActionLogFormSubmit = async (data: any) => {
@@ -356,6 +363,7 @@ export default function DashboardPage() {
   const handleGenerateProtocol = (batch: Batch) => {
     setProtocolBatch(batch);
     setIsProtocolDialogOpen(true);
+    setIsDetailDialogOpen(false);
   };
 
   const handleSignOut = async () => {
@@ -363,6 +371,11 @@ export default function DashboardPage() {
     router.push('/login');
     toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
   };
+
+  const handleCardClick = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsDetailDialogOpen(true);
+  }
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -518,10 +531,7 @@ export default function DashboardPage() {
               <div key={batch.id}>
                 <BatchCard
                   batch={batch}
-                  onEdit={handleEditBatch}
-                  onTransplant={handleTransplantBatch}
-                  onLogAction={handleLogAction}
-                  onGenerateProtocol={handleGenerateProtocol}
+                  onClick={handleCardClick}
                 />
               </div>
             ))}
@@ -609,8 +619,16 @@ export default function DashboardPage() {
             if (scannedBatch) handleGenerateProtocol(scannedBatch);
         }}
       />
+      
+      <BatchDetailDialog
+        open={isDetailDialogOpen}
+        onOpenChange={setIsDetailDialogOpen}
+        batch={selectedBatch}
+        onEdit={handleEditBatch}
+        onTransplant={handleTransplantBatch}
+        onLogAction={handleLogAction}
+        onGenerateProtocol={handleGenerateProtocol}
+      />
     </div>
   );
 }
-
-    
