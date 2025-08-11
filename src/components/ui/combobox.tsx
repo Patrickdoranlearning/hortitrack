@@ -35,6 +35,7 @@ interface ComboboxProps {
 export function Combobox({ options, value, onChange, placeholder, emptyMessage }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState(value || "")
+  const [suggestion, setSuggestion] = React.useState("");
 
   React.useEffect(() => {
     const selectedOption = options.find(option => option.value.toLowerCase() === value?.toLowerCase());
@@ -42,19 +43,39 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
   }, [value, options]);
 
   const handleSelect = (currentValue: string) => {
-    const newValue = currentValue === value?.toLowerCase() ? "" : currentValue;
+    const newValue = currentValue.toLowerCase() === value?.toLowerCase() ? "" : currentValue;
     onChange(newValue);
     const selectedOption = options.find(option => option.value.toLowerCase() === newValue.toLowerCase());
     setInputValue(selectedOption ? selectedOption.label : "");
+    setSuggestion("");
     setOpen(false);
   }
   
   const handleInputChange = (search: string) => {
       setInputValue(search);
+      const match = options.find(option => option.label.toLowerCase().startsWith(search.toLowerCase()));
+      if (search.length > 0 && match) {
+        setSuggestion(match.label);
+      } else {
+        setSuggestion("");
+      }
+
       if (!open) {
           setOpen(true);
       }
   }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Tab" || e.key === "Enter") {
+        if (suggestion) {
+            const match = options.find(option => option.label === suggestion);
+            if (match) {
+                e.preventDefault();
+                handleSelect(match.value);
+            }
+        }
+    }
+  };
   
   const handleInputClick = () => {
     if (!open) {
@@ -65,28 +86,43 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
   return (
     <Popover open={open} onOpenChange={setOpen}>
         <div className="relative">
-             <Command shouldFilter={false} className="overflow-visible">
-                <CommandInput 
-                    asChild
-                    value={inputValue}
-                    onValueChange={handleInputChange}
-                    onBlur={() => {
-                        const existingOption = options.find(option => option.label.toLowerCase() === inputValue.toLowerCase());
-                        if (!existingOption && value) {
-                             const originalOption = options.find(option => option.value.toLowerCase() === value.toLowerCase());
-                             setInputValue(originalOption?.label || "");
-                        }
-                    }}
-                >
-                    <Input 
-                        placeholder={placeholder}
-                        className="w-full"
-                        onClick={handleInputClick}
-                    />
-                </CommandInput>
+             <Command shouldFilter={false} className="overflow-visible bg-transparent">
+                <div className="relative">
+                    <CommandInput 
+                        asChild
+                        value={inputValue}
+                        onValueChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        onBlur={() => {
+                            const existingOption = options.find(option => option.label.toLowerCase() === inputValue.toLowerCase());
+                            if (!existingOption && value) {
+                                const originalOption = options.find(option => option.value.toLowerCase() === value.toLowerCase());
+                                setInputValue(originalOption?.label || "");
+                            }
+                            setSuggestion("");
+                        }}
+                    >
+                        <Input 
+                            placeholder={placeholder}
+                            className="w-full bg-transparent relative z-10"
+                            onClick={handleInputClick}
+                        />
+                    </CommandInput>
+                    {suggestion && inputValue && (
+                        <Input
+                            className="absolute top-0 left-0 z-0 text-muted-foreground"
+                            value={suggestion}
+                            readOnly
+                        />
+                    )}
+                </div>
 
                 <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start"
                     onOpenAutoFocus={(e) => e.preventDefault()}
+                    onInteractOutside={(e) => {
+                        e.preventDefault();
+                        setOpen(false);
+                    }}
                 >
                     <CommandList>
                         <CommandEmpty>{emptyMessage || "No options found."}</CommandEmpty>
