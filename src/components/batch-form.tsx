@@ -48,6 +48,7 @@ import {
 import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
 import { VARIETIES } from '@/lib/varieties';
 import { Combobox } from './ui/combobox';
+import { useState } from 'react';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -89,6 +90,9 @@ interface BatchFormProps {
 }
 
 export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes }: BatchFormProps) {
+  const [isFamilySet, setIsFamilySet] = useState(false);
+  const [isCategorySet, setIsCategorySet] = useState(false);
+  
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
     defaultValues: batch
@@ -152,8 +156,13 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     form.setValue('plantVariety', varietyValue);
     const selectedVariety = VARIETIES.find(v => v.name.toLowerCase() === varietyValue.toLowerCase());
     if (selectedVariety) {
-      form.setValue('plantFamily', selectedVariety.family);
-      form.setValue('category', selectedVariety.category);
+      form.setValue('plantFamily', selectedVariety.family, { shouldValidate: true });
+      form.setValue('category', selectedVariety.category, { shouldValidate: true });
+      setIsFamilySet(true);
+      setIsCategorySet(true);
+    } else {
+      setIsFamilySet(false);
+      setIsCategorySet(false);
     }
   };
 
@@ -190,20 +199,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="supplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Doran Nurseries" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
+               <FormField
                 control={form.control}
                 name="plantingDate"
                 render={({ field }) => (
@@ -239,6 +235,19 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               />
               <FormField
                 control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="size"
                 render={({ field }) => (
                   <FormItem>
@@ -249,6 +258,24 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       </FormControl>
                       <SelectContent>
                         {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -279,7 +306,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Plant Family</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Lavender" {...field} />
+                      <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -292,38 +319,20 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Shrub, Perennial" {...field} />
+                      <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
                <FormField
                 control={form.control}
-                name="quantity"
+                name="supplier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quantity</FormLabel>
+                    <FormLabel>Supplier</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input placeholder="e.g., Doran Nurseries" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
