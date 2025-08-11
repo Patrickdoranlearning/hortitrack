@@ -91,7 +91,7 @@ export default function LocationsPage() {
   
   const handleCancelEdit = () => {
       setEditingLocationId(null);
-      form.reset();
+      form.reset({ id: '', name: '', area: 0, isCovered: false });
   }
 
   const handleDelete = (locationId: string) => {
@@ -274,5 +274,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-
-    
