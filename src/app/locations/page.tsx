@@ -30,18 +30,104 @@ import * as z from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const INITIAL_LOCATIONS: NurseryLocation[] = [
-    { id: 'gh1', name: 'Greenhouse 1', area: 1000, isCovered: true, nursery: 'Doran Nurseries', type: 'Glasshouse' },
-    { id: 'gh2', name: 'Greenhouse 2', area: 1200, isCovered: true, nursery: 'Doran Nurseries', type: 'Glasshouse' },
-    { id: 'fa1', name: 'Field A1', area: 5000, isCovered: false, nursery: 'Second Nursery', type: 'Section' },
-    { id: 'sh1', name: 'Shade House 1', area: 800, isCovered: true, nursery: 'Doran Nurseries', type: 'Tunnel' },
+    { id: 't1', name: 'T1', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't2', name: 'T2', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't3', name: 'T3', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't4', name: 'T4', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't5', name: 'T5', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't6a', name: 'T6A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't6b', name: 'T6B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't6c', name: 'T6C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't6d', name: 'T6D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't7a', name: 'T7A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't7b', name: 'T7B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't8', name: 'T8', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't9', name: 'T9', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't10', name: 'T10', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't11', name: 'T11', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't12', name: 'T12', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't13a', name: 'T13A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't13b', name: 'T13B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't14', name: 'T14', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't15', name: 'T15', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't16', name: 'T16', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't17', name: 'T17', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't18', name: 'T18', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't19', name: 'T19', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't20', name: 'T20', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't21a', name: 'T21A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't21b', name: 'T21B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't22', name: 'T22', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't23', name: 'T23', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't24', name: 'T24', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't25', name: 'T25', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't26', name: 'T26', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't27', name: 'T27', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't28', name: 'T28', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't29', name: 'T29', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't30', name: 'T30', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't31', name: 'T31', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't32a', name: 'T32A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't32b', name: 'T32B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't32c', name: 'T32C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't32d', name: 'T32D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't32e', name: 'T32E', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't32f', name: 'T32F', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't32g', name: 'T32G', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't35a', name: 'T35A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't35b', name: 'T35B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't35c', name: 'T35C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't35e', name: 'T35E', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't36a', name: 'T36A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't36b', name: 'T36B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't36c', name: 'T36C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't36d', name: 'T36D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't36e', name: 'T36E', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't37a', name: 'T37A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't37b', name: 'T37B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 't37c', name: 'T37C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 's2', name: 'S2', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's3', name: 'S3', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's4', name: 'S4', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's5', name: 'S5', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's6', name: 'S6', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's7', name: 'S7', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's8', name: 'S8', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's9', name: 'S9', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's10', name: 'S10', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's11', name: 'S11', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's12', name: 'S12', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's13', name: 'S13', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's14', name: 'S14', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 's15', name: 'S15', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
+    { id: 'at1', name: 'AT1', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at2', name: 'AT2', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at3', name: 'AT3', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at4', name: 'AT4', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at5', name: 'AT5', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at6', name: 'AT6', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at7', name: 'AT7', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at8', name: 'AT8', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at9', name: 'AT9', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at10', name: 'AT10', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'at11', name: 'AT11', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'as1', name: 'AS1', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
+    { id: 'as2', name: 'AS2', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
+    { id: 'as3', name: 'AS3', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
+    { id: 'as4', name: 'AS4', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
+    { id: 't35d', name: 'T35D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
+    { id: 'agh', name: 'AGH', nursery: 'Alberts', type: 'Glasshouse', area: 100, isCovered: true },
+    { id: 'gh', name: 'GH', nursery: 'Main', type: 'Glasshouse', area: 100, isCovered: true },
+    { id: 'lous', name: 'Lous', nursery: 'Main', type: 'Prophouse', area: 100, isCovered: true },
 ];
+
 
 const locationFormSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Location name is required.'),
   area: z.coerce.number().min(0, 'Area must be a positive number.'),
   isCovered: z.boolean(),
-  nursery: z.string().optional(),
+  nursery: z.string().min(1, 'Nursery is required.'),
   type: z.string().min(1, 'Location type is required.'),
 });
 type LocationFormValues = z.infer<typeof locationFormSchema>;
@@ -60,7 +146,7 @@ export default function LocationsPage() {
         name: '',
         area: 0,
         isCovered: false,
-        nursery: 'Doran Nurseries',
+        nursery: 'Main',
         type: '',
     }
   });
@@ -93,7 +179,7 @@ export default function LocationsPage() {
   }, [locations, isClient]);
 
   const handleAddNew = () => {
-    form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Doran Nurseries', type: '' });
+    form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Main', type: '' });
     setEditingLocationId('new');
   };
 
@@ -104,7 +190,7 @@ export default function LocationsPage() {
   
   const handleCancelEdit = () => {
       setEditingLocationId(null);
-      form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Doran Nurseries', type: '' });
+      form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Main', type: '' });
   }
 
   const handleDelete = (locationId: string) => {
@@ -165,8 +251,8 @@ export default function LocationsPage() {
                           <SelectTrigger><SelectValue placeholder="Select nursery" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Doran Nurseries">Doran Nurseries</SelectItem>
-                          <SelectItem value="Second Nursery">Second Nursery</SelectItem>
+                          <SelectItem value="Main">Main</SelectItem>
+                          <SelectItem value="Alberts">Alberts</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -183,7 +269,7 @@ export default function LocationsPage() {
                           <SelectItem value="Glasshouse">Glasshouse</SelectItem>
                           <SelectItem value="Tunnel">Tunnel</SelectItem>
                           <SelectItem value="Section">Section</SelectItem>
-                          <SelectItem value="Prop House">Prop House</SelectItem>
+                          <SelectItem value="Prophouse">Prophouse</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
