@@ -50,5 +50,6 @@ export const LocationSchema = z.object({
   area: z.coerce.number().min(0, 'Area must be a positive number.'),
   isCovered: z.boolean(),
   nursery: z.string().optional(),
+  type: z.string().min(1, 'Type is required.'),
 });
 export type NurseryLocation = z.infer<typeof LocationSchema>;

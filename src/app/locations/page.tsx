@@ -30,10 +30,10 @@ import * as z from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const INITIAL_LOCATIONS: NurseryLocation[] = [
-    { id: 'gh1', name: 'Greenhouse 1', area: 1000, isCovered: true, nursery: 'Doran Nurseries' },
-    { id: 'gh2', name: 'Greenhouse 2', area: 1200, isCovered: true, nursery: 'Doran Nurseries' },
-    { id: 'fa1', name: 'Field A1', area: 5000, isCovered: false, nursery: 'Second Nursery' },
-    { id: 'sh1', name: 'Shade House 1', area: 800, isCovered: true, nursery: 'Doran Nurseries' },
+    { id: 'gh1', name: 'Greenhouse 1', area: 1000, isCovered: true, nursery: 'Doran Nurseries', type: 'Glasshouse' },
+    { id: 'gh2', name: 'Greenhouse 2', area: 1200, isCovered: true, nursery: 'Doran Nurseries', type: 'Glasshouse' },
+    { id: 'fa1', name: 'Field A1', area: 5000, isCovered: false, nursery: 'Second Nursery', type: 'Section' },
+    { id: 'sh1', name: 'Shade House 1', area: 800, isCovered: true, nursery: 'Doran Nurseries', type: 'Tunnel' },
 ];
 
 const locationFormSchema = z.object({
@@ -42,6 +42,7 @@ const locationFormSchema = z.object({
   area: z.coerce.number().min(0, 'Area must be a positive number.'),
   isCovered: z.boolean(),
   nursery: z.string().optional(),
+  type: z.string().min(1, 'Location type is required.'),
 });
 type LocationFormValues = z.infer<typeof locationFormSchema>;
 
@@ -60,6 +61,7 @@ export default function LocationsPage() {
         area: 0,
         isCovered: false,
         nursery: 'Doran Nurseries',
+        type: '',
     }
   });
 
@@ -91,7 +93,7 @@ export default function LocationsPage() {
   }, [locations, isClient]);
 
   const handleAddNew = () => {
-    form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Doran Nurseries' });
+    form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Doran Nurseries', type: '' });
     setEditingLocationId('new');
   };
 
@@ -102,7 +104,7 @@ export default function LocationsPage() {
   
   const handleCancelEdit = () => {
       setEditingLocationId(null);
-      form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Doran Nurseries' });
+      form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Doran Nurseries', type: '' });
   }
 
   const handleDelete = (locationId: string) => {
@@ -148,8 +150,8 @@ export default function LocationsPage() {
   
   const renderEditRow = (id: 'new' | string) => {
     return (
-      <Form {...form}>
-        <TableRow key={id} className="bg-muted/50">
+      <TableRow key={id} className="bg-muted/50">
+        <Form {...form}>
             <TableCell>
                 <FormField control={form.control} name="name" render={({ field }) => (
                     <FormItem><FormControl><Input {...field} placeholder="New Location Name" /></FormControl></FormItem>
@@ -171,6 +173,23 @@ export default function LocationsPage() {
                 )} />
             </TableCell>
             <TableCell>
+                 <FormField control={form.control} name="type" render={({ field }) => (
+                    <FormItem>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Glasshouse">Glasshouse</SelectItem>
+                          <SelectItem value="Tunnel">Tunnel</SelectItem>
+                          <SelectItem value="Section">Section</SelectItem>
+                          <SelectItem value="Prop House">Prop House</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                )} />
+            </TableCell>
+            <TableCell>
                 <FormField control={form.control} name="area" render={({ field }) => (
                      <FormItem><FormControl><Input type="number" {...field} placeholder="Area in m²" onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl></FormItem>
                 )} />
@@ -186,13 +205,13 @@ export default function LocationsPage() {
                 )} />
             </TableCell>
             <TableCell className="text-right">
-            <div className="flex gap-2 justify-end">
-                <Button size="icon" onClick={form.handleSubmit(onSubmit)}><Check /></Button>
-                <Button size="icon" variant="ghost" onClick={handleCancelEdit}><X /></Button>
-            </div>
+              <div className="flex gap-2 justify-end">
+                  <Button size="icon" onClick={form.handleSubmit(onSubmit)}><Check /></Button>
+                  <Button size="icon" variant="ghost" onClick={handleCancelEdit}><X /></Button>
+              </div>
             </TableCell>
-        </TableRow>
-      </Form>
+        </Form>
+      </TableRow>
     );
   }
 
@@ -222,8 +241,9 @@ export default function LocationsPage() {
                   <TableRow>
                       <TableHead className="w-[30%]">Name</TableHead>
                       <TableHead>Nursery</TableHead>
-                      <TableHead>Area (m²)</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Area (m²)</TableHead>
+                      <TableHead>Covered</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
               </TableHeader>
@@ -236,6 +256,7 @@ export default function LocationsPage() {
                           <TableRow key={location.id}>
                               <TableCell className="font-medium">{location.name}</TableCell>
                               <TableCell>{location.nursery || 'N/A'}</TableCell>
+                              <TableCell>{location.type || 'N/A'}</TableCell>
                               <TableCell>{location.area.toLocaleString()} m²</TableCell>
                               <TableCell>
                                   <div className="flex items-center gap-2">
