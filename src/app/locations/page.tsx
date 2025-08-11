@@ -129,7 +129,7 @@ export default function LocationsPage() {
         <TableRow key={location.id} className="bg-muted/50">
             <Form {...form}>
             <TableCell><FormField control={form.control} name="name" render={({ field }) => <Input {...field} />} /></TableCell>
-            <TableCell><FormField control={form.control} name="area" render={({ field }) => <Input type="number" {...field} />} /></TableCell>
+            <TableCell><FormField control={form.control} name="area" render={({ field }) => <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />} /></TableCell>
             <TableCell><FormField control={form.control} name="isCovered" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />} /></TableCell>
             <TableCell className="text-right">
                 <div className="flex gap-2 justify-end">
@@ -205,7 +205,7 @@ export default function LocationsPage() {
                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-[40%]">Name</TableHead>
-                        <TableHead>Area</TableHead>
+                        <TableHead>Area (m²)</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -216,7 +216,7 @@ export default function LocationsPage() {
                         <TableRow className="bg-muted/50">
                             <Form {...form}>
                                 <TableCell><FormField control={form.control} name="name" render={({ field }) => <Input {...field} placeholder="New Location Name" />} /></TableCell>
-                                <TableCell><FormField control={form.control} name="area" render={({ field }) => <Input type="number" {...field} placeholder="Area in m²"/>} /></TableCell>
+                                <TableCell><FormField control={form.control} name="area" render={({ field }) => <Input type="number" {...field} placeholder="Area in m²" onChange={e => field.onChange(parseInt(e.target.value, 10))} /> }/></TableCell>
                                 <TableCell><FormField control={form.control} name="isCovered" render={({ field }) => <div className="flex items-center gap-2"><Switch checked={field.value} onCheckedChange={field.onChange} id="is-covered-new" /><Label htmlFor="is-covered-new">Covered</Label></div>} /></TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex gap-2 justify-end">
