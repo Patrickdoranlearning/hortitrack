@@ -82,7 +82,7 @@ export interface BatchDistribution {
 interface BatchFormProps {
   batch: Batch | null;
   distribution: BatchDistribution | null;
-  onSubmit: (data: Omit<Batch, 'id'>) => void;
+  onSubmit: (data: Omit<Batch, 'id'> | Batch) => void;
   onCancel: () => void;
   onArchive: (batchId: string) => void;
   nurseryLocations: string[];
@@ -140,7 +140,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
        onSubmit({ ...data, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
     } else {
-        onSubmit({ ...data, initialQuantity: data.quantity } as Batch);
+        onSubmit({ ...data, initialQuantity: data.quantity } as Omit<Batch, 'id'>);
     }
   };
 
@@ -200,8 +200,76 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   )}
                 />
               </div>
+              <div className="space-y-4 md:col-start-1 md:row-start-2">
+                 <FormField
+                  control={form.control}
+                  name="plantFamily"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Plant Family</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <div className="space-y-4 md:col-start-2">
+               <div className="space-y-4 md:col-start-1 md:row-start-3">
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4 md:col-start-1 md:row-start-4">
+                 <FormField
+                  control={form.control}
+                  name="size"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Size</FormLabel>
+                      <Select onValueChange={handleSizeChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+               <div className="space-y-4 md:col-start-1 md:row-start-5">
+                 <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="space-y-4 md:col-start-2 md:row-start-1">
                  <FormField
                   control={form.control}
                   name="batchNumber"
@@ -217,7 +285,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-              <div className="space-y-4 md:col-start-1 md:row-start-2">
+              <div className="space-y-4 md:col-start-2 md:row-start-2">
                 <FormField
                   control={form.control}
                   name="plantingDate"
@@ -254,76 +322,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 />
               </div>
 
-              <div className="space-y-4 md:col-start-2 md:row-start-2">
-                 <FormField
-                  control={form.control}
-                  name="plantFamily"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Plant Family</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-4 md:col-start-1 md:row-start-3">
-                 <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantity</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <div className="space-y-4 md:col-start-2 md:row-start-3">
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4 md:col-start-1 md:row-start-4">
-                 <FormField
-                  control={form.control}
-                  name="size"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Size</FormLabel>
-                      <Select onValueChange={handleSizeChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4 md:col-start-2 md:row-start-4">
                  <FormField
                   control={form.control}
                   name="supplier"
@@ -338,8 +337,8 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   )}
                 />
               </div>
-
-              <div className="space-y-4 md:col-start-1 md:row-start-5">
+              
+              <div className="space-y-4 md:col-start-2 md:row-start-4">
                  <FormField
                   control={form.control}
                   name="location"
@@ -415,7 +414,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                               render={({ field }) => (
                                   <FormItem className="w-1/3">
                                   <FormControl>
-                                      <Input type="date" {...field} />
+                                      <Input type="date" {...field} value={format(new Date(field.value), 'yyyy-MM-dd')} onChange={(e) => field.onChange(new Date(e.target.value).toISOString())} />
                                   </FormControl>
                                   </FormItem>
                               )}
@@ -436,7 +435,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                           </Button>
                       </div>
                   ))}
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString().split('T')[0], action: '' })}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), action: '' })}>
                       <Plus className="h-4 w-4 mr-2"/>
                       Add Log Entry
                   </Button>
