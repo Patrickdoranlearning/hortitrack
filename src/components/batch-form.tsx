@@ -168,96 +168,37 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+            
+            {/* Left Column: User Input */}
+            <div className="space-y-4">
               <FormField
-                control={form.control}
-                name="batchNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Batch Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Auto-generated" {...field} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
                 control={form.control}
                 name="plantVariety"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Plant Variety</FormLabel>
                     <Combobox
-                        options={varietyOptions}
-                        value={field.value}
-                        onChange={handleVarietyChange}
-                        placeholder="Select variety..."
-                        emptyMessage="No matching variety found."
-                      />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="plantFamily"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Plant Family</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Lavender" {...field} />
-                    </FormControl>
+                      options={varietyOptions}
+                      value={field.value}
+                      onChange={handleVarietyChange}
+                      placeholder="Select variety..."
+                      emptyMessage="No matching variety found."
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="category"
+                name="supplier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
+                    <FormLabel>Supplier</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Shrub, Perennial" {...field} />
+                      <Input placeholder="e.g., Doran Nurseries" {...field} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                  control={form.control}
-                  name="supplier"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Supplier</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Doran Nurseries" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select a location" />
-                              </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                              {nurseryLocations.map(location => (
-                                  <SelectItem key={location} value={location}>{location}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -274,16 +215,12 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                           <Button
                             variant={'outline'}
                             className={cn(
-                              'w-full pl-3 text-left font-normal',
+                              'w-full justify-start text-left font-normal',
                               !field.value && 'text-muted-foreground'
                             )}
                           >
-                            {field.value ? (
-                              format(new Date(field.value), 'PPP')
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(new Date(field.value), 'PPP') : <span>Pick a date</span>}
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
@@ -300,6 +237,85 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="size"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Size</FormLabel>
+                    <Select onValueChange={handleSizeChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Right Column: Auto-populated/Derived */}
+            <div className="space-y-4">
+               <FormField
+                control={form.control}
+                name="batchNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Batch Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-generated" {...field} disabled />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="plantFamily"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Plant Family</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Lavender" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Shrub, Perennial" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                <FormField
                 control={form.control}
                 name="quantity"
@@ -309,28 +325,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                     <FormControl>
                       <Input type="number" {...field} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Size</FormLabel>
-                      <Select onValueChange={handleSizeChange} value={field.value}>
-                          <FormControl>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select a size" />
-                              </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                              {plantSizes.map(size => (
-                                  <SelectItem key={size} value={size}>{size}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -360,8 +354,21 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 )}
               />
             </div>
+            
+            {/* Full Span Items */}
+            <div className="md:col-span-2">
+              {distribution && batch && (batch.initialQuantity > 0) && (
+                  <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+                      <h3 className="flex items-center font-semibold mb-2"><PieChart className="mr-2 h-4 w-4"/>Batch Distribution</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                          A breakdown of where the initial {batch.initialQuantity} units have gone.
+                      </p>
+                      <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
+                  </div>
+              )}
+            </div>
 
-            <div>
+            <div className="md:col-span-2">
                <FormLabel>Log History</FormLabel>
                <div className="space-y-2 pt-2">
                   {fields.map((field, index) => (
@@ -401,19 +408,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
             </div>
           </div>
           
-          <div className="md:col-span-1 space-y-4">
-            {distribution && batch && (batch.initialQuantity > 0) && (
-                <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
-                    <h3 className="flex items-center font-semibold mb-2"><PieChart className="mr-2 h-4 w-4"/>Batch Distribution</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        A breakdown of where the initial {batch.initialQuantity} units have gone.
-                    </p>
-                    <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
-                </div>
-            )}
-          </div>
-          
-          <div className="md:col-span-3 flex justify-between">
+          <div className="flex justify-between items-center pt-4">
             <div>
               {batch && batch.status !== 'Archived' && (
                 <AlertDialog>
