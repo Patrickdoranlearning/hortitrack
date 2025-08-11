@@ -5,25 +5,7 @@ import { careRecommendations } from '@/ai/flows/care-recommendations';
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
-import admin from 'firebase-admin';
-
-// Correct Firebase Admin SDK Initialization
-try {
-    if (!admin.apps.length) {
-        const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-        if (serviceAccountKey) {
-        const serviceAccount = JSON.parse(serviceAccountKey);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-        });
-        } else {
-        console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase dependant features may not work.');
-        }
-    }
-} catch (error) {
-    console.error('Failed to initialize Firebase Admin SDK in actions.ts:', error);
-}
-
+import { db } from '@/lib/firebase-admin';
 
 export async function getCareRecommendationsAction(batch: Batch) {
   try {
@@ -71,7 +53,6 @@ export async function getBatchesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const db = admin.firestore();
     const batchesCollection = db.collection('batches');
     const snapshot = await batchesCollection.orderBy('batchNumber').get();
     const batches = snapshot.docs.map(doc => doc.data() as Batch);
@@ -86,7 +67,6 @@ export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
   try {
-    const db = admin.firestore();
     const batchesCollection = db.collection('batches');
     const newDocRef = batchesCollection.doc();
     const newBatch: Batch = {
@@ -104,7 +84,6 @@ export async function addBatchAction(
 
 export async function updateBatchAction(batchToUpdate: Batch) {
   try {
-    const db = admin.firestore();
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(batchToUpdate.id);
     await batchDoc.set(batchToUpdate, { merge: true });
@@ -116,7 +95,6 @@ export async function updateBatchAction(batchToUpdate: Batch) {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const db = admin.firestore();
     const docRef = db.collection('batches').doc(batchId);
     const docSnap = await docRef.get();
 
@@ -190,7 +168,6 @@ export async function transplantBatchAction(
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
-  const db = admin.firestore();
   try {
     return await db.runTransaction(async (transaction) => {
         const sourceBatchRef = db.collection('batches').doc(sourceBatchId);
