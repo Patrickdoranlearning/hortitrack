@@ -27,7 +27,7 @@ export async function getBatchesAction(): Promise<{
   const runtime = 'nodejs';
   try {
     const batchesCollection = db.collection('batches');
-    const snapshot = await batchesCollection.where('status', '!=', 'Archived').orderBy('status').orderBy('batchNumber').get();
+    const snapshot = await batchesCollection.orderBy('batchNumber').get();
     const batches = snapshot.docs.map(doc => doc.data() as Batch);
     return { success: true, data: batches };
   } catch (error: any) {
@@ -59,10 +59,20 @@ export async function addBatchAction(
 export async function updateBatchAction(batchToUpdate: Batch) {
   const runtime = 'nodejs';
   try {
+    const updatedBatchData = { ...batchToUpdate };
+
+    if (updatedBatchData.quantity <= 0) {
+      if(updatedBatchData.status !== 'Archived') {
+        updatedBatchData.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
+      }
+      updatedBatchData.status = 'Archived';
+      updatedBatchData.quantity = 0;
+    }
+
     const batchesCollection = db.collection('batches');
-    const batchDoc = batchesCollection.doc(batchToUpdate.id);
-    await batchDoc.set(batchToUpdate, { merge: true });
-    return { success: true, data: batchToUpdate };
+    const batchDoc = batchesCollection.doc(updatedBatchData.id);
+    await batchDoc.set(updatedBatchData, { merge: true });
+    return { success: true, data: updatedBatchData };
   } catch (error: any) {
     console.error('Error updating batch:', error);
     return { success: false, error: 'Failed to update batch: ' + error.message };
@@ -212,6 +222,14 @@ export async function transplantBatchAction(
         }
         
         transaction.set(newDocRef, newBatch);
+        
+        if (updatedSourceBatch.quantity <= 0) {
+            if(updatedSourceBatch.status !== 'Archived') {
+                updatedSourceBatch.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
+            }
+            updatedSourceBatch.status = 'Archived';
+            updatedSourceBatch.quantity = 0;
+        }
         transaction.set(sourceBatchRef, updatedSourceBatch);
         
         return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };

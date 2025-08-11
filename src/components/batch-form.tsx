@@ -116,8 +116,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   });
 
   const handleFormSubmit = (data: BatchFormValues) => {
-    const finalStatus = data.quantity === 0 ? 'Archived' : data.status;
-
     if (batch) {
       const batchNumberPrefix = {
         'Propagation': '1',
@@ -136,9 +134,9 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
         finalBatchNumber = `${newPrefix}-${numberPart}`;
       }
 
-       onSubmit({ ...data, batchNumber: finalBatchNumber, status: finalStatus, initialQuantity: batch.initialQuantity });
+       onSubmit({ ...data, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity });
     } else {
-        onSubmit({ ...data, status: finalStatus, initialQuantity: data.quantity });
+        onSubmit({ ...data, initialQuantity: data.quantity });
     }
   };
 
