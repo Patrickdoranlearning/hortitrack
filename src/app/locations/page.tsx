@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Edit, Check, X, Sun, Wind } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Check, X, Sun, Wind, Download, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
@@ -138,6 +138,7 @@ export default function LocationsPage() {
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(locationFormSchema),
@@ -225,6 +226,64 @@ export default function LocationsPage() {
     form.reset();
   };
   
+  const handleDownloadTemplate = () => {
+    const headers = ['name', 'nursery', 'type', 'area', 'isCovered'];
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + '\n';
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "locations_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target?.result as string;
+        try {
+            const rows = text.split('\n').filter(row => row.trim() !== '');
+            const headers = rows.shift()?.trim().split(',').map(h => h.trim()) || [];
+            
+            const requiredHeaders = ['name', 'nursery', 'type', 'area', 'isCovered'];
+            if (!requiredHeaders.every(h => headers.includes(h))) {
+                throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
+            }
+
+            const newLocations = rows.map((row, index) => {
+                const values = row.trim().split(',');
+                const locationData: any = {};
+                headers.forEach((header, i) => {
+                    locationData[header] = values[i]?.trim();
+                });
+
+                return {
+                    id: `csv_${Date.now()}_${index}`,
+                    name: locationData.name || '',
+                    nursery: locationData.nursery || 'Main',
+                    type: locationData.type || 'Tunnel',
+                    area: parseInt(locationData.area, 10) || 0,
+                    isCovered: locationData.isCovered?.toLowerCase() === 'true',
+                } as NurseryLocation;
+            });
+            
+            setLocations(newLocations);
+            toast({ title: 'Import Successful', description: `${newLocations.length} locations have been loaded from the CSV file.` });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
+        } finally {
+            // Reset file input
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsText(file);
+  };
 
   if (!isClient) {
     return (
@@ -318,8 +377,17 @@ export default function LocationsPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Manage Locations</CardTitle>
-          <CardDescription>Add, edit, or remove locations from the master list.</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Manage Locations</CardTitle>
+              <CardDescription>Add, edit, or remove locations from the master list.</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleDownloadTemplate}><Download /> Download Template</Button>
+              <Button onClick={() => fileInputRef.current?.click()}><Upload /> Upload CSV</Button>
+              <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
