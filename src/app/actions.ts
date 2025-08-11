@@ -7,40 +7,39 @@ import { batchChat } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import admin from 'firebase-admin';
 
-import * as admin from 'firebase-admin';
-
-// Helper function to initialize Firebase Admin SDK
-function getAdminApp() {
-    if (admin.apps.length > 0) {
-        return admin.apps[0]!;
+// Correct Firebase Admin SDK Initialization
+function initializeFirebaseAdmin() {
+  if (!admin.apps.length) {
+    try {
+      const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (!serviceAccountKey) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
+      }
+      const serviceAccount = JSON.parse(serviceAccountKey);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    } catch (error) {
+      console.error('Failed to initialize Firebase Admin SDK:', error);
+      // We are not re-throwing the error to allow the app to run in environments
+      // where the service account key might not be available (e.g., local dev without .env).
+      // Functions that depend on Firebase will fail gracefully.
     }
-
-    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!serviceAccountKey) {
-        throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_KEY environment variable.');
-    }
-
-    const credentials = JSON.parse(serviceAccountKey);
-
-    return admin.initializeApp({
-        credential: admin.credential.cert(credentials),
-    });
+  }
+  return admin;
 }
 
-function getAdminFirestore() {
-    const app = getAdminApp();
-    return admin.firestore(app);
+function getDb() {
+    initializeFirebaseAdmin();
+    return admin.firestore();
 }
 
-async function getBatchesCollection() {
-    const db = getAdminFirestore();
-    return db.collection('batches');
-}
 
 async function migrateData() {
+    const db = getDb();
     console.log("Checking if data migration is needed...");
-    const db = getAdminFirestore();
     const batchesRef = db.collection('batches');
     const snapshot = await batchesRef.limit(1).get();
 
@@ -60,6 +59,7 @@ async function migrateData() {
             await firestoreBatch.commit();
             console.log(`Successfully migrated ${batches.length} batches to Firestore.`);
 
+            // Rename the file to prevent re-migration
             await fs.rename(dataFilePath, dataFilePath + '.migrated');
             console.log("Renamed data.json to data.json.migrated");
 
@@ -68,6 +68,7 @@ async function migrateData() {
                  console.log("data.json not found, assuming already migrated.");
             } else {
                 console.error('Error during data migration:', error);
+                throw new Error('Could not read or process data.json for migration.');
             }
         }
     } else {
@@ -122,9 +123,10 @@ export async function getBatchesAction(): Promise<{
   error?: string;
 }> {
   try {
+    const db = getDb();
     await migrateData();
-    const batchesCollection = await getBatchesCollection();
-    const snapshot = await batchesCollection.get();
+    const batchesCollection = db.collection('batches');
+    const snapshot = await batchesCollection.orderBy('batchNumber').get();
     const batches = snapshot.docs.map(doc => doc.data() as Batch);
     return { success: true, data: batches };
   } catch (error: any) {
@@ -137,7 +139,8 @@ export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
 ) {
   try {
-    const batchesCollection = await getBatchesCollection();
+    const db = getDb();
+    const batchesCollection = db.collection('batches');
     const newDocRef = batchesCollection.doc();
     const newBatch: Batch = {
       ...newBatchData,
@@ -146,26 +149,27 @@ export async function addBatchAction(
     };
     await newDocRef.set(newBatch);
     return { success: true, data: newBatch };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding batch:', error);
-    return { success: false, error: 'Failed to add batch.' };
+    return { success: false, error: 'Failed to add batch: ' + error.message };
   }
 }
 
 export async function updateBatchAction(batchToUpdate: Batch) {
   try {
-    const batchesCollection = await getBatchesCollection();
+    const db = getDb();
+    const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(batchToUpdate.id);
     await batchDoc.set(batchToUpdate, { merge: true });
     return { success: true, data: batchToUpdate };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating batch:', error);
-    return { success: false, error: 'Failed to update batch.' };
+    return { success: false, error: 'Failed to update batch: ' + error.message };
   }
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const db = getAdminFirestore();
+    const db = getDb();
     const docRef = db.collection('batches').doc(batchId);
     const docSnap = await docRef.get();
 
@@ -201,9 +205,9 @@ export async function logAction(batchId: string, action: string, quantityChange:
     } else {
       return { success: false, error: result.error };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error logging action:', error);
-    return { success: false, error: 'Failed to log action.' };
+    return { success: false, error: 'Failed to log action: ' + error.message };
   }
 }
 
@@ -227,9 +231,9 @@ export async function archiveBatchAction(batchId: string, loss: number) {
     } else {
         return { success: false, error: result.error };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error archiving batch:', error);
-    return { success: false, error: 'Failed to archive batch.' };
+    return { success: false, error: 'Failed to archive batch: ' + error.message };
   }
 }
 
@@ -240,7 +244,7 @@ export async function transplantBatchAction(
   logRemainingAsLoss: boolean
 ) {
   try {
-    const db = getAdminFirestore();
+    const db = getDb();
     const batchesCollection = db.collection('batches');
 
     return await db.runTransaction(async (transaction) => {
