@@ -24,7 +24,7 @@ export const BatchSchema = z.object({
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
-export type TransplantFormData = Omit<Batch, 'id' | 'initialQuantity'> & {
+export type TransplantFormData = Omit<Batch, 'id' | 'initialQuantity' | 'logHistory'> & {
     initialQuantity: number;
     logRemainingAsLoss: boolean;
 };

@@ -38,13 +38,10 @@ import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
-    id: z.string(),
-    batchNumber: z.string(),
     category: z.string(),
     plantFamily: z.string(),
     plantVariety: z.string(),
     plantingDate: z.string().min(1, 'Planting date is required.'),
-    initialQuantity: z.coerce.number(),
     quantity: z.coerce
       .number()
       .min(1, 'Quantity must be at least 1.')
@@ -55,14 +52,8 @@ const transplantFormSchema = (maxQuantity: number) =>
     status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
     location: z.string().min(1, 'Location is required.'),
     size: z.string().min(1, 'Size is required.'),
-    transplantedFrom: z.string(),
+    transplantedFrom: z.string().optional(),
     supplier: z.string().optional(),
-    logHistory: z.array(
-      z.object({
-        date: z.string(),
-        action: z.string(),
-      })
-    ),
     logRemainingAsLoss: z.boolean(),
   });
 
@@ -85,25 +76,16 @@ export function TransplantForm({
     resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
       ? {
-          id: '',
-          batchNumber: '',
           category: batch.category,
           plantFamily: batch.plantFamily,
           plantVariety: batch.plantVariety,
           plantingDate: new Date().toISOString(),
-          initialQuantity: batch.quantity,
           quantity: batch.quantity,
           status: 'Potted',
           location: '',
           size: '',
           transplantedFrom: batch.batchNumber,
           supplier: 'Doran Nurseries',
-          logHistory: [
-            {
-              date: new Date().toISOString().split('T')[0],
-              action: `Transplanted from batch #${batch.batchNumber}`,
-            },
-          ],
           logRemainingAsLoss: false,
         }
       : undefined,
@@ -145,19 +127,13 @@ export function TransplantForm({
           className="space-y-6"
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="batchNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Batch Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Auto-generated" {...field} disabled />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel>New Batch Number</FormLabel>
+              <FormControl>
+                <Input placeholder="Auto-generated" disabled />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
             <FormField
                 control={form.control}
                 name="category"
@@ -378,5 +354,3 @@ export function TransplantForm({
     </>
   );
 }
-
-    

@@ -5,6 +5,17 @@ import { productionProtocol } from '@/ai/flows/production-protocol';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 
+export async function getBatchesAction() {
+    try {
+        const snapshot = await db.collection('batches').get();
+        const batches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Batch[];
+        return { success: true, data: batches };
+    } catch (error: any) {
+        console.error('Error getting batches:', error);
+        return { success: false, error: 'Failed to fetch batches: ' + error.message };
+    }
+}
+
 export async function getProductionProtocolAction(batch: Batch) {
   try {
     const protocol = await productionProtocol(batch);

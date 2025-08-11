@@ -62,7 +62,7 @@ const batchSchema = z.object({
   plantFamily: z.string().min(1, 'Plant family is required.'),
   plantVariety: z.string().min(1, 'Plant variety is required.'),
   plantingDate: z.string().min(1, 'Planting date is required.'),
-  initialQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
+  initialQuantity: z.coerce.number(),
   quantity: z.coerce.number().min(0, 'Quantity must be at least 0.'),
   status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
   location: z.string().min(1, 'Location is required.'),
@@ -82,7 +82,7 @@ export interface BatchDistribution {
 interface BatchFormProps {
   batch: Batch | null;
   distribution: BatchDistribution | null;
-  onSubmit: (data: Omit<Batch, 'id'> | Batch) => void;
+  onSubmit: (data: Omit<Batch, 'id' | 'batchNumber'> | Batch) => void;
   onCancel: () => void;
   onArchive: (batchId: string) => void;
   nurseryLocations: string[];
@@ -96,7 +96,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
     defaultValues: batch
-      ? { ...batch, supplier: batch.supplier || 'Doran Nurseries' }
+      ? { ...batch, initialQuantity: batch.initialQuantity || batch.quantity, supplier: batch.supplier || 'Doran Nurseries' }
       : {
           id: Date.now().toString(),
           batchNumber: '',
@@ -140,7 +140,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
        onSubmit({ ...data, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
     } else {
-        onSubmit({ ...data, initialQuantity: data.quantity } as Omit<Batch, 'id'>);
+        onSubmit({ ...data, initialQuantity: data.quantity } as Omit<Batch, 'id' | 'batchNumber'>);
     }
   };
 
@@ -178,269 +178,267 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       </DialogHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-            {/* Re-ordered for mobile, styled for desktop grid */}
-            <div className="md:contents">
-              <div className="space-y-4 md:col-start-1">
-                 <FormField
-                  control={form.control}
-                  name="plantVariety"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Plant Variety</FormLabel>
-                      <Combobox
-                        options={varietyOptions}
-                        value={field.value}
-                        onChange={handleVarietyChange}
-                        placeholder="Select variety..."
-                        emptyMessage="No matching variety found."
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="space-y-4 md:col-start-1 md:row-start-2">
-                 <FormField
-                  control={form.control}
-                  name="plantFamily"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Plant Family</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-5 gap-x-8 gap-y-4">
+            
+            <div className="md:row-start-1">
+              <FormField
+                control={form.control}
+                name="plantVariety"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Plant Variety</FormLabel>
+                    <Combobox
+                      options={varietyOptions}
+                      value={field.value}
+                      onChange={handleVarietyChange}
+                      placeholder="Select variety..."
+                      emptyMessage="No matching variety found."
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-               <div className="space-y-4 md:col-start-1 md:row-start-3">
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-4 md:col-start-1 md:row-start-4">
-                 <FormField
-                  control={form.control}
-                  name="size"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Size</FormLabel>
-                      <Select onValueChange={handleSizeChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-               <div className="space-y-4 md:col-start-1 md:row-start-5">
-                 <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantity</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4 md:col-start-2 md:row-start-1">
-                 <FormField
-                  control={form.control}
-                  name="batchNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Batch Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Auto-generated" {...field} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-4 md:col-start-2 md:row-start-2">
-                <FormField
-                  control={form.control}
-                  name="plantingDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Planting Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={'outline'}
-                              className={cn(
-                                'w-full justify-start text-left font-normal',
-                                !field.value && 'text-muted-foreground'
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? format(new Date(field.value), 'PPP') : <span>Pick a date</span>}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value ? new Date(field.value) : undefined}
-                            onSelect={(date) => field.onChange(date?.toISOString())}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-4 md:col-start-2 md:row-start-3">
-                 <FormField
-                  control={form.control}
-                  name="supplier"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Supplier</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Doran Nurseries" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4 md:col-start-2 md:row-start-4">
-                 <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-               <div className="space-y-4 md:col-start-2 md:row-start-5">
-                 <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Propagation">Propagation</SelectItem>
-                          <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-                          <SelectItem value="Potted">Potted</SelectItem>
-                          <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
-                          <SelectItem value="Looking Good">Looking Good</SelectItem>
-                           {field.value === 'Archived' && (
-                            <SelectItem value="Archived" disabled>Archived</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-               </div>
-
+            <div className="md:row-start-2">
+               <FormField
+                control={form.control}
+                name="plantFamily"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Plant Family</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
             
-            <div className="md:col-span-2">
-              {distribution && batch && (batch.initialQuantity > 0) && (
-                  <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
-                      <h3 className="flex items-center font-semibold mb-2"><PieChart className="mr-2 h-4 w-4"/>Batch Distribution</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                          A breakdown of where the initial {batch.initialQuantity} units have gone.
-                      </p>
-                      <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
-                  </div>
-              )}
+            <div className="md:row-start-3">
+               <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <div className="md:col-span-2">
-               <FormLabel>Log History</FormLabel>
-               <div className="space-y-2 pt-2">
-                  {fields.map((field, index) => (
-                      <div key={field.id} className="flex items-start gap-2">
-                           <FormField
-                              control={form.control}
-                              name={`logHistory.${index}.date`}
-                              render={({ field }) => (
-                                  <FormItem className="w-1/3">
-                                  <FormControl>
-                                      <Input type="date" {...field} value={format(new Date(field.value), 'yyyy-MM-dd')} onChange={(e) => field.onChange(new Date(e.target.value).toISOString())} />
-                                  </FormControl>
-                                  </FormItem>
-                              )}
-                              />
-                          <FormField
-                              control={form.control}
-                              name={`logHistory.${index}.action`}
-                              render={({ field }) => (
-                                  <FormItem className="flex-1">
-                                  <FormControl>
-                                      <Textarea placeholder="Describe the action taken..." {...field} className="min-h-[40px]"/>
-                                  </FormControl>
-                                  </FormItem>
-                              )}
-                              />
-                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                      </div>
-                  ))}
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), action: '' })}>
-                      <Plus className="h-4 w-4 mr-2"/>
-                      Add Log Entry
-                  </Button>
-               </div>
+            <div className="md:row-start-4">
+              <FormField
+                control={form.control}
+                name="size"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Size</FormLabel>
+                    <Select onValueChange={handleSizeChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {plantSizes.map(size => <SelectItem key={size} value={size}>{size}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
+            
+            <div className="md:row-start-5">
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:row-start-1">
+               <FormField
+                control={form.control}
+                name="batchNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Batch Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-generated" {...field} disabled />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:row-start-2">
+              <FormField
+                control={form.control}
+                name="plantingDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Planting Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full justify-start text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(new Date(field.value), 'PPP') : <span>Pick a date</span>}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? new Date(field.value) : undefined}
+                          onSelect={(date) => field.onChange(date?.toISOString())}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="md:row-start-3">
+              <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Doran Nurseries" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:row-start-4">
+               <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map(location => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:row-start-5">
+               <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Propagation">Propagation</SelectItem>
+                        <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                        <SelectItem value="Potted">Potted</SelectItem>
+                        <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                        <SelectItem value="Looking Good">Looking Good</SelectItem>
+                         {field.value === 'Archived' && (
+                          <SelectItem value="Archived" disabled>Archived</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+            
+          <div className="md:col-span-2">
+            {distribution && batch && (batch.initialQuantity > 0) && (
+                <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+                    <h3 className="flex items-center font-semibold mb-2"><PieChart className="mr-2 h-4 w-4"/>Batch Distribution</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        A breakdown of where the initial {batch.initialQuantity} units have gone.
+                    </p>
+                    <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
+                </div>
+            )}
+          </div>
+
+          <div className="md:col-span-2">
+              <FormLabel>Log History</FormLabel>
+              <div className="space-y-2 pt-2">
+                {fields.map((field, index) => (
+                    <div key={field.id} className="flex items-start gap-2">
+                          <FormField
+                            control={form.control}
+                            name={`logHistory.${index}.date`}
+                            render={({ field }) => (
+                                <FormItem className="w-1/3">
+                                <FormControl>
+                                    <Input type="date" {...field} value={format(new Date(field.value), 'yyyy-MM-dd')} onChange={(e) => field.onChange(new Date(e.target.value).toISOString())} />
+                                </FormControl>
+                                </FormItem>
+                            )}
+                            />
+                        <FormField
+                            control={form.control}
+                            name={`logHistory.${index}.action`}
+                            render={({ field }) => (
+                                <FormItem className="flex-1">
+                                <FormControl>
+                                    <Textarea placeholder="Describe the action taken..." {...field} className="min-h-[40px]"/>
+                                </FormControl>
+                                </FormItem>
+                            )}
+                            />
+                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), action: '' })}>
+                    <Plus className="h-4 w-4 mr-2"/>
+                    Add Log Entry
+                </Button>
+              </div>
           </div>
           
           <div className="flex justify-between items-center pt-4">
@@ -482,5 +480,3 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     </>
   );
 }
-
-    
