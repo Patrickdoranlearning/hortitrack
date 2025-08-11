@@ -49,7 +49,7 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
   };
   
   return (
-    <Card>
+    <Card className="flex flex-col h-full">
       <CardHeader>
         <CardTitle className="font-headline text-xl">
           {batch.plantVariety}{' '}
@@ -59,7 +59,7 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
         </CardTitle>
         <CardDescription>Batch #{batch.batchNumber}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2 flex-grow">
         <div>
           <div className="flex justify-between text-sm font-semibold mb-1">
             <span>Stock</span>
@@ -77,33 +77,15 @@ export function BatchCard({ batch, onEdit, onTransplant, onLogAction, onGenerate
           </TooltipProvider>
         </div>
         <p>
-          <span className="font-semibold">Category:</span> {batch.category}
-        </p>
-        <p>
-          <span className="font-semibold">Planting Date:</span>{' '}
-          {new Date(batch.plantingDate).toISOString().split('T')[0]}
-        </p>
-        <p>
           <span className="font-semibold">Location:</span> {batch.location}
         </p>
         <p>
           <span className="font-semibold">Size:</span> {batch.size}
         </p>
-        {batch.supplier && (
-          <p className="flex items-center gap-2">
-            <Factory className="h-4 w-4 text-muted-foreground" />
-            <span className="font-semibold">Supplier:</span> {batch.supplier}
-          </p>
-        )}
         <div>
           <span className="font-semibold">Status:</span>{' '}
           <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
         </div>
-        {batch.transplantedFrom && (
-            <p className="text-sm text-muted-foreground">
-                Transplanted from #{batch.transplantedFrom}
-            </p>
-        )}
       </CardContent>
       <CardFooter className="flex justify-end gap-2">
         <TooltipProvider>
