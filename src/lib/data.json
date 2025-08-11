@@ -1,0 +1,107 @@
+
+[
+  {
+    "id": "1",
+    "batchNumber": "1-000001",
+    "category": "Shrub",
+    "plantFamily": "Hydrangea",
+    "plantVariety": "Annabelle",
+    "plantingDate": "2024-03-15T00:00:00.000Z",
+    "initialQuantity": 100,
+    "quantity": 95,
+    "status": "Potted",
+    "location": "Greenhouse 1",
+    "size": "1 Gallon",
+    "supplier": "Doran Nurseries",
+    "transplantedFrom": "",
+    "logHistory": [
+      {
+        "date": "2024-03-15T00:00:00.000Z",
+        "action": "Batch created."
+      },
+      {
+        "date": "2024-04-01T00:00:00.000Z",
+        "action": "Watered."
+      },
+      {
+        "date": "2024-04-10T00:00:00.000Z",
+        "action": "Logged 5 units as loss due to pest damage."
+      }
+    ]
+  },
+  {
+    "id": "2",
+    "batchNumber": "1-000002",
+    "category": "Perennial",
+    "plantFamily": "Lavender",
+    "plantVariety": "Hidcote",
+    "plantingDate": "2024-02-20T00:00:00.000Z",
+    "initialQuantity": 250,
+    "quantity": 250,
+    "status": "Ready for Sale",
+    "location": "Field A1",
+    "size": "Quart",
+    "supplier": "Doran Nurseries",
+    "transplantedFrom": "",
+    "logHistory": [
+      {
+        "date": "2024-02-20T00:00:00.000Z",
+        "action": "Batch created."
+      },
+      {
+        "date": "2024-05-01T00:00:00.000Z",
+        "action": "Moved to 'Ready for Sale' status."
+      }
+    ]
+  },
+  {
+    "id": "3",
+    "batchNumber": "1-000003",
+    "category": "Shrub",
+    "plantFamily": "Rose",
+    "plantVariety": "Peace",
+    "plantingDate": "2024-01-10T00:00:00.000Z",
+    "initialQuantity": 50,
+    "quantity": 0,
+    "status": "Archived",
+    "location": "Potting Area",
+    "size": "2 Gallon",
+    "supplier": "External Supplier",
+    "transplantedFrom": "",
+    "logHistory": [
+      {
+        "date": "2024-01-10T00:00:00.000Z",
+        "action": "Batch created."
+      },
+      {
+        "date": "2024-06-01T00:00:00.000Z",
+        "action": "Entire batch sold. Archived."
+      }
+    ]
+  },
+  {
+    "id": "4",
+    "batchNumber": "2-000004",
+    "category": "Shrub",
+    "plantFamily": "Boxwood",
+    "plantVariety": "Winter Gem",
+    "plantingDate": "2024-04-05T00:00:00.000Z",
+    "initialQuantity": 500,
+    "quantity": 200,
+    "status": "Plugs/Liners",
+    "location": "Shade House 1",
+    "size": "72-cell plug",
+    "supplier": "Doran Nurseries",
+    "transplantedFrom": "",
+    "logHistory": [
+      {
+        "date": "2024-04-05T00:00:00.000Z",
+        "action": "Batch created from cuttings."
+      },
+      {
+        "date": "2024-05-20T00:00:00.000Z",
+        "action": "Transplanted 300 units to a new batch."
+      }
+    ]
+  }
+]

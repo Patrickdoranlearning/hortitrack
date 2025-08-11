@@ -42,8 +42,12 @@ async function migrateData() {
             console.log("Renamed data.json to data.json.migrated");
 
         } catch (error) {
-            console.error('Error during data migration:', error);
-            // Don't throw, allow app to continue, but log the failure
+            // Check if file not found error, which means it was already migrated
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+                 console.log("data.json not found, assuming already migrated.");
+            } else {
+                console.error('Error during data migration:', error);
+            }
         }
     } else {
         console.log("Firestore already contains data. Skipping migration.");
