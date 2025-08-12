@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, PlusCircle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -29,22 +29,41 @@ interface ComboboxProps {
   options: ComboboxOption[];
   value?: string;
   onChange: (value: string) => void;
+  onCreate?: (value: string) => void;
   placeholder?: string;
   emptyMessage?: string;
-  allowCustomValue?: boolean;
 }
 
 export function Combobox({
   options,
   value,
   onChange,
+  onCreate,
   placeholder = "Select...",
   emptyMessage = "No results found.",
-  allowCustomValue = false,
 }: ComboboxProps) {
-  const [open, setOpen] = React.useState(false)
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
   
-  const selectedOption = options.find(option => option.value.toLowerCase() === value?.toLowerCase());
+  const selectedOption = options.find(option => option.value === value);
+
+  const handleSelect = (selectedValue: string) => {
+    onChange(selectedValue);
+    setOpen(false);
+    setSearch('');
+  }
+
+  const handleCreate = () => {
+    if (onCreate) {
+        onCreate(search);
+        setOpen(false);
+        setSearch('');
+    }
+  }
+
+  const filteredOptions = options.filter(option => 
+    option.label.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -55,42 +74,40 @@ export function Combobox({
           aria-expanded={open}
           className="w-full justify-between font-normal"
         >
-          {selectedOption ? selectedOption.label : value || placeholder}
+          {selectedOption ? selectedOption.label : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-        <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+        <Command>
           <CommandInput 
             placeholder={placeholder}
-            onBlur={(e) => {
-              if (allowCustomValue) {
-                const currentValue = e.target.value;
-                if (currentValue && !options.some(opt => opt.label.toLowerCase() === currentValue.toLowerCase())) {
-                  onChange(currentValue);
-                }
-              }
-            }}
+            value={search}
+            onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            {filteredOptions.length === 0 && search.length > 0 && onCreate ? (
+                <CommandItem
+                    onSelect={handleCreate}
+                    className="flex items-center gap-2 cursor-pointer"
+                >
+                    <PlusCircle className="h-4 w-4" />
+                    Create "{search}"
+                </CommandItem>
+            ) : (
+                 <CommandEmpty>{emptyMessage}</CommandEmpty>
+            )}
             <CommandGroup>
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
-                  onSelect={(currentValue) => {
-                    const selectedValue = options.find(opt => opt.label.toLowerCase() === currentValue.toLowerCase())?.value || (allowCustomValue ? currentValue : '');
-                    if (selectedValue) {
-                        onChange(selectedValue);
-                    }
-                    setOpen(false);
-                  }}
+                  value={option.value}
+                  onSelect={() => handleSelect(option.value)}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      selectedOption?.value?.toLowerCase() === option.value.toLowerCase() ? "opacity-100" : "opacity-0"
+                      value === option.value ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {option.label}

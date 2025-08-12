@@ -13,7 +13,7 @@ import {
   LogOut,
   Menu,
 } from 'lucide-react';
-import type { Batch, NurseryLocation, PlantSize, Supplier } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -87,6 +87,7 @@ export default function DashboardPage() {
   const [nurseryLocations, setNurseryLocations] = useState<NurseryLocation[]>([]);
   const [plantSizes, setPlantSizes] = useState<PlantSize[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [varieties, setVarieties] = useState<Variety[]>([]);
 
   const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
   const [protocolBatch, setProtocolBatch] = useState<Batch | null>(null);
@@ -116,70 +117,52 @@ export default function DashboardPage() {
 
     return unsubscribe;
   }, [user, toast]);
+  
+  const subscribeToCollection = useCallback(<T,>(
+    collectionName: string, 
+    setter: React.Dispatch<React.SetStateAction<T[]>>,
+    initialData: T[] = []
+  ) => {
+    if (!user) return () => {};
+
+    const q = query(collection(db, collectionName));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (snapshot.empty) {
+            setter(initialData);
+        } else {
+            const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as T);
+            setter(data);
+        }
+    }, (error) => {
+        console.error(`Failed to subscribe to ${collectionName}:`, error);
+        toast({ variant: 'destructive', title: `Error loading ${collectionName}`, description: error.message });
+        setter(initialData);
+    });
+
+    return unsubscribe;
+  }, [user, toast]);
 
   useEffect(() => {
     setIsClient(true);
-    let unsubscribe: (() => void) | undefined;
+    let unsubBatches: (() => void) | undefined;
     if (user) {
-        const unsub = loadBatches();
-        if (unsub) {
-          unsubscribe = unsub;
-        }
+        unsubBatches = loadBatches();
     }
     
-    try {
-        const storedLocationsRaw = localStorage.getItem('nurseryLocations');
-        if (storedLocationsRaw) {
-            const storedLocations = JSON.parse(storedLocationsRaw);
-            if (Array.isArray(storedLocations) && storedLocations.length > 0) {
-                setNurseryLocations(storedLocations);
-            }
-        }
-    } catch (e) {
-        console.error("Failed to parse nursery locations from localStorage", e);
-        setNurseryLocations([]);
-    }
-
-    try {
-        const storedSizesRaw = localStorage.getItem('plantSizes');
-        if (storedSizesRaw) {
-          const storedSizes = JSON.parse(storedSizesRaw);
-          if (storedSizes && storedSizes.length > 0) {
-            setPlantSizes(storedSizes);
-          } else {
-            setPlantSizes(INITIAL_PLANT_SIZES);
-          }
-        } else {
-          setPlantSizes(INITIAL_PLANT_SIZES);
-        }
-    } catch (e) {
-        console.error("Failed to parse plant sizes from localStorage", e);
-        setPlantSizes(INITIAL_PLANT_SIZES);
-    }
-    
-    try {
-        const storedSuppliersRaw = localStorage.getItem('suppliers');
-        if (storedSuppliersRaw) {
-            const storedSuppliers = JSON.parse(storedSuppliersRaw);
-            if (Array.isArray(storedSuppliers) && storedSuppliers.length > 0) {
-                setSuppliers(storedSuppliers);
-            } else {
-                setSuppliers(INITIAL_SUPPLIERS);
-            }
-        } else {
-            setSuppliers(INITIAL_SUPPLIERS);
-        }
-    } catch (e) {
-        console.error("Failed to parse suppliers from localStorage", e);
-        setSuppliers(INITIAL_SUPPLIERS);
-    }
+    // Subscribe to all golden tables
+    const unsubVarieties = subscribeToCollection<Variety>('varieties', setVarieties);
+    const unsubLocations = subscribeToCollection<NurseryLocation>('locations', setNurseryLocations);
+    const unsubSizes = subscribeToCollection<PlantSize>('sizes', setPlantSizes, INITIAL_PLANT_SIZES);
+    const unsubSuppliers = subscribeToCollection<Supplier>('suppliers', setSuppliers, INITIAL_SUPPLIERS);
     
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (unsubBatches) unsubBatches();
+      unsubVarieties();
+      unsubLocations();
+      unsubSizes();
+      unsubSuppliers();
     };
-  }, [loadBatches, user]);
+  }, [user, loadBatches, subscribeToCollection]);
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
@@ -562,6 +545,7 @@ export default function DashboardPage() {
             nurseryLocations={nurseryLocations}
             plantSizes={plantSizes}
             suppliers={suppliers}
+            varieties={varieties}
           />
         </DialogContent>
       </Dialog>

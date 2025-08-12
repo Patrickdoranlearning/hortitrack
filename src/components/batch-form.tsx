@@ -4,7 +4,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch, NurseryLocation, PlantSize, Supplier } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -33,7 +33,7 @@ import { CalendarIcon, Plus, Trash2, PieChart, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
-import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BatchDistributionBar } from './batch-distribution-bar';
 import {
     AlertDialog,
@@ -46,9 +46,11 @@ import {
     AlertDialogTrigger,
   } from "@/components/ui/alert-dialog";
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
-import { VARIETIES } from '@/lib/varieties';
 import { Combobox } from './ui/combobox';
 import { useState, useMemo, useEffect } from 'react';
+import { addVarietyAction, updateVarietyAction } from '@/app/actions';
+import { VarietyForm } from './variety-form';
+import { useToast } from '@/hooks/use-toast';
 
 const logEntrySchema = z.object({
   id: z.string().optional(),
@@ -107,12 +109,17 @@ interface BatchFormProps {
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];
   suppliers: Supplier[];
+  varieties: Variety[];
 }
 
-export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers }: BatchFormProps) {
+export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers, varieties }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
   const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
+
+  const [isVarietyFormOpen, setIsVarietyFormOpen] = useState(false);
+  const [newVarietyName, setNewVarietyName] = useState('');
+  const { toast } = useToast();
 
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchFormSchema),
@@ -208,17 +215,21 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
   
-  const handleVarietyChange = (varietyValue: string) => {
-    form.setValue('plantVariety', varietyValue, { shouldValidate: true });
-    const selectedVariety = VARIETIES.find(v => v.name.toLowerCase() === varietyValue.toLowerCase());
+  const handleVarietyChange = (varietyIdOrName: string) => {
+    const selectedVariety = varieties.find(v => v.id === varietyIdOrName);
     if (selectedVariety) {
+      form.setValue('plantVariety', selectedVariety.name, { shouldValidate: true });
       form.setValue('plantFamily', selectedVariety.family, { shouldValidate: true });
       form.setValue('category', selectedVariety.category, { shouldValidate: true });
       setIsFamilySet(true);
       setIsCategorySet(true);
     } else {
-      setIsFamilySet(false);
-      setIsCategorySet(false);
+        // This case shouldn't be hit with the updated combobox, but as a fallback:
+        form.setValue('plantVariety', varietyIdOrName);
+        setIsFamilySet(false);
+        setIsCategorySet(false);
+        form.setValue('plantFamily', '');
+        form.setValue('category', '');
     }
   };
 
@@ -230,7 +241,24 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
 
-  const varietyOptions = useMemo(() => VARIETIES.map(v => ({ value: v.name, label: v.name })), []);
+  const handleCreateNewVariety = (name: string) => {
+    setNewVarietyName(name);
+    setIsVarietyFormOpen(true);
+  };
+
+  const handleVarietyFormSubmit = async (varietyData: Omit<Variety, 'id'>) => {
+    const result = await addVarietyAction(varietyData);
+
+    if (result.success && result.data?.id) {
+        toast({ title: 'Variety Added', description: `Successfully added "${result.data.name}".` });
+        handleVarietyChange(result.data.id);
+        setIsVarietyFormOpen(false);
+    } else {
+        toast({ variant: 'destructive', title: 'Add Failed', description: result.error });
+    }
+  }
+
+  const varietyOptions = useMemo(() => varieties.map(v => ({ value: v.id!, label: v.name })), [varieties]);
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
   const currentSizeValue = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
 
@@ -255,11 +283,11 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                     <FormLabel>Plant Variety</FormLabel>
                     <Combobox
                       options={varietyOptions}
-                      value={field.value}
+                      value={varieties.find(v => v.name === field.value)?.id}
                       onChange={handleVarietyChange}
+                      onCreate={handleCreateNewVariety}
                       placeholder="Select variety..."
                       emptyMessage="No matching variety found."
-                      allowCustomValue={true}
                     />
                     <FormMessage />
                   </FormItem>
@@ -572,6 +600,15 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
           </DialogFooter>
         </form>
       </Form>
+      <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
+        <DialogContent className="max-w-2xl">
+            <VarietyForm
+                variety={{ name: newVarietyName, family: '', category: '' }}
+                onSubmit={handleVarietyFormSubmit}
+                onCancel={() => setIsVarietyFormOpen(false)}
+            />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
