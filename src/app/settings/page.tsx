@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Boxes, Ruler, MapPin } from 'lucide-react';
+import { ArrowLeft, Database, Boxes, Ruler, MapPin, Truck } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -60,6 +60,20 @@ export default function SettingsPage() {
             <Button asChild>
                 <Link href="/sizes">
                     Manage Sizes
+                </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Truck /> Suppliers</CardTitle>
+            <CardDescription>Maintain the list of plant and material suppliers for your nursery.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+                <Link href="/suppliers">
+                    Manage Suppliers
                 </Link>
             </Button>
           </CardContent>

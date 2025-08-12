@@ -4,7 +4,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize, Supplier } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -89,9 +89,10 @@ interface BatchFormProps {
   onArchive: (batchId: string) => void;
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];
+  suppliers: Supplier[];
 }
 
-export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes }: BatchFormProps) {
+export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
   const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
 
@@ -362,9 +363,14 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Supplier</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Doran Nurseries" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {suppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

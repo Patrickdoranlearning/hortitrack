@@ -64,3 +64,13 @@ export const PlantSizeSchema = z.object({
   multiple: z.coerce.number().min(0, 'Multiple must be a positive number.').optional(),
 });
 export type PlantSize = z.infer<typeof PlantSizeSchema>;
+
+export const SupplierSchema = z.object({
+    id: z.string(),
+    name: z.string().min(1, 'Supplier name is required.'),
+    address: z.string().optional(),
+    country: z.string().optional(),
+    countryCode: z.string().optional(),
+    producerCode: z.string().optional(),
+});
+export type Supplier = z.infer<typeof SupplierSchema>;

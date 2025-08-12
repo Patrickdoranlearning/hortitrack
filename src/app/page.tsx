@@ -13,7 +13,7 @@ import {
   LogOut,
   Menu,
 } from 'lucide-react';
-import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize, Supplier } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -53,6 +53,7 @@ import { useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { BatchDetailDialog } from '@/components/batch-detail-dialog';
+import { INITIAL_SUPPLIERS } from '@/lib/suppliers';
 
 
 export default function DashboardPage() {
@@ -85,6 +86,7 @@ export default function DashboardPage() {
 
   const [nurseryLocations, setNurseryLocations] = useState<NurseryLocation[]>([]);
   const [plantSizes, setPlantSizes] = useState<PlantSize[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
   const [protocolBatch, setProtocolBatch] = useState<Batch | null>(null);
@@ -152,6 +154,18 @@ export default function DashboardPage() {
       }
     } else {
       setPlantSizes(INITIAL_PLANT_SIZES);
+    }
+    
+    const storedSuppliersRaw = localStorage.getItem('suppliers');
+    if (storedSuppliersRaw) {
+        const storedSuppliers = JSON.parse(storedSuppliersRaw);
+        if (Array.isArray(storedSuppliers) && storedSuppliers.length > 0) {
+            setSuppliers(storedSuppliers);
+        } else {
+            setSuppliers(INITIAL_SUPPLIERS);
+        }
+    } else {
+        setSuppliers(INITIAL_SUPPLIERS);
     }
     
     return () => {
@@ -563,6 +577,7 @@ export default function DashboardPage() {
             onArchive={handleArchiveBatch}
             nurseryLocations={nurseryLocations}
             plantSizes={plantSizes}
+            suppliers={suppliers}
           />
         </DialogContent>
       </Dialog>
