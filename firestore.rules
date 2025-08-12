@@ -1,14 +1,39 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access to the batches collection only for authenticated users.
+
+    // Users collection: users can only read/write their own document.
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Batches collection: only authenticated users can read/write.
+    // Consider adding userId to batches for per-user ownership in the future.
     match /batches/{batchId} {
       allow read, write: if request.auth != null;
     }
+    
+    // Golden Tables: Allow all authenticated users to read, but no one to write.
+    // For now, you can manage this data directly in the Firebase Console.
+    match /varieties/{varietyId} {
+        allow read: if request.auth != null;
+        allow write: if false; // Or check for an admin role
+    }
+    match /locations/{locationId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+    }
+     match /sizes/{sizeId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+    }
+     match /suppliers/{supplierId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+    }
 
-    // Lock down all other collections by default.
+    // Default deny for any other path to ensure security
     match /{document=**} {
       allow read, write: if false;
     }
