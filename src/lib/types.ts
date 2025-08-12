@@ -2,6 +2,7 @@
 import { z } from 'zod';
 
 export const LogEntrySchema = z.object({
+  id: z.string().optional(), // Allow optional id for client-side generation
   date: z.string(),
   action: z.string(),
 });

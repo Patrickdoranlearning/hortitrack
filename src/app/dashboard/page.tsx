@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { Logo } from '@/components/logo';
 
 export default function DashboardOverviewPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -194,8 +195,9 @@ export default function DashboardOverviewPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-2xl">Loading Dashboard...</div>
+      <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
+        <Logo />
+        <p className="mt-4 text-muted-foreground">Loading Dashboard...</p>
       </div>
     );
   }
@@ -450,5 +452,3 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
-
-    

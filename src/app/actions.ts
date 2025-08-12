@@ -3,6 +3,7 @@
 
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
+import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 
@@ -27,6 +28,24 @@ export async function getProductionProtocolAction(batch: Batch) {
       success: false,
       error: 'Failed to generate AI production protocol.',
     };
+  }
+}
+
+export async function getCareRecommendationsAction(batch: Batch) {
+  try {
+    const input: CareRecommendationsInput = {
+      batchInfo: {
+        plantFamily: batch.plantFamily,
+        plantVariety: batch.plantVariety,
+        plantingDate: batch.plantingDate,
+      },
+      logHistory: batch.logHistory.map(log => log.action),
+    };
+    const result = await careRecommendations(input);
+    return { success: true, data: result };
+  } catch (error: any) {
+    console.error('Error in care recommendations action:', error);
+    return { success: false, error: 'Failed to get AI care recommendations.' };
   }
 }
 

@@ -32,7 +32,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from './ui/checkbox';
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { useMemo, useState, useEffect } from 'react';
@@ -123,8 +123,17 @@ export function TransplantForm({
   };
 
   const sortedPlantSizes = useMemo(() => {
-    return [...plantSizes].sort(customSizeSort);
+    return plantSizes ? [...plantSizes].sort(customSizeSort) : [];
   }, [plantSizes]);
+
+  useEffect(() => {
+    if (batch) {
+        form.reset({
+            ...form.getValues(),
+            quantity: batch.quantity,
+        })
+    }
+  }, [batch, form]);
 
   const handleFormSubmit = (
     data: z.infer<ReturnType<typeof transplantFormSchema>>
@@ -437,12 +446,12 @@ export function TransplantForm({
               )}
             />
 
-          <div className="flex justify-end gap-4">
+          <DialogFooter className="pt-4">
             <Button type="button" variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
             <Button type="submit">Create Transplanted Batch</Button>
-          </div>
+          </DialogFooter>
         </form>
       </Form>
     </>

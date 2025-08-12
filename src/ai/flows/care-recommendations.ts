@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -11,7 +12,6 @@
  * const recommendations = await careRecommendations({
  *   batchInfo: { plantFamily: 'Roses', plantVariety: 'Peace', plantingDate: '2024-01-01' },
  *   logHistory: ['Watered on 2024-03-01', 'Fertilized on 2024-02-15'],
- *   weatherInfo: { temperature: 20, humidity: 70 },
  * });
  * console.log(recommendations.careActivities);
  * ```
@@ -32,12 +32,6 @@ const CareRecommendationsInputSchema = z.object({
   logHistory: z
     .array(z.string())
     .describe('Recent log history of care activities for the batch.'),
-  weatherInfo: z
-    .object({
-      temperature: z.number().describe('The current temperature in Celsius.'),
-      humidity: z.number().describe('The current humidity percentage.'),
-    })
-    .describe('External weather information.'),
 });
 export type CareRecommendationsInput =
   z.infer<typeof CareRecommendationsInputSchema>;
@@ -54,19 +48,14 @@ export type CareRecommendationsOutput =
 // Define the tool for fetching weather information
 const getContextualWeatherInfo = ai.defineTool({
   name: 'getContextualWeatherInfo',
-  description: 'Retrieves detailed, contextual weather information including temperature, humidity, and precipitation forecasts.',
-  inputSchema: z.object({
-    plantFamily: z.string().describe('The family of plant for which weather information is needed.'),
-    plantVariety: z.string().describe('The variety of plant for which weather information is needed.'),
-  }),
+  description: 'Retrieves detailed, contextual weather information including temperature, humidity, and precipitation forecasts for the nursery\'s location.',
+  inputSchema: z.object({}),
   outputSchema: z.object({
     temperature: z.number().describe('The current temperature in Celsius.'),
     humidity: z.number().describe('The current humidity percentage.'),
-    precipitationForecast: z.string().describe('The precipitation forecast.'),
+    precipitationForecast: z.string().describe('The precipitation forecast for the next 7 days.'),
   }),
-}, async (input) => {
-  console.log('Plant family is ', input.plantFamily);
-  console.log('Plant variety is ', input.plantVariety);
+}, async () => {
   // Simulate fetching weather information. In a real application, this
   // would call an external weather API.
   return {
@@ -82,31 +71,27 @@ const careRecommendationsPrompt = ai.definePrompt({
   input: {schema: CareRecommendationsInputSchema},
   output: {schema: CareRecommendationsOutputSchema},
   tools: [getContextualWeatherInfo],
-  prompt: `You are an expert horticulturalist providing plant care recommendations.
+  prompt: `You are an expert horticulturalist providing plant care recommendations for a nursery.
 
-  Based on the following batch information, recent log history, and weather information, provide a list of care activities to optimize plant health and yield.
+  Your primary instruction is to **always** call the \`getContextualWeatherInfo\` tool to get the current weather conditions before making any recommendations.
+
+  Based on the retrieved weather and the following batch information and recent log history, provide a list of care activities to optimize plant health and yield.
 
   Batch Information:
-  Plant Family: {{{batchInfo.plantFamily}}}
-  Plant Variety: {{{batchInfo.plantVariety}}}
-  Planting Date: {{{batchInfo.plantingDate}}}
+  - Plant Family: {{{batchInfo.plantFamily}}}
+  - Plant Variety: {{{batchInfo.plantVariety}}}
+  - Planting Date: {{{batchInfo.plantingDate}}}
 
   Log History:
   {{#each logHistory}}- {{{this}}}\n{{/each}}
 
-  Weather Information:
-  Temperature: {{{weatherInfo.temperature}}}°C
-  Humidity: {{{weatherInfo.humidity}}}%
-
   Given the plant type, consider the following when creating recommendations:
-  - Watering needs
-  - Fertilization requirements
-  - Pruning schedule
-  - Pest control
+  - Watering needs based on weather and plant type.
+  - Fertilization requirements.
+  - Pruning schedule.
+  - Pest control measures.
 
-  Make sure to use the getContextualWeatherInfo tool to refine your plant care recommendations based on localized weather.
-
-  Care Activities:
+  Your final output must be a list of actionable care activities.
   `,  
 });
 
@@ -117,21 +102,15 @@ const careRecommendationsFlow = ai.defineFlow(
     inputSchema: CareRecommendationsInputSchema,
     outputSchema: CareRecommendationsOutputSchema,
   },
-  async input => {
-    // Before calling the prompt, invoke the getContextualWeatherInfo tool.
-    //const weatherInfo = await getContextualWeatherInfo({plantType: input.batchInfo.plantType});
-    //console.log('WeatherInfo is ', weatherInfo);
-    //const promptInput = {...input, weatherInfo: weatherInfo};
-
+  async (input) => {
     const {output} = await careRecommendationsPrompt(input);
-
     return output!;
   }
 );
 
 /**
- * Provides AI-powered plant care recommendations based on batch information,
- * recent log history, and external weather data.
+ * Provides AI-powered plant care recommendations based on batch information
+ * and recent log history. It will use a tool to fetch weather data.
  * @param input - The input data for generating care recommendations.
  * @returns A promise that resolves to the care recommendations.
  */

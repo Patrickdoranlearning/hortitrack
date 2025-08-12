@@ -33,7 +33,7 @@ import { CalendarIcon, Plus, Trash2, PieChart, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
-import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { BatchDistributionBar } from './batch-distribution-bar';
 import {
     AlertDialog,
@@ -41,7 +41,6 @@ import {
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
-    AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
@@ -52,6 +51,7 @@ import { Combobox } from './ui/combobox';
 import { useState, useMemo, useEffect } from 'react';
 
 const logEntrySchema = z.object({
+  id: z.string().optional(),
   date: z.string().min(1, "Date is required."),
   action: z.string().min(1, "Action is required."),
 });
@@ -74,6 +74,14 @@ const batchFormSchema = z.object({
   salesPhotoUrl: z.string().optional(),
   // Non-schema fields for form logic
   trayQuantity: z.number().optional(),
+}).refine(data => {
+    if (!data.id) { // Only for new batches
+        return data.quantity > 0;
+    }
+    return true;
+}, {
+    message: "Quantity must be greater than 0 for a new batch.",
+    path: ["quantity"],
 });
 
 
@@ -543,7 +551,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               </div>
           </div>
           
-          <div className="flex justify-between items-center pt-4">
+          <DialogFooter className="flex justify-between items-center pt-4">
             <div>
               {batch && batch.status !== 'Archived' && (
                 <AlertDialog>
@@ -576,7 +584,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 </Button>
                 <Button type="submit">{batch ? 'Save Changes' : 'Create Batch'}</Button>
             </div>
-          </div>
+          </DialogFooter>
         </form>
       </Form>
     </>
