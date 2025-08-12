@@ -176,7 +176,7 @@ export function ActionLogForm({
           )}
           
           {actionType === 'LOSS' && (
-            <>
+            <div className='space-y-8'>
               <FormField
                   control={form.control}
                   name="qty"
@@ -203,7 +203,7 @@ export function ActionLogForm({
                   </FormItem>
                 )}
               />
-            </>
+            </div>
           )}
 
           <DialogFooter>
