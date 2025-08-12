@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowLeft, Plus, Download, Upload, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { VARIETIES, type Variety } from '@/lib/varieties';
+import type { Variety } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { VarietyForm } from '@/components/variety-form';
@@ -21,41 +21,51 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog";
+import { useAuth } from '@/hooks/use-auth';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { addVarietyAction, updateVarietyAction, deleteVarietyAction } from '../actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function VarietiesPage() {
+  const { user } = useAuth();
   const [varieties, setVarieties] = useState<Variety[]>([]);
-  const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVariety, setEditingVariety] = useState<Variety | null>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const storedVarietiesRaw = localStorage.getItem('varieties');
-    if (storedVarietiesRaw) {
-      try {
-        const storedVarieties = JSON.parse(storedVarietiesRaw);
-        if (Array.isArray(storedVarieties) && storedVarieties.length > 0) {
-          setVarieties(storedVarieties);
-        } else {
-          setVarieties(VARIETIES);
-        }
-      } catch (e) {
-        console.error("Failed to parse stored varieties:", e);
-        setVarieties(VARIETIES);
+  const subscribeToVarieties = useCallback(() => {
+    if (!user) return;
+    setIsLoading(true);
+    const q = query(collection(db, 'varieties'), orderBy('name'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const varietiesData = snapshot.docs.map(
+          (doc) => ({ ...doc.data(), id: doc.id }) as Variety
+        );
+        setVarieties(varietiesData);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Failed to subscribe to variety updates:', error);
+        toast({ variant: 'destructive', title: 'Error loading varieties', description: error.message });
+        setIsLoading(false);
       }
-    } else {
-      setVarieties(VARIETIES);
-    }
-    setIsClient(true);
-  }, []);
+    );
+    return unsubscribe;
+  }, [user, toast]);
 
   useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('varieties', JSON.stringify(varieties));
-    }
-  }, [varieties, isClient]);
+    const unsubscribe = subscribeToVarieties();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [subscribeToVarieties]);
+
 
   const handleAddVariety = () => {
     setEditingVariety(null);
@@ -67,29 +77,39 @@ export default function VarietiesPage() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteVariety = (varietyNameToDelete: string) => {
-    setVarieties(prev => prev.filter(v => v.name !== varietyNameToDelete));
-    toast({ title: 'Variety Deleted', description: `Successfully deleted "${varietyNameToDelete}".` });
+  const handleDeleteVariety = async (varietyId: string) => {
+    const varietyToDelete = varieties.find(v => v.id === varietyId);
+    if (!varietyToDelete) return;
+
+    const result = await deleteVarietyAction(varietyId);
+    if (result.success) {
+        toast({ title: 'Variety Deleted', description: `Successfully deleted "${varietyToDelete.name}".` });
+    } else {
+        toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
+    }
   };
   
-  const handleFormSubmit = (varietyData: Variety) => {
-    const isEditing = !!editingVariety;
+  const handleFormSubmit = async (varietyData: Omit<Variety, 'id'> | Variety) => {
+    const isEditing = 'id' in varietyData;
 
-    if (isEditing) {
-        setVarieties(prev => prev.map(v => v.name === editingVariety.name ? varietyData : v));
-        toast({ title: 'Variety Updated', description: `Successfully updated "${varietyData.name}".` });
+    const result = isEditing
+      ? await updateVarietyAction(varietyData as Variety)
+      : await addVarietyAction(varietyData);
+
+    if (result.success) {
+      toast({ 
+        title: isEditing ? 'Variety Updated' : 'Variety Added', 
+        description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".` 
+      });
+      setIsFormOpen(false);
+      setEditingVariety(null);
     } else {
-        const isDuplicate = varieties.some(v => v.name.toLowerCase() === varietyData.name.toLowerCase());
-        if (isDuplicate) {
-            toast({ variant: 'destructive', title: 'Duplicate Variety', description: `The variety "${varietyData.name}" already exists.` });
-            return;
-        }
-        setVarieties(prev => [...prev, varietyData].sort((a,b) => a.name.localeCompare(b.name)));
-        toast({ title: 'Variety Added', description: `Successfully added "${varietyData.name}".` });
+      toast({ 
+        variant: 'destructive', 
+        title: isEditing ? 'Update Failed' : 'Add Failed', 
+        description: result.error 
+      });
     }
-    
-    setEditingVariety(null);
-    setIsFormOpen(false);
   };
 
   const handleDownloadData = () => {
@@ -116,7 +136,7 @@ export default function VarietiesPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         const text = e.target?.result as string;
         try {
             const rows = text.split('\n').filter(row => row.trim() !== '');
@@ -128,18 +148,16 @@ export default function VarietiesPage() {
                 throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
             }
 
-            const newVarieties = rows.map((row, index) => {
+            for (const row of rows) {
                 const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)!.map(v => v.replace(/"/g, '').trim());
                 const varietyData: any = {};
                 headers.forEach((header, i) => {
                     varietyData[header] = values[i] || '';
                 });
-
-                return varietyData as Variety;
-            });
+                await addVarietyAction(varietyData);
+            }
             
-            setVarieties(newVarieties);
-            toast({ title: 'Import Successful', description: `${newVarieties.length} varieties have been loaded from the CSV file.` });
+            toast({ title: 'Import Successful', description: `${rows.length} varieties have been imported.` });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
         } finally {
@@ -151,15 +169,8 @@ export default function VarietiesPage() {
     reader.readAsText(file);
   };
 
-  if (!isClient) {
-    return (
-       <div className="flex items-center justify-center h-screen">
-        <div className="text-2xl">Loading Varieties...</div>
-      </div>
-    );
-  }
-
   return (
+    <>
     <div className="container mx-auto max-w-7xl p-4 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -189,59 +200,65 @@ export default function VarietiesPage() {
           <CardDescription>This is the master list of varieties used for auto-completing new batch forms.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Variety Name</TableHead>
-                <TableHead>Common Name</TableHead>
-                <TableHead>Family</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Grouping</TableHead>
-                <TableHead>Flowering Period</TableHead>
-                <TableHead>Flower Colour</TableHead>
-                <TableHead>Evergreen</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {varieties.map((variety, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">{variety.name}</TableCell>
-                  <TableCell>{variety.commonName}</TableCell>
-                  <TableCell>{variety.family}</TableCell>
-                  <TableCell>{variety.category}</TableCell>
-                  <TableCell>{variety.grouping}</TableCell>
-                  <TableCell>{variety.floweringPeriod}</TableCell>
-                  <TableCell>{variety.flowerColour}</TableCell>
-                  <TableCell>{variety.evergreen}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
-                        <Button type="button" size="icon" variant="outline" onClick={() => handleEditVariety(variety)}><Edit /></Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This will permanently delete the "{variety.name}" variety. This action cannot be undone.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteVariety(variety.name)}>
-                                    Yes, delete it
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                  </TableCell>
+          {isLoading ? (
+             <div className="space-y-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Variety Name</TableHead>
+                  <TableHead>Common Name</TableHead>
+                  <TableHead>Family</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Grouping</TableHead>
+                  <TableHead>Flowering Period</TableHead>
+                  <TableHead>Flower Colour</TableHead>
+                  <TableHead>Evergreen</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {varieties.map((variety) => (
+                  <TableRow key={variety.id}>
+                    <TableCell className="font-medium">{variety.name}</TableCell>
+                    <TableCell>{variety.commonName}</TableCell>
+                    <TableCell>{variety.family}</TableCell>
+                    <TableCell>{variety.category}</TableCell>
+                    <TableCell>{variety.grouping}</TableCell>
+                    <TableCell>{variety.floweringPeriod}</TableCell>
+                    <TableCell>{variety.flowerColour}</TableCell>
+                    <TableCell>{variety.evergreen}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                          <Button type="button" size="icon" variant="outline" onClick={() => handleEditVariety(variety)}><Edit /></Button>
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                  <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                      This will permanently delete the "{variety.name}" variety. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteVariety(variety.id!)}>
+                                      Yes, delete it
+                                  </AlertDialogAction>
+                                  </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
       
@@ -258,5 +275,6 @@ export default function VarietiesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

@@ -4,7 +4,7 @@
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
-import type { Batch, LogEntry } from '@/lib/types';
+import type { Batch, LogEntry, Variety } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 import { FieldValue, Transaction } from 'firebase-admin/firestore';
 
@@ -68,6 +68,8 @@ async function getNextBatchNumber(transaction: Transaction, status: Batch['statu
     let nextBatchNum = 1;
     if (counterDoc.exists) {
         nextBatchNum = counterDoc.data()!.count + 1;
+    } else {
+        transaction.set(counterRef, { count: 0 }); // Initialize counter if it doesn't exist
     }
     
     const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
@@ -77,10 +79,11 @@ async function getNextBatchNumber(transaction: Transaction, status: Batch['statu
     };
     const prefixedBatchNumber = `${batchNumberPrefix[status]}-${nextBatchNumStr}`;
 
-    transaction.set(counterRef, { count: nextBatchNum }, { merge: true });
+    transaction.update(counterRef, { count: nextBatchNum });
 
-    return { prefixedBatchNumber, nextBatchNum };
+    return { prefixedBatchNumber };
 }
+
 
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'>
@@ -119,7 +122,12 @@ export async function addBatchesFromCsvAction(
     try {
         await db.runTransaction(async (transaction) => {
             const counterDoc = await transaction.get(counterRef);
-            let currentBatchNum = counterDoc.exists ? counterDoc.data()!.count : 0;
+            let currentBatchNum = 0;
+            if (counterDoc.exists) {
+                currentBatchNum = counterDoc.data()!.count;
+            } else {
+                transaction.set(counterRef, { count: 0 });
+            }
 
             const batchNumberPrefixMap = {
                 'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
@@ -146,7 +154,7 @@ export async function addBatchesFromCsvAction(
                 };
                 transaction.set(newDocRef, newBatch);
             }
-            transaction.set(counterRef, { count: currentBatchNum }, { merge: true });
+            transaction.update(counterRef, { count: currentBatchNum });
         });
         return { success: true, message: `${newBatchesData.length} batches added successfully.` };
     } catch (error: any) {
@@ -380,4 +388,36 @@ export async function transplantBatchAction(
     console.error('Error transplanting batch:', error);
     return { success: false, error: error.message || 'Failed to transplant batch.' };
   }
+}
+
+// Actions for Varieties
+export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
+    try {
+        const docRef = await db.collection('varieties').add(varietyData);
+        return { success: true, data: { ...varietyData, id: docRef.id } };
+    } catch (error: any) {
+        console.error('Error adding variety:', error);
+        return { success: false, error: 'Failed to add variety: ' + error.message };
+    }
+}
+
+export async function updateVarietyAction(varietyData: Variety) {
+    try {
+        const { id, ...dataToUpdate } = varietyData;
+        await db.collection('varieties').doc(id).update(dataToUpdate);
+        return { success: true, data: varietyData };
+    } catch (error: any) {
+        console.error('Error updating variety:', error);
+        return { success: false, error: 'Failed to update variety: ' + error.message };
+    }
+}
+
+export async function deleteVarietyAction(varietyId: string) {
+    try {
+        await db.collection('varieties').doc(varietyId).delete();
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting variety:', error);
+        return { success: false, error: 'Failed to delete variety: ' + error.message };
+    }
 }

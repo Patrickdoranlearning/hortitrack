@@ -15,28 +15,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import type { Variety } from '@/lib/varieties';
+import { type Variety, VarietySchema } from '@/lib/types';
 import { ScrollArea } from './ui/scroll-area';
 import { useEffect } from 'react';
 
-const formSchema = z.object({
-    name: z.string().min(1, 'Variety name is required.'),
-    family: z.string().min(1, 'Plant family is required.'),
-    category: z.string().min(1, 'Category is required.'),
-    grouping: z.string().optional(),
-    commonName: z.string().optional(),
-    rating: z.string().optional(),
-    salesPeriod: z.string().optional(),
-    floweringPeriod: z.string().optional(),
-    flowerColour: z.string().optional(),
-    evergreen: z.string().optional(),
-});
-
-type VarietyFormValues = z.infer<typeof formSchema>;
+type VarietyFormValues = z.infer<typeof VarietySchema>;
 
 interface VarietyFormProps {
   variety: Variety | null;
-  onSubmit: (data: Variety) => void;
+  onSubmit: (data: VarietyFormValues) => void;
   onCancel: () => void;
 }
 
@@ -44,7 +31,7 @@ export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
   const isEditing = !!variety;
 
   const form = useForm<VarietyFormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(VarietySchema),
     defaultValues: variety || {
         name: '',
         family: '',
@@ -83,7 +70,7 @@ export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
       <DialogHeader>
         <DialogTitle>{isEditing ? 'Edit Variety' : 'Add New Variety'}</DialogTitle>
         <DialogDescription>
-          {isEditing ? `Editing the details for "${variety.name}".` : 'Add a new plant variety to your golden table.'}
+          {isEditing && variety ? `Editing the details for "${variety.name}".` : 'Add a new plant variety to your golden table.'}
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
@@ -94,7 +81,7 @@ export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
                   <FormField control={form.control} name="name" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Variety Name</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Munstead'" {...field} disabled={isEditing} /></FormControl>
+                          <FormControl><Input placeholder="e.g., 'Munstead'" {...field} /></FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />

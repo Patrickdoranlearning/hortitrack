@@ -5,7 +5,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 export const LogEntrySchema = z.object({
   id: z.string().optional(),
   date: z.any(), // serverTimestamp or string
-  type: z.enum(['NOTE', 'LOSS', 'ADJUST', 'MOVE', 'TRANSPLANT_TO', 'TRANSPLANT_FROM', 'CREATE', 'ARCHIVE']),
+  type: z.enum(['NOTE', 'LOSS', 'ADJUST', 'MOVE', 'TRANSPLANT_TO', 'TRANSPLANT_FROM', 'CREATE', 'ARCHIVE', 'Batch Spaced', 'Batch Trimmed']),
   qty: z.number().nullable().optional(),
   fromBatch: z.string().optional(),
   toBatch: z.string().optional(),
@@ -84,3 +84,18 @@ export const SupplierSchema = z.object({
     producerCode: z.string().optional(),
 });
 export type Supplier = z.infer<typeof SupplierSchema>;
+
+export const VarietySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Variety name is required.'),
+  family: z.string().min(1, 'Plant family is required.'),
+  category: z.string().min(1, 'Category is required.'),
+  grouping: z.string().optional(),
+  commonName: z.string().optional(),
+  rating: z.string().optional(),
+  salesPeriod: z.string().optional(),
+  floweringPeriod: z.string().optional(),
+  flowerColour: z.string().optional(),
+  evergreen: z.string().optional(),
+});
+export type Variety = z.infer<typeof VarietySchema>;
