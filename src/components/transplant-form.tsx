@@ -337,7 +337,7 @@ export function TransplantForm({
                     <FormItem>
                       <FormLabel>No. of Trays</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={handleTrayQuantityChange} />
+                        <Input type="number" {...field} onChange={handleTrayQuantityChange} value={field.value || ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

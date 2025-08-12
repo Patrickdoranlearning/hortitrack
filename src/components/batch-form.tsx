@@ -329,7 +329,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       <FormItem>
                         <FormLabel>No. of Trays</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} onChange={handleTrayQuantityChange} />
+                          <Input type="number" {...field} onChange={handleTrayQuantityChange} value={field.value || ''} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -582,5 +582,3 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     </>
   );
 }
-
-    
