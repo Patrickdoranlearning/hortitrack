@@ -56,9 +56,9 @@ const logEntrySchema = z.object({
   action: z.string().min(1, "Action is required."),
 });
 
-const batchSchema = z.object({
-  id: z.string(),
-  batchNumber: z.string(),
+const batchFormSchema = z.object({
+  id: z.string().optional(),
+  batchNumber: z.string().optional(),
   category: z.string().min(1, 'Category is required.'),
   plantFamily: z.string().min(1, 'Plant family is required.'),
   plantVariety: z.string().min(1, 'Plant variety is required.'),
@@ -76,7 +76,8 @@ const batchSchema = z.object({
   trayQuantity: z.number().optional(),
 });
 
-type BatchFormValues = z.infer<typeof batchSchema>;
+
+type BatchFormValues = Omit<Batch, 'id' | 'batchNumber'> & { id?: string; batchNumber?: string };
 
 export interface BatchDistribution {
   inStock: number;
@@ -101,12 +102,10 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
 
   const form = useForm<BatchFormValues>({
-    resolver: zodResolver(batchSchema),
+    resolver: zodResolver(batchFormSchema),
     defaultValues: batch
       ? { ...batch, initialQuantity: batch.initialQuantity || batch.quantity, supplier: batch.supplier || 'Doran Nurseries' }
       : {
-          id: Date.now().toString(),
-          batchNumber: '',
           category: '',
           plantFamily: '',
           plantVariety: '',
@@ -187,7 +186,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
         finalBatchNumber = `${newPrefix}-${numberPart}`;
       }
 
-       onSubmit({ ...data, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
+       onSubmit({ ...data, id: batch.id, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
     } else {
         onSubmit({ ...data, initialQuantity: data.quantity } as Omit<Batch, 'id' | 'batchNumber'>);
     }
