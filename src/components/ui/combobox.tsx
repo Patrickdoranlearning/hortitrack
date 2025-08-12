@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, PlusCircle } from "lucide-react"
+import { Check, ChevronsUpDown, PlusCircle, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -79,11 +79,15 @@ export function Combobox({
             if (value.toLowerCase().includes(search.toLowerCase())) return 1;
             return 0;
         }}>
-          <CommandInput 
-            placeholder={placeholder}
-            value={search}
-            onValueChange={setSearch}
-          />
+          <div className="flex items-center border-b px-3">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <CommandInput 
+              placeholder={placeholder}
+              value={search}
+              onValueChange={setSearch}
+              className="border-0 focus:ring-0 focus:outline-none p-0 h-10"
+            />
+          </div>
           <CommandList>
             <CommandEmpty>
                 {onCreate && search ? (
