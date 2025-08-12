@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -48,7 +49,7 @@ import {
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { VARIETIES } from '@/lib/varieties';
 import { Combobox } from './ui/combobox';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 const logEntrySchema = z.object({
   date: z.string().min(1, "Date is required."),
@@ -71,6 +72,8 @@ const batchSchema = z.object({
   logHistory: z.array(logEntrySchema),
   growerPhotoUrl: z.string().optional(),
   salesPhotoUrl: z.string().optional(),
+  // Non-schema fields for form logic
+  trayQuantity: z.number().optional(),
 });
 
 type BatchFormValues = z.infer<typeof batchSchema>;
@@ -95,6 +98,7 @@ interface BatchFormProps {
 export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
   const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
+  const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
 
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchSchema),
@@ -114,6 +118,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
           size: '',
           supplier: 'Doran Nurseries',
           logHistory: [],
+          trayQuantity: 1,
         },
   });
 
@@ -150,6 +155,16 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     return [...plantSizes].sort(customSizeSort);
   }, [plantSizes]);
 
+  useEffect(() => {
+    if (batch) {
+        const sizeInfo = plantSizes.find(s => s.size === batch.size);
+        setSelectedSizeInfo(sizeInfo || null);
+        if (sizeInfo?.multiple && sizeInfo.multiple > 1) {
+            form.setValue('trayQuantity', batch.quantity / sizeInfo.multiple);
+        }
+    }
+  }, [batch, plantSizes, form]);
+
   const handleFormSubmit = (data: BatchFormValues) => {
     if (batch) {
       const batchNumberPrefix = {
@@ -178,10 +193,15 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   const handleSizeChange = (sizeValue: string) => {
     form.setValue('size', sizeValue);
     const selectedSize = plantSizes.find(s => s.size === sizeValue);
+    setSelectedSizeInfo(selectedSize || null);
     if (selectedSize) {
       const newStatus = SIZE_TYPE_TO_STATUS_MAP[selectedSize.type];
       if (newStatus) {
         form.setValue('status', newStatus);
+      }
+      if (selectedSize.multiple && selectedSize.multiple > 1) {
+        const trayQty = form.getValues('trayQuantity') || 1;
+        form.setValue('quantity', trayQty * selectedSize.multiple);
       }
     }
   };
@@ -200,7 +220,16 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
 
+  const handleTrayQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const trayQty = parseInt(e.target.value, 10) || 0;
+    form.setValue('trayQuantity', trayQty);
+    if (selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1) {
+      form.setValue('quantity', trayQty * selectedSizeInfo.multiple);
+    }
+  };
+
   const varietyOptions = VARIETIES.map(v => ({ value: v.name, label: v.name }));
+  const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
 
   return (
     <>
@@ -287,20 +316,51 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               />
             </div>
             
-            <div className="md:row-start-5">
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="md:row-start-5 grid grid-cols-2 gap-4">
+              {showTrayFields ? (
+                <>
+                   <FormField
+                    control={form.control}
+                    name="trayQuantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>No. of Trays</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} onChange={handleTrayQuantityChange} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="quantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total Plants</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} readOnly className="bg-muted" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Quantity</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             <div className="md:row-start-1">

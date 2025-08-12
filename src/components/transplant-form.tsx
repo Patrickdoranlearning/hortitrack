@@ -35,7 +35,7 @@ import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from './ui/checkbox';
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -58,6 +58,7 @@ const transplantFormSchema = (maxQuantity: number) =>
     logRemainingAsLoss: z.boolean(),
     growerPhotoUrl: z.string().optional(),
     salesPhotoUrl: z.string().optional(),
+    trayQuantity: z.number().optional(),
   });
 
 interface TransplantFormProps {
@@ -75,6 +76,8 @@ export function TransplantForm({
   nurseryLocations,
   plantSizes,
 }: TransplantFormProps) {
+  const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
+  
   const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
     resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
@@ -90,6 +93,7 @@ export function TransplantForm({
           transplantedFrom: batch.batchNumber,
           supplier: 'Doran Nurseries',
           logRemainingAsLoss: false,
+          trayQuantity: 1,
         }
       : undefined,
   });
@@ -131,14 +135,34 @@ export function TransplantForm({
   const handleSizeChange = (sizeValue: string) => {
     form.setValue('size', sizeValue);
     const selectedSize = plantSizes.find(s => s.size === sizeValue);
+    setSelectedSizeInfo(selectedSize || null);
     if (selectedSize) {
       const newStatus = SIZE_TYPE_TO_STATUS_MAP[selectedSize.type];
       if (newStatus) {
         form.setValue('status', newStatus);
       }
+      if (selectedSize.multiple && selectedSize.multiple > 1) {
+        const trayQty = form.getValues('trayQuantity') || 1;
+        form.setValue('quantity', trayQty * selectedSize.multiple);
+      }
     }
   };
 
+  const handleTrayQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const trayQty = parseInt(e.target.value, 10) || 0;
+    form.setValue('trayQuantity', trayQty);
+    if (selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1) {
+      const newQuantity = trayQty * selectedSizeInfo.multiple;
+      form.setValue('quantity', newQuantity);
+      if (batch && newQuantity > batch.quantity) {
+        form.setError('quantity', { type: 'manual', message: `Quantity cannot exceed remaining stock of ${batch.quantity}.`});
+      } else {
+        form.clearErrors('quantity');
+      }
+    }
+  };
+
+  const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
 
   if (!batch) {
     return null;
@@ -278,26 +302,6 @@ export function TransplantForm({
             />
             <FormField
               control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantity to Transplant</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Max available: {batch?.quantity}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="size"
               render={({ field }) => (
                 <FormItem>
@@ -323,6 +327,62 @@ export function TransplantForm({
                 </FormItem>
               )}
             />
+
+            {showTrayFields ? (
+              <>
+                 <FormField
+                  control={form.control}
+                  name="trayQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>No. of Trays</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} onChange={handleTrayQuantityChange} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Plants</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} readOnly className="bg-muted" />
+                      </FormControl>
+                       <FormDescription>
+                        Max available: {batch?.quantity}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            ) : (
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity to Transplant</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Max available: {batch?.quantity}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="status"
