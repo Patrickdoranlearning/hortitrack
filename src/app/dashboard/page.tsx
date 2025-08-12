@@ -5,11 +5,6 @@ import * as React from 'react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
-import {
   Users,
   ShoppingCart,
   Archive,
@@ -20,7 +15,6 @@ import {
   PieChart as PieIcon,
   Package,
 } from 'lucide-react';
-import * as Recharts from 'recharts';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
@@ -34,8 +28,24 @@ import { Input } from '@/components/ui/input';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
+import dynamic from 'next/dynamic';
+
+const FamilyDistributionChart = dynamic(
+  () => import('@/components/charts/FamilyDistributionChart'),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+);
+
+const SizeDistributionChart = dynamic(
+  () => import('@/components/charts/SizeDistributionChart'),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+);
+
+const LossesChart = dynamic(
+  () => import('@/components/charts/LossesChart'),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+);
+
 
 export default function DashboardOverviewPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -180,18 +190,6 @@ export default function DashboardOverviewPage() {
       value,
     }));
   }, [filteredBatches]);
-
-  const chartConfig = {
-    value: {
-      label: 'Plants',
-    },
-    primary: {
-      color: 'hsl(var(--primary))',
-    },
-    destructive: {
-      color: 'hsl(var(--destructive))',
-    },
-  };
 
   if (isLoading) {
     return (
@@ -374,26 +372,7 @@ export default function DashboardOverviewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={chartConfig}
-              className="min-h-[300px] w-full"
-            >
-              <Recharts.BarChart accessibilityLayer data={plantFamilyData}>
-                <Recharts.XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <Recharts.YAxis />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Recharts.Bar
-                  dataKey="value"
-                  fill="var(--color-primary)"
-                  radius={8}
-                />
-              </Recharts.BarChart>
-            </ChartContainer>
+            <FamilyDistributionChart data={plantFamilyData} />
           </CardContent>
         </Card>
         <Card>
@@ -404,26 +383,7 @@ export default function DashboardOverviewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={chartConfig}
-              className="min-h-[300px] w-full"
-            >
-              <Recharts.BarChart accessibilityLayer data={plantSizeData}>
-                <Recharts.XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <Recharts.YAxis />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Recharts.Bar
-                  dataKey="value"
-                  fill="var(--color-primary)"
-                  radius={8}
-                />
-              </Recharts.BarChart>
-            </ChartContainer>
+            <SizeDistributionChart data={plantSizeData} />
           </CardContent>
         </Card>
         <Card className="col-span-1 md:col-span-2">
@@ -434,29 +394,7 @@ export default function DashboardOverviewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <ChartContainer
-              config={chartConfig}
-              className="min-h-[300px] w-full"
-            >
-              <Recharts.BarChart accessibilityLayer data={lossData}>
-                <Recharts.XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <Recharts.YAxis />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent hideLabel />}
-                />
-                <Recharts.Bar
-                  dataKey="value"
-                  fill="var(--color-destructive)"
-                  radius={8}
-                />
-              </Recharts.BarChart>
-            </ChartContainer>
+            <LossesChart data={lossData} />
           </CardContent>
         </Card>
       </div>
