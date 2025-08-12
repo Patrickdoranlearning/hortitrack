@@ -155,7 +155,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   };
   
   const sortedPlantSizes = useMemo(() => {
-    return [...plantSizes].sort(customSizeSort);
+    return plantSizes ? [...plantSizes].sort(customSizeSort) : [];
   }, [plantSizes]);
 
   useEffect(() => {
@@ -259,6 +259,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       onChange={handleVarietyChange}
                       placeholder="Select variety..."
                       emptyMessage="No matching variety found."
+                      allowCustomValue={true}
                     />
                     <FormMessage />
                   </FormItem>
