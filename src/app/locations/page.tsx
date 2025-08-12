@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ArrowLeft, Plus, Trash2, Edit, Check, X, Sun, Wind, Download, Upload } from 'lucide-react';
@@ -28,98 +28,12 @@ import {
   } from "@/components/ui/alert-dialog";
 import * as z from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-const INITIAL_LOCATIONS: NurseryLocation[] = [
-    { id: 't1', name: 'T1', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't2', name: 'T2', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't3', name: 'T3', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't4', name: 'T4', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't5', name: 'T5', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't6a', name: 'T6A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't6b', name: 'T6B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't6c', name: 'T6C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't6d', name: 'T6D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't7a', name: 'T7A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't7b', name: 'T7B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't8', name: 'T8', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't9', name: 'T9', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't10', name: 'T10', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't11', name: 'T11', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't12', name: 'T12', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't13a', name: 'T13A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't13b', name: 'T13B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't14', name: 'T14', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't15', name: 'T15', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't16', name: 'T16', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't17', name: 'T17', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't18', name: 'T18', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't19', name: 'T19', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't20', name: 'T20', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't21a', name: 'T21A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't21b', name: 'T21B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't22', name: 'T22', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't23', name: 'T23', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't24', name: 'T24', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't25', name: 'T25', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't26', name: 'T26', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't27', name: 'T27', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't28', name: 'T28', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't29', name: 'T29', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't30', name: 'T30', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't31', name: 'T31', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't32a', name: 'T32A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't32b', name: 'T32B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't32c', name: 'T32C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't32d', name: 'T32D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't32e', name: 'T32E', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't32f', name: 'T32F', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't32g', name: 'T32G', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't35a', name: 'T35A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't35b', name: 'T35B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't35c', name: 'T35C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't35e', name: 'T35E', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't36a', name: 'T36A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't36b', name: 'T36B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't36c', name: 'T36C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't36d', name: 'T36D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't36e', name: 'T36E', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't37a', name: 'T37A', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't37b', name: 'T37B', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 't37c', name: 'T37C', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 's2', name: 'S2', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's3', name: 'S3', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's4', name: 'S4', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's5', name: 'S5', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's6', name: 'S6', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's7', name: 'S7', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's8', name: 'S8', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's9', name: 'S9', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's10', name: 'S10', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's11', name: 'S11', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's12', name: 'S12', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's13', name: 'S13', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's14', name: 'S14', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 's15', name: 'S15', nursery: 'Main', type: 'Section', area: 100, isCovered: false },
-    { id: 'at1', name: 'AT1', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at2', name: 'AT2', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at3', name: 'AT3', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at4', name: 'AT4', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at5', name: 'AT5', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at6', name: 'AT6', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at7', name: 'AT7', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at8', name: 'AT8', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at9', name: 'AT9', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at10', name: 'AT10', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'at11', name: 'AT11', nursery: 'Alberts', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'as1', name: 'AS1', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
-    { id: 'as2', name: 'AS2', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
-    { id: 'as3', name: 'AS3', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
-    { id: 'as4', name: 'AS4', nursery: 'Alberts', type: 'Section', area: 100, isCovered: false },
-    { id: 't35d', name: 'T35D', nursery: 'Main', type: 'Tunnel', area: 100, isCovered: true },
-    { id: 'agh', name: 'AGH', nursery: 'Alberts', type: 'Glasshouse', area: 100, isCovered: true },
-    { id: 'gh', name: 'GH', nursery: 'Main', type: 'Glasshouse', area: 100, isCovered: true },
-    { id: 'lous', name: 'Lous', nursery: 'Main', type: 'Prophouse', area: 100, isCovered: true },
-];
+import { useAuth } from '@/hooks/use-auth';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { addLocationAction, updateLocationAction, deleteLocationAction } from '../actions';
+import { Skeleton } from '@/components/ui/skeleton';
+import { INITIAL_LOCATIONS } from '@/lib/locations';
 
 
 const locationFormSchema = z.object({
@@ -134,9 +48,10 @@ type LocationFormValues = z.infer<typeof locationFormSchema>;
 
 
 export default function LocationsPage() {
+  const { user } = useAuth();
   const [locations, setLocations] = useState<NurseryLocation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,32 +67,41 @@ export default function LocationsPage() {
     }
   });
 
-  useEffect(() => {
-    setIsClient(true);
-    const storedLocationsRaw = localStorage.getItem('nurseryLocations');
-    if (storedLocationsRaw) {
-      try {
-        const storedLocations: NurseryLocation[] = JSON.parse(storedLocationsRaw);
-        if (Array.isArray(storedLocations) && storedLocations.length > 0) {
-          const validLocations = storedLocations.filter(loc => typeof loc.name === 'string' && loc.name.length > 0);
-          setLocations(validLocations.length > 0 ? validLocations : INITIAL_LOCATIONS);
-        } else {
-          setLocations(INITIAL_LOCATIONS);
-        }
-      } catch (e) {
-          console.error("Failed to parse stored locations from localStorage:", e);
-          setLocations(INITIAL_LOCATIONS);
+  const subscribeToLocations = useCallback(() => {
+    if (!user) return;
+    setIsLoading(true);
+    const q = query(collection(db, 'locations'), orderBy('name'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        // Seed initial data if the collection is empty
+        const batch = db.batch();
+        INITIAL_LOCATIONS.forEach(loc => {
+          const { id, ...data } = loc; // Exclude client-side ID
+          const docRef = db.collection('locations').doc();
+          batch.set(docRef, data);
+        });
+        batch.commit().then(() => console.log("Initial locations seeded."));
+      } else {
+        const locationsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as NurseryLocation);
+        setLocations(locationsData);
       }
-    } else {
-      setLocations(INITIAL_LOCATIONS);
-    }
-  }, []);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Failed to subscribe to location updates:", error);
+      toast({ variant: 'destructive', title: 'Error loading locations', description: error.message });
+      setIsLoading(false);
+    });
+
+    return unsubscribe;
+  }, [user, toast]);
 
   useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('nurseryLocations', JSON.stringify(locations));
-    }
-  }, [locations, isClient]);
+    const unsubscribe = subscribeToLocations();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [subscribeToLocations]);
 
   const handleAddNew = () => {
     form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Main', type: '' });
@@ -194,15 +118,19 @@ export default function LocationsPage() {
       form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Main', type: '' });
   }
 
-  const handleDelete = (locationId: string) => {
+  const handleDelete = async (locationId: string) => {
     const locationToDelete = locations.find(loc => loc.id === locationId);
     if (locationToDelete) {
-        setLocations(locations.filter(loc => loc.id !== locationId));
-        toast({ title: 'Location Deleted', description: `Successfully deleted "${locationToDelete.name}".` });
+        const result = await deleteLocationAction(locationId);
+        if (result.success) {
+            toast({ title: 'Location Deleted', description: `Successfully deleted "${locationToDelete.name}".` });
+        } else {
+            toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
+        }
     }
   };
 
-  const onSubmit = (data: LocationFormValues) => {
+  const onSubmit = async (data: LocationFormValues) => {
     const isNew = editingLocationId === 'new';
 
     if (locations.some(loc => loc.name.toLowerCase() === data.name.toLowerCase() && (isNew || loc.id !== data.id))) {
@@ -210,20 +138,25 @@ export default function LocationsPage() {
         return;
     }
 
-    if (isNew) {
-      const newLocation = { ...data, id: `loc_${Date.now()}` };
-      setLocations(prev => [...prev, newLocation].sort((a,b) => {
-        const nameA = a?.name || '';
-        const nameB = b?.name || '';
-        return nameA.localeCompare(nameB);
-      }));
-      toast({ title: 'Location Added', description: `Successfully added "${data.name}".` });
+    const { id, ...locationData } = data;
+    const result = isNew 
+        ? await addLocationAction(locationData)
+        : await updateLocationAction({ ...locationData, id: editingLocationId! });
+
+    if (result.success) {
+        toast({
+            title: isNew ? 'Location Added' : 'Location Updated',
+            description: `Successfully ${isNew ? 'added' : 'updated'} "${result.data?.name}".`
+        });
+        setEditingLocationId(null);
+        form.reset();
     } else {
-      setLocations(locations.map(loc => loc.id === editingLocationId ? { ...loc, ...data } : loc));
-      toast({ title: 'Location Updated', description: `Successfully updated "${data.name}".` });
+        toast({
+            variant: 'destructive',
+            title: isNew ? 'Add Failed' : 'Update Failed',
+            description: result.error
+        });
     }
-    setEditingLocationId(null);
-    form.reset();
   };
   
   const handleDownloadData = () => {
@@ -250,7 +183,7 @@ export default function LocationsPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         const text = e.target?.result as string;
         try {
             const rows = text.split('\n').filter(row => row.trim() !== '');
@@ -260,30 +193,27 @@ export default function LocationsPage() {
             if (!requiredHeaders.every(h => headers.includes(h))) {
                 throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
             }
-
-            const newLocations = rows.map((row, index) => {
+            
+            for (const row of rows) {
                 const values = row.trim().split(',');
                 const locationData: any = {};
                 headers.forEach((header, i) => {
                     locationData[header] = values[i]?.trim();
                 });
 
-                return {
-                    id: `csv_${Date.now()}_${index}`,
+                const dataToSave: Omit<NurseryLocation, 'id'> = {
                     name: locationData.name || '',
                     nursery: locationData.nursery || 'Main',
                     type: locationData.type || 'Tunnel',
                     area: parseInt(locationData.area, 10) || 0,
                     isCovered: locationData.isCovered?.toLowerCase() === 'true',
-                } as NurseryLocation;
-            });
-            
-            setLocations(newLocations);
-            toast({ title: 'Import Successful', description: `${newLocations.length} locations have been loaded from the CSV file.` });
+                };
+                await addLocationAction(dataToSave);
+            }
+            toast({ title: 'Import Successful', description: `${rows.length} locations have been processed.` });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
         } finally {
-            // Reset file input
             if(fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -291,14 +221,6 @@ export default function LocationsPage() {
     };
     reader.readAsText(file);
   };
-
-  if (!isClient) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-2xl">Loading Locations...</div>
-      </div>
-    );
-  }
   
   const renderEditRow = (id: 'new' | string) => {
     return (
@@ -397,6 +319,11 @@ export default function LocationsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : (
           <Table>
               <TableHeader>
                   <TableRow>
@@ -455,6 +382,7 @@ export default function LocationsPage() {
                   {editingLocationId === 'new' && renderEditRow('new')}
               </TableBody>
           </Table>
+          )}
         </CardContent>
         <CardFooter>
             <Button onClick={handleAddNew} disabled={!!editingLocationId}>

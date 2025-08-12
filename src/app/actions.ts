@@ -4,7 +4,7 @@
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
-import type { Batch, LogEntry, Variety } from '@/lib/types';
+import type { Batch, LogEntry, Variety, NurseryLocation, PlantSize, Supplier } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 import { FieldValue, Transaction } from 'firebase-admin/firestore';
 
@@ -68,8 +68,6 @@ async function getNextBatchNumber(transaction: Transaction, status: Batch['statu
     let nextBatchNum = 1;
     if (counterDoc.exists) {
         nextBatchNum = counterDoc.data()!.count + 1;
-    } else {
-        transaction.set(counterRef, { count: 0 }); // Initialize counter if it doesn't exist
     }
     
     const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
@@ -88,9 +86,24 @@ async function getNextBatchNumber(transaction: Transaction, status: Batch['statu
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'>
 ) {
+  const counterRef = db.collection('counters').doc('batches');
   try {
     return await db.runTransaction(async (transaction) => {
-        const { prefixedBatchNumber } = await getNextBatchNumber(transaction, newBatchData.status);
+        const counterDoc = await transaction.get(counterRef);
+        
+        let nextBatchNum = 1;
+        if (counterDoc.exists && counterDoc.data()!.count) {
+            nextBatchNum = counterDoc.data()!.count + 1;
+        } else {
+            transaction.set(counterRef, { count: 0 }); // Initialize counter
+        }
+
+        const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
+        const batchNumberPrefix = {
+            'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
+            'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
+        };
+        const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
 
         const newDocRef = db.collection('batches').doc();
         const newBatch: Omit<Batch, 'id'> = {
@@ -106,6 +119,8 @@ export async function addBatchAction(
           updatedAt: FieldValue.serverTimestamp(),
         };
         transaction.set(newDocRef, newBatch);
+        transaction.update(counterRef, { count: nextBatchNum });
+
         return { success: true, data: { ...newBatch, id: newDocRef.id }};
     });
   } catch (error: any) {
@@ -123,7 +138,7 @@ export async function addBatchesFromCsvAction(
         await db.runTransaction(async (transaction) => {
             const counterDoc = await transaction.get(counterRef);
             let currentBatchNum = 0;
-            if (counterDoc.exists) {
+            if (counterDoc.exists && counterDoc.data()!.count) {
                 currentBatchNum = counterDoc.data()!.count;
             } else {
                 transaction.set(counterRef, { count: 0 });
@@ -309,6 +324,7 @@ export async function transplantBatchAction(
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
+  const counterRef = db.collection('counters').doc('batches');
   try {
     return await db.runTransaction(async (transaction) => {
         const sourceBatchRef = db.collection('batches').doc(sourceBatchId);
@@ -322,8 +338,19 @@ export async function transplantBatchAction(
         if (sourceBatch.quantity < transplantQuantity) {
             throw new Error('Insufficient quantity in source batch.');
         }
+        
+        const counterDoc = await transaction.get(counterRef);
+        let nextBatchNum = 1;
+        if (counterDoc.exists && counterDoc.data()!.count) {
+            nextBatchNum = counterDoc.data()!.count + 1;
+        }
 
-        const { prefixedBatchNumber } = await getNextBatchNumber(transaction, newBatchData.status);
+        const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
+        const batchNumberPrefix = {
+            'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
+            'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
+        };
+        const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
 
         const newDocRef = db.collection('batches').doc();
         const newBatch: Omit<Batch, 'id'> = {
@@ -380,6 +407,7 @@ export async function transplantBatchAction(
             updatedSourceBatch.quantity = 0;
         }
         transaction.update(sourceBatchRef, { ...updatedSourceBatch, updatedAt: FieldValue.serverTimestamp() });
+        transaction.update(counterRef, { count: nextBatchNum });
         
         return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };
     });
@@ -404,7 +432,7 @@ export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
 export async function updateVarietyAction(varietyData: Variety) {
     try {
         const { id, ...dataToUpdate } = varietyData;
-        await db.collection('varieties').doc(id).update(dataToUpdate);
+        await db.collection('varieties').doc(id!).update(dataToUpdate);
         return { success: true, data: varietyData };
     } catch (error: any) {
         console.error('Error updating variety:', error);
@@ -419,5 +447,102 @@ export async function deleteVarietyAction(varietyId: string) {
     } catch (error: any) {
         console.error('Error deleting variety:', error);
         return { success: false, error: 'Failed to delete variety: ' + error.message };
+    }
+}
+
+
+// Actions for Locations
+export async function addLocationAction(locationData: Omit<NurseryLocation, 'id'>) {
+    try {
+        const docRef = await db.collection('locations').add(locationData);
+        return { success: true, data: { ...locationData, id: docRef.id } };
+    } catch (error: any) {
+        console.error('Error adding location:', error);
+        return { success: false, error: 'Failed to add location: ' + error.message };
+    }
+}
+
+export async function updateLocationAction(locationData: NurseryLocation) {
+    try {
+        const { id, ...dataToUpdate } = locationData;
+        await db.collection('locations').doc(id).update(dataToUpdate);
+        return { success: true, data: locationData };
+    } catch (error: any) {
+        console.error('Error updating location:', error);
+        return { success: false, error: 'Failed to update location: ' + error.message };
+    }
+}
+
+export async function deleteLocationAction(locationId: string) {
+    try {
+        await db.collection('locations').doc(locationId).delete();
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting location:', error);
+        return { success: false, error: 'Failed to delete location: ' + error.message };
+    }
+}
+
+// Actions for Plant Sizes
+export async function addSizeAction(sizeData: Omit<PlantSize, 'id'>) {
+    try {
+        const docRef = await db.collection('sizes').add(sizeData);
+        return { success: true, data: { ...sizeData, id: docRef.id } };
+    } catch (error: any) {
+        console.error('Error adding size:', error);
+        return { success: false, error: 'Failed to add size: ' + error.message };
+    }
+}
+
+export async function updateSizeAction(sizeData: PlantSize) {
+    try {
+        const { id, ...dataToUpdate } = sizeData;
+        await db.collection('sizes').doc(id).update(dataToUpdate);
+        return { success: true, data: sizeData };
+    } catch (error: any) {
+        console.error('Error updating size:', error);
+        return { success: false, error: 'Failed to update size: ' + error.message };
+    }
+}
+
+export async function deleteSizeAction(sizeId: string) {
+    try {
+        await db.collection('sizes').doc(sizeId).delete();
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting size:', error);
+        return { success: false, error: 'Failed to delete size: ' + error.message };
+    }
+}
+
+// Actions for Suppliers
+export async function addSupplierAction(supplierData: Omit<Supplier, 'id'>) {
+    try {
+        const docRef = await db.collection('suppliers').add(supplierData);
+        return { success: true, data: { ...supplierData, id: docRef.id } };
+    } catch (error: any) {
+        console.error('Error adding supplier:', error);
+        return { success: false, error: 'Failed to add supplier: ' + error.message };
+    }
+}
+
+export async function updateSupplierAction(supplierData: Supplier) {
+    try {
+        const { id, ...dataToUpdate } = supplierData;
+        await db.collection('suppliers').doc(id).update(dataToUpdate);
+        return { success: true, data: supplierData };
+    } catch (error: any) {
+        console.error('Error updating supplier:', error);
+        return { success: false, error: 'Failed to update supplier: ' + error.message };
+    }
+}
+
+export async function deleteSupplierAction(supplierId: string) {
+    try {
+        await db.collection('suppliers').doc(supplierId).delete();
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting supplier:', error);
+        return { success: false, error: 'Failed to delete supplier: ' + error.message };
     }
 }

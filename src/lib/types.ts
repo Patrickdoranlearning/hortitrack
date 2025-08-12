@@ -1,6 +1,5 @@
 
 import { z } from 'zod';
-import { FieldValue } from 'firebase-admin/firestore';
 
 export const LogEntrySchema = z.object({
   id: z.string().optional(),

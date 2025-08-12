@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowLeft, Plus, Trash2, Edit, Download, Upload } from 'lucide-react';
@@ -23,41 +23,57 @@ import {
     AlertDialogTrigger,
   } from "@/components/ui/alert-dialog";
 import { SizeForm } from '@/components/size-form';
+import { useAuth } from '@/hooks/use-auth';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { addSizeAction, updateSizeAction, deleteSizeAction } from '../actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function SizesPage() {
+  const { user } = useAuth();
   const [sizes, setSizes] = useState<PlantSize[]>([]);
-  const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSize, setEditingSize] = useState<PlantSize | null>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const storedSizesRaw = localStorage.getItem('plantSizes');
-    if (storedSizesRaw) {
-        try {
-            const storedSizes = JSON.parse(storedSizesRaw);
-            if (Array.isArray(storedSizes) && storedSizes.length > 0) {
-                setSizes(storedSizes);
-            } else {
-                setSizes(INITIAL_PLANT_SIZES);
-            }
-        } catch(e) {
-            console.error("Failed to parse stored sizes:", e);
-            setSizes(INITIAL_PLANT_SIZES);
+  const subscribeToSizes = useCallback(() => {
+    if (!user) return;
+    setIsLoading(true);
+    const q = query(collection(db, 'sizes')); // No specific order needed yet
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (snapshot.empty) {
+            // Seed initial data if the collection is empty
+            const batch = db.batch();
+            INITIAL_PLANT_SIZES.forEach(size => {
+              const { id, ...data } = size; // Exclude client-side ID
+              const docRef = db.collection('sizes').doc();
+              batch.set(docRef, data);
+            });
+            batch.commit().then(() => console.log("Initial plant sizes seeded."));
+        } else {
+            const sizesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as PlantSize);
+            setSizes(sizesData);
         }
-    } else {
-      setSizes(INITIAL_PLANT_SIZES);
-    }
-    setIsClient(true);
-  }, []);
+        setIsLoading(false);
+    }, (error) => {
+        console.error("Failed to subscribe to size updates:", error);
+        toast({ variant: 'destructive', title: 'Error loading sizes', description: error.message });
+        setIsLoading(false);
+    });
+
+    return unsubscribe;
+  }, [user, toast]);
 
   useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('plantSizes', JSON.stringify(sizes));
-    }
-  }, [sizes, isClient]);
+    const unsubscribe = subscribeToSizes();
+    return () => {
+        if (unsubscribe) unsubscribe();
+    };
+  }, [subscribeToSizes]);
 
   const handleAddSize = () => {
     setEditingSize(null);
@@ -69,32 +85,39 @@ export default function SizesPage() {
     setIsFormOpen(true);
   };
   
-  const handleDeleteSize = (sizeId: string) => {
+  const handleDeleteSize = async (sizeId: string) => {
     const sizeToDelete = sizes.find(s => s.id === sizeId);
     if (sizeToDelete) {
-        setSizes(sizes.filter(s => s.id !== sizeId));
-        toast({ title: 'Size Deleted', description: `Successfully deleted "${sizeToDelete.size}".` });
+        const result = await deleteSizeAction(sizeId);
+        if (result.success) {
+            toast({ title: 'Size Deleted', description: `Successfully deleted "${sizeToDelete.size}".` });
+        } else {
+            toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
+        }
     }
   };
 
-  const handleFormSubmit = (data: PlantSize) => {
-    const isNew = !editingSize;
+  const handleFormSubmit = async (data: Omit<PlantSize, 'id'> | PlantSize) => {
+    const isEditing = 'id' in data;
 
-    if (sizes.some(s => s.size.toLowerCase() === data.size.toLowerCase() && (isNew || s.id !== data.id))) {
-        toast({ variant: 'destructive', title: 'Duplicate Size', description: 'A size with this name already exists.' });
-        return;
-    }
+    const result = isEditing
+      ? await updateSizeAction(data as PlantSize)
+      : await addSizeAction(data as Omit<PlantSize, 'id'>);
 
-    if (isNew) {
-      const newSizeWithId = { ...data, id: `size_${Date.now()}` };
-      setSizes(prev => [...prev, newSizeWithId]);
-      toast({ title: 'Size Added', description: `Successfully added "${data.size}".` });
+    if (result.success) {
+      toast({ 
+        title: isEditing ? 'Size Updated' : 'Size Added', 
+        description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.size}".` 
+      });
+      setIsFormOpen(false);
+      setEditingSize(null);
     } else {
-      setSizes(sizes.map(s => s.id === editingSize.id ? { ...s, ...data } : s));
-      toast({ title: 'Size Updated', description: `Successfully updated "${data.size}".` });
+      toast({ 
+        variant: 'destructive', 
+        title: isEditing ? 'Update Failed' : 'Add Failed', 
+        description: result.error 
+      });
     }
-    setIsFormOpen(false);
-    setEditingSize(null);
   };
 
   const handleDownloadData = () => {
@@ -121,7 +144,7 @@ export default function SizesPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         const text = e.target?.result as string;
         try {
             const rows = text.split('\n').filter(row => row.trim() !== '');
@@ -132,22 +155,18 @@ export default function SizesPage() {
             if (!requiredHeaders.every(h => headers.includes(h))) {
                 throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
             }
-
-            const newSizes = rows.map((row, index) => {
+            
+            for (const row of rows) {
                 const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)!.map(v => v.replace(/"/g, '').trim());
                 const sizeData: any = {};
                 headers.forEach((header, i) => {
                     sizeData[header] = values[i] || '';
                 });
 
-                return {
-                    id: `csv_${Date.now()}_${index}`,
-                    ...sizeData
-                } as PlantSize;
-            });
+                await addSizeAction(sizeData);
+            }
             
-            setSizes(newSizes);
-            toast({ title: 'Import Successful', description: `${newSizes.length} sizes have been loaded.` });
+            toast({ title: 'Import Successful', description: `${rows.length} sizes have been imported.` });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
         } finally {
@@ -182,14 +201,6 @@ export default function SizesPage() {
 
     return a.size.localeCompare(b.size);
   };
-  
-  if (!isClient) {
-    return (
-       <div className="flex items-center justify-center h-screen">
-        <div className="text-2xl">Loading Sizes...</div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -222,53 +233,59 @@ export default function SizesPage() {
           <CardDescription>Add, edit, or remove sizes from the list used in batch forms.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Size</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Area (m²)</TableHead>
-                <TableHead>Shelf Quantity</TableHead>
-                <TableHead>Multiple</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sizes.sort(customSizeSort).map((size) => (
-                <TableRow key={size.id}>
-                  <TableCell className="font-medium">{size.size}</TableCell>
-                  <TableCell>{size.type}</TableCell>
-                  <TableCell>{size.area}</TableCell>
-                  <TableCell>{size.shelfQuantity}</TableCell>
-                  <TableCell>{size.multiple}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
-                        <Button type="button" size="icon" variant="outline" onClick={() => handleEditSize(size)}><Edit /></Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This will permanently delete the "{size.size}" size. This action cannot be undone.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteSize(size.id)}>
-                                    Yes, delete it
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                  </TableCell>
+          {isLoading ? (
+             <div className="space-y-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Size</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Area (m²)</TableHead>
+                  <TableHead>Shelf Quantity</TableHead>
+                  <TableHead>Multiple</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {sizes.sort(customSizeSort).map((size) => (
+                  <TableRow key={size.id}>
+                    <TableCell className="font-medium">{size.size}</TableCell>
+                    <TableCell>{size.type}</TableCell>
+                    <TableCell>{size.area}</TableCell>
+                    <TableCell>{size.shelfQuantity}</TableCell>
+                    <TableCell>{size.multiple}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                          <Button type="button" size="icon" variant="outline" onClick={() => handleEditSize(size)}><Edit /></Button>
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                  <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                      This will permanently delete the "{size.size}" size. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteSize(size.id)}>
+                                      Yes, delete it
+                                  </AlertDialogAction>
+                                  </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

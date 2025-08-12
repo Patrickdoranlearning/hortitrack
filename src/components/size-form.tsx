@@ -15,15 +15,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import type { PlantSize } from '@/lib/types';
-import { PlantSizeSchema } from '@/lib/types';
+import { PlantSizeSchema as FormSchema } from '@/lib/types'; // Rename to avoid conflict
 import { useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-type SizeFormValues = PlantSize;
+const PlantSizeFormSchema = FormSchema.omit({ id: true }); // Omit ID for form validation
+type SizeFormValues = Omit<PlantSize, 'id'>;
 
 interface SizeFormProps {
   size: PlantSize | null;
-  onSubmit: (data: PlantSize) => void;
+  onSubmit: (data: Omit<PlantSize, 'id'> | PlantSize) => void;
   onCancel: () => void;
 }
 
@@ -31,9 +32,8 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
   const isEditing = !!size;
 
   const form = useForm<SizeFormValues>({
-    resolver: zodResolver(PlantSizeSchema),
-    defaultValues: size || {
-        id: '',
+    resolver: zodResolver(PlantSizeFormSchema),
+    defaultValues: size ? { ...size } : {
         size: '',
         type: 'Pot',
         area: 0,
@@ -44,7 +44,6 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
 
   useEffect(() => {
     form.reset(size || {
-        id: '',
         size: '',
         type: 'Pot',
         area: 0,
@@ -52,17 +51,25 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
         multiple: 1,
     });
   }, [size, form]);
+  
+  const handleFormSubmit = (data: SizeFormValues) => {
+    if (isEditing && size) {
+      onSubmit({ ...data, id: size.id });
+    } else {
+      onSubmit(data);
+    }
+  };
 
   return (
     <>
       <DialogHeader>
         <DialogTitle>{isEditing ? 'Edit Size' : 'Add New Size'}</DialogTitle>
         <DialogDescription>
-          {isEditing ? `Editing the details for the "${size.size}" size.` : 'Add a new plant size to your master list.'}
+          {isEditing && size ? `Editing the details for the "${size.size}" size.` : 'Add a new plant size to your master list.'}
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
             <FormField control={form.control} name="size" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Size Name</FormLabel>
