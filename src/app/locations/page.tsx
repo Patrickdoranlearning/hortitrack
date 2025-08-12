@@ -30,7 +30,7 @@ import * as z from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, writeBatch, doc } from 'firebase/firestore';
 import { addLocationAction, updateLocationAction, deleteLocationAction } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INITIAL_LOCATIONS } from '@/lib/locations';
@@ -75,11 +75,10 @@ export default function LocationsPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) {
         // Seed initial data if the collection is empty
-        const batch = db.batch();
+        const batch = writeBatch(db);
         INITIAL_LOCATIONS.forEach(loc => {
-          const { id, ...data } = loc; // Exclude client-side ID
-          const docRef = db.collection('locations').doc();
-          batch.set(docRef, data);
+          const docRef = doc(collection(db, "locations"));
+          batch.set(docRef, loc);
         });
         batch.commit().then(() => console.log("Initial locations seeded."));
       } else {
@@ -140,7 +139,7 @@ export default function LocationsPage() {
 
     const { id, ...locationData } = data;
     const result = isNew 
-        ? await addLocationAction(locationData)
+        ? await addLocationAction(locationData as Omit<NurseryLocation, 'id'>)
         : await updateLocationAction({ ...locationData, id: editingLocationId! });
 
     if (result.success) {

@@ -25,7 +25,7 @@ import {
 import { SupplierForm } from '@/components/supplier-form';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, writeBatch, doc } from 'firebase/firestore';
 import { addSupplierAction, updateSupplierAction, deleteSupplierAction } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -46,10 +46,10 @@ export default function SuppliersPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
         if (snapshot.empty) {
             // Seed initial data if the collection is empty
-            const batch = db.batch();
+            const batch = writeBatch(db);
             INITIAL_SUPPLIERS.forEach(supplier => {
               const { id, ...data } = supplier; // Exclude client-side ID
-              const docRef = db.collection('suppliers').doc();
+              const docRef = doc(collection(db, "suppliers"));
               batch.set(docRef, data);
             });
             batch.commit().then(() => console.log("Initial suppliers seeded."));
@@ -121,7 +121,7 @@ export default function SuppliersPage() {
   };
 
   const handleDownloadData = () => {
-    const headers: (keyof Supplier)[] = ['name', 'address', 'country', 'countryCode', 'producerCode'];
+    const headers: (keyof Omit<Supplier, 'id'>)[] = ['name', 'address', 'country', 'countryCode', 'producerCode'];
     const csvRows = suppliers.map(s => 
       headers.map(header => `"${s[header] || ''}"`).join(',')
     );

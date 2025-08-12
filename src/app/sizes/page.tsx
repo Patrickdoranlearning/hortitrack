@@ -25,7 +25,7 @@ import {
 import { SizeForm } from '@/components/size-form';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, writeBatch, doc } from 'firebase/firestore';
 import { addSizeAction, updateSizeAction, deleteSizeAction } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -47,10 +47,10 @@ export default function SizesPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
         if (snapshot.empty) {
             // Seed initial data if the collection is empty
-            const batch = db.batch();
+            const batch = writeBatch(db);
             INITIAL_PLANT_SIZES.forEach(size => {
               const { id, ...data } = size; // Exclude client-side ID
-              const docRef = db.collection('sizes').doc();
+              const docRef = doc(collection(db, "sizes"));
               batch.set(docRef, data);
             });
             batch.commit().then(() => console.log("Initial plant sizes seeded."));
@@ -121,7 +121,7 @@ export default function SizesPage() {
   };
 
   const handleDownloadData = () => {
-    const headers: (keyof PlantSize)[] = ['size', 'type', 'area', 'shelfQuantity', 'multiple'];
+    const headers: (keyof Omit<PlantSize, 'id'>)[] = ['size', 'type', 'area', 'shelfQuantity', 'multiple'];
     const csvRows = sizes.map(s => 
       headers.map(header => `"${s[header] || ''}"`).join(',')
     );
