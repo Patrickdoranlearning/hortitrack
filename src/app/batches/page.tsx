@@ -57,7 +57,7 @@ export default function BatchesPage() {
     if (!user) return;
     setIsDataLoading(true);
     
-    const q = query(collection(db, 'batches'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'batches'), orderBy('batchNumber', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const batchesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Batch);
