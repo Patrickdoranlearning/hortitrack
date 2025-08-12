@@ -1,7 +1,8 @@
+
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, PlusCircle } from "lucide-react"
+import { Check, ChevronsUpDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -42,36 +43,13 @@ export function Combobox({
   allowCustomValue = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState(value || "")
-
-  React.useEffect(() => {
-    setInputValue(value || "");
-  }, [value]);
 
   const handleSelect = (currentValue: string) => {
-    const newValue = currentValue.toLowerCase() === value?.toLowerCase() ? "" : currentValue;
-    onChange(newValue);
-    setOpen(false);
+    onChange(currentValue === value ? "" : currentValue);
+    setOpen(false)
   }
 
-  const handleCreate = () => {
-    if (inputValue) {
-      onChange(inputValue)
-      setOpen(false)
-    }
-  }
-
-  const currentSelection = options.find(
-    (option) => option.value.toLowerCase() === value?.toLowerCase()
-  )
-
-  const filteredOptions = inputValue 
-    ? options.filter(option => 
-        option.label.toLowerCase().includes(inputValue.toLowerCase())
-      )
-    : options;
-
-  const showCreateOption = allowCustomValue && inputValue && !options.some(opt => opt.label.toLowerCase() === inputValue.toLowerCase());
+  const currentSelectionLabel = options.find(option => option.value.toLowerCase() === value?.toLowerCase())?.label;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -82,7 +60,7 @@ export function Combobox({
           aria-expanded={open}
           className="w-full justify-between font-normal"
         >
-          {currentSelection ? currentSelection.label : placeholder || "Select option..."}
+          {value ? currentSelectionLabel || value : placeholder || "Select option..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -90,29 +68,17 @@ export function Combobox({
         <Command>
           <CommandInput 
             placeholder={placeholder || "Search..."} 
-            value={inputValue}
-            onValueChange={setInputValue}
           />
           <CommandList>
             <CommandEmpty>
-              {showCreateOption ? (
-                <CommandItem
-                    onSelect={handleCreate}
-                    className="text-primary cursor-pointer"
-                >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Create and use "{inputValue}"
-                </CommandItem>
-              ) : (
-                emptyMessage || "No options found."
-              )}
+                {emptyMessage || "No options found."}
             </CommandEmpty>
             <CommandGroup>
-              {filteredOptions.map((option) => (
+              {options.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.value}
-                  onSelect={() => handleSelect(option.value)}
+                  onSelect={handleSelect}
                 >
                   <Check
                     className={cn(
@@ -124,15 +90,6 @@ export function Combobox({
                 </CommandItem>
               ))}
             </CommandGroup>
-             {showCreateOption && <div className="p-1 border-t mt-1">
-                <CommandItem
-                    onSelect={handleCreate}
-                    className="text-primary cursor-pointer"
-                >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Create and use "{inputValue}"
-                </CommandItem>
-             </div>}
           </CommandList>
         </Command>
       </PopoverContent>
