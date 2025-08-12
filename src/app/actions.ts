@@ -62,20 +62,24 @@ export async function batchChatAction(batch: Batch, query: string) {
 }
 
 async function getNextBatchNumber(transaction: Transaction, status: Batch['status']) {
-    const allBatchesSnapshot = await transaction.get(db.collection('batches'));
-    const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
-        const b = doc.data() as Batch;
-        const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
-        return numPart > max ? numPart : max;
-    }, 0);
-    const nextBatchNumStr = (maxBatchNum + 1).toString().padStart(6, '0');
+    const counterRef = db.collection('counters').doc('batches');
+    const counterDoc = await transaction.get(counterRef);
     
+    let nextBatchNum = 1;
+    if (counterDoc.exists) {
+        nextBatchNum = counterDoc.data()!.count + 1;
+    }
+    
+    const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
     const batchNumberPrefix = {
         'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
         'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
     };
     const prefixedBatchNumber = `${batchNumberPrefix[status]}-${nextBatchNumStr}`;
-    return { prefixedBatchNumber, nextBatchNum: maxBatchNum + 1 };
+
+    transaction.set(counterRef, { count: nextBatchNum }, { merge: true });
+
+    return { prefixedBatchNumber, nextBatchNum };
 }
 
 export async function addBatchAction(
@@ -110,14 +114,12 @@ export async function addBatchAction(
 export async function addBatchesFromCsvAction(
     newBatchesData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'>[]
 ) {
+    const counterRef = db.collection('counters').doc('batches');
+
     try {
         await db.runTransaction(async (transaction) => {
-            const allBatchesSnapshot = await transaction.get(db.collection('batches'));
-            let maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
-                const b = doc.data() as Batch;
-                const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
-                return numPart > max ? numPart : max;
-            }, 0);
+            const counterDoc = await transaction.get(counterRef);
+            let currentBatchNum = counterDoc.exists ? counterDoc.data()!.count : 0;
 
             const batchNumberPrefixMap = {
                 'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
@@ -125,8 +127,8 @@ export async function addBatchesFromCsvAction(
             };
             
             for (const batchData of newBatchesData) {
-                maxBatchNum++;
-                const nextBatchNumStr = maxBatchNum.toString().padStart(6, '0');
+                currentBatchNum++;
+                const nextBatchNumStr = currentBatchNum.toString().padStart(6, '0');
                 const prefixedBatchNumber = `${batchNumberPrefixMap[batchData.status]}-${nextBatchNumStr}`;
 
                 const newDocRef = db.collection('batches').doc();
@@ -144,6 +146,7 @@ export async function addBatchesFromCsvAction(
                 };
                 transaction.set(newDocRef, newBatch);
             }
+            transaction.set(counterRef, { count: currentBatchNum }, { merge: true });
         });
         return { success: true, message: `${newBatchesData.length} batches added successfully.` };
     } catch (error: any) {
@@ -163,8 +166,8 @@ export async function updateBatchAction(batchToUpdate: Omit<Batch, 'createdAt' |
     let wasArchived = false;
     if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
       updatedBatchData.logHistory.push({ 
-          date: FieldValue.serverTimestamp(),
-          type: 'ARCHIVE',
+          date: FieldValue.serverTimestamp(), 
+          type: 'ARCHIVE', 
           note: `Batch quantity reached zero and was automatically archived.`
         });
       updatedBatchData.status = 'Archived';
