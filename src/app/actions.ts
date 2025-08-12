@@ -210,23 +210,39 @@ export async function logAction(
     }
     
     const updatedBatch = { ...batch };
-
-    const newLog: LogEntry = {
+    
+    const newLog: Partial<LogEntry> = {
         date: FieldValue.serverTimestamp(),
-        ...logData
+        type: logData.type,
+    };
+    
+    switch (logData.type) {
+      case 'NOTE':
+        newLog.note = logData.note;
+        break;
+      case 'MOVE':
+        newLog.note = `Moved batch from ${batch.location} to ${logData.newLocation}`;
+        newLog.newLocation = logData.newLocation;
+        updatedBatch.location = logData.newLocation!;
+        break;
+      case 'LOSS':
+        newLog.note = `Logged loss of ${logData.qty}. Reason: ${logData.reason}`;
+        newLog.qty = logData.qty;
+        newLog.reason = logData.reason;
+        updatedBatch.quantity -= logData.qty!;
+        break;
+      case 'Batch Spaced':
+      case 'Batch Trimmed':
+        newLog.note = logData.type;
+        break;
+      default:
+        return { success: false, error: 'Invalid log action type.' };
     }
-    updatedBatch.logHistory = [...updatedBatch.logHistory, newLog];
+
+    updatedBatch.logHistory = [...updatedBatch.logHistory, newLog as LogEntry];
 
     if (logData.type === 'ADJUST' && logData.qty) {
       updatedBatch.quantity += logData.qty;
-    }
-
-    if (logData.type === 'LOSS' && logData.qty) {
-      updatedBatch.quantity -= logData.qty;
-    }
-    
-    if (logData.type === 'MOVE' && logData.newLocation) {
-        updatedBatch.location = logData.newLocation;
     }
 
     const result = await updateBatchAction(updatedBatch);
@@ -360,3 +376,5 @@ export async function transplantBatchAction(
     return { success: false, error: error.message || 'Failed to transplant batch.' };
   }
 }
+
+    

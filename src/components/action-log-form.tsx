@@ -98,6 +98,8 @@ export function ActionLogForm({
     form.clearErrors();
   }
 
+  const showSubmit = actionType === 'NOTE' || actionType === 'MOVE' || actionType === 'LOSS';
+
   return (
     <>
       <DialogHeader>
@@ -217,3 +219,5 @@ export function ActionLogForm({
     </>
   );
 }
+
+    
