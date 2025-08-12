@@ -86,21 +86,12 @@ export default function DashboardOverviewPage() {
   );
 
   const calculateLosses = (batch: Batch) => {
-    const lossLogRegex =
-      /Logged (\d+) units as loss|Adjusted quantity by -(\d+)|Archived with loss of (\d+)/;
-    const lostQuantity = batch.logHistory.reduce((sum, log) => {
-      const match = log.action.match(lossLogRegex);
-      if (match) {
-        return (
-          sum +
-          (parseInt(match[1], 10) ||
-            parseInt(match[2], 10) ||
-            parseInt(match[3], 10))
-        );
+    return batch.logHistory.reduce((sum, log) => {
+      if (log.details?.quantityChange && log.details.quantityChange < 0) {
+        return sum - log.details.quantityChange; // quantityChange is negative
       }
       return sum;
     }, 0);
-    return lostQuantity;
   };
 
   const filteredBatches = useMemo(() => {

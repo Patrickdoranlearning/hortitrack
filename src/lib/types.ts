@@ -5,6 +5,11 @@ export const LogEntrySchema = z.object({
   id: z.string().optional(), // Allow optional id for client-side generation
   date: z.string(),
   action: z.string(),
+  details: z.object({
+      quantityChange: z.number().optional(),
+      newLocation: z.string().optional(),
+      reason: z.string().optional(),
+  }).optional(),
 });
 export type LogEntry = z.infer<typeof LogEntrySchema>;
 

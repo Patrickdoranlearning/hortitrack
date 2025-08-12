@@ -205,14 +205,6 @@ export default function DashboardPage() {
       });
   }, [batches, searchQuery, filters]);
 
-  const getNextBatchNumber = () => {
-    const maxBatchNum = batches.reduce((max, b) => {
-        const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
-        return numPart > max ? numPart : max;
-    }, -1);
-    return (maxBatchNum + 1).toString().padStart(6, '0');
-  }
-
   const handleNewBatch = () => {
     setEditingBatch(null);
     setBatchDistribution(null);
@@ -220,20 +212,22 @@ export default function DashboardPage() {
   };
 
   const handleEditBatch = (batch: Batch) => {
-    const transplantedQuantity = batches.filter(b => b.transplantedFrom === batch.batchNumber).reduce((sum, b) => sum + b.initialQuantity, 0);
-    const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)|Archived with loss of (\d+)/;
+    const transplantedQuantity = batches
+      .filter(b => b.transplantedFrom === batch.batchNumber)
+      .reduce((sum, b) => sum + b.initialQuantity, 0);
+      
     const lostQuantity = batch.logHistory.reduce((sum, log) => {
-      const match = log.action.match(lossLogRegex);
-      if (match) {
-        return sum + (parseInt(match[1], 10) || parseInt(match[2], 10) || parseInt(match[3], 10));
-      }
-      return sum;
-    }, 0);
-    
+        if (log.details?.quantityChange && log.details.quantityChange < 0) {
+            // quantityChange is negative, so subtract to make it a positive loss
+            return sum - log.details.quantityChange;
+        }
+        return sum;
+    }, 0) - transplantedQuantity; // Subtract transplants from total losses
+
     setBatchDistribution({
       inStock: batch.quantity,
       transplanted: transplantedQuantity,
-      lost: lostQuantity,
+      lost: Math.max(0, lostQuantity), // Ensure loss isn't negative
     });
     setEditingBatch(batch);
     setIsFormOpen(true);
@@ -266,20 +260,8 @@ export default function DashboardPage() {
         toast({ variant: 'destructive', title: 'Update Failed', description: result.error });
       }
     } else {
-      const batchNumberPrefix = {
-        'Propagation': '1',
-        'Plugs/Liners': '2',
-        'Potted': '3',
-        'Ready for Sale': '4',
-        'Looking Good': '6',
-        'Archived': '5'
-      };
-      const nextBatchNumStr = getNextBatchNumber();
-      const prefixedBatchNumber = `${batchNumberPrefix[data.status]}-${nextBatchNumStr}`;
-      
       const newBatchData = { 
         ...data, 
-        batchNumber: prefixedBatchNumber, 
         supplier: data.supplier || 'Doran Nurseries',
         initialQuantity: data.quantity, 
       };
@@ -332,8 +314,7 @@ export default function DashboardPage() {
     if (!actionLogBatch) return;
 
     let logMessage = '';
-    let quantityChange: number | null = null;
-    let newLocation: string | null = null;
+    let details: any = {};
 
     switch (data.actionType) {
       case 'log':
@@ -341,11 +322,12 @@ export default function DashboardPage() {
         break;
       case 'move':
         logMessage = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
-        newLocation = data.newLocation;
+        details.newLocation = data.newLocation;
         break;
       case 'adjust':
         logMessage = `Adjusted quantity by -${data.adjustQuantity}. Reason: ${data.adjustReason}`;
-        quantityChange = -data.adjustQuantity;
+        details.quantityChange = -data.adjustQuantity;
+        details.reason = data.adjustReason;
         break;
       case 'Batch Spaced':
       case 'Batch Trimmed':
@@ -356,7 +338,7 @@ export default function DashboardPage() {
         return;
     }
 
-    const result = await logAction(actionLogBatch.id, logMessage, quantityChange, newLocation);
+    const result = await logAction(actionLogBatch.id, logMessage, details);
 
     if (result.success) {
       toast({ title: 'Action Logged', description: 'The action has been successfully logged.' });
@@ -369,7 +351,8 @@ export default function DashboardPage() {
   };
 
   const handleScanSuccess = (scannedData: string) => {
-    const foundBatch = batches.find(b => b.batchNumber === scannedData);
+    const trimmedScan = scannedData.trim().toLowerCase();
+    const foundBatch = batches.find(b => b.batchNumber.trim().toLowerCase() === trimmedScan);
     if (foundBatch) {
       setScannedBatch(foundBatch);
       setIsScannedActionsOpen(true);
@@ -658,5 +641,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

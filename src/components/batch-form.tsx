@@ -54,6 +54,11 @@ const logEntrySchema = z.object({
   id: z.string().optional(),
   date: z.string().min(1, "Date is required."),
   action: z.string().min(1, "Action is required."),
+  details: z.object({
+    quantityChange: z.number().optional(),
+    newLocation: z.string().optional(),
+    reason: z.string().optional(),
+  }).optional(),
 });
 
 const batchFormSchema = z.object({
@@ -88,7 +93,7 @@ const batchFormSchema = z.object({
 type BatchFormValues = Omit<Batch, 'id' | 'batchNumber' | 'logHistory'> & {
     id?: string;
     batchNumber?: string;
-    logHistory: { id?: string; date: string; action: string }[];
+    logHistory: { id?: string; date: string; action: string, details?: any }[];
 };
 
 export interface BatchDistribution {
@@ -185,24 +190,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
         logHistory: data.logHistory.map(log => ({...log, id: log.id || `log_${Date.now()}_${Math.random()}`}))
     };
     if (batch) {
-      const batchNumberPrefix = {
-        'Propagation': '1',
-        'Plugs/Liners': '2',
-        'Potted': '3',
-        'Ready for Sale': '4',
-        'Looking Good': '6',
-        'Archived': '5'
-      };
-      // For existing batches, we might need to update the prefix if the status changes
-      const currentPrefix = batch.batchNumber.split('-')[0];
-      const newPrefix = batchNumberPrefix[finalData.status];
-      let finalBatchNumber = batch.batchNumber;
-      if (currentPrefix !== newPrefix) {
-        const numberPart = batch.batchNumber.split('-')[1] || '0';
-        finalBatchNumber = `${newPrefix}-${numberPart}`;
-      }
-
-       onSubmit({ ...finalData, id: batch.id, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
+       onSubmit({ ...finalData, id: batch.id, batchNumber: batch.batchNumber, initialQuantity: batch.initialQuantity } as Batch);
     } else {
         onSubmit({ ...finalData, initialQuantity: finalData.quantity } as Omit<Batch, 'id' | 'batchNumber'>);
     }
@@ -252,7 +240,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="font-headline text-2xl">{batch ? 'Edit Batch' : 'Create New Batch'}</DialogTitle>
+        <DialogTitle className="font-headline text-2xl">{batch ? `Edit Batch #${batch.batchNumber}` : 'Create New Batch'}</DialogTitle>
         <DialogDescription>
           {batch ? 'Update the details for this nursery stock batch.' : 'Enter the details for the new nursery stock batch.'}
         </DialogDescription>
@@ -385,13 +373,27 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
             <div className="md:row-start-1">
                <FormField
                 control={form.control}
-                name="batchNumber"
+                name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Batch Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Auto-generated" {...field} disabled />
-                    </FormControl>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Propagation">Propagation</SelectItem>
+                        <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                        <SelectItem value="Potted">Potted</SelectItem>
+                        <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                        <SelectItem value="Looking Good">Looking Good</SelectItem>
+                         {field.value === 'Archived' && (
+                          <SelectItem value="Archived" disabled>Archived</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -469,36 +471,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       </FormControl>
                       <SelectContent>
                         {nurseryLocations.map(location => <SelectItem key={location.id} value={location.name}>{location.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="md:row-start-5">
-               <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Propagation">Propagation</SelectItem>
-                        <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-                        <SelectItem value="Potted">Potted</SelectItem>
-                        <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
-                        <SelectItem value="Looking Good">Looking Good</SelectItem>
-                         {field.value === 'Archived' && (
-                          <SelectItem value="Archived" disabled>Archived</SelectItem>
-                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
