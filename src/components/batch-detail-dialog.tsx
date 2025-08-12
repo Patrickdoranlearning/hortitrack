@@ -111,8 +111,8 @@ export function BatchDetailDialog({
                             </div>
                             <div className="md:col-span-2 grid grid-cols-2 gap-x-8 gap-y-4">
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Status</p>
-                                    <p><Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge></p>
+                                    <div className="text-sm font-medium text-muted-foreground">Status</div>
+                                    <div><Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge></div>
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Location</p>
@@ -174,4 +174,3 @@ export function BatchDetailDialog({
   );
 }
 
-    
