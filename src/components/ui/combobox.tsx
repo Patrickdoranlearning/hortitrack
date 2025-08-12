@@ -79,15 +79,11 @@ export function Combobox({
             if (value.toLowerCase().includes(search.toLowerCase())) return 1;
             return 0;
         }}>
-          <div className="flex items-center border-b px-3">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-            <CommandInput 
-              placeholder={placeholder}
-              value={search}
-              onValueChange={setSearch}
-              className="border-0 focus:ring-0 focus:outline-none p-0 h-10"
-            />
-          </div>
+          <CommandInput 
+            placeholder={placeholder}
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty>
                 {onCreate && search ? (
