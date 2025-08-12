@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Boxes, Ruler, MapPin, Truck } from 'lucide-react';
+import { ArrowLeft, Database, Boxes, Ruler, MapPin, Truck, PackageSearch } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -23,6 +23,20 @@ export default function SettingsPage() {
         Manage your "golden tables" - the standardized lists of data used throughout the application.
       </p>
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><PackageSearch /> Batch Data</CardTitle>
+            <CardDescription>View, search, and manage all historical and active batch records in a table.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <Button asChild>
+                <Link href="/batches">
+                    Manage Batches
+                </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Database /> Plant Varieties</CardTitle>
