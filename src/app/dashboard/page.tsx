@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
@@ -47,7 +47,8 @@ export default function DashboardOverviewPage() {
     location: 'all',
   });
 
-  useEffect(() => {
+  const subscribeToBatches = useCallback(() => {
+    setIsLoading(true);
     const q = query(collection(db, 'batches'), orderBy('batchNumber'));
     const unsubscribe = onSnapshot(
       q,
@@ -63,9 +64,13 @@ export default function DashboardOverviewPage() {
         setIsLoading(false);
       }
     );
-
-    return () => unsubscribe();
+    return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToBatches();
+    return () => unsubscribe();
+  }, [subscribeToBatches]);
 
   const statuses = useMemo(
     () => ['all', ...Array.from(new Set(batches.map((b) => b.status)))],
@@ -464,5 +469,3 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
-
-    

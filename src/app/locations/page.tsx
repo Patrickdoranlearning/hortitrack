@@ -317,8 +317,8 @@ export default function LocationsPage() {
                           <SelectTrigger><SelectValue placeholder="Select nursery" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Main">Main</SelectItem>
-                          <SelectItem value="Alberts">Alberts</SelectItem>
+                          <SelectItem key="main" value="Main">Main</SelectItem>
+                          <SelectItem key="alberts" value="Alberts">Alberts</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -332,10 +332,10 @@ export default function LocationsPage() {
                           <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Glasshouse">Glasshouse</SelectItem>
-                          <SelectItem value="Tunnel">Tunnel</SelectItem>
-                          <SelectItem value="Section">Section</SelectItem>
-                          <SelectItem value="Prophouse">Prophouse</SelectItem>
+                          <SelectItem key="glasshouse" value="Glasshouse">Glasshouse</SelectItem>
+                          <SelectItem key="tunnel" value="Tunnel">Tunnel</SelectItem>
+                          <SelectItem key="section" value="Section">Section</SelectItem>
+                          <SelectItem key="prophouse" value="Prophouse">Prophouse</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormItem>

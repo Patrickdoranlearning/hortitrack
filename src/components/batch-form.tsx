@@ -598,5 +598,3 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     </>
   );
 }
-
-    

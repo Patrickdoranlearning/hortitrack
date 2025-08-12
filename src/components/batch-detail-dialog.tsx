@@ -77,7 +77,7 @@ export function BatchDetailDialog({
                         <DialogTitle className="font-headline text-3xl">{batch.plantVariety}</DialogTitle>
                         <DialogDescription className="text-lg">{batch.plantFamily} - Batch #{batch.batchNumber}</DialogDescription>
                     </div>
-                    <div className="grid grid-cols-3 sm:flex sm:flex-wrap sm:justify-end gap-2 shrink-0">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 sm:flex sm:flex-wrap sm:justify-end gap-2 shrink-0">
                         <Button variant="outline" size="sm" onClick={() => setIsChatOpen(true)}>
                             <MessageSquare /> AI Chat
                         </Button>
@@ -156,7 +156,7 @@ export function BatchDetailDialog({
                             </TableHeader>
                             <TableBody>
                                 {batch.logHistory.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((log, index) => (
-                                    <TableRow key={index}>
+                                    <TableRow key={log.id || index}>
                                         <TableCell>{format(new Date(log.date), 'PPP p')}</TableCell>
                                         <TableCell>{log.action}</TableCell>
                                     </TableRow>
@@ -173,4 +173,3 @@ export function BatchDetailDialog({
     </>
   );
 }
-
