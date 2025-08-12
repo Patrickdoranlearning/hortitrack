@@ -6,7 +6,7 @@ import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import type { Batch, LogEntry } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Transaction } from 'firebase-admin/firestore';
 
 export async function getBatchesAction() {
     try {
@@ -61,25 +61,29 @@ export async function batchChatAction(batch: Batch, query: string) {
   }
 }
 
+async function getNextBatchNumber(transaction: Transaction, status: Batch['status']) {
+    const allBatchesSnapshot = await transaction.get(db.collection('batches'));
+    const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
+        const b = doc.data() as Batch;
+        const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
+        return numPart > max ? numPart : max;
+    }, 0);
+    const nextBatchNumStr = (maxBatchNum + 1).toString().padStart(6, '0');
+    
+    const batchNumberPrefix = {
+        'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
+        'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
+    };
+    const prefixedBatchNumber = `${batchNumberPrefix[status]}-${nextBatchNumStr}`;
+    return { prefixedBatchNumber, nextBatchNum: maxBatchNum + 1 };
+}
 
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'>
 ) {
   try {
     return await db.runTransaction(async (transaction) => {
-        const allBatchesSnapshot = await transaction.get(db.collection('batches'));
-        const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
-            const b = doc.data() as Batch;
-            const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
-            return numPart > max ? numPart : max;
-        }, 0);
-        const nextBatchNumStr = (maxBatchNum + 1).toString().padStart(6, '0');
-        
-        const batchNumberPrefix = {
-            'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
-            'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
-        };
-        const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
+        const { prefixedBatchNumber } = await getNextBatchNumber(transaction, newBatchData.status);
 
         const newDocRef = db.collection('batches').doc();
         const newBatch: Omit<Batch, 'id'> = {
@@ -102,6 +106,52 @@ export async function addBatchAction(
     return { success: false, error: 'Failed to add batch: ' + error.message };
   }
 }
+
+export async function addBatchesFromCsvAction(
+    newBatchesData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'>[]
+) {
+    try {
+        await db.runTransaction(async (transaction) => {
+            const allBatchesSnapshot = await transaction.get(db.collection('batches'));
+            let maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
+                const b = doc.data() as Batch;
+                const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
+                return numPart > max ? numPart : max;
+            }, 0);
+
+            const batchNumberPrefixMap = {
+                'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
+                'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
+            };
+            
+            for (const batchData of newBatchesData) {
+                maxBatchNum++;
+                const nextBatchNumStr = maxBatchNum.toString().padStart(6, '0');
+                const prefixedBatchNumber = `${batchNumberPrefixMap[batchData.status]}-${nextBatchNumStr}`;
+
+                const newDocRef = db.collection('batches').doc();
+                const newBatch: Omit<Batch, 'id'> = {
+                    ...batchData,
+                    batchNumber: prefixedBatchNumber,
+                    logHistory: [{ 
+                        date: FieldValue.serverTimestamp(), 
+                        type: 'CREATE', 
+                        note: 'Batch created via CSV import.',
+                        qty: batchData.quantity
+                    }],
+                    createdAt: FieldValue.serverTimestamp(),
+                    updatedAt: FieldValue.serverTimestamp(),
+                };
+                transaction.set(newDocRef, newBatch);
+            }
+        });
+        return { success: true, message: `${newBatchesData.length} batches added successfully.` };
+    } catch (error: any) {
+        console.error('Error adding batches from CSV:', error);
+        return { success: false, error: 'Failed to add batches: ' + error.message };
+    }
+}
+
 
 export async function updateBatchAction(batchToUpdate: Omit<Batch, 'createdAt' | 'updatedAt'> & { updatedAt?: any, createdAt?: any }) {
   try {
@@ -244,19 +294,7 @@ export async function transplantBatchAction(
             throw new Error('Insufficient quantity in source batch.');
         }
 
-        const allBatchesSnapshot = await transaction.get(db.collection('batches'));
-        const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
-            const b = doc.data() as Batch;
-            const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
-            return numPart > max ? numPart : max;
-        }, 0);
-        const nextBatchNumStr = (maxBatchNum + 1).toString().padStart(6, '0');
-
-        const batchNumberPrefix = {
-            'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
-            'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
-        };
-        const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
+        const { prefixedBatchNumber } = await getNextBatchNumber(transaction, newBatchData.status);
 
         const newDocRef = db.collection('batches').doc();
         const newBatch: Omit<Batch, 'id'> = {

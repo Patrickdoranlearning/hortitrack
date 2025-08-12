@@ -2,11 +2,13 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Search,
   Filter,
-  ArrowLeft
+  ArrowLeft,
+  Download,
+  Upload,
 } from 'lucide-react';
 import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { addBatchesFromCsvAction } from '../actions';
 
 
 export default function BatchesPage() {
@@ -48,6 +51,7 @@ export default function BatchesPage() {
   }>({ plantFamily: 'all', status: 'all', category: 'all' });
 
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const loadBatches = useCallback(() => {
     if (!user) return;
@@ -141,6 +145,74 @@ export default function BatchesPage() {
     }
   };
 
+  const handleDownloadData = () => {
+    const headers = ['category', 'plantFamily', 'plantVariety', 'plantingDate', 'quantity', 'status', 'location', 'size', 'supplier'];
+    const csvRows = batches.map(b => 
+      [b.category, b.plantFamily, b.plantVariety, b.plantingDate, b.quantity, b.status, b.location, b.size, b.supplier || ''].map(val => `"${val}"`).join(',')
+    );
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + headers.join(',') + '\n'
+        + csvRows.join('\n');
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "batches_data_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const text = e.target?.result as string;
+        try {
+            const rows = text.split('\n').filter(row => row.trim() !== '');
+            const headerLine = rows.shift()?.trim() || '';
+            const headers = headerLine.split(',').map(h => h.trim().replace(/"/g, ''));
+            
+            const requiredHeaders = ['plantVariety', 'plantFamily', 'category', 'plantingDate', 'quantity', 'status', 'location', 'size', 'supplier'];
+            if (!requiredHeaders.every(h => headers.includes(h))) {
+                throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
+            }
+
+            const newBatches = rows.map((row) => {
+                const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)!.map(v => v.replace(/"/g, '').trim());
+                const batchData: any = {};
+                headers.forEach((header, i) => {
+                    batchData[header] = values[i] || '';
+                });
+
+                return {
+                    ...batchData,
+                    quantity: parseInt(batchData.quantity, 10),
+                    initialQuantity: parseInt(batchData.quantity, 10),
+                };
+            });
+            
+            const result = await addBatchesFromCsvAction(newBatches);
+
+            if (result.success) {
+                toast({ title: 'Import Successful', description: result.message });
+            } else {
+                throw new Error(result.error);
+            }
+
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
+        } finally {
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsText(file);
+  };
 
   if (authLoading || !user) {
      return (
@@ -167,8 +239,18 @@ export default function BatchesPage() {
 
         <Card>
             <CardHeader>
-                <CardTitle>All Batches</CardTitle>
-                <CardDescription>A complete history of all batches recorded in the system.</CardDescription>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <CardTitle>All Batches</CardTitle>
+                        <CardDescription>A complete history of all batches recorded in the system.</CardDescription>
+                    </div>
+                     <div className="flex gap-2">
+                      <Button variant="outline" onClick={handleDownloadData}><Download /> Download Template</Button>
+                      <Button onClick={() => fileInputRef.current?.click()}><Upload /> Upload CSV</Button>
+                      <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
+                    </div>
+                </div>
+
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center pt-4">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
