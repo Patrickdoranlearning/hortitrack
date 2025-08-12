@@ -53,7 +53,7 @@ import { useState, useMemo, useEffect } from 'react';
 const logEntrySchema = z.object({
   id: z.string().optional(),
   date: z.any(),
-  type: z.enum(['NOTE', 'LOSS', 'ADJUST', 'MOVE', 'TRANSPLANT_TO', 'TRANSPLANT_FROM', 'CREATE', 'ARCHIVE']),
+  type: z.enum(['NOTE', 'LOSS', 'ADJUST', 'MOVE', 'TRANSPLANT_TO', 'TRANSPLANT_FROM', 'CREATE', 'ARCHIVE', 'Batch Spaced', 'Batch Trimmed']),
   note: z.string().optional(),
 });
 
@@ -192,8 +192,8 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
 
-  const handleSizeChange = (sizeId: string) => {
-    const selectedSize = plantSizes.find(s => s.id === sizeId);
+  const handleSizeChange = (sizeValue: string) => {
+    const selectedSize = plantSizes.find(s => s.id === sizeValue);
     if (selectedSize) {
       form.setValue('size', selectedSize.size);
       setSelectedSizeInfo(selectedSize);
@@ -232,7 +232,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
   const varietyOptions = useMemo(() => VARIETIES.map(v => ({ value: v.name, label: v.name })), []);
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
-  const currentSizeId = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
+  const currentSizeValue = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
 
   return (
     <>
@@ -306,16 +306,18 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Size</FormLabel>
-                    <Select onValueChange={handleSizeChange} value={currentSizeId}>
+                    <Select onValueChange={handleSizeChange} value={currentSizeValue}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {sortedPlantSizes.filter(s => s?.id && s?.size).map(size => 
-                          <SelectItem key={size.id} value={size.id}>
-                            <span>{size.size} ({size.type})</span>
-                          </SelectItem>
-                        )}
+                        {sortedPlantSizes
+                          .filter(s => s?.id && s?.size)
+                          .map(s => (
+                            <SelectItem key={s.id} value={s.id}>
+                              <span>{s.size} ({s.type})</span>
+                            </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -232,8 +232,10 @@ export async function logAction(
         updatedBatch.quantity -= logData.qty!;
         break;
       case 'Batch Spaced':
+        newLog.note = 'Batch Spaced';
+        break;
       case 'Batch Trimmed':
-        newLog.note = logData.type;
+        newLog.note = 'Batch Trimmed';
         break;
       default:
         return { success: false, error: 'Invalid log action type.' };
@@ -376,5 +378,3 @@ export async function transplantBatchAction(
     return { success: false, error: error.message || 'Failed to transplant batch.' };
   }
 }
-
-    

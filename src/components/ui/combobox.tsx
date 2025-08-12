@@ -40,9 +40,10 @@ export function Combobox({
   onChange,
   placeholder = "Select...",
   emptyMessage = "No results found.",
-  allowCustomValue = false
+  allowCustomValue = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
+  
   const selectedOption = options.find(option => option.value.toLowerCase() === value?.toLowerCase());
 
   return (
@@ -63,8 +64,11 @@ export function Combobox({
           <CommandInput 
             placeholder={placeholder}
             onBlur={(e) => {
-              if (allowCustomValue && e.target.value) {
-                onChange(e.target.value);
+              if (allowCustomValue) {
+                const currentValue = e.target.value;
+                if (currentValue && !options.some(opt => opt.label.toLowerCase() === currentValue.toLowerCase())) {
+                  onChange(currentValue);
+                }
               }
             }}
           />
@@ -76,8 +80,10 @@ export function Combobox({
                   key={option.value}
                   value={option.label}
                   onSelect={(currentValue) => {
-                    const selectedValue = options.find(opt => opt.label.toLowerCase() === currentValue.toLowerCase())?.value || '';
-                    onChange(selectedValue);
+                    const selectedValue = options.find(opt => opt.label.toLowerCase() === currentValue.toLowerCase())?.value || (allowCustomValue ? currentValue : '');
+                    if (selectedValue) {
+                        onChange(selectedValue);
+                    }
                     setOpen(false);
                   }}
                 >
