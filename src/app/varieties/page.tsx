@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Plus, Download, Upload, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit } from 'lucide-react';
 import Link from 'next/link';
 import type { Variety } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -35,7 +35,6 @@ export default function VarietiesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVariety, setEditingVariety] = useState<Variety | null>(null);
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const subscribeToVarieties = useCallback(() => {
     if (!user) return;
@@ -112,63 +111,6 @@ export default function VarietiesPage() {
     }
   };
 
-  const handleDownloadData = () => {
-    const headers: (keyof Variety)[] = ['name', 'family', 'category', 'grouping', 'commonName', 'rating', 'salesPeriod', 'floweringPeriod', 'flowerColour', 'evergreen'];
-    const csvRows = varieties.map(v => 
-      headers.map(header => `"${v[header] || ''}"`).join(',')
-    );
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(',') + '\n'
-        + csvRows.join('\n');
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "varieties_data.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        try {
-            const rows = text.split('\n').filter(row => row.trim() !== '');
-            const headerLine = rows.shift()?.trim() || '';
-            const headers = headerLine.split(',').map(h => h.trim().replace(/"/g, '') as keyof Variety);
-            
-            const requiredHeaders: (keyof Variety)[] = ['name', 'family', 'category'];
-            if (!requiredHeaders.every(h => headers.includes(h))) {
-                throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
-            }
-
-            for (const row of rows) {
-                const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)!.map(v => v.replace(/"/g, '').trim());
-                const varietyData: any = {};
-                headers.forEach((header, i) => {
-                    varietyData[header] = values[i] || '';
-                });
-                await addVarietyAction(varietyData);
-            }
-            
-            toast({ title: 'Import Successful', description: `${rows.length} varieties have been imported.` });
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
-        } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-    reader.readAsText(file);
-  };
-
   return (
     <>
     <div className="container mx-auto max-w-7xl p-4 sm:p-6">
@@ -184,9 +126,6 @@ export default function VarietiesPage() {
                     Back to Data Management
                 </Link>
             </Button>
-            <Button variant="outline" onClick={handleDownloadData}><Download /> Download Data</Button>
-            <Button onClick={() => fileInputRef.current?.click()}><Upload /> Upload CSV</Button>
-            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
             <Button onClick={handleAddVariety}>
                 <Plus />
                 Add New Variety
