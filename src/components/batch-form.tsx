@@ -85,7 +85,11 @@ const batchFormSchema = z.object({
 });
 
 
-type BatchFormValues = Omit<Batch, 'id' | 'batchNumber'> & { id?: string; batchNumber?: string };
+type BatchFormValues = Omit<Batch, 'id' | 'batchNumber' | 'logHistory'> & {
+    id?: string;
+    batchNumber?: string;
+    logHistory: { id?: string; date: string; action: string }[];
+};
 
 export interface BatchDistribution {
   inStock: number;
@@ -176,6 +180,10 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   }, [batch, plantSizes, form]);
 
   const handleFormSubmit = (data: BatchFormValues) => {
+    const finalData = {
+        ...data,
+        logHistory: data.logHistory.map(log => ({...log, id: log.id || `log_${Date.now()}_${Math.random()}`}))
+    };
     if (batch) {
       const batchNumberPrefix = {
         'Propagation': '1',
@@ -187,16 +195,16 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       };
       // For existing batches, we might need to update the prefix if the status changes
       const currentPrefix = batch.batchNumber.split('-')[0];
-      const newPrefix = batchNumberPrefix[data.status];
+      const newPrefix = batchNumberPrefix[finalData.status];
       let finalBatchNumber = batch.batchNumber;
       if (currentPrefix !== newPrefix) {
         const numberPart = batch.batchNumber.split('-')[1] || '0';
         finalBatchNumber = `${newPrefix}-${numberPart}`;
       }
 
-       onSubmit({ ...data, id: batch.id, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
+       onSubmit({ ...finalData, id: batch.id, batchNumber: finalBatchNumber, initialQuantity: batch.initialQuantity } as Batch);
     } else {
-        onSubmit({ ...data, initialQuantity: data.quantity } as Omit<Batch, 'id' | 'batchNumber'>);
+        onSubmit({ ...finalData, initialQuantity: finalData.quantity } as Omit<Batch, 'id' | 'batchNumber'>);
     }
   };
 
@@ -590,3 +598,5 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     </>
   );
 }
+
+    

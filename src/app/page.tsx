@@ -98,7 +98,7 @@ export default function DashboardPage() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
 
-  const loadBatches = useCallback(async () => {
+  const loadBatches = useCallback(() => {
     if (!user) return;
     setIsDataLoading(true);
     
@@ -121,50 +121,56 @@ export default function DashboardPage() {
     setIsClient(true);
     let unsubscribe: (() => void) | undefined;
     if (user) {
-        loadBatches().then(unsub => {
-          if (unsub) {
-            unsubscribe = unsub;
-          }
-        });
+        const unsub = loadBatches();
+        if (unsub) {
+          unsubscribe = unsub;
+        }
     }
     
-    const storedLocationsRaw = localStorage.getItem('nurseryLocations');
-    if (storedLocationsRaw) {
-      try {
-        const storedLocations = JSON.parse(storedLocationsRaw);
-        if (Array.isArray(storedLocations) && storedLocations.length > 0) {
-          setNurseryLocations(storedLocations);
+    try {
+        const storedLocationsRaw = localStorage.getItem('nurseryLocations');
+        if (storedLocationsRaw) {
+            const storedLocations = JSON.parse(storedLocationsRaw);
+            if (Array.isArray(storedLocations) && storedLocations.length > 0) {
+                setNurseryLocations(storedLocations);
+            }
         }
-      } catch (e) {
+    } catch (e) {
         console.error("Failed to parse nursery locations from localStorage", e);
-        setNurseryLocations([]); // Set to empty if parsing fails
-      }
-    } else {
         setNurseryLocations([]);
     }
 
-
-    const storedSizesRaw = localStorage.getItem('plantSizes');
-    if (storedSizesRaw) {
-      const storedSizes = JSON.parse(storedSizesRaw);
-      if (storedSizes && storedSizes.length > 0) {
-        setPlantSizes(storedSizes);
-      } else {
+    try {
+        const storedSizesRaw = localStorage.getItem('plantSizes');
+        if (storedSizesRaw) {
+          const storedSizes = JSON.parse(storedSizesRaw);
+          if (storedSizes && storedSizes.length > 0) {
+            setPlantSizes(storedSizes);
+          } else {
+            setPlantSizes(INITIAL_PLANT_SIZES);
+          }
+        } else {
+          setPlantSizes(INITIAL_PLANT_SIZES);
+        }
+    } catch (e) {
+        console.error("Failed to parse plant sizes from localStorage", e);
         setPlantSizes(INITIAL_PLANT_SIZES);
-      }
-    } else {
-      setPlantSizes(INITIAL_PLANT_SIZES);
     }
     
-    const storedSuppliersRaw = localStorage.getItem('suppliers');
-    if (storedSuppliersRaw) {
-        const storedSuppliers = JSON.parse(storedSuppliersRaw);
-        if (Array.isArray(storedSuppliers) && storedSuppliers.length > 0) {
-            setSuppliers(storedSuppliers);
+    try {
+        const storedSuppliersRaw = localStorage.getItem('suppliers');
+        if (storedSuppliersRaw) {
+            const storedSuppliers = JSON.parse(storedSuppliersRaw);
+            if (Array.isArray(storedSuppliers) && storedSuppliers.length > 0) {
+                setSuppliers(storedSuppliers);
+            } else {
+                setSuppliers(INITIAL_SUPPLIERS);
+            }
         } else {
             setSuppliers(INITIAL_SUPPLIERS);
         }
-    } else {
+    } catch (e) {
+        console.error("Failed to parse suppliers from localStorage", e);
         setSuppliers(INITIAL_SUPPLIERS);
     }
     
@@ -214,7 +220,7 @@ export default function DashboardPage() {
   };
 
   const handleEditBatch = (batch: Batch) => {
-    const transplantedQuantity = batches.filter(b => b.transplantedFrom === batch.id).reduce((sum, b) => sum + b.initialQuantity, 0);
+    const transplantedQuantity = batches.filter(b => b.transplantedFrom === batch.batchNumber).reduce((sum, b) => sum + b.initialQuantity, 0);
     const lossLogRegex = /Logged (\d+) units as loss|Adjusted quantity by -(\d+)|Archived with loss of (\d+)/;
     const lostQuantity = batch.logHistory.reduce((sum, log) => {
       const match = log.action.match(lossLogRegex);
@@ -652,3 +658,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

@@ -35,6 +35,7 @@ import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Logo } from '@/components/logo';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardOverviewPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -195,9 +196,20 @@ export default function DashboardOverviewPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
-        <Logo />
-        <p className="mt-4 text-muted-foreground">Loading Dashboard...</p>
+      <div className="flex min-h-screen w-full flex-col p-6">
+          <div className="flex items-center justify-between space-y-2">
+            <h1 className="text-4xl font-headline tracking-tight">Dashboard</h1>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mt-6">
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
       </div>
     );
   }
@@ -452,3 +464,5 @@ export default function DashboardOverviewPage() {
     </div>
   );
 }
+
+    

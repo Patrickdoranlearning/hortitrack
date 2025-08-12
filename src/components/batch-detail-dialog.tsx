@@ -72,18 +72,18 @@ export function BatchDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl">
             <DialogHeader>
-                <div className="flex items-start justify-between">
-                    <div>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                    <div className="mb-4 sm:mb-0">
                         <DialogTitle className="font-headline text-3xl">{batch.plantVariety}</DialogTitle>
                         <DialogDescription className="text-lg">{batch.plantFamily} - Batch #{batch.batchNumber}</DialogDescription>
                     </div>
-                    <div className="flex gap-2 items-center flex-wrap pt-2">
+                    <div className="grid grid-cols-3 sm:flex sm:flex-wrap sm:justify-end gap-2 shrink-0">
                         <Button variant="outline" size="sm" onClick={() => setIsChatOpen(true)}>
                             <MessageSquare /> AI Chat
                         </Button>
                         <Button variant="outline" size="sm" onClick={handleLogAction}><ClipboardList /> Log</Button>
                         <Button variant="outline" size="sm" onClick={handleTransplant}><MoveRight /> Transplant</Button>
-                        <Button variant="outline" size="sm" onClick={handleGenerateProtocol}><FileText /> Gen. Protocol</Button>
+                        <Button variant="outline" size="sm" onClick={handleGenerateProtocol}><FileText /> Protocol</Button>
                         <Button size="sm" onClick={handleEdit}><Pencil /> Edit</Button>
                     </div>
                 </div>
@@ -173,3 +173,5 @@ export function BatchDetailDialog({
     </>
   );
 }
+
+    

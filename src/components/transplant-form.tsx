@@ -129,8 +129,18 @@ export function TransplantForm({
   useEffect(() => {
     if (batch) {
         form.reset({
-            ...form.getValues(),
-            quantity: batch.quantity,
+          category: batch.category,
+          plantFamily: batch.plantFamily,
+          plantVariety: batch.plantVariety,
+          plantingDate: new Date().toISOString(),
+          quantity: batch.quantity,
+          status: 'Potted',
+          location: '',
+          size: '',
+          transplantedFrom: batch.batchNumber,
+          supplier: 'Doran Nurseries',
+          logRemainingAsLoss: false,
+          trayQuantity: 1,
         })
     }
   }, [batch, form]);
@@ -457,3 +467,5 @@ export function TransplantForm({
     </>
   );
 }
+
+    
