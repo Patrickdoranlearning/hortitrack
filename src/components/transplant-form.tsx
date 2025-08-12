@@ -119,7 +119,9 @@ export function TransplantForm({
       return sizeB - sizeA;
     }
 
-    return a.size.localeCompare(b.size);
+    const aSize = a.size || '';
+    const bSize = b.size || '';
+    return aSize.localeCompare(bSize);
   };
 
   const sortedPlantSizes = useMemo(() => {
