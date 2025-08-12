@@ -6,6 +6,7 @@ import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import type { Batch, LogEntry } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function getBatchesAction() {
     try {
@@ -39,7 +40,7 @@ export async function getCareRecommendationsAction(batch: Batch) {
         plantVariety: batch.plantVariety,
         plantingDate: batch.plantingDate,
       },
-      logHistory: batch.logHistory.map(log => log.action),
+      logHistory: batch.logHistory.map(log => log.note || log.type),
     };
     const result = await careRecommendations(input);
     return { success: true, data: result };
@@ -62,7 +63,7 @@ export async function batchChatAction(batch: Batch, query: string) {
 
 
 export async function addBatchAction(
-  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber'>
+  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'>
 ) {
   try {
     return await db.runTransaction(async (transaction) => {
@@ -80,16 +81,21 @@ export async function addBatchAction(
         };
         const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
 
-
         const newDocRef = db.collection('batches').doc();
-        const newBatch: Batch = {
+        const newBatch: Omit<Batch, 'id'> = {
           ...newBatchData,
-          id: newDocRef.id,
           batchNumber: prefixedBatchNumber,
-          logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
+          logHistory: [{ 
+            date: FieldValue.serverTimestamp(), 
+            type: 'CREATE', 
+            note: 'Batch created.',
+            qty: newBatchData.quantity
+          }],
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         };
         transaction.set(newDocRef, newBatch);
-        return { success: true, data: newBatch };
+        return { success: true, data: { ...newBatch, id: newDocRef.id }};
     });
   } catch (error: any) {
     console.error('Error adding batch:', error);
@@ -97,26 +103,34 @@ export async function addBatchAction(
   }
 }
 
-export async function updateBatchAction(batchToUpdate: Batch) {
+export async function updateBatchAction(batchToUpdate: Omit<Batch, 'createdAt' | 'updatedAt'> & { updatedAt?: any, createdAt?: any }) {
   try {
     const updatedBatchData = { ...batchToUpdate };
+    
+    // Ensure quantity doesn't go below zero
+    updatedBatchData.quantity = Math.max(0, updatedBatchData.quantity);
 
+    let wasArchived = false;
     if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
       updatedBatchData.logHistory.push({ 
-          date: new Date().toISOString(), 
-          action: `Batch quantity reached zero and was automatically archived.` 
+          date: FieldValue.serverTimestamp(),
+          type: 'ARCHIVE',
+          note: `Batch quantity reached zero and was automatically archived.`
         });
       updatedBatchData.status = 'Archived';
+      wasArchived = true;
     }
     
-    if (updatedBatchData.status === 'Archived') {
+    if (updatedBatchData.status === 'Archived' && !wasArchived) {
         updatedBatchData.quantity = 0;
     }
 
-
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(updatedBatchData.id);
-    await batchDoc.set(updatedBatchData, { merge: true });
+    await batchDoc.update({
+        ...updatedBatchData,
+        updatedAt: FieldValue.serverTimestamp(),
+    });
     return { success: true, data: updatedBatchData };
   } catch (error: any) {
     console.error('Error updating batch:', error);
@@ -137,8 +151,7 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
 
 export async function logAction(
     batchId: string, 
-    action: string, 
-    details?: { quantityChange?: number; newLocation?: string; reason?: string }
+    logData: Partial<LogEntry> & { type: LogEntry['type']}
 ) {
   try {
     const batch = await getBatchById(batchId);
@@ -149,18 +162,21 @@ export async function logAction(
     const updatedBatch = { ...batch };
 
     const newLog: LogEntry = {
-        date: new Date().toISOString(),
-        action: action,
-        details: details,
+        date: FieldValue.serverTimestamp(),
+        ...logData
     }
     updatedBatch.logHistory = [...updatedBatch.logHistory, newLog];
 
-    if (details?.quantityChange) {
-      updatedBatch.quantity += details.quantityChange;
+    if (logData.type === 'ADJUST' && logData.qty) {
+      updatedBatch.quantity += logData.qty;
+    }
+
+    if (logData.type === 'LOSS' && logData.qty) {
+      updatedBatch.quantity -= logData.qty;
     }
     
-    if (details?.newLocation) {
-        updatedBatch.location = details.newLocation;
+    if (logData.type === 'MOVE' && logData.newLocation) {
+        updatedBatch.location = logData.newLocation;
     }
 
     const result = await updateBatchAction(updatedBatch);
@@ -185,14 +201,13 @@ export async function archiveBatchAction(batchId: string, loss: number) {
     const updatedBatch = { ...batch };
     
     updatedBatch.status = 'Archived';
-    const action = `Archived with loss of ${loss} units. Final quantity: ${batch.quantity - loss}.`;
+    
     const newLog: LogEntry = { 
-        date: new Date().toISOString(), 
-        action: action,
-        details: {
-            quantityChange: -loss,
-            reason: 'Archived'
-        }
+        date: FieldValue.serverTimestamp(),
+        type: 'ARCHIVE',
+        note: `Archived with loss of ${loss} units. Final quantity: ${batch.quantity - loss}.`,
+        qty: loss,
+        reason: 'Archived'
     };
     updatedBatch.logHistory.push(newLog);
     updatedBatch.quantity = 0;
@@ -211,7 +226,7 @@ export async function archiveBatchAction(batchId: string, loss: number) {
 
 export async function transplantBatchAction(
   sourceBatchId: string,
-  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber'>,
+  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber' | 'createdAt' | 'updatedAt'>,
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
@@ -244,36 +259,44 @@ export async function transplantBatchAction(
         const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
 
         const newDocRef = db.collection('batches').doc();
-        const newBatch: Batch = {
+        const newBatch: Omit<Batch, 'id'> = {
             ...(newBatchData as any),
-            id: newDocRef.id,
             batchNumber: prefixedBatchNumber,
             initialQuantity: transplantQuantity,
             quantity: transplantQuantity,
             transplantedFrom: sourceBatch.batchNumber,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
             logHistory: [
                 {
-                date: new Date().toISOString(),
-                action: `Created from transplant of ${transplantQuantity} units from batch ${sourceBatch.batchNumber}.`,
-                details: { quantityChange: 0 }
+                    date: FieldValue.serverTimestamp(),
+                    type: 'TRANSPLANT_FROM',
+                    note: `Created from transplant of ${transplantQuantity} units from batch ${sourceBatch.batchNumber}.`,
+                    qty: transplantQuantity,
+                    fromBatch: sourceBatch.batchNumber,
                 },
             ],
         };
 
         const updatedSourceBatch = { ...sourceBatch };
         updatedSourceBatch.logHistory.push({
-            date: new Date().toISOString(),
-            action: `Transplanted ${transplantQuantity} units to new batch ${newBatch.batchNumber}.`,
-            details: { quantityChange: -transplantQuantity, reason: 'Transplant' }
+            date: FieldValue.serverTimestamp(),
+            type: 'TRANSPLANT_TO',
+            note: `Transplanted ${transplantQuantity} units to new batch ${newBatch.batchNumber}.`,
+            qty: -transplantQuantity,
+            reason: 'Transplant',
+            toBatch: newBatch.batchNumber,
         });
 
         if (logRemainingAsLoss) {
             const remaining = sourceBatch.quantity - transplantQuantity;
             if (remaining > 0) {
                 updatedSourceBatch.logHistory.push({
-                    date: new Date().toISOString(),
-                    action: `Archived with loss of ${remaining} units.`,
-                    details: { quantityChange: -remaining, reason: 'Archived remaining' }
+                    date: FieldValue.serverTimestamp(),
+                    type: 'ARCHIVE',
+                    note: `Archived with loss of ${remaining} units.`,
+                    qty: -remaining,
+                    reason: 'Archived remaining'
                 });
             }
             updatedSourceBatch.status = 'Archived';
@@ -285,11 +308,11 @@ export async function transplantBatchAction(
         transaction.set(newDocRef, newBatch);
         
         if (updatedSourceBatch.quantity <= 0 && updatedSourceBatch.status !== 'Archived') {
-            updatedSourceBatch.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
+            updatedSourceBatch.logHistory.push({ date: FieldValue.serverTimestamp(), type: 'ARCHIVE', note: `Batch quantity reached zero and was automatically archived.` });
             updatedSourceBatch.status = 'Archived';
             updatedSourceBatch.quantity = 0;
         }
-        transaction.set(sourceBatchRef, updatedSourceBatch);
+        transaction.update(sourceBatchRef, { ...updatedSourceBatch, updatedAt: FieldValue.serverTimestamp() });
         
         return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };
     });

@@ -1,15 +1,17 @@
 
 import { z } from 'zod';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export const LogEntrySchema = z.object({
-  id: z.string().optional(), // Allow optional id for client-side generation
-  date: z.string(),
-  action: z.string(),
-  details: z.object({
-      quantityChange: z.number().optional(),
-      newLocation: z.string().optional(),
-      reason: z.string().optional(),
-  }).optional(),
+  id: z.string().optional(),
+  date: z.any(), // serverTimestamp or string
+  type: z.enum(['NOTE', 'LOSS', 'ADJUST', 'MOVE', 'TRANSPLANT_TO', 'TRANSPLANT_FROM', 'CREATE', 'ARCHIVE']),
+  qty: z.number().nullable().optional(),
+  fromBatch: z.string().optional(),
+  toBatch: z.string().optional(),
+  newLocation: z.string().optional(),
+  note: z.string().optional(),
+  reason: z.string().optional(),
 });
 export type LogEntry = z.infer<typeof LogEntrySchema>;
 
@@ -30,10 +32,12 @@ export const BatchSchema = z.object({
   supplier: z.string().optional(),
   growerPhotoUrl: z.string().optional(),
   salesPhotoUrl: z.string().optional(),
+  createdAt: z.any(), // serverTimestamp
+  updatedAt: z.any(), // serverTimestamp
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
-export type TransplantFormData = Omit<Batch, 'id' | 'initialQuantity' | 'logHistory'> & {
+export type TransplantFormData = Omit<Batch, 'id' | 'initialQuantity' | 'logHistory' | 'createdAt' | 'updatedAt'> & {
     initialQuantity: number;
     logRemainingAsLoss: boolean;
 };

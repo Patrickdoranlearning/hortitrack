@@ -87,8 +87,11 @@ export default function DashboardOverviewPage() {
 
   const calculateLosses = (batch: Batch) => {
     return batch.logHistory.reduce((sum, log) => {
-      if (log.details?.quantityChange && log.details.quantityChange < 0) {
-        return sum - log.details.quantityChange; // quantityChange is negative
+      if (log.type === 'LOSS' && typeof log.qty === 'number') {
+        return sum + log.qty;
+      }
+      if (log.type === 'ADJUST' && typeof log.qty === 'number' && log.qty < 0) {
+        return sum - log.qty; // qty is negative, so subtract to make it a positive loss
       }
       return sum;
     }, 0);

@@ -102,7 +102,7 @@ export default function DashboardPage() {
     if (!user) return;
     setIsDataLoading(true);
     
-    const q = query(collection(db, 'batches'), orderBy('batchNumber'));
+    const q = query(collection(db, 'batches'), orderBy('createdAt', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const batchesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Batch);
@@ -212,22 +212,18 @@ export default function DashboardPage() {
   };
 
   const handleEditBatch = (batch: Batch) => {
-    const transplantedQuantity = batches
-      .filter(b => b.transplantedFrom === batch.batchNumber)
-      .reduce((sum, b) => sum + b.initialQuantity, 0);
+    const transplantedQuantity = batch.logHistory
+      .filter(log => log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number')
+      .reduce((sum, log) => sum - log.qty!, 0); // qty is negative
       
-    const lostQuantity = batch.logHistory.reduce((sum, log) => {
-        if (log.details?.quantityChange && log.details.quantityChange < 0) {
-            // quantityChange is negative, so subtract to make it a positive loss
-            return sum - log.details.quantityChange;
-        }
-        return sum;
-    }, 0) - transplantedQuantity; // Subtract transplants from total losses
+    const lostQuantity = batch.logHistory
+      .filter(log => log.type === 'LOSS' && typeof log.qty === 'number')
+      .reduce((sum, log) => sum + log.qty!, 0);
 
     setBatchDistribution({
       inStock: batch.quantity,
       transplanted: transplantedQuantity,
-      lost: Math.max(0, lostQuantity), // Ensure loss isn't negative
+      lost: lostQuantity,
     });
     setEditingBatch(batch);
     setIsFormOpen(true);
@@ -251,7 +247,7 @@ export default function DashboardPage() {
     setEditingBatch(null);
   }
 
-  const handleFormSubmit = async (data: Omit<Batch, 'id' | 'batchNumber'> & { id?: string; batchNumber?: string }) => {
+  const handleFormSubmit = async (data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'> & { id?: string; batchNumber?: string }) => {
     if (editingBatch) {
       const result = await updateBatchAction(data as Batch);
       if (result.success) {
@@ -313,32 +309,31 @@ export default function DashboardPage() {
   const handleActionLogFormSubmit = async (data: any) => {
     if (!actionLogBatch) return;
 
-    let logMessage = '';
-    let details: any = {};
+    let logData: any = { type: data.actionType };
 
     switch (data.actionType) {
-      case 'log':
-        logMessage = data.logMessage;
+      case 'NOTE':
+        logData.note = data.note;
         break;
-      case 'move':
-        logMessage = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
-        details.newLocation = data.newLocation;
+      case 'MOVE':
+        logData.note = `Moved batch from ${actionLogBatch.location} to ${data.newLocation}`;
+        logData.newLocation = data.newLocation;
         break;
-      case 'adjust':
-        logMessage = `Adjusted quantity by -${data.adjustQuantity}. Reason: ${data.adjustReason}`;
-        details.quantityChange = -data.adjustQuantity;
-        details.reason = data.adjustReason;
+      case 'LOSS':
+        logData.note = `Logged loss of ${data.qty}. Reason: ${data.reason}`;
+        logData.qty = data.qty;
+        logData.reason = data.reason;
         break;
       case 'Batch Spaced':
       case 'Batch Trimmed':
-        logMessage = data.actionType;
+        logData.note = data.actionType;
         break;
       default:
         toast({ variant: 'destructive', title: 'Invalid Action', description: 'The selected action is not supported.' });
         return;
     }
 
-    const result = await logAction(actionLogBatch.id, logMessage, details);
+    const result = await logAction(actionLogBatch.id, logData);
 
     if (result.success) {
       toast({ title: 'Action Logged', description: 'The action has been successfully logged.' });

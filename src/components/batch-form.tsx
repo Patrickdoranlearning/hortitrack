@@ -52,13 +52,9 @@ import { useState, useMemo, useEffect } from 'react';
 
 const logEntrySchema = z.object({
   id: z.string().optional(),
-  date: z.string().min(1, "Date is required."),
-  action: z.string().min(1, "Action is required."),
-  details: z.object({
-    quantityChange: z.number().optional(),
-    newLocation: z.string().optional(),
-    reason: z.string().optional(),
-  }).optional(),
+  date: z.any(),
+  type: z.enum(['NOTE', 'LOSS', 'ADJUST', 'MOVE', 'TRANSPLANT_TO', 'TRANSPLANT_FROM', 'CREATE', 'ARCHIVE']),
+  note: z.string().optional(),
 });
 
 const batchFormSchema = z.object({
@@ -90,10 +86,10 @@ const batchFormSchema = z.object({
 });
 
 
-type BatchFormValues = Omit<Batch, 'id' | 'batchNumber' | 'logHistory'> & {
+type BatchFormValues = Omit<Batch, 'id' | 'batchNumber' | 'logHistory' | 'createdAt' | 'updatedAt'> & {
     id?: string;
     batchNumber?: string;
-    logHistory: { id?: string; date: string; action: string, details?: any }[];
+    logHistory: { id?: string; date: any; type: any, note?: string }[];
 };
 
 export interface BatchDistribution {
@@ -105,7 +101,7 @@ export interface BatchDistribution {
 interface BatchFormProps {
   batch: Batch | null;
   distribution: BatchDistribution | null;
-  onSubmit: (data: Omit<Batch, 'id' | 'batchNumber'> | Batch) => void;
+  onSubmit: (data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'> | Batch) => void;
   onCancel: () => void;
   onArchive: (batchId: string) => void;
   nurseryLocations: NurseryLocation[];
@@ -190,9 +186,9 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
         logHistory: data.logHistory.map(log => ({...log, id: log.id || `log_${Date.now()}_${Math.random()}`}))
     };
     if (batch) {
-       onSubmit({ ...finalData, id: batch.id, batchNumber: batch.batchNumber, initialQuantity: batch.initialQuantity } as Batch);
+       onSubmit({ ...finalData, id: batch.id, batchNumber: batch.batchNumber, initialQuantity: batch.initialQuantity, createdAt: batch.createdAt } as Batch);
     } else {
-        onSubmit({ ...finalData, initialQuantity: finalData.quantity } as Omit<Batch, 'id' | 'batchNumber'>);
+        onSubmit({ ...finalData, initialQuantity: finalData.quantity } as Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'>);
     }
   };
 
@@ -510,7 +506,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                             />
                         <FormField
                             control={form.control}
-                            name={`logHistory.${index}.action`}
+                            name={`logHistory.${index}.note`}
                             render={({ field }) => (
                                 <FormItem className="flex-1">
                                 <FormControl>
@@ -524,7 +520,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         </Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), action: '' })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), type: 'NOTE', note: '' })}>
                     <Plus className="h-4 w-4 mr-2"/>
                     Add Log Entry
                 </Button>

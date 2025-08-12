@@ -66,6 +66,16 @@ export function BatchDetailDialog({
   };
 
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
+  
+  const formatDate = (date: any) => {
+    if (date && date.toDate) { // It's a Firestore Timestamp
+      return format(date.toDate(), 'PPP p');
+    }
+    if (typeof date === 'string') { // It's an ISO string
+      return format(new Date(date), 'PPP p');
+    }
+    return 'Date not available';
+  };
 
   return (
     <>
@@ -155,10 +165,10 @@ export function BatchDetailDialog({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {batch.logHistory.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((log, index) => (
+                                {batch.logHistory.sort((a,b) => (b.date?.toDate?.() || new Date(b.date)) - (a.date?.toDate?.() || new Date(a.date))).map((log, index) => (
                                     <TableRow key={log.id || index}>
-                                        <TableCell>{format(new Date(log.date), 'PPP p')}</TableCell>
-                                        <TableCell>{log.action}</TableCell>
+                                        <TableCell>{formatDate(log.date)}</TableCell>
+                                        <TableCell>{log.note || log.type}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

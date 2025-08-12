@@ -27,21 +27,21 @@ import { useState } from 'react';
 import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 
 const formSchema = (maxQuantity: number) => z.object({
-  actionType: z.enum(['log', 'move', 'adjust', 'Batch Spaced', 'Batch Trimmed']),
-  logMessage: z.string().optional(),
+  actionType: z.enum(['NOTE', 'MOVE', 'LOSS', 'Batch Spaced', 'Batch Trimmed']),
+  note: z.string().optional(),
   newLocation: z.string().optional(),
-  adjustQuantity: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
-  adjustReason: z.string().min(1, 'A reason is required for adjustments.').optional(),
+  qty: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
+  reason: z.string().min(1, 'A reason is required for adjustments.').optional(),
 }).refine(data => {
-    if (data.actionType === 'log') {
-        return !!data.logMessage && data.logMessage.trim().length > 0;
+    if (data.actionType === 'NOTE') {
+        return !!data.note && data.note.trim().length > 0;
     }
     return true;
 }, {
-    message: "A log message is required.",
-    path: ["logMessage"],
+    message: "A note is required.",
+    path: ["note"],
 }).refine(data => {
-    if (data.actionType === 'move') {
+    if (data.actionType === 'MOVE') {
         return !!data.newLocation;
     }
     return true;
@@ -49,13 +49,13 @@ const formSchema = (maxQuantity: number) => z.object({
     message: "A new location is required.",
     path: ["newLocation"],
 }).refine(data => {
-    if (data.actionType === 'adjust') {
-        return !!data.adjustQuantity && !!data.adjustReason;
+    if (data.actionType === 'LOSS') {
+        return !!data.qty && !!data.reason;
     }
     return true;
 }, {
     message: "Quantity and reason are required for adjustments.",
-    path: ["adjustQuantity"],
+    path: ["qty"],
 });
 
 
@@ -75,16 +75,16 @@ export function ActionLogForm({
   onCancel,
   nurseryLocations,
 }: ActionLogFormProps) {
-  const [actionType, setActionType] = useState('log');
+  const [actionType, setActionType] = useState('NOTE');
   
   const form = useForm<ActionLogFormValues>({
     resolver: zodResolver(formSchema(batch?.quantity ?? 0)),
     defaultValues: {
-        actionType: 'log',
-        logMessage: '',
+        actionType: 'NOTE',
+        note: '',
         newLocation: '',
-        adjustQuantity: undefined,
-        adjustReason: '',
+        qty: undefined,
+        reason: '',
     },
   });
 
@@ -94,7 +94,7 @@ export function ActionLogForm({
   
   const handleActionTypeChange = (value: string) => {
     setActionType(value);
-    form.setValue('actionType', value as 'log' | 'move' | 'adjust' | 'Batch Spaced' | 'Batch Trimmed');
+    form.setValue('actionType', value as 'NOTE' | 'MOVE' | 'LOSS' | 'Batch Spaced' | 'Batch Trimmed');
     form.clearErrors();
   }
 
@@ -122,9 +122,9 @@ export function ActionLogForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="log">General Log</SelectItem>
-                    <SelectItem value="move">Move Batch</SelectItem>
-                    <SelectItem value="adjust">Adjust Stock (Losses)</SelectItem>
+                    <SelectItem value="NOTE">General Note</SelectItem>
+                    <SelectItem value="MOVE">Move Batch</SelectItem>
+                    <SelectItem value="LOSS">Record Loss</SelectItem>
                     <SelectItem value="Batch Spaced">Batch Spaced</SelectItem>
                     <SelectItem value="Batch Trimmed">Batch Trimmed</SelectItem>
                   </SelectContent>
@@ -134,13 +134,13 @@ export function ActionLogForm({
             )}
           />
 
-          {actionType === 'log' && (
+          {actionType === 'NOTE' && (
              <FormField
               control={form.control}
-              name="logMessage"
+              name="note"
               render={({ field }) => (
                   <FormItem>
-                      <FormLabel>Log Message</FormLabel>
+                      <FormLabel>Note</FormLabel>
                       <FormControl>
                           <Textarea placeholder="e.g., 'Pruned dead leaves', 'Applied fertilizer', etc." {...field} />
                       </FormControl>
@@ -150,7 +150,7 @@ export function ActionLogForm({
              />
           )}
           
-          {actionType === 'move' && (
+          {actionType === 'MOVE' && (
               <FormField
                 control={form.control}
                 name="newLocation"
@@ -175,14 +175,14 @@ export function ActionLogForm({
               />
           )}
           
-          {actionType === 'adjust' && (
+          {actionType === 'LOSS' && (
             <>
               <FormField
                   control={form.control}
-                  name="adjustQuantity"
+                  name="qty"
                   render={({ field }) => (
                       <FormItem>
-                          <FormLabel>Quantity to Remove</FormLabel>
+                          <FormLabel>Quantity Lost</FormLabel>
                           <FormControl>
                               <Input type="number" placeholder="e.g., 10" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
                           </FormControl>
@@ -192,10 +192,10 @@ export function ActionLogForm({
               />
               <FormField
                 control={form.control}
-                name="adjustReason"
+                name="reason"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reason for Adjustment</FormLabel>
+                    <FormLabel>Reason for Loss</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Dumping, Pest Damage, etc." {...field} />
                     </FormControl>
