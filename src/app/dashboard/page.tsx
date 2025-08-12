@@ -29,8 +29,12 @@ import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+// Import 'dynamic' from Next.js
 import dynamic from 'next/dynamic';
 
+// --- FIX: DYNAMICALLY IMPORT CHART COMPONENTS ---
+// This tells Next.js to only render these components on the client-side,
+// which solves the conflict with React 18's Strict Mode.
 const FamilyDistributionChart = dynamic(
   () => import('@/components/charts/FamilyDistributionChart'),
   { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
