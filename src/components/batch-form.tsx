@@ -192,11 +192,11 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
 
-  const handleSizeChange = (sizeValue: string) => {
-    form.setValue('size', sizeValue);
-    const selectedSize = plantSizes.find(s => s.size === sizeValue);
-    setSelectedSizeInfo(selectedSize || null);
+  const handleSizeChange = (sizeId: string) => {
+    const selectedSize = plantSizes.find(s => s.id === sizeId);
     if (selectedSize) {
+      form.setValue('size', selectedSize.size);
+      setSelectedSizeInfo(selectedSize);
       const newStatus = SIZE_TYPE_TO_STATUS_MAP[selectedSize.type];
       if (newStatus) {
         form.setValue('status', newStatus);
@@ -232,6 +232,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
   const varietyOptions = useMemo(() => VARIETIES.map(v => ({ value: v.name, label: v.name })), []);
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
+  const currentSizeId = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
 
   return (
     <>
@@ -305,12 +306,16 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Size</FormLabel>
-                    <Select onValueChange={handleSizeChange} value={field.value}>
+                    <Select onValueChange={handleSizeChange} value={currentSizeId}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {sortedPlantSizes.map(size => <SelectItem key={size.id} value={size.size}>{size.size} ({size.type})</SelectItem>)}
+                        {sortedPlantSizes.filter(s => s?.id && s?.size).map(size => 
+                          <SelectItem key={size.id} value={size.id}>
+                            <span>{size.size} ({size.type})</span>
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -493,14 +498,14 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               <div className="space-y-2 pt-2">
                 {fields.map((field, index) => (
                     <div key={field.id} className="flex items-start gap-2">
-                          <FormField
+                        <FormField
                             key={`date-${field.id}`}
                             control={form.control}
                             name={`logHistory.${index}.date`}
-                            render={({ field }) => (
+                            render={({ field: formField }) => (
                                 <FormItem className="w-1/3">
                                 <FormControl>
-                                    <Input type="date" {...field} value={format(new Date(field.value), 'yyyy-MM-dd')} onChange={(e) => field.onChange(new Date(e.target.value).toISOString())} />
+                                    <Input type="date" {...formField} value={format(new Date(formField.value), 'yyyy-MM-dd')} onChange={(e) => formField.onChange(new Date(e.target.value).toISOString())} />
                                 </FormControl>
                                 </FormItem>
                             )}
@@ -509,10 +514,10 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                             key={`note-${field.id}`}
                             control={form.control}
                             name={`logHistory.${index}.note`}
-                            render={({ field }) => (
+                            render={({ field: formField }) => (
                                 <FormItem className="flex-1">
                                 <FormControl>
-                                    <Textarea placeholder="Describe the action taken..." {...field} className="min-h-[40px]"/>
+                                    <Textarea placeholder="Describe the action taken..." {...formField} className="min-h-[40px]"/>
                                 </FormControl>
                                 </FormItem>
                             )}

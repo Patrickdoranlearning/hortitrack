@@ -151,11 +151,11 @@ export function TransplantForm({
     onSubmit({ ...data, initialQuantity: data.quantity });
   };
   
-  const handleSizeChange = (sizeValue: string) => {
-    form.setValue('size', sizeValue);
-    const selectedSize = plantSizes.find(s => s.size === sizeValue);
-    setSelectedSizeInfo(selectedSize || null);
+  const handleSizeChange = (sizeId: string) => {
+    const selectedSize = plantSizes.find(s => s.id === sizeId);
     if (selectedSize) {
+      form.setValue('size', selectedSize.size);
+      setSelectedSizeInfo(selectedSize);
       const newStatus = SIZE_TYPE_TO_STATUS_MAP[selectedSize.type];
       if (newStatus) {
         form.setValue('status', newStatus);
@@ -182,6 +182,7 @@ export function TransplantForm({
   };
 
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
+  const currentSizeId = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
 
   if (!batch) {
     return null;
@@ -327,7 +328,7 @@ export function TransplantForm({
                   <FormLabel>New Size</FormLabel>
                   <Select
                     onValueChange={handleSizeChange}
-                    value={field.value}
+                    value={currentSizeId}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -335,9 +336,9 @@ export function TransplantForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {sortedPlantSizes.map((size) => (
-                        <SelectItem key={size.id} value={size.size}>
-                          {size.size} ({size.type})
+                      {sortedPlantSizes.filter(s => s?.id && s?.size).map((size) => (
+                        <SelectItem key={size.id} value={size.id}>
+                          <span>{size.size} ({size.type})</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
