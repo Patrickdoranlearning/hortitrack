@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -11,8 +10,8 @@ import {
   CommandEmpty,
   CommandGroup,
   CommandInput,
-  CommandItem,
   CommandList,
+  CommandItem,
 } from "@/components/ui/command"
 import {
   Popover,
@@ -46,7 +45,7 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
           className="w-full justify-between"
         >
           {value
-            ? options.find((option) => option.value.toLowerCase() === value.toLowerCase())?.label
+            ? options.find((option) => option.value.toLowerCase() === value?.toLowerCase())?.label
             : placeholder || "Select option..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -62,7 +61,7 @@ export function Combobox({ options, value, onChange, placeholder, emptyMessage }
                   key={option.value}
                   value={option.value}
                   onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "" : currentValue)
+                    onChange(currentValue) // Always set the value to the selected item
                     setOpen(false)
                   }}
                 >
