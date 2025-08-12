@@ -48,7 +48,7 @@ import {
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { Combobox } from './ui/combobox';
 import { useState, useMemo, useEffect } from 'react';
-import { addVarietyAction, updateVarietyAction } from '@/app/actions';
+import { addVarietyAction } from '@/app/actions';
 import { VarietyForm } from './variety-form';
 import { useToast } from '@/hooks/use-toast';
 
@@ -223,13 +223,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       form.setValue('category', selectedVariety.category, { shouldValidate: true });
       setIsFamilySet(true);
       setIsCategorySet(true);
-    } else {
-        // This case shouldn't be hit with the updated combobox, but as a fallback:
-        form.setValue('plantVariety', varietyIdOrName);
-        setIsFamilySet(false);
-        setIsCategorySet(false);
-        form.setValue('plantFamily', '');
-        form.setValue('category', '');
     }
   };
 
@@ -251,8 +244,12 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
     if (result.success && result.data?.id) {
         toast({ title: 'Variety Added', description: `Successfully added "${result.data.name}".` });
+        // The `varieties` state will be updated by the onSnapshot listener,
+        // which will re-render the combobox with the new option.
+        // We can then set the value.
         handleVarietyChange(result.data.id);
         setIsVarietyFormOpen(false);
+        setNewVarietyName('');
     } else {
         toast({ variant: 'destructive', title: 'Add Failed', description: result.error });
     }
@@ -261,6 +258,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   const varietyOptions = useMemo(() => varieties.map(v => ({ value: v.id!, label: v.name })), [varieties]);
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
   const currentSizeValue = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
+  const selectedVarietyId = varieties.find(v => v.name === form.watch('plantVariety'))?.id;
 
   return (
     <>
@@ -283,7 +281,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                     <FormLabel>Plant Variety</FormLabel>
                     <Combobox
                       options={varietyOptions}
-                      value={varieties.find(v => v.name === field.value)?.id}
+                      value={selectedVarietyId}
                       onChange={handleVarietyChange}
                       onCreate={handleCreateNewVariety}
                       placeholder="Select variety..."

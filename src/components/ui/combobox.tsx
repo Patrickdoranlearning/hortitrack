@@ -54,16 +54,12 @@ export function Combobox({
   }
 
   const handleCreate = () => {
-    if (onCreate) {
+    if (onCreate && search) {
         onCreate(search);
         setOpen(false);
         setSearch('');
     }
   }
-
-  const filteredOptions = options.filter(option => 
-    option.label.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -79,29 +75,34 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-        <Command>
+        <Command filter={(value, search) => {
+            if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+            return 0;
+        }}>
           <CommandInput 
             placeholder={placeholder}
             value={search}
             onValueChange={setSearch}
           />
           <CommandList>
-            {filteredOptions.length === 0 && search.length > 0 && onCreate ? (
-                <CommandItem
-                    onSelect={handleCreate}
-                    className="flex items-center gap-2 cursor-pointer"
-                >
-                    <PlusCircle className="h-4 w-4" />
-                    Create "{search}"
-                </CommandItem>
-            ) : (
-                 <CommandEmpty>{emptyMessage}</CommandEmpty>
-            )}
+            <CommandEmpty>
+                {onCreate && search ? (
+                     <CommandItem
+                        onSelect={handleCreate}
+                        className="flex items-center gap-2 cursor-pointer"
+                    >
+                        <PlusCircle className="h-4 w-4" />
+                        Create "{search}"
+                    </CommandItem>
+                ) : (
+                    emptyMessage
+                )}
+            </CommandEmpty>
             <CommandGroup>
-              {filteredOptions.map((option) => (
+              {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value}
+                  value={option.label}
                   onSelect={() => handleSelect(option.value)}
                 >
                   <Check
