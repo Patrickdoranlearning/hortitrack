@@ -148,7 +148,10 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       return sizeB - sizeA;
     }
 
-    return a.size.localeCompare(b.size);
+    // Fallback for other types, ensure size is a string before calling localeCompare
+    const aSize = a.size || '';
+    const bSize = b.size || '';
+    return aSize.localeCompare(bSize);
   };
   
   const sortedPlantSizes = useMemo(() => {
@@ -207,7 +210,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   };
   
   const handleVarietyChange = (varietyValue: string) => {
-    form.setValue('plantVariety', varietyValue);
+    form.setValue('plantVariety', varietyValue, { shouldValidate: true });
     const selectedVariety = VARIETIES.find(v => v.name.toLowerCase() === varietyValue.toLowerCase());
     if (selectedVariety) {
       form.setValue('plantFamily', selectedVariety.family, { shouldValidate: true });
@@ -228,7 +231,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
 
-  const varietyOptions = VARIETIES.map(v => ({ value: v.name, label: v.name }));
+  const varietyOptions = useMemo(() => VARIETIES.map(v => ({ value: v.name, label: v.name })), []);
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
 
   return (
@@ -579,3 +582,5 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     </>
   );
 }
+
+    
