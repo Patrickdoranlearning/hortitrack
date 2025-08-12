@@ -494,6 +494,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 {fields.map((field, index) => (
                     <div key={field.id} className="flex items-start gap-2">
                           <FormField
+                            key={`date-${field.id}`}
                             control={form.control}
                             name={`logHistory.${index}.date`}
                             render={({ field }) => (
@@ -505,6 +506,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                             )}
                             />
                         <FormField
+                            key={`note-${field.id}`}
                             control={form.control}
                             name={`logHistory.${index}.note`}
                             render={({ field }) => (
