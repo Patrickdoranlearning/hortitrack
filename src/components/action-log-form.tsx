@@ -22,18 +22,18 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize, LogEntry } from '@/lib/types';
 import { useState } from 'react';
 import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 
 const formSchema = (maxQuantity: number) => z.object({
-  actionType: z.enum(['NOTE', 'MOVE', 'LOSS', 'Batch Spaced', 'Batch Trimmed']),
+  type: z.enum(['NOTE', 'MOVE', 'LOSS', 'Batch Spaced', 'Batch Trimmed']),
   note: z.string().optional(),
   newLocation: z.string().optional(),
   qty: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
   reason: z.string().min(1, 'A reason is required for adjustments.').optional(),
 }).refine(data => {
-    if (data.actionType === 'NOTE') {
+    if (data.type === 'NOTE') {
         return !!data.note && data.note.trim().length > 0;
     }
     return true;
@@ -41,7 +41,7 @@ const formSchema = (maxQuantity: number) => z.object({
     message: "A note is required.",
     path: ["note"],
 }).refine(data => {
-    if (data.actionType === 'MOVE') {
+    if (data.type === 'MOVE') {
         return !!data.newLocation;
     }
     return true;
@@ -49,7 +49,7 @@ const formSchema = (maxQuantity: number) => z.object({
     message: "A new location is required.",
     path: ["newLocation"],
 }).refine(data => {
-    if (data.actionType === 'LOSS') {
+    if (data.type === 'LOSS') {
         return !!data.qty && !!data.reason;
     }
     return true;
@@ -63,7 +63,7 @@ type ActionLogFormValues = z.infer<ReturnType<typeof formSchema>>;
 
 interface ActionLogFormProps {
   batch: Batch | null;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Partial<LogEntry> & {type: LogEntry['type']}) => void;
   onCancel: () => void;
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];
@@ -80,7 +80,7 @@ export function ActionLogForm({
   const form = useForm<ActionLogFormValues>({
     resolver: zodResolver(formSchema(batch?.quantity ?? 0)),
     defaultValues: {
-        actionType: 'NOTE',
+        type: 'NOTE',
         note: '',
         newLocation: '',
         qty: undefined,
@@ -94,7 +94,7 @@ export function ActionLogForm({
   
   const handleActionTypeChange = (value: string) => {
     setActionType(value);
-    form.setValue('actionType', value as 'NOTE' | 'MOVE' | 'LOSS' | 'Batch Spaced' | 'Batch Trimmed');
+    form.setValue('type', value as 'NOTE' | 'MOVE' | 'LOSS' | 'Batch Spaced' | 'Batch Trimmed');
     form.clearErrors();
   }
 
@@ -113,7 +113,7 @@ export function ActionLogForm({
           
           <FormField
             control={form.control}
-            name="actionType"
+            name="type"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Action Type</FormLabel>

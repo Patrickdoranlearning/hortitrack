@@ -99,7 +99,7 @@ export async function addBatchAction(
         }
 
         const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
-        const batchNumberPrefix = {
+        const batchNumberPrefix: Record<Batch['status'], string> = {
             'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
             'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
         };
@@ -121,7 +121,7 @@ export async function addBatchAction(
         transaction.set(newDocRef, newBatch);
         transaction.update(counterRef, { count: nextBatchNum });
 
-        return { success: true, data: { ...newBatch, id: newDocRef.id }};
+        return { success: true, data: { id: newDocRef.id, batchNumber: prefixedBatchNumber }};
     });
   } catch (error: any) {
     console.error('Error adding batch:', error);
@@ -144,7 +144,7 @@ export async function addBatchesFromCsvAction(
                 transaction.set(counterRef, { count: 0 });
             }
 
-            const batchNumberPrefixMap = {
+            const batchNumberPrefixMap: Record<Batch['status'], string> = {
                 'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
                 'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
             };
@@ -346,7 +346,7 @@ export async function transplantBatchAction(
         }
 
         const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
-        const batchNumberPrefix = {
+        const batchNumberPrefix: Record<Batch['status'], string> = {
             'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
             'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
         };
@@ -409,7 +409,7 @@ export async function transplantBatchAction(
         transaction.update(sourceBatchRef, { ...updatedSourceBatch, updatedAt: FieldValue.serverTimestamp() });
         transaction.update(counterRef, { count: nextBatchNum });
         
-        return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };
+        return { success: true, data: { newBatch: { id: newDocRef.id, batchNumber: newBatch.batchNumber! }, sourceBatch: { id: sourceBatch.id, batchNumber: sourceBatch.batchNumber } } };
     });
 
   } catch (error: any) {
@@ -546,3 +546,5 @@ export async function deleteSupplierAction(supplierId: string) {
         return { success: false, error: 'Failed to delete supplier: ' + error.message };
     }
 }
+
+    
