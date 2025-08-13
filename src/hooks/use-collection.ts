@@ -3,35 +3,36 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Query, DocumentData } from 'firebase/firestore';
+import { collection, onSnapshot, query, Query, DocumentData, QueryConstraint } from 'firebase/firestore';
 import { useAuth } from './use-auth';
+import { useToast } from './use-toast';
 
-// Define a generic type for the hook's return value
 interface UseCollectionReturn<T> {
   data: T[];
   isLoading: boolean;
   error: Error | null;
 }
 
-// T is a generic type parameter for our document data
-export function useCollection<T>(collectionPath: string, firestoreQuery?: Query): UseCollectionReturn<T> {
+export function useCollection<T>(
+  collectionName: string,
+  initialData: T[] = [],
+  constraints: QueryConstraint[] = [],
+): UseCollectionReturn<T> {
   const { user } = useAuth();
-  const [data, setData] = useState<T[]>([]);
+  const { toast } = useToast();
+  const [data, setData] = useState<T[]>(initialData);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const subscribeToCollection = useCallback(() => {
     if (!user) {
-      // Don't try to fetch if the user isn't logged in
-      // You might want to adjust this based on your security rules
       setIsLoading(false);
-      return () => {}; // Return an empty unsubscribe function
+      return () => {};
     }
 
     setIsLoading(true);
     
-    // Use the provided query or default to the base collection
-    const q = firestoreQuery || query(collection(db, collectionPath));
+    const q = query(collection(db, collectionName), ...constraints);
 
     const unsubscribe = onSnapshot(
       q,
@@ -41,18 +42,22 @@ export function useCollection<T>(collectionPath: string, firestoreQuery?: Query)
         setIsLoading(false);
       },
       (err) => {
-        console.error(`Error fetching collection ${collectionPath}:`, err);
+        console.error(`Error fetching collection ${collectionName}:`, err);
         setError(err);
         setIsLoading(false);
+        toast({
+            variant: 'destructive',
+            title: `Error loading ${collectionName}`,
+            description: err.message,
+        });
       }
     );
 
     return unsubscribe;
-  }, [collectionPath, firestoreQuery, user]);
+  }, [collectionName, user, toast, constraints]);
 
   useEffect(() => {
     const unsubscribe = subscribeToCollection();
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [subscribeToCollection]);
 

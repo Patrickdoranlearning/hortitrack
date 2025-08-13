@@ -1,0 +1,291 @@
+
+'use client';
+
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCollection } from '@/hooks/use-collection';
+import {
+  Batch,
+  NurseryLocation,
+  PlantSize,
+  Supplier,
+  Variety,
+  TransplantFormData,
+  LogEntry,
+} from '@/lib/types';
+import { INITIAL_PLANT_SIZES } from '@/lib/constants';
+import { INITIAL_SUPPLIERS } from '@/lib/suppliers';
+import {
+  addBatchAction,
+  updateBatchAction,
+  archiveBatchAction,
+  transplantBatchAction,
+  logAction,
+} from '@/app/actions';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import HomePageView from './HomePageView';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { BatchDistribution } from '@/components/batch-form';
+
+
+export default function HomePageContainer() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+
+  const { data: batches, isLoading: isDataLoading } = useCollection<Batch>('batches');
+  const { data: varieties } = useCollection<Variety>('varieties');
+  const { data: nurseryLocations } = useCollection<NurseryLocation>('locations');
+  const { data: plantSizes } = useCollection<PlantSize>(
+    'sizes',
+    INITIAL_PLANT_SIZES
+  );
+  const { data: suppliers } = useCollection<Supplier>(
+    'suppliers',
+    INITIAL_SUPPLIERS
+  );
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({
+    plantFamily: 'all',
+    category: 'all',
+    status: 'Active',
+  });
+
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+  const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
+  const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(
+    null
+  );
+  const [actionLogBatch, setActionLogBatch] = useState<Batch | null>(null);
+
+  const plantFamilies = useMemo(
+    () => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily).filter(Boolean)))],
+    [batches]
+  );
+  const categories = useMemo(
+    () => ['all', ...Array.from(new Set(batches.map((b) => b.category).filter(Boolean)))],
+    [batches]
+  );
+
+  const filteredBatches = useMemo(() => {
+    return batches
+      .filter((batch) =>
+        `${batch.plantFamily} ${batch.plantVariety} ${batch.category} ${
+          batch.supplier || ''
+        }`
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())
+      )
+      .filter(
+        (batch) =>
+          filters.plantFamily === 'all' ||
+          batch.plantFamily === filters.plantFamily
+      )
+      .filter(
+        (batch) =>
+          filters.category === 'all' || batch.category === filters.category
+      )
+      .filter((batch) => {
+        if (filters.status === 'all') return true;
+        if (filters.status === 'Active') return batch.status !== 'Archived';
+        return batch.status === filters.status;
+      });
+  }, [batches, searchQuery, filters]);
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+    toast({
+      title: 'Signed Out',
+      description: 'You have been successfully signed out.',
+    });
+  };
+
+  const handleNewBatch = () => {
+    setEditingBatch(null);
+    setBatchDistribution(null);
+  };
+
+  const handleEditBatch = (batch: Batch) => {
+    const transplantedQuantity = batch.logHistory
+      .filter(
+        (log) => log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number'
+      )
+      .reduce((sum, log) => sum - log.qty!, 0);
+    const lostQuantity = batch.logHistory
+      .filter((log) => log.type === 'LOSS' && typeof log.qty === 'number')
+      .reduce((sum, log) => sum + log.qty!, 0);
+
+    setBatchDistribution({
+      inStock: batch.quantity,
+      transplanted: transplantedQuantity,
+      lost: lostQuantity,
+    });
+    setEditingBatch(batch);
+  };
+
+  const handleArchiveBatch = async (batchId: string) => {
+    const batchToArchive = batches.find((b) => b.id === batchId);
+    if (!batchToArchive) return;
+
+    const loss = batchToArchive.quantity;
+    const result = await archiveBatchAction(batchId, loss);
+
+    if (result.success) {
+      toast({
+        title: 'Success',
+        description: `Batch #${batchToArchive.batchNumber} has been archived.`,
+      });
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Error archiving batch',
+        description: result.error,
+      });
+    }
+  };
+
+  const handleFormSubmit = async (
+    data: Omit<
+      Batch,
+      'id' | 'batchNumber' | 'createdAt' | 'updatedAt'
+    > & { id?: string; batchNumber?: string }
+  ) => {
+    if (editingBatch) {
+      const result = await updateBatchAction(data as Batch);
+      if (result.success) {
+        toast({
+          title: 'Batch Updated',
+          description: `Batch #${result.data?.batchNumber} saved.`,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Update Failed',
+          description: result.error,
+        });
+      }
+    } else {
+      const newBatchData = {
+        ...data,
+        supplier: data.supplier || 'Doran Nurseries',
+        initialQuantity: data.quantity,
+      };
+
+      const result = await addBatchAction(newBatchData);
+      if (result.success) {
+        toast({
+          title: 'Batch Created',
+          description: `Batch #${result.data?.batchNumber} added.`,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Create Failed',
+          description: result.error,
+        });
+      }
+    }
+    setEditingBatch(null);
+    setBatchDistribution(null);
+  };
+
+  const handleTransplantBatch = (batch: Batch) => {
+    setTransplantingBatch(batch);
+  };
+
+  const handleTransplantFormSubmit = async (data: TransplantFormData) => {
+    if (!transplantingBatch) return;
+
+    const result = await transplantBatchAction(
+      transplantingBatch.id,
+      data,
+      data.quantity,
+      data.logRemainingAsLoss
+    );
+
+    if (result.success) {
+      toast({
+        title: 'Transplant Successful',
+        description: `New batch #${result.data?.newBatch.batchNumber} created.`,
+      });
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Transplant Failed',
+        description: result.error,
+      });
+    }
+    setTransplantingBatch(null);
+  };
+
+  const handleLogAction = (batch: Batch) => {
+    setActionLogBatch(batch);
+  };
+
+  const handleActionLogFormSubmit = async (data: Partial<LogEntry> & {type: LogEntry['type']}) => {
+    if (!actionLogBatch) return;
+
+    const result = await logAction(actionLogBatch.id, data);
+
+    if (result.success) {
+      toast({
+        title: 'Action Logged',
+        description: 'The action has been successfully logged.',
+      });
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Logging Failed',
+        description: result.error,
+      });
+    }
+    setActionLogBatch(null);
+  };
+  
+  if (authLoading || !user) {
+     return (
+        <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
+            <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+    );
+  }
+
+  return (
+    <HomePageView
+      isDataLoading={isDataLoading}
+      authLoading={authLoading}
+      user={user}
+      batches={filteredBatches}
+      plantFamilies={plantFamilies}
+      categories={categories}
+      filters={filters}
+      setFilters={setFilters}
+      searchQuery={searchQuery}
+      setSearchQuery={setSearchQuery}
+      onSignOut={handleSignOut}
+      onNewBatch={handleNewBatch}
+      onEditBatch={handleEditBatch}
+      onArchiveBatch={handleArchiveBatch}
+      onTransplantBatch={handleTransplantBatch}
+      onLogAction={handleLogAction}
+      onFormSubmit={handleFormSubmit}
+      onTransplantFormSubmit={handleTransplantFormSubmit}
+      onActionLogFormSubmit={handleActionLogFormSubmit}
+      editingBatch={editingBatch}
+      setEditingBatch={setEditingBatch}
+      batchDistribution={batchDistribution}
+      transplantingBatch={transplantingBatch}
+      setTransplantingBatch={setTransplantingBatch}
+      actionLogBatch={actionLogBatch}
+      setActionLogBatch={setActionLogBatch}
+      nurseryLocations={nurseryLocations}
+      plantSizes={plantSizes}
+      suppliers={suppliers}
+      varieties={varieties}
+    />
+  );
+}
