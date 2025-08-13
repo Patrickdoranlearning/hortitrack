@@ -30,6 +30,19 @@ import { auth } from '@/lib/firebase';
 import { BatchDistribution } from '@/components/batch-form';
 
 
+function dedupeByIdOrName<T extends { id?: string; name?: string; size?: string }>(arr: T[]): T[] {
+  const seen = new Set<string>();
+  return arr.filter(item => {
+    const key = (item.id ?? item.name ?? item.size ?? "").trim().toLowerCase();
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      return true;
+    }
+    return false;
+  });
+}
+
+
 export default function HomePageContainer() {
   const router = useRouter();
   const { toast } = useToast();
@@ -265,6 +278,10 @@ export default function HomePageContainer() {
         </div>
     );
   }
+  
+  const uniqueSuppliers = dedupeByIdOrName(suppliers);
+  const uniquePlantSizes = dedupeByIdOrName(plantSizes);
+  const uniqueNurseryLocations = dedupeByIdOrName(nurseryLocations);
 
   return (
     <HomePageView
@@ -294,9 +311,9 @@ export default function HomePageContainer() {
       setTransplantingBatch={setTransplantingBatch}
       actionLogBatch={actionLogBatch}
       setActionLogBatch={setActionLogBatch}
-      nurseryLocations={nurseryLocations}
-      plantSizes={plantSizes}
-      suppliers={suppliers}
+      nurseryLocations={uniqueNurseryLocations}
+      plantSizes={uniquePlantSizes}
+      suppliers={uniqueSuppliers}
       varieties={varieties}
       isFormOpen={isFormOpen}
       setIsFormOpen={setIsFormOpen}

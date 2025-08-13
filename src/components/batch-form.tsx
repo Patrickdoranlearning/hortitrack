@@ -73,8 +73,8 @@ const batchFormSchema = z.object({
   size: z.string().min(1, 'Size is required.'),
   supplier: z.string().min(1, 'Supplier is required.'),
   logHistory: z.array(logEntrySchema),
-  growerPhotoUrl: z.string().optional(),
-  salesPhotoUrl: z.string().optional(),
+  growerPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+  salesPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   // Non-schema fields for form logic
   trayQuantity: z.number().optional(),
 }).refine(data => {
@@ -138,6 +138,8 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
           supplier: 'Doran Nurseries',
           logHistory: [],
           trayQuantity: 1,
+          growerPhotoUrl: '',
+          salesPhotoUrl: '',
         },
   });
 
@@ -170,7 +172,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     // Fallback for other types, ensure size is a string before calling localeCompare
     const aSize = a.size || '';
     const bSize = b.size || '';
-    return aSize.localeCompare(bBsize);
+    return aSize.localeCompare(bSize);
   };
   
   const sortedPlantSizes = useMemo(() => {

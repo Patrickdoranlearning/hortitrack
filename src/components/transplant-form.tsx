@@ -56,8 +56,8 @@ const transplantFormSchema = (maxQuantity: number) =>
     transplantedFrom: z.string().optional(),
     supplier: z.string().optional(),
     logRemainingAsLoss: z.boolean(),
-    growerPhotoUrl: z.string().optional(),
-    salesPhotoUrl: z.string().optional(),
+    growerPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+    salesPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
     trayQuantity: z.number().optional(),
   });
 
@@ -94,6 +94,8 @@ export function TransplantForm({
           supplier: 'Doran Nurseries',
           logRemainingAsLoss: false,
           trayQuantity: 1,
+          growerPhotoUrl: '',
+          salesPhotoUrl: '',
         }
       : undefined,
   });
