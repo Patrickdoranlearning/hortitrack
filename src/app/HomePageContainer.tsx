@@ -36,7 +36,7 @@ export default function HomePageContainer() {
   const { user, loading: authLoading } = useAuth();
 
   const { data: batches, isLoading: isDataLoading } = useCollection<Batch>('batches');
-  const { data: varieties } = useCollection<Variety>('varieties');
+  const { data: varieties } = useCollection<Variety>('varieties', [], [["name", "!=", ""]]);
   const { data: nurseryLocations } = useCollection<NurseryLocation>('locations');
   const { data: plantSizes } = useCollection<PlantSize>(
     'sizes',
@@ -60,6 +60,11 @@ export default function HomePageContainer() {
     null
   );
   const [actionLogBatch, setActionLogBatch] = useState<Batch | null>(null);
+
+  // State for dialogs, managed here
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
+  const [isActionLogFormOpen, setIsActionLogFormOpen] = useState(false);
 
   const plantFamilies = useMemo(
     () => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily).filter(Boolean)))],
@@ -107,6 +112,7 @@ export default function HomePageContainer() {
   const handleNewBatch = () => {
     setEditingBatch(null);
     setBatchDistribution(null);
+    setIsFormOpen(true);
   };
 
   const handleEditBatch = (batch: Batch) => {
@@ -125,6 +131,7 @@ export default function HomePageContainer() {
       lost: lostQuantity,
     });
     setEditingBatch(batch);
+    setIsFormOpen(true);
   };
 
   const handleArchiveBatch = async (batchId: string) => {
@@ -191,10 +198,12 @@ export default function HomePageContainer() {
     }
     setEditingBatch(null);
     setBatchDistribution(null);
+    setIsFormOpen(false);
   };
 
   const handleTransplantBatch = (batch: Batch) => {
     setTransplantingBatch(batch);
+    setIsTransplantFormOpen(true);
   };
 
   const handleTransplantFormSubmit = async (data: TransplantFormData) => {
@@ -220,10 +229,12 @@ export default function HomePageContainer() {
       });
     }
     setTransplantingBatch(null);
+    setIsTransplantFormOpen(false);
   };
 
   const handleLogAction = (batch: Batch) => {
     setActionLogBatch(batch);
+    setIsActionLogFormOpen(true);
   };
 
   const handleActionLogFormSubmit = async (data: Partial<LogEntry> & {type: LogEntry['type']}) => {
@@ -244,6 +255,7 @@ export default function HomePageContainer() {
       });
     }
     setActionLogBatch(null);
+    setIsActionLogFormOpen(false);
   };
   
   if (authLoading || !user) {
@@ -286,6 +298,12 @@ export default function HomePageContainer() {
       plantSizes={plantSizes}
       suppliers={suppliers}
       varieties={varieties}
+      isFormOpen={isFormOpen}
+      setIsFormOpen={setIsFormOpen}
+      isTransplantFormOpen={isTransplantFormOpen}
+      setIsTransplantFormOpen={setIsTransplantFormOpen}
+      isActionLogFormOpen={isActionLogFormOpen}
+      setIsActionLogFormOpen={setIsActionLogFormOpen}
     />
   );
 }

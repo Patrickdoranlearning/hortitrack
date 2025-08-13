@@ -56,6 +56,12 @@ interface HomePageViewProps {
   plantSizes: PlantSize[];
   suppliers: Supplier[];
   varieties: Variety[];
+  isFormOpen: boolean;
+  setIsFormOpen: (open: boolean) => void;
+  isTransplantFormOpen: boolean;
+  setIsTransplantFormOpen: (open: boolean) => void;
+  isActionLogFormOpen: boolean;
+  setIsActionLogFormOpen: (open: boolean) => void;
 }
 
 export default function HomePageView({
@@ -89,12 +95,15 @@ export default function HomePageView({
   plantSizes,
   suppliers,
   varieties,
+  isFormOpen,
+  setIsFormOpen,
+  isTransplantFormOpen,
+  setIsTransplantFormOpen,
+  isActionLogFormOpen,
+  setIsActionLogFormOpen,
 }: HomePageViewProps) {
   const { toast } = useToast();
   // Local state for dialogs
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
-  const [isActionLogFormOpen, setIsActionLogFormOpen] = useState(false);
   const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isScannedActionsOpen, setIsScannedActionsOpen] = useState(false);
@@ -114,19 +123,16 @@ export default function HomePageView({
   const openEditDialog = (batch: Batch) => {
       onEditBatch(batch);
       setIsDetailDialogOpen(false);
-      setIsFormOpen(true);
   };
 
   const openTransplantDialog = (batch: Batch) => {
       onTransplantBatch(batch);
       setIsDetailDialogOpen(false);
-      setIsTransplantFormOpen(true);
   };
 
   const openLogActionDialog = (batch: Batch) => {
       onLogAction(batch);
       setIsDetailDialogOpen(false);
-      setIsActionLogFormOpen(true);
   };
 
   const openProtocolDialog = (batch: Batch) => {
@@ -177,10 +183,7 @@ export default function HomePageView({
               </Link>
             </Button>
             <Button
-              onClick={() => {
-                onNewBatch();
-                setIsFormOpen(true);
-              }}
+              onClick={onNewBatch}
               size="lg"
             >
               <PlusCircle /> New Batch
@@ -205,7 +208,7 @@ export default function HomePageView({
                 <SheetContent>
                     <div className="flex flex-col gap-4">
                         <SheetClose asChild>
-                            <Button onClick={() => { onNewBatch(); setIsFormOpen(true); }} className="w-full">
+                            <Button onClick={onNewBatch} className="w-full">
                                 <PlusCircle />
                                 New Batch
                             </Button>
@@ -320,9 +323,9 @@ export default function HomePageView({
           <BatchForm
             batch={editingBatch}
             distribution={batchDistribution}
-            onSubmit={(data) => { onFormSubmit(data); setIsFormOpen(false); }}
+            onSubmit={onFormSubmit}
             onCancel={() => setIsFormOpen(false)}
-            onArchive={(id) => { onArchiveBatch(id); setIsFormOpen(false); }}
+            onArchive={onArchiveBatch}
             nurseryLocations={nurseryLocations}
             plantSizes={plantSizes}
             suppliers={suppliers}
@@ -335,7 +338,7 @@ export default function HomePageView({
         <DialogContent className="max-w-2xl">
           <TransplantForm
             batch={transplantingBatch}
-            onSubmit={(data) => { onTransplantFormSubmit(data); setIsTransplantFormOpen(false); }}
+            onSubmit={onTransplantFormSubmit}
             onCancel={() => setIsTransplantFormOpen(false)}
             nurseryLocations={nurseryLocations}
             plantSizes={plantSizes}
@@ -347,7 +350,7 @@ export default function HomePageView({
         <DialogContent className="max-w-2xl">
           <ActionLogForm
             batch={actionLogBatch}
-            onSubmit={(data) => { onActionLogFormSubmit(data); setIsActionLogFormOpen(false); }}
+            onSubmit={onActionLogFormSubmit}
             onCancel={() => setIsActionLogFormOpen(false)}
             nurseryLocations={nurseryLocations}
             plantSizes={plantSizes}
