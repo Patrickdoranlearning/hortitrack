@@ -24,9 +24,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, writeBatch, doc } from 'firebase/firestore';
 import { addVarietyAction, updateVarietyAction, deleteVarietyAction } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { VARIETIES as INITIAL_VARIETIES } from '@/lib/varieties';
+
 
 export default function VarietiesPage() {
   const { user } = useAuth();
@@ -43,10 +45,20 @@ export default function VarietiesPage() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const varietiesData = snapshot.docs.map(
-          (doc) => ({ ...doc.data(), id: doc.id }) as Variety
-        );
-        setVarieties(varietiesData);
+        if (snapshot.empty) {
+          console.log("Varieties collection is empty, seeding initial data...");
+          const batch = writeBatch(db);
+          INITIAL_VARIETIES.forEach(variety => {
+            const docRef = doc(collection(db, "varieties"));
+            batch.set(docRef, variety);
+          });
+          batch.commit().then(() => console.log("Initial varieties seeded successfully."));
+        } else {
+          const varietiesData = snapshot.docs.map(
+            (doc) => ({ ...doc.data(), id: doc.id }) as Variety
+          );
+          setVarieties(varietiesData);
+        }
         setIsLoading(false);
       },
       (error) => {
@@ -217,3 +229,4 @@ export default function VarietiesPage() {
     </>
   );
 }
+

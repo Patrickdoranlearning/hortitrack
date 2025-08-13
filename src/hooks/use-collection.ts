@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Query, DocumentData, QueryConstraint } from 'firebase/firestore';
+import { collection, onSnapshot, query, Query, DocumentData, QueryConstraint, writeBatch, doc } from 'firebase/firestore';
 import { useAuth } from './use-auth';
 import { useToast } from './use-toast';
 
@@ -15,12 +15,12 @@ interface UseCollectionReturn<T> {
 
 export function useCollection<T>(
   collectionName: string,
-  initialData: T[] = [],
+  initialData: any[] = [],
   constraints: QueryConstraint[] = [],
 ): UseCollectionReturn<T> {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [data, setData] = useState<T[]>(initialData);
+  const [data, setData] = useState<T[]>(initialData as T[]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -37,8 +37,21 @@ export function useCollection<T>(
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const documents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as T));
-        setData(documents);
+        if (snapshot.empty && initialData.length > 0) {
+            console.log(`Collection '${collectionName}' is empty. Seeding initial data.`);
+            const batch = writeBatch(db);
+            initialData.forEach(item => {
+              const { id, ...data } = item;
+              const docRef = doc(collection(db, collectionName));
+              batch.set(docRef, data);
+            });
+            batch.commit()
+              .then(() => console.log(`Initial data for '${collectionName}' seeded successfully.`))
+              .catch(err => console.error(`Failed to seed data for ${collectionName}:`, err));
+        } else {
+            const documents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as T));
+            setData(documents);
+        }
         setIsLoading(false);
       },
       (err) => {
@@ -54,7 +67,7 @@ export function useCollection<T>(
     );
 
     return unsubscribe;
-  }, [collectionName, user, toast, constraints]);
+  }, [collectionName, user?.uid, toast]); // Depend on user.uid to re-run when auth state changes
 
   useEffect(() => {
     const unsubscribe = subscribeToCollection();
