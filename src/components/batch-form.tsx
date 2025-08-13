@@ -334,8 +334,8 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Size</FormLabel>
                     <Select
+                      value={idFromSize(sortedPlantSizes, field.value)}
                       onValueChange={handleSizeChange}
-                      defaultValue={idFromSize(sortedPlantSizes, field.value)}
                      >
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
@@ -410,7 +410,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={field.value === 'Archived'}>
+                    <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={field.value === 'Archived'}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a status" />
@@ -478,11 +478,11 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Supplier</FormLabel>
                     <Select
+                      value={idFromName(suppliers, field.value)}
                       onValueChange={(id) => {
                         const selected = suppliers.find(s => s.id === id);
                         field.onChange(selected?.name ?? '');
                       }}
-                      defaultValue={idFromName(suppliers, field.value)}
                     >
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger>
@@ -507,11 +507,11 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <Select
+                      value={idFromName(nurseryLocations, field.value)}
                       onValueChange={(id) => {
                         const selected = nurseryLocations.find(l => l.id === id);
                         field.onChange(selected?.name ?? '');
                       }}
-                      defaultValue={idFromName(nurseryLocations, field.value)}
                     >
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
@@ -544,7 +544,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 )}
               />
             </div>
-            <div className="md:row-start-5">
+             <div className="md:row-start-6">
               <FormField
                 control={form.control}
                 name="salesPhotoUrl"

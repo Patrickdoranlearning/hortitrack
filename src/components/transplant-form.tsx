@@ -35,7 +35,7 @@ import { format } from 'date-fns';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from './ui/checkbox';
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -248,11 +248,11 @@ export function TransplantForm({
                 <FormItem>
                   <FormLabel>New Location</FormLabel>
                   <Select
-                    onValueChange={(id) => {
-                      const selected = nurseryLocations.find(l => l.id === id);
-                      field.onChange(selected?.name ?? '');
-                    }}
-                    defaultValue={idFromName(nurseryLocations, field.value)}
+                     value={idFromName(nurseryLocations, field.value)}
+                     onValueChange={(id) => {
+                       const selected = nurseryLocations.find(l => l.id === id);
+                       field.onChange(selected?.name ?? '');
+                     }}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -320,8 +320,8 @@ export function TransplantForm({
                 <FormItem>
                   <FormLabel>New Size</FormLabel>
                   <Select
+                    value={idFromSize(sortedPlantSizes, field.value)}
                     onValueChange={handleSizeChange}
-                    defaultValue={idFromSize(sortedPlantSizes, field.value)}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -404,7 +404,7 @@ export function TransplantForm({
                   <FormLabel>New Status</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    value={field.value}
+                    value={field.value ?? ''}
                   >
                     <FormControl>
                       <SelectTrigger>
