@@ -91,11 +91,13 @@ export async function addBatchAction(
     return await db.runTransaction(async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         
-        let nextBatchNum = 1;
-        if (counterDoc.exists && counterDoc.data()!.count) {
-            nextBatchNum = counterDoc.data()!.count + 1;
+        let nextBatchNum: number;
+        if (!counterDoc.exists) {
+            nextBatchNum = 1;
+            transaction.set(counterRef, { count: 1 });
         } else {
-            transaction.set(counterRef, { count: 0 }); // Initialize counter
+            nextBatchNum = (counterDoc.data()?.count ?? 0) + 1;
+            transaction.update(counterRef, { count: nextBatchNum });
         }
 
         const nextBatchNumStr = nextBatchNum.toString().padStart(6, '0');
@@ -119,7 +121,6 @@ export async function addBatchAction(
           updatedAt: FieldValue.serverTimestamp(),
         };
         transaction.set(newDocRef, newBatch);
-        transaction.update(counterRef, { count: nextBatchNum });
 
         return { success: true, data: { id: newDocRef.id, batchNumber: prefixedBatchNumber }};
     });
