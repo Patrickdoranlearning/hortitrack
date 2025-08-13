@@ -1,5 +1,5 @@
 
-import type {Metadata} from 'next';
+import type { Metadata, Viewport } from "next";
 import {PT_Sans, Playfair_Display} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
@@ -20,22 +20,21 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: 'HortiTrack',
-  description: 'Nursery stock production and crop management for Doran Nurseries',
-  themeColor: '#6AB04A',
+  title: "HortiTrack",
+  description: "Nursery stock production and crop management for Doran Nurseries",
   openGraph: {
-    title: 'HortiTrack',
-    description: 'Track batches, locations, and crop data with ease.',
-    images: ['/og-image.png'],
+    title: "HortiTrack",
+    description: "Track batches, locations, and crop data with ease.",
+    images: ["/og-image.png"],
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
-  other: {
-    'color-scheme': 'light dark',
-  },
+  colorScheme: "light dark",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#6AB04A",
 };
 
 export default function RootLayout({

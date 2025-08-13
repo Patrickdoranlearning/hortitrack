@@ -109,8 +109,8 @@ interface BatchFormProps {
 const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
   list.find(x => x.name === name)?.id ?? '';
 
-const idFromSize = (list: {id?: string; size?: string}[], size?: string) =>
-  list.find(x => x.size === size)?.id ?? '';
+const idFromSize = (list: PlantSize[], name?: string) =>
+  list.find(s => s.size === name)?.id ?? "";
 
 export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers, varieties }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
@@ -123,23 +123,29 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(batchFormSchema),
+    mode: "onChange",
+    criteriaMode: "all",
     defaultValues: batch
-      ? { ...batch, initialQuantity: batch.initialQuantity || batch.quantity, supplier: batch.supplier || 'Doran Nurseries' }
+      ? {
+          ...batch,
+          initialQuantity: batch.initialQuantity || batch.quantity,
+          supplier: batch.supplier || "Doran Nurseries",
+        }
       : {
-          category: '',
-          plantFamily: '',
-          plantVariety: '',
+          category: "",
+          plantFamily: "",
+          plantVariety: "",
           plantingDate: new Date().toISOString(),
           initialQuantity: 1,
           quantity: 1,
-          status: 'Propagation',
-          location: '',
-          size: '',
-          supplier: 'Doran Nurseries',
+          status: "Propagation",
+          location: "",
+          size: "",
+          supplier: "Doran Nurseries",
           logHistory: [],
           trayQuantity: 1,
-          growerPhotoUrl: '',
-          salesPhotoUrl: '',
+          growerPhotoUrl: "",
+          salesPhotoUrl: "",
         },
   });
 
@@ -169,7 +175,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       return sizeB - sizeA;
     }
 
-    // Fallback for other types, ensure size is a string before calling localeCompare
     const aSize = a.size || '';
     const bSize = b.size || '';
     return aSize.localeCompare(bSize);
@@ -202,38 +207,44 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
   };
 
   const handleSizeChange = (sizeId: string) => {
-    const selectedSize = plantSizes.find(s => s.id === sizeId);
-    if (selectedSize) {
-      form.setValue('size', selectedSize.size);
-      setSelectedSizeInfo(selectedSize);
-      const newStatus = SIZE_TYPE_TO_STATUS_MAP[selectedSize.type];
+    const selected = plantSizes.find(s => s.id === sizeId);
+    if (!selected) return;
+    form.setValue("size", selected.size, { shouldValidate: true, shouldDirty: true });
+    setSelectedSizeInfo(selected);
+    const newStatus = SIZE_TYPE_TO_STATUS_MAP[selected.type];
       if (newStatus) {
         form.setValue('status', newStatus);
       }
-      if (selectedSize.multiple && selectedSize.multiple > 1) {
-        const trayQty = form.getValues('trayQuantity') || 1;
-        form.setValue('quantity', trayQty * selectedSize.multiple);
-      }
+    if (selected.multiple && selected.multiple > 1) {
+      const trayQty = form.getValues('trayQuantity') || 1;
+      form.setValue('quantity', trayQty * selected.multiple);
     }
   };
   
-  const handleVarietyChange = (varietyIdOrName: string) => {
-    const selectedVariety = varieties.find(v => v.id === varietyIdOrName);
-    if (selectedVariety) {
-      form.setValue('plantVariety', selectedVariety.name, { shouldValidate: true });
-      form.setValue('plantFamily', selectedVariety.family, { shouldValidate: true });
-      form.setValue('category', selectedVariety.category, { shouldValidate: true });
-      setIsFamilySet(true);
-      setIsCategorySet(true);
-    }
+  const idFromVarietyName = (list: Variety[], name?: string) =>
+    list.find(v => v.name === name)?.id ?? "";
+
+  const varietyOptions = useMemo(
+    () => varieties.map(v => ({ value: v.id!, label: v.name })),
+    [varieties]
+  );
+  
+  const handleVarietyChange = (varietyId: string) => {
+    const v = varieties.find(x => x.id === varietyId);
+    if (!v) return;
+    form.setValue("plantVariety", v.name, { shouldValidate: true, shouldDirty: true });
+    form.setValue("plantFamily", v.family, { shouldValidate: true, shouldDirty: true });
+    form.setValue("category", v.category, { shouldValidate: true, shouldDirty: true });
+    setIsFamilySet(true);
+    setIsCategorySet(true);
   };
 
   const handleTrayQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const trayQty = parseInt(e.target.value, 10) || 0;
-    form.setValue('trayQuantity', trayQty);
-    if (selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1) {
-      form.setValue('quantity', trayQty * selectedSizeInfo.multiple);
-    }
+    const trayQty = Number(e.target.value || 0);
+    form.setValue("trayQuantity", trayQty, { shouldValidate: true, shouldDirty: true });
+    const perTray = selectedSizeInfo?.multiple ?? 1;
+    const total = Math.max(0, trayQty * perTray);
+    form.setValue("quantity", total, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleCreateNewVariety = (name: string) => {
@@ -246,9 +257,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
     if (result.success && result.data?.id) {
         toast({ title: 'Variety Added', description: `Successfully added "${result.data.name}".` });
-        // The `varieties` state will be updated by the onSnapshot listener,
-        // which will re-render the combobox with the new option.
-        // We can then set the value.
         handleVarietyChange(result.data.id);
         setIsVarietyFormOpen(false);
         setNewVarietyName('');
@@ -257,9 +265,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   }
 
-  const varietyOptions = useMemo(() => varieties.map(v => ({ value: v.id!, label: v.name })), [varieties]);
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
-  const selectedVarietyId = varieties.find(v => v.name === form.watch('plantVariety'))?.id;
 
   return (
     <>
@@ -270,7 +276,20 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+        <form 
+          onSubmit={form.handleSubmit(
+            handleFormSubmit,
+            (errors) => {
+              console.error("Batch form invalid", errors);
+              toast({
+                variant: "destructive",
+                title: "Please complete the required fields",
+                description: Object.keys(errors).join(", "),
+              });
+            }
+          )} 
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-5 gap-x-8 gap-y-4">
             
             <div className="md:row-start-1">
@@ -282,12 +301,13 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                     <FormLabel>Plant Variety</FormLabel>
                     <Combobox
                       options={varietyOptions}
-                      value={selectedVarietyId}
+                      value={idFromVarietyName(varieties, field.value)}
                       onChange={handleVarietyChange}
                       onCreate={handleCreateNewVariety}
                       placeholder="Select variety..."
                       emptyMessage="No matching variety found."
                     />
+                    <FormDescription>Choose a variety or type to create a new one.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -350,6 +370,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormDescription>Tray sizes auto-calculate total quantity.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -366,7 +387,12 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       <FormItem>
                         <FormLabel>No. of Trays</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} onChange={handleTrayQuantityChange} value={field.value || ''} />
+                          <Input 
+                            type="number" 
+                            value={field.value ?? ""}
+                            onChange={handleTrayQuantityChange}
+                            inputMode="numeric"
+                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -379,7 +405,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       <FormItem>
                         <FormLabel>Total Plants</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} readOnly className="bg-muted" />
+                          <Input type="number" value={field.value ?? ""} readOnly className="bg-muted" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -394,7 +420,12 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                     <FormItem className="col-span-2">
                       <FormLabel>Quantity</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} />
+                        <Input 
+                          type="number" 
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          inputMode="numeric"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -410,7 +441,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={field.value === 'Archived'}>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange} disabled={field.value === 'Archived'}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a status" />
@@ -459,7 +490,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         <Calendar
                           mode="single"
                           selected={field.value ? new Date(field.value) : undefined}
-                          onSelect={(date) => field.onChange(date?.toISOString())}
+                          onSelect={(date) => field.onChange(date?.toISOString() ?? "")}
                           initialFocus
                         />
                       </PopoverContent>
@@ -481,7 +512,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       value={idFromName(suppliers, field.value)}
                       onValueChange={(id) => {
                         const selected = suppliers.find(s => s.id === id);
-                        field.onChange(selected?.name ?? '');
+                        if(selected) field.onChange(selected.name);
                       }}
                     >
                         <FormControl>
@@ -510,7 +541,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       value={idFromName(nurseryLocations, field.value)}
                       onValueChange={(id) => {
                         const selected = nurseryLocations.find(l => l.id === id);
-                        field.onChange(selected?.name ?? '');
+                        if(selected) field.onChange(selected.name);
                       }}
                     >
                       <FormControl>
@@ -528,7 +559,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               />
             </div>
 
-            {/* New fields for photo uploads */}
             <div className="md:row-start-5">
               <FormField
                 control={form.control}
@@ -537,7 +567,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Grower Photo URL</FormLabel>
                     <FormControl>
-                      <Input placeholder="URL for grower's photo" {...field} />
+                      <Input placeholder="URL for grower's photo" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -552,14 +582,13 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                   <FormItem>
                     <FormLabel>Sales Photo URL</FormLabel>
                     <FormControl>
-                      <Input placeholder="URL for sales photo" {...field} />
+                      <Input placeholder="URL for sales photo" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-
 
           </div>
             
@@ -599,7 +628,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                             render={({ field: formField }) => (
                                 <FormItem className="flex-1">
                                 <FormControl>
-                                    <Textarea placeholder="Describe the action taken..." {...formField} className="min-h-[40px]"/>
+                                    <Textarea placeholder="Describe the action taken..." {...formField} value={formField.value ?? ""} className="min-h-[40px]"/>
                                 </FormControl>
                                 </FormItem>
                             )}
@@ -647,7 +676,9 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 <Button type="button" variant="ghost" onClick={onCancel}>
                 Cancel
                 </Button>
-                <Button type="submit">{batch ? 'Save Changes' : 'Create Batch'}</Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Saving...' : (batch ? 'Save Changes' : 'Create Batch')}
+                </Button>
             </div>
           </DialogFooter>
         </form>
