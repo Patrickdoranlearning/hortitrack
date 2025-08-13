@@ -97,7 +97,7 @@ export interface BatchDistribution {
 interface BatchFormProps {
   batch: Batch | null;
   distribution: BatchDistribution | null;
-  onSubmit: (data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'> | Batch) => void;
+  onSubmit: (data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'> | Batch) => Promise<{ success: boolean; error?: string }>;
   onCancel: () => void;
   onArchive: (batchId: string) => void;
   nurseryLocations: NurseryLocation[];
@@ -194,15 +194,24 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   }, [batch, plantSizes, form]);
 
-  const handleFormSubmit = (data: BatchFormValues) => {
+  const handleFormSubmit = async (data: BatchFormValues) => {
     const finalData = {
         ...data,
         logHistory: data.logHistory.map(log => ({...log, id: log.id || `log_${Date.now()}_${Math.random()}`}))
     };
+    let result;
     if (batch) {
-       onSubmit({ ...finalData, id: batch.id, batchNumber: batch.batchNumber, initialQuantity: batch.initialQuantity, createdAt: batch.createdAt } as Batch);
+       result = await onSubmit({ ...finalData, id: batch.id, batchNumber: batch.batchNumber, initialQuantity: batch.initialQuantity, createdAt: batch.createdAt } as Batch);
     } else {
-        onSubmit({ ...finalData, initialQuantity: finalData.quantity } as Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'>);
+        result = await onSubmit({ ...finalData, initialQuantity: finalData.quantity } as Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'>);
+    }
+
+    if (!result.success) {
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: result.error || "An unknown error occurred.",
+      });
     }
   };
 

@@ -6,7 +6,7 @@ import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import type { Batch, LogEntry, Variety, NurseryLocation, PlantSize, Supplier } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
-import { FieldValue, Transaction } from 'firebase-admin/firestore';
+import { FieldValue, Transaction, Timestamp } from 'firebase-admin/firestore';
 
 export async function getBatchesAction() {
     try {
@@ -112,7 +112,7 @@ export async function addBatchAction(
           ...newBatchData,
           batchNumber: prefixedBatchNumber,
           logHistory: [{ 
-            date: FieldValue.serverTimestamp(), 
+            date: Timestamp.now(), 
             type: 'CREATE', 
             note: 'Batch created.',
             qty: newBatchData.quantity
@@ -160,7 +160,7 @@ export async function addBatchesFromCsvAction(
                     ...batchData,
                     batchNumber: prefixedBatchNumber,
                     logHistory: [{ 
-                        date: FieldValue.serverTimestamp(), 
+                        date: Timestamp.now(), 
                         type: 'CREATE', 
                         note: 'Batch created via CSV import.',
                         qty: batchData.quantity
@@ -190,7 +190,7 @@ export async function updateBatchAction(batchToUpdate: Omit<Batch, 'createdAt' |
     let wasArchived = false;
     if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
       updatedBatchData.logHistory.push({ 
-          date: FieldValue.serverTimestamp(), 
+          date: Timestamp.now(), 
           type: 'ARCHIVE', 
           note: `Batch quantity reached zero and was automatically archived.`
         });
@@ -239,7 +239,7 @@ export async function logAction(
     const updatedBatch = { ...batch };
     
     const newLog: Partial<LogEntry> & { type: LogEntry['type'] } = {
-        date: FieldValue.serverTimestamp(),
+        date: Timestamp.now(),
         type: logData.type,
     };
     
@@ -294,7 +294,7 @@ export async function archiveBatchAction(batchId: string, loss: number) {
     updatedBatch.status = 'Archived';
     
     const newLog: LogEntry = { 
-        date: FieldValue.serverTimestamp(),
+        date: Timestamp.now(),
         type: 'ARCHIVE',
         note: `Archived with loss of ${loss} units. Final quantity: ${batch.quantity - loss}.`,
         qty: loss,
@@ -360,7 +360,7 @@ export async function transplantBatchAction(
             updatedAt: FieldValue.serverTimestamp(),
             logHistory: [
                 {
-                    date: FieldValue.serverTimestamp(),
+                    date: Timestamp.now(),
                     type: 'TRANSPLANT_FROM',
                     note: `Created from transplant of ${transplantQuantity} units from batch ${sourceBatch.batchNumber}.`,
                     qty: transplantQuantity,
@@ -371,7 +371,7 @@ export async function transplantBatchAction(
 
         const updatedSourceBatch = { ...sourceBatch };
         updatedSourceBatch.logHistory.push({
-            date: FieldValue.serverTimestamp(),
+            date: Timestamp.now(),
             type: 'TRANSPLANT_TO',
             note: `Transplanted ${transplantQuantity} units to new batch ${newBatch.batchNumber}.`,
             qty: -transplantQuantity,
@@ -383,7 +383,7 @@ export async function transplantBatchAction(
             const remaining = sourceBatch.quantity - transplantQuantity;
             if (remaining > 0) {
                 updatedSourceBatch.logHistory.push({
-                    date: FieldValue.serverTimestamp(),
+                    date: Timestamp.now(),
                     type: 'ARCHIVE',
                     note: `Archived with loss of ${remaining} units.`,
                     qty: -remaining,
@@ -399,7 +399,7 @@ export async function transplantBatchAction(
         transaction.set(newDocRef, newBatch);
         
         if (updatedSourceBatch.quantity <= 0 && updatedSourceBatch.status !== 'Archived') {
-            updatedSourceBatch.logHistory.push({ date: FieldValue.serverTimestamp(), type: 'ARCHIVE', note: `Batch quantity reached zero and was automatically archived.` });
+            updatedSourceBatch.logHistory.push({ date: Timestamp.now(), type: 'ARCHIVE', note: `Batch quantity reached zero and was automatically archived.` });
             updatedSourceBatch.status = 'Archived';
             updatedSourceBatch.quantity = 0;
         }
