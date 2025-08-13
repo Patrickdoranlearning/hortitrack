@@ -54,8 +54,8 @@ export function BatchDistributionBar({ distribution, initialQuantity }: BatchDis
             <div className="p-2 space-y-2">
                 <p className="font-bold text-center">Distribution of {initialQuantity} units</p>
                 <ul className="space-y-1">
-                    {sections.map(section => (
-                        <li key={`${section.name}-${section.value}`} className="flex items-center justify-between gap-4">
+                    {sections.map((section, i) => (
+                        <li key={`sec-${i}`} className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
                                 <span className={cn("h-3 w-3 rounded-sm", section.color)} />
                                 <span>{section.name}:</span>

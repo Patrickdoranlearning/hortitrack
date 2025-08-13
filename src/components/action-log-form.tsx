@@ -24,8 +24,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { Batch, NurseryLocation, PlantSize, LogEntry } from '@/lib/types';
 import { useState } from 'react';
-import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { LogEntrySchema } from '@/lib/types';
+
+const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
+  list.find(x => x.name === name)?.id ?? '';
 
 const actionTypeEnum = LogEntrySchema.shape.type;
 
@@ -106,12 +109,6 @@ export function ActionLogForm({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Log Action for Batch #{batch?.batchNumber}</DialogTitle>
-        <DialogDescription>
-          Record a new activity or update for this batch. The action will be added to the log history.
-        </DialogDescription>
-      </DialogHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           
@@ -163,15 +160,23 @@ export function ActionLogForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>New Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      value={idFromName(nurseryLocations, field.value)}
+                      onValueChange={(id) => {
+                        const selected = nurseryLocations.find(l => l.id === id);
+                        field.onChange(selected?.name ?? "");
+                      }}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select new location" />
+                          <SelectValue placeholder="Select a new location" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {nurseryLocations.map(location => (
-                          <SelectItem key={location.id} value={location.name}>{location.name}</SelectItem>
+                        {nurseryLocations.map((location) => (
+                          <SelectItem key={location.id} value={location.id!}>
+                            {location.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

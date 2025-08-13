@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { INITIAL_PLANT_SIZES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import type { PlantSize } from '@/lib/types';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -292,6 +292,10 @@ export default function SizesPage() {
 
     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-md">
+            <DialogHeader>
+                <DialogTitle>{editingSize ? "Edit Size" : "Add Size"}</DialogTitle>
+                <DialogDescription>Define container/tray sizes and multiples.</DialogDescription>
+            </DialogHeader>
             <SizeForm 
                 size={editingSize}
                 onSubmit={handleFormSubmit}

@@ -8,7 +8,7 @@ import { ArrowLeft, Plus, Trash2, Edit } from 'lucide-react';
 import Link from 'next/link';
 import type { Variety } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { VarietyForm } from '@/components/variety-form';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -215,6 +215,10 @@ export default function VarietiesPage() {
       
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>{editingVariety ? "Edit Variety" : "Add Variety"}</DialogTitle>
+                <DialogDescription>Family/category is used to prefill batch info.</DialogDescription>
+            </DialogHeader>
             <VarietyForm
                 variety={editingVariety}
                 onSubmit={handleFormSubmit}
@@ -229,4 +233,5 @@ export default function VarietiesPage() {
     </>
   );
 }
+
 

@@ -269,12 +269,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle className="font-headline text-2xl">{batch ? `Edit Batch #${batch.batchNumber}` : 'Create New Batch'}</DialogTitle>
-        <DialogDescription>
-          {batch ? 'Update the details for this nursery stock batch.' : 'Enter the details for the new nursery stock batch.'}
-        </DialogDescription>
-      </DialogHeader>
       <Form {...form}>
         <form 
           onSubmit={form.handleSubmit(
@@ -520,7 +514,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         </FormControl>
                         <SelectContent>
                             {suppliers.map((s, i) => (
-                              <SelectItem key={s.id ?? `${s.name}-${i}`} value={s.id!}>{s.name}</SelectItem>
+                              <SelectItem key={s.id ?? `sup-${i}`} value={s.id!}>{s.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -549,7 +543,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                       </FormControl>
                       <SelectContent>
                         {nurseryLocations.map((loc, i) => (
-                          <SelectItem key={loc.id ?? `${loc.name}-${i}`} value={loc.id!}>{loc.name}</SelectItem>
+                          <SelectItem key={loc.id ?? `loc-${i}`} value={loc.id!}>{loc.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -685,6 +679,10 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       </Form>
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
         <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Add Variety</DialogTitle>
+                <DialogDescription>Create a new plant variety to reuse later.</DialogDescription>
+            </DialogHeader>
             <VarietyForm
                 variety={{ name: newVarietyName, family: '', category: '' }}
                 onSubmit={handleVarietyFormSubmit}

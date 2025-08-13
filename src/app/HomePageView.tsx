@@ -16,7 +16,7 @@ import { ProductionProtocolDialog } from "@/components/production-protocol-dialo
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { ScannedBatchActionsDialog } from "@/components/scanned-batch-actions-dialog";
 import { BatchDetailDialog } from "@/components/batch-detail-dialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { Logo } from '@/components/logo';
@@ -320,6 +320,12 @@ export default function HomePageView({
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{editingBatch ? `Edit Batch #${editingBatch?.batchNumber}` : "Create New Batch"}</DialogTitle>
+            <DialogDescription>
+              {editingBatch ? "Update the details for this batch." : "Enter the details for the new batch."}
+            </DialogDescription>
+          </DialogHeader>
           <BatchForm
             batch={editingBatch}
             distribution={batchDistribution}
@@ -336,6 +342,10 @@ export default function HomePageView({
 
       <Dialog open={isTransplantFormOpen} onOpenChange={setIsTransplantFormOpen}>
         <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Transplant Batch</DialogTitle>
+            <DialogDescription>Move quantity into a new batch and optionally log remaining as loss.</DialogDescription>
+          </DialogHeader>
           <TransplantForm
             batch={transplantingBatch}
             onSubmit={onTransplantFormSubmit}
@@ -348,6 +358,10 @@ export default function HomePageView({
 
       <Dialog open={isActionLogFormOpen} onOpenChange={setIsActionLogFormOpen}>
         <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Log Action</DialogTitle>
+            <DialogDescription>Add a note, move, or loss entry to the batch history.</DialogDescription>
+          </DialogHeader>
           <ActionLogForm
             batch={actionLogBatch}
             onSubmit={onActionLogFormSubmit}

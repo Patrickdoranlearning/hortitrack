@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { INITIAL_SUPPLIERS } from '@/lib/suppliers';
 import type { Supplier } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
     AlertDialog,
@@ -265,6 +265,10 @@ export default function SuppliersPage() {
       
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>{editingSupplier ? "Edit Supplier" : "Add Supplier"}</DialogTitle>
+                <DialogDescription>Manage supplier records for your batches.</DialogDescription>
+            </DialogHeader>
             <SupplierForm
                 supplier={editingSupplier}
                 onSubmit={handleFormSubmit}
