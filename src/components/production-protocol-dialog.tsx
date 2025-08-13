@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -135,8 +136,8 @@ function ProtocolDisplay({ protocol }: { protocol: ProductionProtocolOutput }) {
             <div>
                 <h4 className="font-semibold text-lg mb-3">Production Timeline</h4>
                 <div className="relative pl-6 space-y-6 border-l-2 border-primary/20">
-                    {protocol.timeline.map((item) => (
-                        <div key={`${item.date}-${item.action}`} className="relative">
+                    {protocol.timeline.map((item, index) => (
+                        <div key={`${item.date}-${item.action}-${index}`} className="relative">
                             <div className="absolute -left-[34px] top-1 flex items-center justify-center w-4 h-4 bg-primary rounded-full">
                                 <Clock className="h-2 w-2 text-primary-foreground" />
                             </div>
@@ -153,8 +154,8 @@ function ProtocolDisplay({ protocol }: { protocol: ProductionProtocolOutput }) {
             <div>
                 <h4 className="font-semibold text-lg mb-2">Key Recommendations</h4>
                 <ul className="space-y-3">
-                    {protocol.recommendations.map((rec) => (
-                        <li key={rec} className="flex items-start gap-3">
+                    {protocol.recommendations.map((rec, index) => (
+                        <li key={`${rec.slice(0, 10)}-${index}`} className="flex items-start gap-3">
                             <CheckCircle className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
                             <span>{rec}</span>
                         </li>

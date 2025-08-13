@@ -25,9 +25,12 @@ import { Textarea } from '@/components/ui/textarea';
 import type { Batch, NurseryLocation, PlantSize, LogEntry } from '@/lib/types';
 import { useState } from 'react';
 import { DialogDescription, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { LogEntrySchema } from '@/lib/types';
+
+const actionTypeEnum = LogEntrySchema.shape.type;
 
 const formSchema = (maxQuantity: number) => z.object({
-  type: z.enum(['NOTE', 'MOVE', 'LOSS', 'Batch Spaced', 'Batch Trimmed']),
+  type: actionTypeEnum,
   note: z.string().optional(),
   newLocation: z.string().optional(),
   qty: z.coerce.number().min(1, 'Quantity must be at least 1.').max(maxQuantity, `Cannot exceed remaining stock of ${maxQuantity}.`).optional(),
@@ -93,8 +96,9 @@ export function ActionLogForm({
   };
   
   const handleActionTypeChange = (value: string) => {
-    setActionType(value);
-    form.setValue('type', value as 'NOTE' | 'MOVE' | 'LOSS' | 'Batch Spaced' | 'Batch Trimmed');
+    const newType = value as z.infer<typeof actionTypeEnum>;
+    setActionType(newType);
+    form.setValue('type', newType);
     form.clearErrors();
   }
 
@@ -219,5 +223,3 @@ export function ActionLogForm({
     </>
   );
 }
-
-    

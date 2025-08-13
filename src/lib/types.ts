@@ -109,5 +109,3 @@ export const VarietySchema = z.object({
   evergreen: z.string().optional(),
 });
 export type Variety = z.infer<typeof VarietySchema>;
-
-    
