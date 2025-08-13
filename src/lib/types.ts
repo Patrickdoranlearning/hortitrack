@@ -29,8 +29,8 @@ export const BatchSchema = z.object({
   logHistory: z.array(LogEntrySchema),
   transplantedFrom: z.string().optional(),
   supplier: z.string().optional(),
-  growerPhotoUrl: z.string().optional(),
-  salesPhotoUrl: z.string().optional(),
+  growerPhotoUrl: z.string().optional(), // Added for grower photo URL
+  salesPhotoUrl: z.string().optional(), // Added for sales photo URL
   createdAt: z.any(), // serverTimestamp
   updatedAt: z.any(), // serverTimestamp
 });

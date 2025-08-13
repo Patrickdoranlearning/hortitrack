@@ -170,7 +170,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     // Fallback for other types, ensure size is a string before calling localeCompare
     const aSize = a.size || '';
     const bSize = b.size || '';
-    return aSize.localeCompare(bSize);
+    return aSize.localeCompare(bBsize);
   };
   
   const sortedPlantSizes = useMemo(() => {
@@ -507,6 +507,40 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 )}
               />
             </div>
+
+            {/* New fields for photo uploads */}
+            <div className="md:row-start-5">
+              <FormField
+                control={form.control}
+                name="growerPhotoUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Grower Photo URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="URL for grower's photo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="md:row-start-5">
+              <FormField
+                control={form.control}
+                name="salesPhotoUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sales Photo URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="URL for sales photo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+
           </div>
             
           <div className="md:col-span-2">

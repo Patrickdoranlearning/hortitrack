@@ -3,11 +3,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper function to check for admin role
+    function isAdmin() {
+      return request.auth.token.role == 'admin';
+    }
+
     // Users collection: users can only read/write their own document.
     match /users/{userId} {
       allow read, write: if request.auth.uid == userId;
     }
-    
+
     // Batches and Counters collections: only authenticated users can read/write.
     match /batches/{batchId} {
       allow read, write: if request.auth != null;
@@ -16,19 +21,22 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    // Golden Tables: Allow any authenticated user to read and write.
-    // This allows for management through the app's UI.
+    // Golden Tables: Only admin users can write. All authenticated users can read.
     match /varieties/{varietyId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
     }
     match /locations/{locationId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
     }
      match /sizes/{sizeId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
     }
      match /suppliers/{supplierId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
     }
 
     // Default deny for any other path to ensure security
