@@ -237,7 +237,7 @@ export async function logAction(
     
     const updatedBatch = { ...batch };
     
-    const newLog: Partial<LogEntry> = {
+    const newLog: Partial<LogEntry> & { type: LogEntry['type'] } = {
         date: FieldValue.serverTimestamp(),
         type: logData.type,
     };
@@ -267,12 +267,8 @@ export async function logAction(
         return { success: false, error: 'Invalid log action type.' };
     }
 
-    updatedBatch.logHistory = [...updatedBatch.logHistory, newLog as LogEntry];
-
-    if (logData.type === 'ADJUST' && logData.qty) {
-      updatedBatch.quantity += logData.qty;
-    }
-
+    updatedBatch.logHistory.push(newLog as LogEntry);
+    
     const result = await updateBatchAction(updatedBatch);
     if (result.success) {
       return { success: true, data: result.data };
