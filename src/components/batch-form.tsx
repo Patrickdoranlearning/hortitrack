@@ -106,6 +106,12 @@ interface BatchFormProps {
   varieties: Variety[];
 }
 
+const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
+  list.find(x => x.name === name)?.id ?? '';
+
+const idFromSize = (list: {id?: string; size?: string}[], size?: string) =>
+  list.find(x => x.size === size)?.id ?? '';
+
 export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers, varieties }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
   const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
@@ -195,8 +201,8 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     }
   };
 
-  const handleSizeChange = (sizeValue: string) => {
-    const selectedSize = plantSizes.find(s => s.id === sizeValue);
+  const handleSizeChange = (sizeId: string) => {
+    const selectedSize = plantSizes.find(s => s.id === sizeId);
     if (selectedSize) {
       form.setValue('size', selectedSize.size);
       setSelectedSizeInfo(selectedSize);
@@ -253,7 +259,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
 
   const varietyOptions = useMemo(() => varieties.map(v => ({ value: v.id!, label: v.name })), [varieties]);
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
-  const currentSizeValue = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
   const selectedVarietyId = varieties.find(v => v.name === form.watch('plantVariety'))?.id;
 
   return (
@@ -328,15 +333,18 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Size</FormLabel>
-                    <Select onValueChange={handleSizeChange} value={currentSizeValue}>
+                    <Select
+                      onValueChange={handleSizeChange}
+                      defaultValue={idFromSize(sortedPlantSizes, field.value)}
+                     >
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {sortedPlantSizes
                           .filter(s => s?.id && s?.size)
-                          .map(s => (
-                            <SelectItem key={s.id} value={s.id}>
+                          .map((s, i) => (
+                            <SelectItem key={s.id ?? `${s.size}-${i}`} value={s.id!}>
                               <span>{s.size} ({s.type})</span>
                             </SelectItem>
                         ))}
@@ -469,12 +477,20 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Supplier</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(id) => {
+                        const selected = suppliers.find(s => s.id === id);
+                        field.onChange(selected?.name ?? '');
+                      }}
+                      defaultValue={idFromName(suppliers, field.value)}
+                    >
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            {suppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                            {suppliers.map((s, i) => (
+                              <SelectItem key={s.id ?? `${s.name}-${i}`} value={s.id!}>{s.name}</SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                     <FormMessage />
@@ -490,12 +506,20 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(id) => {
+                        const selected = nurseryLocations.find(l => l.id === id);
+                        field.onChange(selected?.name ?? '');
+                      }}
+                      defaultValue={idFromName(nurseryLocations, field.value)}
+                    >
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {nurseryLocations.map(location => <SelectItem key={location.id} value={location.name}>{location.name}</SelectItem>)}
+                        {nurseryLocations.map((loc, i) => (
+                          <SelectItem key={loc.id ?? `${loc.name}-${i}`} value={loc.id!}>{loc.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -69,6 +69,12 @@ interface TransplantFormProps {
   plantSizes: PlantSize[];
 }
 
+const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
+  list.find(x => x.name === name)?.id ?? '';
+
+const idFromSize = (list: {id?: string; size?: string}[], size?: string) =>
+  list.find(x => x.size === size)?.id ?? '';
+
 export function TransplantForm({
   batch,
   onSubmit,
@@ -130,25 +136,6 @@ export function TransplantForm({
     return plantSizes ? [...plantSizes].sort(customSizeSort) : [];
   }, [plantSizes]);
 
-  useEffect(() => {
-    if (batch) {
-        form.reset({
-          category: batch.category,
-          plantFamily: batch.plantFamily,
-          plantVariety: batch.plantVariety,
-          plantingDate: new Date().toISOString(),
-          quantity: batch.quantity,
-          status: 'Potted',
-          location: '',
-          size: '',
-          transplantedFrom: batch.batchNumber,
-          supplier: 'Doran Nurseries',
-          logRemainingAsLoss: false,
-          trayQuantity: 1,
-        })
-    }
-  }, [batch, form]);
-
   const handleFormSubmit = (
     data: z.infer<ReturnType<typeof transplantFormSchema>>
   ) => {
@@ -186,7 +173,6 @@ export function TransplantForm({
   };
 
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
-  const currentSizeId = plantSizes.find(s => s.size === form.watch('size'))?.id || '';
 
   if (!batch) {
     return null;
@@ -262,8 +248,11 @@ export function TransplantForm({
                 <FormItem>
                   <FormLabel>New Location</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    onValueChange={(id) => {
+                      const selected = nurseryLocations.find(l => l.id === id);
+                      field.onChange(selected?.name ?? '');
+                    }}
+                    defaultValue={idFromName(nurseryLocations, field.value)}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -271,8 +260,8 @@ export function TransplantForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {nurseryLocations.map((location) => (
-                        <SelectItem key={location.id} value={location.name}>
+                      {nurseryLocations.map((location, i) => (
+                        <SelectItem key={location.id ?? `${location.name}-${i}`} value={location.id!}>
                           {location.name}
                         </SelectItem>
                       ))}
@@ -332,7 +321,7 @@ export function TransplantForm({
                   <FormLabel>New Size</FormLabel>
                   <Select
                     onValueChange={handleSizeChange}
-                    value={currentSizeId}
+                    defaultValue={idFromSize(sortedPlantSizes, field.value)}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -340,8 +329,8 @@ export function TransplantForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {sortedPlantSizes.filter(s => s?.id && s?.size).map((size) => (
-                        <SelectItem key={size.id} value={size.id}>
+                      {sortedPlantSizes.filter(s => s?.id && s?.size).map((size, i) => (
+                        <SelectItem key={size.id ?? `${size.size}-${i}`} value={size.id!}>
                           <span>{size.size} ({size.type})</span>
                         </SelectItem>
                       ))}

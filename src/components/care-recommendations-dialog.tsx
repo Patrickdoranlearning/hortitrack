@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -115,7 +116,7 @@ function RecommendationsList({ recommendations }: { recommendations: string[] })
     return (
         <ul className="space-y-3">
             {recommendations.map((rec, index) => (
-                <li key={index} className="flex items-start gap-3">
+                <li key={`${rec}-${index}`} className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
                     <span>{rec}</span>
                 </li>

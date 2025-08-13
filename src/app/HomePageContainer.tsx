@@ -30,10 +30,10 @@ import { auth } from '@/lib/firebase';
 import { BatchDistribution } from '@/components/batch-form';
 
 
-function dedupeByIdOrName<T extends { id?: string; name?: string; size?: string }>(arr: T[]): T[] {
+function dedupeByName<T extends { id?: string; name?: string; size?: string }>(arr: T[]): T[] {
   const seen = new Set<string>();
   return arr.filter(item => {
-    const key = (item.id ?? item.name ?? item.size ?? "").trim().toLowerCase();
+    const key = (item.name ?? item.size ?? "").trim().toLowerCase();
     if (key && !seen.has(key)) {
       seen.add(key);
       return true;
@@ -279,9 +279,9 @@ export default function HomePageContainer() {
     );
   }
   
-  const uniqueSuppliers = dedupeByIdOrName(suppliers);
-  const uniquePlantSizes = dedupeByIdOrName(plantSizes);
-  const uniqueNurseryLocations = dedupeByIdOrName(nurseryLocations);
+  const uniqueSuppliers = dedupeByName(suppliers);
+  const uniquePlantSizes = dedupeByName(plantSizes);
+  const uniqueNurseryLocations = dedupeByName(nurseryLocations);
 
   return (
     <HomePageView

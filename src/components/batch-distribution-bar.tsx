@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -54,7 +55,7 @@ export function BatchDistributionBar({ distribution, initialQuantity }: BatchDis
                 <p className="font-bold text-center">Distribution of {initialQuantity} units</p>
                 <ul className="space-y-1">
                     {sections.map(section => (
-                        <li key={section.name} className="flex items-center justify-between gap-4">
+                        <li key={`${section.name}-${section.value}`} className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
                                 <span className={cn("h-3 w-3 rounded-sm", section.color)} />
                                 <span>{section.name}:</span>
