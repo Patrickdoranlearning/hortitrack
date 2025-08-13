@@ -186,8 +186,7 @@ export function TransplantForm({
           Transplant Batch
         </DialogTitle>
         <DialogDescription>
-          Create a new batch from an existing one. Original batch is #
-          {batch?.batchNumber}.
+          Create a new batch from existing batch #{batch?.batchNumber}.
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
@@ -212,7 +211,7 @@ export function TransplantForm({
                       <FormItem>
                         <FormLabel>Category</FormLabel>
                         <FormControl>
-                          <Input {...field} disabled />
+                          <Input {...field} value={field.value ?? ""} disabled />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -225,7 +224,7 @@ export function TransplantForm({
                     <FormItem>
                       <FormLabel>Plant Family</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled />
+                        <Input {...field} value={field.value ?? ""} disabled />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -238,7 +237,7 @@ export function TransplantForm({
                     <FormItem>
                       <FormLabel>Plant Variety</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled />
+                        <Input {...field} value={field.value ?? ""} disabled />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -366,7 +365,7 @@ export function TransplantForm({
                         <FormItem>
                           <FormLabel>Total Plants</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} readOnly className="bg-muted" />
+                            <Input type="number" {...field} value={field.value ?? ""} readOnly className="bg-muted" />
                           </FormControl>
                           <FormDescription>
                             Max available: {batch?.quantity}
@@ -387,6 +386,7 @@ export function TransplantForm({
                           <Input
                             type="number"
                             {...field}
+                            value={field.value ?? ""}
                             onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
                           />
                         </FormControl>
