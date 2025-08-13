@@ -4,7 +4,18 @@ import { z } from 'zod';
 export const LogEntrySchema = z.object({
   id: z.string().optional(),
   date: z.any(), // serverTimestamp or string
-  type: z.enum(['NOTE', 'LOSS', 'ADJUST', 'MOVE', 'TRANSPLANT_TO', 'TRANSPLANT_FROM', 'CREATE', 'ARCHIVE', 'Batch Spaced', 'Batch Trimmed']),
+  type: z.enum([
+    'NOTE',
+    'LOSS',
+    'ADJUST',
+    'MOVE',
+    'TRANSPLANT_TO',
+    'TRANSPLANT_FROM',
+    'CREATE',
+    'ARCHIVE',
+    'Batch Spaced',
+    'Batch Trimmed',
+  ]),
   qty: z.number().nullable().optional(),
   fromBatch: z.string().optional(),
   toBatch: z.string().optional(),

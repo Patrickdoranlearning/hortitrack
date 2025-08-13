@@ -27,7 +27,8 @@ interface BatchChatDialogProps {
   batch: Batch | null;
 }
 
-interface Message {
+interface ChatMsg {
+    id: string;
     role: 'user' | 'bot';
     text: string;
 }
@@ -38,7 +39,7 @@ export function BatchChatDialog({
   batch,
 }: BatchChatDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -46,7 +47,7 @@ export function BatchChatDialog({
   useEffect(() => {
     if (open && batch) {
         setMessages([
-            { role: 'bot', text: `Hi! I'm your AI assistant for batch #${batch.batchNumber}. Ask me anything about this batch.` }
+            { id: 'welcome', role: 'bot', text: `Hi! I'm your AI assistant for batch #${batch.batchNumber}. Ask me anything about this batch.` }
         ]);
     }
   }, [open, batch]);
@@ -63,7 +64,7 @@ export function BatchChatDialog({
     e.preventDefault();
     if (!input.trim() || !batch) return;
 
-    const userMessage: Message = { role: 'user', text: input };
+    const userMessage: ChatMsg = { id: crypto.randomUUID(), role: 'user', text: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
@@ -71,7 +72,7 @@ export function BatchChatDialog({
     const result = await batchChatAction(batch, input);
 
     if (result.success && result.data) {
-        const botMessage: Message = { role: 'bot', text: result.data.response };
+        const botMessage: ChatMsg = { id: crypto.randomUUID(), role: 'bot', text: result.data.response };
         setMessages(prev => [...prev, botMessage]);
     } else {
         toast({
@@ -79,7 +80,7 @@ export function BatchChatDialog({
             title: "AI Chat Error",
             description: result.error,
         });
-        const errorMessage: Message = { role: 'bot', text: "Sorry, I couldn't get a response. Please try again." };
+        const errorMessage: ChatMsg = { id: crypto.randomUUID(), role: 'bot', text: "Sorry, I couldn't get a response. Please try again." };
         setMessages(prev => [...prev, errorMessage]);
     }
     setLoading(false);
@@ -108,23 +109,23 @@ export function BatchChatDialog({
         </DialogHeader>
         <ScrollArea className="flex-1 pr-4 -mr-4" ref={scrollAreaRef}>
             <div className="space-y-4 py-4">
-                {messages.map((message, index) => (
-                    <div key={index} className={cn(
+                {messages.map(m => (
+                    <div key={m.id} className={cn(
                         "flex items-start gap-3",
-                        message.role === 'user' ? 'justify-end' : 'justify-start'
+                        m.role === 'user' ? 'justify-end' : 'justify-start'
                     )}>
-                        {message.role === 'bot' && (
+                        {m.role === 'bot' && (
                             <Avatar className="w-8 h-8 border-2 border-primary">
                                 <AvatarFallback><Bot /></AvatarFallback>
                             </Avatar>
                         )}
                         <div className={cn(
                             "p-3 rounded-lg max-w-sm",
-                            message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                            m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
                         )}>
-                            <p className="text-sm">{message.text}</p>
+                            <p className="text-sm">{m.text}</p>
                         </div>
-                         {message.role === 'user' && (
+                         {m.role === 'user' && (
                             <Avatar className="w-8 h-8">
                                 <AvatarFallback><User /></AvatarFallback>
                             </Avatar>
