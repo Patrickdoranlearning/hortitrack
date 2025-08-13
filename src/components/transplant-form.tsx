@@ -72,8 +72,8 @@ interface TransplantFormProps {
 const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
   list.find(x => x.name === name)?.id ?? '';
 
-const idFromSize = (list: {id?: string; size?: string}[], size?: string) =>
-  list.find(x => x.size === size)?.id ?? '';
+const idFromSize = (list: PlantSize[], name?: string) =>
+  list.find(s => s.size === name)?.id ?? "";
 
 export function TransplantForm({
   batch,
@@ -242,35 +242,35 @@ export function TransplantForm({
               )}
             />
             <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Location</FormLabel>
-                  <Select
-                     value={idFromName(nurseryLocations, field.value)}
-                     onValueChange={(id) => {
-                       const selected = nurseryLocations.find(l => l.id === id);
-                       field.onChange(selected?.name ?? '');
-                     }}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a new location" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {nurseryLocations.map((location, i) => (
-                        <SelectItem key={location.id ?? `${location.name}-${i}`} value={location.id!}>
-                          {location.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Location</FormLabel>
+                    <Select
+                      value={idFromName(nurseryLocations, field.value)}
+                      onValueChange={(id) => {
+                        const selected = nurseryLocations.find(l => l.id === id);
+                        field.onChange(selected?.name ?? '');
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a new location" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {nurseryLocations.map((loc, i) => (
+                          <SelectItem key={loc.id ?? `loc-${i}`} value={loc.id!}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <FormField
               control={form.control}
               name="plantingDate"
@@ -313,33 +313,33 @@ export function TransplantForm({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="size"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Size</FormLabel>
-                  <Select
-                    value={idFromSize(sortedPlantSizes, field.value)}
-                    onValueChange={handleSizeChange}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a new size" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {sortedPlantSizes.filter(s => s?.id && s?.size).map((size, i) => (
-                        <SelectItem key={size.id ?? `${size.size}-${i}`} value={size.id!}>
-                          <span>{size.size} ({size.type})</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+             <FormField
+                control={form.control}
+                name="size"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Size</FormLabel>
+                    <Select
+                      value={idFromSize(sortedPlantSizes, field.value)}
+                      onValueChange={handleSizeChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a new size" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {sortedPlantSizes.map((s, i) => (
+                          <SelectItem key={s.id ?? `size-${i}`} value={s.id!}>
+                            <span>{s.size} ({s.type})</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
             {showTrayFields ? (
               <>
@@ -461,3 +461,5 @@ export function TransplantForm({
     </>
   );
 }
+
+    
