@@ -36,6 +36,7 @@ import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/co
 import { Checkbox } from './ui/checkbox';
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { useMemo, useState } from 'react';
+import { ScrollArea } from './ui/scroll-area';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -192,165 +193,39 @@ export function TransplantForm({
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(handleFormSubmit)}
-          className="space-y-6"
+          className="space-y-0"
         >
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FormItem>
-              <FormLabel>New Batch Number</FormLabel>
-              <FormControl>
-                <Input placeholder="Auto-generated" disabled />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-            <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            <FormField
-              control={form.control}
-              name="plantFamily"
-              render={({ field }) => (
+          <ScrollArea className="h-[70vh] p-6 pr-8 -mr-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormItem>
-                  <FormLabel>Plant Family</FormLabel>
+                  <FormLabel>New Batch Number</FormLabel>
                   <FormControl>
-                    <Input {...field} disabled />
+                    <Input placeholder="Auto-generated" disabled />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="plantVariety"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Plant Variety</FormLabel>
-                  <FormControl>
-                    <Input {...field} disabled />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Location</FormLabel>
-                    <Select
-                      value={idFromName(nurseryLocations, field.value)}
-                      onValueChange={(id) => {
-                        const selected = nurseryLocations.find(l => l.id === id);
-                        field.onChange(selected?.name ?? '');
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a new location" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {nurseryLocations.map((loc, i) => (
-                          <SelectItem key={loc.id ?? `loc-${i}`} value={loc.id!}>
-                            {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            <FormField
-              control={form.control}
-              name="plantingDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Transplant Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={'outline'}
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(new Date(field.value), 'PPP')
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={
-                          field.value ? new Date(field.value) : undefined
-                        }
-                        onSelect={(date) =>
-                          field.onChange(date?.toISOString())
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Size</FormLabel>
-                    <Select
-                      value={idFromSize(sortedPlantSizes, field.value)}
-                      onValueChange={handleSizeChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a new size" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sortedPlantSizes.map((s, i) => (
-                          <SelectItem key={s.id ?? `size-${i}`} value={s.id!}>
-                            <span>{s.size} ({s.type})</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-            {showTrayFields ? (
-              <>
-                 <FormField
+                <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <FormControl>
+                          <Input {...field} disabled />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                <FormField
                   control={form.control}
-                  name="trayQuantity"
+                  name="plantFamily"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>No. of Trays</FormLabel>
+                      <FormLabel>Plant Family</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={handleTrayQuantityChange} value={field.value || ''} />
+                        <Input {...field} disabled />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -358,99 +233,228 @@ export function TransplantForm({
                 />
                 <FormField
                   control={form.control}
-                  name="quantity"
+                  name="plantVariety"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Plants</FormLabel>
+                      <FormLabel>Plant Variety</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} readOnly className="bg-muted" />
+                        <Input {...field} disabled />
                       </FormControl>
-                       <FormDescription>
-                        Max available: {batch?.quantity}
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </>
-            ) : (
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity to Transplant</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Max available: {batch?.quantity}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+                <FormField
+                    control={form.control}
+                    name="location"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Location</FormLabel>
+                        <Select
+                          value={idFromName(nurseryLocations, field.value)}
+                          onValueChange={(id) => {
+                            const selected = nurseryLocations.find(l => l.id === id);
+                            field.onChange(selected?.name ?? '');
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a new location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {nurseryLocations.map((loc, i) => (
+                              <SelectItem key={loc.id ?? `loc-${i}`} value={loc.id!}>
+                                {loc.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                <FormField
+                  control={form.control}
+                  name="plantingDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Transplant Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={'outline'}
+                              className={cn(
+                                'w-full pl-3 text-left font-normal',
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
+                              {field.value ? (
+                                format(new Date(field.value), 'PPP')
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={
+                              field.value ? new Date(field.value) : undefined
+                            }
+                            onSelect={(date) =>
+                              field.onChange(date?.toISOString())
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                    control={form.control}
+                    name="size"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Size</FormLabel>
+                        <Select
+                          value={idFromSize(sortedPlantSizes, field.value)}
+                          onValueChange={handleSizeChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a new size" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {sortedPlantSizes.map((s, i) => (
+                              <SelectItem key={s.id ?? `size-${i}`} value={s.id!}>
+                                <span>{s.size} ({s.type})</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Status</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value ?? ''}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Propagation">Propagation</SelectItem>
-                      <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-                      <SelectItem value="Potted">Potted</SelectItem>
-                      <SelectItem value="Ready for Sale">
-                        Ready for Sale
-                      </SelectItem>
-                      <SelectItem value="Looking Good">Looking Good</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          
-          <FormField
-              control={form.control}
-              name="logRemainingAsLoss"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
+                {showTrayFields ? (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="trayQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>No. of Trays</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} onChange={handleTrayQuantityChange} value={field.value || ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      Log remaining units as loss and archive original batch
-                    </FormLabel>
-                    <FormDescription>
-                      If checked, any units not transplanted will be logged as a loss, and the original batch #{batch.batchNumber} will be archived.
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
+                    <FormField
+                      control={form.control}
+                      name="quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Total Plants</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} readOnly className="bg-muted" />
+                          </FormControl>
+                          <FormDescription>
+                            Max available: {batch?.quantity}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="quantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantity to Transplant</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Max available: {batch?.quantity}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-          <DialogFooter className="pt-4">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Propagation">Propagation</SelectItem>
+                          <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                          <SelectItem value="Potted">Potted</SelectItem>
+                          <SelectItem value="Ready for Sale">
+                            Ready for Sale
+                          </SelectItem>
+                          <SelectItem value="Looking Good">Looking Good</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                  control={form.control}
+                  name="logRemainingAsLoss"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Log remaining units as loss and archive original batch
+                        </FormLabel>
+                        <FormDescription>
+                          If checked, any units not transplanted will be logged as a loss, and the original batch #{batch.batchNumber} will be archived.
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </ScrollArea>
+          <DialogFooter className="pt-6 p-6 border-t">
             <Button type="button" variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
@@ -461,5 +465,3 @@ export function TransplantForm({
     </>
   );
 }
-
-    

@@ -52,6 +52,7 @@ import { addVarietyAction } from '@/app/actions';
 import { VarietyForm } from './variety-form';
 import { useToast } from '@/hooks/use-toast';
 import { LogEntrySchema } from '@/lib/types';
+import { ScrollArea } from './ui/scroll-area';
 
 const batchFormSchema = z.object({
   id: z.string().optional(),
@@ -291,364 +292,368 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
               });
             }
           )} 
-          className="space-y-6"
+          className="space-y-0"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-5 gap-x-8 gap-y-4">
-            
-            <div className="md:row-start-1">
-              <FormField
-                control={form.control}
-                name="plantVariety"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Plant Variety</FormLabel>
-                    <Combobox
-                      options={varietyOptions}
-                      value={idFromVarietyName(varieties, field.value)}
-                      onChange={handleVarietyChange}
-                      onCreate={handleCreateNewVariety}
-                      placeholder="Select variety..."
-                      emptyMessage="No matching variety found."
-                    />
-                    <FormDescription>Choose a variety or type to create a new one.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="md:row-start-2">
-               <FormField
-                control={form.control}
-                name="plantFamily"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Plant Family</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="md:row-start-3">
-               <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="md:row-start-4">
-              <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Size</FormLabel>
-                    <Select
-                      value={idFromSize(sortedPlantSizes, field.value)}
-                      onValueChange={handleSizeChange}
-                     >
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sortedPlantSizes
-                          .filter(s => s?.id && s?.size)
-                          .map((s, i) => (
-                            <SelectItem key={s.id ?? `${s.size}-${i}`} value={s.id!}>
-                              <span>{s.size} ({s.type})</span>
-                            </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>Tray sizes auto-calculate total quantity.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="md:row-start-5 grid grid-cols-2 gap-4">
-              {showTrayFields ? (
-                <>
-                   <FormField
-                    control={form.control}
-                    name="trayQuantity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>No. of Trays</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            value={field.value ?? ""}
-                            onChange={handleTrayQuantityChange}
-                            inputMode="numeric"
-                           />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+          <ScrollArea className="h-[70vh] p-6 pr-8 -mr-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-5 gap-x-8 gap-y-4">
+                
+                <div className="md:row-start-1">
                   <FormField
                     control={form.control}
-                    name="quantity"
+                    name="plantVariety"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Plant Variety</FormLabel>
+                        <Combobox
+                          options={varietyOptions}
+                          value={idFromVarietyName(varieties, field.value)}
+                          onChange={handleVarietyChange}
+                          onCreate={handleCreateNewVariety}
+                          placeholder="Select variety..."
+                          emptyMessage="No matching variety found."
+                        />
+                        <FormDescription>Choose a variety or type to create a new one.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="md:row-start-2">
+                  <FormField
+                    control={form.control}
+                    name="plantFamily"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Total Plants</FormLabel>
+                        <FormLabel>Plant Family</FormLabel>
                         <FormControl>
-                          <Input type="number" value={field.value ?? ""} readOnly className="bg-muted" />
+                          <Input placeholder="Auto-populated" {...field} className={cn(isFamilySet && 'bg-green-100 dark:bg-green-900/20')} disabled />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </>
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Quantity</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          inputMode="numeric"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
-
-            <div className="md:row-start-1">
-               <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select value={field.value ?? ""} onValueChange={field.onChange} disabled={field.value === 'Archived'}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Propagation">Propagation</SelectItem>
-                        <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-                        <SelectItem value="Potted">Potted</SelectItem>
-                        <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
-                        <SelectItem value="Looking Good">Looking Good</SelectItem>
-                         {field.value === 'Archived' && (
-                          <SelectItem value="Archived" disabled>Archived</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="md:row-start-2">
-              <FormField
-                control={form.control}
-                name="plantingDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Planting Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={'outline'}
-                            className={cn(
-                              'w-full justify-start text-left font-normal',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(new Date(field.value), 'PPP') : <span>Pick a date</span>}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value ? new Date(field.value) : undefined}
-                          onSelect={(date) => field.onChange(date?.toISOString() ?? "")}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="md:row-start-3">
-              <FormField
-                control={form.control}
-                name="supplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier</FormLabel>
-                    <Select
-                      value={idFromName(suppliers, field.value)}
-                      onValueChange={(id) => {
-                        const selected = suppliers.find(s => s.id === id);
-                        if(selected) field.onChange(selected.name);
-                      }}
-                    >
-                        <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {suppliers.map((s, i) => (
-                              <SelectItem key={s.id ?? `sup-${i}`} value={s.id!}>{s.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="md:row-start-4">
-               <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <Select
-                      value={idFromName(nurseryLocations, field.value)}
-                      onValueChange={(id) => {
-                        const selected = nurseryLocations.find(l => l.id === id);
-                        if(selected) field.onChange(selected.name);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {nurseryLocations.map((loc, i) => (
-                          <SelectItem key={loc.id ?? `loc-${i}`} value={loc.id!}>{loc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="md:row-start-5">
-              <FormField
-                control={form.control}
-                name="growerPhotoUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Grower Photo URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="URL for grower's photo" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-             <div className="md:row-start-6">
-              <FormField
-                control={form.control}
-                name="salesPhotoUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sales Photo URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="URL for sales photo" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-          </div>
-            
-          <div className="md:col-span-2">
-            {distribution && batch && (batch.initialQuantity > 0) && (
-                <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
-                    <h3 className="flex items-center font-semibold mb-2"><PieChart className="mr-2 h-4 w-4"/>Batch Distribution</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        A breakdown of where the initial {batch.initialQuantity} units have gone.
-                    </p>
-                    <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
                 </div>
-            )}
-          </div>
+                
+                <div className="md:row-start-3">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Auto-populated" {...field} className={cn(isCategorySet && 'bg-green-100 dark:bg-green-900/20')} disabled/>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-          <div className="md:col-span-2">
-              <FormLabel>Log History</FormLabel>
-              <div className="space-y-2 pt-2">
-                {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-start gap-2">
-                        <FormField
-                            key={`date-${field.id}`}
-                            control={form.control}
-                            name={`logHistory.${index}.date`}
-                            render={({ field: formField }) => (
-                                <FormItem className="w-1/3">
-                                <FormControl>
-                                    <Input type="date" {...formField} value={format(new Date(formField.value), 'yyyy-MM-dd')} onChange={(e) => formField.onChange(new Date(e.target.value).toISOString())} />
-                                </FormControl>
-                                </FormItem>
-                            )}
+                <div className="md:row-start-4">
+                  <FormField
+                    control={form.control}
+                    name="size"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Size</FormLabel>
+                        <Select
+                          value={idFromSize(sortedPlantSizes, field.value)}
+                          onValueChange={handleSizeChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {sortedPlantSizes
+                              .filter(s => s?.id && s?.size)
+                              .map((s, i) => (
+                                <SelectItem key={s.id ?? `${s.size}-${i}`} value={s.id!}>
+                                  <span>{s.size} ({s.type})</span>
+                                </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>Tray sizes auto-calculate total quantity.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="md:row-start-5 grid grid-cols-2 gap-4">
+                  {showTrayFields ? (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="trayQuantity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>No. of Trays</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                value={field.value ?? ""}
+                                onChange={handleTrayQuantityChange}
+                                inputMode="numeric"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="quantity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Total Plants</FormLabel>
+                            <FormControl>
+                              <Input type="number" value={field.value ?? ""} readOnly className="bg-muted" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="quantity"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              inputMode="numeric"
                             />
-                        <FormField
-                            key={`note-${field.id}`}
-                            control={form.control}
-                            name={`logHistory.${index}.note`}
-                            render={({ field: formField }) => (
-                                <FormItem className="flex-1">
-                                <FormControl>
-                                    <Textarea placeholder="Describe the action taken..." {...formField} value={formField.value ?? ""} className="min-h-[40px]"/>
-                                </FormControl>
-                                </FormItem>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+
+                <div className="md:row-start-1">
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select value={field.value ?? ""} onValueChange={field.onChange} disabled={field.value === 'Archived'}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Propagation">Propagation</SelectItem>
+                            <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                            <SelectItem value="Potted">Potted</SelectItem>
+                            <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                            <SelectItem value="Looking Good">Looking Good</SelectItem>
+                            {field.value === 'Archived' && (
+                              <SelectItem value="Archived" disabled>Archived</SelectItem>
                             )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="md:row-start-2">
+                  <FormField
+                    control={form.control}
+                    name="plantingDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Planting Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={'outline'}
+                                className={cn(
+                                  'w-full justify-start text-left font-normal',
+                                  !field.value && 'text-muted-foreground'
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {field.value ? format(new Date(field.value), 'PPP') : <span>Pick a date</span>}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value ? new Date(field.value) : undefined}
+                              onSelect={(date) => field.onChange(date?.toISOString() ?? "")}
+                              initialFocus
                             />
-                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                    </div>
-                ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), type: 'NOTE', note: '' })}>
-                    <Plus className="h-4 w-4 mr-2"/>
-                    Add Log Entry
-                </Button>
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="md:row-start-3">
+                  <FormField
+                    control={form.control}
+                    name="supplier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Supplier</FormLabel>
+                        <Select
+                          value={idFromName(suppliers, field.value)}
+                          onValueChange={(id) => {
+                            const selected = suppliers.find(s => s.id === id);
+                            if(selected) field.onChange(selected.name);
+                          }}
+                        >
+                            <FormControl>
+                                <SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {suppliers.map((s, i) => (
+                                  <SelectItem key={s.id ?? `sup-${i}`} value={s.id!}>{s.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="md:row-start-4">
+                  <FormField
+                    control={form.control}
+                    name="location"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <Select
+                          value={idFromName(nurseryLocations, field.value)}
+                          onValueChange={(id) => {
+                            const selected = nurseryLocations.find(l => l.id === id);
+                            if(selected) field.onChange(selected.name);
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {nurseryLocations.map((loc, i) => (
+                              <SelectItem key={loc.id ?? `loc-${i}`} value={loc.id!}>{loc.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="md:row-start-5">
+                  <FormField
+                    control={form.control}
+                    name="growerPhotoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Grower Photo URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="URL for grower's photo" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="md:row-start-6">
+                  <FormField
+                    control={form.control}
+                    name="salesPhotoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sales Photo URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="URL for sales photo" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
               </div>
-          </div>
+                
+              <div className="md:col-span-2">
+                {distribution && batch && (batch.initialQuantity > 0) && (
+                    <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+                        <h3 className="flex items-center font-semibold mb-2"><PieChart className="mr-2 h-4 w-4"/>Batch Distribution</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            A breakdown of where the initial {batch.initialQuantity} units have gone.
+                        </p>
+                        <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
+                    </div>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                  <FormLabel>Log History</FormLabel>
+                  <div className="space-y-2 pt-2">
+                    {fields.map((field, index) => (
+                        <div key={field.id} className="flex items-start gap-2">
+                            <FormField
+                                key={`date-${field.id}`}
+                                control={form.control}
+                                name={`logHistory.${index}.date`}
+                                render={({ field: formField }) => (
+                                    <FormItem className="w-1/3">
+                                    <FormControl>
+                                        <Input type="date" {...formField} value={format(new Date(formField.value), 'yyyy-MM-dd')} onChange={(e) => formField.onChange(new Date(e.target.value).toISOString())} />
+                                    </FormControl>
+                                    </FormItem>
+                                )}
+                                />
+                            <FormField
+                                key={`note-${field.id}`}
+                                control={form.control}
+                                name={`logHistory.${index}.note`}
+                                render={({ field: formField }) => (
+                                    <FormItem className="flex-1">
+                                    <FormControl>
+                                        <Textarea placeholder="Describe the action taken..." {...formField} value={formField.value ?? ""} className="min-h-[40px]"/>
+                                    </FormControl>
+                                    </FormItem>
+                                )}
+                                />
+                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), type: 'NOTE', note: '' })}>
+                        <Plus className="h-4 w-4 mr-2"/>
+                        Add Log Entry
+                    </Button>
+                  </div>
+              </div>
+            </div>
+          </ScrollArea>
           
-          <DialogFooter className="flex justify-between items-center pt-4">
+          <DialogFooter className="flex justify-between items-center p-6 border-t">
             <div>
               {batch && batch.status !== 'Archived' && (
                 <AlertDialog>
@@ -688,10 +693,10 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
       </Form>
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
         <DialogContent className="max-w-2xl">
-            <DialogHeader>
-                <DialogTitle>Add Variety</DialogTitle>
-                <DialogDescription>Create a new plant variety to reuse later.</DialogDescription>
-            </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Add Variety</DialogTitle>
+            <DialogDescription>Create a new plant variety to reuse later.</DialogDescription>
+          </DialogHeader>
             <VarietyForm
                 variety={{ name: newVarietyName, family: '', category: '' }}
                 onSubmit={handleVarietyFormSubmit}
