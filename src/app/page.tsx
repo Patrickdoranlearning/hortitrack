@@ -112,8 +112,12 @@ export default function HomePageView({
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
 
+  const isReadonly = !user;
+
   // Use the initial data passed from the server component
-  const { data: batches } = useCollection<Batch>('batches', initialBatches);
+  const { data: batchesData } = useCollection<Batch>('batches', initialBatches);
+  const batches = batchesData || [];
+
   const { data: varieties } = useCollection<Variety>(
     'varieties',
     initialVarieties
@@ -155,7 +159,8 @@ export default function HomePageView({
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const filteredBatches = React.useMemo(() => {
-    return batches
+    const dataToFilter = isReadonly ? initialBatches : batches;
+    return (dataToFilter || [])
       .filter((batch) =>
         `${batch.plantFamily} ${batch.plantVariety} ${batch.category} ${
           batch.supplier || ''
@@ -177,7 +182,7 @@ export default function HomePageView({
         if (filters.status === 'Active') return batch.status !== 'Archived';
         return batch.status === filters.status;
       });
-  }, [batches, searchQuery, filters]);
+  }, [isReadonly, initialBatches, batches, searchQuery, filters]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -201,7 +206,7 @@ export default function HomePageView({
     let transplanted = 0;
     let lost = 0;
 
-    batch.logHistory.forEach((log) => {
+    (batch.logHistory || []).forEach((log) => {
       if (log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number') {
         transplanted += Math.abs(log.qty);
       }
@@ -253,12 +258,6 @@ export default function HomePageView({
     if (foundBatch) {
       setSelectedBatch(foundBatch);
       setIsScannedActionOpen(true);
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Batch Not Found',
-        description: `No batch with number "${data}" could be found.`,
-      });
     }
   };
 
@@ -394,17 +393,18 @@ export default function HomePageView({
               variant="outline"
               size="icon"
               onClick={() => setIsScannerOpen(true)}
+              disabled={isReadonly}
             >
               <QrCode />
             </Button>
             <Button
               onClick={() => handleRecommendations(batches[0])}
               variant="outline"
-              disabled={batches.length === 0}
+              disabled={isReadonly || batches.length === 0}
             >
               <Sparkles /> AI Care
             </Button>
-            <Button onClick={() => handleOpenForm()}>
+            <Button onClick={() => handleOpenForm()} disabled={isReadonly}>
               <Plus /> New Batch
             </Button>
           </div>
@@ -443,7 +443,7 @@ export default function HomePageView({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c) => (
+              {(categories || []).map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
                 </SelectItem>
@@ -462,7 +462,7 @@ export default function HomePageView({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Families</SelectItem>
-              {plantFamilies.map((p) => (
+              {(plantFamilies || []).map((p) => (
                 <SelectItem key={p} value={p}>
                   {p}
                 </SelectItem>

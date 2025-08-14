@@ -1,4 +1,3 @@
-
 import HomePageView from '@/app/page';
 import {
   addBatchAction,
@@ -80,6 +79,10 @@ export default async function HomePageContainer() {
     INITIAL_SUPPLIERS
   );
 
+  const uniqueSuppliers = dedupeByName(suppliers);
+  const uniquePlantSizes = dedupeByName(plantSizes);
+  const uniqueNurseryLocations = dedupeByName(nurseryLocations);
+
   const plantFamilies = [
     'all',
     ...Array.from(new Set(batches.map((b: Batch) => b.plantFamily).filter(Boolean))),
@@ -88,10 +91,6 @@ export default async function HomePageContainer() {
     'all',
     ...Array.from(new Set(batches.map((b: Batch) => b.category).filter(Boolean))),
   ];
-
-  const uniqueSuppliers = dedupeByName(suppliers);
-  const uniquePlantSizes = dedupeByName(plantSizes);
-  const uniqueNurseryLocations = dedupeByName(nurseryLocations);
 
   return (
     <HomePageView

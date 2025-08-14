@@ -69,6 +69,7 @@ export function useCollection<T>(
     );
 
     return unsubscribe;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectionName, user, toast, JSON.stringify(constraints)]);
 
   useEffect(() => {
@@ -76,5 +77,5 @@ export function useCollection<T>(
     return () => unsubscribe();
   }, [subscribeToCollection]);
 
-  return { data, isLoading, error };
+  return { data: data || initialData || [], isLoading, error };
 }
