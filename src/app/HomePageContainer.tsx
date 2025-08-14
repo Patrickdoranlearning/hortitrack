@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -21,7 +20,6 @@ import {
   archiveBatchAction,
   transplantBatchAction,
   logAction,
-  addVarietyAction,
 } from '@/app/actions';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -50,7 +48,7 @@ export default function HomePageContainer() {
   const { user, loading: authLoading } = useAuth();
 
   const { data: batches, isLoading: isDataLoading } = useCollection<Batch>('batches');
-  const { data: varieties, isLoading: varietiesLoading } = useCollection<Variety>('varieties', [], [["name", "!=", ""]]);
+  const { data: varieties } = useCollection<Variety>('varieties', [], [["name", "!=", ""]]);
   const { data: nurseryLocations } = useCollection<NurseryLocation>('locations');
   const { data: plantSizes } = useCollection<PlantSize>(
     'sizes',
@@ -79,9 +77,6 @@ export default function HomePageContainer() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
   const [isActionLogFormOpen, setIsActionLogFormOpen] = useState(false);
-  const [isVarietyFormOpen, setIsVarietyFormOpen] = useState(false);
-  const [newVarietyName, setNewVarietyName] = useState('');
-
 
   const plantFamilies = useMemo(
     () => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily).filter(Boolean)))],
@@ -133,14 +128,14 @@ export default function HomePageContainer() {
   };
 
   const handleEditBatch = (batch: Batch) => {
-    const transplantedQuantity = (batch.logHistory || [])
+    const transplantedQuantity = batch.logHistory
       .filter(
         (log) => log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number'
       )
-      .reduce((sum, log) => sum - (log.qty || 0), 0);
-    const lostQuantity = (batch.logHistory || [])
+      .reduce((sum, log) => sum - log.qty!, 0);
+    const lostQuantity = batch.logHistory
       .filter((log) => log.type === 'LOSS' && typeof log.qty === 'number')
-      .reduce((sum, log) => sum + (log.qty || 0), 0);
+      .reduce((sum, log) => sum + log.qty!, 0);
 
     setBatchDistribution({
       inStock: batch.quantity,
@@ -180,12 +175,14 @@ export default function HomePageContainer() {
   ) => {
     if (editingBatch) {
       const result = await updateBatchAction(data as Batch);
+      console.log('updateBatchAction result:', result);
       if (result.success) {
         toast({
           title: 'Batch Updated',
           description: `Batch #${result.data?.batchNumber} saved.`,
         });
       } else {
+        console.error('Update batch failed:', result?.error);
         toast({
           variant: 'destructive',
           title: 'Update Failed',
@@ -200,12 +197,14 @@ export default function HomePageContainer() {
       };
 
       const result = await addBatchAction(newBatchData);
+      console.log('addBatchAction result:', result);
       if (result.success) {
         toast({
           title: 'Batch Created',
           description: `Batch #${result.data?.batchNumber} added.`,
         });
       } else {
+        console.error('Add batch failed:', result?.error);
         toast({
           variant: 'destructive',
           title: 'Create Failed',
@@ -225,11 +224,13 @@ export default function HomePageContainer() {
 
   const onTransplantFormSubmit = async (values: any) => {
     if (!transplantingBatch) return;
-    const transplantQuantity = Number(values?.transplantQuantity ?? values?.quantity ?? 0);
-    if (!transplantQuantity || transplantQuantity <= 0) {
+
+    try {
+      const transplantQuantity = Number(values?.transplantQuantity ?? values?.quantity ?? 0);
+      if (!transplantQuantity || transplantQuantity <= 0) {
         toast({ variant: "destructive", title: "Transplant quantity required", description: "Enter a quantity greater than zero." });
         return;
-    }
+      }
   
       const newBatchData: Omit<
         Batch,
@@ -261,9 +262,10 @@ export default function HomePageContainer() {
       if (result.success) {
         toast({
           title: 'Transplant Successful',
-          description: `New batch #${result.data.newBatch.batchNumber} created.`,
+          description: `New batch #${result.data?.newBatch.batchNumber} created.`,
         });
       } else {
+         console.error("Transplant failed:", result?.error);
         toast({
           variant: 'destructive',
           title: 'Transplant Failed',
@@ -272,6 +274,10 @@ export default function HomePageContainer() {
       }
       setTransplantingBatch(null);
       setIsTransplantFormOpen(false);
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Transplant crashed", description: String(e?.message ?? e) });
+    }
   };
 
   const handleLogAction = (batch: Batch) => {
@@ -282,13 +288,13 @@ export default function HomePageContainer() {
   const onActionLogFormSubmit = async (values: any) => {
     if (!actionLogBatch) return;
 
-    const payload = {
+    try {
+      const payload = {
         type: values.type,
         note: values.note ?? "",
         qty: values.qty ? Number(values.qty) : undefined,
         reason: values.reason,
-        newLocation: values.newLocation, // legacy name support
-        newLocationId: values.newLocationId, // future (if your UI adds it)
+        newLocation: values.newLocation,
       };
   
       const result = await logAction(actionLogBatch.id, payload as any);
@@ -299,6 +305,7 @@ export default function HomePageContainer() {
           description: 'The action has been successfully logged.',
         });
       } else {
+        console.error("Log action failed:", result?.error);
         toast({
           variant: 'destructive',
           title: 'Logging Failed',
@@ -307,39 +314,25 @@ export default function HomePageContainer() {
       }
       setActionLogBatch(null);
       setIsActionLogFormOpen(false);
-  };
-
-  const handleCreateNewVariety = (name: string) => {
-    setNewVarietyName(name);
-    setIsVarietyFormOpen(true);
-  };
-
-  const handleVarietyFormSubmit = async (varietyData: Omit<Variety, 'id'>) => {
-    const result = await addVarietyAction(varietyData);
-
-    if (result.success && result.data?.id) {
-        toast({ title: 'Variety Added', description: `Successfully added "${result.data.name}".` });
-        // The useCollection hook will update the varieties list automatically
-        setIsVarietyFormOpen(false);
-        setNewVarietyName('');
-    } else {
-        toast({ variant: 'destructive', title: 'Add Failed', description: result.error });
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Logging crashed", description: String(e?.message ?? e) });
     }
-  }
+  };
   
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
     }
   }, [user, authLoading, router]);
-
+  
   const uniqueSuppliers = dedupeByName(suppliers);
   const uniquePlantSizes = dedupeByName(plantSizes);
   const uniqueNurseryLocations = dedupeByName(nurseryLocations);
 
   return (
     <HomePageView
-      isDataLoading={isDataLoading || varietiesLoading}
+      isDataLoading={isDataLoading}
       authLoading={authLoading}
       user={user}
       batches={filteredBatches}
@@ -375,11 +368,6 @@ export default function HomePageContainer() {
       setIsTransplantFormOpen={setIsTransplantFormOpen}
       isActionLogFormOpen={isActionLogFormOpen}
       setIsActionLogFormOpen={setIsActionLogFormOpen}
-      isVarietyFormOpen={isVarietyFormOpen}
-      setIsVarietyFormOpen={setIsVarietyFormOpen}
-      newVarietyName={newVarietyName}
-      onCreateNewVariety={handleCreateNewVariety}
-      onVarietyFormSubmit={handleVarietyFormSubmit}
     />
   );
 }
