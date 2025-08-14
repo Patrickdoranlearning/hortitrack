@@ -109,3 +109,29 @@ export const VarietySchema = z.object({
   evergreen: z.string().optional(),
 });
 export type Variety = z.infer<typeof VarietySchema>;
+
+
+// Action Log Form Schema
+export const ActionLogSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("NOTE"),
+    note: z.string().min(1, "Please add a note."),
+  }),
+  z.object({
+      type: z.literal("MOVE"),
+      newLocation: z.string().optional(),
+      newLocationId: z.string().optional(),
+    })
+    .refine((v) => Boolean(v.newLocation || v.newLocationId), {
+      message: "Select a new location",
+      path: ["newLocation"],
+    }),
+  z.object({
+    type: z.literal("LOSS"),
+    qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
+    reason: z.string().optional(),
+    note: z.string().optional(),
+  }),
+]);
+
+export type ActionLogFormValues = z.infer<typeof ActionLogSchema>;

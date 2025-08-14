@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BatchCard } from "@/components/batch-card";
 import { BatchForm, BatchDistribution } from "@/components/batch-form";
+import { VarietyForm } from '@/components/variety-form';
 import { TransplantForm } from "@/components/transplant-form";
 import { ActionLogForm } from "@/components/action-log-form";
 import { ProductionProtocolDialog } from "@/components/production-protocol-dialog";
@@ -61,6 +62,11 @@ interface HomePageViewProps {
   setIsTransplantFormOpen: (open: boolean) => void;
   isActionLogFormOpen: boolean;
   setIsActionLogFormOpen: (open: boolean) => void;
+  isVarietyFormOpen: boolean;
+  setIsVarietyFormOpen: (open: boolean) => void;
+  newVarietyName: string;
+  onCreateNewVariety: (name: string) => void;
+  onVarietyFormSubmit: (data: Omit<Variety, 'id'>) => void;
 }
 
 export default function HomePageView({
@@ -100,6 +106,11 @@ export default function HomePageView({
   setIsTransplantFormOpen,
   isActionLogFormOpen,
   setIsActionLogFormOpen,
+  isVarietyFormOpen,
+  setIsVarietyFormOpen,
+  newVarietyName,
+  onCreateNewVariety,
+  onVarietyFormSubmit,
 }: HomePageViewProps) {
   const { toast } = useToast();
   // Local state for dialogs
@@ -335,7 +346,22 @@ export default function HomePageView({
             plantSizes={plantSizes}
             suppliers={suppliers}
             varieties={varieties}
+            onCreateNewVariety={onCreateNewVariety}
           />
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Variety</DialogTitle>
+            <DialogDescription>Create a new plant variety to reuse later.</DialogDescription>
+          </DialogHeader>
+            <VarietyForm
+                variety={{ name: newVarietyName, family: '', category: '' }}
+                onSubmit={onVarietyFormSubmit}
+                onCancel={() => setIsVarietyFormOpen(false)}
+            />
         </DialogContent>
       </Dialog>
 

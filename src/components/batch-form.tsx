@@ -33,7 +33,7 @@ import { CalendarIcon, Plus, Trash2, PieChart, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DialogFooter } from '@/components/ui/dialog';
 import { BatchDistributionBar } from './batch-distribution-bar';
 import {
     AlertDialog,
@@ -48,8 +48,6 @@ import {
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { Combobox } from './ui/combobox';
 import { useState, useMemo, useEffect } from 'react';
-import { addVarietyAction } from '@/app/actions';
-import { VarietyForm } from './variety-form';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from './ui/scroll-area';
 
@@ -109,6 +107,7 @@ interface BatchFormProps {
   plantSizes: PlantSize[];
   suppliers: Supplier[];
   varieties: Variety[];
+  onCreateNewVariety: (name: string) => void;
 }
 
 const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
@@ -117,13 +116,11 @@ const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
 const idFromSize = (list: PlantSize[], name?: string) =>
   list.find(s => s.size === name)?.id ?? "";
 
-export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers, varieties }: BatchFormProps) {
+export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, nurseryLocations, plantSizes, suppliers, varieties, onCreateNewVariety }: BatchFormProps) {
   const [isFamilySet, setIsFamilySet] = useState(!!batch?.plantFamily);
   const [isCategorySet, setIsCategorySet] = useState(!!batch?.category);
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
 
-  const [isVarietyFormOpen, setIsVarietyFormOpen] = useState(false);
-  const [newVarietyName, setNewVarietyName] = useState('');
   const { toast } = useToast();
 
   const form = useForm<BatchFormValues>({
@@ -252,24 +249,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
     form.setValue("quantity", total, { shouldValidate: true, shouldDirty: true });
   };
 
-  const handleCreateNewVariety = (name: string) => {
-    setNewVarietyName(name);
-    setIsVarietyFormOpen(true);
-  };
-
-  const handleVarietyFormSubmit = async (varietyData: Omit<Variety, 'id'>) => {
-    const result = await addVarietyAction(varietyData);
-
-    if (result.success && result.data?.id) {
-        toast({ title: 'Variety Added', description: `Successfully added "${result.data.name}".` });
-        handleVarietyChange(result.data.id);
-        setIsVarietyFormOpen(false);
-        setNewVarietyName('');
-    } else {
-        toast({ variant: 'destructive', title: 'Add Failed', description: result.error });
-    }
-  }
-
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
 
   return (
@@ -303,7 +282,7 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                                 options={varietyOptions}
                                 value={idFromVarietyName(varieties, field.value)}
                                 onChange={handleVarietyChange}
-                                onCreate={handleCreateNewVariety}
+                                onCreate={onCreateNewVariety}
                                 placeholder="Select variety..."
                                 emptyMessage="No matching variety found."
                             />
@@ -664,19 +643,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
           </DialogFooter>
         </form>
       </Form>
-      <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Variety</DialogTitle>
-            <DialogDescription>Create a new plant variety to reuse later.</DialogDescription>
-          </DialogHeader>
-            <VarietyForm
-                variety={{ name: newVarietyName, family: '', category: '' }}
-                onSubmit={handleVarietyFormSubmit}
-                onCancel={() => setIsVarietyFormOpen(false)}
-            />
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

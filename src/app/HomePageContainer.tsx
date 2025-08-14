@@ -21,6 +21,7 @@ import {
   archiveBatchAction,
   transplantBatchAction,
   logAction,
+  addVarietyAction,
 } from '@/app/actions';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -49,7 +50,7 @@ export default function HomePageContainer() {
   const { user, loading: authLoading } = useAuth();
 
   const { data: batches, isLoading: isDataLoading } = useCollection<Batch>('batches');
-  const { data: varieties } = useCollection<Variety>('varieties', [], [["name", "!=", ""]]);
+  const { data: varieties, isLoading: varietiesLoading } = useCollection<Variety>('varieties', [], [["name", "!=", ""]]);
   const { data: nurseryLocations } = useCollection<NurseryLocation>('locations');
   const { data: plantSizes } = useCollection<PlantSize>(
     'sizes',
@@ -78,6 +79,9 @@ export default function HomePageContainer() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
   const [isActionLogFormOpen, setIsActionLogFormOpen] = useState(false);
+  const [isVarietyFormOpen, setIsVarietyFormOpen] = useState(false);
+  const [newVarietyName, setNewVarietyName] = useState('');
+
 
   const plantFamilies = useMemo(
     () => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily).filter(Boolean)))],
@@ -304,6 +308,24 @@ export default function HomePageContainer() {
       setActionLogBatch(null);
       setIsActionLogFormOpen(false);
   };
+
+  const handleCreateNewVariety = (name: string) => {
+    setNewVarietyName(name);
+    setIsVarietyFormOpen(true);
+  };
+
+  const handleVarietyFormSubmit = async (varietyData: Omit<Variety, 'id'>) => {
+    const result = await addVarietyAction(varietyData);
+
+    if (result.success && result.data?.id) {
+        toast({ title: 'Variety Added', description: `Successfully added "${result.data.name}".` });
+        // The useCollection hook will update the varieties list automatically
+        setIsVarietyFormOpen(false);
+        setNewVarietyName('');
+    } else {
+        toast({ variant: 'destructive', title: 'Add Failed', description: result.error });
+    }
+  }
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -317,7 +339,7 @@ export default function HomePageContainer() {
 
   return (
     <HomePageView
-      isDataLoading={isDataLoading}
+      isDataLoading={isDataLoading || varietiesLoading}
       authLoading={authLoading}
       user={user}
       batches={filteredBatches}
@@ -353,6 +375,11 @@ export default function HomePageContainer() {
       setIsTransplantFormOpen={setIsTransplantFormOpen}
       isActionLogFormOpen={isActionLogFormOpen}
       setIsActionLogFormOpen={setIsActionLogFormOpen}
+      isVarietyFormOpen={isVarietyFormOpen}
+      setIsVarietyFormOpen={setIsVarietyFormOpen}
+      newVarietyName={newVarietyName}
+      onCreateNewVariety={handleCreateNewVariety}
+      onVarietyFormSubmit={handleVarietyFormSubmit}
     />
   );
 }

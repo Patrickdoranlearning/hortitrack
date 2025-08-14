@@ -2,10 +2,8 @@
 "use client";
 
 import * as React from "react";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
@@ -15,42 +13,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { NurseryLocation } from '@/lib/types';
-import { DialogFooter } from './ui/dialog';
-
-const ActionTypeEnum = z.enum(["NOTE", "MOVE", "LOSS"]);
-
-// Define schemas independently to avoid SSR race conditions with .extend()
-const NoteSchema = z.object({
-  type: z.literal("NOTE"),
-  note: z.string().min(1, "Please add a note."),
-});
-
-const MoveSchema = z.object({
-  type: z.literal("MOVE"),
-  newLocation: z.string().optional(),
-  newLocationId: z.string().optional(),
-  note: z.string().optional(),
-}).refine(v => Boolean(v.newLocation || v.newLocationId), {
-  message: "Select a new location",
-  path: ["newLocation"],
-});
-
-const LossSchema = z.object({
-  type: z.literal("LOSS"),
-  qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
-  reason: z.string().optional(),
-  note: z.string().optional(),
-});
-
-
-const ActionLogSchema = z.discriminatedUnion("type", [
-  NoteSchema,
-  MoveSchema,
-  LossSchema,
-]);
-
-export type ActionLogFormValues = z.infer<typeof ActionLogSchema>;
+import type { NurseryLocation, ActionLogFormValues } from "@/lib/types";
+import { ActionLogSchema } from "@/lib/types";
+import { DialogFooter } from "./ui/dialog";
 
 function idFromName(list: NurseryLocation[], name?: string) {
   return list.find((x) => x.name === name)?.id ?? "";
@@ -73,16 +38,17 @@ export function ActionLogForm({
     defaultValues: {
       type: "NOTE",
       note: "",
-    } as any,
+    },
   });
 
-  const type = form.watch("type");
+  const type = form.watch("type") ?? "NOTE";
 
   const handleValid = async (values: ActionLogFormValues) => {
+    // Optional guard: prevent loss > available
     if (values.type === "LOSS" && typeof values.qty === "number") {
       const available = Number(batch?.quantity ?? 0);
       if (values.qty > available) {
-        form.setError("qty" as any, {
+        form.setError("qty", {
           type: "validate",
           message: `Quantity exceeds available (${available}).`,
         });
@@ -90,7 +56,7 @@ export function ActionLogForm({
       }
     }
     await onSubmit(values);
-    form.reset();
+    form.reset({ type: "NOTE", note: "" } as any);
   };
 
   const handleInvalid = (errors: any) => {
@@ -103,6 +69,7 @@ export function ActionLogForm({
         onSubmit={form.handleSubmit(handleValid, handleInvalid)}
         className="space-y-6"
       >
+        {/* Action Type */}
         <FormField
           control={form.control}
           name="type"
@@ -132,6 +99,7 @@ export function ActionLogForm({
           )}
         />
 
+        {/* NOTE */}
         {type === "NOTE" && (
           <FormField
             control={form.control}
@@ -140,7 +108,10 @@ export function ActionLogForm({
               <FormItem>
                 <FormLabel>Note</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="Add a note..." value={field.value ?? ""} onChange={field.onChange} />
+                  <Textarea
+                    placeholder="Add a note..."
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -148,6 +119,7 @@ export function ActionLogForm({
           />
         )}
 
+        {/* MOVE */}
         {type === "MOVE" && (
           <FormField
             control={form.control}
@@ -159,8 +131,8 @@ export function ActionLogForm({
                   value={idFromName(nurseryLocations, field.value)}
                   onValueChange={(id) => {
                     const selected = nurseryLocations.find((l) => l.id === id);
-                    // Set both name + id; server prefers id if present.
-                    form.setValue('newLocationId', id, { shouldValidate: true });
+                    // set both name + id; server prefers id
+                    form.setValue("newLocationId", id, { shouldValidate: true });
                     field.onChange(selected?.name ?? "");
                   }}
                 >
@@ -171,7 +143,10 @@ export function ActionLogForm({
                   </FormControl>
                   <SelectContent>
                     {nurseryLocations.map((location, i) => (
-                      <SelectItem key={location.id ?? `loc-${i}`} value={location.id ?? `loc-${i}`}>
+                      <SelectItem
+                        key={location.id ?? `loc-${i}`}
+                        value={location.id ?? `loc-${i}`}
+                      >
                         {location.name}
                       </SelectItem>
                     ))}
@@ -183,6 +158,7 @@ export function ActionLogForm({
           />
         )}
 
+        {/* LOSS */}
         {type === "LOSS" && (
           <>
             <FormField
@@ -192,7 +168,13 @@ export function ActionLogForm({
                 <FormItem>
                   <FormLabel>Loss Quantity</FormLabel>
                   <FormControl>
-                    <Input type="number" inputMode="numeric" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value)} min={1} />
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      min={1}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -205,7 +187,10 @@ export function ActionLogForm({
                 <FormItem>
                   <FormLabel>Reason (optional)</FormLabel>
                   <FormControl>
-                    <Input value={field.value ?? ""} onChange={field.onChange} placeholder="e.g. disease, weather damage" />
+                    <Input
+                      {...field}
+                      placeholder="e.g. disease, weather damage"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -215,7 +200,9 @@ export function ActionLogForm({
         )}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
           <Button type="submit">Log Action</Button>
         </DialogFooter>
       </form>
