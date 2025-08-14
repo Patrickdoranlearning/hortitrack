@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -323,21 +322,175 @@ export default function HomePageView({
   }
 
   if (!user) {
+    router.replace('/login');
     return null;
   }
 
   return (
     <div className="flex min-h-screen w-full flex-col">
-      {/* Header */}
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 justify-between z-10">
         <Logo />
-        {/* ... unchanged header UI */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon" className="rounded-full">
+                <Users className="h-5 w-5" />
+                <span className="sr-only">Toggle user menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>
+                {user.email || 'My Account'}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard">
+                  <LayoutGrid />
+                  Dashboard
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                  <Settings />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut}>
+                <LogOut />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-headline text-4xl">Nursery Stock</h1>
+            <p className="text-muted-foreground">
+              A real-time overview of all plant batches currently in production.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsScannerOpen(true)}
+            >
+              <QrCode />
+            </Button>
+            <Button
+              onClick={() => handleRecommendations(batches[0])}
+              variant="outline"
+              disabled={batches.length === 0}
+            >
+              <Sparkles /> AI Care
+            </Button>
+            <Button onClick={() => handleOpenForm()}>
+              <Plus /> New Batch
+            </Button>
+          </div>
+        </div>
 
-      {/* Main content */}
-      {/* ... unchanged main UI */}
+        <div className="flex items-center gap-4">
+          <Select
+            value={filters.status}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, status: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="Active">Active</SelectItem>
+              <SelectItem value="Propagation">Propagation</SelectItem>
+              <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+              <SelectItem value="Potted">Potted</SelectItem>
+              <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+              <SelectItem value="Looking Good">Looking Good</SelectItem>
+              <SelectItem value="Archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
 
-      {/* Create/Edit Batch */}
+          <Select
+            value={filters.category}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, category: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.plantFamily}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, plantFamily: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by family" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Families</SelectItem>
+              {plantFamilies.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+          {authLoading
+            ? [...Array(8)].map((_, i) => (
+                <Skeleton key={i} className="h-40" />
+              ))
+            : filteredBatches.map((batch) => (
+                <BatchCard
+                  key={batch.id}
+                  batch={batch}
+                  onClick={handleOpenDetail}
+                  onLogAction={handleLogAction}
+                  onTransplant={handleTransplant}
+                />
+              ))}
+        </div>
+        {filteredBatches.length === 0 && !authLoading && (
+          <div className="text-center col-span-full py-20">
+            <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold">No Batches Found</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Try adjusting your filters or create a new batch.
+            </p>
+          </div>
+        )}
+      </main>
+
+      {/* Dialogs */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
@@ -351,16 +504,25 @@ export default function HomePageView({
             onSubmit={handleFormSubmit}
             onCancel={() => setIsFormOpen(false)}
             onArchive={handleArchive}
-            nurseryLocations={nurseryLocations ?? []}
-            plantSizes={plantSizes ?? []}
-            suppliers={suppliers ?? []}
-            varieties={varieties ?? []}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
+            suppliers={suppliers}
+            varieties={varieties}
             onCreateNewVariety={handleCreateNewVariety}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Log Action */}
+      <BatchDetailDialog
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        batch={selectedBatch}
+        onEdit={handleOpenForm}
+        onTransplant={handleTransplant}
+        onLogAction={handleLogAction}
+        onGenerateProtocol={handleGenerateProtocol}
+      />
+
       <Dialog open={isLogActionOpen} onOpenChange={setIsLogActionOpen}>
         <DialogContent>
           <DialogHeader>
@@ -370,25 +532,59 @@ export default function HomePageView({
           </DialogHeader>
           <ActionLogForm
             batch={selectedBatch}
-            nurseryLocations={nurseryLocations ?? []}
+            nurseryLocations={nurseryLocations}
             onSubmit={handleLogActionSubmit}
             onCancel={() => setIsLogActionOpen(false)}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Transplant */}
       <Dialog open={isTransplantOpen} onOpenChange={setIsTransplantOpen}>
         <DialogContent className="max-w-4xl">
           <TransplantForm
             batch={selectedBatch}
             onSubmit={handleTransplantSubmit}
             onCancel={() => setIsTransplantOpen(false)}
-            nurseryLocations={nurseryLocations ?? []}
-            plantSizes={plantSizes ?? []}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
           />
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
+        <DialogContent>
+          <VarietyForm
+            variety={{ name: newVarietyName } as Variety}
+            onSubmit={handleVarietyFormSubmit}
+            onCancel={() => setIsVarietyFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <ProductionProtocolDialog
+        open={isProtocolOpen}
+        onOpenChange={setIsProtocolOpen}
+        batch={selectedBatch}
+      />
+      <CareRecommendationsDialog
+        open={isRecommendationsOpen}
+        onOpenChange={setIsRecommendationsOpen}
+        batch={selectedBatch}
+      />
+      <ScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScanSuccess={handleScanSuccess}
+      />
+      <ScannedBatchActionsDialog
+        open={isScannedActionOpen}
+        onOpenChange={setIsScannedActionOpen}
+        batch={selectedBatch}
+        onLogAction={() => handleLogAction(selectedBatch!)}
+        onTransplant={() => handleTransplant(selectedBatch!)}
+        onEdit={() => handleOpenForm(selectedBatch!)}
+        onGenerateProtocol={() => handleGenerateProtocol(selectedBatch!)}
+      />
     </div>
   );
 }
