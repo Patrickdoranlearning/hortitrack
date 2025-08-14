@@ -54,7 +54,7 @@ export function ScannedBatchActionsDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-4 py-4">
-          <Button onClick={onLogAction} variant="outline">
+          <Button onClick={onLogAction} variant="outline" className="h-12 text-base">
             <ClipboardList />
             Log Action
           </Button>
@@ -62,15 +62,16 @@ export function ScannedBatchActionsDialog({
             onClick={onTransplant}
             variant="outline"
             disabled={batch.quantity === 0}
+            className="h-12 text-base"
           >
             <MoveRight />
             Transplant
           </Button>
-          <Button onClick={onGenerateProtocol} variant="outline">
+          <Button onClick={onGenerateProtocol} variant="outline" className="h-12 text-base">
             <FileText />
             Gen. Protocol
           </Button>
-          <Button onClick={onEdit} variant="outline">
+          <Button onClick={onEdit} variant="outline" className="h-12 text-base">
             <Pencil />
             Edit Batch
           </Button>

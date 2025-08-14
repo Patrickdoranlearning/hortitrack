@@ -6,26 +6,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { Batch, NurseryLocation, PlantSize, LogEntry } from '@/lib/types';
-import { DialogFooter } from './ui/dialog';
+import type { NurseryLocation } from "@/lib/types";
+import { DialogFooter } from "./ui/dialog";
 import { ActionLogSchema, ActionLogFormValues } from "@/lib/types";
+
 
 function idFromName(list: NurseryLocation[], name?: string) {
   return list.find((x) => x.name === name)?.id ?? "";
@@ -47,14 +39,21 @@ export function ActionLogForm({
     mode: "onChange",
     defaultValues: {
       type: "NOTE",
+      // fields below are safely ignored by other variants
       note: "",
+      newLocation: "",
+      newLocationId: "",
+      // for LOSS
+      // @ts-expect-error: start empty; z.coerce will handle when used
+      qty: undefined,
+      reason: "",
     },
   });
 
-  const type = form.watch("type");
+  const type = form.watch("type") ?? "NOTE";
 
   const handleValid = async (values: ActionLogFormValues) => {
-    // optional guard: prevent loss > available
+    // Optional guard: prevent loss > available
     if (values.type === "LOSS" && typeof values.qty === "number") {
       const available = Number(batch?.quantity ?? 0);
       if (values.qty > available) {
@@ -66,12 +65,10 @@ export function ActionLogForm({
       }
     }
     await onSubmit(values);
-    form.reset();
+    form.reset({ type: "NOTE", note: "" } as any);
   };
 
   const handleInvalid = (errors: any) => {
-    // This fires only when validation FAILS
-    // If you saw "Action log invalid: {}", it means the handler wiring was wrong
     console.error("Action log invalid:", errors);
   };
 
@@ -91,7 +88,6 @@ export function ActionLogForm({
               <Select
                 value={field.value ?? "NOTE"}
                 onValueChange={(v) => {
-                  // switch type and clear previous errors
                   field.onChange(v as any);
                   form.clearErrors();
                 }}
@@ -112,7 +108,7 @@ export function ActionLogForm({
           )}
         />
 
-        {/* NOTE fields */}
+        {/* NOTE */}
         {type === "NOTE" && (
           <FormField
             control={form.control}
@@ -133,7 +129,7 @@ export function ActionLogForm({
           />
         )}
 
-        {/* MOVE fields */}
+        {/* MOVE */}
         {type === "MOVE" && (
           <FormField
             control={form.control}
@@ -145,6 +141,8 @@ export function ActionLogForm({
                   value={idFromName(nurseryLocations, field.value)}
                   onValueChange={(id) => {
                     const selected = nurseryLocations.find((l) => l.id === id);
+                    // set both name + id; server prefers id
+                    form.setValue("newLocationId", id);
                     field.onChange(selected?.name ?? "");
                   }}
                 >
@@ -170,7 +168,7 @@ export function ActionLogForm({
           />
         )}
 
-        {/* LOSS fields */}
+        {/* LOSS */}
         {type === "LOSS" && (
           <>
             <FormField
@@ -213,10 +211,10 @@ export function ActionLogForm({
         )}
 
         <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit">Log Action</Button>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit">Log Action</Button>
         </DialogFooter>
       </form>
     </Form>

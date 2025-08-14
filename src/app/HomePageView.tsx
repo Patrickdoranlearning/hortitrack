@@ -1,8 +1,7 @@
-
 "use client";
 
-import React, { useState } from 'react';
-import { Batch, NurseryLocation, PlantSize, Supplier, Variety, TransplantFormData, LogEntry } from "@/lib/types";
+import React, { useState, useMemo } from 'react';
+import { Batch, NurseryLocation, PlantSize, Supplier, Variety, TransplantFormData, LogEntry, ActionLogFormValues } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Filter, LayoutDashboard, Database, PlusCircle, LogOut, ScanLine, Menu, Search } from "lucide-react";
@@ -23,7 +22,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/s
 import { Logo } from '@/components/logo';
 import type { User } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-
+import type { ActionResult } from './actions';
 
 interface HomePageViewProps {
   isDataLoading: boolean;
@@ -37,36 +36,18 @@ interface HomePageViewProps {
   searchQuery: string;
   setSearchQuery: (val: string) => void;
   onSignOut: () => void;
-  onNewBatch: () => void;
-  onEditBatch: (batch: Batch) => void;
-  onArchiveBatch: (batchId: string) => void;
-  onTransplantBatch: (batch: Batch) => void;
-  onLogAction: (batch: Batch) => void;
-  onFormSubmit: (data: any) => void;
-  onTransplantFormSubmit: (data: TransplantFormData) => void;
-  onActionLogFormSubmit: (data: any) => void;
-  editingBatch: Batch | null;
-  setEditingBatch: (batch: Batch | null) => void;
-  batchDistribution: BatchDistribution | null;
-  transplantingBatch: Batch | null;
-  setTransplantingBatch: (batch: Batch | null) => void;
-  actionLogBatch: Batch | null;
-  setActionLogBatch: (batch: Batch | null) => void;
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];
   suppliers: Supplier[];
   varieties: Variety[];
-  isFormOpen: boolean;
-  setIsFormOpen: (open: boolean) => void;
-  isTransplantFormOpen: boolean;
-  setIsTransplantFormOpen: (open: boolean) => void;
-  isActionLogFormOpen: boolean;
-  setIsActionLogFormOpen: (open: boolean) => void;
-  isVarietyFormOpen: boolean;
-  setIsVarietyFormOpen: (open: boolean) => void;
-  newVarietyName: string;
-  onCreateNewVariety: (name: string) => void;
-  onVarietyFormSubmit: (data: Omit<Variety, 'id'>) => void;
+  actions: {
+    addBatch: (data: any) => Promise<ActionResult<any>>;
+    updateBatch: (data: any) => Promise<ActionResult<any>>;
+    archiveBatch: (batchId: string, loss: number) => Promise<ActionResult<any>>;
+    transplantBatch: (sourceBatchId: string, newBatchData: any, transplantQuantity: number, logRemainingAsLoss: boolean) => Promise<ActionResult<any>>;
+    logAction: (batchId: string, logData: any) => Promise<ActionResult<any>>;
+    addVariety: (data: any) => Promise<ActionResult<any>>;
+  }
 }
 
 export default function HomePageView({
@@ -81,47 +62,171 @@ export default function HomePageView({
   searchQuery,
   setSearchQuery,
   onSignOut,
-  onNewBatch,
-  onEditBatch,
-  onArchiveBatch,
-  onTransplantBatch,
-  onLogAction,
-  onFormSubmit,
-  onTransplantFormSubmit,
-  onActionLogFormSubmit,
-  editingBatch,
-  setEditingBatch,
-  batchDistribution,
-  transplantingBatch,
-  setTransplantingBatch,
-  actionLogBatch,
-  setActionLogBatch,
   nurseryLocations,
   plantSizes,
   suppliers,
   varieties,
-  isFormOpen,
-  setIsFormOpen,
-  isTransplantFormOpen,
-  setIsTransplantFormOpen,
-  isActionLogFormOpen,
-  setIsActionLogFormOpen,
-  isVarietyFormOpen,
-  setIsVarietyFormOpen,
-  newVarietyName,
-  onCreateNewVariety,
-  onVarietyFormSubmit,
+  actions,
 }: HomePageViewProps) {
   const { toast } = useToast();
-  // Local state for dialogs
+
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+  const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
+  const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(null);
+  const [actionLogBatch, setActionLogBatch] = useState<Batch | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
+  const [isActionLogFormOpen, setIsActionLogFormOpen] = useState(false);
   const [isProtocolDialogOpen, setIsProtocolDialogOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isScannedActionsOpen, setIsScannedActionsOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [scannedBatch, setScannedBatch] = useState<Batch | null>(null);
   const [protocolBatch, setProtocolBatch] = useState<Batch | null>(null);
+  const [isVarietyFormOpen, setIsVarietyFormOpen] = useState(false);
+  const [newVarietyName, setNewVarietyName] = useState('');
+
+  const handleNewBatch = () => {
+    setEditingBatch(null);
+    setBatchDistribution(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditBatch = (batch: Batch) => {
+    const transplantedQuantity = batch.logHistory
+      .filter(log => log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number')
+      .reduce((sum, log) => sum - log.qty!, 0);
+    const lostQuantity = batch.logHistory
+      .filter(log => log.type === 'LOSS' && typeof log.qty === 'number')
+      .reduce((sum, log) => sum + log.qty!, 0);
+
+    setBatchDistribution({
+      inStock: batch.quantity,
+      transplanted: transplantedQuantity,
+      lost: lostQuantity,
+    });
+    setEditingBatch(batch);
+    setIsFormOpen(true);
+  };
+
+  const handleArchiveBatch = async (batchId: string) => {
+    const batchToArchive = batches.find((b) => b.id === batchId);
+    if (!batchToArchive) return;
+  
+    const loss = batchToArchive.quantity;
+    const result = await actions.archiveBatch(batchId, loss);
+  
+    if (result.success) {
+      toast({ title: 'Success', description: `Batch #${batchToArchive.batchNumber} has been archived.` });
+    } else {
+      toast({ variant: 'destructive', title: 'Error archiving batch', description: result.error });
+    }
+  };
+
+  const handleFormSubmit = async (data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'> & { id?: string; batchNumber?: string }) => {
+    if (editingBatch) {
+      const result = await actions.updateBatch(data as Batch);
+      if (result.success) {
+        toast({ title: 'Batch Updated', description: `Batch #${result.data?.batchNumber} saved.` });
+      } else {
+        toast({ variant: 'destructive', title: 'Update Failed', description: result.error });
+      }
+    } else {
+      const newBatchData = { ...data, supplier: data.supplier || 'Doran Nurseries', initialQuantity: data.quantity };
+      const result = await actions.addBatch(newBatchData);
+      if (result.success) {
+        toast({ title: 'Batch Created', description: `Batch #${result.data?.batchNumber} added.` });
+      } else {
+        toast({ variant: 'destructive', title: 'Create Failed', description: String(result.error ?? 'Unknown error') });
+      }
+    }
+    setEditingBatch(null);
+    setBatchDistribution(null);
+    setIsFormOpen(false);
+  };
+
+  const handleTransplantBatch = (batch: Batch) => {
+    setTransplantingBatch(batch);
+    setIsTransplantFormOpen(true);
+  };
+
+  const onTransplantFormSubmit = async (values: any) => {
+    if (!transplantingBatch) return;
+
+    try {
+      const transplantQuantity = Number(values?.quantity ?? 0);
+      if (!transplantQuantity || transplantQuantity <= 0) {
+        toast({ variant: "destructive", title: "Transplant quantity required" });
+        return;
+      }
+  
+      const newBatchData: Omit<Batch, "id" | "logHistory" | "transplantedFrom" | "batchNumber" | "createdAt" | "updatedAt"> = {
+        plantVariety: transplantingBatch.plantVariety,
+        plantFamily: transplantingBatch.plantFamily,
+        category: transplantingBatch.category,
+        size: values.size || transplantingBatch.size,
+        location: values.location || transplantingBatch.location,
+        supplier: values.supplier || transplantingBatch.supplier,
+        status: (values.status as Batch["status"]) || transplantingBatch.status,
+        plantingDate: transplantingBatch.plantingDate,
+        growerPhotoUrl: transplantingBatch.growerPhotoUrl ?? "",
+        salesPhotoUrl: transplantingBatch.salesPhotoUrl ?? "",
+        initialQuantity: transplantQuantity,
+        quantity: transplantQuantity,
+      };
+  
+      const logRemainingAsLoss = Boolean(values?.logRemainingAsLoss);
+      const result = await actions.transplantBatch(transplantingBatch.id, newBatchData, transplantQuantity, logRemainingAsLoss);
+      
+      if (result.success) {
+        toast({ title: 'Transplant Successful', description: `New batch #${result.data?.newBatch.batchNumber} created.` });
+      } else {
+        toast({ variant: 'destructive', title: 'Transplant Failed', description: result.error });
+      }
+      setTransplantingBatch(null);
+      setIsTransplantFormOpen(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Transplant crashed", description: String(e?.message ?? e) });
+    }
+  };
+
+  const handleLogAction = (batch: Batch) => {
+    setActionLogBatch(batch);
+    setIsActionLogFormOpen(true);
+  };
+
+  const onActionLogFormSubmit = async (values: ActionLogFormValues) => {
+    if (!actionLogBatch) return;
+    try {
+      const result = await actions.logAction(actionLogBatch.id, values);
+      if (result.success) {
+        toast({ title: 'Action Logged', description: 'The action has been successfully logged.' });
+      } else {
+        toast({ variant: 'destructive', title: 'Logging Failed', description: result.error });
+      }
+      setActionLogBatch(null);
+      setIsActionLogFormOpen(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Logging crashed", description: String(e?.message ?? e) });
+    }
+  };
+
+  const onCreateNewVariety = (name: string) => {
+    setNewVarietyName(name);
+    setIsVarietyFormOpen(true);
+  };
+
+  const onVarietyFormSubmit = async (data: Omit<Variety, 'id'>) => {
+    const result = await actions.addVariety(data);
+    if (result.success) {
+      toast({ title: 'Variety Created', description: `Successfully created "${result.data?.name}".` });
+      setIsVarietyFormOpen(false);
+      setNewVarietyName('');
+    } else {
+      toast({ variant: 'destructive', title: 'Creation Failed', description: result.error });
+    }
+  };
 
   const statuses = ["Active", "all", "Propagation", "Plugs/Liners", "Potted", "Ready for Sale", "Looking Good", "Archived"];
 
@@ -129,28 +234,7 @@ export default function HomePageView({
     setSelectedBatch(batch);
     setIsDetailDialogOpen(true);
   };
-  
-  const openEditDialog = (batch: Batch) => {
-      onEditBatch(batch);
-      setIsDetailDialogOpen(false);
-  };
 
-  const openTransplantDialog = (batch: Batch) => {
-      onTransplantBatch(batch);
-      setIsDetailDialogOpen(false);
-  };
-
-  const openLogActionDialog = (batch: Batch) => {
-      onLogAction(batch);
-      setIsDetailDialogOpen(false);
-  };
-
-  const openProtocolDialog = (batch: Batch) => {
-      setProtocolBatch(batch);
-      setIsDetailDialogOpen(false);
-      setIsProtocolDialogOpen(true);
-  };
-  
   const handleScanSuccess = (scannedData: string) => {
     const trimmedScan = scannedData.trim().toLowerCase();
     const foundBatch = batches.find(b => b.batchNumber.trim().toLowerCase() === trimmedScan);
@@ -158,11 +242,7 @@ export default function HomePageView({
       setScannedBatch(foundBatch);
       setIsScannedActionsOpen(true);
     } else {
-      toast({
-        variant: 'destructive',
-        title: 'Batch not found',
-        description: `No batch found with code: ${scannedData}`,
-      });
+      toast({ variant: 'destructive', title: 'Batch not found', description: `No batch found with code: ${scannedData}` });
     }
     setIsScannerOpen(false);
   };
@@ -183,68 +263,26 @@ export default function HomePageView({
           <Logo />
           <div className="hidden items-center gap-2 md:flex">
             <Button asChild variant="outline">
-              <Link href="/dashboard">
-                <LayoutDashboard /> Dashboard
-              </Link>
+              <Link href="/dashboard"><LayoutDashboard /> Dashboard</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/settings">
-                <Database /> Manage Data
-              </Link>
+              <Link href="/settings"><Database /> Manage Data</Link>
             </Button>
-            <Button
-              onClick={onNewBatch}
-              size="lg"
-            >
-              <PlusCircle /> New Batch
-            </Button>
-            <Button onClick={onSignOut} variant="ghost" size="icon">
-              <LogOut />
-              <span className="sr-only">Sign Out</span>
-            </Button>
+            <Button onClick={handleNewBatch} size="lg"><PlusCircle /> New Batch</Button>
+            <Button onClick={onSignOut} variant="ghost" size="icon"><LogOut /><span className="sr-only">Sign Out</span></Button>
           </div>
           <div className="flex items-center gap-2 md:hidden">
-            <Button onClick={() => setIsScannerOpen(true)} size="icon" variant="outline">
-              <ScanLine />
-              <span className="sr-only">Scan</span>
-            </Button>
+            <Button onClick={() => setIsScannerOpen(true)} size="icon" variant="outline"><ScanLine /><span className="sr-only">Scan</span></Button>
              <Sheet>
                 <SheetTrigger asChild>
-                    <Button variant="outline" size="icon">
-                        <Menu />
-                        <span className="sr-only">Open menu</span>
-                    </Button>
+                    <Button variant="outline" size="icon"><Menu /><span className="sr-only">Open menu</span></Button>
                 </SheetTrigger>
                 <SheetContent>
                     <div className="flex flex-col gap-4">
-                        <SheetClose asChild>
-                            <Button onClick={onNewBatch} className="w-full">
-                                <PlusCircle />
-                                New Batch
-                            </Button>
-                        </SheetClose>
-                        <SheetClose asChild>
-                             <Button asChild variant="outline" className="w-full">
-                                <Link href="/dashboard">
-                                    <LayoutDashboard />
-                                    Dashboard
-                                </Link>
-                            </Button>
-                        </SheetClose>
-                         <SheetClose asChild>
-                            <Button asChild variant="outline" className="w-full">
-                                <Link href="/settings">
-                                    <Database />
-                                    Manage Data
-                                </Link>
-                            </Button>
-                        </SheetClose>
-                        <SheetClose asChild>
-                            <Button onClick={onSignOut} variant="ghost" className="w-full">
-                                <LogOut />
-                                Sign Out
-                            </Button>
-                        </SheetClose>
+                        <SheetClose asChild><Button onClick={handleNewBatch} className="w-full"><PlusCircle /> New Batch</Button></SheetClose>
+                        <SheetClose asChild><Button asChild variant="outline" className="w-full"><Link href="/dashboard"><LayoutDashboard /> Dashboard</Link></Button></SheetClose>
+                        <SheetClose asChild><Button asChild variant="outline" className="w-full"><Link href="/settings"><Database /> Manage Data</Link></Button></SheetClose>
+                        <SheetClose asChild><Button onClick={onSignOut} variant="ghost" className="w-full"><LogOut /> Sign Out</Button></SheetClose>
                     </div>
                 </SheetContent>
             </Sheet>
@@ -253,50 +291,32 @@ export default function HomePageView({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by category, family, variety..."
-              className="pl-10 w-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+            <Input placeholder="Search by category, family, variety..." className="pl-10 w-full" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
           <div className="flex gap-2">
-             <Button onClick={() => setIsScannerOpen(true)} className="hidden sm:inline-flex">
-                <ScanLine />
-                Scan Code
-            </Button>
+             <Button onClick={() => setIsScannerOpen(true)} className="hidden sm:inline-flex"><ScanLine /> Scan Code</Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="shrink-0 w-full sm:w-auto">
-                  <Filter className="mr-2" />
-                  Filter
-                </Button>
+                <Button variant="outline" className="shrink-0 w-full sm:w-auto"><Filter className="mr-2" /> Filter</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56">
                 <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuRadioGroup value={filters.status} onValueChange={(value) => setFilters((f) => ({ ...f, status: value }))}>
-                  {statuses.map((status) => (
-                    <DropdownMenuRadioItem key={status} value={status}>{status === 'all' ? 'All Statuses' : status}</DropdownMenuRadioItem>
-                  ))}
+                  {statuses.map((status) => (<DropdownMenuRadioItem key={status} value={status}>{status === 'all' ? 'All Statuses' : status}</DropdownMenuRadioItem>))}
                 </DropdownMenuRadioGroup>
 
                 <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuRadioGroup value={filters.category} onValueChange={(value) => setFilters((f) => ({ ...f, category: value }))}>
-                  {categories.map((cat) => (
-                    <DropdownMenuRadioItem key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</DropdownMenuRadioItem>
-                  ))}
+                  {categories.map((cat) => (<DropdownMenuRadioItem key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</DropdownMenuRadioItem>))}
                 </DropdownMenuRadioGroup>
                 
                 <DropdownMenuLabel>Filter by Plant Family</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuRadioGroup value={filters.plantFamily} onValueChange={(value) => setFilters((f) => ({ ...f, plantFamily: value }))}>
-                  {plantFamilies.map((fam) => (
-                    <DropdownMenuRadioItem key={fam} value={fam}>{fam === 'all' ? 'All Families' : fam}</DropdownMenuRadioItem>
-                  ))}
+                  {plantFamilies.map((fam) => (<DropdownMenuRadioItem key={fam} value={fam}>{fam === 'all' ? 'All Families' : fam}</DropdownMenuRadioItem>))}
                 </DropdownMenuRadioGroup>
-
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -311,13 +331,7 @@ export default function HomePageView({
         ) : batches.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {batches.map((batch) => (
-              <BatchCard
-                key={batch.id}
-                batch={batch}
-                onClick={handleCardClick}
-                onLogAction={() => openLogActionDialog(batch)}
-                onTransplant={() => openTransplantDialog(batch)}
-              />
+              <BatchCard key={batch.id} batch={batch} onClick={handleCardClick} onLogAction={() => handleLogAction(batch)} onTransplant={() => handleTransplantBatch(batch)} />
             ))}
           </div>
         ) : (
@@ -332,44 +346,21 @@ export default function HomePageView({
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editingBatch ? `Edit Batch #${editingBatch?.batchNumber}` : "Create New Batch"}</DialogTitle>
-            <DialogDescription>
-              {editingBatch ? "Update the details for this batch." : "Enter the details for the new batch."}
-            </DialogDescription>
+            <DialogDescription>{editingBatch ? "Update the details for this batch." : "Enter the details for the new batch."}</DialogDescription>
           </DialogHeader>
-          <BatchForm
-            batch={editingBatch}
-            distribution={batchDistribution}
-            onSubmit={onFormSubmit}
-            onCancel={() => setIsFormOpen(false)}
-            onArchive={onArchiveBatch}
-            nurseryLocations={nurseryLocations}
-            plantSizes={plantSizes}
-            suppliers={suppliers}
-            varieties={varieties}
-            onCreateNewVariety={onCreateNewVariety}
-          />
+          <BatchForm batch={editingBatch} distribution={batchDistribution} onSubmit={handleFormSubmit} onCancel={() => setIsFormOpen(false)} onArchive={handleArchiveBatch} nurseryLocations={nurseryLocations} plantSizes={plantSizes} suppliers={suppliers} varieties={varieties} onCreateNewVariety={onCreateNewVariety} />
         </DialogContent>
       </Dialog>
       
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
         <DialogContent className="max-w-2xl">
-            <VarietyForm
-                variety={{ name: newVarietyName, family: '', category: '' }}
-                onSubmit={onVarietyFormSubmit}
-                onCancel={() => setIsVarietyFormOpen(false)}
-            />
+            <VarietyForm variety={{ name: newVarietyName, family: '', category: '' }} onSubmit={onVarietyFormSubmit} onCancel={() => setIsVarietyFormOpen(false)} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={isTransplantFormOpen} onOpenChange={setIsTransplantFormOpen}>
         <DialogContent className="max-w-2xl">
-          <TransplantForm
-            batch={transplantingBatch}
-            onSubmit={onTransplantFormSubmit}
-            onCancel={() => setIsTransplantFormOpen(false)}
-            nurseryLocations={nurseryLocations}
-            plantSizes={plantSizes}
-          />
+          <TransplantForm batch={transplantingBatch} onSubmit={onTransplantFormSubmit} onCancel={() => setIsTransplantFormOpen(false)} nurseryLocations={nurseryLocations} plantSizes={plantSizes} />
         </DialogContent>
       </Dialog>
 
@@ -379,57 +370,23 @@ export default function HomePageView({
             <DialogTitle>Log Action</DialogTitle>
             <DialogDescription>Add a note, move, or loss entry to the batch history.</DialogDescription>
           </DialogHeader>
-          <ActionLogForm
-            batch={actionLogBatch}
-            onSubmit={onActionLogFormSubmit}
-            onCancel={() => setIsActionLogFormOpen(false)}
-            nurseryLocations={nurseryLocations}
-          />
+          <ActionLogForm batch={actionLogBatch} onSubmit={onActionLogFormSubmit} onCancel={() => setIsActionLogFormOpen(false)} nurseryLocations={nurseryLocations} />
         </DialogContent>
       </Dialog>
 
-      <ProductionProtocolDialog
-        open={isProtocolDialogOpen}
-        onOpenChange={setIsProtocolDialogOpen}
-        batch={protocolBatch}
+      <ProductionProtocolDialog open={isProtocolDialogOpen} onOpenChange={setIsProtocolDialogOpen} batch={protocolBatch} />
+      <ScannerDialog open={isScannerOpen} onOpenChange={setIsScannerOpen} onScanSuccess={handleScanSuccess} />
+      <ScannedBatchActionsDialog open={isScannedActionsOpen} onOpenChange={setIsScannedActionsOpen} batch={scannedBatch}
+        onLogAction={() => { setIsScannedActionsOpen(false); if (scannedBatch) handleLogAction(scannedBatch); }}
+        onTransplant={() => { setIsScannedActionsOpen(false); if (scannedBatch) handleTransplantBatch(scannedBatch); }}
+        onEdit={() => { setIsScannedActionsOpen(false); if (scannedBatch) handleEditBatch(scannedBatch); }}
+        onGenerateProtocol={() => { setIsScannedActionsOpen(false); if (scannedBatch) setProtocolBatch(scannedBatch); setIsProtocolDialogOpen(true); }}
       />
-
-      <ScannerDialog
-        open={isScannerOpen}
-        onOpenChange={setIsScannerOpen}
-        onScanSuccess={handleScanSuccess}
-      />
-
-      <ScannedBatchActionsDialog
-        open={isScannedActionsOpen}
-        onOpenChange={setIsScannedActionsOpen}
-        batch={scannedBatch}
-        onLogAction={() => {
-          setIsScannedActionsOpen(false);
-          if (scannedBatch) openLogActionDialog(scannedBatch);
-        }}
-        onTransplant={() => {
-          setIsScannedActionsOpen(false);
-          if (scannedBatch) openTransplantDialog(scannedBatch);
-        }}
-        onEdit={() => {
-          setIsScannedActionsOpen(false);
-          if (scannedBatch) openEditDialog(scannedBatch);
-        }}
-        onGenerateProtocol={() => {
-          setIsScannedActionsOpen(false);
-          if (scannedBatch) openProtocolDialog(scannedBatch);
-        }}
-      />
-
-      <BatchDetailDialog
-        open={isDetailDialogOpen}
-        onOpenChange={setIsDetailDialogOpen}
-        batch={selectedBatch}
-        onEdit={openEditDialog}
-        onTransplant={openTransplantDialog}
-        onLogAction={openLogActionDialog}
-        onGenerateProtocol={openProtocolDialog}
+      <BatchDetailDialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} batch={selectedBatch}
+        onEdit={handleEditBatch}
+        onTransplant={handleTransplantBatch}
+        onLogAction={handleLogAction}
+        onGenerateProtocol={(batch) => { setProtocolBatch(batch); setIsDetailDialogOpen(false); setIsProtocolDialogOpen(true); }}
       />
     </div>
   );

@@ -9,8 +9,6 @@ import {
   PlantSize,
   Supplier,
   Variety,
-  TransplantFormData,
-  LogEntry,
 } from '@/lib/types';
 import { INITIAL_PLANT_SIZES } from '@/lib/constants';
 import { INITIAL_SUPPLIERS } from '@/lib/suppliers';
@@ -20,14 +18,13 @@ import {
   archiveBatchAction,
   transplantBatchAction,
   logAction,
+  addVarietyAction,
 } from '@/app/actions';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import HomePageView from './HomePageView';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { BatchDistribution } from '@/components/batch-form';
-
 
 function dedupeByName<T extends { id?: string; name?: string; size?: string }>(arr: T[]): T[] {
   const seen = new Set<string>();
@@ -65,18 +62,6 @@ export default function HomePageContainer() {
     category: 'all',
     status: 'Active',
   });
-
-  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
-  const [batchDistribution, setBatchDistribution] = useState<BatchDistribution | null>(null);
-  const [transplantingBatch, setTransplantingBatch] = useState<Batch | null>(
-    null
-  );
-  const [actionLogBatch, setActionLogBatch] = useState<Batch | null>(null);
-
-  // State for dialogs, managed here
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isTransplantFormOpen, setIsTransplantFormOpen] = useState(false);
-  const [isActionLogFormOpen, setIsActionLogFormOpen] = useState(false);
 
   const plantFamilies = useMemo(
     () => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily).filter(Boolean)))],
@@ -120,205 +105,6 @@ export default function HomePageContainer() {
       description: 'You have been successfully signed out.',
     });
   };
-
-  const handleNewBatch = () => {
-    setEditingBatch(null);
-    setBatchDistribution(null);
-    setIsFormOpen(true);
-  };
-
-  const handleEditBatch = (batch: Batch) => {
-    const transplantedQuantity = batch.logHistory
-      .filter(
-        (log) => log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number'
-      )
-      .reduce((sum, log) => sum - log.qty!, 0);
-    const lostQuantity = batch.logHistory
-      .filter((log) => log.type === 'LOSS' && typeof log.qty === 'number')
-      .reduce((sum, log) => sum + log.qty!, 0);
-
-    setBatchDistribution({
-      inStock: batch.quantity,
-      transplanted: transplantedQuantity,
-      lost: lostQuantity,
-    });
-    setEditingBatch(batch);
-    setIsFormOpen(true);
-  };
-
-  const handleArchiveBatch = async (batchId: string) => {
-    const batchToArchive = batches.find((b) => b.id === batchId);
-    if (!batchToArchive) return;
-
-    const loss = batchToArchive.quantity;
-    const result = await archiveBatchAction(batchId, loss);
-
-    if (result.success) {
-      toast({
-        title: 'Success',
-        description: `Batch #${batchToArchive.batchNumber} has been archived.`,
-      });
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Error archiving batch',
-        description: result.error,
-      });
-    }
-  };
-
-  const handleFormSubmit = async (
-    data: Omit<
-      Batch,
-      'id' | 'batchNumber' | 'createdAt' | 'updatedAt'
-    > & { id?: string; batchNumber?: string }
-  ) => {
-    if (editingBatch) {
-      const result = await updateBatchAction(data as Batch);
-      console.log('updateBatchAction result:', result);
-      if (result.success) {
-        toast({
-          title: 'Batch Updated',
-          description: `Batch #${result.data?.batchNumber} saved.`,
-        });
-      } else {
-        console.error('Update batch failed:', result?.error);
-        toast({
-          variant: 'destructive',
-          title: 'Update Failed',
-          description: result.error,
-        });
-      }
-    } else {
-      const newBatchData = {
-        ...data,
-        supplier: data.supplier || 'Doran Nurseries',
-        initialQuantity: data.quantity,
-      };
-
-      const result = await addBatchAction(newBatchData);
-      console.log('addBatchAction result:', result);
-      if (result.success) {
-        toast({
-          title: 'Batch Created',
-          description: `Batch #${result.data?.batchNumber} added.`,
-        });
-      } else {
-        console.error('Add batch failed:', result?.error);
-        toast({
-          variant: 'destructive',
-          title: 'Create Failed',
-          description: String(result.error ?? 'Unknown error'),
-        });
-      }
-    }
-    setEditingBatch(null);
-    setBatchDistribution(null);
-    setIsFormOpen(false);
-  };
-
-  const handleTransplantBatch = (batch: Batch) => {
-    setTransplantingBatch(batch);
-    setIsTransplantFormOpen(true);
-  };
-
-  const onTransplantFormSubmit = async (values: any) => {
-    if (!transplantingBatch) return;
-
-    try {
-      const transplantQuantity = Number(values?.transplantQuantity ?? values?.quantity ?? 0);
-      if (!transplantQuantity || transplantQuantity <= 0) {
-        toast({ variant: "destructive", title: "Transplant quantity required", description: "Enter a quantity greater than zero." });
-        return;
-      }
-  
-      const newBatchData: Omit<
-        Batch,
-        "id" | "logHistory" | "transplantedFrom" | "batchNumber" | "createdAt" | "updatedAt"
-      > = {
-        plantVariety: transplantingBatch.plantVariety,
-        plantFamily: transplantingBatch.plantFamily,
-        category: transplantingBatch.category,
-        size: values.size || transplantingBatch.size,
-        location: values.location || transplantingBatch.location,
-        supplier: values.supplier || transplantingBatch.supplier,
-        status: (values.status as Batch["status"]) || transplantingBatch.status,
-        plantingDate: transplantingBatch.plantingDate,
-        growerPhotoUrl: transplantingBatch.growerPhotoUrl ?? "",
-        salesPhotoUrl: transplantingBatch.salesPhotoUrl ?? "",
-        initialQuantity: transplantQuantity,
-        quantity: transplantQuantity,
-      };
-  
-      const logRemainingAsLoss = Boolean(values?.logRemainingAsLoss);
-  
-      const result = await transplantBatchAction(
-        transplantingBatch.id,
-        newBatchData,
-        transplantQuantity,
-        logRemainingAsLoss
-      );
-      
-      if (result.success) {
-        toast({
-          title: 'Transplant Successful',
-          description: `New batch #${result.data?.newBatch.batchNumber} created.`,
-        });
-      } else {
-         console.error("Transplant failed:", result?.error);
-        toast({
-          variant: 'destructive',
-          title: 'Transplant Failed',
-          description: result.error,
-        });
-      }
-      setTransplantingBatch(null);
-      setIsTransplantFormOpen(false);
-    } catch (e: any) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Transplant crashed", description: String(e?.message ?? e) });
-    }
-  };
-
-  const handleLogAction = (batch: Batch) => {
-    setActionLogBatch(batch);
-    setIsActionLogFormOpen(true);
-  };
-
-  const onActionLogFormSubmit = async (values: any) => {
-    if (!actionLogBatch) return;
-
-    try {
-      const payload = {
-        type: values.type,
-        note: values.note ?? "",
-        qty: values.qty ? Number(values.qty) : undefined,
-        reason: values.reason,
-        newLocation: values.newLocation,
-      };
-  
-      const result = await logAction(actionLogBatch.id, payload as any);
-      
-      if (result.success) {
-        toast({
-          title: 'Action Logged',
-          description: 'The action has been successfully logged.',
-        });
-      } else {
-        console.error("Log action failed:", result?.error);
-        toast({
-          variant: 'destructive',
-          title: 'Logging Failed',
-          description: result.error,
-        });
-      }
-      setActionLogBatch(null);
-      setIsActionLogFormOpen(false);
-    } catch (e: any) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Logging crashed", description: String(e?.message ?? e) });
-    }
-  };
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -343,31 +129,18 @@ export default function HomePageContainer() {
       searchQuery={searchQuery}
       setSearchQuery={setSearchQuery}
       onSignOut={handleSignOut}
-      onNewBatch={handleNewBatch}
-      onEditBatch={handleEditBatch}
-      onArchiveBatch={handleArchiveBatch}
-      onTransplantBatch={handleTransplantBatch}
-      onLogAction={handleLogAction}
-      onFormSubmit={handleFormSubmit}
-      onTransplantFormSubmit={onTransplantFormSubmit}
-      onActionLogFormSubmit={onActionLogFormSubmit}
-      editingBatch={editingBatch}
-      setEditingBatch={setEditingBatch}
-      batchDistribution={batchDistribution}
-      transplantingBatch={transplantingBatch}
-      setTransplantingBatch={setTransplantingBatch}
-      actionLogBatch={actionLogBatch}
-      setActionLogBatch={setActionLogBatch}
       nurseryLocations={uniqueNurseryLocations}
       plantSizes={uniquePlantSizes}
       suppliers={uniqueSuppliers}
       varieties={varieties}
-      isFormOpen={isFormOpen}
-      setIsFormOpen={setIsFormOpen}
-      isTransplantFormOpen={isTransplantFormOpen}
-      setIsTransplantFormOpen={setIsTransplantFormOpen}
-      isActionLogFormOpen={isActionLogFormOpen}
-      setIsActionLogFormOpen={setIsActionLogFormOpen}
+      actions={{
+        addBatch: addBatchAction,
+        updateBatch: updateBatchAction,
+        archiveBatch: archiveBatchAction,
+        transplantBatch: transplantBatchAction,
+        logAction: logAction,
+        addVariety: addVarietyAction,
+      }}
     />
   );
 }

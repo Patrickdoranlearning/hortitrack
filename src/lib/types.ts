@@ -73,35 +73,32 @@ const BatchSpacedLog = z.object({
   note: z.string().optional(),
 });
 
-// envelope with id+date that we AND onto the union below
-export const LogEnvelope = z.object({
+// A simplified LogEntrySchema for data transfer and use in BatchSchema to avoid SSR issues with discriminated unions.
+// The strict validation is handled in the ActionLogForm itself.
+export const LogEntrySchema = z.object({
   id: z.string(),
-  date: z.any(), // Firestore Timestamp or ISO string; normalize at edges
+  date: z.any(),
+  type: z.string(),
+  note: z.string().optional(),
+  qty: z.number().optional(),
+  reason: z.string().optional(),
+  newLocation: z.string().optional(),
+  newLocationId: z.string().optional(),
+  fromBatch: z.string().optional(),
+  toBatch: z.string().optional(),
 });
-
-// Final discriminated union for LogEntry
-export const LogEntrySchema = LogEnvelope.and(
-  z.discriminatedUnion("type", [
-    NoteLog,
-    MoveLog,
-    LossLog,
-    TransplantFromLog,
-    TransplantToLog,
-    CreateLog,
-    ArchiveLog,
-    AdjustLog,
-    BatchSpacedLog,
-  ])
-);
 export type LogEntry = z.infer<typeof LogEntrySchema>;
 
+
 // ---- Action Log Form Values (NOTE | MOVE | LOSS only) ----
+// This schema is for client-side form validation and is more specific.
 export const ActionLogSchema = z.discriminatedUnion("type", [
   NoteLog,
   MoveLog,
   LossLog,
 ]);
 export type ActionLogFormValues = z.infer<typeof ActionLogSchema>;
+
 
 // ---- Domain types ----
 
