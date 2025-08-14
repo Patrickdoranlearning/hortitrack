@@ -308,8 +308,8 @@ export default function HomePageContainer() {
       onTransplantBatch={handleTransplantBatch}
       onLogAction={handleLogAction}
       onFormSubmit={handleFormSubmit}
-      onTransplantFormSubmit={onTransplantFormSubmit}
-      onActionLogFormSubmit={onActionLogFormSubmit}
+      onTransplantFormSubmit={handleTransplantFormSubmit}
+      onActionLogFormSubmit={handleActionLogFormSubmit}
       editingBatch={editingBatch}
       setEditingBatch={setEditingBatch}
       batchDistribution={batchDistribution}
@@ -330,5 +330,3 @@ export default function HomePageContainer() {
     />
   );
 }
-
-    
