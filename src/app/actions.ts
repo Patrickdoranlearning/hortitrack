@@ -1,8 +1,7 @@
 
 'use server';
 
-import { db, FieldValue } from '@/lib/firebase-admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { db, FieldValue, Timestamp } from '@/lib/firebase-admin';
 import type { Batch, LogEntry } from '@/lib/types';
 import {
   productionProtocol,
