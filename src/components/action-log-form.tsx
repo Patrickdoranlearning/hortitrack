@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -14,40 +15,54 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { NurseryLocation, ActionLogFormValues } from "@/lib/types";
+import type { NurseryLocation } from "@/lib/types";
 import { DialogFooter } from "./ui/dialog";
 
-// ---- Action Log Form Values (NOTE | MOVE | LOSS only) ----
 // This schema is for client-side form validation.
 const NoteLog = z.object({
-  type: z.literal("NOTE").default("NOTE"),
+  type: z.literal("NOTE"),
   note: z.string().min(1, "Please add a note."),
 });
 
-const MoveLog = z
-  .object({
-    type: z.literal("MOVE").default("MOVE"),
-    newLocationId: z.string().optional(),
-    newLocation: z.string().optional(),
-    note: z.string().optional(),
-  })
-  .refine((v) => Boolean(v.newLocationId || v.newLocation), {
-    message: "Select a new location",
-    path: ["newLocation"],
-  });
+// Make this a plain ZodObject (no .refine here)
+const MoveLog = z.object({
+  type: z.literal("MOVE"),
+  // prefer ID; keep name for backward compatibility
+  newLocationId: z.string().optional(),
+  newLocation: z.string().optional(),
+  note: z.string().optional(),
+});
 
 const LossLog = z.object({
-  type: z.literal("LOSS").default("LOSS"),
+  type: z.literal("LOSS"),
   qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
   reason: z.string().optional(),
   note: z.string().optional(),
 });
 
-const ActionLogSchema = z.discriminatedUnion("type", [
+// Build the discriminated union FIRST
+const ActionLogSchemaBase = z.discriminatedUnion("type", [
   NoteLog,
   MoveLog,
   LossLog,
 ]);
+
+// Then add cross-field validation that only runs for MOVE
+const ActionLogSchema = ActionLogSchemaBase.superRefine((val, ctx) => {
+  if (val.type === "MOVE") {
+    const hasId = Boolean(val.newLocationId && val.newLocationId.trim());
+    const hasName = Boolean(val.newLocation && val.newLocation.trim());
+    if (!hasId && !hasName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select a new location",
+        path: ["newLocation"], // matches the old UI error target
+      });
+    }
+  }
+});
+
+type ActionLogFormValues = z.infer<typeof ActionLogSchema>;
 
 function idFromName(list: NurseryLocation[], name?: string) {
   return list.find((x) => x.name === name)?.id ?? "";
