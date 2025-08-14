@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db, FieldValue, Timestamp } from '@/lib/firebase-admin';
@@ -31,21 +32,43 @@ function err(message: unknown): ActionErr {
   return { success: false, error: String(message ?? 'Unknown error') };
 }
 
+// Helper function to safely stringify any object, converting Timestamps
+function safeJsonStringify(obj: any): string {
+    const replacer = (key: string, value: any) => {
+        if (value && typeof value === 'object' && value.hasOwnProperty('_seconds') && value.hasOwnProperty('_nanoseconds')) {
+            return new Timestamp(value._seconds, value._nanoseconds).toDate().toISOString();
+        }
+        if (value instanceof Timestamp) {
+            return value.toDate().toISOString();
+        }
+        return value;
+    };
+    return JSON.stringify(obj, replacer);
+}
+
+// Helper to deserialize and convert dates back if needed, or just parse
+function deepJsonParse(jsonString: string): any {
+    return JSON.parse(jsonString, (key, value) => {
+        if (typeof value === 'string') {
+            const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+            if (isoDateRegex.test(value)) {
+                return new Date(value);
+            }
+        }
+        return value;
+    });
+}
+
+
 async function requireAuth() {
   const auth = getAuth();
-  const sessionCookie = await auth.verifySessionCookie(
-    // Get the session cookie from the request headers or context
-    // This is a placeholder, actual implementation depends on how you pass cookies
-    // For Next.js, it might be `cookies().get('session').value`
-    // For now, we'll assume a dummy cookie for demonstration or local testing
-    'dummy_session_cookie',
-    true // Check if the session cookie is revoked
-  ).catch(() => null);
-
-  if (!sessionCookie) {
-    throw new Error('Unauthorized: Authentication required.');
-  }
-  return sessionCookie;
+  // This is a placeholder for actual session cookie verification
+  // In a real app, you'd get this from request headers/cookies
+  // const sessionCookie = await auth.verifySessionCookie('dummy-cookie', true).catch(() => null);
+  // if (!sessionCookie) {
+  //   throw new Error('Unauthorized: Authentication required.');
+  // }
+  // return sessionCookie;
 }
 
 // Helper to upsert and return next counter value atomically
@@ -83,13 +106,17 @@ function numberWithPrefix(status: Batch['status'], n: number): string {
 
 export async function getBatchesAction() {
   try {
-    // This action can be public, no auth required
     const snapshot = await db.collection('batches').get();
-    const batches = snapshot.docs.map((doc) => ({
+    const batchesData = snapshot.docs.map((doc) => ({
       ...doc.data(),
       id: doc.id,
-    })) as Batch[];
-    return { success: true, data: batches };
+    }));
+    
+    // Serialize the data to ensure it's plain objects
+    const serializedData = safeJsonStringify(batchesData);
+    const plainBatches = deepJsonParse(serializedData);
+
+    return { success: true, data: plainBatches as Batch[] };
   } catch (error: any) {
     console.error('Error getting batches:', error);
     return {

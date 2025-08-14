@@ -1,3 +1,4 @@
+
 'use server';
 
 import HomePageView from '@/app/HomePageView';
@@ -36,12 +37,15 @@ async function getCollectionData<T>(
       await batch.commit();
       // Re-fetch after seeding
       const seededSnapshot = await getDocs(q);
-      return seededSnapshot.docs.map(
-        (doc) => ({ ...doc.data(), id: doc.id }) as T
+      const docs = seededSnapshot.docs.map(
+        (doc) => ({ ...doc.data(), id: doc.id })
       );
+       return JSON.parse(JSON.stringify(docs)) as T[];
     }
 
-    return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as T);
+    const docs = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+    return JSON.parse(JSON.stringify(docs)) as T[];
+
   } catch (error) {
     console.error(`Error fetching ${collectionName}:`, error);
     return initialData as T[]; // Return initial/empty data on error

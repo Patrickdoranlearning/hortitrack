@@ -14,9 +14,42 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { NurseryLocation } from "@/lib/types";
+import type { NurseryLocation, ActionLogFormValues } from "@/lib/types";
 import { DialogFooter } from "./ui/dialog";
-import { ActionLogSchema, ActionLogFormValues } from "@/lib/types";
+
+// ---- Action Log Form Values (NOTE | MOVE | LOSS only) ----
+// This schema is for client-side form validation.
+const NoteLog = z.object({
+  type: z.literal("NOTE"),
+  note: z.string().min(1, "Please add a note."),
+});
+
+const MoveLog = z
+  .object({
+    type: z.literal("MOVE"),
+    // prefer ID; keep name for backward compatibility
+    newLocationId: z.string().optional(),
+    newLocation: z.string().optional(),
+    note: z.string().optional(),
+  })
+  .refine((v) => Boolean(v.newLocationId || v.newLocation), {
+    message: "Select a new location",
+    path: ["newLocation"],
+  });
+
+const LossLog = z.object({
+  type: z.literal("LOSS"),
+  qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
+  reason: z.string().optional(),
+  note: z.string().optional(),
+});
+
+
+const ActionLogSchema = z.discriminatedUnion("type", [
+  NoteLog,
+  MoveLog,
+  LossLog,
+]);
 
 
 function idFromName(list: NurseryLocation[], name?: string) {

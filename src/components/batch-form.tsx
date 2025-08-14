@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
@@ -29,10 +29,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Plus, Trash2, PieChart, Archive } from 'lucide-react';
+import { CalendarIcon, PieChart, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Textarea } from '@/components/ui/textarea';
 import { DialogFooter } from '@/components/ui/dialog';
 import { BatchDistributionBar } from './batch-distribution-bar';
 import {
@@ -149,11 +148,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
           growerPhotoUrl: "",
           salesPhotoUrl: "",
         },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'logHistory',
   });
   
   const customSizeSort = (a: PlantSize, b: PlantSize) => {
@@ -561,47 +555,6 @@ export function BatchForm({ batch, distribution, onSubmit, onCancel, onArchive, 
                         <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
                     </div>
                 )}
-
-                <div>
-                    <FormLabel>Log History</FormLabel>
-                    <div className="space-y-2 pt-2">
-                        {fields.map((field, index) => (
-                            <div key={field.id} className="flex items-start gap-2">
-                                <FormField
-                                    key={`date-${field.id}`}
-                                    control={form.control}
-                                    name={`logHistory.${index}.date`}
-                                    render={({ field: formField }) => (
-                                        <FormItem className="w-1/3">
-                                        <FormControl>
-                                            <Input type="date" {...formField} value={format(new Date(formField.value), 'yyyy-MM-dd')} onChange={(e) => formField.onChange(new Date(e.target.value).toISOString())} />
-                                        </FormControl>
-                                        </FormItem>
-                                    )}
-                                    />
-                                <FormField
-                                    key={`note-${field.id}`}
-                                    control={form.control}
-                                    name={`logHistory.${index}.note`}
-                                    render={({ field: formField }) => (
-                                        <FormItem className="flex-1">
-                                        <FormControl>
-                                            <Textarea placeholder="Describe the action taken..." {...formField} value={formField.value ?? ""} className="min-h-[40px]"/>
-                                        </FormControl>
-                                        </FormItem>
-                                    )}
-                                    />
-                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </div>
-                        ))}
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ date: new Date().toISOString(), type: 'NOTE', note: '' })}>
-                            <Plus className="h-4 w-4 mr-2"/>
-                            Add Log Entry
-                        </Button>
-                    </div>
-                </div>
             </div>
           </ScrollArea>
           

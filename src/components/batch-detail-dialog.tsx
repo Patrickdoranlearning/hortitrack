@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { BatchChatDialog } from '@/components/batch-chat-dialog';
 
 interface BatchDetailDialogProps {
@@ -67,15 +67,27 @@ export function BatchDetailDialog({
 
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
   
-  const formatDate = (date: any) => {
-    if (date && date.toDate) { // It's a Firestore Timestamp
+  const formatDate = (date: any): string => {
+    if (!date) return 'N/A';
+    // Handle Firestore Timestamps passed from server actions
+    if (date.toDate) {
       return format(date.toDate(), 'PPP p');
     }
-    if (typeof date === 'string') { // It's an ISO string
-      return format(new Date(date), 'PPP p');
+    // Handle ISO strings from client-side state
+    if (typeof date === 'string') {
+      try {
+        return format(parseISO(date), 'PPP p');
+      } catch (e) {
+        return date; // fallback to original string if parsing fails
+      }
     }
-    return 'Date not available';
+    // Handle native Date objects
+    if (date instanceof Date) {
+      return format(date, 'PPP p');
+    }
+    return String(date);
   };
+
 
   return (
     <>
@@ -165,7 +177,7 @@ export function BatchDetailDialog({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {batch.logHistory.sort((a,b) => (b.date?.toDate?.() || new Date(b.date)) - (a.date?.toDate?.() || new Date(a.date))).map((log, index) => (
+                                {batch.logHistory.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((log, index) => (
                                     <TableRow key={log.id || index}>
                                         <TableCell>{formatDate(log.date)}</TableCell>
                                         <TableCell>{log.note || log.type}</TableCell>

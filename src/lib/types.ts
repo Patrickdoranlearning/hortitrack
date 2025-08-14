@@ -1,14 +1,6 @@
+import { z } from 'zod';
 
-import { z } from "zod";
-
-/**
- * Core log types used throughout the app.
- * IMPORTANT: When using z.discriminatedUnion('type', variants),
- * every variant MUST declare `type` as a z.literal(...).
- */
-
-// A simplified LogEntrySchema for data transfer and use in BatchSchema to avoid SSR issues with discriminated unions.
-// The strict validation is handled in the ActionLogForm itself.
+// This is the simplified, universal LogEntry shape for data transfer.
 export const LogEntrySchema = z.object({
   id: z.string(),
   date: z.any(),
@@ -23,52 +15,26 @@ export const LogEntrySchema = z.object({
 });
 export type LogEntry = z.infer<typeof LogEntrySchema>;
 
-
-// ---- Action Log Form Values (NOTE | MOVE | LOSS only) ----
-// This schema is for client-side form validation and is more specific.
-const NoteLog = z.object({
-  type: z.literal("NOTE"),
-  note: z.string().min(1, "Please add a note."),
-});
-
-const MoveLog = z
-  .object({
-    type: z.literal("MOVE"),
-    // prefer ID; keep name for backward compatibility
-    newLocationId: z.string().optional(),
-    newLocation: z.string().optional(),
-    note: z.string().optional(),
-  })
-  .refine((v) => Boolean(v.newLocationId || v.newLocation), {
-    message: "Select a new location",
-    path: ["newLocation"],
-  });
-
-const LossLog = z.object({
-  type: z.literal("LOSS"),
-  qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
-  reason: z.string().optional(),
-  note: z.string().optional(),
-});
-
-
-export const ActionLogSchema = z.discriminatedUnion("type", [
-  NoteLog,
-  MoveLog,
-  LossLog,
-]);
-export type ActionLogFormValues = z.infer<typeof ActionLogSchema>;
-
+// This is the client-side form validation schema.
+// It will be defined inside the form component that uses it.
+export type ActionLogFormValues = {
+  type: 'NOTE' | 'MOVE' | 'LOSS';
+  note?: string;
+  newLocation?: string;
+  newLocationId?: string;
+  qty?: number;
+  reason?: string;
+};
 
 // ---- Domain types ----
 
 export const BatchStatus = z.enum([
-  "Propagation",
-  "Plugs/Liners",
-  "Potted",
-  "Ready for Sale",
-  "Looking Good",
-  "Archived",
+  'Propagation',
+  'Plugs/Liners',
+  'Potted',
+  'Ready for Sale',
+  'Looking Good',
+  'Archived',
 ]);
 
 export const BatchSchema = z.object({
@@ -96,10 +62,10 @@ export type Batch = z.infer<typeof BatchSchema>;
 
 export const VarietySchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1, "Variety name is required"),
+  name: z.string().min(1, 'Variety name is required'),
   commonName: z.string().optional(),
-  family: z.string().min(1, "Family is required"),
-  category: z.string().min(1, "Category is required"),
+  family: z.string().min(1, 'Family is required'),
+  category: z.string().min(1, 'Category is required'),
   grouping: z.string().optional(),
   rating: z.string().optional(),
   salesPeriod: z.string().optional(),
@@ -122,7 +88,7 @@ export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
 export const PlantSizeSchema = z.object({
   id: z.string().optional(),
   size: z.string().min(1), // e.g., "10.5", "54"
-  type: z.enum(["Tray", "Pot", "Bareroot"]),
+  type: z.enum(['Tray', 'Pot', 'Bareroot']),
   area: z.coerce.number().nonnegative(),
   shelfQuantity: z.coerce.number().nonnegative(),
   multiple: z.coerce.number().positive(),
@@ -147,14 +113,14 @@ export type Supplier = z.infer<typeof SupplierSchema>;
  * Matches the shape used by <ProductionProtocolDialog />.
  */
 export const ProductionProtocolOutputSchema = z.object({
-  protocolTitle: z.string(),
-  summary: z.string(),
-  timeline: z.array(z.object({
-    day: z.number(),
-    action: z.string(),
-    date: z.string(),
-    details: z.string(),
-  })),
-  recommendations: z.array(z.string()),
-});
+    protocolTitle: z.string().describe('A descriptive title for the production protocol.'),
+    summary: z.string().describe('A brief summary of the protocol and its objective.'),
+    timeline: z.array(z.object({
+      day: z.number().describe('The day in the production cycle (e.g., 0, 15, 30).'),
+      action: z.string().describe('The key action or task to be performed on this day.'),
+      date: z.string().describe('The calendar date of the action'),
+      details: z.string().describe('Specific instructions or notes for the action.'),
+    })).describe('A timeline of key production stages and actions.'),
+    recommendations: z.array(z.string()).describe('Additional recommendations for optimizing future batches based on this protocol.'),
+  });
 export type ProductionProtocolOutput = z.infer<typeof ProductionProtocolOutputSchema>;
