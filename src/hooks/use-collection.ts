@@ -26,6 +26,7 @@ export function useCollection<T>(
 
   const subscribeToCollection = useCallback(() => {
     if (!user) {
+      setData(initialData as T[]);
       setIsLoading(false);
       return () => {};
     }
