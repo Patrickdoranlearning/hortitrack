@@ -223,31 +223,62 @@ export default function HomePageContainer() {
     setIsTransplantFormOpen(true);
   };
 
-  const handleTransplantFormSubmit = async (data: TransplantFormData) => {
+  const onTransplantFormSubmit = async (values: any) => {
     if (!transplantingBatch) return;
 
-    const result = await transplantBatchAction(
-      transplantingBatch.id,
-      data,
-      data.quantity,
-      data.logRemainingAsLoss
-    );
-    
-    if (result.success) {
-      toast({
-        title: 'Transplant Successful',
-        description: `New batch #${result.data?.newBatch.batchNumber} created.`,
-      });
-    } else {
-       console.error("Transplant failed:", result?.error);
-      toast({
-        variant: 'destructive',
-        title: 'Transplant Failed',
-        description: result.error,
-      });
+    try {
+      const transplantQuantity = Number(values?.transplantQuantity ?? values?.quantity ?? 0);
+      if (!transplantQuantity || transplantQuantity <= 0) {
+        toast({ variant: "destructive", title: "Transplant quantity required", description: "Enter a quantity greater than zero." });
+        return;
+      }
+  
+      const newBatchData: Omit<
+        Batch,
+        "id" | "logHistory" | "transplantedFrom" | "batchNumber" | "createdAt" | "updatedAt"
+      > = {
+        plantVariety: transplantingBatch.plantVariety,
+        plantFamily: transplantingBatch.plantFamily,
+        category: transplantingBatch.category,
+        size: values.size || transplantingBatch.size,
+        location: values.location || transplantingBatch.location,
+        supplier: values.supplier || transplantingBatch.supplier,
+        status: (values.status as Batch["status"]) || transplantingBatch.status,
+        plantingDate: transplantingBatch.plantingDate,
+        growerPhotoUrl: transplantingBatch.growerPhotoUrl ?? "",
+        salesPhotoUrl: transplantingBatch.salesPhotoUrl ?? "",
+        initialQuantity: transplantQuantity,
+        quantity: transplantQuantity,
+      };
+  
+      const logRemainingAsLoss = Boolean(values?.logRemainingAsLoss);
+  
+      const result = await transplantBatchAction(
+        transplantingBatch.id,
+        newBatchData,
+        transplantQuantity,
+        logRemainingAsLoss
+      );
+      
+      if (result.success) {
+        toast({
+          title: 'Transplant Successful',
+          description: `New batch #${result.data?.newBatch.batchNumber} created.`,
+        });
+      } else {
+         console.error("Transplant failed:", result?.error);
+        toast({
+          variant: 'destructive',
+          title: 'Transplant Failed',
+          description: result.error,
+        });
+      }
+      setTransplantingBatch(null);
+      setIsTransplantFormOpen(false);
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Transplant crashed", description: String(e?.message ?? e) });
     }
-    setTransplantingBatch(null);
-    setIsTransplantFormOpen(false);
   };
 
   const handleLogAction = (batch: Batch) => {
@@ -255,26 +286,39 @@ export default function HomePageContainer() {
     setIsActionLogFormOpen(true);
   };
 
-  const handleActionLogFormSubmit = async (data: Partial<LogEntry> & {type: LogEntry['type']}) => {
+  const onActionLogFormSubmit = async (values: any) => {
     if (!actionLogBatch) return;
 
-    const result = await logAction(actionLogBatch.id, data);
-    
-    if (result.success) {
-      toast({
-        title: 'Action Logged',
-        description: 'The action has been successfully logged.',
-      });
-    } else {
-      console.error("Log action failed:", result?.error);
-      toast({
-        variant: 'destructive',
-        title: 'Logging Failed',
-        description: result.error,
-      });
+    try {
+      const payload = {
+        type: values.type,
+        note: values.note ?? "",
+        qty: values.qty ? Number(values.qty) : undefined,
+        reason: values.reason,
+        newLocation: values.newLocation,
+      };
+  
+      const result = await logAction(actionLogBatch.id, payload as any);
+      
+      if (result.success) {
+        toast({
+          title: 'Action Logged',
+          description: 'The action has been successfully logged.',
+        });
+      } else {
+        console.error("Log action failed:", result?.error);
+        toast({
+          variant: 'destructive',
+          title: 'Logging Failed',
+          description: result.error,
+        });
+      }
+      setActionLogBatch(null);
+      setIsActionLogFormOpen(false);
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Logging crashed", description: String(e?.message ?? e) });
     }
-    setActionLogBatch(null);
-    setIsActionLogFormOpen(false);
   };
   
   if (authLoading || !user) {
@@ -308,8 +352,8 @@ export default function HomePageContainer() {
       onTransplantBatch={handleTransplantBatch}
       onLogAction={handleLogAction}
       onFormSubmit={handleFormSubmit}
-      onTransplantFormSubmit={handleTransplantFormSubmit}
-      onActionLogFormSubmit={handleActionLogFormSubmit}
+      onTransplantFormSubmit={onTransplantFormSubmit}
+      onActionLogFormSubmit={onActionLogFormSubmit}
       editingBatch={editingBatch}
       setEditingBatch={setEditingBatch}
       batchDistribution={batchDistribution}
