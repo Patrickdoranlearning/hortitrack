@@ -353,10 +353,6 @@ export default function HomePageView({
       
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Variety</DialogTitle>
-            <DialogDescription>Create a new plant variety to reuse later.</DialogDescription>
-          </DialogHeader>
             <VarietyForm
                 variety={{ name: newVarietyName, family: '', category: '' }}
                 onSubmit={onVarietyFormSubmit}
@@ -367,10 +363,6 @@ export default function HomePageView({
 
       <Dialog open={isTransplantFormOpen} onOpenChange={setIsTransplantFormOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Transplant Batch</DialogTitle>
-            <DialogDescription>Move quantity into a new batch and optionally log remaining as loss.</DialogDescription>
-          </DialogHeader>
           <TransplantForm
             batch={transplantingBatch}
             onSubmit={onTransplantFormSubmit}
@@ -392,7 +384,6 @@ export default function HomePageView({
             onSubmit={onActionLogFormSubmit}
             onCancel={() => setIsActionLogFormOpen(false)}
             nurseryLocations={nurseryLocations}
-            plantSizes={plantSizes}
           />
         </DialogContent>
       </Dialog>

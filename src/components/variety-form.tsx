@@ -28,7 +28,7 @@ interface VarietyFormProps {
 }
 
 export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
-  const isEditing = !!variety;
+  const isEditing = !!variety?.id;
 
   const form = useForm<VarietyFormValues>({
     resolver: zodResolver(VarietySchema),

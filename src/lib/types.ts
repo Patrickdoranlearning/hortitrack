@@ -2,7 +2,7 @@
 import { z } from 'zod';
 
 export const LogEntrySchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   date: z.any(), // serverTimestamp or string
   type: z.enum([
     'NOTE',
