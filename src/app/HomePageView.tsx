@@ -116,8 +116,7 @@ export default function HomePageView({
   const { data: batches } = useCollection<Batch>('batches', initialBatches);
   const { data: varieties } = useCollection<Variety>(
     'varieties',
-    initialVarieties,
-    [['name', '!=', '']]
+    initialVarieties
   );
   const { data: nurseryLocations } = useCollection<NurseryLocation>(
     'locations',

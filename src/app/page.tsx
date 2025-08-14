@@ -1,6 +1,4 @@
 
-'use server';
-
 import HomePageView from '@/app/HomePageView';
 import {
   addBatchAction,
@@ -15,42 +13,36 @@ import { INITIAL_PLANT_SIZES } from '@/lib/constants';
 import { db } from '@/lib/firebase-admin';
 import { INITIAL_SUPPLIERS } from '@/lib/suppliers';
 import type { NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
-import { collection, getDocs, query, where } from 'firebase/firestore';
 import { VARIETIES as INITIAL_VARIETIES } from '@/lib/varieties';
 import { INITIAL_LOCATIONS } from '@/lib/locations';
 
 async function getCollectionData<T>(
   collectionName: string,
-  initialData: any[] = [],
-  constraints: any[] = []
+  initialData: any[] = []
 ): Promise<T[]> {
   try {
-    const q = query(collection(db, collectionName), ...constraints);
-    const snapshot = await getDocs(q);
+    const ref = db.collection(collectionName);
+    const snapshot = await ref.get();
 
     if (snapshot.empty && initialData.length > 0) {
       console.log(`Seeding ${collectionName}...`);
       const batch = db.batch();
       initialData.forEach((item) => {
         const { id, ...data } = item;
-        const docRef = collection(db, collectionName).doc();
+        const docRef = ref.doc();
         batch.set(docRef, data);
       });
       await batch.commit();
-      // Re-fetch after seeding
-      const seededSnapshot = await getDocs(q);
-      const docs = seededSnapshot.docs.map(
-        (doc) => ({ ...doc.data(), id: doc.id })
-      );
-       return JSON.parse(JSON.stringify(docs)) as T[];
+      const seededSnapshot = await ref.get();
+      const docs = seededSnapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+      return JSON.parse(JSON.stringify(docs)) as T[];
     }
 
     const docs = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
     return JSON.parse(JSON.stringify(docs)) as T[];
-
-  } catch (error) {
-    console.error(`Error fetching ${collectionName}:`, error);
-    return initialData as T[]; // Return initial/empty data on error
+  } catch (error: any) {
+    console.error(`Error fetching ${collectionName}:`, error?.message ?? error);
+    return initialData as T[];
   }
 }
 
@@ -72,9 +64,10 @@ export default async function HomePage() {
   const batchesResult = await getBatchesAction();
   const batches = batchesResult.success ? batchesResult.data : [];
 
-  const varieties = await getCollectionData<Variety>('varieties', INITIAL_VARIETIES, [
-    where('name', '!=', ''),
-  ]);
+  const varieties = await getCollectionData<Variety>('varieties', INITIAL_VARIETIES);
+  const filteredVarieties = varieties.filter(
+    v => (v as any).name && String((v as any).name).trim() !== ''
+  );
   const nurseryLocations =
     await getCollectionData<NurseryLocation>('locations', INITIAL_LOCATIONS);
   const plantSizes = await getCollectionData<PlantSize>(
@@ -102,7 +95,7 @@ export default async function HomePage() {
   return (
     <HomePageView
       initialBatches={batches}
-      initialVarieties={varieties}
+      initialVarieties={filteredVarieties}
       initialNurseryLocations={uniqueNurseryLocations}
       initialPlantSizes={uniquePlantSizes}
       initialSuppliers={uniqueSuppliers}
