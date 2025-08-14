@@ -69,7 +69,7 @@ export function useCollection<T>(
     );
 
     return unsubscribe;
-  }, [collectionName, user, toast, constraints]); // Depend on user to re-run when auth state changes
+  }, [collectionName, user, toast, JSON.stringify(constraints)]);
 
   useEffect(() => {
     const unsubscribe = subscribeToCollection();

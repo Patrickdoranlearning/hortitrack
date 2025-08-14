@@ -1,10 +1,12 @@
+
 'use server';
 
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import { careRecommendations, type CareRecommendationsInput, type CareRecommendationsOutput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
-import type { Batch } from '@/lib/types';
+import type { Batch, Variety } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
+import { z } from 'zod';
 
 export async function getBatchesAction() {
     try {
@@ -62,6 +64,21 @@ export async function batchChatAction(batch: Batch, query: string) {
   }
 }
 
+export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
+    try {
+        const docRef = db.collection('varieties').doc();
+        const newVariety = {
+            ...varietyData,
+            id: docRef.id,
+        };
+        await docRef.set(newVariety);
+        return { success: true, data: newVariety };
+    } catch (error: any) {
+        console.error('Error adding variety:', error);
+        return { success: false, error: 'Failed to add variety: ' + error.message };
+    }
+}
+
 
 export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory'>
@@ -72,7 +89,7 @@ export async function addBatchAction(
     const newBatch: Batch = {
       ...newBatchData,
       id: newDocRef.id,
-      logHistory: [{ date: new Date().toISOString(), type: 'CREATE', note: 'Batch created.' }],
+      logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: 'Batch created.' }],
     };
     await newDocRef.set(newBatch);
     return { success: true, data: newBatch };
@@ -87,7 +104,7 @@ export async function updateBatchAction(batchToUpdate: Batch) {
     const updatedBatchData = { ...batchToUpdate };
 
     if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
-      updatedBatchData.logHistory.push({ date: new Date().toISOString(), type: 'ARCHIVE', note: `Batch quantity reached zero and was automatically archived.` });
+      updatedBatchData.logHistory.push({ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'ARCHIVE', note: `Batch quantity reached zero and was automatically archived.` });
       updatedBatchData.status = 'Archived';
     }
     

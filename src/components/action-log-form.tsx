@@ -62,7 +62,7 @@ const ActionLogSchema = ActionLogSchemaBase.superRefine((val, ctx) => {
   }
 });
 
-type ActionLogFormValues = z.infer<typeof ActionLogSchema>;
+export type ActionLogFormValues = z.infer<typeof ActionLogSchema>;
 
 function idFromName(list: NurseryLocation[], name?: string) {
   return list.find((x) => x.name === name)?.id ?? "";
