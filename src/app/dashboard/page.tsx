@@ -1,8 +1,7 @@
-
 'use client';
 
 import * as React from 'react';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users,
@@ -29,12 +28,8 @@ import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-// Import 'dynamic' from Next.js
 import dynamic from 'next/dynamic';
 
-// --- FIX: DYNAMICALLY IMPORT CHART COMPONENTS ---
-// This tells Next.js to only render these components on the client-side,
-// which solves the conflict with React 18's Strict Mode.
 const FamilyDistributionChart = dynamic(
   () => import('@/components/charts/FamilyDistributionChart'),
   { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
@@ -61,8 +56,7 @@ export default function DashboardOverviewPage() {
     location: 'all',
   });
 
-  const subscribeToBatches = useCallback(() => {
-    setIsLoading(true);
+  useEffect(() => {
     const q = query(collection(db, 'batches'), orderBy('batchNumber'));
     const unsubscribe = onSnapshot(
       q,
@@ -78,13 +72,9 @@ export default function DashboardOverviewPage() {
         setIsLoading(false);
       }
     );
-    return unsubscribe;
-  }, []);
 
-  useEffect(() => {
-    const unsubscribe = subscribeToBatches();
     return () => unsubscribe();
-  }, [subscribeToBatches]);
+  }, []);
 
   const statuses = useMemo(
     () => ['all', ...Array.from(new Set(batches.map((b) => b.status)))],
