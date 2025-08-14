@@ -7,12 +7,12 @@ import { z } from "zod";
  */
 
 // ---- Log variants ----
-export const NoteLog = z.object({
+const NoteLog = z.object({
   type: z.literal("NOTE"),
   note: z.string().min(1, "Please add a note."),
 });
 
-export const MoveLog = z
+const MoveLog = z
   .object({
     type: z.literal("MOVE"),
     // prefer ID; keep name for backward compatibility
@@ -25,21 +25,21 @@ export const MoveLog = z
     path: ["newLocation"],
   });
 
-export const LossLog = z.object({
+const LossLog = z.object({
   type: z.literal("LOSS"),
   qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
   reason: z.string().optional(),
   note: z.string().optional(),
 });
 
-export const TransplantFromLog = z.object({
+const TransplantFromLog = z.object({
   type: z.literal("TRANSPLANT_FROM"),
   qty: z.coerce.number().min(1),
   fromBatch: z.string(),
   note: z.string().optional(),
 });
 
-export const TransplantToLog = z.object({
+const TransplantToLog = z.object({
   type: z.literal("TRANSPLANT_TO"),
   // your UI stores negative qty; allow any number
   qty: z.coerce.number(),
@@ -48,13 +48,13 @@ export const TransplantToLog = z.object({
   note: z.string().optional(),
 });
 
-export const CreateLog = z.object({
+const CreateLog = z.object({
   type: z.literal("CREATE"),
   qty: z.coerce.number().optional(),
   note: z.string().optional(),
 });
 
-export const ArchiveLog = z.object({
+const ArchiveLog = z.object({
   type: z.literal("ARCHIVE"),
   qty: z.coerce.number().optional(),
   reason: z.string().optional(),
@@ -62,13 +62,13 @@ export const ArchiveLog = z.object({
 });
 
 // keep legacy/other types seen in data
-export const AdjustLog = z.object({
+const AdjustLog = z.object({
   type: z.literal("ADJUST"),
   qty: z.coerce.number().optional(),
   note: z.string().optional(),
 });
 
-export const BatchSpacedLog = z.object({
+const BatchSpacedLog = z.object({
   type: z.literal("Batch Spaced"),
   note: z.string().optional(),
 });
@@ -140,8 +140,15 @@ export type Batch = z.infer<typeof BatchSchema>;
 export const VarietySchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "Variety name is required"),
+  commonName: z.string().optional(),
   family: z.string().min(1, "Family is required"),
   category: z.string().min(1, "Category is required"),
+  grouping: z.string().optional(),
+  rating: z.string().optional(),
+  salesPeriod: z.string().optional(),
+  floweringPeriod: z.string().optional(),
+  flowerColour: z.string().optional(),
+  evergreen: z.string().optional(),
 });
 export type Variety = z.infer<typeof VarietySchema>;
 
@@ -150,7 +157,7 @@ export const NurseryLocationSchema = z.object({
   name: z.string().min(1),
   nursery: z.string().min(1),
   type: z.string().min(1), // e.g., "Tunnel", "Section", ...
-  area: z.number().nonnegative().optional(),
+  area: z.coerce.number().nonnegative().optional(),
   isCovered: z.boolean().optional(),
 });
 export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
@@ -159,9 +166,9 @@ export const PlantSizeSchema = z.object({
   id: z.string().optional(),
   size: z.string().min(1), // e.g., "10.5", "54"
   type: z.enum(["Tray", "Pot", "Bareroot"]),
-  area: z.number().nonnegative(),
-  shelfQuantity: z.number().nonnegative(),
-  multiple: z.number().positive(),
+  area: z.coerce.number().nonnegative(),
+  shelfQuantity: z.coerce.number().nonnegative(),
+  multiple: z.coerce.number().positive(),
 });
 export type PlantSize = z.infer<typeof PlantSizeSchema>;
 
@@ -186,3 +193,22 @@ export const TransplantFormSchema = z.object({
   logRemainingAsLoss: z.boolean().optional(),
 });
 export type TransplantFormData = z.infer<typeof TransplantFormSchema>;
+
+// ---- AI flow output types ----
+
+/**
+ * Output schema for the Production Protocol AI flow.
+ * Matches the shape used by <ProductionProtocolDialog />.
+ */
+export const ProductionProtocolOutputSchema = z.object({
+  protocolTitle: z.string(),
+  summary: z.string(),
+  timeline: z.array(z.object({
+    day: z.number(),
+    action: z.string(),
+    date: z.string(),
+    details: z.string(),
+  })),
+  recommendations: z.array(z.string()),
+});
+export type ProductionProtocolOutput = z.infer<typeof ProductionProtocolOutputSchema>;
