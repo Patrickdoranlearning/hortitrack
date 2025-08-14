@@ -128,7 +128,7 @@ export default function VarietiesPage() {
     <div className="container mx-auto max-w-7xl p-4 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 className="mb-1 font-headline text-4xl">Plant Varieties</h1>
+            <h1 className="font-headline text-4xl">Plant Varieties</h1>
             <p className="text-muted-foreground">The master list of all plant varieties and their attributes.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -233,5 +233,6 @@ export default function VarietiesPage() {
     </>
   );
 }
+
 
 

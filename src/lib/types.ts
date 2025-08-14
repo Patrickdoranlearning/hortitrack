@@ -80,7 +80,7 @@ export const NurseryLocationSchema = z.object({
   name: z.string().min(1),
   nursery: z.string().min(1),
   type: z.string().min(1), // e.g., "Tunnel", "Section", ...
-  area: z.coerce.number().nonnegative().optional(),
+  area: z.coerce.number().min(0).optional(),
   isCovered: z.boolean().optional(),
 });
 export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
@@ -89,9 +89,9 @@ export const PlantSizeSchema = z.object({
   id: z.string().optional(),
   size: z.string().min(1), // e.g., "10.5", "54"
   type: z.enum(['Tray', 'Pot', 'Bareroot']),
-  area: z.coerce.number().nonnegative(),
-  shelfQuantity: z.coerce.number().nonnegative(),
-  multiple: z.coerce.number().positive(),
+  area: z.coerce.number().min(0),
+  shelfQuantity: z.coerce.number().min(0),
+  multiple: z.coerce.number().min(1),
 });
 export type PlantSize = z.infer<typeof PlantSizeSchema>;
 

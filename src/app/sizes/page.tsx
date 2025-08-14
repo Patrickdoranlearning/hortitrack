@@ -207,7 +207,7 @@ export default function SizesPage() {
     <div className="container mx-auto max-w-6xl p-4 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 className="mb-1 font-headline text-4xl">Plant Sizes</h1>
+            <h1 className="font-headline text-4xl">Plant Sizes</h1>
             <p className="text-muted-foreground">The master list of all standard plant/container sizes.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -273,7 +273,7 @@ export default function SizesPage() {
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteSize(size.id)}>
+                                  <AlertDialogAction onClick={() => handleDeleteSize(size.id!)}>
                                       Yes, delete it
                                   </AlertDialogAction>
                                   </AlertDialogFooter>

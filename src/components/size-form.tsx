@@ -62,12 +62,6 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>{isEditing ? 'Edit Size' : 'Add New Size'}</DialogTitle>
-        <DialogDescription>
-          {isEditing && size ? `Editing the details for the "${size.size}" size.` : 'Add a new plant size to your master list.'}
-        </DialogDescription>
-      </DialogHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
             <FormField control={form.control} name="size" render={({ field }) => (
@@ -96,21 +90,21 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
             <FormField control={form.control} name="area" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Area (m²)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 0.01" {...field} /></FormControl>
+                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
             <FormField control={form.control} name="shelfQuantity" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Shelf Quantity</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl>
+                    <FormControl><Input type="number" placeholder="e.g., 100" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
             <FormField control={form.control} name="multiple" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Multiple (for Trays)</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 54" {...field} /></FormControl>
+                    <FormControl><Input type="number" placeholder="e.g., 54" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl>
                     <FormMessage />
                 </FormItem>
             )} />

@@ -4,7 +4,7 @@
 import { productionProtocol } from '@/ai/flows/production-protocol';
 import { careRecommendations, type CareRecommendationsInput, type CareRecommendationsOutput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
-import type { Batch, Variety } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 import { z } from 'zod';
 
@@ -283,4 +283,137 @@ export async function transplantBatchAction(
     console.error('Error transplanting batch:', error);
     return { success: false, error: error.message || 'Failed to transplant batch.' };
   }
+}
+
+export async function addLocationAction(locationData: Omit<NurseryLocation, 'id'>) {
+    try {
+        const docRef = db.collection('locations').doc();
+        const newLocation = { ...locationData, id: docRef.id };
+        await docRef.set(newLocation);
+        return { success: true, data: newLocation };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateLocationAction(locationData: NurseryLocation) {
+    try {
+        const docRef = db.collection('locations').doc(locationData.id!);
+        await docRef.set(locationData, { merge: true });
+        return { success: true, data: locationData };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deleteLocationAction(locationId: string) {
+    try {
+        await db.collection('locations').doc(locationId).delete();
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function addSizeAction(sizeData: Omit<PlantSize, 'id'>) {
+    try {
+        const docRef = db.collection('sizes').doc();
+        const newSize = { ...sizeData, id: docRef.id };
+        await docRef.set(newSize);
+        return { success: true, data: newSize };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateSizeAction(sizeData: PlantSize) {
+    try {
+        const docRef = db.collection('sizes').doc(sizeData.id!);
+        await docRef.set(sizeData, { merge: true });
+        return { success: true, data: sizeData };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deleteSizeAction(sizeId: string) {
+    try {
+        await db.collection('sizes').doc(sizeId).delete();
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function addSupplierAction(supplierData: Omit<Supplier, 'id'>) {
+    try {
+        const docRef = db.collection('suppliers').doc();
+        const newSupplier = { ...supplierData, id: docRef.id };
+        await docRef.set(newSupplier);
+        return { success: true, data: newSupplier };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateSupplierAction(supplierData: Supplier) {
+    try {
+        const docRef = db.collection('suppliers').doc(supplierData.id!);
+        await docRef.set(supplierData, { merge: true });
+        return { success: true, data: supplierData };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deleteSupplierAction(supplierId: string) {
+    try {
+        await db.collection('suppliers').doc(supplierId).delete();
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+
+export async function updateVarietyAction(varietyData: Variety) {
+    try {
+        const docRef = db.collection('varieties').doc(varietyData.id!);
+        await docRef.set(varietyData, { merge: true });
+        return { success: true, data: varietyData };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deleteVarietyAction(varietyId: string) {
+    try {
+        await db.collection('varieties').doc(varietyId).delete();
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function addBatchesFromCsvAction(batches: any[]) {
+    try {
+        const writeBatch = db.batch();
+        
+        batches.forEach(batchData => {
+            const docRef = db.collection('batches').doc();
+            
+            const newBatch: Omit<Batch, 'id'> = {
+              ...batchData,
+              batchNumber: `CSV-${docRef.id.substring(0,6)}`, // Temporary batch number
+              logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: 'Batch created from CSV import.' }],
+            };
+            writeBatch.set(docRef, newBatch);
+        });
+
+        await writeBatch.commit();
+        return { success: true, message: `${batches.length} batches imported successfully.` };
+    } catch (error: any) {
+        console.error("Error importing batches from CSV:", error);
+        return { success: false, error: error.message };
+    }
 }

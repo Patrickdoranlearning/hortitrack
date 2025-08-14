@@ -1,4 +1,4 @@
-import HomePageView from '@/app/page';
+import HomePageView from '@/app/HomePageView';
 import {
   addBatchAction,
   addVarietyAction,
@@ -7,6 +7,16 @@ import {
   logAction,
   transplantBatchAction,
   updateBatchAction,
+  addLocationAction,
+  updateLocationAction,
+  deleteLocationAction,
+  addSizeAction,
+  updateSizeAction,
+  deleteSizeAction,
+  addSupplierAction,
+  updateSupplierAction,
+  deleteSupplierAction,
+  addBatchesFromCsvAction,
 } from '@/app/actions';
 import { INITIAL_PLANT_SIZES } from '@/lib/constants';
 import { db } from '@/lib/firebase-admin';
@@ -108,6 +118,16 @@ export default async function HomePageContainer() {
         transplantBatch: transplantBatchAction,
         logAction: logAction,
         addVariety: addVarietyAction,
+        addLocation: addLocationAction,
+        updateLocation: updateLocationAction,
+        deleteLocation: deleteLocationAction,
+        addSize: addSizeAction,
+        updateSize: updateSizeAction,
+        deleteSize: deleteSizeAction,
+        addSupplier: addSupplierAction,
+        updateSupplier: updateSupplierAction,
+        deleteSupplier: deleteSupplierAction,
+        addBatchesFromCsv: addBatchesFromCsvAction,
       }}
     />
   );

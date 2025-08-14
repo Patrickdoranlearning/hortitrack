@@ -114,7 +114,9 @@ export default function HomePageView({
   const isReadonly = !user;
 
   // Use the initial data passed from the server component
-  const { data: batches } = useCollection<Batch>('batches', initialBatches);
+  const { data: batchesData } = useCollection<Batch>('batches', initialBatches);
+  const batches = batchesData || [];
+
   const { data: varieties } = useCollection<Variety>(
     'varieties',
     initialVarieties
@@ -157,7 +159,7 @@ export default function HomePageView({
 
   const filteredBatches = React.useMemo(() => {
     const dataToFilter = isReadonly ? initialBatches : batches;
-    return dataToFilter
+    return (dataToFilter || [])
       .filter((batch) =>
         `${batch.plantFamily} ${batch.plantVariety} ${batch.category} ${
           batch.supplier || ''
@@ -203,7 +205,7 @@ export default function HomePageView({
     let transplanted = 0;
     let lost = 0;
 
-    batch.logHistory.forEach((log) => {
+    (batch.logHistory || []).forEach((log) => {
       if (log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number') {
         transplanted += Math.abs(log.qty);
       }
@@ -440,7 +442,7 @@ export default function HomePageView({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c) => (
+              {(categories || []).map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
                 </SelectItem>
@@ -459,7 +461,7 @@ export default function HomePageView({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Families</SelectItem>
-              {plantFamilies.map((p) => (
+              {(plantFamilies || []).map((p) => (
                 <SelectItem key={p} value={p}>
                   {p}
                 </SelectItem>
@@ -508,10 +510,10 @@ export default function HomePageView({
             onSubmit={handleFormSubmit}
             onCancel={() => setIsFormOpen(false)}
             onArchive={handleArchive}
-            nurseryLocations={nurseryLocations}
-            plantSizes={plantSizes}
-            suppliers={suppliers}
-            varieties={varieties}
+            nurseryLocations={nurseryLocations || []}
+            plantSizes={plantSizes || []}
+            suppliers={suppliers || []}
+            varieties={varieties || []}
             onCreateNewVariety={handleCreateNewVariety}
           />
         </DialogContent>
@@ -536,7 +538,7 @@ export default function HomePageView({
           </DialogHeader>
           <ActionLogForm
             batch={selectedBatch}
-            nurseryLocations={nurseryLocations}
+            nurseryLocations={nurseryLocations || []}
             onSubmit={handleLogActionSubmit}
             onCancel={() => setIsLogActionOpen(false)}
           />
@@ -549,8 +551,8 @@ export default function HomePageView({
             batch={selectedBatch}
             onSubmit={handleTransplantSubmit}
             onCancel={() => setIsTransplantOpen(false)}
-            nurseryLocations={nurseryLocations}
-            plantSizes={plantSizes}
+            nurseryLocations={nurseryLocations || []}
+            plantSizes={plantSizes || []}
           />
         </DialogContent>
       </Dialog>
