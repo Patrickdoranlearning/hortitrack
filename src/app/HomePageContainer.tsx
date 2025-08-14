@@ -1,7 +1,7 @@
 
 'use server';
 
-import HomePageView from '@/app/HomePageView';
+import HomePageView from '@/app/page';
 import {
   addBatchAction,
   addVarietyAction,
@@ -68,7 +68,7 @@ function dedupeByName<T extends { id?: string; name?: string; size?: string }>(
   });
 }
 
-export default async function HomePage() {
+export default async function HomePageContainer() {
   const batchesResult = await getBatchesAction();
   const batches = batchesResult.success ? batchesResult.data : [];
 

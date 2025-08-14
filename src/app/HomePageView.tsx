@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -71,7 +72,7 @@ interface HomePageViewProps {
   categories: string[];
   actions: {
     addBatch: (
-      data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'>
+      data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'logHistory'>
     ) => Promise<any>;
     updateBatch: (data: Batch) => Promise<any>;
     archiveBatch: (batchId: string, loss: number) => Promise<any>;

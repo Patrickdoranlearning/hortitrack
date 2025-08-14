@@ -286,7 +286,7 @@ export async function updateBatchAction(
 ) {
   try {
     await requireAuth(); // Auth required
-    const batch = await getBatchById(batchToUpdate.id);
+    const batch = await getBatchById(batchToUpdate.id!);
     if (!batch) {
       return err('Batch not found.');
     }
@@ -316,7 +316,7 @@ export async function updateBatchAction(
     }
 
     const batchesCollection = db.collection('batches');
-    const batchDoc = batchesCollection.doc(updatedBatchData.id);
+    const batchDoc = batchesCollection.doc(updatedBatchData.id!);
     await batchDoc.update({
       ...updatedBatchData,
       updatedAt: FieldValue.serverTimestamp(),
@@ -428,8 +428,8 @@ export async function transplantBatchAction(
   sourceBatchId: string,
   newBatchData: Omit<
     Batch,
-    'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber' | 'createdAt' | 'updatedAt'
-  >,
+    'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'initialQuantity'
+  > & { initialQuantity: number },
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ): Promise<
