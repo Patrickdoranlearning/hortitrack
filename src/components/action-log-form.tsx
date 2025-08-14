@@ -20,14 +20,13 @@ import { DialogFooter } from "./ui/dialog";
 // ---- Action Log Form Values (NOTE | MOVE | LOSS only) ----
 // This schema is for client-side form validation.
 const NoteLog = z.object({
-  type: z.literal("NOTE"),
+  type: z.literal("NOTE").default("NOTE"),
   note: z.string().min(1, "Please add a note."),
 });
 
 const MoveLog = z
   .object({
-    type: z.literal("MOVE"),
-    // prefer ID; keep name for backward compatibility
+    type: z.literal("MOVE").default("MOVE"),
     newLocationId: z.string().optional(),
     newLocation: z.string().optional(),
     note: z.string().optional(),
@@ -38,19 +37,17 @@ const MoveLog = z
   });
 
 const LossLog = z.object({
-  type: z.literal("LOSS"),
+  type: z.literal("LOSS").default("LOSS"),
   qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
   reason: z.string().optional(),
   note: z.string().optional(),
 });
-
 
 const ActionLogSchema = z.discriminatedUnion("type", [
   NoteLog,
   MoveLog,
   LossLog,
 ]);
-
 
 function idFromName(list: NurseryLocation[], name?: string) {
   return list.find((x) => x.name === name)?.id ?? "";
@@ -71,12 +68,10 @@ export function ActionLogForm({
     resolver: zodResolver(ActionLogSchema),
     mode: "onChange",
     defaultValues: {
-      type: "NOTE",
-      // fields below are safely ignored by other variants
+      type: "NOTE", // always set to prevent undefined
       note: "",
       newLocation: "",
       newLocationId: "",
-      // for LOSS
       // @ts-expect-error: start empty; z.coerce will handle when used
       qty: undefined,
       reason: "",
@@ -86,7 +81,6 @@ export function ActionLogForm({
   const type = form.watch("type") ?? "NOTE";
 
   const handleValid = async (values: ActionLogFormValues) => {
-    // Optional guard: prevent loss > available
     if (values.type === "LOSS" && typeof values.qty === "number") {
       const available = Number(batch?.quantity ?? 0);
       if (values.qty > available) {
@@ -174,7 +168,6 @@ export function ActionLogForm({
                   value={idFromName(nurseryLocations, field.value)}
                   onValueChange={(id) => {
                     const selected = nurseryLocations.find((l) => l.id === id);
-                    // set both name + id; server prefers id
                     form.setValue("newLocationId", id);
                     field.onChange(selected?.name ?? "");
                   }}

@@ -1,6 +1,7 @@
 // src/app/api/admin-whoami/route.ts
 import 'server-only';
 export const runtime = 'nodejs';
+import '@/lib/firebase-admin'; // Ensure admin is initialized
 import { getApps } from 'firebase-admin/app';
 
 export async function GET() {

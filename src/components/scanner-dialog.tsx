@@ -68,6 +68,7 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
         if (videoRef.current?.srcObject) {
             const stream = videoRef.current.srcObject as MediaStream;
             stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
         }
     }
   }, [open, toast]);

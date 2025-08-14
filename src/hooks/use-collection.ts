@@ -38,6 +38,7 @@ export function useCollection<T>(
       q,
       (snapshot) => {
         if (snapshot.empty && initialData.length > 0) {
+            if (!user) { setIsLoading(false); return; }
             console.log(`Collection '${collectionName}' is empty. Seeding initial data.`);
             const batch = writeBatch(db);
             initialData.forEach(item => {
@@ -67,7 +68,7 @@ export function useCollection<T>(
     );
 
     return unsubscribe;
-  }, [collectionName, user?.uid, toast]); // Depend on user.uid to re-run when auth state changes
+  }, [collectionName, user, toast, initialData, constraints]); // Depend on user to re-run when auth state changes
 
   useEffect(() => {
     const unsubscribe = subscribeToCollection();

@@ -65,7 +65,7 @@ export type TransplantFormData = z.infer<ReturnType<typeof transplantFormSchema>
 
 interface TransplantFormProps {
   batch: Batch | null;
-  onSubmit: (data: Omit<TransplantFormData, 'initialQuantity'> & { initialQuantity: number }) => void;
+  onSubmit: (data: TransplantFormData) => void;
   onCancel: () => void;
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];
@@ -187,7 +187,7 @@ export function TransplantForm({
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(
-            (values) => onSubmit({ ...values, initialQuantity: values.quantity }),
+            (values) => onSubmit(values),
             (errors) => {
               console.error("Transplant form invalid:", errors);
             }

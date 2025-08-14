@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge, BadgeVariant } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
@@ -42,7 +42,7 @@ const TransplantIcon = () => (
 export function BatchCard({ batch, onClick, onLogAction, onTransplant }: BatchCardProps) {
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
 
-  const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
+  const getStatusVariant = (status: Batch['status']): BadgeVariant => {
     switch (status) {
       case 'Ready for Sale':
       case 'Looking Good':

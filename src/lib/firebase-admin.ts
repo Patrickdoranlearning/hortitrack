@@ -3,6 +3,7 @@ import "server-only";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getFirestore, FieldValue as AdminFieldValue, Timestamp } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { cookies } from 'next/headers';
 
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -22,6 +23,7 @@ if (!getApps().length) {
     credential: cert({
       projectId,
       clientEmail,
+      // The private key must have newlines escaped in the .env file
       privateKey: privateKey?.replace(/\\n/g, '\n'),
     }),
   });

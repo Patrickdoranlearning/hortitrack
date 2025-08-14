@@ -19,6 +19,7 @@ import type {
   Supplier,
 } from '@/lib/types';
 import { getAuth } from 'firebase-admin/auth';
+import { cookies } from 'next/headers';
 
 // Ensure every action returns only primitives/arrays/objects with primitives
 type ActionOk<T> = { success: true; data: T };
@@ -34,13 +35,15 @@ function err(message: unknown): ActionErr {
 
 // Helper function to safely stringify any object, converting Timestamps
 function safeJsonStringify(obj: any): string {
-    const replacer = (key: string, value: any) => {
-        if (value && typeof value === 'object' && value.hasOwnProperty('_seconds') && value.hasOwnProperty('_nanoseconds')) {
-            return new Timestamp(value._seconds, value._nanoseconds).toDate().toISOString();
+    const replacer = (_: string, value: any) => {
+        // Admin Timestamp (object shape)
+        if (value && typeof value === 'object' && value._seconds != null && value._nanoseconds != null) {
+          return new Timestamp(value._seconds, value._nanoseconds).toDate().toISOString();
         }
-        if (value instanceof Timestamp) {
-            return value.toDate().toISOString();
-        }
+        // Admin/Client Timestamp instance
+        if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
+        // Plain Date
+        if (value instanceof Date) return value.toISOString();
         return value;
     };
     return JSON.stringify(obj, replacer);
@@ -61,14 +64,11 @@ function deepJsonParse(jsonString: string): any {
 
 
 async function requireAuth() {
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get('__session')?.value;
+  if (!sessionCookie) throw new Error('Unauthorized');
   const auth = getAuth();
-  // This is a placeholder for actual session cookie verification
-  // In a real app, you'd get this from request headers/cookies
-  // const sessionCookie = await auth.verifySessionCookie('dummy-cookie', true).catch(() => null);
-  // if (!sessionCookie) {
-  //   throw new Error('Unauthorized: Authentication required.');
-  // }
-  // return sessionCookie;
+  await auth.verifySessionCookie(sessionCookie, true);
 }
 
 // Helper to upsert and return next counter value atomically
@@ -225,11 +225,11 @@ export async function addBatchesFromCsvAction(
 
     await db.runTransaction(async (transaction) => {
       const counterDoc = await transaction.get(counterRef);
-      let currentBatchNum = 0;
-      if (counterDoc.exists && counterDoc.data()!.count) {
-        currentBatchNum = counterDoc.data()!.count;
-      } else {
+      let current = 0;
+      if (!counterDoc.exists) {
         transaction.set(counterRef, { count: 0 });
+      } else {
+        current = Number(counterDoc.data()?.count ?? 0);
       }
 
       const batchNumberPrefixMap: Record<Batch['status'], string> = {
@@ -242,8 +242,8 @@ export async function addBatchesFromCsvAction(
       };
 
       for (const batchData of newBatchesData) {
-        currentBatchNum++;
-        const nextBatchNumStr = currentBatchNum.toString().padStart(6, '0');
+        current++;
+        const nextBatchNumStr = current.toString().padStart(6, '0');
         const prefixedBatchNumber = `${
           batchNumberPrefixMap[batchData.status]
         }-${nextBatchNumStr}`;
@@ -266,7 +266,7 @@ export async function addBatchesFromCsvAction(
         };
         transaction.set(newDocRef, newBatch);
       }
-      transaction.update(counterRef, { count: currentBatchNum });
+      transaction.update(counterRef, { count: current });
     });
     return {
       success: true,
@@ -292,28 +292,28 @@ export async function updateBatchAction(
     }
 
     const updatedBatchData = { ...batchToUpdate };
+    const prevStatus = batch.status;
 
     // Ensure quantity doesn't go below zero
     updatedBatchData.quantity = Math.max(0, updatedBatchData.quantity);
 
-    let wasArchived = false;
     if (
       updatedBatchData.quantity <= 0 &&
-      updatedBatchData.status !== 'Archived'
+      prevStatus !== 'Archived'
     ) {
       updatedBatchData.logHistory.push({
         id: `log_${Date.now()}`,
         date: Timestamp.now(),
         type: 'ARCHIVE',
-        note: `Batch quantity reached zero and was automatically archived.`,
+        note: `Auto-archived when quantity reached 0.`,
       });
       updatedBatchData.status = 'Archived';
-      wasArchived = true;
     }
-
-    if (updatedBatchData.status === 'Archived' && !wasArchived) {
+    
+    if (updatedBatchData.status === 'Archived' && prevStatus !== 'Archived') {
       updatedBatchData.quantity = 0;
     }
+
 
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(updatedBatchData.id!);
@@ -429,7 +429,7 @@ export async function transplantBatchAction(
   newBatchData: Omit<
     Batch,
     'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'initialQuantity'
-  > & { initialQuantity: number },
+  >,
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ): Promise<
@@ -513,27 +513,18 @@ export async function transplantBatchAction(
         : sourceLog;
 
       const sourceUpdateData: any = {
-        quantity: source.quantity - transplantQuantity,
         logHistory: updatedHistory,
         updatedAt: FieldValue.serverTimestamp(),
       };
-
+      
+      const prevStatus = source.status;
+      sourceUpdateData.quantity = Math.max(0, source.quantity - transplantQuantity);
       if (logRemainingAsLoss) {
-        sourceUpdateData.status = 'Archived';
         sourceUpdateData.quantity = 0;
       }
-
-      if (
-        sourceUpdateData.quantity <= 0 &&
-        source.status !== 'Archived'
-      ) {
-        sourceUpdateData.status = 'Archived';
-        sourceUpdateData.logHistory.push({
-          id: `log_${Date.now()}_auto_archive`,
-          date: Timestamp.now(),
-          type: 'ARCHIVE',
-          note: `Batch quantity reached zero and was automatically archived.`,
-        });
+      if (sourceUpdateData.quantity <= 0 && prevStatus !== 'Archived') {
+          sourceUpdateData.status = 'Archived';
+          sourceUpdateData.logHistory.push({ id: `log_${Date.now()}`, date: Timestamp.now(), type: 'ARCHIVE', note: 'Auto-archived when quantity reached 0.' });
       }
 
       tx.update(sourceRef, sourceUpdateData);
