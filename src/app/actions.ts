@@ -1,25 +1,40 @@
 
 'use server';
 
+/**
+ * NOTES
+ * - Requires Firebase Admin already initialized in `@/lib/firebase-admin`.
+ * - Server-side auth: we try to read a Bearer token from headers OR a __session cookie,
+ *   then verify it using firebase-admin Auth. If none is found, we throw.
+ *   If you’re not ready to enforce auth yet, set ENFORCE_AUTH=false in your env.
+ * - All actions now return { success: boolean, data?: T, error?: string }.
+ */
+
 import { db, FieldValue, Timestamp } from '@/lib/firebase-admin';
-import type { Batch, LogEntry } from '@/lib/types';
-import {
-  productionProtocol,
-  ProductionProtocolOutput,
-} from '@/ai/flows/production-protocol';
-import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
-import {
-  careRecommendations,
-  type CareRecommendationsInput,
-} from '@/ai/flows/care-recommendations';
+import { getAuth } from 'firebase-admin/auth';
+import { headers, cookies } from 'next/headers';
+
 import type {
+  Batch,
+  LogEntry,
   Variety,
   NurseryLocation,
   PlantSize,
   Supplier,
 } from '@/lib/types';
 
-// Ensure every action returns only primitives/arrays/objects with primitives
+import {
+  productionProtocol,
+  type ProductionProtocolOutput,
+} from '@/ai/flows/production-protocol';
+import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
+import {
+  careRecommendations,
+  type CareRecommendationsInput,
+} from '@/ai/flows/care-recommendations';
+
+/* ---------------------------------- Types --------------------------------- */
+
 type ActionOk<T> = { success: true; data: T };
 type ActionErr = { success: false; error: string };
 export type ActionResult<T> = ActionOk<T> | ActionErr;
@@ -31,6 +46,58 @@ function err(message: unknown): ActionErr {
   return { success: false, error: String(message ?? 'Unknown error') };
 }
 
+/* ----------------------------- Server-side auth ---------------------------- */
+
+const ENFORCE_AUTH = process.env.ENFORCE_AUTH !== 'false';
+
+async function requireAuth(): Promise<{ uid: string } | null> {
+  try {
+    const h = await headers();
+    const authHeader = h.get('Authorization');
+    const tokenFromHeader = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : undefined;
+
+    const c = await cookies();
+    const tokenFromCookie = c.get('__session')?.value;
+
+    const token = tokenFromHeader || tokenFromCookie;
+    if (!token) {
+      if (ENFORCE_AUTH) throw new Error('Unauthenticated');
+      return null;
+    }
+
+    const decoded = await getAuth().verifyIdToken(token);
+    return { uid: decoded.uid };
+  } catch (e) {
+    if (ENFORCE_AUTH) throw e;
+    return null;
+  }
+}
+
+/* ------------------------- Helpers: ids / numbering ------------------------ */
+
+function newId(prefix = 'log'): string {
+  // ULID would be ideal; this is collision-resistant enough for our use.
+  return `${prefix}_${Date.now().toString(36)}_${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
+
+const BATCH_PREFIX: Record<Batch['status'], string> = {
+  Propagation: '1',
+  'Plugs/Liners': '2',
+  Potted: '3',
+  'Ready for Sale': '4',
+  'Looking Good': '6',
+  Archived: '5',
+};
+
+function numberWithPrefix(status: Batch['status'], n: number): string {
+  const seq = String(n).padStart(6, '0');
+  return `${BATCH_PREFIX[status]}-${seq}`;
+}
+
 // Helper to upsert and return next counter value atomically
 async function getNextBatchNumberInTx(
   tx: FirebaseFirestore.Transaction
@@ -38,113 +105,199 @@ async function getNextBatchNumberInTx(
   const counterRef = db.collection('counters').doc('batches');
   const snap = await tx.get(counterRef);
 
-  let next = 1;
   if (!snap.exists) {
-    // First ever batch number
     tx.set(counterRef, { count: 1 });
-    next = 1;
-  } else {
-    const current = Number(snap.data()?.count ?? 0);
-    next = current + 1;
-    tx.update(counterRef, { count: next });
+    return 1;
   }
+  const current = Number(snap.data()?.count ?? 0);
+  const next = current + 1;
+  tx.update(counterRef, { count: next });
   return next;
 }
 
-function numberWithPrefix(status: Batch['status'], n: number): string {
-  const prefix: Record<Batch['status'], string> = {
-    Propagation: '1',
-    'Plugs/Liners': '2',
-    Potted: '3',
-    'Ready for Sale': '4',
-    'Looking Good': '6',
-    Archived: '5',
-  };
-  const seq = String(n).padStart(6, '0');
-  return `${prefix[status]}-${seq}`;
+/* ----------------------------- Server validation --------------------------- */
+/**
+ * Lightweight runtime guards. (Keep strict Zod for client forms; here we
+ * validate only what’s needed to protect Firestore and invariants.)
+ */
+
+function assertNonEmptyString(v: unknown, field: string) {
+  if (typeof v !== 'string' || !v.trim()) {
+    throw new Error(`Invalid ${field}`);
+  }
 }
 
-export async function getBatchesAction() {
+function sanitizeNewBatchPayload(
+  payload: any
+): Omit<
+  Batch,
+  'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'
+> {
+  // required:
+  assertNonEmptyString(payload.category, 'category');
+  assertNonEmptyString(payload.plantFamily, 'plantFamily');
+  assertNonEmptyString(payload.plantVariety, 'plantVariety');
+  assertNonEmptyString(payload.plantingDate, 'plantingDate');
+  assertNonEmptyString(payload.location, 'location');
+  assertNonEmptyString(payload.size, 'size');
+  assertNonEmptyString(payload.supplier ?? 'Doran Nurseries', 'supplier');
+  if (
+    payload.status !== 'Propagation' &&
+    payload.status !== 'Plugs/Liners' &&
+    payload.status !== 'Potted' &&
+    payload.status !== 'Ready for Sale' &&
+    payload.status !== 'Looking Good' &&
+    payload.status !== 'Archived'
+  ) {
+    throw new Error('Invalid status');
+  }
+  const quantity = Number(payload.quantity ?? payload.initialQuantity ?? 0);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error('Quantity must be > 0');
+  }
+
+  // Optional URLs
+  const growerPhotoUrl =
+    typeof payload.growerPhotoUrl === 'string' ? payload.growerPhotoUrl : '';
+  const salesPhotoUrl =
+    typeof payload.salesPhotoUrl === 'string' ? payload.salesPhotoUrl : '';
+
+  return {
+    category: String(payload.category),
+    plantFamily: String(payload.plantFamily),
+    plantVariety: String(payload.plantVariety),
+    plantingDate: String(payload.plantingDate),
+    initialQuantity: Number(payload.initialQuantity ?? quantity),
+    quantity,
+    status: payload.status,
+    location: String(payload.location),
+    size: String(payload.size),
+    supplier: String(payload.supplier ?? 'Doran Nurseries'),
+    growerPhotoUrl,
+    salesPhotoUrl,
+  } as any;
+}
+
+function sanitizeUpdateBatchPayload(payload: any): Batch {
+  assertNonEmptyString(payload.id, 'id');
+  // Keep these immutable:
+  // - id, batchNumber, createdAt
+  const clean: any = { ...payload };
+  delete clean.createdAt;
+  delete clean.id; // will pass separately to .doc(id)
+  delete clean.batchNumber;
+
+  // Enforce invariants
+  if (typeof payload.quantity === 'number') {
+    clean.quantity = Math.max(0, Number(payload.quantity));
+  }
+  if (payload.status === 'Archived') {
+    clean.quantity = 0;
+  }
+
+  // Normalize photo URLs to string
+  if (payload.growerPhotoUrl == null) clean.growerPhotoUrl = '';
+  if (payload.salesPhotoUrl == null) clean.salesPhotoUrl = '';
+
+  return { ...payload, ...clean } as Batch;
+}
+
+/* --------------------------------- Getters -------------------------------- */
+
+export async function getBatchesAction(): Promise<ActionResult<Batch[]>> {
   try {
+    await requireAuth();
     const snapshot = await db.collection('batches').get();
     const batches = snapshot.docs.map((doc) => ({
       ...doc.data(),
       id: doc.id,
     })) as Batch[];
-    return { success: true, data: batches };
-  } catch (error: any) {
-    console.error('Error getting batches:', error);
-    return {
-      success: false,
-      error: 'Failed to fetch batches: ' + error.message,
-    };
+    return ok(batches);
+  } catch (e: any) {
+    console.error('Error getting batches:', e);
+    return err('Failed to fetch batches: ' + e?.message);
   }
 }
 
-export async function getProductionProtocolAction(batch: Batch) {
+/* ------------------------------ AI conveniences --------------------------- */
+
+export async function getProductionProtocolAction(
+  batch: Batch
+): Promise<ActionResult<ProductionProtocolOutput>> {
   try {
+    await requireAuth();
     const protocol = await productionProtocol(batch);
-    return { success: true, data: protocol };
-  } catch (error) {
-    console.error('Error getting production protocol:', error);
-    return {
-      success: false,
-      error: 'Failed to generate AI production protocol.',
-    };
+    return ok(protocol);
+  } catch (e) {
+    console.error('Error getting production protocol:', e);
+    return err('Failed to generate AI production protocol.');
   }
 }
 
-export async function getCareRecommendationsAction(batch: Batch) {
+export async function getCareRecommendationsAction(
+  batch: Batch
+): Promise<ActionResult<any>> {
   try {
+    await requireAuth();
     const input: CareRecommendationsInput = {
       batchInfo: {
         plantFamily: batch.plantFamily,
         plantVariety: batch.plantVariety,
         plantingDate: batch.plantingDate,
       },
-      logHistory: batch.logHistory.map((log) => log.note || log.type),
+      logHistory: (batch.logHistory || []).map((log) => log.note || log.type),
     };
     const result = await careRecommendations(input);
-    return { success: true, data: result };
-  } catch (error: any) {
-    console.error('Error in care recommendations action:', error);
-    return { success: false, error: 'Failed to get AI care recommendations.' };
+    return ok(result);
+  } catch (e) {
+    console.error('Error in care recommendations action:', e);
+    return err('Failed to get AI care recommendations.');
   }
 }
 
-export async function batchChatAction(batch: Batch, query: string) {
+export async function batchChatAction(
+  batch: Batch,
+  query: string
+): Promise<ActionResult<any>> {
   try {
+    await requireAuth();
     const input: BatchChatInput = { batch, query };
     const result = await batchChat(input);
-    return { success: true, data: result };
-  } catch (error: any) {
-    console.error('Error in batch chat action:', error);
-    return { success: false, error: 'Failed to get AI response.' };
+    return ok(result);
+  } catch (e: any) {
+    console.error('Error in batch chat action:', e);
+    return err('Failed to get AI response.');
   }
 }
 
-// ---------- CREATE ----------
+/* ---------------------------------- Create -------------------------------- */
+
 export async function addBatchAction(
-  newBatchData: Omit<
+  incoming: Omit<
     Batch,
     'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'
   >
 ): Promise<ActionResult<{ id: string; batchNumber: string }>> {
   try {
+    await requireAuth();
+    const newBatchData = sanitizeNewBatchPayload(incoming);
+
     const { id, batchNumber } = await db.runTransaction(async (tx) => {
       const next = await getNextBatchNumberInTx(tx);
       const batchNumber = numberWithPrefix(newBatchData.status, next);
       const ref = db.collection('batches').doc();
 
+      const logId = newId();
       tx.set(ref, {
         ...newBatchData,
+        id: ref.id,
         batchNumber,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         logHistory: [
           {
-            id: `log_${Date.now()}`,
-            date: Timestamp.now(), // concrete timestamp (OK inside arrays)
+            id: logId,
+            date: Timestamp.now(),
             type: 'CREATE',
             note: 'Batch created.',
             qty: newBatchData.quantity,
@@ -155,7 +308,6 @@ export async function addBatchAction(
       return { id: ref.id, batchNumber };
     });
 
-    // ✅ Return only primitives
     return ok({ id, batchNumber });
   } catch (e: any) {
     console.error('addBatchAction failed:', e);
@@ -164,159 +316,174 @@ export async function addBatchAction(
 }
 
 export async function addBatchesFromCsvAction(
-  newBatchesData: Omit<
+  rows: Omit<
     Batch,
     'id' | 'logHistory' | 'batchNumber' | 'createdAt' | 'updatedAt'
   >[]
-) {
-  const counterRef = db.collection('counters').doc('batches');
-
+): Promise<ActionResult<{ count: number }>> {
   try {
-    await db.runTransaction(async (transaction) => {
-      const counterDoc = await transaction.get(counterRef);
-      let currentBatchNum = 0;
-      if (counterDoc.exists && counterDoc.data()!.count) {
-        currentBatchNum = counterDoc.data()!.count;
-      } else {
-        transaction.set(counterRef, { count: 0 });
-      }
+    await requireAuth();
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new Error('No rows provided.');
+    }
 
-      const batchNumberPrefixMap: Record<Batch['status'], string> = {
-        Propagation: '1',
-        'Plugs/Liners': '2',
-        Potted: '3',
-        'Ready for Sale': '4',
-        'Looking Good': '6',
-        Archived: '5',
-      };
+    await db.runTransaction(async (tx) => {
+      for (const raw of rows) {
+        const batchData = sanitizeNewBatchPayload(raw);
+        const next = await getNextBatchNumberInTx(tx);
+        const newBatchNumber = numberWithPrefix(batchData.status, next);
 
-      for (const batchData of newBatchesData) {
-        currentBatchNum++;
-        const nextBatchNumStr = currentBatchNum.toString().padStart(6, '0');
-        const prefixedBatchNumber = `${
-          batchNumberPrefixMap[batchData.status]
-        }-${nextBatchNumStr}`;
-
-        const newDocRef = db.collection('batches').doc();
-        const newBatch: Omit<Batch, 'id'> = {
+        const newRef = db.collection('batches').doc();
+        tx.set(newRef, {
           ...batchData,
-          batchNumber: prefixedBatchNumber,
+          id: newRef.id,
+          batchNumber: newBatchNumber,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
           logHistory: [
             {
-              id: `log_${Date.now()}`,
+              id: newId(),
               date: Timestamp.now(),
               type: 'CREATE',
               note: 'Batch created via CSV import.',
               qty: batchData.quantity,
             },
           ],
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        };
-        transaction.set(newDocRef, newBatch);
+        });
       }
-      transaction.update(counterRef, { count: currentBatchNum });
     });
-    return {
-      success: true,
-      message: `${newBatchesData.length} batches added successfully.`,
-    };
-  } catch (error: any) {
-    console.error('Error adding batches from CSV:', error);
-    return { success: false, error: 'Failed to add batches: ' + error.message };
+
+    return ok({ count: rows.length });
+  } catch (e: any) {
+    console.error('Error adding batches from CSV:', e);
+    return err('Failed to add batches: ' + e?.message);
   }
 }
+
+/* --------------------------------- Update --------------------------------- */
 
 export async function updateBatchAction(
   batchToUpdate: Omit<Batch, 'createdAt' | 'updatedAt'> & {
     updatedAt?: any;
     createdAt?: any;
   }
-) {
+): Promise<ActionResult<Batch>> {
   try {
-    const updatedBatchData = { ...batchToUpdate };
+    await requireAuth();
 
-    // Ensure quantity doesn't go below zero
-    updatedBatchData.quantity = Math.max(0, updatedBatchData.quantity);
+    const current = await getBatchById(batchToUpdate.id);
+    if (!current) return err('Batch not found.');
 
-    let wasArchived = false;
-    if (
-      updatedBatchData.quantity <= 0 &&
-      updatedBatchData.status !== 'Archived'
-    ) {
-      updatedBatchData.logHistory.push({
-        id: `log_${Date.now()}`,
-        date: Timestamp.now(),
-        type: 'ARCHIVE',
-        note: `Batch quantity reached zero and was automatically archived.`,
-      });
+    // Apply sanitize rules (immutables enforced)
+    const updatedBatchData = sanitizeUpdateBatchPayload(batchToUpdate);
+
+    // Archive auto-invariant
+    let wasArchived = current.status === 'Archived';
+    if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
       updatedBatchData.status = 'Archived';
       wasArchived = true;
-    }
-
-    if (updatedBatchData.status === 'Archived' && !wasArchived) {
+      updatedBatchData.logHistory = [
+        ...(current.logHistory || []),
+        {
+          id: newId(),
+          date: Timestamp.now(),
+          type: 'ARCHIVE',
+          note: 'Batch quantity reached zero and was automatically archived.',
+        } as any,
+      ];
       updatedBatchData.quantity = 0;
     }
 
-    const batchesCollection = db.collection('batches');
-    const batchDoc = batchesCollection.doc(updatedBatchData.id);
+    const batchDoc = db.collection('batches').doc(current.id);
+    const { id, createdAt, batchNumber, ...rest } = updatedBatchData as any;
+
     await batchDoc.update({
-      ...updatedBatchData,
+      ...rest,
       updatedAt: FieldValue.serverTimestamp(),
     });
-    return { success: true, data: updatedBatchData };
-  } catch (error: any) {
-    console.error('Error updating batch:', error);
-    return {
-      success: false,
-      error: 'Failed to update batch: ' + error.message,
-    };
+
+    return ok({ ...(current as any), ...rest, id: current.id, batchNumber: current.batchNumber });
+  } catch (e: any) {
+    console.error('Error updating batch:', e);
+    return err('Failed to update batch: ' + e?.message);
   }
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
   const docRef = db.collection('batches').doc(batchId);
   const docSnap = await docRef.get();
-
-  if (docSnap.exists) {
-    return { ...docSnap.data(), id: docSnap.id } as Batch;
-  }
-  return null;
+  if (!docSnap.exists) return null;
+  return { ...docSnap.data(), id: docSnap.id } as Batch;
 }
+
+/* ---------------------------------- Logs ---------------------------------- */
 
 export async function logAction(
   batchId: string,
-  logData: Partial<LogEntry> & { type: LogEntry['type'] }
+  logData: Partial<LogEntry> & { type: LogEntry['type'] } & {
+    // Preferred new field: pass a location ID; we’ll still accept name for now.
+    newLocationId?: string;
+  }
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const batch = await getBatchById(batchId);
-    if (!batch) {
-      return err('Batch not found.');
-    }
+    await requireAuth();
 
-    const now = Timestamp.now();
-    const newLog: LogEntry = {
-      id: `log_${Date.now()}`,
-      date: now,
-      type: logData.type,
-      note: logData.note ?? '',
-      qty: logData.qty,
-      reason: logData.reason,
-      newLocation: logData.newLocation,
-    };
+    if (!batchId) return err('Missing batchId');
+    if (!logData?.type) return err('Missing log type');
 
-    const updates: any = {
-      logHistory: FieldValue.arrayUnion(newLog),
-      updatedAt: FieldValue.serverTimestamp(),
-    };
+    const logId = logData.id || newId();
 
-    if (logData.type === 'MOVE' && logData.newLocation) {
-      updates.location = logData.newLocation;
-    } else if (logData.type === 'LOSS' && typeof logData.qty === 'number') {
-      updates.quantity = FieldValue.increment(-logData.qty);
-    }
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection('batches').doc(batchId);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error('Batch not found.');
+      const batch = { id: snap.id, ...(snap.data() as any) } as Batch;
 
-    await db.collection('batches').doc(batchId).update(updates);
+      const existing = (batch.logHistory || []).some((l) => l.id === logId);
+      if (existing) return; // idempotent
+
+      const now = Timestamp.now();
+      const newLog: LogEntry = {
+        id: logId,
+        date: now,
+        type: logData.type,
+        note: logData.note ?? '',
+        qty: logData.qty,
+        reason: logData.reason,
+        newLocation: logData.newLocation, // legacy: name
+      } as any;
+
+      const update: any = {
+        logHistory: [...(batch.logHistory || []), newLog],
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      if (logData.type === 'MOVE') {
+        // Prefer ID if provided; fall back to name for compatibility.
+        if (logData.newLocationId) {
+          update.locationId = logData.newLocationId;
+        } else if (logData.newLocation) {
+          update.location = logData.newLocation;
+        }
+      } else if (logData.type === 'LOSS' && typeof logData.qty === 'number') {
+        const nextQty = Math.max(0, Number(batch.quantity || 0) - Number(logData.qty));
+        update.quantity = nextQty;
+        if (nextQty === 0 && batch.status !== 'Archived') {
+          update.status = 'Archived';
+          update.logHistory = [
+            ...update.logHistory,
+            {
+              id: newId(),
+              date: now,
+              type: 'ARCHIVE',
+              note: 'Batch quantity reached zero and was automatically archived.',
+            },
+          ];
+        }
+      }
+
+      tx.update(ref, update);
+    });
 
     return ok({ id: batchId });
   } catch (e: any) {
@@ -325,46 +492,68 @@ export async function logAction(
   }
 }
 
-export async function archiveBatchAction(batchId: string, loss: number) {
+/* --------------------------------- Archive -------------------------------- */
+
+export async function archiveBatchAction(
+  batchId: string,
+  loss: number
+): Promise<ActionResult<Batch>> {
   try {
-    const batch = await getBatchById(batchId);
-    if (!batch) {
-      return { success: false, error: 'Batch not found.' };
-    }
+    await requireAuth();
 
-    const updatedBatch = { ...batch };
+    const result = await db.runTransaction(async (tx) => {
+      const ref = db.collection('batches').doc(batchId);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error('Batch not found.');
 
-    updatedBatch.status = 'Archived';
+      const batch = { id: snap.id, ...(snap.data() as any) } as Batch;
+      if (batch.status === 'Archived') {
+        return batch; // already archived
+      }
 
-    const newLog: LogEntry = {
-      id: `log_${Date.now()}`,
-      date: Timestamp.now(),
-      type: 'ARCHIVE',
-      note: `Archived with loss of ${loss} units. Final quantity: ${
-        batch.quantity - loss
-      }.`,
-      qty: loss,
-      reason: 'Archived',
-    };
-    updatedBatch.logHistory.push(newLog);
-    updatedBatch.quantity = 0;
+      const safeLoss = Math.max(0, Math.min(Number(loss || 0), Number(batch.quantity || 0)));
+      const finalQty = 0;
 
-    const result = await updateBatchAction(updatedBatch);
-    if (result.success) {
-      return { success: true, data: result.data };
-    } else {
-      return { success: false, error: result.error };
-    }
-  } catch (error: any) {
-    console.error('Error archiving batch:', error);
-    return {
-      success: false,
-      error: 'Failed to archive batch: ' + error.message,
-    };
+      const logs = [...(batch.logHistory || [])];
+      if (safeLoss > 0) {
+        logs.push({
+          id: newId(),
+          date: Timestamp.now(),
+          type: 'LOSS',
+          note: `Loss during archive.`,
+          qty: safeLoss,
+          reason: 'Archived',
+        } as any);
+      }
+      logs.push({
+        id: newId(),
+        date: Timestamp.now(),
+        type: 'ARCHIVE',
+        note: `Archived. Final quantity: ${finalQty}.`,
+        qty: safeLoss || undefined,
+        reason: 'Archived',
+      } as any);
+
+      const update = {
+        status: 'Archived' as const,
+        quantity: 0,
+        logHistory: logs,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      tx.update(ref, update);
+      return { ...batch, ...update };
+    });
+
+    return ok(result);
+  } catch (e: any) {
+    console.error('Error archiving batch:', e);
+    return err('Failed to archive batch: ' + e?.message);
   }
 }
 
-// ---------- TRANSPLANT ----------
+/* -------------------------------- Transplant ------------------------------- */
+
 export async function transplantBatchAction(
   sourceBatchId: string,
   newBatchData: Omit<
@@ -380,39 +569,45 @@ export async function transplantBatchAction(
   }>
 > {
   try {
+    await requireAuth();
+
+    if (!transplantQuantity || transplantQuantity <= 0) {
+      throw new Error('Transplant quantity must be > 0.');
+    }
+
     const result = await db.runTransaction(async (tx) => {
       const sourceRef = db.collection('batches').doc(sourceBatchId);
       const sourceSnap = await tx.get(sourceRef);
       if (!sourceSnap.exists) throw new Error('Source batch not found.');
 
-      const source = {
-        id: sourceSnap.id,
-        ...(sourceSnap.data() as any),
-      } as Batch;
-
-      if (transplantQuantity <= 0)
-        throw new Error('Transplant quantity must be > 0.');
-      if (transplantQuantity > source.quantity)
+      const source = { id: sourceSnap.id, ...(sourceSnap.data() as any) } as Batch;
+      if (transplantQuantity > (source.quantity || 0)) {
         throw new Error('Transplant quantity exceeds available quantity.');
+      }
+
+      const cleanedNew = sanitizeNewBatchPayload({
+        ...newBatchData,
+        quantity: transplantQuantity,
+        initialQuantity: transplantQuantity,
+      });
 
       const next = await getNextBatchNumberInTx(tx);
-      const newBatchNumber = numberWithPrefix(newBatchData.status, next);
+      const newBatchNumber = numberWithPrefix(cleanedNew.status, next);
 
       const now = Timestamp.now();
       const newRef = db.collection('batches').doc();
 
       tx.set(newRef, {
-        ...newBatchData,
+        ...cleanedNew,
+        id: newRef.id,
         batchNumber: newBatchNumber,
-        initialQuantity: transplantQuantity,
-        quantity: transplantQuantity,
         transplantedFrom: source.batchNumber,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         logHistory: [
           {
-            id: `log_${Date.now()}_from`,
-            date: now, // ✅ concrete timestamp
+            id: newId(),
+            date: now,
             type: 'TRANSPLANT_FROM',
             note: `Created from transplant of ${transplantQuantity} units from batch ${source.batchNumber}.`,
             qty: transplantQuantity,
@@ -421,11 +616,12 @@ export async function transplantBatchAction(
         ],
       });
 
-      const remaining = source.quantity - transplantQuantity;
+      const remaining = Math.max(0, (source.quantity || 0) - transplantQuantity);
 
-      const sourceLog = [
+      const sourceLogs = [
+        ...(source.logHistory || []),
         {
-          id: `log_${Date.now()}_to`,
+          id: newId(),
           date: now,
           type: 'TRANSPLANT_TO',
           note: `Transplanted ${transplantQuantity} units to new batch ${newBatchNumber}.`,
@@ -433,61 +629,47 @@ export async function transplantBatchAction(
           reason: 'Transplant',
           toBatch: newBatchNumber,
         },
-        ...(logRemainingAsLoss && remaining > 0
-          ? [
-              {
-                id: `log_${Date.now()}_loss`,
-                date: now,
-                type: 'LOSS',
-                qty: remaining,
-                reason: 'Remaining after transplant',
-                note: `Logged ${remaining} units as loss after transplant.`,
-              },
-            ]
-          : []),
       ];
 
-      const updatedHistory = Array.isArray(source.logHistory)
-        ? [...source.logHistory, ...sourceLog]
-        : sourceLog;
+      if (logRemainingAsLoss && remaining > 0) {
+        sourceLogs.push({
+          id: newId(),
+          date: now,
+          type: 'LOSS',
+          qty: remaining,
+          reason: 'Remaining after transplant',
+          note: `Logged ${remaining} units as loss after transplant.`,
+        } as any);
+      }
 
-      const sourceUpdateData: any = {
-        quantity: source.quantity - transplantQuantity,
-        logHistory: updatedHistory,
+      const sourceUpdate: any = {
+        quantity: logRemainingAsLoss ? 0 : remaining,
+        logHistory: sourceLogs,
         updatedAt: FieldValue.serverTimestamp(),
       };
 
-      if (logRemainingAsLoss) {
-        sourceUpdateData.status = 'Archived';
-        sourceUpdateData.quantity = 0;
-      }
-
-      if (
-        sourceUpdateData.quantity <= 0 &&
-        source.status !== 'Archived'
-      ) {
-        sourceUpdateData.status = 'Archived';
-        sourceUpdateData.logHistory.push({
-          id: `log_${Date.now()}_auto_archive`,
-          date: Timestamp.now(),
+      if (sourceUpdate.quantity <= 0) {
+        sourceUpdate.status = 'Archived';
+        sourceUpdate.logHistory.push({
+          id: newId(),
+          date: now,
           type: 'ARCHIVE',
-          note: `Batch quantity reached zero and was automatically archived.`,
+          note: 'Batch quantity reached zero and was automatically archived.',
         });
       }
 
-      tx.update(sourceRef, sourceUpdateData);
+      tx.update(sourceRef, sourceUpdate);
 
       return {
         newBatch: { id: newRef.id, batchNumber: newBatchNumber },
         sourceBatch: {
           id: source.id,
           batchNumber: source.batchNumber,
-          remaining: sourceUpdateData.quantity,
+          remaining: sourceUpdate.quantity,
         },
       };
     });
 
-    // ✅ Only primitives/strings/numbers
     return ok(result);
   } catch (e: any) {
     console.error('transplantBatchAction failed:', e);
@@ -495,158 +677,164 @@ export async function transplantBatchAction(
   }
 }
 
-// Actions for Varieties
-export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
+/* --------------------- Varieties / Locations / Sizes / Suppliers --------------------- */
+
+export async function addVarietyAction(
+  varietyData: Omit<Variety, 'id'>
+): Promise<ActionResult<{ id: string } & Omit<Variety, 'id'>>> {
   try {
+    await requireAuth();
     const docRef = await db.collection('varieties').add(varietyData);
-    return { success: true, data: { ...varietyData, id: docRef.id } };
-  } catch (error: any) {
-    console.error('Error adding variety:', error);
-    return { success: false, error: 'Failed to add variety: ' + error.message };
+    return ok({ ...varietyData, id: docRef.id });
+  } catch (e: any) {
+    console.error('Error adding variety:', e);
+    return err('Failed to add variety: ' + e?.message);
   }
 }
 
-export async function updateVarietyAction(varietyData: Variety) {
+export async function updateVarietyAction(
+  varietyData: Variety
+): Promise<ActionResult<Variety>> {
   try {
+    await requireAuth();
     const { id, ...dataToUpdate } = varietyData;
     await db.collection('varieties').doc(id!).update(dataToUpdate);
-    return { success: true, data: varietyData };
-  } catch (error: any) {
-    console.error('Error updating variety:', error);
-    return {
-      success: false,
-      error: 'Failed to update variety: ' + error.message,
-    };
+    return ok(varietyData);
+  } catch (e: any) {
+    console.error('Error updating variety:', e);
+    return err('Failed to update variety: ' + e?.message);
   }
 }
 
-export async function deleteVarietyAction(varietyId: string) {
+export async function deleteVarietyAction(
+  varietyId: string
+): Promise<ActionResult<{}>> {
   try {
+    await requireAuth();
     await db.collection('varieties').doc(varietyId).delete();
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error deleting variety:', error);
-    return {
-      success: false,
-      error: 'Failed to delete variety: ' + error.message,
-    };
+    return ok({});
+  } catch (e: any) {
+    console.error('Error deleting variety:', e);
+    return err('Failed to delete variety: ' + e?.message);
   }
 }
 
-// Actions for Locations
 export async function addLocationAction(
   locationData: Omit<NurseryLocation, 'id'>
-) {
+): Promise<ActionResult<{ id: string } & Omit<NurseryLocation, 'id'>>> {
   try {
+    await requireAuth();
     const docRef = await db.collection('locations').add(locationData);
-    return { success: true, data: { ...locationData, id: docRef.id } };
-  } catch (error: any) {
-    console.error('Error adding location:', error);
-    return {
-      success: false,
-      error: 'Failed to add location: ' + error.message,
-    };
+    return ok({ ...locationData, id: docRef.id });
+  } catch (e: any) {
+    console.error('Error adding location:', e);
+    return err('Failed to add location: ' + e?.message);
   }
 }
 
-export async function updateLocationAction(locationData: NurseryLocation) {
+export async function updateLocationAction(
+  locationData: NurseryLocation
+): Promise<ActionResult<NurseryLocation>> {
   try {
+    await requireAuth();
     const { id, ...dataToUpdate } = locationData;
     await db.collection('locations').doc(id).update(dataToUpdate);
-    return { success: true, data: locationData };
-  } catch (error: any) {
-    console.error('Error updating location:', error);
-    return {
-      success: false,
-      error: 'Failed to update location: ' + error.message,
-    };
+    return ok(locationData);
+  } catch (e: any) {
+    console.error('Error updating location:', e);
+    return err('Failed to update location: ' + e?.message);
   }
 }
 
-export async function deleteLocationAction(locationId: string) {
+export async function deleteLocationAction(
+  locationId: string
+): Promise<ActionResult<{}>> {
   try {
+    await requireAuth();
     await db.collection('locations').doc(locationId).delete();
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error deleting location:', error);
-    return {
-      success: false,
-      error: 'Failed to delete location: ' + error.message,
-    };
+    return ok({});
+  } catch (e: any) {
+    console.error('Error deleting location:', e);
+    return err('Failed to delete location: ' + e?.message);
   }
 }
 
-// Actions for Plant Sizes
-export async function addSizeAction(sizeData: Omit<PlantSize, 'id'>) {
+export async function addSizeAction(
+  sizeData: Omit<PlantSize, 'id'>
+): Promise<ActionResult<{ id: string } & Omit<PlantSize, 'id'>>> {
   try {
+    await requireAuth();
     const docRef = await db.collection('sizes').add(sizeData);
-    return { success: true, data: { ...sizeData, id: docRef.id } };
-  } catch (error: any) {
-    console.error('Error adding size:', error);
-    return { success: false, error: 'Failed to add size: ' + error.message };
+    return ok({ ...sizeData, id: docRef.id });
+  } catch (e: any) {
+    console.error('Error adding size:', e);
+    return err('Failed to add size: ' + e?.message);
   }
 }
 
-export async function updateSizeAction(sizeData: PlantSize) {
+export async function updateSizeAction(
+  sizeData: PlantSize
+): Promise<ActionResult<PlantSize>> {
   try {
+    await requireAuth();
     const { id, ...dataToUpdate } = sizeData;
     await db.collection('sizes').doc(id).update(dataToUpdate);
-    return { success: true, data: sizeData };
-  } catch (error: any) {
-    console.error('Error updating size:', error);
-    return { success: false, error: 'Failed to update size: ' + error.message };
+    return ok(sizeData);
+  } catch (e: any) {
+    console.error('Error updating size:', e);
+    return err('Failed to update size: ' + e?.message);
   }
 }
 
-export async function deleteSizeAction(sizeId: string) {
+export async function deleteSizeAction(
+  sizeId: string
+): Promise<ActionResult<{}>> {
   try {
+    await requireAuth();
     await db.collection('sizes').doc(sizeId).delete();
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error deleting size:', error);
-    return { success: false, error: 'Failed to delete size: ' + error.message };
+    return ok({});
+  } catch (e: any) {
+    console.error('Error deleting size:', e);
+    return err('Failed to delete size: ' + e?.message);
   }
 }
 
-// Actions for Suppliers
-export async function addSupplierAction(supplierData: Omit<Supplier, 'id'>) {
+export async function addSupplierAction(
+  supplierData: Omit<Supplier, 'id'>
+): Promise<ActionResult<{ id: string } & Omit<Supplier, 'id'>>> {
   try {
+    await requireAuth();
     const docRef = await db.collection('suppliers').add(supplierData);
-    return { success: true, data: { ...supplierData, id: docRef.id } };
-  } catch (error: any) {
-    console.error('Error adding supplier:', error);
-    return {
-      success: false,
-      error: 'Failed to add supplier: ' + error.message,
-    };
+    return ok({ ...supplierData, id: docRef.id });
+  } catch (e: any) {
+    console.error('Error adding supplier:', e);
+    return err('Failed to add supplier: ' + e?.message);
   }
 }
 
-export async function updateSupplierAction(supplierData: Supplier) {
+export async function updateSupplierAction(
+  supplierData: Supplier
+): Promise<ActionResult<Supplier>> {
   try {
+    await requireAuth();
     const { id, ...dataToUpdate } = supplierData;
     await db.collection('suppliers').doc(id).update(dataToUpdate);
-    return { success: true, data: supplierData };
-  } catch (error: any) {
-    console.error('Error updating supplier:', error);
-    return {
-      success: false,
-      error: 'Failed to update supplier: ' + error.message,
-    };
+    return ok(supplierData);
+  } catch (e: any) {
+    console.error('Error updating supplier:', e);
+    return err('Failed to update supplier: ' + e?.message);
   }
 }
 
-export async function deleteSupplierAction(supplierId: string) {
+export async function deleteSupplierAction(
+  supplierId: string
+): Promise<ActionResult<{}>> {
   try {
+    await requireAuth();
     await db.collection('suppliers').doc(supplierId).delete();
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error deleting supplier:', error);
-    return {
-      success: false,
-      error: 'Failed to delete supplier: ' + error.message,
-    };
+    return ok({});
+  } catch (e: any) {
+    console.error('Error deleting supplier:', e);
+    return err('Failed to delete supplier: ' + e?.message);
   }
 }
-
-    

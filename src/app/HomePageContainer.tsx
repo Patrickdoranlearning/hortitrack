@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection } from '@/hooks/use-collection';
 import {
@@ -129,14 +129,14 @@ export default function HomePageContainer() {
   };
 
   const handleEditBatch = (batch: Batch) => {
-    const transplantedQuantity = batch.logHistory
+    const transplantedQuantity = (batch.logHistory || [])
       .filter(
         (log) => log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number'
       )
-      .reduce((sum, log) => sum - log.qty!, 0);
-    const lostQuantity = batch.logHistory
+      .reduce((sum, log) => sum - (log.qty || 0), 0);
+    const lostQuantity = (batch.logHistory || [])
       .filter((log) => log.type === 'LOSS' && typeof log.qty === 'number')
-      .reduce((sum, log) => sum + log.qty!, 0);
+      .reduce((sum, log) => sum + (log.qty || 0), 0);
 
     setBatchDistribution({
       inStock: batch.quantity,
@@ -176,14 +176,12 @@ export default function HomePageContainer() {
   ) => {
     if (editingBatch) {
       const result = await updateBatchAction(data as Batch);
-      console.log('updateBatchAction result:', result);
       if (result.success) {
         toast({
           title: 'Batch Updated',
           description: `Batch #${result.data?.batchNumber} saved.`,
         });
       } else {
-        console.error('Update batch failed:', result?.error);
         toast({
           variant: 'destructive',
           title: 'Update Failed',
@@ -198,14 +196,12 @@ export default function HomePageContainer() {
       };
 
       const result = await addBatchAction(newBatchData);
-      console.log('addBatchAction result:', result);
       if (result.success) {
         toast({
           title: 'Batch Created',
           description: `Batch #${result.data?.batchNumber} added.`,
         });
       } else {
-        console.error('Add batch failed:', result?.error);
         toast({
           variant: 'destructive',
           title: 'Create Failed',
@@ -225,13 +221,11 @@ export default function HomePageContainer() {
 
   const onTransplantFormSubmit = async (values: any) => {
     if (!transplantingBatch) return;
-
-    try {
-      const transplantQuantity = Number(values?.transplantQuantity ?? values?.quantity ?? 0);
-      if (!transplantQuantity || transplantQuantity <= 0) {
+    const transplantQuantity = Number(values?.transplantQuantity ?? values?.quantity ?? 0);
+    if (!transplantQuantity || transplantQuantity <= 0) {
         toast({ variant: "destructive", title: "Transplant quantity required", description: "Enter a quantity greater than zero." });
         return;
-      }
+    }
   
       const newBatchData: Omit<
         Batch,
@@ -263,10 +257,9 @@ export default function HomePageContainer() {
       if (result.success) {
         toast({
           title: 'Transplant Successful',
-          description: `New batch #${result.data?.newBatch.batchNumber} created.`,
+          description: `New batch #${result.data.newBatch.batchNumber} created.`,
         });
       } else {
-         console.error("Transplant failed:", result?.error);
         toast({
           variant: 'destructive',
           title: 'Transplant Failed',
@@ -275,10 +268,6 @@ export default function HomePageContainer() {
       }
       setTransplantingBatch(null);
       setIsTransplantFormOpen(false);
-    } catch (e: any) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Transplant crashed", description: String(e?.message ?? e) });
-    }
   };
 
   const handleLogAction = (batch: Batch) => {
@@ -289,13 +278,13 @@ export default function HomePageContainer() {
   const onActionLogFormSubmit = async (values: any) => {
     if (!actionLogBatch) return;
 
-    try {
-      const payload = {
+    const payload = {
         type: values.type,
         note: values.note ?? "",
         qty: values.qty ? Number(values.qty) : undefined,
         reason: values.reason,
-        newLocation: values.newLocation,
+        newLocation: values.newLocation, // legacy name support
+        newLocationId: values.newLocationId, // future (if your UI adds it)
       };
   
       const result = await logAction(actionLogBatch.id, payload as any);
@@ -306,7 +295,6 @@ export default function HomePageContainer() {
           description: 'The action has been successfully logged.',
         });
       } else {
-        console.error("Log action failed:", result?.error);
         toast({
           variant: 'destructive',
           title: 'Logging Failed',
@@ -315,20 +303,14 @@ export default function HomePageContainer() {
       }
       setActionLogBatch(null);
       setIsActionLogFormOpen(false);
-    } catch (e: any) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Logging crashed", description: String(e?.message ?? e) });
-    }
   };
   
-  if (authLoading || !user) {
-     return (
-        <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
-            <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-    );
-  }
-  
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
   const uniqueSuppliers = dedupeByName(suppliers);
   const uniquePlantSizes = dedupeByName(plantSizes);
   const uniqueNurseryLocations = dedupeByName(nurseryLocations);
