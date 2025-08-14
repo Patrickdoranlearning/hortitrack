@@ -279,52 +279,37 @@ export async function logAction(
       return { success: false, error: 'Batch not found.' };
     }
 
-    const updatedBatch = { ...batch };
-
-    const newLog: Partial<LogEntry> & { type: LogEntry['type'] } = {
+    const now = Timestamp.now();
+    const newLog: LogEntry = {
       id: `log_${Date.now()}`,
-      date: Timestamp.now(),
+      date: now,
       type: logData.type,
+      note: logData.note ?? '',
+      qty: logData.qty,
+      reason: logData.reason,
+      newLocation: logData.newLocation,
+    };
+    
+    const updates: any = {
+      logHistory: FieldValue.arrayUnion(newLog),
+      updatedAt: FieldValue.serverTimestamp(),
     };
 
-    switch (logData.type) {
-      case 'NOTE':
-        newLog.note = logData.note;
-        break;
-      case 'MOVE':
-        newLog.note = `Moved batch from ${batch.location} to ${logData.newLocation}`;
-        newLog.newLocation = logData.newLocation;
-        updatedBatch.location = logData.newLocation!;
-        break;
-      case 'LOSS':
-        newLog.note = `Logged loss of ${logData.qty}. Reason: ${logData.reason}`;
-        newLog.qty = logData.qty;
-        newLog.reason = logData.reason;
-        updatedBatch.quantity -= logData.qty!;
-        break;
-      case 'Batch Spaced':
-        newLog.note = 'Batch Spaced';
-        break;
-      case 'Batch Trimmed':
-        newLog.note = 'Batch Trimmed';
-        break;
-      default:
-        return { success: false, error: 'Invalid log action type.' };
+    if (logData.type === 'MOVE' && logData.newLocation) {
+        updates.location = logData.newLocation;
+    } else if (logData.type === 'LOSS' && typeof logData.qty === 'number') {
+        updates.quantity = FieldValue.increment(-logData.qty);
     }
+    
+    await db.collection('batches').doc(batchId).update(updates);
 
-    updatedBatch.logHistory.push(newLog as LogEntry);
-
-    const result = await updateBatchAction(updatedBatch);
-    if (result.success) {
-      return { success: true, data: result.data };
-    } else {
-      return { success: false, error: result.error };
-    }
+    return { success: true };
   } catch (error: any) {
     console.error('Error logging action:', error);
     return { success: false, error: 'Failed to log action: ' + error.message };
   }
 }
+
 
 export async function archiveBatchAction(batchId: string, loss: number) {
   try {
@@ -384,13 +369,13 @@ export async function transplantBatchAction(
       if (transplantQuantity > source.quantity)
         throw new Error("Transplant quantity exceeds available quantity.");
 
-      // Next number for the new batch
+      // Next number for the new batch (counter upsert)
       const next = await getNextBatchNumberInTx(tx);
       const newBatchNumber = numberWithPrefix(newBatchData.status, next);
 
       // Create the new batch
-      const newRef = db.collection("batches").doc();
       const now = Timestamp.now();
+      const newRef = db.collection("batches").doc();
 
       const newBatch: Omit<Batch, "id"> = {
         ...newBatchData,
@@ -404,7 +389,7 @@ export async function transplantBatchAction(
           {
             id: `log_${Date.now()}_from`,
             date: now, // ✅ not a sentinel inside array
-            type: "TRANSPLANT_FROM",
+            type: 'TRANSPLANT_FROM',
             note: `Created from transplant of ${transplantQuantity} units from batch ${source.batchNumber}.`,
             qty: transplantQuantity,
             fromBatch: source.batchNumber,
@@ -421,7 +406,7 @@ export async function transplantBatchAction(
         {
           id: `log_${Date.now()}_to`,
           date: now,
-          type: "TRANSPLANT_TO",
+          type: 'TRANSPLANT_TO',
           note: `Transplanted ${transplantQuantity} units to new batch ${newBatchNumber}.`,
           qty: -transplantQuantity,
           reason: 'Transplant',

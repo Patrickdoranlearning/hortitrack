@@ -136,12 +136,6 @@ export function TransplantForm({
   const sortedPlantSizes = useMemo(() => {
     return plantSizes ? [...plantSizes].sort(customSizeSort) : [];
   }, [plantSizes]);
-
-  const handleFormSubmit = (
-    data: z.infer<ReturnType<typeof transplantFormSchema>>
-  ) => {
-    onSubmit({ ...data, initialQuantity: data.quantity });
-  };
   
   const handleSizeChange = (sizeId: string) => {
     const selectedSize = plantSizes.find(s => s.id === sizeId);
@@ -191,7 +185,12 @@ export function TransplantForm({
       </DialogHeader>
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit(handleFormSubmit)}
+          onSubmit={form.handleSubmit(
+            (values) => onSubmit({ ...values, initialQuantity: values.quantity }),
+            (errors) => {
+              console.error("Transplant form invalid:", errors);
+            }
+          )}
           className="space-y-0"
         >
           <ScrollArea className="h-[70vh] p-6 pr-8 -mr-6">

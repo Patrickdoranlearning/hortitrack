@@ -81,7 +81,7 @@ export function ActionLogForm({
   onCancel,
   nurseryLocations,
 }: ActionLogFormProps) {
-  const [actionType, setActionType] = useState('NOTE');
+  const [actionType, setActionType] = useState<z.infer<typeof actionTypeEnum>>('NOTE');
   
   const form = useForm<ActionLogFormValues>({
     resolver: zodResolver(formSchema(batch?.quantity ?? 0)),
@@ -98,19 +98,20 @@ export function ActionLogForm({
     onSubmit(values);
   };
   
-  const handleActionTypeChange = (value: string) => {
-    const newType = value as z.infer<typeof actionTypeEnum>;
-    setActionType(newType);
-    form.setValue('type', newType);
-    form.clearErrors();
-  }
-
   const showSubmit = actionType === 'NOTE' || actionType === 'MOVE' || actionType === 'LOSS';
 
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        <form
+          onSubmit={form.handleSubmit(
+            handleSubmit,
+            (errors) => {
+              console.error("Action log invalid:", errors);
+            }
+          )}
+          className="space-y-8"
+        >
           
           <FormField
             control={form.control}
@@ -118,7 +119,15 @@ export function ActionLogForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Action Type</FormLabel>
-                <Select onValueChange={handleActionTypeChange} defaultValue={field.value}>
+                <Select
+                  value={field.value ?? "NOTE"}
+                  onValueChange={(v) => {
+                    const newType = v as z.infer<typeof actionTypeEnum>;
+                    setActionType(newType);
+                    form.setValue('type', newType, { shouldDirty: true, shouldValidate: true });
+                    form.clearErrors();
+                  }}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select an action type" />
@@ -127,7 +136,7 @@ export function ActionLogForm({
                   <SelectContent>
                     <SelectItem value="NOTE">General Note</SelectItem>
                     <SelectItem value="MOVE">Move Batch</SelectItem>
-                    <SelectItem value="LOSS">Record Loss</SelectItem>
+                    <SelectItem value="LOSS">Log Loss</SelectItem>
                     <SelectItem value="Batch Spaced">Batch Spaced</SelectItem>
                     <SelectItem value="Batch Trimmed">Batch Trimmed</SelectItem>
                   </SelectContent>
