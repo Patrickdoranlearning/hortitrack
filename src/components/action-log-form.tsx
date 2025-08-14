@@ -137,8 +137,6 @@ export function ActionLogForm({
                     <SelectItem value="NOTE">General Note</SelectItem>
                     <SelectItem value="MOVE">Move Batch</SelectItem>
                     <SelectItem value="LOSS">Log Loss</SelectItem>
-                    <SelectItem value="Batch Spaced">Batch Spaced</SelectItem>
-                    <SelectItem value="Batch Trimmed">Batch Trimmed</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -237,3 +235,5 @@ export function ActionLogForm({
     </>
   );
 }
+
+    

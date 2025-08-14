@@ -176,14 +176,14 @@ export default function HomePageContainer() {
   ) => {
     if (editingBatch) {
       const result = await updateBatchAction(data as Batch);
-      console.log("updateBatchAction result:", result);
+      console.log('updateBatchAction result:', result);
       if (result.success) {
         toast({
           title: 'Batch Updated',
           description: `Batch #${result.data?.batchNumber} saved.`,
         });
       } else {
-        console.error("Update batch failed:", result?.error);
+        console.error('Update batch failed:', result?.error);
         toast({
           variant: 'destructive',
           title: 'Update Failed',
@@ -198,18 +198,18 @@ export default function HomePageContainer() {
       };
 
       const result = await addBatchAction(newBatchData);
-      console.log("addBatchAction result:", result);
+      console.log('addBatchAction result:', result);
       if (result.success) {
         toast({
           title: 'Batch Created',
           description: `Batch #${result.data?.batchNumber} added.`,
         });
       } else {
-        console.error("Add batch failed:", result?.error);
+        console.error('Add batch failed:', result?.error);
         toast({
           variant: 'destructive',
           title: 'Create Failed',
-          description: String(result.error ?? "Unknown error"),
+          description: String(result.error ?? 'Unknown error'),
         });
       }
     }
@@ -232,7 +232,7 @@ export default function HomePageContainer() {
       data.quantity,
       data.logRemainingAsLoss
     );
-    console.log("transplantBatchAction result:", result);
+    
     if (result.success) {
       toast({
         title: 'Transplant Successful',
@@ -259,7 +259,7 @@ export default function HomePageContainer() {
     if (!actionLogBatch) return;
 
     const result = await logAction(actionLogBatch.id, data);
-    console.log("logAction result:", result);
+    
     if (result.success) {
       toast({
         title: 'Action Logged',
@@ -308,8 +308,8 @@ export default function HomePageContainer() {
       onTransplantBatch={handleTransplantBatch}
       onLogAction={handleLogAction}
       onFormSubmit={handleFormSubmit}
-      onTransplantFormSubmit={handleTransplantFormSubmit}
-      onActionLogFormSubmit={handleActionLogFormSubmit}
+      onTransplantFormSubmit={onTransplantFormSubmit}
+      onActionLogFormSubmit={onActionLogFormSubmit}
       editingBatch={editingBatch}
       setEditingBatch={setEditingBatch}
       batchDistribution={batchDistribution}
@@ -330,3 +330,5 @@ export default function HomePageContainer() {
     />
   );
 }
+
+    
