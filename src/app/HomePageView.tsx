@@ -1,29 +1,6 @@
-
 'use client';
 
-import * as React from 'react';
-import {
-  Grid,
-  Search,
-  Settings,
-  LogOut,
-  Plus,
-  QrCode,
-  Sparkles,
-  Users,
-  LayoutGrid,
-} from 'lucide-react';
-import type { User } from 'firebase/auth';
-import Link from 'next/link';
-
-import type {
-  Batch,
-  NurseryLocation,
-  PlantSize,
-  Supplier,
-  Variety,
-  ActionLogFormValues,
-} from '@/lib/types';
+import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -41,36 +18,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { BatchCard } from '@/components/batch-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Logo } from '@/components/logo';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { BatchForm, type BatchDistribution } from '@/components/batch-form';
-import { BatchDetailDialog } from '@/components/batch-detail-dialog';
-import { ActionLogForm } from '@/components/action-log-form';
-import { TransplantForm } from '@/components/transplant-form';
-import type { TransplantFormData } from '@/components/transplant-form';
-import { ProductionProtocolDialog } from '@/components/production-protocol-dialog';
-import { CareRecommendationsDialog } from '@/components/care-recommendations-dialog';
-import { ScannerDialog } from '@/components/scanner-dialog';
-import { ScannedBatchActionsDialog } from '@/components/scanned-batch-actions-dialog';
-import { VarietyForm } from '@/components/variety-form';
+  ActionLogFormValues,
+  Batch,
+  NurseryLocation,
+  PlantSize,
+  Supplier,
+  Variety,
+} from '@/lib/types';
+import { signOut } from 'firebase/auth';
+import {
+  Grid,
+  LayoutGrid,
+  LogOut,
+  Plus,
+  QrCode,
+  Search,
+  Settings,
+  Sparkles,
+  Users,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import * as React from 'react';
+import { ActionLogForm } from '../components/action-log-form';
+import { BatchCard } from '../components/batch-card';
+import { BatchDetailDialog } from '../components/batch-detail-dialog';
+import { BatchDistribution, BatchForm } from '../components/batch-form';
+import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
+import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
+import { ScannedBatchActionsDialog } from '../components/scanned-batch-actions-dialog';
+import { ScannerDialog } from '../components/scanner-dialog';
+import {
+  TransplantForm,
+  TransplantFormData,
+} from '../components/transplant-form';
+import { VarietyForm } from '../components/variety-form';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { useCollection } from '@/hooks/use-collection';
 
 interface HomePageViewProps {
-  authLoading: boolean;
-  user: User | null;
-  batches: Batch[];
+  initialBatches: Batch[];
+  initialVarieties: Variety[];
+  initialNurseryLocations: NurseryLocation[];
+  initialPlantSizes: PlantSize[];
+  initialSuppliers: Supplier[];
   plantFamilies: string[];
   categories: string[];
-  nurseryLocations: NurseryLocation[];
-  plantSizes: PlantSize[];
-  suppliers: Supplier[];
-  varieties: Variety[];
   actions: {
     addBatch: (
       data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'>
@@ -81,7 +79,12 @@ interface HomePageViewProps {
       sourceBatchId: string,
       newBatchData: Omit<
         Batch,
-        'id' | 'batchNumber' | 'logHistory' | 'transplantedFrom' | 'createdAt' | 'updatedAt'
+        | 'id'
+        | 'batchNumber'
+        | 'logHistory'
+        | 'transplantedFrom'
+        | 'createdAt'
+        | 'updatedAt'
       >,
       transplantQuantity: number,
       logRemainingAsLoss: boolean
@@ -92,32 +95,58 @@ interface HomePageViewProps {
     ) => Promise<any>;
     addVariety: (data: Omit<Variety, 'id'>) => Promise<any>;
   };
-  onSignOut: () => void;
 }
 
 export default function HomePageView({
-  authLoading,
-  user,
-  batches: initialBatches,
+  initialBatches,
+  initialVarieties,
+  initialNurseryLocations,
+  initialPlantSizes,
+  initialSuppliers,
   plantFamilies,
   categories,
-  onSignOut,
-  ...props
+  actions,
 }: HomePageViewProps) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+
+  // Use the initial data passed from the server component
+  const { data: batches } = useCollection<Batch>('batches', initialBatches);
+  const { data: varieties } = useCollection<Variety>(
+    'varieties',
+    initialVarieties,
+    [['name', '!=', '']]
+  );
+  const { data: nurseryLocations } = useCollection<NurseryLocation>(
+    'locations',
+    initialNurseryLocations
+  );
+  const { data: plantSizes } = useCollection<PlantSize>(
+    'sizes',
+    initialPlantSizes
+  );
+  const { data: suppliers } = useCollection<Supplier>(
+    'suppliers',
+    initialSuppliers
+  );
+
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
   const [isLogActionOpen, setIsLogActionOpen] = React.useState(false);
   const [isTransplantOpen, setIsTransplantOpen] = React.useState(false);
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
-  const [isRecommendationsOpen, setIsRecommendationsOpen] = React.useState(false);
+  const [isRecommendationsOpen, setIsRecommendationsOpen] =
+    React.useState(false);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [isScannedActionOpen, setIsScannedActionOpen] = React.useState(false);
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
   const [newVarietyName, setNewVarietyName] = React.useState('');
-  const [distribution, setDistribution] = React.useState<BatchDistribution | null>(null);
-  
+  const [distribution, setDistribution] =
+    React.useState<BatchDistribution | null>(null);
+
   const [filters, setFilters] = React.useState({
     plantFamily: 'all',
     category: 'all',
@@ -126,7 +155,7 @@ export default function HomePageView({
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const filteredBatches = React.useMemo(() => {
-    return initialBatches
+    return batches
       .filter((batch) =>
         `${batch.plantFamily} ${batch.plantVariety} ${batch.category} ${
           batch.supplier || ''
@@ -148,14 +177,31 @@ export default function HomePageView({
         if (filters.status === 'Active') return batch.status !== 'Archived';
         return batch.status === filters.status;
       });
-  }, [initialBatches, searchQuery, filters]);
+  }, [batches, searchQuery, filters]);
 
-  const calculateDistribution = (batch: Batch | null): BatchDistribution | null => {
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+    toast({
+      title: 'Signed Out',
+      description: 'You have been successfully signed out.',
+    });
+  };
+
+  React.useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
+  const calculateDistribution = (
+    batch: Batch | null
+  ): BatchDistribution | null => {
     if (!batch) return null;
     let transplanted = 0;
     let lost = 0;
 
-    batch.logHistory.forEach(log => {
+    batch.logHistory.forEach((log) => {
       if (log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number') {
         transplanted += Math.abs(log.qty);
       }
@@ -203,7 +249,7 @@ export default function HomePageView({
   };
 
   const handleScanSuccess = (data: string) => {
-    const foundBatch = initialBatches.find(b => b.batchNumber === data);
+    const foundBatch = batches.find((b) => b.batchNumber === data);
     if (foundBatch) {
       setSelectedBatch(foundBatch);
       setIsScannedActionOpen(true);
@@ -212,8 +258,8 @@ export default function HomePageView({
 
   const handleFormSubmit = async (data: any) => {
     const result = selectedBatch
-      ? await props.actions.updateBatch(data)
-      : await props.actions.addBatch(data);
+      ? await actions.updateBatch(data)
+      : await actions.addBatch(data);
     if (result?.success) {
       setIsFormOpen(false);
       setSelectedBatch(null);
@@ -221,14 +267,14 @@ export default function HomePageView({
   };
 
   const handleArchive = async (batchId: string) => {
-    await props.actions.archiveBatch(batchId, selectedBatch?.quantity || 0);
+    await actions.archiveBatch(batchId, selectedBatch?.quantity || 0);
     setIsFormOpen(false);
     setSelectedBatch(null);
   };
 
   const handleLogActionSubmit = async (values: ActionLogFormValues) => {
     if (!selectedBatch?.id) return;
-    await props.actions.logAction(selectedBatch.id, values);
+    await actions.logAction(selectedBatch.id, values);
     setIsLogActionOpen(false);
     setSelectedBatch(null);
   };
@@ -236,7 +282,12 @@ export default function HomePageView({
   const handleTransplantSubmit = async (data: TransplantFormData) => {
     if (!selectedBatch?.id) return;
     const { quantity, logRemainingAsLoss, ...newBatchData } = data;
-    await props.actions.transplantBatch(selectedBatch.id, newBatchData, quantity, logRemainingAsLoss);
+    await actions.transplantBatch(
+      selectedBatch.id,
+      newBatchData,
+      quantity,
+      logRemainingAsLoss
+    );
     setIsTransplantOpen(false);
     setSelectedBatch(null);
   };
@@ -247,7 +298,7 @@ export default function HomePageView({
   };
 
   const handleVarietyFormSubmit = async (data: Omit<Variety, 'id'>) => {
-    const result = await props.actions.addVariety(data);
+    const result = await actions.addVariety(data);
     if (result.success) {
       setIsVarietyFormOpen(false);
     }
@@ -311,7 +362,7 @@ export default function HomePageView({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onSignOut}>
+              <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut />
                 Logout
               </DropdownMenuItem>
@@ -328,10 +379,18 @@ export default function HomePageView({
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={() => setIsScannerOpen(true)}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsScannerOpen(true)}
+            >
               <QrCode />
             </Button>
-            <Button onClick={() => handleRecommendations(initialBatches[0])} variant="outline" disabled={initialBatches.length === 0}>
+            <Button
+              onClick={() => handleRecommendations(batches[0])}
+              variant="outline"
+              disabled={batches.length === 0}
+            >
               <Sparkles /> AI Care
             </Button>
             <Button onClick={() => handleOpenForm()}>
@@ -417,16 +476,16 @@ export default function HomePageView({
               ))}
         </div>
         {filteredBatches.length === 0 && !authLoading && (
-            <div className="text-center col-span-full py-20">
-                <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">No Batches Found</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    Try adjusting your filters or create a new batch.
-                </p>
-            </div>
+          <div className="text-center col-span-full py-20">
+            <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-semibold">No Batches Found</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Try adjusting your filters or create a new batch.
+            </p>
+          </div>
         )}
       </main>
-      
+
       {/* Dialogs */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-4xl">
@@ -441,16 +500,16 @@ export default function HomePageView({
             onSubmit={handleFormSubmit}
             onCancel={() => setIsFormOpen(false)}
             onArchive={handleArchive}
-            nurseryLocations={props.nurseryLocations}
-            plantSizes={props.plantSizes}
-            suppliers={props.suppliers}
-            varieties={props.varieties}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
+            suppliers={suppliers}
+            varieties={varieties}
             onCreateNewVariety={handleCreateNewVariety}
           />
         </DialogContent>
       </Dialog>
-      
-      <BatchDetailDialog 
+
+      <BatchDetailDialog
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         batch={selectedBatch}
@@ -462,12 +521,14 @@ export default function HomePageView({
 
       <Dialog open={isLogActionOpen} onOpenChange={setIsLogActionOpen}>
         <DialogContent>
-           <DialogHeader>
-            <DialogTitle className="font-headline text-2xl">Log Action for Batch #{selectedBatch?.batchNumber}</DialogTitle>
+          <DialogHeader>
+            <DialogTitle className="font-headline text-2xl">
+              Log Action for Batch #{selectedBatch?.batchNumber}
+            </DialogTitle>
           </DialogHeader>
-          <ActionLogForm 
+          <ActionLogForm
             batch={selectedBatch}
-            nurseryLocations={props.nurseryLocations}
+            nurseryLocations={nurseryLocations}
             onSubmit={handleLogActionSubmit}
             onCancel={() => setIsLogActionOpen(false)}
           />
@@ -480,8 +541,8 @@ export default function HomePageView({
             batch={selectedBatch}
             onSubmit={handleTransplantSubmit}
             onCancel={() => setIsTransplantOpen(false)}
-            nurseryLocations={props.nurseryLocations}
-            plantSizes={props.plantSizes}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
           />
         </DialogContent>
       </Dialog>
@@ -496,7 +557,7 @@ export default function HomePageView({
         </DialogContent>
       </Dialog>
 
-      <ProductionProtocolDialog 
+      <ProductionProtocolDialog
         open={isProtocolOpen}
         onOpenChange={setIsProtocolOpen}
         batch={selectedBatch}
