@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -19,33 +20,29 @@ import { DialogFooter } from './ui/dialog';
 
 const ActionTypeEnum = z.enum(["NOTE", "MOVE", "LOSS"]);
 
-const Base = z.object({
-  type: ActionTypeEnum,
-  note: z.string().optional(),
-});
-
-// NOTE requires a non-empty note
-const NoteSchema = Base.extend({
+// Define schemas independently to avoid SSR race conditions with .extend()
+const NoteSchema = z.object({
   type: z.literal("NOTE"),
   note: z.string().min(1, "Please add a note."),
 });
 
-// MOVE requires a new location (by name OR id)
-const MoveSchema = Base.extend({
+const MoveSchema = z.object({
   type: z.literal("MOVE"),
   newLocation: z.string().optional(),
   newLocationId: z.string().optional(),
+  note: z.string().optional(),
 }).refine(v => Boolean(v.newLocation || v.newLocationId), {
   message: "Select a new location",
   path: ["newLocation"],
 });
 
-// LOSS requires a positive quantity
-const LossSchema = Base.extend({
+const LossSchema = z.object({
   type: z.literal("LOSS"),
   qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
   reason: z.string().optional(),
+  note: z.string().optional(),
 });
+
 
 const ActionLogSchema = z.discriminatedUnion("type", [
   NoteSchema,
@@ -76,10 +73,6 @@ export function ActionLogForm({
     defaultValues: {
       type: "NOTE",
       note: "",
-      newLocation: "",
-      newLocationId: "",
-      qty: undefined as unknown as number,
-      reason: "",
     } as any,
   });
 
@@ -167,7 +160,7 @@ export function ActionLogForm({
                   onValueChange={(id) => {
                     const selected = nurseryLocations.find((l) => l.id === id);
                     // Set both name + id; server prefers id if present.
-                    form.setValue('newLocationId', id);
+                    form.setValue('newLocationId', id, { shouldValidate: true });
                     field.onChange(selected?.name ?? "");
                   }}
                 >

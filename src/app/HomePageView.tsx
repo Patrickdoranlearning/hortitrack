@@ -9,7 +9,7 @@ import { Filter, LayoutDashboard, Database, PlusCircle, LogOut, ScanLine, Menu, 
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BatchCard } from "@/components/batch-card";
-import { BatchForm } from "@/components/batch-form";
+import { BatchForm, BatchDistribution } from "@/components/batch-form";
 import { TransplantForm } from "@/components/transplant-form";
 import { ActionLogForm } from "@/components/action-log-form";
 import { ProductionProtocolDialog } from "@/components/production-protocol-dialog";
@@ -22,7 +22,6 @@ import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/s
 import { Logo } from '@/components/logo';
 import type { User } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { BatchDistribution } from '@/components/batch-form';
 
 
 interface HomePageViewProps {

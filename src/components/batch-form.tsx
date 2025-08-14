@@ -51,7 +51,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { addVarietyAction } from '@/app/actions';
 import { VarietyForm } from './variety-form';
 import { useToast } from '@/hooks/use-toast';
-import { LogEntrySchema } from '@/lib/types';
 import { ScrollArea } from './ui/scroll-area';
 
 const batchFormSchema = z.object({
@@ -67,7 +66,12 @@ const batchFormSchema = z.object({
   location: z.string().min(1, 'Location is required.'),
   size: z.string().min(1, 'Size is required.'),
   supplier: z.string().min(1, 'Supplier is required.'),
-  logHistory: z.array(LogEntrySchema),
+  logHistory: z.array(z.object({
+    id: z.string().optional(),
+    date: z.any(),
+    type: z.any(),
+    note: z.string().optional(),
+  })),
   growerPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   salesPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   // Non-schema fields for form logic
