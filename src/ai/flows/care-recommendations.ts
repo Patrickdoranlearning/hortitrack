@@ -18,7 +18,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
 
 // Define the schema for the input data
 const CareRecommendationsInputSchema = z.object({

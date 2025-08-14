@@ -2,8 +2,8 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import type { Batch, TransplantFormData, NurseryLocation, PlantSize } from '@/lib/types';
+import { z } from 'zod';
+import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -61,9 +61,11 @@ const transplantFormSchema = (maxQuantity: number) =>
     trayQuantity: z.number().optional(),
   });
 
+export type TransplantFormData = z.infer<ReturnType<typeof transplantFormSchema>>;
+
 interface TransplantFormProps {
   batch: Batch | null;
-  onSubmit: (data: TransplantFormData) => void;
+  onSubmit: (data: Omit<TransplantFormData, 'initialQuantity'> & { initialQuantity: number }) => void;
   onCancel: () => void;
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];

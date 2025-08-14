@@ -3,7 +3,7 @@
 
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { z } from 'zod';
 import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {

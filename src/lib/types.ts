@@ -1,3 +1,4 @@
+
 import { z } from "zod";
 
 /**
@@ -6,7 +7,25 @@ import { z } from "zod";
  * every variant MUST declare `type` as a z.literal(...).
  */
 
-// ---- Log variants ----
+// A simplified LogEntrySchema for data transfer and use in BatchSchema to avoid SSR issues with discriminated unions.
+// The strict validation is handled in the ActionLogForm itself.
+export const LogEntrySchema = z.object({
+  id: z.string(),
+  date: z.any(),
+  type: z.string(),
+  note: z.string().optional(),
+  qty: z.number().optional(),
+  reason: z.string().optional(),
+  newLocation: z.string().optional(),
+  newLocationId: z.string().optional(),
+  fromBatch: z.string().optional(),
+  toBatch: z.string().optional(),
+});
+export type LogEntry = z.infer<typeof LogEntrySchema>;
+
+
+// ---- Action Log Form Values (NOTE | MOVE | LOSS only) ----
+// This schema is for client-side form validation and is more specific.
 const NoteLog = z.object({
   type: z.literal("NOTE"),
   note: z.string().min(1, "Please add a note."),
@@ -32,66 +51,7 @@ const LossLog = z.object({
   note: z.string().optional(),
 });
 
-const TransplantFromLog = z.object({
-  type: z.literal("TRANSPLANT_FROM"),
-  qty: z.coerce.number().min(1),
-  fromBatch: z.string(),
-  note: z.string().optional(),
-});
 
-const TransplantToLog = z.object({
-  type: z.literal("TRANSPLANT_TO"),
-  // your UI stores negative qty; allow any number
-  qty: z.coerce.number(),
-  toBatch: z.string(),
-  reason: z.string().optional(),
-  note: z.string().optional(),
-});
-
-const CreateLog = z.object({
-  type: z.literal("CREATE"),
-  qty: z.coerce.number().optional(),
-  note: z.string().optional(),
-});
-
-const ArchiveLog = z.object({
-  type: z.literal("ARCHIVE"),
-  qty: z.coerce.number().optional(),
-  reason: z.string().optional(),
-  note: z.string().optional(),
-});
-
-// keep legacy/other types seen in data
-const AdjustLog = z.object({
-  type: z.literal("ADJUST"),
-  qty: z.coerce.number().optional(),
-  note: z.string().optional(),
-});
-
-const BatchSpacedLog = z.object({
-  type: z.literal("Batch Spaced"),
-  note: z.string().optional(),
-});
-
-// A simplified LogEntrySchema for data transfer and use in BatchSchema to avoid SSR issues with discriminated unions.
-// The strict validation is handled in the ActionLogForm itself.
-export const LogEntrySchema = z.object({
-  id: z.string(),
-  date: z.any(),
-  type: z.string(),
-  note: z.string().optional(),
-  qty: z.number().optional(),
-  reason: z.string().optional(),
-  newLocation: z.string().optional(),
-  newLocationId: z.string().optional(),
-  fromBatch: z.string().optional(),
-  toBatch: z.string().optional(),
-});
-export type LogEntry = z.infer<typeof LogEntrySchema>;
-
-
-// ---- Action Log Form Values (NOTE | MOVE | LOSS only) ----
-// This schema is for client-side form validation and is more specific.
 export const ActionLogSchema = z.discriminatedUnion("type", [
   NoteLog,
   MoveLog,
@@ -179,17 +139,6 @@ export const SupplierSchema = z.object({
 });
 export type Supplier = z.infer<typeof SupplierSchema>;
 
-// ---- misc UI form types ----
-
-export const TransplantFormSchema = z.object({
-  size: z.string().optional(),
-  location: z.string().optional(),
-  supplier: z.string().optional(),
-  status: BatchStatus.optional(),
-  transplantQuantity: z.coerce.number().min(1),
-  logRemainingAsLoss: z.boolean().optional(),
-});
-export type TransplantFormData = z.infer<typeof TransplantFormSchema>;
 
 // ---- AI flow output types ----
 
