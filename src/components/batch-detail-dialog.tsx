@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import type { Batch } from '@/lib/types';
+import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf, Camera, Flag } from 'lucide-react';
@@ -33,6 +33,8 @@ interface BatchDetailDialogProps {
     onGenerateProtocol: (batch: Batch) => void;
     onCareRecommendations: (batch: Batch) => void;
     onDelete?: (batch: Batch) => void;
+    nurseryLocations: NurseryLocation[];
+    plantSizes: PlantSize[];
 }
 
 export function BatchDetailDialog({ 
@@ -45,6 +47,8 @@ export function BatchDetailDialog({
     onGenerateProtocol,
     onCareRecommendations,
     onDelete,
+    nurseryLocations,
+    plantSizes,
 }: BatchDetailDialogProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [flagOpen, setFlagOpen] = React.useState(false);

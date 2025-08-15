@@ -285,10 +285,24 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
   
-  const handleScanDetected = (data: { batch: Batch }) => {
-    setIsScanOpen(false);
-    setSelectedBatch(data.batch);
-    setIsDetailOpen(true);
+  const handleScanDetected = async (text: string) => {
+    try {
+      const res = await fetch(`/api/batches/scan?code=${encodeURIComponent(text)}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: 'Batch not found.' }));
+        throw new Error(errBody.error);
+      }
+      const { batch: foundBatch } = await res.json();
+      setIsScanOpen(false);
+      setSelectedBatch(foundBatch);
+      setIsDetailOpen(true);
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Scan Failed',
+        description: err.message || 'Could not find a batch for the scanned code.',
+      });
+    }
   };
 
 
@@ -522,14 +536,19 @@ export default function HomePageView({
               Log Action for Batch #{selectedBatch?.batchNumber}
             </DialogTitle>
           </DialogHeader>
-          <ActionLogForm
-            batchId={selectedBatch?.id || ''}
-            onSubmitted={() => {
-              setIsLogActionOpen(false);
-              setSelectedBatch(null);
-            }}
-            onCancel={() => setIsLogActionOpen(false)}
-          />
+          {selectedBatch && (
+            <ActionLogForm
+              batch={selectedBatch}
+              nurseryLocations={nurseryLocations || []}
+              plantSizes={plantSizes || []}
+              onSubmitted={() => {
+                setIsLogActionOpen(false);
+                setSelectedBatch(null);
+                toast({ title: 'Actions Logged', description: 'The batch has been updated.' });
+              }}
+              onCancel={() => setIsLogActionOpen(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -568,8 +587,10 @@ export default function HomePageView({
       <ScannerDialog 
         open={isScanOpen} 
         onOpenChange={setIsScanOpen} 
-        onBatchResolved={handleScanDetected}
+        onDetected={handleScanDetected}
       />
     </div>
   );
 }
+
+    
