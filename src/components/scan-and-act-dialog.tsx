@@ -6,152 +6,154 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Loader2, Camera } from "lucide-react";
-import {
   BrowserMultiFormatReader,
   DecodeHintType,
   BarcodeFormat,
 } from "@zxing/library";
+import { Camera } from "lucide-react";
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** called with raw decoded string when a code is recognized */
+  /** Called once with decoded text */
   onDetected: (text: string) => void;
 };
 
 export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
-  const [status, setStatus] = useState<
-    "idle" | "init" | "ready" | "scanning" | "noresult" | "error"
-  >("idle");
-  const [errorMsg, setErrorMsg] = useState<string>("");
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [status, setStatus] = useState<"idle" | "init" | "scanning" | "noresult" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
+  // Restrict to Data Matrix + QR for faster, more stable scans
   const hints = useMemo(() => {
     const h = new Map();
     h.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.DATA_MATRIX, BarcodeFormat.QR_CODE]);
     return h;
   }, []);
 
+  // Start/stop stream when dialog opens/closes
   useEffect(() => {
     if (!open) return;
+
+    let stopped = false;
     setStatus("init");
     setErrorMsg("");
 
-    // enumerate cameras AFTER permission (labels are empty until then on many browsers)
-    async function init() {
-      try {
-        // try to get a stream quickly (relaxed constraints), this triggers permission prompt
-        const warmup = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        warmup.getTracks().forEach(t => t.stop());
+    const start = async () => {
+      const video = videoRef.current;
+      if (!video) return;
 
-        const all = (await navigator.mediaDevices.enumerateDevices())
-          .filter(d => d.kind === "videoinput");
+      // helper to stop any existing stream
+      const stopStream = () => {
+        try {
+          readerRef.current?.reset();
+        } catch {}
+        readerRef.current = null;
+        if (video.srcObject) {
+          (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+          video.srcObject = null;
+        }
+      };
 
-        setDevices(all);
+      // Try: exact environment -> ideal environment -> default
+      // Mobile Safari/Chrome honor facingMode hints.
+      const tryConstraints: MediaStreamConstraints[] = [
+        { video: { facingMode: { exact: "environment" } as any }, audio: false },
+        { video: { facingMode: { ideal: "environment" } as any }, audio: false },
+        { video: true, audio: false },
+      ];
 
-        // prefer a back/environment camera on mobile
-        const back = all.find(d => /back|rear|environment/i.test(d.label));
-        const firstId = back?.deviceId ?? all[0]?.deviceId;
-
-        setDeviceId(prev => prev ?? firstId);
-        setStatus(all.length ? "ready" : "error");
-        if (!all.length) setErrorMsg("No cameras found.");
-
-      } catch (err: any) {
-        console.error(err);
-        setStatus("error");
-        setErrorMsg(err?.name === "NotAllowedError"
-          ? "Camera permission denied."
-          : err?.message || "Failed to initialize camera.");
-      }
-    }
-
-    init();
-  }, [open]);
-
-  useEffect(() => {
-    // start decoding when ready + we have a deviceId
-    if (!(open && status === "ready" && deviceId && videoRef.current)) return;
-
-    const video = videoRef.current;
-    let stopped = false;
-
-    async function start() {
-      try {
-        setStatus("scanning");
-
-        // start chosen device
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: deviceId } },
-          audio: false,
-        });
-        video.setAttribute("playsinline", "true");
-        video.muted = true;
-        video.srcObject = stream;
-        await video.play();
-
-        // ZXing reader
-        const reader = new BrowserMultiFormatReader(hints, 500);
-        codeReaderRef.current = reader;
-
-        let gotResult = false;
-        reader.decodeFromVideoDevice(deviceId, video, (result, err) => {
-          if (stopped) return;
-          if (result) {
-            gotResult = true;
-            // clean up immediately so the dialog can close
-            teardown();
-            onDetected(result.getText());
+      let stream: MediaStream | null = null;
+      for (const c of tryConstraints) {
+        try {
+          // On many browsers, camera permission must be user-gesture initiated (opening the modal button counts)
+          stream = await navigator.mediaDevices.getUserMedia(c);
+          if (stream) break;
+        } catch (err: any) {
+          // OverconstrainedError means that particular constraint isn't available—fall through to next
+          if (err?.name !== "OverconstrainedError") {
+            // keep last error; we'll surface a message if all attempts fail
+            setErrorMsg(err?.message || "Failed to open camera.");
           }
-          // ignore intermittent decode errors while scanning
-        });
+        }
+      }
 
-        // soft timeout to show “no code yet” hint
-        setTimeout(() => {
-          if (!gotResult && !stopped) setStatus("noresult");
-        }, 2000);
-
-      } catch (err: any) {
-        console.error(err);
+      if (!stream) {
         setStatus("error");
-        setErrorMsg(err?.message || "Could not open selected camera.");
+        if (!errorMsg) setErrorMsg("No camera available or permission denied.");
+        return;
       }
-    }
 
-    start();
+      // Hook stream to video
+      video.setAttribute("playsinline", "true"); // iOS: avoid fullscreen
+      video.muted = true;
+      video.srcObject = stream;
+      await video.play();
 
-    function teardown() {
-      stopped = true;
-      try {
-        codeReaderRef.current?.reset();
-      } catch {}
-      codeReaderRef.current = null;
-      if (video.srcObject) {
-        (video.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-        video.srcObject = null;
-      }
-    }
+      // Start ZXing decoding from the video element (we own the stream)
+      const reader = new BrowserMultiFormatReader(hints, 400);
+      readerRef.current = reader;
 
-    return teardown;
-  }, [open, status, deviceId, hints, onDetected]);
+      setStatus("scanning");
+      let gotResult = false;
 
-  // when modal closes, ensure we fully stop the camera
+      reader.decodeFromVideoElement(video, (result, err) => {
+        if (stopped) return;
+
+        if (result) {
+          gotResult = true;
+          // Clean up before reporting
+          stopStream();
+          onDetected(result.getText());
+        }
+        // We intentionally ignore transient errors while scanning
+      });
+
+      // Gentle hint if nothing detected for a bit
+      setTimeout(() => {
+        if (!gotResult && !stopped && status === "scanning") setStatus("noresult");
+      }, 2000);
+
+      // Cleanup on effect end
+      return stopStream;
+    };
+
+    const teardownPromise = start();
+
+    return () => {
+      (async () => {
+        stopped = true;
+        try {
+          (await teardownPromise)?.();
+        } catch {}
+        try {
+          readerRef.current?.reset();
+        } catch {}
+        readerRef.current = null;
+        const v = videoRef.current;
+        if (v?.srcObject) {
+          (v.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+          v.srcObject = null;
+        }
+        setStatus("idle");
+        setErrorMsg("");
+      })();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hints, onDetected]);
+
   const handleOpenChange = (v: boolean) => {
     if (!v) {
+      // stop immediately on close
       try {
-        codeReaderRef.current?.reset();
+        readerRef.current?.reset();
       } catch {}
-      codeReaderRef.current = null;
-      const video = videoRef.current;
-      if (video?.srcObject) {
-        (video.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-        video.srcObject = null;
+      readerRef.current = null;
+      const vEl = videoRef.current;
+      if (vEl?.srcObject) {
+        (vEl.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+        vEl.srcObject = null;
       }
       setStatus("idle");
       setErrorMsg("");
@@ -161,45 +163,42 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-sm p-0 overflow-hidden">
         <DialogHeader className="px-4 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" /> Scan Batch Code
+            <Camera className="h-5 w-5" />
+            Scan Batch Code
           </DialogTitle>
           <DialogDescription>
-            Point your camera at a <b>Data&nbsp;Matrix</b> or QR code. We’ll detect it automatically.
+            Aim at a <b>Data&nbsp;Matrix</b> or QR code. We’ll auto-detect it.
           </DialogDescription>
         </DialogHeader>
 
-        {/* camera picker */}
-        {devices.length > 1 && (
-          <div className="px-4 pb-2">
-            <Select value={deviceId ?? ""} onValueChange={setDeviceId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose camera" />
-              </SelectTrigger>
-              <SelectContent>
-                {devices.map((d, i) => (
-                  <SelectItem key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Camera ${i + 1}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* video */}
-        <div className="relative aspect-[3/4] w-full bg-black">
+        {/* Video with square finder */}
+        <div className="relative w-full aspect-square bg-black">
           <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" />
-          {/* overlay mask / status */}
-          <div className="pointer-events-none absolute inset-0 flex items-end justify-center">
-            <div className="mb-3 rounded bg-black/40 px-3 py-1 text-xs text-white">
+
+          {/* dim mask */}
+          <div className="pointer-events-none absolute inset-0 bg-black/30" />
+
+          {/* square finder box */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-white/70">
+            {/* corner accents */}
+            <span className="absolute -left-[2px] -top-[2px] h-5 w-5 border-l-4 border-t-4 border-white/90 rounded-tl-sm" />
+            <span className="absolute -right-[2px] -top-[2px] h-5 w-5 border-r-4 border-t-4 border-white/90 rounded-tr-sm" />
+            <span className="absolute -left-[2px] -bottom-[2px] h-5 w-5 border-l-4 border-b-4 border-white/90 rounded-bl-sm" />
+            <span className="absolute -right-[2px] -bottom-[2px] h-5 w-5 border-r-4 border-b-4 border-white/90 rounded-br-sm" />
+            {/* subtle scan line (pulses) */}
+            <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-white/70 opacity-60 animate-pulse" />
+          </div>
+
+          {/* status pill */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+            <div className="rounded bg-black/60 px-3 py-1 text-xs text-white">
               {status === "init" && "Initializing camera…"}
-              {status === "ready" && "Starting scanner…"}
               {status === "scanning" && "Scanning… hold steady"}
               {status === "noresult" && "Still looking… try more light or move closer"}
-              {status === "error" && errorMsg}
+              {status === "error" && (errorMsg || "Camera error")}
             </div>
           </div>
         </div>
