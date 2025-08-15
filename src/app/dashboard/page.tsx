@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -358,37 +359,43 @@ export default function DashboardOverviewPage() {
         </Card>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieIcon />
               Plant Family Distribution
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <FamilyDistributionChart data={plantFamilyData} />
+          <CardContent className="min-w-0">
+            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+              <FamilyDistributionChart data={plantFamilyData} />
+            </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieIcon />
               Plant Size Distribution
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <SizeDistributionChart data={plantSizeData} />
+          <CardContent className="min-w-0">
+             <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+              <SizeDistributionChart data={plantSizeData} />
+            </div>
           </CardContent>
         </Card>
-        <Card className="col-span-1 md:col-span-2">
+        <Card className="col-span-1 md:col-span-2 min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingDown />
               Losses by Plant Family
             </CardTitle>
           </CardHeader>
-          <CardContent className="pl-2">
-            <LossesChart data={lossData} />
+          <CardContent className="pl-2 min-w-0">
+            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+              <LossesChart data={lossData} />
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -48,7 +49,7 @@ import * as React from 'react';
 import { ActionLogForm } from '../components/action-log-form';
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
-import { BatchDistribution, BatchForm } from '../components/batch-form';
+import { BatchForm } from '../components/batch-form';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
 import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
 import { ScannedBatchActionsDialog } from '../components/scanned-batch-actions-dialog';
@@ -94,6 +95,7 @@ interface HomePageViewProps {
       logData: Partial<ActionLogFormValues>
     ) => Promise<any>;
     addVariety: (data: Omit<Variety, 'id'>) => Promise<any>;
+    addCareRecommendations: (batch: Batch) => void;
   };
 }
 
@@ -147,9 +149,7 @@ export default function HomePageView({
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
   const [newVarietyName, setNewVarietyName] = React.useState('');
-  const [distribution, setDistribution] =
-    React.useState<BatchDistribution | null>(null);
-
+  
   const [filters, setFilters] = React.useState({
     plantFamily: 'all',
     category: 'all',
@@ -198,32 +198,9 @@ export default function HomePageView({
     }
   }, [user, authLoading, router]);
 
-  const calculateDistribution = (
-    batch: Batch | null
-  ): BatchDistribution | null => {
-    if (!batch) return null;
-    let transplanted = 0;
-    let lost = 0;
-
-    (batch.logHistory || []).forEach((log) => {
-      if (log.type === 'TRANSPLANT_TO' && typeof log.qty === 'number') {
-        transplanted += Math.abs(log.qty);
-      }
-      if (log.type === 'LOSS' && typeof log.qty === 'number') {
-        lost += log.qty;
-      }
-    });
-
-    return {
-      inStock: batch.quantity,
-      transplanted,
-      lost,
-    };
-  };
-
+  
   const handleOpenForm = (batch?: Batch) => {
     setSelectedBatch(batch || null);
-    setDistribution(calculateDistribution(batch || null));
     setIsFormOpen(true);
   };
 
@@ -380,30 +357,32 @@ export default function HomePageView({
         </div>
       </header>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-headline text-4xl">Nursery Stock</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-headline text-3xl sm:text-4xl truncate">Nursery Stock</h1>
             <p className="text-muted-foreground">
               A real-time overview of all plant batches currently in production.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
-              size="icon"
               onClick={() => setIsScannerOpen(true)}
               disabled={isReadonly}
+               className="w-full sm:w-auto"
             >
               <QrCode />
+              Scan
             </Button>
             <Button
-              onClick={() => handleRecommendations(batches[0])}
+              onClick={() => actions.addCareRecommendations(batches[0])}
               variant="outline"
               disabled={isReadonly || batches.length === 0}
+              className="w-full sm:w-auto"
             >
               <Sparkles /> AI Care
             </Button>
-            <Button onClick={() => handleOpenForm()} disabled={isReadonly}>
+            <Button onClick={() => handleOpenForm()} disabled={isReadonly} className="w-full sm:w-auto">
               <Plus /> New Batch
             </Button>
           </div>
@@ -506,8 +485,7 @@ export default function HomePageView({
           </DialogHeader>
           <BatchForm
             batch={selectedBatch}
-            distribution={distribution}
-            onSubmit={handleFormSubmit}
+            onSubmitSuccess={() => setIsFormOpen(false)}
             onCancel={() => setIsFormOpen(false)}
             onArchive={handleArchive}
             nurseryLocations={nurseryLocations || []}
@@ -527,6 +505,7 @@ export default function HomePageView({
         onTransplant={handleTransplant}
         onLogAction={handleLogAction}
         onGenerateProtocol={handleGenerateProtocol}
+        onCareRecommendations={handleRecommendations}
       />
 
       <Dialog open={isLogActionOpen} onOpenChange={setIsLogActionOpen}>

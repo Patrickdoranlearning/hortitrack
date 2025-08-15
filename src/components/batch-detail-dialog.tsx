@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -11,7 +12,7 @@ import {
 import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, ImageIcon, Trash2, Leaf } from 'lucide-react';
+import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -136,14 +137,13 @@ export function BatchDetailDialog({
                 <TabsList>
                   <TabsTrigger value="summary">Summary</TabsTrigger>
                   <TabsTrigger value="history">Log History</TabsTrigger>
+                  <TabsTrigger value="photos">Photos</TabsTrigger>
                 </TabsList>
                 <TabsContent value="summary">
                   <Card className="mt-2">
                     <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="md:col-span-1 space-y-4">
-                        <div className="aspect-square w-full flex items-center justify-center bg-muted rounded-md">
-                          <ImageIcon className="h-16 w-16 text-muted-foreground" />
-                        </div>
+                        
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm font-semibold">
                             <span>Stock</span>
@@ -211,6 +211,43 @@ export function BatchDetailDialog({
                             ))}
                         </TableBody>
                       </Table>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                <TabsContent value="photos">
+                  <Card className="mt-2">
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-muted">
+                          {batch.growerPhotoUrl ? (
+                            <img
+                              src={batch.growerPhotoUrl}
+                              alt="Grower"
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="h-full w-full grid place-items-center text-sm text-muted-foreground">
+                              No Grower Photo
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-muted">
+                          {batch.salesPhotoUrl ? (
+                            <img
+                              src={batch.salesPhotoUrl}
+                              alt="Sales"
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="h-full w-full grid place-items-center text-sm text-muted-foreground">
+                              No Sales Photo
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>

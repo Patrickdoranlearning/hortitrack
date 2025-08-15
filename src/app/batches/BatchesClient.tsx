@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -510,10 +511,10 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   }
 
   return (
-    <div className="container mx-auto max-w-7xl p-3 sm:p-6">
+    <div className="container mx-auto max-w-7xl px-3 sm:px-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-                <h1 className="mb-1 font-headline text-4xl">Manage Batch Data</h1>
+            <div className="min-w-0">
+                <h1 className="mb-1 font-headline text-2xl sm:text-4xl truncate">Manage Batch Data</h1>
                 <p className="text-muted-foreground">View, search, and manage all batch records.</p>
             </div>
             <Button asChild variant="outline">
@@ -531,8 +532,8 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         <CardTitle>All Batches</CardTitle>
                         <CardDescription>A complete history of all batches recorded in the system.</CardDescription>
                     </div>
-                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={downloadCsv}>
+                     <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
+                      <Button variant="outline" onClick={downloadCsv} className="w-full sm:w-auto">
                         <Download className="mr-2 h-4 w-4" />
                         Export CSV
                       </Button>
@@ -544,7 +545,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         className="hidden"
                         onChange={handleCsvFile}
                       />
-                      <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                      <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full sm:w-auto">
                         <Upload className="mr-2 h-4 w-4" />
                         Import CSV
                       </Button>
@@ -605,38 +606,40 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                     </div>
                 ) : (
-                    <Table>
-                        <TableHeader>
-                        <TableRow>
-                            <TableHead>Batch #</TableHead>
-                            <TableHead>Variety</TableHead>
-                            <TableHead>Family</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Location</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead className="text-right">Current Qty</TableHead>
-                            <TableHead className="text-right">Initial Qty</TableHead>
-                            <TableHead>Created</TableHead>
-                        </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                        {filteredBatches.map((batch) => (
-                            <TableRow key={batch.id} onClick={() => handleViewDetails(batch)} className="cursor-pointer">
-                                <TableCell className="font-medium">{batch.batchNumber}</TableCell>
-                                <TableCell>{batch.plantVariety}</TableCell>
-                                <TableCell>{batch.plantFamily}</TableCell>
-                                <TableCell>
-                                    <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
-                                </TableCell>
-                                <TableCell>{batch.location}</TableCell>
-                                <TableCell>{batch.size}</TableCell>
-                                <TableCell className="text-right font-semibold">{batch.quantity.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{batch.initialQuantity.toLocaleString()}</TableCell>
-                                <TableCell>{formatDate(batch.createdAt)}</TableCell>
-                            </TableRow>
-                        ))}
-                        </TableBody>
-                    </Table>
+                    <div className="w-full overflow-x-auto">
+                      <Table>
+                          <TableHeader>
+                          <TableRow>
+                              <TableHead>Batch #</TableHead>
+                              <TableHead>Variety</TableHead>
+                              <TableHead>Family</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Location</TableHead>
+                              <TableHead>Size</TableHead>
+                              <TableHead className="text-right">Current Qty</TableHead>
+                              <TableHead className="text-right">Initial Qty</TableHead>
+                              <TableHead>Created</TableHead>
+                          </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                          {filteredBatches.map((batch) => (
+                              <TableRow key={batch.id} onClick={() => handleViewDetails(batch)} className="cursor-pointer">
+                                  <TableCell className="font-medium">{batch.batchNumber}</TableCell>
+                                  <TableCell>{batch.plantVariety}</TableCell>
+                                  <TableCell>{batch.plantFamily}</TableCell>
+                                  <TableCell>
+                                      <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
+                                  </TableCell>
+                                  <TableCell>{batch.location}</TableCell>
+                                  <TableCell>{batch.size}</TableCell>
+                                  <TableCell className="text-right font-semibold">{batch.quantity.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{batch.initialQuantity.toLocaleString()}</TableCell>
+                                  <TableCell>{formatDate(batch.createdAt)}</TableCell>
+                              </TableRow>
+                          ))}
+                          </TableBody>
+                      </Table>
+                    </div>
                 )}
                  {filteredBatches.length === 0 && !isDataLoading && (
                     <div className="flex h-[20vh] flex-col items-center justify-center rounded-lg text-center">
@@ -683,6 +686,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         onLogAction={() => console.log("Log action for batch:", selectedBatch?.id)} // Placeholder
         onGenerateProtocol={() => console.log("Generate protocol for batch:", selectedBatch?.id)} // Placeholder
         onDelete={handleDeleteBatch}
+        onCareRecommendations={() => console.log("Care recommendations for batch:", selectedBatch?.id)}
       />
 
       {/* Transplant Dialog */}
