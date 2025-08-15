@@ -1,8 +1,7 @@
-// utils/labels.ts
+
+// src/utils/labels.ts
 const DOTS_PER_MM = 8;
 const mm = (n: number) => Math.round(n * DOTS_PER_MM);
-
-// Simple escape; we don’t use ^FH hex mode here to keep things bulletproof
 const sanitize = (s: string) => String(s).replace(/[\^\~\\]/g, " ");
 
 export function buildBatchLabelZplLandscape(opts: {
@@ -11,40 +10,31 @@ export function buildBatchLabelZplLandscape(opts: {
   family: string;
   quantity: number;
   size: string;
-  dataMatrixPayload?: string; // default: BATCH:<batchNumber>
-  labelWidthMM?: number;      // default: 70
-  labelHeightMM?: number;     // default: 50
-  marginMM?: number;          // default: 3
-  rotate90?: boolean;         // if true, rotate all fields 90° for “landscape” on some setups
-  debugFrame?: boolean;       // draws the 3mm inner frame
+  dataMatrixPayload?: string;
+  marginMM?: number; // default 3
+  debugFrame?: boolean;
 }) {
   const {
-    batchNumber,
-    variety,
-    family,
-    quantity,
-    size,
+    batchNumber, variety, family, quantity, size,
     dataMatrixPayload,
-    labelWidthMM = 70,
-    labelHeightMM = 50,
     marginMM = 3,
-    rotate90 = false,
     debugFrame = false,
   } = opts;
 
-  const PW = mm(labelWidthMM);
-  const LL = mm(labelHeightMM);
-  const M  = mm(marginMM);
-  const innerW = PW - M*2;
-  const innerH = LL - M*2;
+  // IMPORTANT: Use PW=50mm, LL=70mm and rotate fields 90° via ^FWB.
+  const PW = mm(50);
+  const LL = mm(70);
+  const M = mm(marginMM);
+  const innerW = PW - M * 2;
+  const innerH = LL - M * 2;
 
-  // DM fits left column: up to 45% of text width but not taller than inner height
-  const dmSize = Math.min(innerH, Math.floor(innerW * 0.45));
+  // Coordinates still use PW×LL grid. With ^FWB, fields are rotated,
+  // but you can keep your anchors simple and “mentally” treat it landscape.
+  const dmSize = Math.min(innerW, Math.floor(innerH * 0.45)); // a bit conservative
   const gutter = mm(2);
-
-  const textX = M + dmSize + gutter;
-  const textY = M;
-  const textW = innerW - dmSize - gutter;
+  const textX = M;
+  const textY = M + dmSize + gutter; // text appears “to the right” after rotation
+  const textW = innerH - dmSize - gutter;
 
   const batchFont   = 70;
   const varietyFont = 58;
@@ -58,19 +48,15 @@ export function buildBatchLabelZplLandscape(opts: {
   z += `^LL${LL}\n`;
   z += "^LH0,0\n";
   z += "^CI28\n";
-
-  // For sites where the driver/printer expects portrait, rotate fields 90°
-  // This keeps math identical; only orientation changes.
-  if (rotate90) z += "^FWB\n";  // B = 270° (clockwise)
+  z += "^FWB\n"; // rotate all fields 90° → landscape look on printer that assumes portrait media
 
   if (debugFrame) {
     z += `^FO${M},${M}^GB${innerW},${innerH},2^FS\n`;
   }
 
-  // Data Matrix (use ^BXM — module size, error corr)
-  // module size 8 is compact but very readable at 203dpi. Adjust 6–10 if needed.
+  // DataMatrix “left” (after rotation)
   z += `^FO${M},${M}\n`;
-  z += "^BXM,8,200\n"; // orientation handled by ^FW, module=8, ECC=200
+  z += "^BXM,8,200\n";
   z += `^FD${sanitize(payload)}^FS\n`;
 
   // Batch #

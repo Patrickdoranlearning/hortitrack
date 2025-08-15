@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { adminDb } from "@/server/db/admin";
 import { buildBatchLabelZplLandscape } from "@/server/labels/build-batch-label";
@@ -18,9 +19,6 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     quantity: data.initialQuantity ?? data.quantity ?? 0,
     size: data.size,
     dataMatrixPayload: encodeBatchDataMatrixPayload({ id: doc.id, batchNumber: data.batchNumber }),
-    // You could pass these from query params if needed, e.g. /zpl?rotate=true
-    // rotate90: false,
-    // debugFrame: false,
   });
 
   return new NextResponse(zpl, {
