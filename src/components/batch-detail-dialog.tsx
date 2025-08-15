@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,13 +12,16 @@ import {
 import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf } from 'lucide-react';
+import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf, Camera, Flag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format, parseISO, isValid } from 'date-fns';
 import { BatchChatDialog } from '@/components/batch-chat-dialog';
+import { uploadBatchPhoto } from '@/lib/storage';
+import FlagBatchDialog from '@/components/flag-batch-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface BatchDetailDialogProps {
     open: boolean;
@@ -44,6 +47,28 @@ export function BatchDetailDialog({
     onDelete,
 }: BatchDetailDialogProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [flagOpen, setFlagOpen] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const handlePickPhoto = () => fileInputRef.current?.click();
+  const handlePhotoChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f || !batch?.id) return;
+    try {
+      const url = await uploadBatchPhoto(batch.id, f);
+      await fetch(`/api/batches/${batch.id}/log`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "Photo", photoUrl: url }),
+      });
+      toast({ title: "Photo uploaded", description: "The photo has been logged for this batch." });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Upload Failed", description: err?.message ?? "Photo upload failed" });
+    } finally {
+      e.target.value = "";
+    }
+  };
 
   if (!batch) return null;
 
@@ -121,11 +146,34 @@ export function BatchDetailDialog({
                   <DialogDescription className="text-lg">{batch.plantFamily} - Batch #{batch.batchNumber}</DialogDescription>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 sm:flex sm:flex-wrap sm:justify-end gap-2 shrink-0">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handlePhotoChosen}
+                  />
                   <Button variant="outline" size="sm" onClick={() => setIsChatOpen(true)}><MessageSquare /> AI Chat</Button>
                   <Button variant="outline" size="sm" onClick={handleLogAction}><ClipboardList /> Log</Button>
                   <Button variant="outline" size="sm" onClick={handleTransplant}><MoveRight /> Transplant</Button>
                   <Button variant="outline" size="sm" onClick={handleGenerateProtocol}><FileText /> Protocol</Button>
                   <Button variant="outline" size="sm" onClick={handleCareRecommendations}><Leaf /> Care Recs</Button>
+                   <Button variant="outline" size="sm" onClick={handlePickPhoto}><Camera /> Photo</Button>
+                   <Button variant={batch?.flag?.active ? "destructive" : "outline"} size="sm" onClick={() => {
+                      if (batch?.flag?.active) {
+                        fetch(`/api/batches/${batch!.id}/log`, {
+                          method: "POST",
+                          headers: { "content-type": "application/json" },
+                          body: JSON.stringify({ type: "Unflagged" }),
+                        }).catch(() => {});
+                      } else {
+                        setFlagOpen(true);
+                      }
+                    }}>
+                      <Flag className="mr-1 h-4 w-4" />
+                      {batch?.flag?.active ? "Clear Flag" : "Flag"}
+                    </Button>
                   <Button size="sm" onClick={handleEdit}><Pencil /> Edit</Button>
                   {onDelete && <Button variant="destructive" size="sm" onClick={handleDelete}><Trash2 /> Delete</Button>}
                 </div>
@@ -202,11 +250,11 @@ export function BatchDetailDialog({
                         <TableBody>
                           {(batch.logHistory ?? [])
                             .slice()
-                            .sort((a, b) => dateToMillis(b.date) - dateToMillis(a.date))
+                            .sort((a, b) => dateToMillis(b.at || b.date) - dateToMillis(a.at || a.date))
                             .map((log, index) => (
                               <TableRow key={log.id || index}>
-                                <TableCell>{formatDate(log.date)}</TableCell>
-                                <TableCell>{log.note || log.type}</TableCell>
+                                <TableCell>{formatDate(log.at || log.date)}</TableCell>
+                                <TableCell>{log.note || log.type || log.action}</TableCell>
                               </TableRow>
                             ))}
                         </TableBody>
@@ -261,6 +309,15 @@ export function BatchDetailDialog({
         open={isChatOpen}
         onOpenChange={setIsChatOpen}
         batch={batch}
+      />
+      
+      <FlagBatchDialog
+        open={flagOpen}
+        onOpenChange={setFlagOpen}
+        batchId={batch!.id}
+        onDone={() => {
+          toast({ title: "Batch flagged", description: "The issue has been recorded."});
+        }}
       />
     </>
   );

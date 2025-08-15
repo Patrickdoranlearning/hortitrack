@@ -1,262 +1,105 @@
 
-"use client";
-
+'use client';
 import * as React from "react";
+import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-
-import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
-import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { NurseryLocation } from "@/lib/types";
-import { DialogFooter } from "./ui/dialog";
+import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
-// This schema is for client-side form validation.
-const NoteLog = z.object({
-  type: z.literal("NOTE"),
-  note: z.string().min(1, "Please add a note."),
-});
-
-// Make this a plain ZodObject (no .refine here)
-const MoveLog = z.object({
-  type: z.literal("MOVE"),
-  // prefer ID; keep name for backward compatibility
-  newLocationId: z.string().optional(),
-  newLocation: z.string().optional(),
+const schema = z.object({
+  type: z.enum(["Spaced","Move","Trimmed","Dumped","Weed","Note"]),
   note: z.string().optional(),
 });
 
-const LossLog = z.object({
-  type: z.literal("LOSS"),
-  qty: z.coerce.number().min(1, "Enter a quantity greater than 0"),
-  reason: z.string().optional(),
-  note: z.string().optional(),
-});
-
-// Build the discriminated union FIRST
-const ActionLogSchemaBase = z.discriminatedUnion("type", [
-  NoteLog,
-  MoveLog,
-  LossLog,
-]);
-
-// Then add cross-field validation that only runs for MOVE
-const ActionLogSchema = ActionLogSchemaBase.superRefine((val, ctx) => {
-  if (val.type === "MOVE") {
-    const hasId = Boolean(val.newLocationId && val.newLocationId.trim());
-    const hasName = Boolean(val.newLocation && val.newLocation.trim());
-    if (!hasId && !hasName) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Select a new location",
-        path: ["newLocation"], // matches the old UI error target
-      });
-    }
-  }
-});
-
-export type ActionLogFormValues = z.infer<typeof ActionLogSchema>;
-
-function idFromName(list: NurseryLocation[], name?: string) {
-  return list.find((x) => x.name === name)?.id ?? "";
-}
+export type ActionLogFormValues = z.infer<typeof schema>;
 
 export function ActionLogForm({
-  batch,
-  nurseryLocations,
-  onSubmit,
+  batchId,
+  onSubmitted,
   onCancel,
 }: {
-  batch: { id: string; quantity?: number } | null | undefined;
-  nurseryLocations: NurseryLocation[];
-  onSubmit: (values: ActionLogFormValues) => void | Promise<void>;
+  batchId: string;
+  onSubmitted?: () => void;
   onCancel?: () => void;
 }) {
   const form = useForm<ActionLogFormValues>({
-    resolver: zodResolver(ActionLogSchema),
-    mode: "onChange",
+    resolver: zodResolver(schema),
     defaultValues: {
-      type: "NOTE", // always set to prevent undefined
+      type: "Spaced",
       note: "",
-      newLocation: "",
-      newLocationId: "",
-      // @ts-expect-error: start empty; z.coerce will handle when used
-      qty: undefined,
-      reason: "",
     },
   });
-
-  const type = form.watch("type") ?? "NOTE";
-
-  const handleValid = async (values: ActionLogFormValues) => {
-    if (values.type === "LOSS" && typeof values.qty === "number") {
-      const available = Number(batch?.quantity ?? 0);
-      if (values.qty > available) {
-        form.setError("qty" as any, {
-          type: "validate",
-          message: `Quantity exceeds available (${available}).`,
-        });
-        return;
-      }
-    }
-    await onSubmit(values);
-    form.reset({ type: "NOTE", note: "" } as any);
-  };
-
-  const handleInvalid = (errors: any) => {
-    console.error("Action log invalid:", errors);
-  };
+  const [saving, setSaving] = useState(false);
 
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(handleValid, handleInvalid)}
-        className="space-y-6"
+        className="space-y-4"
+        onSubmit={form.handleSubmit(async (vals) => {
+          setSaving(true);
+          try {
+            const res = await fetch(`/api/batches/${batchId}/log`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ ...vals }),
+            });
+            if (!res.ok) throw new Error("Log failed");
+            onSubmitted?.();
+          } catch (e: any) {
+            alert(e.message ?? "Log failed");
+          } finally {
+            setSaving(false);
+          }
+        })}
       >
-        {/* Action Type */}
         <FormField
           control={form.control}
           name="type"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Action Type</FormLabel>
-              <Select
-                value={field.value ?? "NOTE"}
-                onValueChange={(v) => {
-                  field.onChange(v as any);
-                  form.clearErrors();
-                }}
-              >
+              <FormLabel>Action</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an action type" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Choose action" /></SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="NOTE">General Note</SelectItem>
-                  <SelectItem value="MOVE">Move Batch</SelectItem>
-                  <SelectItem value="LOSS">Log Loss</SelectItem>
+                  <SelectItem value="Spaced">Spaced</SelectItem>
+                  <SelectItem value="Move">Move</SelectItem>
+                  <SelectItem value="Trimmed">Trimmed</SelectItem>
+                  <SelectItem value="Dumped">Dumped</SelectItem>
+                  <SelectItem value="Weed">Weed</SelectItem>
+                  <SelectItem value="Note">Note</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
           )}
         />
-
-        {/* NOTE */}
-        {type === "NOTE" && (
-          <FormField
-            control={form.control}
-            name="note"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Note</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Add a note..."
-                    value={field.value ?? ""}
-                    onChange={field.onChange}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        {/* MOVE */}
-        {type === "MOVE" && (
-          <FormField
-            control={form.control}
-            name="newLocation"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>New Location</FormLabel>
-                <Select
-                  value={idFromName(nurseryLocations, field.value)}
-                  onValueChange={(id) => {
-                    const selected = nurseryLocations.find((l) => l.id === id);
-                    form.setValue("newLocationId", id);
-                    field.onChange(selected?.name ?? "");
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a new location" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {nurseryLocations.map((location, i) => (
-                      <SelectItem
-                        key={location.id ?? `loc-${i}`}
-                        value={location.id ?? `loc-${i}`}
-                      >
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        {/* LOSS */}
-        {type === "LOSS" && (
-          <>
-            <FormField
-              control={form.control}
-              name="qty"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Loss Quantity</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      min={1}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="reason"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Reason (optional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      placeholder="e.g. disease, weather damage"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </>
-        )}
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+        <FormField
+          control={form.control}
+          name="note"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Note (optional)</FormLabel>
+              <FormControl>
+                <Textarea {...field} placeholder="Add details…" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="flex justify-end gap-2">
+           <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit">Log Action</Button>
-        </DialogFooter>
+          <Button type="submit" disabled={saving} aria-disabled={saving}>
+            {saving ? "Saving…" : "Log Action"}
+          </Button>
+        </div>
       </form>
     </Form>
   );

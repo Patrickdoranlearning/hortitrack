@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 // This is the simplified, universal LogEntry shape for data transfer.
@@ -37,6 +38,35 @@ export const BatchStatus = z.enum([
   'Archived',
 ]);
 
+export type BatchActionType =
+  | "Spaced"
+  | "Move"
+  | "Trimmed"
+  | "Dumped"
+  | "Weed"
+  | "Photo"
+  | "Note"
+  | "Flagged"
+  | "Unflagged";
+
+export interface BatchLog {
+  type: BatchActionType;
+  note?: string;
+  photoUrl?: string;
+  userId?: string;
+  userName?: string;
+  at: string; // ISO
+}
+
+export interface BatchFlag {
+  active: boolean;
+  reason: string;
+  remedy?: string;
+  severity?: "low" | "medium" | "high";
+  flaggedAt: string;   // ISO
+  flaggedBy?: string;
+}
+
 export const BatchSchema = z.object({
   id: z.string().optional(),
   batchNumber: z.string(),
@@ -50,13 +80,14 @@ export const BatchSchema = z.object({
   location: z.string(),
   locationId: z.string().optional(),
   size: z.string(),
-  logHistory: z.array(LogEntrySchema),
+  logHistory: z.array(z.any()), // Temporarily 'any' to accommodate old and new log formats
   transplantedFrom: z.string().optional(),
   supplier: z.string().optional(),
   growerPhotoUrl: z.string().optional(),
   salesPhotoUrl: z.string().optional(),
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
+  flag: z.any().optional(), // Accommodate BatchFlag
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
