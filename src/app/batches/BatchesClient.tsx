@@ -78,6 +78,25 @@ function normalizeBatch(d: any): any {
   };
 }
 
+// --- Batch quick-open via search (Enter) ---
+function normalizeBatchQuery(q: string): string {
+  // trim + remove common prefixes: "batch ", "#", "b:", "b-"
+  return (q || "")
+    .trim()
+    .replace(/^(batch\s*#?|b[:\-]?)\s*/i, ""); // keep leading zeros
+}
+
+function findBatchByNumberOrId(batches: Batch[], query: string): Batch | undefined {
+  const q = normalizeBatchQuery(query);
+  if (!q) return undefined;
+  // exact batchNumber match first (string compare to preserve leading zeros)
+  const byNumber = batches.find(b => String(b.batchNumber) === q);
+  if (byNumber) return byNumber;
+  // fallback: exact id
+  return batches.find(b => String(b.id) === q);
+}
+
+
 export default function BatchesClient({ initialBatches }: { initialBatches: Batch[] }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -220,6 +239,21 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const handleViewDetails = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsBatchDetailDialogOpen(true);
+  };
+
+  const handleSearchKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key !== "Enter") return;
+    const hit = findBatchByNumberOrId(batches, searchQuery);
+    if (hit) {
+      e.preventDefault();
+      handleViewDetails(hit); // your existing function that opens the dialog
+    } else {
+      toast({
+        variant: "outline",
+        title: "No matching batch",
+        description: `Couldn't find batch #${normalizeBatchQuery(searchQuery)}.`,
+      });
+    }
   };
 
   const handleEditBatch = (batch: Batch) => {
@@ -556,10 +590,11 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                        placeholder="Search by number, category, family, variety..."
-                        className="pl-10 w-full"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search by number, category, family, variety..."
+                          className="pl-10 w-full"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={handleSearchKeyDown}
                         />
                     </div>
                     <div className="flex gap-2">
