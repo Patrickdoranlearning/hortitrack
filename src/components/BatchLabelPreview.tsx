@@ -5,6 +5,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import LabelPreview from "./LabelPreview";
+import { useToast } from "@/hooks/use-toast";
 
 type Props = {
   open: boolean;
@@ -16,25 +17,45 @@ type Props = {
     plantFamily: string;
     size: string;
     initialQuantity: number;
+    quantity: number;
   };
 };
 
 export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) {
-  
+  const { toast } = useToast();
+
   const printToZebra = async () => {
-    // fetch ZPL from server then POST to /api/labels/print
-    const zplRes = await fetch(`/api/labels/batch/${batch.id}/zpl`);
-    const zpl = await zplRes.text();
-    const res = await fetch(`/api/labels/print`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ zpl, copies: 1 }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      alert(`Print failed: ${j?.error || res.statusText}`);
-    } else {
+    try {
+      const res = await fetch(`/api/labels/print`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          batchNumber: batch.batchNumber,
+          variety: batch.plantVariety,
+          family: batch.plantFamily,
+          quantity: batch.initialQuantity, // Usually print with initial quantity
+          size: batch.size,
+          payload: `BATCH:${batch.batchNumber}`, // Or batch.id
+        }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || res.statusText);
+      }
+      
+      toast({
+        title: "Print Job Sent",
+        description: "The label has been sent to the printer.",
+      });
       onOpenChange(false);
+
+    } catch (e: any) {
+       toast({
+        variant: "destructive",
+        title: "Print Failed",
+        description: e.message || "Could not connect to the printer.",
+      });
     }
   };
 
@@ -52,7 +73,7 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
                 family={batch.plantFamily}
                 quantity={batch.initialQuantity}
                 size={batch.size}
-                dataMatrixPayload={batch.id}
+                dataMatrixPayload={`BATCH:${batch.batchNumber}`}
             />
         </div>
 

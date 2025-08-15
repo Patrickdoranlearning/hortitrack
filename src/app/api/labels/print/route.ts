@@ -1,34 +1,50 @@
-import { NextResponse } from "next/server";
+
+import { NextRequest, NextResponse } from "next/server";
 import net from "net";
+import { buildZpl } from "@/server/labels/build-batch-label";
 
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => null) as null | {
-    zpl?: string;
-    copies?: number;
-    host?: string;
-    port?: number;
-  };
+const PRINTER_HOST = process.env.PRINTER_HOST!; // e.g. 192.168.1.50
+const PRINTER_PORT = Number(process.env.PRINTER_PORT || 9100);
 
-  const host = body?.host || process.env.ZPL_PRINTER_HOST;
-  const port = Number(body?.port || process.env.ZPL_PRINTER_PORT || 9100);
-  const copies = Math.max(1, Math.floor(body?.copies ?? 1));
-  let zpl = (body?.zpl || "").trim();
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const zpl = buildZpl(body);
 
-  if (!host) return NextResponse.json({ error: "Printer host not configured" }, { status: 400 });
-  if (!zpl) return NextResponse.json({ error: "Missing ZPL" }, { status: 400 });
+    if (!PRINTER_HOST) {
+        throw new Error("Printer host is not configured. Set PRINTER_HOST environment variable.");
+    }
 
-  // Ensure exactly one ^XA ... ^XZ with ^PQ
-  zpl = zpl.replace(/^\^XA|\^XZ$/gm, "");
-  const payload = `^XA\n^PQ${copies}\n${zpl}\n^XZ\n`;
+    await sendRawToPrinter(zpl);
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    console.error("Print error:", e);
+    return NextResponse.json({ ok: false, error: e?.message || "Print failed" }, { status: 500 });
+  }
+}
 
-  await new Promise<void>((resolve, reject) => {
-    const socket = net.createConnection({ host, port }, () => {
-      socket.write(payload);
-      socket.end();
+function sendRawToPrinter(data: string) {
+  return new Promise<void>((resolve, reject) => {
+    const client = new net.Socket();
+    
+    client.setTimeout(5000);
+
+    client.connect(PRINTER_PORT, PRINTER_HOST, () => {
+      client.write(data, "utf8", () => {
+        client.end();
+      });
     });
-    socket.once("error", reject);
-    socket.once("close", () => resolve());
-  });
+    
+    client.on("error", (err) => {
+        client.destroy();
+        reject(err);
+    });
 
-  return NextResponse.json({ ok: true });
+    client.on('timeout', () => {
+        client.destroy();
+        reject(new Error('Printer connection timed out.'));
+    });
+
+    client.on("close", () => resolve());
+  });
 }

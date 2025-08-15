@@ -1,84 +1,82 @@
 
-// src/utils/labels.ts
-const DOTS_PER_MM = 8;
-const mm = (n: number) => Math.round(n * DOTS_PER_MM);
-const sanitize = (s: string) => String(s).replace(/[\^\~\\]/g, " ");
+// src/server/labels/build-batch-label.ts
+// Helper: mm → dots @ 203dpi
+const dpmm = 8;
+const mm = (n: number) => Math.round(n * dpmm);
 
-export function buildBatchLabelZplLandscape(opts: {
+type LabelInput = {
   batchNumber: string | number;
   variety: string;
   family: string;
   quantity: number;
   size: string;
-  dataMatrixPayload?: string;
-  marginMM?: number; // default 3
-  debugFrame?: boolean;
-}) {
-  const {
-    batchNumber, variety, family, quantity, size,
-    dataMatrixPayload,
-    marginMM = 3,
-    debugFrame = false,
-  } = opts;
+  payload?: string; // DM content; default "BATCH:<batchNumber>"
+};
 
-  // IMPORTANT: Use PW=50mm, LL=70mm and rotate fields 90° via ^FWB.
-  const PW = mm(50);
-  const LL = mm(70);
-  const M = mm(marginMM);
-  const innerW = PW - M * 2;
-  const innerH = LL - M * 2;
+export function buildZpl({ batchNumber, variety, family, quantity, size, payload }: LabelInput) {
+  // Canvas
+  const W = mm(70); // 560
+  const H = mm(50); // 400
+  const M = mm(3);  // 24
+  const innerW = W - 2 * M; // 512
+  const innerH = H - 2 * M; // 352
 
-  // Coordinates still use PW×LL grid. With ^FWB, fields are rotated,
-  // but you can keep your anchors simple and “mentally” treat it landscape.
-  const dmSize = Math.min(innerW, Math.floor(innerH * 0.45)); // a bit conservative
-  const gutter = mm(2);
-  const textX = M;
-  const textY = M + dmSize + gutter; // text appears “to the right” after rotation
-  const textW = innerH - dmSize - gutter;
+  // Left column for DM ~ 24mm
+  const dmBox = { x: M, y: M, w: mm(24), h: mm(24) };
+  // Right text area
+  const textX = dmBox.x + dmBox.w + mm(2);
+  const textW = W - textX - M;
 
-  const batchFont   = 70;
-  const varietyFont = 58;
-  const infoFont    = 36;
+  // Font choices (Zebra device fonts; ^CF0 is scalable)
+  // Sizes tuned by eye to fit 44mm height:
+  const fBatch = 72;  // big
+  const fVar   = 48;  // medium
+  const fInfo  = 32;  // small
 
-  const payload = dataMatrixPayload ?? `BATCH:${batchNumber}`;
+  const dmHeight = dmBox.h;
+  const module   = 6;
+  const dmText   = payload ?? `BATCH:${batchNumber}`;
 
-  let y = textY;
-  let z = "^XA\n";
-  z += `^PW${PW}\n`;
-  z += `^LL${LL}\n`;
-  z += "^LH0,0\n";
-  z += "^CI28\n";
-  z += "^FWB\n"; // rotate all fields 90° → landscape look on printer that assumes portrait media
+  return [
+    "^XA",
+    `^CI28`,
+    `^PW${W}`,
+    `^LL${H}`,
+    "^LH0,0",
 
-  if (debugFrame) {
-    z += `^FO${M},${M}^GB${innerW},${innerH},2^FS\n`;
-  }
+    // Data Matrix on left
+    `^FO${dmBox.x},${dmBox.y}`,
+    `^BXN,${dmHeight},${module},2`,
+    `^FD${escapeZpl(dmText)}^FS`,
 
-  // DataMatrix “left” (after rotation)
-  z += `^FO${M},${M}\n`;
-  z += "^BXM,8,200\n";
-  z += `^FD${sanitize(payload)}^FS\n`;
+    // Batch number (top line)
+    `^FO${textX},${M}`,
+    `^CF0,${fBatch}`,
+    `^FB${textW},1,0,L,0`,
+    `^FD#${escapeZpl(String(batchNumber))}^FS`,
 
-  // Batch #
-  z += `^FO${textX},${y}^CF0,${batchFont}\n`;
-  z += `^FD#${sanitize(String(batchNumber))}^FS\n`;
-  y += batchFont + mm(1.5);
+    // Variety
+    `^FO${textX},${M + mm(12) + 10}`,
+    `^CF0,${fVar}`,
+    `^FB${textW},2,0,L,0`,
+    `^FD${escapeZpl(variety)}^FS`,
 
-  // Variety (wrap to 2 lines)
-  z += `^FO${textX},${y}^CF0,${varietyFont}\n`;
-  z += `^FB${textW},2,0,L,0\n`;
-  z += `^FD${sanitize(variety)}^FS\n`;
-  y += varietyFont * 2 + mm(1.5);
+    // Family
+    `^FO${textX},${M + mm(24) + 10}`,
+    `^CF0,${fInfo}`,
+    `^FB${textW},1,0,L,0`,
+    `^FDFamily: ${escapeZpl(family)}^FS`,
 
-  // Family
-  z += `^FO${textX},${y}^CF0,${infoFont}\n`;
-  z += `^FDFamily: ${sanitize(family)}^FS\n`;
-  y += infoFont + mm(1.5);
+    // Qty & Size
+    `^FO${textX},${M + mm(31) + 10}`,
+    `^CF0,${fInfo}`,
+    `^FB${textW},1,0,L,0`,
+    `^FDQty: ${quantity}    Size: ${escapeZpl(size)}^FS`,
 
-  // Qty + Size
-  z += `^FO${textX},${y}^CF0,${infoFont}\n`;
-  z += `^FDQty: ${sanitize(String(quantity))}   Size: ${sanitize(size)}^FS\n`;
+    "^XZ",
+  ].join("\n");
+}
 
-  z += "^XZ\n";
-  return z;
+function escapeZpl(s: string) {
+  return s.replace(/[\^\\~]/g, (m) => "\\" + m);
 }

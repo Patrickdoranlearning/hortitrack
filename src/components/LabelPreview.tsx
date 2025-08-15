@@ -9,8 +9,7 @@ type Props = {
   family: string;
   quantity: number;
   size: string;
-  dataMatrixPayload?: string; // defaults to BATCH:<batchNumber>
-  debugFrame?: boolean;
+  dataMatrixPayload?: string;
 };
 
 export default function LabelPreview({
@@ -20,7 +19,6 @@ export default function LabelPreview({
   quantity,
   size,
   dataMatrixPayload,
-  debugFrame = false,
 }: Props) {
   const dmRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -30,9 +28,8 @@ export default function LabelPreview({
       bwipjs.toCanvas(dmRef.current, {
         bcid: "datamatrix",
         text: dataMatrixPayload ?? `BATCH:${batchNumber}`,
-        scale: 3,      // ~ module size on screen
+        scale: 3,
         includetext: false,
-        rows: 0, columns: 0, // let it auto-size
       });
     } catch (e) {
       console.error("DataMatrix render failed:", e);
@@ -41,34 +38,62 @@ export default function LabelPreview({
 
   return (
     <div
-      // 70×50 mm, landscape. 3mm inner padding to mimic printer margin.
-      className="relative"
       style={{
         width: "70mm",
         height: "50mm",
         boxSizing: "border-box",
         padding: "3mm",
-        border: debugFrame ? "1px dashed #aaa" : "none",
         background: "white",
+        border: "1px solid rgba(0,0,0,.08)",
+        borderRadius: 6,
+        boxShadow: "0 6px 24px rgba(0,0,0,.10)",
+        fontFamily:
+          'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
       }}
     >
-      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2mm", height: "100%" }}>
-        {/* DM on the left */}
-        <div style={{ display: "flex", alignItems: "flex-start" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "auto 1fr",
+          gap: "2mm",
+          height: "100%",
+          alignItems: "center",
+        }}
+      >
+        {/* Data Matrix */}
+        <div style={{ display: "flex", alignItems: "center" }}>
           <canvas ref={dmRef} style={{ width: "22mm", height: "22mm" }} />
         </div>
 
-        {/* Text on the right */}
-        <div style={{ display: "grid", gridTemplateRows: "auto auto auto auto", gap: "1.5mm" }}>
-          <div style={{ fontWeight: 700, fontSize: "10mm", lineHeight: 1 }}>
+        {/* Text stack */}
+        <div style={{ display: "grid", gap: "1.2mm" }}>
+          <div
+            style={{
+              fontWeight: 800,
+              fontSize: "9mm",
+              lineHeight: 1,
+              letterSpacing: "-0.2mm",
+            }}
+          >
             #{String(batchNumber)}
           </div>
-          <div style={{ fontWeight: 600, fontSize: "8mm", lineHeight: 1.05, wordBreak: "break-word" }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: "6mm",
+              lineHeight: 1.06,
+              letterSpacing: "-0.06mm",
+              wordBreak: "break-word",
+            }}
+          >
             {variety}
           </div>
-          <div style={{ fontSize: "5mm" }}>Family: {family}</div>
-          <div style={{ fontSize: "5mm" }}>
-            Qty: {quantity} &nbsp;&nbsp; Size: {size}
+          <div style={{ fontSize: "4.2mm", lineHeight: 1.1, opacity: 0.95 }}>
+            Family: <span style={{ fontWeight: 600 }}>{family}</span>
+          </div>
+          <div style={{ fontSize: "4.2mm", lineHeight: 1.1 }}>
+            Qty: <span style={{ fontWeight: 700 }}>{quantity}</span>&nbsp;&nbsp;Size:{" "}
+            <span style={{ fontWeight: 700 }}>{size}</span>
           </div>
         </div>
       </div>
