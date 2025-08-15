@@ -1,268 +1,282 @@
 'use client';
-
+import * as React from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from '@/components/ui/form';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, PieChart, Archive } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 import { DialogFooter } from '@/components/ui/dialog';
-import { BatchDistributionBar } from './batch-distribution-bar';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from '@/hooks/use-toast';
-import { useEffect, useMemo, useState } from 'react';
-import { Combobox } from '@/components/ui/combobox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { CalendarIcon } from 'lucide-react';
+import { VarietyCombobox, type VarietyOption } from '@/components/variety-combobox';
+import { format } from 'date-fns';
+import type {
+  Batch, BatchStatus, NurseryLocation, PlantSize, Supplier, Variety,
+} from '@/lib/types';
 
-export interface BatchDistribution {
-  inStock: number;
-  transplanted: number;
-  lost: number;
-}
-interface BatchFormProps {
-  batch: Batch | null;
-  distribution: any;
-  onSubmit: (data: any) => void;
+const BatchFormSchema = z.object({
+  plantVariety: z.string().min(1, 'Variety is required'),
+  plantFamily: z.string().min(1, 'Family is required'),
+  category: z.string().min(1, 'Category is required'),
+  size: z.string().min(1, 'Size is required'),
+  trayQuantity: z.coerce.number().int().nonnegative().optional().nullable(),
+  quantity: z.coerce.number().int().nonnegative('Quantity must be ≥ 0'),
+  status: z.enum([
+    'Propagation',
+    'Plugs/Liners',
+    'Potted',
+    'Ready for Sale',
+    'Looking Good',
+    'Archived',
+  ] as const),
+  plantingDate: z.date({ required_error: 'Planting date is required' }),
+  supplier: z.string().optional().nullable(),
+  location: z.string().min(1, 'Location is required'),
+});
+
+type BatchFormValues = z.infer<typeof BatchFormSchema>;
+
+type Props = {
+  batch: Batch | null; // null = create
+  onSubmitSuccess: (res: { id: string; batchNumber?: string }) => void;
   onCancel: () => void;
-  onArchive: (batchId: string) => void;
-  nurseryLocations?: NurseryLocation[];
-  plantSizes?: PlantSize[];
+  onArchive?: (batchId: string) => void;
+  nurseryLocations: NurseryLocation[];
+  plantSizes: PlantSize[];
   suppliers?: Supplier[];
-  varieties?: Variety[];
+  varieties: Variety[];
   onCreateNewVariety: (name: string) => void;
+};
+
+function parseToDate(value: any): Date {
+  if (!value) return new Date();
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate(); // Firestore Timestamp
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? new Date() : d;
+  }
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date() : d;
 }
 
 export function BatchForm({
-  batch,
-  distribution,
-  onSubmit,
+  batch = null,
+  onSubmitSuccess,
   onCancel,
   onArchive,
+  varieties = [],
   nurseryLocations = [],
   plantSizes = [],
   suppliers = [],
-  varieties = [],
   onCreateNewVariety,
-}: BatchFormProps) {
+}: Props) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
-  const [isFamilySet, setIsFamilySet] = useState(false);
-  const [isCategorySet, setIsCategorySet] = useState(false);
+  const isEdit = !!batch?.id;
 
-  const form = useForm({
-    resolver: zodResolver(z.any()), // Replace with actual schema
+  const form = useForm<BatchFormValues>({
+    resolver: zodResolver(BatchFormSchema),
+    mode: 'onChange',
     defaultValues: {
+      plantVariety: batch?.plantVariety ?? '',
+      plantFamily: batch?.plantFamily ?? '',
+      category: batch?.category ?? '',
+      size: batch?.size ?? '',
+      trayQuantity: null,
+      quantity: batch?.quantity ?? 0,
+      status: (batch?.status as BatchStatus) ?? 'Potted',
+      plantingDate: parseToDate(batch?.plantingDate),
+      supplier: batch?.supplier ?? null,
+      location: batch?.location ?? '',
+    },
+  });
+
+  useEffect(() => {
+    const info = (plantSizes ?? []).find((s) => s.size === form.getValues('size')) || null;
+    setSelectedSizeInfo(info);
+    if (info?.multiple && info.multiple > 1 && batch?.quantity) {
+      form.setValue('trayQuantity', Math.round(batch.quantity / info.multiple));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batch, plantSizes]);
+
+  const sizeMultiple = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1
+    ? selectedSizeInfo.multiple
+    : 1;
+  const isTrayMode = sizeMultiple > 1;
+
+  const varietyOptions: VarietyOption[] = useMemo(
+    () =>
+      (varieties ?? []).map((v) => ({
+        id: v.id!,
+        name: v.name,
+        family: v.family,
+        category: v.category,
+      })),
+    [varieties]
+  );
+
+  const onSubmit = async (values: BatchFormValues) => {
+    const payload = {
+      category: values.category,
+      plantFamily: values.plantFamily,
+      plantVariety: values.plantVariety,
+      plantingDate: values.plantingDate.toISOString(),
+      initialQuantity: isEdit ? (batch?.initialQuantity ?? values.quantity) : values.quantity,
+      quantity: values.quantity,
+      status: values.status,
+      location: values.location,
+      size: values.size,
+      supplier: values.supplier ?? undefined,
+    };
+
+    if (isEdit && batch?.id) {
+      const res = await fetch(`/api/batches/${batch.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'Failed to update batch');
+      }
+      onSubmitSuccess({ id: batch.id });
+      return;
+    }
+
+    const res = await fetch('/api/batches', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || 'Failed to create batch');
+    }
+    const result = (await res.json()) as { id: string; batchNumber: string };
+    onSubmitSuccess(result);
+
+    form.reset({
       plantVariety: '',
       plantFamily: '',
       category: '',
       size: '',
-      quantity: '',
-      trayQuantity: '',
-      status: '',
-      plantingDate: '',
-      supplier: '',
+      trayQuantity: null,
+      quantity: 0,
+      status: 'Potted',
+      plantingDate: new Date(),
+      supplier: null,
       location: '',
-      growerPhotoUrl: '',
-      salesPhotoUrl: '',
-    },
-  });
-
-  const customSizeSort = (a: PlantSize, b: PlantSize) => {
-    if (a.type === 'Tray' && b.type !== 'Tray') return -1;
-    if (a.type !== 'Tray' && b.type === 'Tray') return 1;
-    if (a.type === 'Tray' && b.type === 'Tray') {
-      return (b.multiple ?? 0) - (a.multiple ?? 0);
-    }
-    const aSize = a.size || '';
-    const bSize = b.size || '';
-    return aSize.localeCompare(bSize);
+    });
   };
-
-  const sortedPlantSizes = useMemo(() => {
-    return (plantSizes ?? []).slice().sort(customSizeSort);
-  }, [plantSizes]);
-
-  useEffect(() => {
-    if (batch) {
-      const sizeInfo = (plantSizes ?? []).find(s => s.size === batch.size);
-      setSelectedSizeInfo(sizeInfo || null);
-      if (sizeInfo?.multiple && sizeInfo.multiple > 1) {
-        form.setValue('trayQuantity', batch.quantity / sizeInfo.multiple);
-      }
-    }
-  }, [batch, plantSizes, form]);
-
-  const handleFormSubmit = (data: any) => {
-    const finalData = {
-      ...data,
-      logHistory: (data.logHistory ?? []).map((log: any) => ({
-        ...log,
-        id: log.id || `log_${Date.now()}_${Math.random()}`,
-      })),
-    };
-    if (batch) {
-      onSubmit({
-        ...finalData,
-        id: batch.id,
-        batchNumber: batch.batchNumber,
-        initialQuantity: batch.initialQuantity,
-        createdAt: batch.createdAt,
-      } as Batch);
-    } else {
-      onSubmit({
-        ...finalData,
-        initialQuantity: finalData.quantity,
-      } as Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt'>);
-    }
-  };
-
-  const handleSizeChange = (sizeId: string) => {
-    const selected = (plantSizes ?? []).find(s => s.id === sizeId);
-    if (!selected) return;
-    form.setValue('size', selected.size, { shouldValidate: true, shouldDirty: true });
-    setSelectedSizeInfo(selected);
-    if (selected.multiple && selected.multiple > 1) {
-      const trayQty = form.getValues('trayQuantity') || 1;
-      form.setValue('quantity', trayQty * selected.multiple);
-    }
-  };
-
-  const idFromName = (list: { id?: string; name: string }[], name?: string) =>
-    (list ?? []).find(v => v.name === name)?.id ?? '';
-
-  const idFromSize = (list: PlantSize[], size?: string) =>
-    (list ?? []).find(v => v.size === size)?.id ?? '';
-
-  const varietyOptions = useMemo(
-    () => (varieties ?? []).map(v => ({ value: v.id!, label: v.name })),
-    [varieties]
-  );
-
-  const handleVarietyChange = (varietyId: string) => {
-    const v = (varieties ?? []).find(x => x.id === varietyId);
-    if (!v) return;
-    form.setValue('plantVariety', v.name, { shouldValidate: true, shouldDirty: true });
-    form.setValue('plantFamily', v.family, { shouldValidate: true, shouldDirty: true });
-    form.setValue('category', v.category, { shouldValidate: true, shouldDirty: true });
-    setIsFamilySet(true);
-    setIsCategorySet(true);
-  };
-
-  const handleTrayQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const trayQty = Number(e.target.value || 0);
-    form.setValue('trayQuantity', trayQty, { shouldValidate: true, shouldDirty: true });
-    const perTray = selectedSizeInfo?.multiple ?? 1;
-    form.setValue('quantity', Math.max(0, trayQty * perTray), { shouldValidate: true, shouldDirty: true });
-  };
-
-  const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
 
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(
-          handleFormSubmit,
-          (errors) => {
-            console.error('Batch form invalid', errors);
-            toast({
-              variant: 'destructive',
-              title: 'Please complete the required fields',
-              description: Object.values(errors).map((e: any) => e.message).join(', '),
-            });
+        className="space-y-6"
+        onSubmit={form.handleSubmit(async (vals) => {
+          try {
+            // compute total when in tray mode before submit
+            if (isTrayMode) {
+              const trays = Number(form.getValues('trayQuantity') ?? 0);
+              form.setValue('quantity', trays * sizeMultiple, { shouldValidate: true });
+            }
+            await onSubmit(vals);
+          } catch (e: any) {
+            console.error(e);
+            alert(e.message || 'Save failed');
           }
-        )}
-        className="space-y-0"
+        })}
+        noValidate
       >
-        <ScrollArea className="h-[70vh] p-6 pr-8 -mr-6">
+        {/* Header: batch number info */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">
+              {isEdit ? `Batch #${batch?.batchNumber ?? batch?.id}` : 'Batch Number'}
+            </div>
+            <div className="font-semibold">
+              {isEdit ? 'Read-only' : 'Auto-generated on save'}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Hidden fields to carry family & category */}
+          <input type="hidden" {...form.register('plantFamily')} />
+          <input type="hidden" {...form.register('category')} />
+
           {/* Variety */}
-          {/* ... Replace .map() calls below with safe (arr ?? []).map() */}
           <FormField
             control={form.control}
             name="plantVariety"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Variety</FormLabel>
-                <Combobox
-                  options={(varieties ?? []).map((v) => ({
-                    value: v.name,          // use NAME as the combobox value
-                    label: v.name,
-                  }))}
-                  value={field.value ?? ""} // form field holds NAME
-                  onChange={(selectedName) => {
-                    field.onChange(selectedName); // update form field (name)
-                    const v = (varieties ?? []).find(x => x.name === selectedName);
-                    // keep an ID in sync if you track one elsewhere:
-                    form.setValue("plantVarietyId" as any, v?.id ?? "");
-                    // also update related fields if needed:
-                    if (v) {
-                      form.setValue("plantFamily" as any, v.family ?? "");
-                      form.setValue("category" as any, v.category ?? "");
+                <VarietyCombobox
+                  value={field.value || ''}
+                  disabled={form.formState.isSubmitting}
+                  varieties={varietyOptions}
+                  onSelect={(v) => {
+                    field.onChange(v.name);
+                    if (v.family) {
+                      form.setValue('plantFamily', v.family, { shouldValidate: true, shouldDirty: true });
+                    }
+                    if (v.category) {
+                      form.setValue('category', v.category, { shouldValidate: true, shouldDirty: true });
                     }
                   }}
-                  onCreateOption={onCreateNewVariety}
-                  placeholder="Select or create variety"
-                  emptyMessage="No variety found."
+                  onCreate={(name) => onCreateNewVariety(name)}
+                  placeholder="Search or create variety…"
+                  emptyMessage="No matches."
                 />
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded bg-muted px-2 py-1">
+                    Family: {form.watch('plantFamily') || '—'}
+                  </span>
+                  <span className="rounded bg-muted px-2 py-1">
+                    Category: {form.watch('category') || '—'}
+                  </span>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          {/* Plant Family */}
+          {/* Location */}
           <FormField
             control={form.control}
-            name="plantFamily"
+            name="location"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Plant Family</FormLabel>
-                <Input {...field} disabled={isFamilySet} placeholder="Enter plant family" />
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Category */}
-          <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Category</FormLabel>
-                <Input {...field} disabled={isCategorySet} placeholder="Enter category" />
+                <FormLabel>Location</FormLabel>
+                <Select
+                  value={field.value || ''}
+                  onValueChange={(id) => {
+                    const match = (nurseryLocations ?? []).find((l) => l.id === id);
+                    field.onChange(match?.name ?? '');
+                  }}
+                  disabled={form.formState.isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(nurseryLocations ?? []).map((l) => (
+                      <SelectItem key={l.id} value={l.id!}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -276,18 +290,31 @@ export function BatchForm({
               <FormItem>
                 <FormLabel>Size</FormLabel>
                 <Select
-                  value={idFromSize(plantSizes ?? [], field.value)}
-                  onValueChange={handleSizeChange}
+                  value={field.value || ''}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    const info = (plantSizes ?? []).find((s) => s.size === val) || null;
+                    setSelectedSizeInfo(info);
+                    const trays = Number(form.getValues('trayQuantity') ?? 0);
+                    const perTray = info?.multiple && info.multiple > 1 ? info.multiple : 1;
+                    if (perTray > 1 && trays > 0) {
+                      form.setValue('quantity', trays * perTray, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                    }
+                  }}
+                  disabled={form.formState.isSubmitting}
                 >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a size" />
-                    </SelectTrigger>
-                  </FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a size" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(sortedPlantSizes ?? []).map((size) => (
-                      <SelectItem key={size.id} value={size.id!}>
-                        {size.size}
+                    {(plantSizes ?? []).map((s) => (
+                      <SelectItem key={s.id} value={s.size}>
+                        {s.size}
+                        {s.type ? ` • ${s.type}` : ''}
+                        {s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -297,8 +324,8 @@ export function BatchForm({
             )}
           />
 
-          {/* Tray Quantity */}
-          {showTrayFields && (
+          {/* Tray Quantity (only if multiple > 1) */}
+          {isTrayMode && (
             <FormField
               control={form.control}
               name="trayQuantity"
@@ -307,15 +334,27 @@ export function BatchForm({
                   <FormLabel>Tray Quantity</FormLabel>
                   <Input
                     type="number"
-                    {...field}
-                    onChange={handleTrayQuantityChange}
+                    value={field.value ?? ''} // never null warning
+                    onChange={(e) => {
+                      const trays = Number(e.target.value || 0);
+                      field.onChange(trays);
+                      form.setValue('quantity', trays * sizeMultiple, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                    }}
+                    disabled={form.formState.isSubmitting}
                   />
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {`${field.value ?? 0} trays × ${sizeMultiple} per tray = ${form.watch('quantity')}`}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
           )}
-          {/* Quantity */}
+
+          {/* Total Quantity (always shown) */}
           <FormField
             control={form.control}
             name="quantity"
@@ -324,9 +363,15 @@ export function BatchForm({
                 <FormLabel>Total Quantity</FormLabel>
                 <Input
                   type="number"
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
+                  value={Number(field.value ?? 0)}
+                  onChange={(e) => field.onChange(Number(e.target.value || 0))}
+                  disabled={form.formState.isSubmitting || isTrayMode}
                 />
+                <div className="text-xs text-muted-foreground mt-1">
+                  {isTrayMode
+                    ? 'Computed from trays × per-tray multiple'
+                    : 'Multiple = 1 (pots); you can type total directly'}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -342,16 +387,18 @@ export function BatchForm({
                 <Select
                   value={field.value}
                   onValueChange={field.onChange}
+                  disabled={form.formState.isSubmitting}
                 >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a status" />
-                    </SelectTrigger>
-                  </FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PROPAGATION">Propagation</SelectItem>
-                    <SelectItem value="GROWING">Growing</SelectItem>
-                    <SelectItem value="READY">Ready</SelectItem>
+                    <SelectItem value="Propagation">Propagation</SelectItem>
+                    <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                    <SelectItem value="Potted">Potted</SelectItem>
+                    <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                    <SelectItem value="Looking Good">Looking Good</SelectItem>
+                    <SelectItem value="Archived">Archived</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -359,7 +406,7 @@ export function BatchForm({
             )}
           />
 
-          {/* Planting Date */}
+          {/* Planting date */}
           <FormField
             control={form.control}
             name="plantingDate"
@@ -370,14 +417,13 @@ export function BatchForm({
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button
+                        type="button"
                         variant="outline"
-                        className={cn(
-                          "pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
+                        className="justify-between"
+                        disabled={form.formState.isSubmitting}
                       >
-                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                        <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
@@ -385,7 +431,7 @@ export function BatchForm({
                     <Calendar
                       mode="single"
                       selected={field.value}
-                      onSelect={field.onChange}
+                      onSelect={(d) => d && field.onChange(d)}
                       initialFocus
                     />
                   </PopoverContent>
@@ -395,7 +441,7 @@ export function BatchForm({
             )}
           />
 
-          {/* Supplier */}
+          {/* Supplier (optional) */}
           <FormField
             control={form.control}
             name="supplier"
@@ -403,21 +449,20 @@ export function BatchForm({
               <FormItem>
                 <FormLabel>Supplier</FormLabel>
                 <Select
-                  value={idFromName(suppliers ?? [], field.value)}
+                  value={field.value || ''} // avoid null
                   onValueChange={(id) => {
-                    const s = (suppliers ?? []).find(sup => sup.id === id);
-                    field.onChange(s?.name ?? "");
+                    const match = (suppliers ?? []).find((s) => s.id === id);
+                    field.onChange(match?.name ?? '');
                   }}
+                  disabled={form.formState.isSubmitting}
                 >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a supplier" />
-                    </SelectTrigger>
-                  </FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a supplier" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(suppliers ?? []).map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id!}>
-                        {supplier.name}
+                    {(suppliers ?? []).map((s) => (
+                      <SelectItem key={s.id} value={s.id!}>
+                        {s.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -426,101 +471,35 @@ export function BatchForm({
               </FormItem>
             )}
           />
+        </div>
 
-          {/* Location */}
-          <FormField
-            control={form.control}
-            name="location"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Location</FormLabel>
-                <Select
-                  value={idFromName(nurseryLocations ?? [], field.value)}
-                  onValueChange={(id) => {
-                    const l = (nurseryLocations ?? []).find(loc => loc.id === id);
-                    field.onChange(l?.name ?? "");
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a location" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {(nurseryLocations ?? []).map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id!}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Photos */}
-          <FormField
-            control={form.control}
-            name="growerPhotoUrl"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Grower Photo URL</FormLabel>
-                <Input {...field} placeholder="https://..." />
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="salesPhotoUrl"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sales Photo URL</FormLabel>
-                <Input {...field} placeholder="https://..." />
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Distribution Bar */}
-          {batch && (
-            <BatchDistributionBar
-              distribution={distribution}
-              initialQuantity={batch.initialQuantity}
-            />
-          )}
-        </ScrollArea>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+        <DialogFooter className="gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={form.formState.isSubmitting}
+          >
             Cancel
           </Button>
-          {batch && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="secondary">
-                  <Archive className="mr-2 h-4 w-4" /> Archive
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Archive batch?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will archive the batch but keep its history. You can restore it later if needed.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onArchive(batch.id)}>
-                    Archive
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+
+          {isEdit && onArchive && batch?.id && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onArchive(batch.id!)}
+              disabled={form.formState.isSubmitting}
+            >
+              Archive
+            </Button>
           )}
-          <Button type="submit">
-             Save
+
+          <Button
+            type="submit"
+            disabled={form.formState.isSubmitting}
+            aria-disabled={form.formState.isSubmitting}
+          >
+            {form.formState.isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Batch'}
           </Button>
         </DialogFooter>
       </form>

@@ -27,6 +27,7 @@ interface BatchDetailDialogProps {
     onTransplant: (batch: Batch) => void;
     onLogAction: (batch: Batch) => void;
     onGenerateProtocol: (batch: Batch) => void;
+    onDelete?: (batch: Batch) => void;
 }
 
 export function BatchDetailDialog({ 
@@ -37,6 +38,7 @@ export function BatchDetailDialog({
     onTransplant,
     onLogAction,
     onGenerateProtocol,
+    onDelete,
 }: BatchDetailDialogProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
@@ -46,6 +48,7 @@ export function BatchDetailDialog({
   const handleTransplant = () => onTransplant(batch);
   const handleLogAction = () => onLogAction(batch);
   const handleGenerateProtocol = () => onGenerateProtocol(batch);
+  const handleDelete = () => onDelete?.(batch);
 
   const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
     switch (status) {
@@ -127,6 +130,7 @@ export function BatchDetailDialog({
                         <Button variant="outline" size="sm" onClick={handleTransplant}><MoveRight /> Transplant</Button>
                         <Button variant="outline" size="sm" onClick={handleGenerateProtocol}><FileText /> Protocol</Button>
                         <Button size="sm" onClick={handleEdit}><Pencil /> Edit</Button>
+                        <Button variant="destructive" size="sm" onClick={handleDelete}>Delete</Button>
                     </div>
                 </div>
             </DialogHeader>

@@ -131,15 +131,25 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
                 </FormItem>
             )} />
             
-          <DialogFooter className="pt-6">
-            {onCancel && (<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>)}\
-            <Button\
-              type="submit"\
-              disabled={form.formState.isSubmitting}\
-              aria-disabled={form.formState.isSubmitting}\
-            >\
-              {form.formState.isSubmitting ? (isEditing ? 'Saving Changes…' : 'Adding Size…') : (isEditing ? 'Save Changes' : 'Add Size')}\
-            </Button>\
+          <DialogFooter className="gap-2">
+            {onCancel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={form.formState.isSubmitting}
+              >
+                Cancel
+              </Button>
+            )}
+
+            <Button
+              type="submit"
+              disabled={form.formState.isSubmitting}
+              aria-disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? "Saving…" : "Save"}
+            </Button>
           </DialogFooter>
         </form>
       </Form>

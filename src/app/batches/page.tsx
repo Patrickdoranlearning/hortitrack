@@ -2,7 +2,8 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+
 import {
   Search,
   Filter,
@@ -11,6 +12,7 @@ import {
   Upload,
 } from 'lucide-react';
 import type { Batch } from '@/lib/types';
+import type { NurseryLocation, PlantSize } from "@/lib/types";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,19 +24,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { BatchDetailDialog } from "@/components/batch-detail-dialog";
+import { TransplantForm, TransplantFormData } from "@/components/transplant-form";
 
-import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/hooks/use-auth';
-import { db } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { addBatchesFromCsvAction } from '../actions';
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { useRouter, useSearchParams } from "next/navigation";
+import { collection, onSnapshot, getDocs } from "firebase/firestore";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { Dialog } from "@/components/ui/dialog"; // Re-import Dialog after BatchForm
+import { BatchForm } from "@/components/batch-form";
+
+// helpers near top of BatchesPage (inside file, outside component is fine)
+const toMillis = (v: any): number => {
+  if (!v) return 0;
+  if (typeof v?.toDate === "function") return v.toDate().getTime(); // Firestore Timestamp
+  const d = new Date(typeof v === "string" ? v : v);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+};
+const batchDateScore = (b: any) =>
+  toMillis(b.updatedAt) || toMillis(b.plantingDate) || toMillis(b.createdAt);
+
+
 
 
 export default function BatchesPage() {
@@ -52,41 +69,44 @@ export default function BatchesPage() {
 
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const loadBatches = useCallback(() => {
-    if (!user) return;
-    setIsDataLoading(true);
-    
-    const q = query(collection(db, 'batches'), orderBy('batchNumber', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const batchesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Batch);
-      setBatches(batchesData);
-      setIsDataLoading(false);
-    }, (error) => {
-      console.error("Failed to subscribe to batch updates:", error);
-      toast({ variant: 'destructive', title: 'Error loading batches', description: error.message });
-      setIsDataLoading(false);
-    });
 
-    return unsubscribe;
-  }, [user, toast]);
+  const [isTransplantDialogOpen, setIsTransplantDialogOpen] = useState(false);
+  const [batchToTransplant, setBatchToTransplant] = useState<Batch | null>(null);
+  const [nurseryLocations, setNurseryLocations] = useState<NurseryLocation[]>([]);
+  const [plantSizes, setPlantSizes] = useState<PlantSize[]>([]);
+
+  // State for Batch Detail and Edit Dialogs
+  const [isBatchDetailDialogOpen, setIsBatchDetailDialogOpen] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [batchToEdit, setBatchToEdit] = useState<Batch | null>(null);
+
+  const loadBatches = useCallback(() => {
+    if (!user) return () => {};
+    const unsub = onSnapshot(
+      collection(db, "batches"),
+      (snap) => {
+        const items = snap.docs.map(
+          (d) => ({ id: d.id, ...(d.data() as any) } as Batch)
+        );
+        items.sort((a, b) => batchDateScore(b) - batchDateScore(a));
+        setBatches(items);
+        setIsDataLoading(false); // Set loading to false after data is loaded
+      },
+      (err) => {
+        console.error("batches snapshot error:", err);
+        setIsDataLoading(false); // Set loading to false on error
+      }
+    );
+    return unsub;
+  }, [user]);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    if (user) {
-        const unsub = loadBatches();
-        if (unsub) {
-          unsubscribe = unsub;
-        }
-    }
-    
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [loadBatches, user]);
+    const unsub = loadBatches();
+    return typeof unsub === "function" ? unsub : undefined;
+  }, [loadBatches]);
+
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category)))], [batches]);
@@ -110,6 +130,34 @@ export default function BatchesPage() {
         return batch.status === filters.status;
       });
   }, [batches, searchQuery, filters]);
+
+  // Load locations and sizes (using "sizes" to match your Firestore rules)
+  useEffect(() => {
+    const loadMetaData = async () => {
+      try {
+        const locationsSnap = await getDocs(collection(db, "locations"));
+        setNurseryLocations(
+          locationsSnap.docs.map(
+            (doc) => ({ id: doc.id, ...(doc.data() as any) } as NurseryLocation)
+          )
+        );
+        const sizesSnap = await getDocs(collection(db, "sizes"));
+        setPlantSizes(
+          sizesSnap.docs.map(
+            (doc) => ({ id: doc.id, ...(doc.data() as any) } as PlantSize)
+          )
+        );
+      } catch (error: any) {
+        console.error("Failed to load metadata:", error);
+        toast({
+          variant: "destructive",
+          title: "Error loading data",
+          description: error.message,
+        });
+      }
+    };
+    loadMetaData();
+  }, [toast]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -145,73 +193,296 @@ export default function BatchesPage() {
     }
   };
 
-  const handleDownloadData = () => {
-    const headers = ['category', 'plantFamily', 'plantVariety', 'plantingDate', 'quantity', 'status', 'location', 'size', 'supplier'];
-    const csvRows = batches.map(b => 
-      [b.category, b.plantFamily, b.plantVariety, b.plantingDate, b.quantity, b.status, b.location, b.size, b.supplier || ''].map(val => `"${val}"`).join(',')
-    );
+  const handleTransplant = (batch: Batch) => {
+    setBatchToTransplant(batch);
+    setIsTransplantDialogOpen(true);
+  };
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(',') + '\n'
-        + csvRows.join('\n');
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "batches_data_template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleViewDetails = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsBatchDetailDialogOpen(true);
+  };
+
+  const handleEditBatch = (batch: Batch) => {
+    setBatchToEdit(batch);
+    setIsBatchDetailDialogOpen(false); // Close detail dialog
+    setIsEditDialogOpen(true); // Open edit dialog
+  };
+
+  const handleDeleteBatch = async (batch: Batch) => {
+    const ok = confirm(`Delete batch #${batch.batchNumber}? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/batches/${batch.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        let msg = "Delete failed";
+        try {
+          const j = JSON.parse(txt);
+          msg = j?.error || msg;
+        } catch {
+          if (txt) msg = txt;
+        }
+        throw new Error(msg);
+      }
+      toast({ title: "Deleted", description: `Batch #${batch.batchNumber} removed.` });
+      setIsBatchDetailDialogOpen(false);
+      setSelectedBatch(null);
+      await loadBatches();
+    } catch (e: any) {
+      console.error("Delete API error:", e);
+      toast({ variant: "destructive", title: "Delete failed", description: e.message });
+    }
+  };
+
+
+  const handleTransplantSubmit = async (data: TransplantFormData) => {
+    if (!batchToTransplant) return;
+    try {
+      const res = await fetch(`/api/batches/${batchToTransplant.id}/transplant`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          quantity: data.quantity,
+          location: data.location,
+          size: data.size,
+          status: data.status,
+          supplier: data.supplier || undefined,
+          plantingDate: data.plantingDate || undefined, // ISO string
+          logRemainingAsLoss: !!data.logRemainingAsLoss,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || "Transplant failed");
+      }
+      const { batchNumber } = await res.json(); // { id, batchNumber }
+      toast({
+        title: "Transplant Successful",
+        description: `Created new batch #${batchNumber}`,
+      });
+      setIsTransplantDialogOpen(false);
+      setBatchToTransplant(null);
+      loadBatches(); // Refresh the batch list
+    } catch (error: any) {
+      console.error("Transplant API error:", error);
+      toast({ variant: "destructive", title: "Transplant Failed", description: error.message });
+    }
+  };
+
+  const csvHeaders = [
+    "category",
+    "plantFamily",
+    "plantVariety",
+    "plantingDate",   // ISO
+    "initialQuantity",
+    "quantity",
+    "status",
+    "location",
+    "size",
+    "supplier",
+  ];
+  
+  const csvEscape = (val: any) => {
+    if (val == null) return "";
+    const s = String(val);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        try {
-            const rows = text.split('\n').filter(row => row.trim() !== '');
-            const headerLine = rows.shift()?.trim() || '';
-            const headers = headerLine.split(',').map(h => h.trim().replace(/"/g, ''));
-            
-            const requiredHeaders = ['plantVariety', 'plantFamily', 'category', 'plantingDate', 'quantity', 'status', 'location', 'size', 'supplier'];
-            if (!requiredHeaders.every(h => headers.includes(h))) {
-                throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
-            }
-
-            const newBatches = rows.map((row) => {
-                const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)!.map(v => v.replace(/"/g, '').trim());
-                const batchData: any = {};
-                headers.forEach((header, i) => {
-                    batchData[header] = values[i] || '';
-                });
-
-                return {
-                    ...batchData,
-                    quantity: parseInt(batchData.quantity, 10),
-                    initialQuantity: parseInt(batchData.quantity, 10),
-                };
-            });
-            
-            const result = await addBatchesFromCsvAction(newBatches);
-
-            if (result.success) {
-                toast({ title: 'Import Successful', description: result.message });
-            } else {
-                throw new Error(result.error);
-            }
-
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
-        } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
+  const downloadCsv = () => {
+    const rows = [csvHeaders.join(",")];
+    for (const b of batches) {
+      const row = [
+        b.category,
+        b.plantFamily,
+        b.plantVariety,
+        typeof b.plantingDate === "string"
+          ? b.plantingDate
+          : (b as any).plantingDate?.toDate?.()?.toISOString() ?? "",
+        b.initialQuantity ?? "",
+        b.quantity ?? "",
+        b.status ?? "",
+        b.location ?? "",
+        b.size ?? "",
+        b.supplier ?? "",
+      ].map(csvEscape);
+      rows.push(row.join(","));
+    }
+    const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "batches.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  
+  // very small CSV parser with quoted-field support
+  const parseCsvText = (text: string): Array<Record<string, string>> => {
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(Boolean);
+    if (!lines.length) return [];
+    const header = splitCsvLine(lines[0]);
+    const out: Array<Record<string, string>> = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = splitCsvLine(lines[i]);
+      if (!cols.length) continue;
+      const rec: Record<string, string> = {};
+      header.forEach((h, idx) => (rec[h] = cols[idx] ?? ""));
+      out.push(rec);
+    }
+    return out;
+  };
+  
+  function splitCsvLine(line: string): string[] {
+    const res: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          cur += ch;
         }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ",") {
+          res.push(cur);
+          cur = "";
+        } else {
+          cur += ch;
+        }
+      }
+    }
+    res.push(cur);
+    return res;
+  }
+  
+  // basic validation + mapping to /api/batches
+  const normalizeStatus = (s: string) => {
+    const x = (s || "").trim();
+    const allowed = [
+      "Propagation",
+      "Plugs/Liners",
+      "Potted",
+      "Ready for Sale",
+      "Looking Good",
+      "Archived",
+    ];
+    const hit = allowed.find(a => a.toLowerCase() === x.toLowerCase());
+    return hit ?? "Potted";
+  };
+  
+  const mapRowToCreatePayload = (row: Record<string, string>) => {
+    const toInt = (v: string) => {
+      const n = parseInt(v ?? "", 10);
+      return Number.isFinite(n) && n >= 0 ? n : 0;
     };
-    reader.readAsText(file);
+    const iso =
+      row.plantingDate && !Number.isNaN(Date.parse(row.plantingDate))
+        ? new Date(row.plantingDate).toISOString()
+        : new Date().toISOString();
+  
+    return {
+      category: row.category?.trim() || "Perennial",
+      plantFamily: row.plantFamily?.trim() || "",
+      plantVariety: row.plantVariety?.trim() || "",
+      plantingDate: iso,
+      initialQuantity: toInt(row.initialQuantity),
+      quantity: row.quantity ? toInt(row.quantity) : undefined, // server defaults to initialQuantity if missing
+      status: normalizeStatus(row.status || ""),
+      location: row.location?.trim() || "",
+      size: row.size?.trim() || "",
+      supplier: row.supplier?.trim() || undefined,
+    };
+  };
+  
+  // create a de-dupe key: if your CSV has batchNumber, we skip those entirely
+  // otherwise dedupe by a tuple of fields that describe the batch
+  const makeDedupKey = (x: any) =>
+    [
+      (x.plantFamily || "").toLowerCase(),
+      (x.plantVariety || "").toLowerCase(),
+      // round planting date to day
+      (typeof x.plantingDate === "string"
+        ? x.plantingDate.slice(0, 10)
+        : new Date(x.plantingDate).toISOString().slice(0, 10)),
+      (x.size || "").toLowerCase(),
+      (x.location || "").toLowerCase(),
+    ].join("|");
+  
+  const handleCsvFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const rows = parseCsvText(text);
+      if (!rows.length) {
+        toast({ variant: "destructive", title: "CSV empty", description: "No rows found." });
+        return;
+      }
+  
+      // if CSV contains batchNumber, skip those rows (server generates numbers)
+      const filtered = rows.filter(r => !r.batchNumber);
+  
+      // Build a de-dupe set from current batches + incoming rows we accept
+      const existingKeys = new Set(batches.map(makeDedupKey));
+      let created = 0, skipped = 0, failed = 0;
+  
+      for (const row of filtered) {
+        const payload = mapRowToCreatePayload(row);
+        const key = makeDedupKey(payload);
+        if (existingKeys.has(key)) {
+          skipped++;
+          continue;
+        }
+        try {
+          const res = await fetch("/api/batches", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            created++;
+            existingKeys.add(key);
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+      }
+  
+      toast({
+        title: "Import complete",
+        description: `Added ${created}, skipped ${skipped}, failed ${failed}.`,
+      });
+      // Refresh batches after import
+      loadBatches();
+    } catch (err: any) {
+      console.error("CSV import error:", err);
+      toast({ variant: "destructive", title: "Import failed", description: err?.message ?? String(err) });
+    } finally {
+      // reset input so the same file can be chosen again later
+      e.currentTarget.value = "";
+    }
+  };
+
+  const handleTransplantCancel = () => {
+    setIsTransplantDialogOpen(false);
+    setBatchToTransplant(null);
+  };
+
+  const handleEditCancel = () => {
+    setIsEditDialogOpen(false);
+    setBatchToEdit(null);
   };
 
   if (authLoading || !user) {
@@ -245,9 +516,22 @@ export default function BatchesPage() {
                         <CardDescription>A complete history of all batches recorded in the system.</CardDescription>
                     </div>
                      <div className="flex gap-2">
-                      <Button variant="outline" onClick={handleDownloadData}><Download /> Download Template</Button>
-                      <Button onClick={() => fileInputRef.current?.click()}><Upload /> Upload CSV</Button>
-                      <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
+                      <Button variant="outline" onClick={downloadCsv}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export CSV
+                      </Button>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="hidden"
+                        onChange={handleCsvFile}
+                      />
+                      <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import CSV
+                      </Button>
                     </div>
                 </div>
 
@@ -321,7 +605,7 @@ export default function BatchesPage() {
                         </TableHeader>
                         <TableBody>
                         {filteredBatches.map((batch) => (
-                            <TableRow key={batch.id}>
+                            <TableRow key={batch.id} onClick={() => handleViewDetails(batch)} className="cursor-pointer">
                                 <TableCell className="font-medium">{batch.batchNumber}</TableCell>
                                 <TableCell>{batch.plantVariety}</TableCell>
                                 <TableCell>{batch.plantFamily}</TableCell>
@@ -350,6 +634,53 @@ export default function BatchesPage() {
                 )}
             </CardContent>
         </Card>
+
+      {/* Batch Detail Dialog */}
+      <BatchDetailDialog
+        open={isBatchDetailDialogOpen}
+        onOpenChange={setIsBatchDetailDialogOpen}
+        batch={selectedBatch}
+        onEdit={handleEditBatch}
+        onTransplant={handleTransplant}
+        onLogAction={() => console.log("Log action for batch:", selectedBatch?.id)} // Placeholder
+        onGenerateProtocol={() => console.log("Generate protocol for batch:", selectedBatch?.id)} // Placeholder
+        onDelete={handleDeleteBatch}
+      />
+
+      {/* Transplant Dialog */}
+      <Dialog open={isTransplantDialogOpen} onOpenChange={setIsTransplantDialogOpen}>
+        {batchToTransplant && (
+          <TransplantForm
+            batch={batchToTransplant}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
+            onSubmit={handleTransplantSubmit}
+            onCancel={handleTransplantCancel}
+          />
+        )}
+      </Dialog>
+
+      {/* Edit Batch Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        {batchToEdit && (
+          <BatchForm
+            batch={batchToEdit}
+            onSubmitSuccess={async () => {
+              setIsEditDialogOpen(false);
+              setBatchToEdit(null);
+              await loadBatches(); // Refresh list after edit
+              toast({ title: "Saved", description: `Batch #${batchToEdit.batchNumber} updated.` }); // Assuming batchToEdit still holds the number
+            }}
+            onCancel={handleEditCancel}
+            onArchive={() => { /* Optional: handle archive */ }} // Placeholder
+            varieties={[] /* Replace with actual varieties data */}
+            nurseryLocations={nurseryLocations}
+            plantSizes={plantSizes}
+            suppliers={[] /* Replace with actual suppliers data */}
+            onCreateNewVariety={(name) => { console.log("Create new variety:", name); }} // Placeholder
+          />
+        )}
+      </Dialog>
     </div>
   );
 }

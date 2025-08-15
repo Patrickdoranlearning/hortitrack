@@ -1,11 +1,29 @@
-ts
-import { z } from "zod";
+// src/lib/validation.ts
+import { ZodError } from "zod";
 
-// Add endpoint schemas here as they grow
-export const Whoami = z.object({}); // currently no inputs
+type ErrorBody =
+  | { error: string; issues?: unknown }
+  | { error: string };
 
-export function mapError(e: any): { status: number; body: any } {
-  if (e?.code === "UNAUTHORIZED") return { status: 401, body: { error: "Unauthorized" } };
-  if (e?.name === "ZodError") return { status: 400, body: { error: "Bad Request", issues: e.issues } };
-  return { status: 500, body: { error: "Internal Error" } };
+export function mapError(e: unknown): { status: number; body: ErrorBody } {
+  // Zod validation errors
+  if (e instanceof ZodError) {
+    return {
+      status: 400,
+      body: { error: "Validation failed", issues: e.issues },
+    };
+  }
+
+  // Generic error
+  const msg =
+    (e as any)?.message ||
+    (typeof e === "string" ? e : "Internal Server Error");
+
+  // You can branch on Firebase errors here if you want:
+  // if ((e as any)?.code === 'permission-denied') return { status: 403, body: { error: msg } };
+
+  return {
+    status: 500,
+    body: { error: msg },
+  };
 }
