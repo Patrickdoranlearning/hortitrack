@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -11,10 +12,10 @@ import { BarcodeFormat, DecodeHintType, Result } from "@zxing/library";
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onBatchResolved: (payload: { batch: any; summary: any }) => void; // hook into your existing detail dialog
+  onDetected: (text: string) => void;
 };
 
-export default function ScannerDialog({ open, onOpenChange, onBatchResolved }: Props) {
+export default function ScannerDialog({ open, onOpenChange, onDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -105,7 +106,7 @@ export default function ScannerDialog({ open, onOpenChange, onBatchResolved }: P
             const text = result.getText().trim();
             // Freeze scanning until we resolve
             stop();
-            handleHit(text);
+            onDetected(text);
           }
         });
       } catch (e: any) {
@@ -120,36 +121,13 @@ export default function ScannerDialog({ open, onOpenChange, onBatchResolved }: P
       }
     };
 
-    const handleHit = async (text: string) => {
-      setHintText("Processing code…");
-      try {
-        const res = await fetch(`/api/batches/scan?code=${encodeURIComponent(text)}`);
-        if (!res.ok) {
-          throw new Error(await res.text().catch(() => "Unrecognized code"));
-        }
-        const data = await res.json();
-        onBatchResolved(data); // show your batch summary + actions
-        onOpenChange(false);
-      } catch (err: any) {
-        toast({
-          variant: "destructive",
-          title: "Unrecognized code",
-          description: "Scan a valid HortiTrack Data Matrix / QR code.",
-        });
-        // Restart scanner after brief pause
-        setTimeout(() => {
-          if (open) start();
-        }, 600);
-      }
-    };
-
     start();
 
     return () => {
       cancelled = true;
       stop();
     };
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, onDetected]); 
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) stop(); onOpenChange(v); }}>
