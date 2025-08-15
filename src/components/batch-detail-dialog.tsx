@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -17,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { BatchChatDialog } from '@/components/batch-chat-dialog';
 
 interface BatchDetailDialogProps {
@@ -67,25 +66,46 @@ export function BatchDetailDialog({
 
   const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
   
-  const formatDate = (date: any): string => {
-    if (!date) return 'N/A';
+  // Safe formatter for Timestamp | ISO string | Date | anything else.
+  // Default fmt shows date+time for logs; pass "PPP" for date-only.
+  const formatDate = (date: any, fmt: string = 'PPP p'): string => {
+    if (!date) return '—';
     // Handle Firestore Timestamps passed from server actions
     if (date.toDate) {
-      return format(date.toDate(), 'PPP p');
+      const d = date.toDate();
+      return isValid(d) ? format(d, fmt) : '—';
     }
     // Handle ISO strings from client-side state
     if (typeof date === 'string') {
-      try {
-        return format(parseISO(date), 'PPP p');
-      } catch (e) {
-        return date; // fallback to original string if parsing fails
-      }
+        const parsedDate = parseISO(date);
+        return isValid(parsedDate) ? format(parsedDate, fmt) : '—';
     }
     // Handle native Date objects
     if (date instanceof Date) {
-      return format(date, 'PPP p');
+      return isValid(date) ? format(date, fmt) : '—';
     }
-    return String(date);
+    // Fallback for any other unhandled types
+    try {
+        const d = new Date(date);
+        return isValid(d) ? format(d, fmt) : '—';
+    } catch {
+        return '—';
+    }
+  };
+
+  // Safe comparator support: turn various date shapes into millis for sorting
+  const dateToMillis = (date: any): number => {
+    try {
+      if (!date) return 0;
+      if (typeof date?.toDate === 'function') return date.toDate().getTime(); // Firestore Timestamp
+      if (typeof date === 'string') {
+        const d = parseISO(date);
+        return isValid(d) ? d.getTime() : 0;
+      }
+      if (date instanceof Date) return isValid(date) ? date.getTime() : 0;
+      const d = new Date(date);
+      return isValid(d) ? d.getTime() : 0;
+    } catch { return 0; }
   };
 
 
@@ -150,7 +170,9 @@ export function BatchDetailDialog({
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Planting Date</p>
-                                    <p className="font-semibold">{format(new Date(batch.plantingDate), 'PPP')}</p>
+                                    <p className="font-semibold">
+                                        {formatDate(batch.plantingDate, 'PPP')}
+                                    </p>
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Category</p>
@@ -177,7 +199,10 @@ export function BatchDetailDialog({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {batch.logHistory.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((log, index) => (
+                                {(batch.logHistory ?? [])
+                                  .slice() // avoid mutating original
+                                  .sort((a, b) => dateToMillis(b.date) - dateToMillis(a.date))
+                                  .map((log, index) => (
                                     <TableRow key={log.id || index}>
                                         <TableCell>{formatDate(log.date)}</TableCell>
                                         <TableCell>{log.note || log.type}</TableCell>
