@@ -63,7 +63,7 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4" noValidate aria-busy={form.formState.isSubmitting}>
             <FormField control={form.control} name="size" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Size Name</FormLabel>
@@ -74,7 +74,7 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
             <FormField control={form.control} name="type" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Type</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                     <Select onValueChange={field.onChange} value={field.value ?? "Pot"}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger>
                       </FormControl>
@@ -90,30 +90,56 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
             <FormField control={form.control} name="area" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Area (m²)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="e.g., 0.01"
+                        {...field}
+                        onChange={(e) => { const v = e.target.value; field.onChange(v === "" ? undefined : parseFloat(v)); }}
+                      />
+                    </FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
             <FormField control={form.control} name="shelfQuantity" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Shelf Quantity</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 100" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 100"
+                        {...field}
+                        onChange={(e) => { const v = e.target.value; field.onChange(v === "" ? undefined : parseInt(v, 10)); }}
+                      />
+                    </FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
             <FormField control={form.control} name="multiple" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Multiple (for Trays)</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 54" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 54"
+                        {...field}
+                        onChange={(e) => { const v = e.target.value; field.onChange(v === "" ? undefined : parseInt(v, 10)); }}
+                      />
+                    </FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
             
           <DialogFooter className="pt-6">
-            <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
-            </Button>
-            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Size'}</Button>
+            {onCancel && (<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>)}\
+            <Button\
+              type="submit"\
+              disabled={form.formState.isSubmitting}\
+              aria-disabled={form.formState.isSubmitting}\
+            >\
+              {form.formState.isSubmitting ? (isEditing ? 'Saving Changes…' : 'Adding Size…') : (isEditing ? 'Save Changes' : 'Add Size')}\
+            </Button>\
           </DialogFooter>
         </form>
       </Form>

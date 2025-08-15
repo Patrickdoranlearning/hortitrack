@@ -218,13 +218,24 @@ export function BatchForm({
                 <FormLabel>Variety</FormLabel>
                 <Combobox
                   options={(varieties ?? []).map((v) => ({
-                    value: v.id!,
+                    value: v.name,          // use NAME as the combobox value
                     label: v.name,
                   }))}
-                  value={idFromName(varieties ?? [], field.value)}
-                  onChange={handleVarietyChange}
+                  value={field.value ?? ""} // form field holds NAME
+                  onChange={(selectedName) => {
+                    field.onChange(selectedName); // update form field (name)
+                    const v = (varieties ?? []).find(x => x.name === selectedName);
+                    // keep an ID in sync if you track one elsewhere:
+                    form.setValue("plantVarietyId" as any, v?.id ?? "");
+                    // also update related fields if needed:
+                    if (v) {
+                      form.setValue("plantFamily" as any, v.family ?? "");
+                      form.setValue("category" as any, v.category ?? "");
+                    }
+                  }}
                   onCreateOption={onCreateNewVariety}
                   placeholder="Select or create variety"
+                  emptyMessage="No variety found."
                 />
                 <FormMessage />
               </FormItem>
