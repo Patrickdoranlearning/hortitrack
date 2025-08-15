@@ -16,7 +16,7 @@ import { DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
-import { VarietyCombobox, type VarietyOption } from '@/components/variety-combobox';
+import { VarietyCombobox, type VarietyOption } from '@/components/ui/variety-combobox';
 import { format } from 'date-fns';
 import type {
   Batch, BatchStatus, NurseryLocation, PlantSize, Supplier, Variety,
@@ -46,7 +46,8 @@ type BatchFormValues = z.infer<typeof BatchFormSchema>;
 
 type Props = {
   batch: Batch | null; // null = create
-  onSubmitSuccess: (res: { id: string; batchNumber?: string }) => void;
+  onSubmitSuccess?: (res: { id: string; batchNumber?: string }) => void;
+  onCreated?: (res: { id: string; batchNumber: string }) => void;
   onCancel: () => void;
   onArchive?: (batchId: string) => void;
   nurseryLocations: NurseryLocation[];
@@ -71,6 +72,7 @@ function parseToDate(value: any): Date {
 export function BatchForm({
   batch = null,
   onSubmitSuccess,
+  onCreated,
   onCancel,
   onArchive,
   varieties = [],
@@ -81,6 +83,18 @@ export function BatchForm({
 }: Props) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
   const isEdit = !!batch?.id;
+
+  const onSuccess = React.useMemo(() => {
+    if (onSubmitSuccess) return onSubmitSuccess;
+    if (onCreated) {
+      return (res: { id: string; batchNumber?: string }) => {
+        if (res.batchNumber) {
+          onCreated({ id: res.id, batchNumber: res.batchNumber });
+        }
+      };
+    }
+    return () => {};
+  }, [onSubmitSuccess, onCreated]);
 
   const form = useForm<BatchFormValues>({
     resolver: zodResolver(BatchFormSchema),
@@ -94,8 +108,10 @@ export function BatchForm({
       quantity: batch?.quantity ?? 0,
       status: (batch?.status as BatchStatus) ?? 'Potted',
       plantingDate: parseToDate(batch?.plantingDate),
-      supplier: batch?.supplier ?? null,
+      supplier: batch?.supplier ?? '',
       location: batch?.location ?? '',
+      growerPhotoUrl: '',
+      salesPhotoUrl: '',
     },
   });
 
@@ -135,7 +151,7 @@ export function BatchForm({
       status: values.status,
       location: values.location,
       size: values.size,
-      supplier: values.supplier ?? undefined,
+      supplier: values.supplier ? values.supplier : undefined,
     };
 
     if (isEdit && batch?.id) {
@@ -148,7 +164,7 @@ export function BatchForm({
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error || 'Failed to update batch');
       }
-      onSubmitSuccess({ id: batch.id });
+      onSuccess({ id: batch.id });
       return;
     }
 
@@ -162,7 +178,7 @@ export function BatchForm({
       throw new Error(err?.error || 'Failed to create batch');
     }
     const result = (await res.json()) as { id: string; batchNumber: string };
-    onSubmitSuccess(result);
+    onSuccess(result);
 
     form.reset({
       plantVariety: '',
@@ -173,7 +189,7 @@ export function BatchForm({
       quantity: 0,
       status: 'Potted',
       plantingDate: new Date(),
-      supplier: null,
+      supplier: '',
       location: '',
     });
   };
@@ -260,10 +276,7 @@ export function BatchForm({
                 <FormLabel>Location</FormLabel>
                 <Select
                   value={field.value || ''}
-                  onValueChange={(id) => {
-                    const match = (nurseryLocations ?? []).find((l) => l.id === id);
-                    field.onChange(match?.name ?? '');
-                  }}
+                  onValueChange={field.onChange}
                   disabled={form.formState.isSubmitting}
                 >
                   <SelectTrigger>
@@ -271,7 +284,7 @@ export function BatchForm({
                   </SelectTrigger>
                   <SelectContent>
                     {(nurseryLocations ?? []).map((l) => (
-                      <SelectItem key={l.id} value={l.id!}>
+                      <SelectItem key={l.id} value={l.name}>
                         {l.name}
                       </SelectItem>
                     ))}
@@ -449,21 +462,21 @@ export function BatchForm({
               <FormItem>
                 <FormLabel>Supplier</FormLabel>
                 <Select
-                  value={field.value || ''} // avoid null
-                  onValueChange={(id) => {
-                    const match = (suppliers ?? []).find((s) => s.id === id);
-                    field.onChange(match?.name ?? '');
-                  }}
+                  value={field.value || ''}
+                  onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
                   disabled={form.formState.isSubmitting}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a supplier" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(suppliers ?? []).map((s) => (
-                      <SelectItem key={s.id} value={s.id!}>
-                        {s.name}
-                      </SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {(suppliers ?? [])
+                      .filter((s) => s?.name?.trim()) // avoid accidental empty values
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.name}>
+                          {s.name}
+                        </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

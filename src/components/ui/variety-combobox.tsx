@@ -1,14 +1,13 @@
 'use client';
 
-import * as React from 'react';
-import { Check, ChevronsUpDown, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import * as React from "react";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -16,134 +15,113 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
-} from '@/components/ui/command';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type VarietyOption = {
-  id: string;
+  id?: string;
   name: string;
-  family: string;
-  category: string;
+  family?: string;
+  category?: string;
 };
 
-export function VarietyCombobox(props: {
-  options: VarietyOption[];
-  selectedId?: string | null;
+type Props = {
+  value: string;
+  varieties: VarietyOption[];
+  onSelect: (v: VarietyOption) => void;
+  onCreate?: (name: string) => void;
   placeholder?: string;
+  emptyMessage?: string;
   disabled?: boolean;
-  // When user picks an existing option
-  onSelect: (variety: VarietyOption) => void;
-  // When user clicks create (free text)
-  onCreateOption?: (name: string) => void;
-}) {
-  const {
-    options,
-    selectedId,
-    placeholder = 'Select variety',
-    disabled,
-    onSelect,
-    onCreateOption,
-  } = props;
+};
 
-  const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState('');
-
-  const selected = React.useMemo(
-    () => options.find((o) => o.id === selectedId) || null,
-    [options, selectedId]
+export function VarietyCombobox({
+  value,
+  varieties,
+  onSelect,
+  onCreate,
+  placeholder = "Search variety...",
+  emptyMessage = "No results.",
+  disabled,
+}: Props) {
+  const [open, setOpen] = useState(false);
+  const items = useMemo(
+    () =>
+      varieties
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [varieties]
   );
 
-  // Does the query match an existing option?
-  const matchExists = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return options.some((o) => o.name.toLowerCase() === q);
-  }, [options, query]);
+  const current = items.find((v) => v.name === value);
+
+  const handleCreate = (name: string) => {
+    onCreate?.(name);
+    // optional: immediately select it in the form
+    onSelect({ name });
+    setOpen(false);
+  };
 
   return (
-    <Popover open={open} onOpenChange={(v) => !disabled && setOpen(v)}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn('w-full justify-between', disabled && 'opacity-60')}
+          className="w-full justify-between"
           disabled={disabled}
         >
-          <div className="flex items-center gap-2 truncate">
-            {selected ? (
-              <>
-                <span className="truncate">{selected.name}</span>
-                <Badge variant="secondary" className="hidden sm:inline-flex">
-                  {selected.family}
-                </Badge>
-                <Badge variant="outline" className="hidden md:inline-flex">
-                  {selected.category}
-                </Badge>
-              </>
-            ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
-            )}
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          {current ? current.name : "Select variety"}
+          <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)] min-w-[280px]">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command shouldFilter={true}>
-          <CommandInput
-            placeholder="Search varieties…"
-            value={query}
-            onValueChange={setQuery}
-          />
+          <CommandInput placeholder={placeholder} />
           <CommandList>
-            <CommandEmpty>No matches.</CommandEmpty>
-            <CommandGroup heading="Varieties">
-              {options.map((opt) => (
-                <CommandItem
-                  key={opt.id}
-                  // DO NOT pass disabled
-                  onSelect={() => {
-                    onSelect(opt);
-                    setOpen(false);
-                    setQuery('');
-                  }}
-                  className="flex items-center justify-between"
-                >
-                  <div className="truncate">
-                    <div className="font-medium truncate">{opt.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {opt.family} • {opt.category}
-                    </div>
-                  </div>
-                  <Check
-                    className={cn(
-                      'ml-2 h-4 w-4',
-                      selected?.id === opt.id ? 'opacity-100' : 'opacity-0'
+            <CommandEmpty className="p-3 text-sm text-muted-foreground">
+              {emptyMessage}
+              {onCreate && (
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => handleCreate(
+                      // pull current input from the DOM (CommandInput keeps value in its input)
+                      (document.querySelector("[cmdk-input]") as HTMLInputElement | null)?.value?.trim() || ""
                     )}
-                  />
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create “{(document.querySelector("[cmdk-input]") as HTMLInputElement | null)?.value?.trim() || "new variety"}”
+                  </Button>
+                </div>
+              )}
+            </CommandEmpty>
+            <CommandGroup heading="Varieties">
+              {items.map((v) => (
+                <CommandItem
+                  key={v.id ?? v.name}
+                  value={v.name}
+                  onSelect={() => {
+                    onSelect(v);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", v.name === value ? "opacity-100" : "opacity-0")} />
+                  <div className="flex flex-col">
+                    <span className="font-medium">{v.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {v.family || "—"} • {v.category || "—"}
+                    </span>
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
-
-            {onCreateOption && !matchExists && query.trim() && (
-              <>
-                <CommandSeparator />
-                <CommandGroup>
-                  <CommandItem
-                    onSelect={() => {
-                      onCreateOption(query.trim());
-                      setOpen(false);
-                      setQuery('');
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create “{query.trim()}”
-                  </CommandItem>
-                </CommandGroup>
-              </>
-            )}
           </CommandList>
         </Command>
       </PopoverContent>
