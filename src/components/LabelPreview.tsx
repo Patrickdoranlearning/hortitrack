@@ -1,4 +1,4 @@
-
+// src/components/LabelPreview.tsx
 "use client";
 import { useEffect, useRef } from "react";
 import bwipjs from "bwip-js";
@@ -42,7 +42,7 @@ export default function LabelPreview({
         width: "70mm",
         height: "50mm",
         boxSizing: "border-box",
-        padding: "3mm",
+        padding: "3mm", // 3mm border
         background: "white",
         border: "1px solid rgba(0,0,0,.08)",
         borderRadius: 6,
@@ -51,28 +51,65 @@ export default function LabelPreview({
           'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
       }}
     >
+      {/* Two columns: fixed left (DM + details), flexible right (headline) */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "auto 1fr",
-          gap: "2mm",
+          gridTemplateColumns: "26mm 1fr", // 24mm DM + ~2mm breathing, but DM is explicitly 24mm
+          columnGap: "2mm",
           height: "100%",
-          alignItems: "center",
         }}
       >
-        {/* Data Matrix */}
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <canvas ref={dmRef} style={{ width: "22mm", height: "22mm" }} />
+        {/* LEFT COLUMN */}
+        <div style={{ display: "grid", gridTemplateRows: "auto 1fr", rowGap: "1.5mm" }}>
+          {/* DM top-left */}
+          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            <canvas ref={dmRef} style={{ width: "24mm", height: "24mm" }} />
+          </div>
+
+          {/* Details below DM */}
+          <div
+            style={{
+              display: "grid",
+              gap: "1mm",
+              alignContent: "start",
+              fontSize: "3.6mm",
+              lineHeight: 1.15,
+            }}
+          >
+            <div>
+              <span style={{ opacity: 0.8 }}>Family:</span>{" "}
+              <strong>{family}</strong>
+            </div>
+            <div>
+              <span style={{ opacity: 0.8 }}>Size:</span>{" "}
+              <strong>{size}</strong>
+            </div>
+            <div>
+              <span style={{ opacity: 0.8 }}>Qty:</span>{" "}
+              <strong>{quantity}</strong>
+            </div>
+          </div>
         </div>
 
-        {/* Text stack */}
-        <div style={{ display: "grid", gap: "1.2mm" }}>
+        {/* RIGHT COLUMN (headline stack) */}
+        <div
+          style={{
+            display: "grid",
+            gap: "2mm",
+            alignContent: "center",
+            overflow: "hidden",
+          }}
+        >
           <div
             style={{
               fontWeight: 800,
               fontSize: "9mm",
               lineHeight: 1,
               letterSpacing: "-0.2mm",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             #{String(batchNumber)}
@@ -81,19 +118,12 @@ export default function LabelPreview({
             style={{
               fontWeight: 700,
               fontSize: "6mm",
-              lineHeight: 1.06,
+              lineHeight: 1.05,
               letterSpacing: "-0.06mm",
               wordBreak: "break-word",
             }}
           >
             {variety}
-          </div>
-          <div style={{ fontSize: "4.2mm", lineHeight: 1.1, opacity: 0.95 }}>
-            Family: <span style={{ fontWeight: 600 }}>{family}</span>
-          </div>
-          <div style={{ fontSize: "4.2mm", lineHeight: 1.1 }}>
-            Qty: <span style={{ fontWeight: 700 }}>{quantity}</span>&nbsp;&nbsp;Size:{" "}
-            <span style={{ fontWeight: 700 }}>{size}</span>
           </div>
         </div>
       </div>

@@ -1,7 +1,5 @@
-
 // src/server/labels/build-batch-label.ts
-// Helper: mm → dots @ 203dpi
-const dpmm = 8;
+const dpmm = 8; // 203dpi ≈ 8 dots/mm
 const mm = (n: number) => Math.round(n * dpmm);
 
 type LabelInput = {
@@ -10,68 +8,75 @@ type LabelInput = {
   family: string;
   quantity: number;
   size: string;
-  payload?: string; // DM content; default "BATCH:<batchNumber>"
+  payload?: string; // DataMatrix content
 };
 
 export function buildZpl({ batchNumber, variety, family, quantity, size, payload }: LabelInput) {
-  // Canvas
+  // Label size: 70x50mm, margin 3mm
   const W = mm(70); // 560
   const H = mm(50); // 400
   const M = mm(3);  // 24
   const innerW = W - 2 * M; // 512
   const innerH = H - 2 * M; // 352
 
-  // Left column for DM ~ 24mm
-  const dmBox = { x: M, y: M, w: mm(24), h: mm(24) };
-  // Right text area
-  const textX = dmBox.x + dmBox.w + mm(2);
-  const textW = W - textX - M;
+  // Left column: DM 24mm wide, top-left
+  const dmSide = mm(24); // 192 dots
+  const leftColW = mm(26); // DM + a bit of breathing space
+  const gapCol = mm(2);
+  const textRightX = M + leftColW + gapCol; // start of right column
+  const textRightW = W - textRightX - M;
 
-  // Font choices (Zebra device fonts; ^CF0 is scalable)
-  // Sizes tuned by eye to fit 44mm height:
-  const fBatch = 72;  // big
-  const fVar   = 48;  // medium
-  const fInfo  = 32;  // small
+  // Below-DM text start
+  const belowDmY = M + dmSide + mm(2);
+  const belowDmW = dmSide; // fit under DM
 
-  const dmHeight = dmBox.h;
-  const module   = 6;
-  const dmText   = payload ?? `BATCH:${batchNumber}`;
+  // Fonts
+  const fBatch = 72; // big
+  const fVar   = 48; // medium
+  const fInfo  = 30; // small info under DM
+
+  // DataMatrix
+  const dmText = payload ?? `BATCH:${batchNumber}`;
+  const dmModule = 6; // tweak 5–8 if needed
 
   return [
     "^XA",
-    `^CI28`,
+    "^CI28",
     `^PW${W}`,
     `^LL${H}`,
     "^LH0,0",
 
-    // Data Matrix on left
-    `^FO${dmBox.x},${dmBox.y}`,
-    `^BXN,${dmHeight},${module},2`,
+    // Data Matrix top-left
+    `^FO${M},${M}`,
+    `^BXN,${dmSide},${dmModule},2`,
     `^FD${escapeZpl(dmText)}^FS`,
 
-    // Batch number (top line)
-    `^FO${textX},${M}`,
-    `^CF0,${fBatch}`,
-    `^FB${textW},1,0,L,0`,
-    `^FD#${escapeZpl(String(batchNumber))}^FS`,
-
-    // Variety
-    `^FO${textX},${M + mm(12) + 10}`,
-    `^CF0,${fVar}`,
-    `^FB${textW},2,0,L,0`,
-    `^FD${escapeZpl(variety)}^FS`,
-
-    // Family
-    `^FO${textX},${M + mm(24) + 10}`,
+    // Details BELOW the Data Matrix (Family / Size / Qty)
+    `^FO${M},${belowDmY}`,
     `^CF0,${fInfo}`,
-    `^FB${textW},1,0,L,0`,
+    `^FB${belowDmW},1,0,L,0`,
     `^FDFamily: ${escapeZpl(family)}^FS`,
 
-    // Qty & Size
-    `^FO${textX},${M + mm(31) + 10}`,
+    `^FO${M},${belowDmY + mm(6)}`,
     `^CF0,${fInfo}`,
-    `^FB${textW},1,0,L,0`,
-    `^FDQty: ${quantity}    Size: ${escapeZpl(size)}^FS`,
+    `^FB${belowDmW},1,0,L,0`,
+    `^FDSize: ${escapeZpl(size)}^FS`,
+
+    `^FO${M},${belowDmY + mm(12)}`,
+    `^CF0,${fInfo}`,
+    `^FB${belowDmW},1,0,L,0`,
+    `^FDQty: ${quantity}^FS`,
+
+    // RIGHT COLUMN: Batch # and Variety
+    `^FO${textRightX},${M + mm(2)}`,
+    `^CF0,${fBatch}`,
+    `^FB${textRightW},1,0,L,0`,
+    `^FD#${escapeZpl(String(batchNumber))}^FS`,
+
+    `^FO${textRightX},${M + mm(16)}`,
+    `^CF0,${fVar}`,
+    `^FB${textRightW},2,0,L,0`,
+    `^FD${escapeZpl(variety)}^FS`,
 
     "^XZ",
   ].join("\n");
