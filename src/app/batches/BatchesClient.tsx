@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { BatchDetailDialog } from "@/components/batch-detail-dialog";
 import { TransplantForm, TransplantFormData } from "@/components/transplant-form";
+import MobileBatchCard from "@/components/mobile-batch-card";
 
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -509,7 +510,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   }
 
   return (
-    <div className="container mx-auto max-w-7xl p-4 sm:p-6">
+    <div className="container mx-auto max-w-7xl p-3 sm:p-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
                 <h1 className="mb-1 font-headline text-4xl">Manage Batch Data</h1>
@@ -523,7 +524,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
             </Button>
         </div>
 
-        <Card>
+        <Card className="[content-visibility:auto]"> {/* Add content-visibility for potential performance */}
             <CardHeader>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
@@ -550,7 +551,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center pt-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center justify-between pt-4"> {/* Adjusted class */}
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -648,6 +649,28 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                     </div>
                 )}
             </CardContent>
+             <CardContent className="md:hidden">
+                {/* Mobile: stacked cards */}
+                <div className="space-y-3 [content-visibility:auto]"> {/* Added content-visibility */}
+                  {filteredBatches.map((b) => (
+                    <MobileBatchCard
+                      key={b.id}
+                      batch={b}
+                      onView={handleViewDetails}
+                      onEdit={handleEditBatch}
+                      onDelete={handleDeleteBatch}
+                      onTransplant={handleTransplant}
+                    />
+                  ))}
+                  {filteredBatches.length === 0 && !isDataLoading && (
+                    <div className="flex h-[20vh] flex-col items-center justify-center rounded-lg text-center">
+                      <p className="text-lg font-medium text-muted-foreground">No batches found.</p>
+                      <p className="text-sm text-muted-foreground">Try adjusting your search or filters.</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+
         </Card>
 
       {/* Batch Detail Dialog */}
