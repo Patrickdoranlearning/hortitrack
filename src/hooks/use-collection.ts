@@ -11,6 +11,7 @@ interface UseCollectionReturn<T> {
   data: T[];
   isLoading: boolean;
   error: Error | null;
+  forceRefresh: () => void;
 }
 
 export function useCollection<T>(
@@ -23,6 +24,11 @@ export function useCollection<T>(
   const [data, setData] = useState<T[]>(initialData as T[]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const forceRefresh = () => {
+    setRefreshKey(oldKey => oldKey + 1);
+  };
 
   const subscribeToCollection = useCallback(() => {
     if (!user) {
@@ -70,12 +76,14 @@ export function useCollection<T>(
 
     return unsubscribe;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionName, user, toast, JSON.stringify(constraints)]);
+  }, [collectionName, user, toast, JSON.stringify(constraints), refreshKey]);
 
   useEffect(() => {
     const unsubscribe = subscribeToCollection();
     return () => unsubscribe();
   }, [subscribeToCollection]);
 
-  return { data: data || initialData || [], isLoading, error };
+  return { data: data || initialData || [], isLoading, error, forceRefresh };
 }
+
+    

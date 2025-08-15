@@ -52,8 +52,7 @@ import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { BatchForm } from '../components/batch-form';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
 import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
-import { ScannedBatchActionsDialog } from '../components/scanned-batch-actions-dialog';
-import { ScannerDialog } from '../components/scanner-dialog';
+import ScanAndActDialog from '@/components/scan-and-act-dialog';
 import {
   TransplantForm,
   TransplantFormData,
@@ -116,7 +115,7 @@ export default function HomePageView({
   const isReadonly = !user;
 
   // Use the initial data passed from the server component
-  const { data: batchesData } = useCollection<Batch>('batches', initialBatches);
+  const { data: batchesData, forceRefresh } = useCollection<Batch>('batches', initialBatches);
   const batches = batchesData || [];
 
   const { data: varieties } = useCollection<Variety>(
@@ -143,9 +142,9 @@ export default function HomePageView({
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] =
     React.useState(false);
-  const [isScannerOpen, setIsScannerOpen] = React.useState(false);
-  const [isScannedActionOpen, setIsScannedActionOpen] = React.useState(false);
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
+  const [isScanOpen, setIsScanOpen] = React.useState(false);
+
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
   const [newVarietyName, setNewVarietyName] = React.useState('');
@@ -227,14 +226,6 @@ export default function HomePageView({
   const handleRecommendations = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsRecommendationsOpen(true);
-  };
-
-  const handleScanSuccess = (data: string) => {
-    const foundBatch = batches.find((b) => b.batchNumber === data);
-    if (foundBatch) {
-      setSelectedBatch(foundBatch);
-      setIsScannedActionOpen(true);
-    }
   };
 
   const handleFormSubmit = async (data: any) => {
@@ -376,7 +367,7 @@ export default function HomePageView({
           <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
-              onClick={() => setIsScannerOpen(true)}
+              onClick={() => setIsScanOpen(true)}
               disabled={isReadonly}
                className="w-full sm:w-auto"
             >
@@ -567,20 +558,13 @@ export default function HomePageView({
         onOpenChange={setIsRecommendationsOpen}
         batchId={selectedBatch?.id}
       />
-      <ScannerDialog
-        open={isScannerOpen}
-        onOpenChange={setIsScannerOpen}
-        onScanSuccess={handleScanSuccess}
-      />
-      <ScannedBatchActionsDialog
-        open={isScannedActionOpen}
-        onOpenChange={setIsScannedActionOpen}
-        batch={selectedBatch}
-        onLogAction={() => handleLogAction(selectedBatch!)}
-        onTransplant={() => handleTransplant(selectedBatch!)}
-        onEdit={() => handleOpenForm(selectedBatch!)}
-        onGenerateProtocol={() => handleGenerateProtocol(selectedBatch!)}
+      <ScanAndActDialog 
+        open={isScanOpen} 
+        onOpenChange={setIsScanOpen} 
+        onChanged={() => forceRefresh()} 
       />
     </div>
   );
 }
+
+    
