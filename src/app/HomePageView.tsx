@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -284,6 +283,18 @@ export default function HomePageView({
     setSelectedBatch(batchForRecs);
     setIsRecommendationsOpen(true);
   };
+  
+  const handleScanDetected = (text: string) => {
+    console.log("Detected code:", text);
+    // Here you would typically parse the text and find the corresponding batch
+    // For now, we'll just show a toast.
+    toast({
+      title: "Code Scanned",
+      description: `Detected: ${text}`,
+    });
+    setIsScanOpen(false);
+  };
+
 
   if (authLoading) {
     return (
@@ -561,10 +572,8 @@ export default function HomePageView({
       <ScanAndActDialog 
         open={isScanOpen} 
         onOpenChange={setIsScanOpen} 
-        onChanged={() => forceRefresh()} 
+        onDetected={handleScanDetected}
       />
     </div>
   );
 }
-
-    

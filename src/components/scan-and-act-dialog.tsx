@@ -1,320 +1,213 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { doc, getDoc, getDocs, query, where, collection } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import DataMatrixScanner from '@/components/DataMatrixScanner';
-import { format } from 'date-fns';
-import { Camera, ImagePlus, NotebookPen, ScanLine, Move, Scissors, Trash2, Sprout } from 'lucide-react';
-
-type Batch = {
-  id: string;
-  batchNumber: number;
-  plantVariety: string;
-  plantFamily: string;
-  category: string;
-  size: string;
-  location: string;
-  status: string;
-  quantity: number;
-  initialQuantity: number;
-  supplier?: string;
-  createdAt?: string | number | Date;
-  plantingDate?: string | number | Date;
-  updatedAt?: string | number | Date;
-};
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Camera } from "lucide-react";
+import {
+  BrowserMultiFormatReader,
+  DecodeHintType,
+  BarcodeFormat,
+} from "@zxing/library";
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** optional: called when a batch action changes data so you can refresh lists */
-  onChanged?: () => void;
+  /** called with raw decoded string when a code is recognized */
+  onDetected: (text: string) => void;
 };
 
-/** Normalize possible payloads: id, number, or URL query param like ?batch=123 */
-function parseScan(text: string) {
-  const t = text.trim();
+export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Props) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<
+    "idle" | "init" | "ready" | "scanning" | "noresult" | "error"
+  >("idle");
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
-  // Try URL with ?batch=... or ?id=...
-  try {
-    const url = new URL(t);
-    const byBatch = url.searchParams.get('batch');
-    const byId = url.searchParams.get('id');
-    if (byBatch) return { batchNumber: Number(byBatch) };
-    if (byId) return { id: byId };
-  } catch { /* not a URL */ }
-
-  // pure number? -> probably a batchNumber
-  if (/^\d+$/.test(t)) return { batchNumber: Number(t) };
-
-  // looks like a Firestore doc id
-  if (/^[A-Za-z0-9_-]{10,}$/.test(t)) return { id: t };
-
-  // fallback: return raw
-  return { raw: t };
-}
-
-async function resolveBatch(info: ReturnType<typeof parseScan>): Promise<Batch | null> {
-  if ('id' in info && info.id) {
-    const d = await getDoc(doc(db, 'batches', info.id));
-    if (d.exists()) return { id: d.id, ...(d.data() as any) } as Batch;
-  }
-  if ('batchNumber' in info && Number.isFinite(info.batchNumber)) {
-    const snap = await getDocs(
-      query(collection(db, 'batches'), where('batchNumber', '==', info.batchNumber))
-    );
-    const hit = snap.docs[0];
-    if (hit) return { id: hit.id, ...(hit.data() as any) } as Batch;
-  }
-  return null;
-}
-
-export default function ScanAndActDialog({ open, onOpenChange, onChanged }: Props) {
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [batch, setBatch] = useState<Batch | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  // When the scanner returns text -> resolve batch -> open sheet
-  const handleScanResult = useCallback(async (text: string) => {
-    setLoading(true);
-    try {
-      const info = parseScan(text);
-      const b = await resolveBatch(info);
-      setBatch(b);
-      setSheetOpen(true);
-    } finally {
-      setLoading(false);
-    }
+  const hints = useMemo(() => {
+    const h = new Map();
+    h.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.DATA_MATRIX, BarcodeFormat.QR_CODE]);
+    return h;
   }, []);
 
-  const closeAll = useCallback(() => {
-    setBatch(null);
-    setSheetOpen(false);
-    onOpenChange(false);
-  }, [onOpenChange]);
+  useEffect(() => {
+    if (!open) return;
+    setStatus("init");
+    setErrorMsg("");
 
-  const date = useMemo(() => {
-    if (!batch?.createdAt) return '';
-    const d = typeof batch.createdAt === 'string' ? new Date(batch.createdAt) : new Date(batch.createdAt);
-    return isNaN(d.getTime()) ? '' : format(d, 'PPP');
-  }, [batch]);
+    // enumerate cameras AFTER permission (labels are empty until then on many browsers)
+    async function init() {
+      try {
+        // try to get a stream quickly (relaxed constraints), this triggers permission prompt
+        const warmup = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        warmup.getTracks().forEach(t => t.stop());
 
-  // ---- Quick actions -------------------------------------------------------
+        const all = (await navigator.mediaDevices.enumerateDevices())
+          .filter(d => d.kind === "videoinput");
 
-  async function postLog(action: string, extra?: Record<string, any>) {
-    if (!batch) return;
-    // Adjust to match your API route if needed
-    await fetch(`/api/batches/${batch.id}/log`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: action, ...extra }),
-    });
-    onChanged?.();
-  }
+        setDevices(all);
 
-  async function handleMove() {
-    if (!batch) return;
-    const location = prompt('Move to location:', batch.location || '');
-    if (!location) return;
-    await fetch(`/api/batches/${batch.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ location }),
-    });
-    await postLog('Move', { note: `Moved to ${location}` });
-    alert('Batch moved.');
-    onChanged?.();
-  }
+        // prefer a back/environment camera on mobile
+        const back = all.find(d => /back|rear|environment/i.test(d.label));
+        const firstId = back?.deviceId ?? all[0]?.deviceId;
 
-  async function handleTransplant() {
-    if (!batch) return;
-    // Open your transplant dialog instead if you have it; here is a quick inline
-    const qty = Number(prompt('New batch quantity:', '0') || '0');
-    const size = prompt('Size (e.g. 1L, tray):', '') || '';
-    const location = prompt('Location:', batch.location || '') || '';
-    const status = prompt('Status:', batch.status || 'Potted') || 'Potted';
+        setDeviceId(prev => prev ?? firstId);
+        setStatus(all.length ? "ready" : "error");
+        if (!all.length) setErrorMsg("No cameras found.");
 
-    const res = await fetch(`/api/batches/${batch.id}/transplant`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ quantity: qty, size, location, status }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || 'Transplant failed');
+      } catch (err: any) {
+        console.error(err);
+        setStatus("error");
+        setErrorMsg(err?.name === "NotAllowedError"
+          ? "Camera permission denied."
+          : err?.message || "Failed to initialize camera.");
+      }
     }
-    const j = await res.json().catch(() => ({}));
-    alert(`Transplanted → new batch #${j?.batchNumber ?? 'created'}`);
-    onChanged?.();
-  }
 
-  // Photo milestone
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+    init();
+  }, [open]);
 
-  async function handleSelectPhoto(file: File) {
-    if (!batch) return;
-    const path = `batches/${batch.id}/milestones/${Date.now()}-${file.name}`;
-    const sref = ref(storage, path);
-    await uploadBytes(sref, file);
-    const url = await getDownloadURL(sref);
-    // record as a log entry
-    await postLog('Photo', { photoUrl: url });
-    alert('Photo logged.');
-  }
+  useEffect(() => {
+    // start decoding when ready + we have a deviceId
+    if (!(open && status === "ready" && deviceId && videoRef.current)) return;
 
-  // UI
+    const video = videoRef.current;
+    let stopped = false;
+
+    async function start() {
+      try {
+        setStatus("scanning");
+
+        // start chosen device
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: deviceId } },
+          audio: false,
+        });
+        video.setAttribute("playsinline", "true");
+        video.muted = true;
+        video.srcObject = stream;
+        await video.play();
+
+        // ZXing reader
+        const reader = new BrowserMultiFormatReader(hints, 500);
+        codeReaderRef.current = reader;
+
+        let gotResult = false;
+        reader.decodeFromVideoDevice(deviceId, video, (result, err) => {
+          if (stopped) return;
+          if (result) {
+            gotResult = true;
+            // clean up immediately so the dialog can close
+            teardown();
+            onDetected(result.getText());
+          }
+          // ignore intermittent decode errors while scanning
+        });
+
+        // soft timeout to show “no code yet” hint
+        setTimeout(() => {
+          if (!gotResult && !stopped) setStatus("noresult");
+        }, 2000);
+
+      } catch (err: any) {
+        console.error(err);
+        setStatus("error");
+        setErrorMsg(err?.message || "Could not open selected camera.");
+      }
+    }
+
+    start();
+
+    function teardown() {
+      stopped = true;
+      try {
+        codeReaderRef.current?.reset();
+      } catch {}
+      codeReaderRef.current = null;
+      if (video.srcObject) {
+        (video.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
+    }
+
+    return teardown;
+  }, [open, status, deviceId, hints, onDetected]);
+
+  // when modal closes, ensure we fully stop the camera
+  const handleOpenChange = (v: boolean) => {
+    if (!v) {
+      try {
+        codeReaderRef.current?.reset();
+      } catch {}
+      codeReaderRef.current = null;
+      const video = videoRef.current;
+      if (video?.srcObject) {
+        (video.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
+      setStatus("idle");
+      setErrorMsg("");
+    }
+    onOpenChange(v);
+  };
+
   return (
-    <>
-      {/* Dialog wrapper you open from a button in your UI */}
-      {open && !sheetOpen && (
-        <div className="p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <ScanLine className="opacity-60" />
-            <div className="font-medium">Scan a batch code</div>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" /> Scan Batch Code
+          </DialogTitle>
+          <DialogDescription>
+            Point your camera at a <b>Data&nbsp;Matrix</b> or QR code. We’ll detect it automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* camera picker */}
+        {devices.length > 1 && (
+          <div className="px-4 pb-2">
+            <Select value={deviceId ?? ""} onValueChange={setDeviceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose camera" />
+              </SelectTrigger>
+              <SelectContent>
+                {devices.map((d, i) => (
+                  <SelectItem key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Camera ${i + 1}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+        )}
 
-          <DataMatrixScanner
-            autoStart
-            onResult={handleScanResult}
-            onError={(e) => console.error(e)}
-          />
-
-          {loading && <p className="mt-2 text-sm text-muted-foreground">Resolving…</p>}
-        </div>
-      )}
-
-      {/* Bottom sheet with summary + actions */}
-      <Sheet open={sheetOpen} onOpenChange={(v) => (v ? setSheetOpen(true) : closeAll())}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-auto px-4 pb-4">
-          <SheetHeader>
-            <SheetTitle>
-              {batch ? `Batch #${batch.batchNumber}` : 'No match found'}
-            </SheetTitle>
-            {batch ? (
-              <SheetDescription>
-                {batch.plantVariety} • {batch.plantFamily} • {batch.category}
-              </SheetDescription>
-            ) : (
-              <SheetDescription>Try rescanning or enter the code manually.</SheetDescription>
-            )}
-          </SheetHeader>
-
-          {batch ? (
-            <>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded border p-2">
-                  <div className="text-muted-foreground">Status</div>
-                  <div className="mt-1"><Badge variant="outline">{batch.status}</Badge></div>
-                </div>
-                <div className="rounded border p-2">
-                  <div className="text-muted-foreground">Location</div>
-                  <div className="mt-1">{batch.location || '—'}</div>
-                </div>
-                <div className="rounded border p-2">
-                  <div className="text-muted-foreground">Size</div>
-                  <div className="mt-1">{batch.size || '—'}</div>
-                </div>
-                <div className="rounded border p-2">
-                  <div className="text-muted-foreground">Qty (current / initial)</div>
-                  <div className="mt-1 font-medium">
-                    {batch.quantity?.toLocaleString?.() ?? batch.quantity} / {batch.initialQuantity?.toLocaleString?.() ?? batch.initialQuantity}
-                  </div>
-                </div>
-                <div className="rounded border p-2">
-                  <div className="text-muted-foreground">Supplier</div>
-                  <div className="mt-1">{batch.supplier || '—'}</div>
-                </div>
-                <div className="rounded border p-2">
-                  <div className="text-muted-foreground">Created</div>
-                  <div className="mt-1">{date || '—'}</div>
-                </div>
-              </div>
-
-              <Separator className="my-4" />
-
-              {/* Quick actions (mobile-friendly grid) */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="justify-start" onClick={() => postLog('Spaced')}>
-                  <Sprout className="mr-2 h-4 w-4" /> Spaced
-                </Button>
-                <Button variant="outline" className="justify-start" onClick={handleMove}>
-                  <Move className="mr-2 h-4 w-4" /> Move
-                </Button>
-                <Button variant="outline" className="justify-start" onClick={() => postLog('Trimmed')}>
-                  <Scissors className="mr-2 h-4 w-4" /> Trimmed
-                </Button>
-                <Button variant="outline" className="justify-start" onClick={() => postLog('Weed')}>
-                  <NotebookPen className="mr-2 h-4 w-4" /> Weed
-                </Button>
-                <Button variant="destructive" className="justify-start" onClick={() => postLog('Dumped')}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Dumped
-                </Button>
-                <Button variant="default" className="justify-start" onClick={handleTransplant}>
-                  <Sprout className="mr-2 h-4 w-4" /> Transplant
-                </Button>
-
-                {/* Add Photo */}
-                <input
-                  ref={(r) => (fileInputRef.current = r)}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      await handleSelectPhoto(file);
-                    } catch (err) {
-                      console.error(err);
-                      alert('Photo upload failed.');
-                    } finally {
-                      e.currentTarget.value = '';
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  className="justify-start"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <ImagePlus className="mr-2 h-4 w-4" /> Add Photo
-                </Button>
-
-                {/* View details */}
-                <Button
-                  variant="secondary"
-                  className="justify-start"
-                  onClick={() => {
-                    // route to batch details if you have a page; else open your BatchDetailDialog
-                    window.location.href = `/batches/${batch.id}`;
-                  }}
-                >
-                  <Camera className="mr-2 h-4 w-4" /> View Details
-                </Button>
-              </div>
-
-              <div className="mt-4 flex gap-2">
-                <Button variant="outline" onClick={() => setSheetOpen(false)}>
-                  Rescan
-                </Button>
-                <Button variant="ghost" onClick={closeAll}>
-                  Done
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="mt-4">
-              <Button onClick={() => setSheetOpen(false)}>Rescan</Button>
+        {/* video */}
+        <div className="relative aspect-[3/4] w-full bg-black">
+          <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" />
+          {/* overlay mask / status */}
+          <div className="pointer-events-none absolute inset-0 flex items-end justify-center">
+            <div className="mb-3 rounded bg-black/40 px-3 py-1 text-xs text-white">
+              {status === "init" && "Initializing camera…"}
+              {status === "ready" && "Starting scanner…"}
+              {status === "scanning" && "Scanning… hold steady"}
+              {status === "noresult" && "Still looking… try more light or move closer"}
+              {status === "error" && errorMsg}
             </div>
-          )}
-        </SheetContent>
-      </Sheet>
-    </>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-4 py-3">
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
