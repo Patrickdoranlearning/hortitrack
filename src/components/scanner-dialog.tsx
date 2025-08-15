@@ -26,6 +26,8 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const { toast } = useToast();
 
+  const decodedOnceRef = useRef(false);
+
   const stopScanner = useCallback(() => {
     if (readerRef.current) {
       readerRef.current.reset();
@@ -35,6 +37,7 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
+    decodedOnceRef.current = false;
   }, []);
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -57,22 +60,30 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
 
     const startScanner = async () => {
       try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        if (devices.length === 0) {
+        // Use native browser API to list devices
+        if (!navigator.mediaDevices?.enumerateDevices) {
+            throw new Error("Media devices API not available.");
+        }
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+        if (videoDevices.length === 0) {
           throw new Error('No video input devices found');
         }
         
-        const backCamera = devices.find(d => /back|rear|environment/i.test(d.label));
-        const deviceId = backCamera?.deviceId || devices[0]?.deviceId;
+        const backCamera = videoDevices.find(d => /back|rear|environment/i.test(d.label));
+        const deviceId = backCamera?.deviceId || videoDevices[0]?.deviceId;
 
         if (videoRef.current) {
             setHasPermission(true);
+            decodedOnceRef.current = false; // Reset on start
+            
             await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result, err, controls) => {
-                if (result) {
+                if (result && !decodedOnceRef.current) {
+                    decodedOnceRef.current = true; // Set guard
                     onScanSuccess(result.getText());
                     handleOpenChange(false);
                 }
-                // We don't need to log errors here as they are frequent during scanning
             });
         }
       } catch (err: any) {
@@ -91,7 +102,8 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
     return () => {
       stopScanner();
     };
-  }, [open, onScanSuccess, stopScanner, toast, handleOpenChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
