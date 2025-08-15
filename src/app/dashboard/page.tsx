@@ -392,7 +392,7 @@ export default function DashboardOverviewPage() {
               Losses by Plant Family
             </CardTitle>
           </CardHeader>
-          <CardContent className="pl-2 min-w-0">
+          <CardContent className="min-w-0 pl-2">
             <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
               <LossesChart data={lossData} />
             </div>

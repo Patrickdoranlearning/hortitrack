@@ -25,26 +25,33 @@ const LossesChart = ({ data }: LossesChartProps) => {
   return (
     <ChartContainer
       config={chartConfig}
-      className="min-h-[300px] w-full"
+      className="w-full h-full"
     >
-      <Recharts.BarChart accessibilityLayer data={data}>
-        <Recharts.XAxis
-          dataKey="name"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-        />
-        <Recharts.YAxis />
-        <ChartTooltip
-          cursor={false}
-          content={<ChartTooltipContent hideLabel />}
-        />
-        <Recharts.Bar
-          dataKey="value"
-          fill="var(--color-destructive)"
-          radius={8}
-        />
-      </Recharts.BarChart>
+      <Recharts.ResponsiveContainer width="100%" height="100%">
+        <Recharts.BarChart 
+          accessibilityLayer 
+          data={data}
+          margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+        >
+          <Recharts.XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tick={{ fontSize: 12 }}
+          />
+          <Recharts.YAxis tick={{ fontSize: 12 }} />
+          <ChartTooltip
+            cursor={false}
+            content={<ChartTooltipContent hideLabel />}
+          />
+          <Recharts.Bar
+            dataKey="value"
+            fill="var(--color-destructive)"
+            radius={8}
+          />
+        </Recharts.BarChart>
+      </Recharts.ResponsiveContainer>
     </ChartContainer>
   );
 };
