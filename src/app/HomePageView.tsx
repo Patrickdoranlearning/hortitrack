@@ -52,7 +52,7 @@ import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { BatchForm } from '../components/batch-form';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
 import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
-import ScannerDialog from '@/components/scan-and-act-dialog';
+import ScannerDialog from '../components/scan-and-act-dialog';
 import {
   TransplantForm,
   TransplantFormData,
@@ -285,27 +285,10 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
   
-  const handleScanDetected = (text: string) => {
-    setIsScanOpen(false); // Close scanner immediately
-    fetch(`/api/batches/scan?code=${encodeURIComponent(text)}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Batch not found.' }));
-          throw new Error(err.error);
-        }
-        return res.json();
-      })
-      .then(({ batch }) => {
-        setSelectedBatch(batch);
-        setIsDetailOpen(true);
-      })
-      .catch((e) => {
-        toast({
-          variant: "destructive",
-          title: "Scan Failed",
-          description: e.message || "Could not find a batch matching this code.",
-        });
-      });
+  const handleScanDetected = (data: { batch: Batch }) => {
+    setIsScanOpen(false);
+    setSelectedBatch(data.batch);
+    setIsDetailOpen(true);
   };
 
 
@@ -585,7 +568,7 @@ export default function HomePageView({
       <ScannerDialog 
         open={isScanOpen} 
         onOpenChange={setIsScanOpen} 
-        onDetected={handleScanDetected}
+        onBatchResolved={handleScanDetected}
       />
     </div>
   );
