@@ -10,7 +10,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { getProductionProtocolAction } from '@/app/actions';
-import type { Batch } from '@/lib/types';
 import type { ProductionProtocolOutput } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -22,13 +21,13 @@ import { ScrollArea } from './ui/scroll-area';
 interface ProductionProtocolDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  batch: Batch | null;
+  batchId: string | null | undefined;
 }
 
 export function ProductionProtocolDialog({
   open,
   onOpenChange,
-  batch,
+  batchId,
 }: ProductionProtocolDialogProps) {
   const [loading, setLoading] = useState(false);
   const [protocol, setProtocol] =
@@ -37,13 +36,13 @@ export function ProductionProtocolDialog({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open && batch) {
+    if (open && batchId) {
       setLoading(true);
       setError(null);
       setProtocol(null);
 
       const fetchProtocol = async () => {
-        const result = await getProductionProtocolAction(batch);
+        const result = await getProductionProtocolAction(batchId);
         if (result.success) {
           setProtocol(result.data);
         } else {
@@ -59,7 +58,7 @@ export function ProductionProtocolDialog({
 
       fetchProtocol();
     }
-  }, [open, batch, toast]);
+  }, [open, batchId, toast]);
 
   const handleOpenChange = (isOpen: boolean) => {
     onOpenChange(isOpen);
@@ -76,10 +75,10 @@ export function ProductionProtocolDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-headline text-2xl">
             <FileText className="text-primary" />
-            Production Protocol for {batch?.plantFamily}
+            Production Protocol
           </DialogTitle>
           <DialogDescription>
-            A generated guide based on the successful history of batch #{batch?.batchNumber}.
+            A generated guide based on the history of a successful batch.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] pr-6">

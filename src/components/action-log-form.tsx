@@ -35,6 +35,10 @@ export function ActionLogForm({
   });
   const [saving, setSaving] = useState(false);
 
+  if (!batchId) {
+    return <div className="p-4 text-center text-red-500">Error: Batch ID is missing.</div>;
+  }
+
   return (
     <Form {...form}>
       <form

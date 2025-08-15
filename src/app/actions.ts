@@ -8,11 +8,22 @@ import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib
 import { db } from '@/lib/firebase-admin';
 import { z } from 'zod';
 import { allocateBatchNumber } from '@/server/services/batchNumber';
+import { declassify } from '@/server/utils/declassify';
+
+async function getBatchById(batchId: string): Promise<Batch | null> {
+    const docRef = db.collection('batches').doc(batchId);
+    const docSnap = await docRef.get();
+
+    if (docSnap.exists) {
+        return declassify({ ...docSnap.data(), id: docSnap.id }) as Batch;
+    }
+    return null;
+}
 
 export async function getBatchesAction() {
     try {
         const snapshot = await db.collection('batches').get();
-        const batches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Batch[];
+        const batches = snapshot.docs.map(doc => declassify({ ...doc.data(), id: doc.id })) as Batch[];
         return { success: true, data: batches };
     } catch (error: any) {
         console.error('Error getting batches:', error);
@@ -20,8 +31,12 @@ export async function getBatchesAction() {
     }
 }
 
-export async function getProductionProtocolAction(batch: Batch) {
+export async function getProductionProtocolAction(batchId: string) {
   try {
+    const batch = await getBatchById(batchId);
+    if (!batch) {
+        return { success: false, error: 'Batch not found.' };
+    }
     const protocol = await productionProtocol(batch);
     return { success: true, data: protocol };
   } catch (error) {
@@ -33,8 +48,12 @@ export async function getProductionProtocolAction(batch: Batch) {
   }
 }
 
-export async function getCareRecommendationsAction(batch: Batch) {
+export async function getCareRecommendationsAction(batchId: string) {
   try {
+    const batch = await getBatchById(batchId);
+    if (!batch) {
+        return { success: false, error: 'Batch not found.' };
+    }
     const input: CareRecommendationsInput = {
       batchInfo: {
         plantFamily: batch.plantFamily,
@@ -54,8 +73,12 @@ export async function getCareRecommendationsAction(batch: Batch) {
   }
 }
 
-export async function batchChatAction(batch: Batch, query: string) {
+export async function batchChatAction(batchId: string, query: string) {
   try {
+    const batch = await getBatchById(batchId);
+    if (!batch) {
+        return { success: false, error: 'Batch not found.' };
+    }
     const input: BatchChatInput = { batch, query };
     const result = await batchChat(input);
     return { success: true, data: result };
@@ -128,17 +151,6 @@ export async function updateBatchAction(batchToUpdate: Batch) {
     return { success: false, error: 'Failed to update batch: ' + error.message };
   }
 }
-
-async function getBatchById(batchId: string): Promise<Batch | null> {
-    const docRef = db.collection('batches').doc(batchId);
-    const docSnap = await docRef.get();
-
-    if (docSnap.exists) {
-        return { ...docSnap.data(), id: docSnap.id } as Batch;
-    }
-    return null;
-}
-
 
 export async function logAction(batchId: string, logData: { type: string; note: string; qty?: number; reason?: string; newLocation?: string; }) {
   try {
@@ -409,5 +421,3 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         return { success: false, error: error.message };
     }
 }
-
-    

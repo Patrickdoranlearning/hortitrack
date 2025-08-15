@@ -308,7 +308,8 @@ export function BatchDetailDialog({
       <BatchChatDialog
         open={isChatOpen}
         onOpenChange={setIsChatOpen}
-        batch={batch}
+        batchId={batch?.id}
+        batchNumber={batch?.batchNumber}
       />
       
       <FlagBatchDialog

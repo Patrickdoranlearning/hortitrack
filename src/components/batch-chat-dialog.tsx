@@ -24,7 +24,8 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 interface BatchChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  batch: Batch | null;
+  batchId: string | undefined | null;
+  batchNumber: string | undefined | null;
 }
 
 interface ChatMsg {
@@ -36,7 +37,8 @@ interface ChatMsg {
 export function BatchChatDialog({
   open,
   onOpenChange,
-  batch,
+  batchId,
+  batchNumber,
 }: BatchChatDialogProps) {
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -45,12 +47,12 @@ export function BatchChatDialog({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open && batch) {
+    if (open && batchNumber) {
         setMessages([
-            { id: 'welcome', role: 'bot', text: `Hi! I'm your AI assistant for batch #${batch.batchNumber}. Ask me anything about this batch.` }
+            { id: 'welcome', role: 'bot', text: `Hi! I'm your AI assistant for batch #${batchNumber}. Ask me anything about this batch.` }
         ]);
     }
-  }, [open, batch]);
+  }, [open, batchNumber]);
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -62,14 +64,14 @@ export function BatchChatDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !batch) return;
+    if (!input.trim() || !batchId) return;
 
     const userMessage: ChatMsg = { id: crypto.randomUUID(), role: 'user', text: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
 
-    const result = await batchChatAction(batch, input);
+    const result = await batchChatAction(batchId, input);
 
     if (result.success && result.data) {
         const botMessage: ChatMsg = { id: crypto.randomUUID(), role: 'bot', text: result.data.response };
@@ -101,10 +103,10 @@ export function BatchChatDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-headline text-2xl">
             <MessageSquare className="text-primary" />
-            Chat about Batch #{batch?.batchNumber}
+            Chat about Batch #{batchNumber}
           </DialogTitle>
           <DialogDescription>
-            {batch?.plantVariety} - {batch?.plantFamily}
+            Ask questions to get AI-powered insights on this batch.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 pr-4 -mr-4" ref={scrollAreaRef}>

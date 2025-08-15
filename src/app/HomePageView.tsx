@@ -61,6 +61,7 @@ import {
 import { VarietyForm } from '../components/variety-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useCollection } from '@/hooks/use-collection';
+import { getCareRecommendationsAction } from './actions';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -95,7 +96,6 @@ interface HomePageViewProps {
       logData: Partial<ActionLogFormValues>
     ) => Promise<any>;
     addVariety: (data: Omit<Variety, 'id'>) => Promise<any>;
-    addCareRecommendations: (batch: Batch) => void;
   };
 }
 
@@ -285,6 +285,15 @@ export default function HomePageView({
     }
   };
 
+  const handleAiCareClick = async () => {
+    if (!batches || batches.length === 0) return;
+    // For simplicity, let's just pick the first batch for now.
+    // In a real app, you might let the user select a batch or use a different trigger.
+    const batchForRecs = batches[0];
+    setSelectedBatch(batchForRecs);
+    setIsRecommendationsOpen(true);
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen w-full flex-col p-6">
@@ -375,7 +384,7 @@ export default function HomePageView({
               Scan
             </Button>
             <Button
-              onClick={() => actions.addCareRecommendations(batches[0])}
+              onClick={handleAiCareClick}
               variant="outline"
               disabled={isReadonly || batches.length === 0}
               className="w-full sm:w-auto"
@@ -516,9 +525,11 @@ export default function HomePageView({
             </DialogTitle>
           </DialogHeader>
           <ActionLogForm
-            batch={selectedBatch}
-            nurseryLocations={nurseryLocations || []}
-            onSubmit={handleLogActionSubmit}
+            batchId={selectedBatch?.id || ''}
+            onSubmitted={() => {
+              setIsLogActionOpen(false);
+              setSelectedBatch(null);
+            }}
             onCancel={() => setIsLogActionOpen(false)}
           />
         </DialogContent>
@@ -549,12 +560,12 @@ export default function HomePageView({
       <ProductionProtocolDialog
         open={isProtocolOpen}
         onOpenChange={setIsProtocolOpen}
-        batch={selectedBatch}
+        batchId={selectedBatch?.id}
       />
       <CareRecommendationsDialog
         open={isRecommendationsOpen}
         onOpenChange={setIsRecommendationsOpen}
-        batch={selectedBatch}
+        batchId={selectedBatch?.id}
       />
       <ScannerDialog
         open={isScannerOpen}
