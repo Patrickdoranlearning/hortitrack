@@ -157,8 +157,8 @@ export function BatchDetailDialog({
                   <Button variant="outline" size="sm" onClick={() => setIsChatOpen(true)}><MessageSquare /> AI Chat</Button>
                   <Button variant="outline" size="sm" onClick={handleLogAction}><ClipboardList /> Log</Button>
                   <Button variant="outline" size="sm" onClick={handleTransplant}><MoveRight /> Transplant</Button>
-                  <Button variant="outline" size="sm" onClick={handleGenerateProtocol}><FileText /> Protocol</Button>
-                  <Button variant="outline" size="sm" onClick={handleCareRecommendations}><Leaf /> Care Recs</Button>
+                  <Button variant="outline" size="sm" onClick={() => onGenerateProtocol(batch)}><FileText /> Protocol</Button>
+                  <Button variant="outline" size="sm" onClick={() => onCareRecommendations(batch)}><Leaf /> Care Recs</Button>
                    <Button variant="outline" size="sm" onClick={handlePickPhoto}><Camera /> Photo</Button>
                    <Button variant={batch?.flag?.active ? "destructive" : "outline"} size="sm" onClick={() => {
                       if (batch?.flag?.active) {
@@ -323,3 +323,5 @@ export function BatchDetailDialog({
     </>
   );
 }
+
+    

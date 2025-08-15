@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { logAction } from "@/app/actions";
+import { useToast } from "@/hooks/use-toast";
 
 const schema = z.object({
   type: z.enum(["Spaced","Move","Trimmed","Dumped","Weed","Note"]),
@@ -26,6 +28,7 @@ export function ActionLogForm({
   onSubmitted?: () => void;
   onCancel?: () => void;
 }) {
+  const { toast } = useToast();
   const form = useForm<ActionLogFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -46,15 +49,12 @@ export function ActionLogForm({
         onSubmit={form.handleSubmit(async (vals) => {
           setSaving(true);
           try {
-            const res = await fetch(`/api/batches/${batchId}/log`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ ...vals }),
-            });
-            if (!res.ok) throw new Error("Log failed");
+            const result = await logAction(batchId, vals as any);
+            if (!result.success) throw new Error(result.error);
+            toast({ title: "Action Logged", description: `Successfully logged "${vals.type}" action.`});
             onSubmitted?.();
           } catch (e: any) {
-            alert(e.message ?? "Log failed");
+            toast({ variant: 'destructive', title: "Log Failed", description: e.message ?? "An unknown error occurred."});
           } finally {
             setSaving(false);
           }
@@ -108,3 +108,5 @@ export function ActionLogForm({
     </Form>
   );
 }
+
+    

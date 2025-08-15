@@ -120,7 +120,7 @@ export async function addBatchAction(
         };
         
         transaction.set(newDocRef, newBatch);
-        return { success: true, data: newBatch };
+        return { success: true, data: declassify(newBatch) };
     });
   } catch (error: any) {
     console.error('Error adding batch:', error);
@@ -145,7 +145,7 @@ export async function updateBatchAction(batchToUpdate: Batch) {
     const batchesCollection = db.collection('batches');
     const batchDoc = batchesCollection.doc(updatedBatchData.id!);
     await batchDoc.set(updatedBatchData, { merge: true });
-    return { success: true, data: updatedBatchData };
+    return { success: true, data: declassify(updatedBatchData) };
   } catch (error: any) {
     console.error('Error updating batch:', error);
     return { success: false, error: 'Failed to update batch: ' + error.message };
@@ -173,7 +173,7 @@ export async function logAction(batchId: string, logData: { type: string; note: 
 
     const result = await updateBatchAction(updatedBatch);
     if (result.success) {
-      return { success: true, data: result.data };
+      return { success: true, data: declassify(result.data) };
     } else {
       return { success: false, error: result.error };
     }
@@ -199,7 +199,7 @@ export async function archiveBatchAction(batchId: string, loss: number) {
 
     const result = await updateBatchAction(updatedBatch);
     if (result.success) {
-        return { success: true, data: result.data };
+        return { success: true, data: declassify(result.data) };
     } else {
         return { success: false, error: result.error };
     }
@@ -211,7 +211,7 @@ export async function archiveBatchAction(batchId: string, loss: number) {
 
 export async function transplantBatchAction(
   sourceBatchId: string,
-  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber'>,
+  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber' | 'quantity' | 'initialQuantity'>,
   transplantQuantity: number,
   logRemainingAsLoss: boolean
 ) {
@@ -281,7 +281,7 @@ export async function transplantBatchAction(
         }
         transaction.set(sourceBatchRef, updatedSourceBatch);
         
-        return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };
+        return { success: true };
     });
 
   } catch (error: any) {
@@ -421,3 +421,5 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         return { success: false, error: error.message };
     }
 }
+
+    

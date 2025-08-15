@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from 'react-hook-form';
@@ -36,13 +37,12 @@ import { Checkbox } from './ui/checkbox';
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { useMemo, useState } from 'react';
 import { ScrollArea } from './ui/scroll-area';
+import { transplantBatchAction } from '@/app/actions';
+import { useToast } from '@/hooks/use-toast';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
-    category: z.string(),
-    plantFamily: z.string(),
-    plantVariety: z.string(),
-    plantingDate: z.string().min(1, 'Planting date is required.'),
+    plantingDate: z.date({ required_error: 'Planting date is required' }),
     quantity: z.coerce
       .number()
       .min(1, 'Quantity must be at least 1.')
@@ -53,11 +53,7 @@ const transplantFormSchema = (maxQuantity: number) =>
     status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
     location: z.string().min(1, 'Location is required.'),
     size: z.string().min(1, 'Size is required.'),
-    transplantedFrom: z.string().optional(),
-    supplier: z.string().optional(),
     logRemainingAsLoss: z.boolean(),
-    growerPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
-    salesPhotoUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
     trayQuantity: z.number().optional(),
   });
 
@@ -65,17 +61,11 @@ export type TransplantFormData = z.infer<ReturnType<typeof transplantFormSchema>
 
 interface TransplantFormProps {
   batch: Batch | null;
-  onSubmit: (data: TransplantFormData) => void;
+  onSubmit: (data: any) => void;
   onCancel: () => void;
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];
 }
-
-const idFromName = (list: {id?: string; name?: string}[], name?: string) =>
-  list.find(x => x.name === name)?.id ?? '';
-
-const idFromSize = (list: PlantSize[], name?: string) =>
-  list.find(s => s.size === name)?.id ?? "";
 
 export function TransplantForm({
   batch,
@@ -85,25 +75,19 @@ export function TransplantForm({
   plantSizes,
 }: TransplantFormProps) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
+  const { toast } = useToast();
   
   const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
     resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
       ? {
-          category: batch.category,
-          plantFamily: batch.plantFamily,
-          plantVariety: batch.plantVariety,
-          plantingDate: new Date().toISOString(),
+          plantingDate: new Date(),
           quantity: batch.quantity,
           status: 'Potted',
           location: '',
           size: '',
-          transplantedFrom: batch.batchNumber,
-          supplier: 'Doran Nurseries',
           logRemainingAsLoss: false,
           trayQuantity: 1,
-          growerPhotoUrl: '',
-          salesPhotoUrl: '',
         }
       : undefined,
   });
@@ -138,8 +122,8 @@ export function TransplantForm({
     return plantSizes ? [...plantSizes].sort(customSizeSort) : [];
   }, [plantSizes]);
   
-  const handleSizeChange = (sizeId: string) => {
-    const selectedSize = plantSizes.find(s => s.id === sizeId);
+  const handleSizeChange = (sizeValue: string) => {
+    const selectedSize = plantSizes.find(s => s.size === sizeValue);
     if (selectedSize) {
       form.setValue('size', selectedSize.size);
       setSelectedSizeInfo(selectedSize);
@@ -168,6 +152,33 @@ export function TransplantForm({
     }
   };
 
+  const handleFormSubmit = async (values: TransplantFormData) => {
+    if (!batch) return;
+
+    const { quantity, logRemainingAsLoss, ...newBatchData } = values;
+
+    const result = await transplantBatchAction(
+        batch.id!,
+        {
+          ...newBatchData,
+          category: batch.category,
+          plantFamily: batch.plantFamily,
+          plantVariety: batch.plantVariety,
+          supplier: "Doran Nurseries",
+          plantingDate: newBatchData.plantingDate.toISOString(),
+        },
+        quantity,
+        logRemainingAsLoss
+    );
+
+    if (result.success) {
+        toast({ title: "Transplant Successful", description: `New batch created from batch #${batch.batchNumber}`});
+        onSubmit(result);
+    } else {
+        toast({ variant: 'destructive', title: "Transplant Failed", description: result.error });
+    }
+  };
+
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
 
   if (!batch) {
@@ -187,7 +198,7 @@ export function TransplantForm({
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(
-            (values) => onSubmit(values),
+            handleFormSubmit,
             (errors) => {
               console.error("Transplant form invalid:", errors);
             }
@@ -204,45 +215,27 @@ export function TransplantForm({
                   </FormControl>
                   <FormMessage />
                 </FormItem>
-                <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value ?? ""} disabled />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                <FormField
-                  control={form.control}
-                  name="plantFamily"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Plant Family</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="plantVariety"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Plant Variety</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Input value={batch.category ?? ""} disabled />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Plant Family</FormLabel>
+                  <FormControl>
+                    <Input value={batch.plantFamily ?? ""} disabled />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Plant Variety</FormLabel>
+                  <FormControl>
+                    <Input value={batch.plantVariety ?? ""} disabled />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
                 <FormField
                     control={form.control}
                     name="location"
@@ -250,11 +243,8 @@ export function TransplantForm({
                       <FormItem>
                         <FormLabel>New Location</FormLabel>
                         <Select
-                          value={idFromName(nurseryLocations, field.value)}
-                          onValueChange={(id) => {
-                            const selected = nurseryLocations.find(l => l.id === id);
-                            field.onChange(selected?.name ?? '');
-                          }}
+                          value={field.value}
+                          onValueChange={field.onChange}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -263,7 +253,7 @@ export function TransplantForm({
                           </FormControl>
                           <SelectContent>
                             {nurseryLocations.map((loc, i) => (
-                              <SelectItem key={loc.id ?? `loc-${i}`} value={loc.id!}>
+                              <SelectItem key={loc.id ?? `loc-${i}`} value={loc.name!}>
                                 {loc.name}
                               </SelectItem>
                             ))}
@@ -290,7 +280,7 @@ export function TransplantForm({
                               )}
                             >
                               {field.value ? (
-                                format(new Date(field.value), 'PPP')
+                                format(field.value, 'PPP')
                               ) : (
                                 <span>Pick a date</span>
                               )}
@@ -301,12 +291,8 @@ export function TransplantForm({
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={
-                              field.value ? new Date(field.value) : undefined
-                            }
-                            onSelect={(date) =>
-                              field.onChange(date?.toISOString())
-                            }
+                            selected={field.value}
+                            onSelect={field.onChange}
                             initialFocus
                           />
                         </PopoverContent>
@@ -322,8 +308,11 @@ export function TransplantForm({
                       <FormItem>
                         <FormLabel>New Size</FormLabel>
                         <Select
-                          value={idFromSize(sortedPlantSizes, field.value)}
-                          onValueChange={handleSizeChange}
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            handleSizeChange(value);
+                          }}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -332,7 +321,7 @@ export function TransplantForm({
                           </FormControl>
                           <SelectContent>
                             {sortedPlantSizes.map((s, i) => (
-                              <SelectItem key={s.id ?? `size-${i}`} value={s.id!}>
+                              <SelectItem key={s.id ?? `size-${i}`} value={s.size!}>
                                 <span>{s.size} ({s.type})</span>
                               </SelectItem>
                             ))}
@@ -465,3 +454,5 @@ export function TransplantForm({
     </>
   );
 }
+
+    
