@@ -1,43 +1,22 @@
-// src/server/labels/build-batch-label.ts
-// Zebra GT800 (203 dpi). If you ever move to 300 dpi, change DOTS_PER_MM to 12.
+// utils/labels.ts
 const DOTS_PER_MM = 8;
+const mm = (n: number) => Math.round(n * DOTS_PER_MM);
 
-function mm(mm: number) {
-  return Math.round(mm * DOTS_PER_MM);
-}
+// Simple escape; we don’t use ^FH hex mode here to keep things bulletproof
+const sanitize = (s: string) => String(s).replace(/[\^\~\\]/g, " ");
 
-// Escape ZPL field data safely. We’ll use ^FH\ (hex mode) + hex-encode risky chars.
-function zplEscape(text: string) {
-  if (text === null || text === undefined) return '';
-  const needsHex = /[\^\\~]/;
-  if (!needsHex.test(text)) return text;
-  return text
-    .split("")
-    .map((ch) => {
-      if (ch === "^") return "_5E"; // ^  -> _5E
-      if (ch === "\\") return "_5C"; // \  -> _5C
-      if (ch === "~") return "_7E"; // ~  -> _7E
-      return ch;
-    })
-    .join("");
-}
-
-/**
- * Build a landscape ZPL for 70mm (width) x 50mm (height) label
- * with a 3mm border and a Data Matrix on the left.
- */
-export function buildBatchLabelZplLandscape(params: {
+export function buildBatchLabelZplLandscape(opts: {
   batchNumber: string | number;
   variety: string;
   family: string;
   quantity: number;
   size: string;
-  // What the scanner should read:
-  dataMatrixPayload: string; // e.g. `BATCH:12345` (match your app’s scanner)
-  // Optional tweaks
-  labelWidthMM?: number;   // default 70
-  labelHeightMM?: number;  // default 50
-  marginMM?: number;       // default 3
+  dataMatrixPayload?: string; // default: BATCH:<batchNumber>
+  labelWidthMM?: number;      // default: 70
+  labelHeightMM?: number;     // default: 50
+  marginMM?: number;          // default: 3
+  rotate90?: boolean;         // if true, rotate all fields 90° for “landscape” on some setups
+  debugFrame?: boolean;       // draws the 3mm inner frame
 }) {
   const {
     batchNumber,
@@ -49,88 +28,71 @@ export function buildBatchLabelZplLandscape(params: {
     labelWidthMM = 70,
     labelHeightMM = 50,
     marginMM = 3,
-  } = params;
+    rotate90 = false,
+    debugFrame = false,
+  } = opts;
 
-  // Convert to dots
-  const PW = mm(labelWidthMM);   // print width (across printhead) — 70mm => 560 dots
-  const LL = mm(labelHeightMM);  // label length (feed direction) — 50mm => 400 dots
-  const M  = mm(marginMM);       // 3mm => 24 dots
+  const PW = mm(labelWidthMM);
+  const LL = mm(labelHeightMM);
+  const M  = mm(marginMM);
+  const innerW = PW - M*2;
+  const innerH = LL - M*2;
 
-  // Inner working area after margins
-  const innerW = PW - M * 2;     // 560 - 48 = 512
-  const innerH = LL - M * 2;     // 400 - 48 = 352
+  // DM fits left column: up to 45% of text width but not taller than inner height
+  const dmSize = Math.min(innerH, Math.floor(innerW * 0.45));
+  const gutter = mm(2);
 
-  // Data Matrix square: occupy up to inner height, but not more than ~45% of inner width
-  const dmMax = Math.min(innerH, Math.floor(innerW * 0.45)); // e.g. 352 vs 230 → 230
-  const dmSize = dmMax;          // make it square
-
-  // Gutter between DM and text
-  const gutter = mm(2);          // 2mm spacing
-
-  // Text block geometry
   const textX = M + dmSize + gutter;
   const textY = M;
-  const textW = innerW - dmSize - gutter;  // remaining width to the right
-  const lineGap = mm(1.5);                 // 1.5mm vertical spacing between text blocks
+  const textW = innerW - dmSize - gutter;
 
-  // Font sizes (in dots) — tuned to “maximize” while staying readable & consistent
-  // Feel free to tweak these if your strings are usually short/long.
-  const batchFont = 70; // Batch # headline
-  const varietyFont = 58; // Variety (wrapped up to 2 lines)
-  const infoFont = 36; // Family + Qty/Size
+  const batchFont   = 70;
+  const varietyFont = 58;
+  const infoFont    = 36;
 
-  // Compute Y positions
+  const payload = dataMatrixPayload ?? `BATCH:${batchNumber}`;
+
   let y = textY;
+  let z = "^XA\n";
+  z += `^PW${PW}\n`;
+  z += `^LL${LL}\n`;
+  z += "^LH0,0\n";
+  z += "^CI28\n";
 
-  // Build ZPL
-  let zpl = "^XA\n";
-  zpl += `^PW${PW}\n`;
-  zpl += `^LL${LL}\n`;
-  zpl += "^LH0,0\n";      // Label Home at top-left
-  zpl += "^CI28\n";       // UTF-8/Unicode mode if supported
+  // For sites where the driver/printer expects portrait, rotate fields 90°
+  // This keeps math identical; only orientation changes.
+  if (rotate90) z += "^FWB\n";  // B = 270° (clockwise)
 
-  // --- Data Matrix (left) ---
-  // Position: top-left inside margin
-  const dmX = M;
-  const dmY = M;
+  if (debugFrame) {
+    z += `^FO${M},${M}^GB${innerW},${innerH},2^FS\n`;
+  }
 
-  // ^BX – Data Matrix. Second param is module size (1–10+), we choose ~7 for dense but readable.
-  // Third param is symbol height in dots (we let Zebra scale from module size and data length).
-  // We’ll constrain size by putting it inside a graphic box clipping. Easiest is to size via module.
-  // If you need a hard pixel size, switch to ^BX with a tuned module or use ^FO + ^GB as border only.
-  zpl += `^FO${dmX},${dmY}\n`;
-  zpl += "^BY2\n";               // (Not used by ^BX, but harmless; keeps consistency if you ever swap types)
-  zpl += "^BXN,7,200\n";         // N=normal orientation, module=7, 200 ECC
-  zpl += "^FH\\\n";              // hex mode for safe data
-  zpl += `^FD${zplEscape(String(dataMatrixPayload))}^FS\n`;
+  // Data Matrix (use ^BXM — module size, error corr)
+  // module size 8 is compact but very readable at 203dpi. Adjust 6–10 if needed.
+  z += `^FO${M},${M}\n`;
+  z += "^BXM,8,200\n"; // orientation handled by ^FW, module=8, ECC=200
+  z += `^FD${sanitize(payload)}^FS\n`;
 
-  // Optional: a visual bounding box for the DM zone (comment out if not wanted)
-  // zpl += `^FO${dmX - 2},${dmY - 2}^GB${dmSize + 4},${dmSize + 4},2^FS\n`;
+  // Batch #
+  z += `^FO${textX},${y}^CF0,${batchFont}\n`;
+  z += `^FD#${sanitize(String(batchNumber))}^FS\n`;
+  y += batchFont + mm(1.5);
 
-  // --- Batch # (headline) ---
-  zpl += `^FO${textX},${y}^CF0,${batchFont}\n`;
-  zpl += "^FH\\\n";
-  zpl += `^FD#${zplEscape(String(batchNumber))}^FS\n`;
-  y += batchFont + lineGap;
+  // Variety (wrap to 2 lines)
+  z += `^FO${textX},${y}^CF0,${varietyFont}\n`;
+  z += `^FB${textW},2,0,L,0\n`;
+  z += `^FD${sanitize(variety)}^FS\n`;
+  y += varietyFont * 2 + mm(1.5);
 
-  // --- Variety (wrapped up to 2 lines) ---
-  zpl += `^FO${textX},${y}^CF0,${varietyFont}\n`;
-  zpl += `^FB${textW},2,0,L,0\n`; // width=textW, max 2 lines, 0 gap, Left, no hanging indent
-  zpl += "^FH\\\n";
-  zpl += `^FD${zplEscape(variety)}^FS\n`;
-  y += varietyFont * 2 + lineGap; // reserve space as if 2 lines (safe)
+  // Family
+  z += `^FO${textX},${y}^CF0,${infoFont}\n`;
+  z += `^FDFamily: ${sanitize(family)}^FS\n`;
+  y += infoFont + mm(1.5);
 
-  // --- Family ---
-  zpl += `^FO${textX},${y}^CF0,${infoFont}\n`;
-  zpl += "^FH\\\n";
-  zpl += `^FDFamily: ${zplEscape(family)}^FS\n`;
-  y += infoFont + lineGap;
+  // Qty + Size
+  z += `^FO${textX},${y}^CF0,${infoFont}\n`;
+  z += `^FDQty: ${sanitize(String(quantity))}   Size: ${sanitize(size)}^FS\n`;
 
-  // --- Qty + Size ---
-  zpl += `^FO${textX},${y}^CF0,${infoFont}\n`;
-  zpl += "^FH\\\n";
-  zpl += `^FDQty: ${zplEscape(String(quantity))}   Size: ${zplEscape(size)}^FS\n`;
-
-  zpl += "^XZ\n";
-  return zpl;
+  z += "^XZ\n";
+  return z;
 }
