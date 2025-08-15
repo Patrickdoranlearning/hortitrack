@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -51,7 +52,7 @@ import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { BatchForm } from '../components/batch-form';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
 import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
-import ScanAndActDialog from '@/components/scan-and-act-dialog';
+import ScannerDialog from '@/components/scan-and-act-dialog';
 import {
   TransplantForm,
   TransplantFormData,
@@ -285,14 +286,26 @@ export default function HomePageView({
   };
   
   const handleScanDetected = (text: string) => {
-    console.log("Detected code:", text);
-    // Here you would typically parse the text and find the corresponding batch
-    // For now, we'll just show a toast.
-    toast({
-      title: "Code Scanned",
-      description: `Detected: ${text}`,
-    });
-    setIsScanOpen(false);
+    setIsScanOpen(false); // Close scanner immediately
+    fetch(`/api/batches/scan?code=${encodeURIComponent(text)}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Batch not found.' }));
+          throw new Error(err.error);
+        }
+        return res.json();
+      })
+      .then(({ batch }) => {
+        setSelectedBatch(batch);
+        setIsDetailOpen(true);
+      })
+      .catch((e) => {
+        toast({
+          variant: "destructive",
+          title: "Scan Failed",
+          description: e.message || "Could not find a batch matching this code.",
+        });
+      });
   };
 
 
@@ -569,7 +582,7 @@ export default function HomePageView({
         onOpenChange={setIsRecommendationsOpen}
         batchId={selectedBatch?.id}
       />
-      <ScanAndActDialog 
+      <ScannerDialog 
         open={isScanOpen} 
         onOpenChange={setIsScanOpen} 
         onDetected={handleScanDetected}
