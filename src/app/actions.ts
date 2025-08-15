@@ -7,6 +7,7 @@ import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 import { z } from 'zod';
+import { allocateBatchNumber } from '@/server/services/batchNumber';
 
 export async function getBatchesAction() {
     try {
@@ -81,18 +82,23 @@ export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
 
 
 export async function addBatchAction(
-  newBatchData: Omit<Batch, 'id' | 'logHistory'>
+  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber'>
 ) {
   try {
-    const batchesCollection = db.collection('batches');
-    const newDocRef = batchesCollection.doc();
-    const newBatch: Batch = {
-      ...newBatchData,
-      id: newDocRef.id,
-      logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: 'Batch created.' }],
-    };
-    await newDocRef.set(newBatch);
-    return { success: true, data: newBatch };
+    return await db.runTransaction(async (transaction) => {
+        const newDocRef = db.collection('batches').doc();
+        const batchNumber = await allocateBatchNumber(transaction);
+        
+        const newBatch: Batch = {
+          ...(newBatchData as any),
+          id: newDocRef.id,
+          batchNumber: batchNumber,
+          logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: 'Batch created.' }],
+        };
+        
+        transaction.set(newDocRef, newBatch);
+        return { success: true, data: newBatch };
+    });
   } catch (error: any) {
     console.error('Error adding batch:', error);
     return { success: false, error: 'Failed to add batch: ' + error.message };
@@ -211,25 +217,12 @@ export async function transplantBatchAction(
             throw new Error('Insufficient quantity in source batch.');
         }
 
-        const allBatchesSnapshot = await transaction.get(db.collection('batches'));
-        const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
-            const b = doc.data() as Batch;
-            const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
-            return numPart > max ? numPart : max;
-        }, 0);
-        const nextBatchNumStr = (maxBatchNum + 1).toString().padStart(6, '0');
-
-        const batchNumberPrefix: Record<string, string> = {
-            'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
-            'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
-        };
-        const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
-
+        const batchNumber = await allocateBatchNumber(transaction);
         const newDocRef = db.collection('batches').doc();
         const newBatch: Batch = {
             ...(newBatchData as any),
             id: newDocRef.id,
-            batchNumber: prefixedBatchNumber,
+            batchNumber: batchNumber,
             initialQuantity: transplantQuantity,
             quantity: transplantQuantity,
             transplantedFrom: sourceBatch.batchNumber,
@@ -402,9 +395,8 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         batches.forEach(batchData => {
             const docRef = db.collection('batches').doc();
             
-            const newBatch: Omit<Batch, 'id'> = {
+            const newBatch: Omit<Batch, 'id' | 'batchNumber'> = {
               ...batchData,
-              batchNumber: `CSV-${docRef.id.substring(0,6)}`, // Temporary batch number
               logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: 'Batch created from CSV import.' }],
             };
             writeBatch.set(docRef, newBatch);
@@ -417,3 +409,5 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         return { success: false, error: error.message };
     }
 }
+
+    
