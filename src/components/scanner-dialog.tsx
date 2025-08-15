@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import jsQR from 'jsqr';
 import {
   Dialog,
   DialogContent,
@@ -12,10 +11,8 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { CameraOff, Send } from 'lucide-react';
-import { Input } from './ui/input';
-import { Button } from './ui/button';
-import { Separator } from './ui/separator';
+import { CameraOff } from 'lucide-react';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 interface ScannerDialogProps {
   open: boolean;
@@ -25,113 +22,96 @@ interface ScannerDialogProps {
 
 export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDialogProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [manualBatchNumber, setManualBatchNumber] = useState('');
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const { toast } = useToast();
 
-  const handleOpenChange = (isOpen: boolean) => {
-    onOpenChange(isOpen);
-    if (!isOpen && videoRef.current?.srcObject) {
+  const stopScanner = useCallback(() => {
+    if (readerRef.current) {
+      readerRef.current.reset();
+    }
+    if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
+  }, []);
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      stopScanner();
+    }
+    onOpenChange(isOpen);
   };
 
   useEffect(() => {
     if (!open) {
-      setManualBatchNumber('');
       return;
-    };
+    }
 
-    const getCameraPermission = async () => {
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.DATA_MATRIX]);
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    const reader = new BrowserMultiFormatReader(hints, 500);
+    readerRef.current = reader;
+
+    const startScanner = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        if (devices.length === 0) {
+          throw new Error('No video input devices found');
         }
-        setHasCameraPermission(true);
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
+        
+        const backCamera = devices.find(d => /back|rear|environment/i.test(d.label));
+        const deviceId = backCamera?.deviceId || devices[0]?.deviceId;
+
+        if (videoRef.current) {
+            setHasPermission(true);
+            await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result, err, controls) => {
+                if (result) {
+                    onScanSuccess(result.getText());
+                    handleOpenChange(false);
+                }
+                // We don't need to log errors here as they are frequent during scanning
+            });
+        }
+      } catch (err: any) {
+        console.error('Camera/Scanner error:', err);
+        setHasPermission(false);
         toast({
           variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings.',
+          title: 'Scanner Error',
+          description: err.message || 'Could not initialize camera.',
         });
       }
     };
 
-    getCameraPermission();
-    
+    startScanner();
+
     return () => {
-        if (videoRef.current?.srcObject) {
-            const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(track => track.stop());
-            videoRef.current.srcObject = null;
-        }
-    }
-  }, [open, toast]);
-
-  const tick = useCallback(() => {
-    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-      if (canvasRef.current) {
-        const canvas = canvasRef.current.getContext('2d');
-        if (canvas) {
-          canvas.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
-          const imageData = canvas.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'dontInvert',
-          });
-
-          if (code) {
-            onScanSuccess(code.data);
-            handleOpenChange(false);
-          }
-        }
-      }
-    }
-    if (open) {
-        requestAnimationFrame(tick);
-    }
-  }, [open, onScanSuccess, handleOpenChange]);
-
-  useEffect(() => {
-    let animationFrameId: number;
-    if (open && hasCameraPermission) {
-        animationFrameId = requestAnimationFrame(tick);
-    }
-    return () => {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
-    }
-  }, [open, hasCameraPermission, tick]);
-
-  const handleManualSubmit = () => {
-    if (manualBatchNumber.trim()) {
-      onScanSuccess(manualBatchNumber.trim());
-      handleOpenChange(false);
-    }
-  };
+      stopScanner();
+    };
+  }, [open, onScanSuccess, stopScanner, toast, handleOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Scan Batch Code</DialogTitle>
-          <DialogDescription>Point your camera at a barcode or data matrix.</DialogDescription>
+          <DialogTitle>Scan Batch Data Matrix</DialogTitle>
+          <DialogDescription>Point your camera at the Data Matrix code.</DialogDescription>
         </DialogHeader>
-        <div className="relative aspect-square w-full">
+        <div className="relative aspect-square w-full rounded-md overflow-hidden bg-muted">
           <video
             ref={videoRef}
-            className="h-full w-full rounded-md object-cover"
+            className="h-full w-full object-cover"
             playsInline
             autoPlay
             muted
           />
-          <canvas ref={canvasRef} className="hidden" />
-          {hasCameraPermission === false && (
+           <div className="pointer-events-none absolute inset-0 grid place-items-center">
+             <div className="w-48 h-48 max-w-[65%] max-h-[65%] border-2 border-white/70 rounded" />
+           </div>
+          {hasPermission === false && (
             <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md bg-background/80">
                 <Alert variant="destructive" className="w-auto">
                     <CameraOff className="h-4 w-4" />
@@ -143,22 +123,9 @@ export function ScannerDialog({ open, onOpenChange, onScanSuccess }: ScannerDial
             </div>
           )}
         </div>
-        <Separator />
-        <div>
-          <p className="mb-2 text-center text-sm text-muted-foreground">Or enter manually</p>
-          <div className="flex gap-2">
-            <Input 
-              placeholder="Enter batch number..."
-              value={manualBatchNumber}
-              onChange={(e) => setManualBatchNumber(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-            />
-            <Button onClick={handleManualSubmit} disabled={!manualBatchNumber.trim()}>
-              <Send />
-              Submit
-            </Button>
-          </div>
-        </div>
+        <p className="mt-2 text-sm text-center text-muted-foreground">
+            Tip: Fill the square, keep steady, and use good lighting.
+        </p>
       </DialogContent>
     </Dialog>
   );
