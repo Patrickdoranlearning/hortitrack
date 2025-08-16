@@ -147,9 +147,13 @@ export function BatchDetailDialog({
           <div className="h-[100dvh] overflow-y-auto sm:h-auto sm:max-h-[80vh]">
             <DialogHeader className="p-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
-                <div className="mb-4 sm:mb-0">
-                  <DialogTitle className="font-headline text-3xl">{batch.plantVariety}</DialogTitle>
-                  <DialogDescription className="text-lg">{batch.plantFamily} - Batch #{batch.batchNumber}</DialogDescription>
+                <div className="mb-4 sm:mb-0 min-w-0">
+                  <DialogTitle className="font-headline text-3xl break-words">{batch.plantVariety}</DialogTitle>
+                  <DialogDescription className="text-lg">
+                    <span className="whitespace-nowrap">{batch.plantFamily}</span>
+                    <span className="mx-2 text-muted-foreground/50 select-none">•</span>
+                    <span className="whitespace-nowrap">Batch #{batch.batchNumber}</span>
+                  </DialogDescription>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 sm:flex sm:flex-wrap sm:justify-end gap-2 shrink-0">
                   <input

@@ -72,17 +72,15 @@
   }
 }
 
-/* --- No horizontal scroll anywhere, sane wrapping defaults --- */
+/* No horizontal scroll globally */
 html, body { overflow-x: hidden; }
-
-/* Let long words/IDs/emails wrap instead of forcing scroll */
-* { word-break: break-word; }
-code, kbd, samp { word-break: break-all; }
-pre { white-space: pre-wrap; word-wrap: break-word; }
-
 /* Media must never overflow their container */
 img, video, canvas, svg { max-width: 100%; height: auto; }
-
 /* Tables shrink inside instead of pushing the page wide */
 table { table-layout: fixed; width: 100%; }
 th, td { overflow: hidden; text-overflow: ellipsis; }
+
+/* Opt-in helpers (use on offenders, not globally) */
+.break-words { overflow-wrap: anywhere; word-break: break-word; }
+.break-anywhere { word-break: break-all; }
+.no-x-scroll { overflow-x: hidden; }
