@@ -28,6 +28,7 @@ import { collection, onSnapshot, query, orderBy, writeBatch, doc } from 'firebas
 import { addVarietyAction, updateVarietyAction, deleteVarietyAction } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VARIETIES as INITIAL_VARIETIES } from '@/lib/varieties';
+import { VarietiesCsvButtons } from '@/components/varieties/VarietiesCsvButtons';
 
 
 export default function VarietiesPage() {
@@ -138,6 +139,7 @@ export default function VarietiesPage() {
                     Back to Data Management
                 </Link>
             </Button>
+            <VarietiesCsvButtons />
             <Button onClick={handleAddVariety}>
                 <Plus />
                 Add New Variety
@@ -233,6 +235,3 @@ export default function VarietiesPage() {
     </>
   );
 }
-
-
-
