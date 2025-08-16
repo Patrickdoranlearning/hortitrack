@@ -16,8 +16,8 @@ export function GenerateProtocolButton({ batchId, defaultName }: { batchId: stri
       });
       if (!res.ok) {
         const txt = await res.text();
-        let msg = "Failed";
-        try { msg = JSON.parse(txt).error || msg; } catch { msg = txt || msg; }
+        let msg = "Failed to generate protocol";
+        try { msg = (JSON.parse(txt).error as string) || msg; } catch { msg = txt || msg; }
         throw new Error(msg);
       }
       const blob = await res.blob();

@@ -4,7 +4,7 @@ type AnyDate = Date | string | number | null | undefined;
 const fmt = (d: AnyDate) => {
   if (!d) return "";
   try {
-    const dd = new Date(d);
+    const dd = new Date(d as any);
     return dd.toISOString().slice(0, 10);
   } catch {
     return String(d);

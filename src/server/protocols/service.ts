@@ -1,7 +1,11 @@
 
 import { adminDb } from "@/server/db/admin";
+import { isValidDocId } from "@/server/util/ids";
 
 export async function getBatchById(id: string) {
+  if (!isValidDocId(id)) {
+    throw new Error("Invalid batch id");
+  }
   const snap = await adminDb.collection("batches").doc(id).get();
   if (!snap.exists) return null;
   return { id: snap.id, ...snap.data() } as any;
