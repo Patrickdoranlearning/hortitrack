@@ -61,6 +61,7 @@ import { VarietyForm } from '../components/variety-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useCollection } from '@/hooks/use-collection';
 import { getCareRecommendationsAction } from './actions';
+import { FeatureGate } from '@/components/FeatureGate';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -395,14 +396,16 @@ export default function HomePageView({
               <QrCode />
               Scan
             </Button>
-            <Button
-              onClick={handleAiCareClick}
-              variant="outline"
-              disabled={isReadonly || batches.length === 0}
-              className="w-full sm:w-auto"
-            >
-              <Sparkles /> AI Care
-            </Button>
+            <FeatureGate name="aiCare">
+              <Button
+                onClick={handleAiCareClick}
+                variant="outline"
+                disabled={isReadonly || batches.length === 0}
+                className="w-full sm:w-auto"
+              >
+                <Sparkles /> AI Care
+              </Button>
+            </FeatureGate>
             <Button onClick={() => handleOpenForm()} disabled={isReadonly} className="w-full sm:w-auto">
               <Plus /> New Batch
             </Button>
@@ -592,5 +595,3 @@ export default function HomePageView({
     </div>
   );
 }
-
-    

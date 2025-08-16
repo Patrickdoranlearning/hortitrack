@@ -22,6 +22,7 @@ import { BatchChatDialog } from '@/components/batch-chat-dialog';
 import { uploadBatchPhoto } from '@/lib/storage';
 import FlagBatchDialog from '@/components/flag-batch-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { FeatureGate } from './FeatureGate';
 
 interface BatchDetailDialogProps {
     open: boolean;
@@ -162,7 +163,9 @@ export function BatchDetailDialog({
                   <Button variant="outline" size="sm" onClick={handleLogAction}><ClipboardList /> Log</Button>
                   <Button variant="outline" size="sm" onClick={handleTransplant}><MoveRight /> Transplant</Button>
                   <Button variant="outline" size="sm" onClick={() => onGenerateProtocol(batch)}><FileText /> Protocol</Button>
-                  <Button variant="outline" size="sm" onClick={() => onCareRecommendations(batch)}><Leaf /> Care Recs</Button>
+                  <FeatureGate name="aiCare">
+                    <Button variant="outline" size="sm" onClick={() => onCareRecommendations(batch)}><Leaf /> Care Recs</Button>
+                  </FeatureGate>
                    <Button variant="outline" size="sm" onClick={handlePickPhoto}><Camera /> Photo</Button>
                    <Button variant={batch?.flag?.active ? "destructive" : "outline"} size="sm" onClick={() => {
                       if (batch?.flag?.active) {
@@ -327,5 +330,3 @@ export function BatchDetailDialog({
     </>
   );
 }
-
-    
