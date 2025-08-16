@@ -2,19 +2,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/server/db/admin";
 import { declassify } from "@/server/utils/declassify";
-import { parseScanCode } from "@/server/scan/parse";
 
 /** Accepts many real-world scans and extracts a usable key. */
 function parseScanCode(raw: string): { by: "id" | "batchNumber"; value: string } | null {
   if (!raw) return null;
 
-  // 1) Normalize: strip control chars (FNC1 etc.), trim spaces
+  // 1) Normalize: strip control chars (FNC1 etc.), collapse spaces
   let code = String(raw)
-    .replace(/[\u0000-\u001F\u007F]/g, "") // control chars
+    .replace(/[\u0000-\u001F\u007F]/g, "") // control chars (incl. FNC1)
     .replace(/\s+/g, " ")
     .trim();
 
-  // 2) Common explicit prefixes we use
+  // 2) Our explicit prefixes
   if (/^ht:batch:/i.test(code)) {
     const v = code.split(":").pop()!.trim();
     if (/^\d{4,}$/.test(v) || /^\d{1,2}-\d{6}$/.test(v)) return { by: "batchNumber", value: v };
@@ -24,26 +23,25 @@ function parseScanCode(raw: string): { by: "id" | "batchNumber"; value: string }
     if (/^[A-Za-z0-9_-]{16,32}$/.test(v)) return { by: "id", value: v };
   }
 
-  // 3) Try pure Firestore-like ids first (16–32 URL-safe chars)
+  // 3) Firestore-like doc id (url-safe, 16–32 chars)
   if (/^[A-Za-z0-9_-]{16,32}$/.test(code)) return { by: "id", value: code };
 
-  // 4) Try plain batch number (all digits, at least 4) or our hyphenated format (e.g., 1-000123)
+  // 4) Batch number formats
   if (/^\d{4,}$/.test(code) || /^\d{1,2}-\d{6}$/.test(code)) {
     return { by: "batchNumber", value: code };
   }
 
-  // 5) If code contains multiple fields (GS1-like), scan for likely tokens
-  //    - Firestore id-like token
+  // 5) Embedded tokens (GS1 or mixed payloads)
   const idToken = (code.match(/[A-Za-z0-9_-]{16,32}/g) || []).find(Boolean);
   if (idToken) return { by: "id", value: idToken };
 
-  //    - Batch number-like token (hyphenated or long digits)
-  const batchToken =
-    (code.match(/\b\d{1,2}-\d{6}\b/) || [])[0] ||
-    (code.match(/\b\d{4,}\b/) || [])[0];
-  if (batchToken) return { by: "batchNumber", value: batchToken };
+  const hyphenFmt = (code.match(/\b\d{1,2}-\d{6}\b/) || [])[0];
+  if (hyphenFmt) return { by: "batchNumber", value: hyphenFmt };
 
-  // 6) URL-encoded? try decodeURIComponent once
+  const longDigits = (code.match(/\b\d{4,}\b/) || [])[0];
+  if (longDigits) return { by: "batchNumber", value: longDigits };
+
+  // 6) URL-encoded once?
   try {
     const dec = decodeURIComponent(code);
     if (dec !== code) return parseScanCode(dec);
