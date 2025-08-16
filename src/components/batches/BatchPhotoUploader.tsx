@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useRef, useState } from "react";
@@ -18,8 +19,17 @@ export function BatchPhotoUploader({ batchId, onUploaded, className }: Props) {
   const galRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const normalizedId = String(batchId ?? "").trim();
+  const validId = normalizedId.length > 6;
+
 
   async function upload(file: File) {
+    if (!validId) {
+      console.warn("[uploader] missing batchId:", batchId);
+      setHint("Save the batch before adding photos.");
+      return;
+    }
+
     setBusy(true);
     setHint("Uploading photo…");
 
@@ -29,7 +39,7 @@ export function BatchPhotoUploader({ batchId, onUploaded, className }: Props) {
       const form = new FormData();
       form.set("file", blob, file.name);
 
-      const res = await fetch(`/api/batches/${batchId}/photos`, { method: "POST", body: form });
+      const res = await fetch(`/api/batches/${encodeURIComponent(normalizedId)}/photos`, { method: "POST", body: form });
       const json = await res.json();
       if (!res.ok) {
         throw new Error(json?.error || "Upload failed");
@@ -52,17 +62,28 @@ export function BatchPhotoUploader({ batchId, onUploaded, className }: Props) {
     <div className={["w-full", className ?? ""].join(" ")}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button className="w-full rounded-2xl" disabled={busy} data-testid="btn-add-photo">
+          <Button
+            className="w-full rounded-2xl"
+            disabled={busy || !validId}
+            title={!validId ? "Save the batch first" : undefined}
+            data-testid="btn-add-photo"
+          >
             <Plus className="mr-2 h-4 w-4" />
             {busy ? "Uploading…" : "Add Photo"}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={() => camRef.current?.click()}>
+          <DropdownMenuItem
+            disabled={!validId}
+            onClick={() => validId && camRef.current?.click()}
+          >
             <Camera className="mr-2 h-4 w-4" />
             Take Photo
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => galRef.current?.click()}>
+          <DropdownMenuItem
+            disabled={!validId}
+            onClick={() => validId && galRef.current?.click()}
+          >
             <Images className="mr-2 h-4 w-4" />
             Upload from Gallery
           </DropdownMenuItem>
@@ -76,17 +97,18 @@ export function BatchPhotoUploader({ batchId, onUploaded, className }: Props) {
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+        onChange={(e) => { if (!validId) return; if (e.target.files?.[0]) upload(e.target.files[0]); }}
       />
       <input
         ref={galRef}
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+        onChange={(e) => { if (!validId) return; if (e.target.files?.[0]) upload(e.target.files[0]); }}
       />
 
       {hint && <div className="mt-2 text-xs text-muted-foreground">{hint}</div>}
+      {!validId && <div className="mt-2 text-xs text-amber-600">Save the batch before adding photos.</div>}
     </div>
   );
 }

@@ -14,9 +14,9 @@ function bad(status: number, error: string) {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { batchId: string } }
 ) {
-  const { id } = params;
+  const id = params.batchId;
   if (!id) return bad(400, "Missing batch id.");
 
   const snap = await adminDb
@@ -33,22 +33,21 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { batchId: string } }
 ) {
-  const { id } = params;
+  const id = params.batchId;
   if (!id) return bad(400, "Missing batch id.");
+  console.log("[photos] upload for batch", id); // quick visibility
 
   const form = await req.formData().catch(() => null);
   if (!form) return bad(400, "Invalid form data.");
 
   const file = form.get("file") as unknown as File | null;
-  if (!file) return bad(400, "Missing file field.");
-  if (typeof file.arrayBuffer !== "function") return bad(400, "Invalid file.");
-
-  const type = file.type || "application/octet-stream";
-  if (!type.startsWith("image/")) return bad(415, "Only image uploads allowed.");
+  if (!file || typeof file.arrayBuffer !== "function") return bad(400, "Missing or invalid file.");
+  if (!(file.type || "").startsWith("image/")) return bad(415, "Only image uploads allowed.");
   if (file.size > MAX_BYTES) return bad(413, "Image too large (max 8MB).");
 
+  const type = file.type || "image/jpeg";
   const ext = mime.getExtension(type) || "jpg";
   const buf = Buffer.from(await file.arrayBuffer());
 
@@ -56,10 +55,9 @@ export async function POST(
   const token = crypto.randomUUID();
 
   try {
-    // Acquire bucket by name; surface helpful error if missing
     const bucket = getGcsBucket();
-    // Store in default bucket, make tokenized public URL
     const gcsFile = bucket.file(objectPath);
+
     await gcsFile.save(buf, {
       resumable: false,
       contentType: type,
@@ -68,14 +66,12 @@ export async function POST(
         cacheControl: "public, max-age=31536000, immutable",
       },
     });
-    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
-      objectPath
-    )}?alt=media&token=${token}`;
 
-    // Persist metadata in a subcollection (scales better than array)
+    const publicUrl =
+      `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+
     const doc = await adminDb
-      .collection("batches")
-      .doc(id)
+      .collection("batches").doc(id)
       .collection("photos")
       .add({
         url: publicUrl,
@@ -86,12 +82,9 @@ export async function POST(
         uploadedAt: FieldValue.serverTimestamp(),
       });
 
-    return NextResponse.json({
-      photo: { id: doc.id, url: publicUrl, path: objectPath },
-    });
+    return NextResponse.json({ photo: { id: doc.id, url: publicUrl, path: objectPath } });
   } catch (err: any) {
     if (err?.code === "STORAGE_BUCKET_MISSING") {
-      console.error("photo upload failed: bucket missing");
       return bad(503, "Storage bucket is not configured.");
     }
     console.error("photo upload failed", err);

@@ -102,7 +102,9 @@ export function BatchActionBar({
           <FlaskConical className="mr-2 h-4 w-4" />
           Generate Protocol
         </Button>
-        <BatchPhotoUploader batchId={batch.id} onUploaded={onPhotoAdded} />
+        {!!batch.id && (
+          <BatchPhotoUploader batchId={String(batch.id)} onUploaded={onPhotoAdded} />
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="rounded-2xl w-full" aria-label="More actions" data-testid="btn-more">
