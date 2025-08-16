@@ -143,7 +143,7 @@ export function BatchDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[100vw] h-[100dvh] max-w-none rounded-none p-0 sm:h-auto sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <DialogContent size="xl" className="w-[100vw] h-[100dvh] max-w-none rounded-none p-0 sm:h-auto sm:max-w-2xl sm:rounded-xl sm:p-6">
           <div className="h-[100dvh] overflow-y-auto sm:h-auto sm:max-h-[80vh]">
             <DialogHeader className="p-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
