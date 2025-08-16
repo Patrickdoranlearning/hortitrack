@@ -6,7 +6,7 @@ import { adminDb } from "@/server/db/admin";
 import { declassify } from "@/server/utils/declassify";
 
 export async function POST(req: NextRequest) {
-  // --- parser is scoped INSIDE POST to avoid any duplicate-name conflicts ---
+  // --- parser is scoped INSIDE POST to avoid duplicate-name conflicts ---
   function parseScan(raw: string): { by: "id" | "batchNumber"; value: string } | null {
     if (!raw) return null;
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       return { by: "batchNumber", value: code };
     }
 
-    // 5) Embedded tokens (GS1 or mixed payloads)
+    // 5) Embedded tokens (GS1 / mixed payloads)
     const idToken = (code.match(/[A-Za-z0-9_-]{16,32}/g) || []).find(Boolean);
     if (idToken) return { by: "id", value: idToken };
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     return null;
   }
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------
 
   try {
     const { code } = (await req.json()) as { code?: string };

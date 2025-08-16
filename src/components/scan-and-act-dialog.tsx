@@ -1,14 +1,10 @@
-
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import {
-  BarcodeFormat,
-  DecodeHintType,
-} from "@zxing/library";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 type Props = {
   open: boolean;
@@ -22,7 +18,7 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
   const streamRef = useRef<MediaStream | null>(null);
   const [hintText, setHintText] = useState<string>("");
 
-  // stability tracking
+  // stability
   const lastTextRef = useRef<string>("");
   const sameCountRef = useRef<number>(0);
   const cooldownRef = useRef<boolean>(false);
@@ -68,11 +64,10 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
         BarcodeFormat.UPC_A,
         BarcodeFormat.UPC_E,
       ]);
-      hints.set(DecodeHintType.TRY_HARDER, true);     // better for small/low-contrast
+      hints.set(DecodeHintType.TRY_HARDER, true);     // small/low-contrast
       hints.set(DecodeHintType.ALSO_INVERTED, true);  // white-on-black
-      hints.set(DecodeHintType.ASSUME_GS1, true);     // tolerates FNC1/GS1 prefixes
+      hints.set(DecodeHintType.ASSUME_GS1, true);     // tolerates GS1/FNC1
 
-      // 150ms: responsive without thrashing
       readerRef.current = new BrowserMultiFormatReader(hints, 150);
 
       // Prefer rear camera
@@ -93,7 +88,7 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
             : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: false,
         };
-        // @ts-expect-error non-standard advanced constraint, harmless if ignored
+        // @ts-expect-error: advanced constraints are non-standard; safe to include
         (constraints.video as any).advanced = [{ focusMode: "continuous" }];
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -124,14 +119,14 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
       stopReaderRef.current = () => { stopped = true; };
 
       reader
-        .decodeFromVideoDevice(deviceId, videoRef.current!, (result, err) => {
+        .decodeFromVideoDevice(deviceId, videoRef.current!, (result, _err) => {
           if (stopped || cancelled) return;
-          if (!result) return; // ZXing emits frequent errs; ignore
+          if (!result) return; // ignore frequent transient errors
 
           const raw = String(result.getText() || "").trim();
           if (!raw) return;
 
-          // Require two identical reads in a row to avoid “jumps”
+          // Require two identical reads to avoid jumpiness
           if (raw === lastTextRef.current) {
             sameCountRef.current += 1;
           } else {
@@ -143,7 +138,7 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
             cooldownRef.current = true;
             try { navigator.vibrate?.(50); } catch {}
             onDetected(raw);
-            onOpenChange(false); // same UX as before
+            onOpenChange(false); // keep pop-up UX
             setTimeout(() => { cooldownRef.current = false; }, 1000);
           }
         })
@@ -169,6 +164,7 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
         </DialogHeader>
 
         <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-black">
+          {/* live video */}
           <video
             ref={videoRef}
             className="h-full w-full object-cover"
@@ -176,9 +172,11 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
             playsInline
             autoPlay
           />
+          {/* square overlay */}
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
             <div className="h-[72%] w-[72%] rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
           </div>
+          {/* hint text */}
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-black/60 px-3 py-1 text-xs text-white">
             {hintText || "Aim at the label and hold steady"}
           </div>
