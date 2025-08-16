@@ -40,6 +40,8 @@ const BatchFormSchema = z.object({
   plantingDate: z.date({ required_error: 'Planting date is required' }),
   supplier: z.string().optional().nullable(),
   location: z.string().min(1, 'Location is required'),
+  growerPhotoUrl: z.string().optional(),
+  salesPhotoUrl: z.string().optional(),
 });
 
 type BatchFormValues = z.infer<typeof BatchFormSchema>;
@@ -110,8 +112,8 @@ export function BatchForm({
       plantingDate: parseToDate(batch?.plantingDate),
       supplier: batch?.supplier ?? '',
       location: batch?.location ?? '',
-      growerPhotoUrl: '',
-      salesPhotoUrl: '',
+      growerPhotoUrl: batch?.growerPhotoUrl ?? '',
+      salesPhotoUrl: batch?.salesPhotoUrl ?? '',
     },
   });
 
@@ -152,6 +154,8 @@ export function BatchForm({
       location: values.location,
       size: values.size,
       supplier: values.supplier ? values.supplier : undefined,
+      growerPhotoUrl: values.growerPhotoUrl,
+      salesPhotoUrl: values.salesPhotoUrl,
     };
 
     if (isEdit && batch?.id) {
@@ -191,6 +195,8 @@ export function BatchForm({
       plantingDate: new Date(),
       supplier: '',
       location: '',
+      growerPhotoUrl: '',
+      salesPhotoUrl: '',
     });
   };
 
@@ -225,7 +231,7 @@ export function BatchForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 *:min-w-0">
           {/* Hidden fields to carry family & category */}
           <input type="hidden" {...form.register('plantFamily')} />
           <input type="hidden" {...form.register('category')} />

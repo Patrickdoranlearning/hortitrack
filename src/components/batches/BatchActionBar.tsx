@@ -48,120 +48,57 @@ export function BatchActionBar({
     <TooltipProvider>
       <div
         className={[
-          "w-full md:flex md:flex-wrap md:items-center md:justify-between gap-2",
-          "rounded-xl bg-muted/30 p-2",
+          // two rows on small screens, single row on medium and up
+          "w-full grid grid-cols-3 md:grid-cols-none md:grid-flow-col md:auto-cols-auto gap-2",
+          "rounded-xl bg-muted/30 p-2 overflow-x-hidden min-w-0",
           className ?? "",
         ].join(" ")}
         data-testid="batch-action-bar"
       >
-        {/* Left: primary actions */}
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={onEdit}
-            disabled={!onEdit}
-            className="rounded-2xl"
-            data-testid="btn-edit"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
+        <Button onClick={onEdit} disabled={!onEdit} className="rounded-2xl w-full" data-testid="btn-edit">
+          <Pencil className="mr-2 h-4 w-4" /> Edit
+        </Button>
+        <Button onClick={onMove} variant="secondary" disabled={!onMove} className="rounded-2xl w-full" data-testid="btn-move">
+          <MoveRight className="mr-2 h-4 w-4" /> Move
+        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onQr} variant="outline" size="sm" disabled={!onQr} className="rounded-2xl w-full" data-testid="btn-qr">
+              <QrCode className="mr-2 h-4 w-4" /> QR
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Generate / show QR</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onPrint} variant="outline" size="sm" disabled={!onPrint} className="rounded-2xl w-full" data-testid="btn-print">
+              <Printer className="mr-2 h-4 w-4" /> Print
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Print label</TooltipContent>
+        </Tooltip>
+        {isArchived ? (
+          <Button onClick={onUnarchive} disabled={!onUnarchive} className="rounded-2xl w-full" data-testid="btn-unarchive">
+            <ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive
           </Button>
-          <Button
-            onClick={onMove}
-            variant="secondary"
-            disabled={!onMove}
-            className="rounded-2xl"
-            data-testid="btn-move"
-          >
-            <MoveRight className="mr-2 h-4 w-4" />
-            Move
+        ) : (
+          <Button onClick={onArchive} disabled={!onArchive} className="rounded-2xl w-full" data-testid="btn-archive">
+            <ArchiveIcon className="mr-2 h-4 w-4" /> Archive
           </Button>
-        </div>
-
-        {/* Right: secondary + danger in kebab */}
-        <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={onQr}
-                variant="outline"
-                size="sm"
-                disabled={!onQr}
-                className="rounded-2xl"
-                data-testid="btn-qr"
-              >
-                <QrCode className="mr-2 h-4 w-4" />
-                QR
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Generate / show QR for this batch</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={onPrint}
-                variant="outline"
-                size="sm"
-                disabled={!onPrint}
-                className="rounded-2xl"
-                data-testid="btn-print"
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                Print
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Print label</TooltipContent>
-          </Tooltip>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-2xl"
-                aria-label="More actions"
-                data-testid="btn-more"
-              >
-                <MoreHorizontal className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>More actions</DropdownMenuLabel>
-
-              {isArchived ? (
-                <DropdownMenuItem
-                  onClick={onUnarchive}
-                  disabled={!onUnarchive}
-                  data-testid="mi-unarchive"
-                >
-                  <ArchiveRestore className="mr-2 h-4 w-4" />
-                  Unarchive
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  onClick={onArchive}
-                  disabled={!onArchive}
-                  data-testid="mi-archive"
-                >
-                  <ArchiveIcon className="mr-2 h-4 w-4" />
-                  Archive
-                </DropdownMenuItem>
-              )}
-
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem
-                onClick={onDelete}
-                disabled={!onDelete}
-                className="text-red-600 focus:text-red-600"
-                data-testid="mi-delete"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="rounded-2xl w-full" aria-label="More actions" data-testid="btn-more">
+              <MoreHorizontal className="mr-2 h-4 w-4" /> More
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel>More actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={onDelete} disabled={!onDelete} className="text-red-600 focus:text-red-600" data-testid="mi-delete">
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </TooltipProvider>
   );

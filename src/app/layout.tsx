@@ -44,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-       <body className={cn(ptSans.variable, playfairDisplay.variable, 'font-body', 'antialiased')}>
+       <body className={cn(ptSans.variable, playfairDisplay.variable, 'font-body', 'antialiased', 'overflow-x-hidden')}>
         {children}
         <Toaster />
       </body>

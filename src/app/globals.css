@@ -71,3 +71,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* --- No horizontal scroll anywhere, sane wrapping defaults --- */
+html, body { overflow-x: hidden; }
+
+/* Let long words/IDs/emails wrap instead of forcing scroll */
+* { word-break: break-word; }
+code, kbd, samp { word-break: break-all; }
+pre { white-space: pre-wrap; word-wrap: break-word; }
+
+/* Media must never overflow their container */
+img, video, canvas, svg { max-width: 100%; height: auto; }
+
+/* Tables shrink inside instead of pushing the page wide */
+table { table-layout: fixed; width: 100%; }
+th, td { overflow: hidden; text-overflow: ellipsis; }

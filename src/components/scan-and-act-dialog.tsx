@@ -167,7 +167,7 @@ export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Pro
           {/* live video */}
           <video
             ref={videoRef}
-            className="h-full w-full object-cover"
+            className="block w-full max-w-full rounded-xl bg-black object-cover"
             muted
             playsInline
             autoPlay
