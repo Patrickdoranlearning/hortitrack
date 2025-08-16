@@ -83,7 +83,15 @@ function findParentCandidate(batchDoc: any, logs: FirebaseFirestore.QuerySnapsho
   return (explicit as string) || fromLog || null;
 }
 
+function isValidId(id: unknown): id is string {
+  return typeof id === "string" && id.trim().length > 0 && !id.includes("/");
+}
+
 export async function buildBatchRoute(batchId: string, maxDepth = 3): Promise<BatchRoute> {
+  if (!isValidId(batchId)) {
+    console.warn("[buildBatchRoute] invalid id:", batchId);
+    return { ancestry: [], edges: [], nodes: {}, timeline: [], summary: { transplantWeek: null, previousProducedWeek: null, originBatchId: null, hops: 0 } };
+  }
   const nodes: Record<string, BatchNode> = {};
   const edges: BatchEdge[] = [];
   const ancestry: BatchRoute["ancestry"] = [];
@@ -96,6 +104,7 @@ export async function buildBatchRoute(batchId: string, maxDepth = 3): Promise<Ba
   let previousProducedWeek: string | null = null;
 
   while (currentId && level <= maxDepth) {
+    if (!isValidId(currentId)) break;
     const batchSnap = await adminDb.collection("batches").doc(currentId).get();
     if (!batchSnap.exists) break;
     const batchDoc = batchSnap.data() || {};

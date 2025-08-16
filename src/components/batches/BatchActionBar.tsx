@@ -83,10 +83,26 @@ export function BatchActionBar({
           </TooltipTrigger>
           <TooltipContent>Print label</TooltipContent>
         </Tooltip>
-        <Link href={`/batches/${batch.id}/history`} className="rounded-2xl w-full border inline-flex items-center justify-center px-3 py-2 hover:bg-muted/50 transition text-sm" data-testid="btn-history">
-          <History className="mr-2 h-4 w-4" />
-          History
-        </Link>
+        {batch?.id && typeof batch.id === "string" && !String(batch.id).includes("/") ? (
+          <Link
+            href={`/batches/${encodeURIComponent(String(batch.id))}/history`}
+            className="rounded-2xl w-full border inline-flex items-center justify-center px-3 py-2 hover:bg-muted/50 transition text-sm"
+            data-testid="btn-history"
+          >
+            <History className="mr-2 h-4 w-4" />
+            History
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="rounded-2xl w-full border opacity-60 cursor-not-allowed px-3 py-2 text-sm"
+            title="Save the batch before viewing history"
+          >
+            <History className="mr-2 h-4 w-4" />
+            History
+          </button>
+        )}
         {!!batch.id && (
           <BatchPhotoUploader batchId={String(batch.id)} onUploaded={onPhotoAdded} />
         )}

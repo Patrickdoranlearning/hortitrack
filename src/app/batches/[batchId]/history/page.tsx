@@ -4,6 +4,13 @@ import { adminDb } from "@/server/db/admin";
 import { LineageDiagram } from "@/components/batches/LineageDiagram";
 import { HistoryTimeline } from "@/components/batches/HistoryTimeline";
 import { GenerateProtocolButton } from "@/components/batches/GenerateProtocolButton";
+import { notFound } from "next/navigation";
+
+function normalizeId(raw: unknown): string | null {
+  const s = typeof raw === "string" ? decodeURIComponent(raw).trim() : "";
+  if (!s || s.includes("/")) return null; // Firestore doc ids cannot contain '/'
+  return s;
+}
 
 async function getBatch(id: string) {
   const snap = await adminDb.collection("batches").doc(id).get();
@@ -12,9 +19,14 @@ async function getBatch(id: string) {
   return { id: snap.id, batchNumber: d.batchNumber, variety: d.plantVariety ?? d.variety ?? null };
 }
 
-export default async function BatchHistoryPage({ params }: { params: { id: string } }) {
-  const id = params.id;
-  const batch = await getBatch(id);
+export default async function BatchHistoryPage({ params }: { params: { batchId: string } }) {
+  const id = normalizeId(params?.batchId);
+  if (!id) {
+    console.warn("[history] invalid batch id param:", params?.batchId);
+    notFound();
+  }
+  
+  const batch = await getBatch(id!);
   if (!batch) {
     return (
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-6">
@@ -25,7 +37,7 @@ export default async function BatchHistoryPage({ params }: { params: { id: strin
     );
   }
 
-  const route = await buildBatchRoute(id, 3);
+  const route = await buildBatchRoute(id!, 3);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 py-6 space-y-6 overflow-x-hidden">
@@ -36,7 +48,7 @@ export default async function BatchHistoryPage({ params }: { params: { id: strin
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link href={`/batches`} className="btn btn-ghost px-3 py-2 rounded-lg border">Back</Link>
-          <GenerateProtocolButton batchId={id} defaultName={`Protocol – ${batch.variety || "Batch"} (${new Date().toISOString().slice(0,10)})`} />
+          <GenerateProtocolButton batchId={id!} defaultName={`Protocol – ${batch.variety || "Batch"} (${new Date().toISOString().slice(0,10)})`} />
         </div>
       </div>
 
