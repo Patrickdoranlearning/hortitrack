@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { ImageIcon, ClipboardList, Flag, Printer } from 'lucide-react';
+import { ImageIcon, ClipboardList, Flag, Printer, Ruler, Package, MapPin } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +43,11 @@ export function BatchCard({
     batch.initialQuantity > 0
       ? (batch.quantity / batch.initialQuantity) * 100
       : 0;
+  
+  const variety = batch.plantVariety ?? "Unknown variety";
+  const sizeLabel = batch.size != null && String(batch.size).trim().length
+    ? String(batch.size)
+    : null;
 
   const getStatusVariant = (
     status: Batch['status']
@@ -79,59 +84,87 @@ export function BatchCard({
   return (
     <>
       <Card
-        className="flex flex-col h-full w-full hover:border-primary transition-colors cursor-pointer"
+        className="flex flex-col h-full w-full hover:border-primary transition-colors cursor-pointer group"
         onClick={() => onClick(batch)}
+        data-testid="batch-card"
       >
-        <CardContent className="p-3 flex gap-3 items-start flex-grow">
-          <div className="aspect-square w-20 flex-shrink-0 flex items-center justify-center bg-muted rounded-md">
-            <ImageIcon className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <div className="flex-grow space-y-2">
-            <div>
-              <CardTitle className="font-headline text-lg leading-tight flex items-center gap-2">
-                {batch.plantVariety}
-                {batch.flag?.active && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Flag className="h-4 w-4 text-destructive" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Flagged: {batch.flag.reason}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </CardTitle>
-              <CardDescription className="text-sm text-muted-foreground">
-                {batch.plantFamily}
-              </CardDescription>
-              <CardDescription className="text-xs pt-1">
-                Batch #{batch.batchNumber}
-              </CardDescription>
+        <CardHeader className="p-3 pb-2">
+            <div className="flex items-start justify-between gap-2">
+                <div className="flex-grow min-w-0">
+                     <CardTitle className="font-headline text-lg leading-tight flex items-center gap-2">
+                        <span className="truncate" title={variety}>
+                            {variety}
+                        </span>
+                        {batch.flag?.active && (
+                        <TooltipProvider>
+                            <Tooltip>
+                            <TooltipTrigger>
+                                <Flag className="h-4 w-4 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Flagged: {batch.flag.reason}</p>
+                            </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        )}
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground">
+                        Batch #{batch.batchNumber}
+                    </CardDescription>
+                </div>
+                <div className="shrink-0">
+                    <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
+                </div>
             </div>
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
+        </CardHeader>
+        <CardContent className="p-3 pt-0 flex-grow space-y-3">
+          <div className="flex justify-between text-xs font-semibold">
                 <span>Stock</span>
                 <span>
-                  {batch.quantity} / {batch.initialQuantity}
+                  {batch.quantity.toLocaleString()} / {batch.initialQuantity.toLocaleString()}
                 </span>
               </div>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-full">
                     <Progress value={stockPercentage} />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{Math.round(stockPercentage)}% remaining</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{Math.round(stockPercentage)}% remaining</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+           {batch.location && (
+             <span className="inline-flex items-center gap-1 rounded-md bg-muted/40 px-2 py-1">
+               <MapPin className="h-3.5 w-3.5" />
+               <span className="truncate max-w-[8rem]" title={batch.location}>{batch.location}</span>
+             </span>
+           )}
+           {batch.plantFamily && (
+             <span className="inline-flex items-center gap-1 rounded-md bg-muted/40 px-2 py-1">
+               <Package className="h-3.5 w-3.5" />
+               <span className="truncate max-w-[8rem]" title={batch.plantFamily}>{batch.plantFamily}</span>
+             </span>
+           )}
+          {sizeLabel && (
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-muted/40 px-2 py-1"
+              title={`Size ${sizeLabel}`}
+              aria-label={`Size ${sizeLabel}`}
+              data-testid="batch-size"
+            >
+              <Ruler className="h-3.5 w-3.5" />
+              <span className="truncate max-w-[8rem]">{sizeLabel}</span>
+            </span>
+          )}
+         </div>
+
         </CardContent>
-        <CardFooter className="flex justify-between items-center p-3 pt-0">
-          <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
+        <CardFooter className="flex justify-end p-2 pt-0">
           <div className="flex gap-1">
             <TooltipProvider>
                 <Tooltip>
@@ -199,8 +232,10 @@ export function BatchCard({
           plantFamily: batch.plantFamily,
           size: batch.size,
           initialQuantity: batch.initialQuantity ?? batch.quantity ?? 0,
+          quantity: batch.quantity,
         }}
       />
     </>
   );
 }
+
