@@ -37,8 +37,6 @@ interface BatchDetailDialogProps {
     onGenerateProtocol: (batch: Batch) => void;
     onCareRecommendations: (batch: Batch) => void;
     onDelete?: (batch: Batch) => void;
-    nurseryLocations: NurseryLocation[];
-    plantSizes: PlantSize[];
 }
 
 export function BatchDetailDialog({ 
@@ -168,6 +166,9 @@ export function BatchDetailDialog({
                   onMove={handleTransplant}
                   onPrint={handlePrint}
                   onDelete={onDelete ? handleDelete : undefined}
+                  onActionLog={handleLogAction}
+                  onArchive={batch.status !== 'Archived' ? () => { console.log('archive'); } : undefined}
+                  onUnarchive={batch.status === 'Archived' ? () => { console.log('unarchive'); } : undefined}
               />
 
               <section className="mt-4 space-y-1">

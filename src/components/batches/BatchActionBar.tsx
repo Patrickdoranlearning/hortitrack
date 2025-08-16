@@ -9,15 +9,15 @@ import {
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Pencil, MoveRight, QrCode, Printer, MoreHorizontal,
-  Archive as ArchiveIcon, ArchiveRestore, Trash2,
+  Archive as ArchiveIcon, ArchiveRestore, Trash2, History,
 } from "lucide-react";
 import * as React from "react";
 
 type BatchLite = {
   id: string;
   batchNumber: string | number;
-  status?: string;         // e.g., "Active" | "Archived"
-  archived?: boolean;      // optional flag some schemas use
+  status?: string;
+  archived?: boolean;
 };
 
 type Props = {
@@ -26,6 +26,7 @@ type Props = {
   onMove?: () => void;
   onQr?: () => void;
   onPrint?: () => void;
+  onActionLog?: () => void;
   onArchive?: () => void;
   onUnarchive?: () => void;
   onDelete?: () => void;
@@ -38,6 +39,7 @@ export function BatchActionBar({
   onMove,
   onQr,
   onPrint,
+  onActionLog,
   onArchive,
   onUnarchive,
   onDelete,
@@ -49,9 +51,8 @@ export function BatchActionBar({
     <TooltipProvider>
       <div
         className={[
-          // two rows on small screens, single row on medium and up
-          "w-full grid grid-cols-3 md:grid-cols-none md:grid-flow-col md:auto-cols-auto gap-2",
-          "rounded-xl bg-muted/30 p-2 overflow-x-hidden min-w-0",
+          "w-full grid grid-flow-col grid-rows-2 auto-cols-fr gap-2",
+          "rounded-xl bg-muted/30 p-2",
           className ?? "",
         ].join(" ")}
         data-testid="batch-action-bar"
@@ -59,8 +60,8 @@ export function BatchActionBar({
         <Button onClick={onEdit} disabled={!onEdit} className="rounded-2xl w-full" data-testid="btn-edit">
           <Pencil className="mr-2 h-4 w-4" /> Edit
         </Button>
-        <Button onClick={onMove} variant="secondary" disabled={!onMove} className="rounded-2xl w-full" data-testid="btn-move">
-          <MoveRight className="mr-2 h-4 w-4" /> Move
+        <Button onClick={onMove} variant="secondary" disabled={!onMove} className="rounded-2xl w-full" data-testid="btn-transplant">
+          <MoveRight className="mr-2 h-4 w-4" /> Transplant
         </Button>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -78,25 +79,40 @@ export function BatchActionBar({
           </TooltipTrigger>
           <TooltipContent>Print label</TooltipContent>
         </Tooltip>
-        {isArchived ? (
-          <Button onClick={onUnarchive} disabled={!onUnarchive} className="rounded-2xl w-full" data-testid="btn-unarchive">
-            <ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive
-          </Button>
-        ) : (
-          <Button onClick={onArchive} disabled={!onArchive} className="rounded-2xl w-full" data-testid="btn-archive">
-            <ArchiveIcon className="mr-2 h-4 w-4" /> Archive
-          </Button>
-        )}
+        <Button
+          onClick={onActionLog}
+          disabled={!onActionLog}
+          className="rounded-2xl w-full"
+          data-testid="btn-action-log"
+        >
+          <History className="mr-2 h-4 w-4" /> Action Log
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="rounded-2xl w-full" aria-label="More actions" data-testid="btn-more">
               <MoreHorizontal className="mr-2 h-4 w-4" /> More
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>More actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={onDelete} disabled={!onDelete} className="text-red-600 focus:text-red-600" data-testid="mi-delete">
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
+            {isArchived ? (
+              <DropdownMenuItem onClick={onUnarchive} disabled={!onUnarchive} data-testid="mi-unarchive">
+                <ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={onArchive} disabled={!onArchive} data-testid="mi-archive">
+                <ArchiveIcon className="mr-2 h-4 w-4" /> Archive
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={onDelete}
+              disabled={!onDelete}
+              className="text-red-600 focus:text-red-600"
+              data-testid="mi-delete"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
