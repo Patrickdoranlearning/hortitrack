@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import {
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Pencil, MoveRight, QrCode, Printer, MoreHorizontal,
-  Archive as ArchiveIcon, ArchiveRestore, Trash2, History,
+  Archive as ArchiveIcon, ArchiveRestore, Trash2, History, FlaskConical,
 } from "lucide-react";
 import * as React from "react";
 import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader";
@@ -27,6 +28,7 @@ type Props = {
   onQr?: () => void;
   onPrint?: () => void;
   onActionLog?: () => void;
+  onGenerateProtocol?: () => void;
   onArchive?: () => void;
   onUnarchive?: () => void;
   onDelete?: () => void;
@@ -41,6 +43,7 @@ export function BatchActionBar({
   onQr,
   onPrint,
   onActionLog,
+  onGenerateProtocol,
   onArchive,
   onUnarchive,
   onDelete,
@@ -88,6 +91,16 @@ export function BatchActionBar({
           data-testid="btn-action-log"
         >
           <History className="mr-2 h-4 w-4" /> Action Log
+        </Button>
+         <Button
+          onClick={onGenerateProtocol}
+          disabled={!onGenerateProtocol}
+          className="rounded-2xl w-full"
+          data-testid="btn-generate-protocol"
+          title="Generate a cultivation protocol from this batch"
+        >
+          <FlaskConical className="mr-2 h-4 w-4" />
+          Generate Protocol
         </Button>
         <BatchPhotoUploader batchId={batch.id} onUploaded={onPhotoAdded} />
         <DropdownMenu>

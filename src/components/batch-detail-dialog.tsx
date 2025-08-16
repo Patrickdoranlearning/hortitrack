@@ -12,7 +12,7 @@ import {
 import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf, Camera, Flag, QrCode, Printer } from 'lucide-react';
+import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf, Camera, Flag, QrCode, Printer, FlaskConical } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -96,7 +96,26 @@ export function BatchDetailDialog({
   const handleEdit = () => onEdit(batch);
   const handleTransplant = () => onTransplant(batch);
   const handleLogAction = () => onLogAction(batch);
-  const handleGenerateProtocol = () => onGenerateProtocol(batch);
+  
+  const handleGenerateProtocolClick = () => {
+      const name = `Protocol – ${batch.plantVariety || "Batch"} (${new Date().toISOString().slice(0,10)})`;
+      fetch("/api/protocols/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: batch!.id, name, publish: true }),
+      })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j?.error || "Failed to generate");
+        toast({ title: "Protocol Generated", description: "Successfully created a new protocol from this batch." });
+        onGenerateProtocol(batch);
+      })
+      .catch((e) => {
+        toast({ variant: 'destructive', title: "Generation Failed", description: e.message });
+        console.error(e);
+      });
+  };
+
   const handleCareRecommendations = () => onCareRecommendations(batch);
   const handleDelete = () => onDelete?.(batch);
   const handlePrint = () => setIsPreviewOpen(true);
@@ -180,6 +199,7 @@ export function BatchDetailDialog({
                   onPrint={handlePrint}
                   onDelete={onDelete ? handleDelete : undefined}
                   onActionLog={handleLogAction}
+                  onGenerateProtocol={batch.isTopPerformer ? handleGenerateProtocolClick : undefined}
                   onArchive={batch.status !== 'Archived' ? () => { console.log('archive'); } : undefined}
                   onUnarchive={batch.status === 'Archived' ? () => { console.log('unarchive'); } : undefined}
                   onPhotoAdded={refreshPhotos}
@@ -332,7 +352,7 @@ export function BatchDetailDialog({
                           <Button variant="outline" onClick={() => setIsChatOpen(true)}>
                               <MessageSquare /> AI Chat
                           </Button>
-                           <Button variant="outline" onClick={handleGenerateProtocol}>
+                           <Button variant="outline" onClick={() => onGenerateProtocol(batch)}>
                                <FileText /> Generate Protocol
                            </Button>
                            <FeatureGate name="aiCare">
@@ -374,7 +394,7 @@ export function BatchDetailDialog({
       <FlagBatchDialog
         open={flagOpen}
         onOpenChange={setFlagOpen}
-        batchId={batch!.id}
+        batch={batch}
         onDone={() => {
           toast({ title: "Batch flagged", description: "The issue has been recorded."});
         }}

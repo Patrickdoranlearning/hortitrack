@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 // This is the simplified, universal LogEntry shape for data transfer.
@@ -88,8 +89,51 @@ export const BatchSchema = z.object({
   updatedAt: z.any().optional(),
   flag: z.any().optional(), // Accommodate BatchFlag
   photos: z.array(z.any()).optional(), // For storing photo metadata
+  isTopPerformer: z.boolean().optional(),
+  topPerformerAt: z.any().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
+
+export const ProtocolSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: z.number(),
+  status: z.enum(["draft", "published"]),
+  createdAt: z.any(),
+  createdFromBatchId: z.string(),
+  plantFamily: z.string().optional().nullable(),
+  plantVariety: z.string().optional().nullable(),
+  season: z.string().optional().nullable(),
+  potSize: z.union([z.string(), z.number()]).optional().nullable(),
+  media: z.string().optional().nullable(),
+  containerType: z.string().optional().nullable(),
+  targets: z.object({
+    tempC: z.object({
+      day: z.number().optional().nullable(),
+      night: z.number().optional().nullable(),
+    }).optional(),
+    humidityPct: z.number().optional().nullable(),
+    lightHours: z.number().optional().nullable(),
+    ec: z.number().optional().nullable(),
+    ph: z.number().optional().nullable(),
+    spacing: z.string().optional().nullable(),
+  }).optional(),
+  steps: z.array(z.object({
+    title: z.string(),
+    kind: z.enum(["irrigation", "fertigation", "pruning", "pinch", "move", "misc"]),
+    notes: z.string().optional(),
+    intervalDays: z.number().optional().nullable(),
+  })).optional(),
+  sourceSnapshot: z.object({
+    batchNumber: z.union([z.string(), z.number()]).optional().nullable(),
+    sowDate: z.string().optional().nullable(),
+    plantingDate: z.string().optional().nullable(),
+    size: z.union([z.string(), z.number()]).optional().nullable(),
+    location: z.string().optional().nullable(),
+  }),
+});
+export type Protocol = z.infer<typeof ProtocolSchema>;
+
 
 export const VarietySchema = z.object({
   id: z.string().optional(),
