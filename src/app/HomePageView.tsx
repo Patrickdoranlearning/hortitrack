@@ -501,23 +501,28 @@ export default function HomePageView({
 
       {/* Dialogs */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
+        <DialogContent
+            size="xl"
+            className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden"
+          >
+          <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="font-headline text-3xl">
               {selectedBatch ? 'Edit Batch' : 'Create New Batch'}
             </DialogTitle>
           </DialogHeader>
-          <BatchForm
-            batch={selectedBatch}
-            onSubmitSuccess={() => setIsFormOpen(false)}
-            onCancel={() => setIsFormOpen(false)}
-            onArchive={handleArchive}
-            nurseryLocations={nurseryLocations || []}
-            plantSizes={plantSizes || []}
-            suppliers={suppliers || []}
-            varieties={varieties || []}
-            onCreateNewVariety={handleCreateNewVariety}
-          />
+          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
+            <BatchForm
+              batch={selectedBatch}
+              onSubmitSuccess={() => setIsFormOpen(false)}
+              onCancel={() => setIsFormOpen(false)}
+              onArchive={handleArchive}
+              nurseryLocations={nurseryLocations || []}
+              plantSizes={plantSizes || []}
+              suppliers={suppliers || []}
+              varieties={varieties || []}
+              onCreateNewVariety={handleCreateNewVariety}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

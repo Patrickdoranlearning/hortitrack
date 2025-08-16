@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { useEffect, useMemo, useState } from 'react';
@@ -203,7 +204,8 @@ export function BatchForm({
   return (
     <Form {...form}>
       <form
-        className="space-y-6"
+        id="batch-form"
+        className="space-y-6 min-w-0"
         onSubmit={form.handleSubmit(async (vals) => {
           try {
             // compute total when in tray mode before submit
@@ -492,7 +494,7 @@ export function BatchForm({
           />
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="sticky bottom-0 z-10 -mx-6 px-6 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t -mb-6 pt-4 pb-4">
           <Button
             type="button"
             variant="outline"
@@ -515,6 +517,7 @@ export function BatchForm({
 
           <Button
             type="submit"
+            form="batch-form"
             disabled={form.formState.isSubmitting}
             aria-disabled={form.formState.isSubmitting}
           >
