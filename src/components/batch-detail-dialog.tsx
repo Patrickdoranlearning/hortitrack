@@ -55,6 +55,21 @@ export function BatchDetailDialog({
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [photos, setPhotos] = React.useState<Array<{id:string; url:string}>>([]);
+  
+  const refreshPhotos = async () => {
+    if (!batch?.id) return;
+    const r = await fetch(`/api/batches/${batch.id}/photos`);
+    const j = await r.json();
+    if (Array.isArray(j.photos)) setPhotos(j.photos);
+  };
+  
+  React.useEffect(() => { 
+    if (batch?.id) {
+        refreshPhotos();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batch?.id]);
 
   const handlePickPhoto = () => fileInputRef.current?.click();
   const handlePhotoChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,6 +83,7 @@ export function BatchDetailDialog({
         body: JSON.stringify({ type: "Photo", photoUrl: url }),
       });
       toast({ title: "Photo uploaded", description: "The photo has been logged for this batch." });
+      refreshPhotos(); // Refresh photos after upload
     } catch (err: any) {
       toast({ variant: "destructive", title: "Upload Failed", description: err?.message ?? "Photo upload failed" });
     } finally {
@@ -154,9 +170,6 @@ export function BatchDetailDialog({
           <div className="h-[100dvh] overflow-y-auto sm:h-auto sm:max-h-[80vh]">
             <DialogHeader className="p-6">
                 <DialogTitle>Batch Actions</DialogTitle>
-                <DialogDescription>
-                    Perform actions or view details for this batch.
-                </DialogDescription>
             </DialogHeader>
 
             <div className="px-6 pb-6">
@@ -169,6 +182,7 @@ export function BatchDetailDialog({
                   onActionLog={handleLogAction}
                   onArchive={batch.status !== 'Archived' ? () => { console.log('archive'); } : undefined}
                   onUnarchive={batch.status === 'Archived' ? () => { console.log('unarchive'); } : undefined}
+                  onPhotoAdded={refreshPhotos}
               />
 
               <section className="mt-4 space-y-1">
@@ -187,6 +201,17 @@ export function BatchDetailDialog({
                   {batch.status && <span>Status: <b className="text-foreground">{batch.status}</b></span>}
                 </div>
               </section>
+
+              {!!photos.length && (
+                <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {photos.map((p) => (
+                    <a key={p.id} href={p.url} target="_blank" rel="noreferrer"
+                       className="block aspect-square overflow-hidden rounded-md border bg-muted/30">
+                      <img src={p.url} alt="Batch photo" className="h-full w-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )}
 
               <Tabs defaultValue="summary" className="w-full mt-4">
                 <TabsList>
@@ -284,35 +309,12 @@ export function BatchDetailDialog({
                       <Button variant="outline" size="sm" onClick={handlePickPhoto}><Camera /> Add Photo</Button>
 
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mt-4">
-                        <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-muted">
-                          {batch.growerPhotoUrl ? (
-                            <img
-                              src={batch.growerPhotoUrl}
-                              alt="Grower"
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="h-full w-full grid place-items-center text-sm text-muted-foreground">
-                              No Grower Photo
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-muted">
-                          {batch.salesPhotoUrl ? (
-                            <img
-                              src={batch.salesPhotoUrl}
-                              alt="Sales"
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="h-full w-full grid place-items-center text-sm text-muted-foreground">
-                              No Sales Photo
-                            </div>
-                          )}
-                        </div>
+                         {photos.map((p) => (
+                          <a key={p.id} href={p.url} target="_blank" rel="noreferrer"
+                             className="block aspect-square overflow-hidden rounded-md border bg-muted/30">
+                            <img src={p.url} alt="Batch photo" className="h-full w-full object-cover" />
+                          </a>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>

@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 // This is the simplified, universal LogEntry shape for data transfer.
@@ -88,6 +87,7 @@ export const BatchSchema = z.object({
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
   flag: z.any().optional(), // Accommodate BatchFlag
+  photos: z.array(z.any()).optional(), // For storing photo metadata
 });
 export type Batch = z.infer<typeof BatchSchema>;
 

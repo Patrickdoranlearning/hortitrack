@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import {
   Archive as ArchiveIcon, ArchiveRestore, Trash2, History,
 } from "lucide-react";
 import * as React from "react";
+import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader";
 
 type BatchLite = {
   id: string;
@@ -30,6 +30,7 @@ type Props = {
   onArchive?: () => void;
   onUnarchive?: () => void;
   onDelete?: () => void;
+  onPhotoAdded?: (p: { id: string; url: string }) => void;
   className?: string;
 };
 
@@ -43,6 +44,7 @@ export function BatchActionBar({
   onArchive,
   onUnarchive,
   onDelete,
+  onPhotoAdded,
   className,
 }: Props) {
   const isArchived = Boolean(batch.archived) || String(batch.status).toLowerCase() === "archived";
@@ -51,7 +53,7 @@ export function BatchActionBar({
     <TooltipProvider>
       <div
         className={[
-          "w-full grid grid-flow-col grid-rows-2 auto-cols-fr gap-2",
+          "w-full grid grid-cols-2 md:grid-cols-none md:grid-flow-col md:auto-cols-max md:justify-start gap-2",
           "rounded-xl bg-muted/30 p-2",
           className ?? "",
         ].join(" ")}
@@ -87,6 +89,7 @@ export function BatchActionBar({
         >
           <History className="mr-2 h-4 w-4" /> Action Log
         </Button>
+        <BatchPhotoUploader batchId={batch.id} onUploaded={onPhotoAdded} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="rounded-2xl w-full" aria-label="More actions" data-testid="btn-more">
