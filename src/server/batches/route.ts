@@ -25,6 +25,9 @@ export type BatchNode = {
   sowDate?: string | null;
   plantingDate?: string | null;
   producedAt?: string | null;
+  potSize?: string | number | null;
+  supplierName?: string | null;
+  supplierId?: string | null;
 };
 
 export type BatchEdge = {
@@ -53,6 +56,10 @@ async function readBatch(id: string): Promise<BatchNode | null> {
   const snap = await adminDb.collection("batches").doc(id).get();
   if (!snap.exists) return null;
   const d = snap.data() || {};
+  const supplierName =
+    d.supplier?.name ?? d.supplierName ?? d.vendorName ?? null;
+  const supplierId =
+    d.supplier?.id ?? d.supplierId ?? d.vendorId ?? null;
   return {
     id: snap.id,
     batchNumber: d.batchNumber ?? null,
@@ -60,6 +67,9 @@ async function readBatch(id: string): Promise<BatchNode | null> {
     sowDate: d.sowDate ?? null,
     plantingDate: d.plantingDate ?? null,
     producedAt: d.producedAt ?? d.harvestDate ?? null,
+    potSize: d.size ?? d.potSize ?? null,
+    supplierName,
+    supplierId,
   };
 }
 

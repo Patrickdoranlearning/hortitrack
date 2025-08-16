@@ -61,6 +61,12 @@ export async function renderProtocolPdf(protocol: any): Promise<Uint8Array> {
   drawText(`Family: ${protocol.plantFamily ?? "-"}`, { size: 11 });
   drawText(`Variety: ${protocol.plantVariety ?? "-"}`, { size: 11 });
   drawText(`Season: ${protocol.season ?? "-"}`, { size: 11 });
+  if (protocol.supplierName || protocol.supplierId) {
+    drawText(
+      `Supplier: ${protocol.supplierName ?? "-"}` + (protocol.supplierId ? ` (${protocol.supplierId})` : ""),
+      { size: 11 }
+    );
+  }
   y -= 6;
 
   // Inputs

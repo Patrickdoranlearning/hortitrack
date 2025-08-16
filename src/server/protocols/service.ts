@@ -30,6 +30,8 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
     potSize: batch.size ?? batch.potSize ?? null,
     media: batch.media ?? batch.substrate ?? null,
     containerType: batch.containerType ?? null,
+    supplierName: batch.supplier?.name ?? batch.supplierName ?? batch.vendorName ?? null,
+    supplierId: batch.supplier?.id ?? batch.supplierId ?? d.vendorId ?? null,
 
     targets: {
       tempC: {

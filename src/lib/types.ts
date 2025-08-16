@@ -120,6 +120,8 @@ export const ProtocolSchema = z.object({
   potSize: z.union([z.string(), z.number()]).optional().nullable(),
   media: z.string().optional().nullable(),
   containerType: z.string().optional().nullable(),
+  supplierName: z.string().optional().nullable(),
+  supplierId: z.string().optional().nullable(),
   targets: z.object({
     tempC: z.object({
       day: z.number().optional().nullable(),

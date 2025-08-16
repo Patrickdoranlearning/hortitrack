@@ -1,6 +1,6 @@
 type AncestryItem = {
   level: number;
-  node: { id: string; batchNumber?: string | number | null; plantVariety?: string | null; plantingDate?: string | null; sowDate?: string | null };
+  node: { id: string; batchNumber?: string | number | null; plantVariety?: string | null; plantingDate?: string | null; sowDate?: string | null; potSize?: string | number | null };
   via?: { action?: string; week?: string | null } | null;
 };
 
@@ -12,7 +12,7 @@ export function LineageDiagram({ ancestry }: { ancestry: AncestryItem[] }) {
   const nodes = [...ancestry].sort((a, b) => (b.level ?? 0) - (a.level ?? 0));
   const n = nodes.length;
   const boxW = 220;
-  const boxH = 74;
+  const boxH = 88;
   const gap = 36;
   const width = n * boxW + (n - 1) * gap + 24;
   const height = 140;
@@ -28,6 +28,7 @@ export function LineageDiagram({ ancestry }: { ancestry: AncestryItem[] }) {
           const header = `#${node.batchNumber ?? node.id}`;
           const sub = node.plantVariety ?? "";
           const sub2 = node.plantingDate ? `Planted ${node.plantingDate?.slice(0, 10)}` : (node.sowDate ? `Sowed ${node.sowDate?.slice(0, 10)}` : "");
+          const sub3 = node.potSize != null ? `Pot: ${String(node.potSize)}` : "";
 
           return (
             <g key={i}>
@@ -49,6 +50,7 @@ export function LineageDiagram({ ancestry }: { ancestry: AncestryItem[] }) {
               <text x={x + 10} y={y + 32} fontSize={13} fill="#000">{header}</text>
               {sub ? <text x={x + 10} y={y + 48} fontSize={11} fill="#444">{sub}</text> : null}
               {sub2 ? <text x={x + 10} y={y + 62} fontSize={10} fill="#666">{sub2}</text> : null}
+              {sub3 ? <text x={x + 10} y={y + 74} fontSize={10} fill="#666">{sub3}</text> : null}
             </g>
           );
         })}
