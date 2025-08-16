@@ -35,7 +35,7 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
           family: batch.plantFamily,
           quantity: batch.initialQuantity, // Usually print with initial quantity
           size: batch.size,
-          payload: `BATCH:${batch.batchNumber}`, // Or batch.id
+          payload: `ht:batch:${batch.batchNumber}`, // Or batch.id
         }),
       });
 
@@ -73,7 +73,7 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
                 family={batch.plantFamily}
                 quantity={batch.initialQuantity}
                 size={batch.size}
-                dataMatrixPayload={`BATCH:${batch.batchNumber}`}
+                dataMatrixPayload={`ht:batch:${batch.batchNumber}`}
             />
         </div>
 

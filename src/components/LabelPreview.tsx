@@ -1,3 +1,4 @@
+
 // src/components/LabelPreview.tsx
 "use client";
 import { useEffect, useRef } from "react";
@@ -27,7 +28,7 @@ export default function LabelPreview({
     try {
       bwipjs.toCanvas(dmRef.current, {
         bcid: "datamatrix",
-        text: dataMatrixPayload ?? `BATCH:${batchNumber}`,
+        text: dataMatrixPayload ?? `ht:batch:${batchNumber}`,
         scale: 3,
         includetext: false,
       });

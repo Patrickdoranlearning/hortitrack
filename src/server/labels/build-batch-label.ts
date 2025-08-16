@@ -1,3 +1,4 @@
+
 // src/server/labels/build-batch-label.ts
 const dpmm = 8; // 203dpi ≈ 8 dots/mm
 const mm = (n: number) => Math.round(n * dpmm);
@@ -12,6 +13,7 @@ type LabelInput = {
 };
 
 export function buildZpl({ batchNumber, variety, family, quantity, size, payload }: LabelInput) {
+  const dmPayload = payload ?? `ht:batch:${batchNumber}`;
   // Label size: 70x50mm, margin 3mm
   const W = mm(70); // 560
   const H = mm(50); // 400
@@ -36,7 +38,7 @@ export function buildZpl({ batchNumber, variety, family, quantity, size, payload
   const fInfo  = 30; // small info under DM
 
   // DataMatrix
-  const dmText = payload ?? `BATCH:${batchNumber}`;
+  const dmText = dmPayload;
   const dmModule = 6; // tweak 5–8 if needed
 
   return [

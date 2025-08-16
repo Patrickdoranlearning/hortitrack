@@ -6,7 +6,11 @@ import { declassify } from "@/server/utils/declassify";
 /** Try to understand whatever the scanner read. */
 function parseScanCode(raw: string): { by: "id" | "batchNumber"; value: string } | null {
   if (!raw) return null;
-  const code = String(raw).trim();
+  // Normalize: trim, drop common DM control separators (GS/RS/US),
+  // and hard-cap length to avoid abuse.
+  const code0 = String(raw).trim();
+  if (code0.length > 512) return null;
+  const code = code0.replace(/[\x1D\x1E\x1F]/g, "");
 
   // 1) Our recommended encodings
   //    ht:batch:12345  -> batchNumber
@@ -18,6 +22,12 @@ function parseScanCode(raw: string): { by: "id" | "batchNumber"; value: string }
   if (/^ht:id:/i.test(code)) {
     const val = code.split(":").pop()!.trim();
     if (/^[A-Za-z0-9_-]{15,}$/.test(val)) return { by: "id", value: val };
+  }
+
+  // 1b) Back-compat with existing labels: BATCH:12345
+  if (/^batch:/i.test(code)) {
+    const val = code.split(":").pop()!.trim();
+    if (/^\d+$/.test(val)) return { by: "batchNumber", value: val };
   }
 
   // 2) Pure number or "#12345" -> batchNumber
