@@ -38,7 +38,6 @@ export function buildZpl({ batchNumber, variety, family, quantity, size, payload
   const fInfo  = 30; // small info under DM
 
   // DataMatrix
-  const dmText = dmPayload;
   const dmModule = 6; // tweak 5–8 if needed
 
   return [
@@ -51,7 +50,7 @@ export function buildZpl({ batchNumber, variety, family, quantity, size, payload
     // Data Matrix top-left
     `^FO${M},${M}`,
     `^BXN,${dmSide},${dmModule},2`,
-    `^FD${escapeZpl(dmText)}^FS`,
+    `^FD${escapeZpl(dmPayload)}^FS`,
 
     // Details BELOW the Data Matrix (Family / Size / Qty)
     `^FO${M},${belowDmY}`,

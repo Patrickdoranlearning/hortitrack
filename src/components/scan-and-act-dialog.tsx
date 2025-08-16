@@ -9,6 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType, Result } from "@zxing/library";
 
+// Minimal typing for the experimental API
+declare global {
+  interface Window {
+    BarcodeDetector?: any;
+  }
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -43,26 +50,26 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
 
     const start = async () => {
       if (typeof window === "undefined") return;
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setHintText("Camera API not available in this browser.");
+        return;
+      }
 
       // HTTPS / permissions guard
       if (!window.isSecureContext) {
         setHintText("Camera requires HTTPS (or localhost).");
         return;
       }
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setHintText("Camera API not available in this browser.");
-        return;
-      }
 
-      // ZXing hints – include Data Matrix
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.DATA_MATRIX,
-        BarcodeFormat.QR_CODE,
-        BarcodeFormat.CODE_128,
-      ]);
-      // small delay between attempts
-      readerRef.current = new BrowserMultiFormatReader(hints, 300);
+      // Prefer native BarcodeDetector if it supports Data Matrix
+      const Native = window.BarcodeDetector;
+      let canUseNativeDM = false;
+      try {
+        if (Native && typeof Native.getSupportedFormats === "function") {
+          const fmts: string[] = await Native.getSupportedFormats();
+          canUseNativeDM = fmts.includes("data_matrix");
+        }
+      } catch {}
 
       try {
         // 1) Try to get the rear camera directly (works on most mobile)
@@ -95,20 +102,47 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
           await videoRef.current.play().catch(() => {});
         }
 
-        // On iOS, labels are empty until permission is granted.
-        // We already opened a stream so now decode using ZXing.
-        setHintText("Looking for a code…");
+        // Decide decode strategy
+        if (canUseNativeDM) {
+          setHintText("Scanning (native)...");
+          const detector = new Native({ formats: ["data_matrix", "qr_code", "code_128"] });
+          let raf = 0;
+          const loop = async () => {
+            if (cancelled || !videoRef.current) return;
+            try {
+              const codes = await detector.detect(videoRef.current);
+              const hit = codes?.find((c: any) => String(c?.rawValue || "").trim());
+              if (hit) {
+                const text = String(hit.rawValue).trim();
+                stop();
+                onDetected(text);
+                return;
+              }
+            } catch { /* keep trying */ }
+            raf = requestAnimationFrame(loop);
+          };
+          raf = requestAnimationFrame(loop);
+        } else {
+          // ZXing path with TRY_HARDER for tougher DM symbols
+          setHintText("Scanning…");
+          const hints = new Map();
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.DATA_MATRIX,
+            BarcodeFormat.QR_CODE,
+            BarcodeFormat.CODE_128,
+          ]);
+          hints.set(DecodeHintType.TRY_HARDER, true);
+          readerRef.current = new BrowserMultiFormatReader(hints, 300);
+          await readerRef.current!.decodeFromVideoElement(videoRef.current!, (result?: Result) => {
+            if (cancelled) return;
+            const text = result?.getText?.().trim();
+            if (text) {
+              stop();
+              onDetected(text);
+            }
+          });
+        }
 
-        // Use decodeFromVideoElement for consistent behavior
-        await readerRef.current!.decodeFromVideoElement(videoRef.current!, (result?: Result, err?: any) => {
-          if (cancelled) return;
-          if (result?.getText) {
-            const text = result.getText().trim();
-            // Freeze scanning until we resolve
-            stop();
-            onDetected(text);
-          }
-        });
       } catch (e: any) {
         console.error("Scanner init error:", e);
         if (e?.name === "OverconstrainedError") {
