@@ -9,10 +9,11 @@ import {
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Pencil, MoveRight, QrCode, Printer, MoreHorizontal,
-  Archive as ArchiveIcon, ArchiveRestore, Trash2, History, FlaskConical,
+  Archive as ArchiveIcon, ArchiveRestore, Trash2, History,
 } from "lucide-react";
 import * as React from "react";
 import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader";
+import Link from "next/link";
 
 type BatchLite = {
   id: string;
@@ -28,7 +29,6 @@ type Props = {
   onQr?: () => void;
   onPrint?: () => void;
   onActionLog?: () => void;
-  onGenerateProtocol?: () => void;
   onArchive?: () => void;
   onUnarchive?: () => void;
   onDelete?: () => void;
@@ -43,7 +43,6 @@ export function BatchActionBar({
   onQr,
   onPrint,
   onActionLog,
-  onGenerateProtocol,
   onArchive,
   onUnarchive,
   onDelete,
@@ -84,24 +83,10 @@ export function BatchActionBar({
           </TooltipTrigger>
           <TooltipContent>Print label</TooltipContent>
         </Tooltip>
-        <Button
-          onClick={onActionLog}
-          disabled={!onActionLog}
-          className="rounded-2xl w-full"
-          data-testid="btn-action-log"
-        >
-          <History className="mr-2 h-4 w-4" /> Action Log
-        </Button>
-         <Button
-          onClick={onGenerateProtocol}
-          disabled={!onGenerateProtocol}
-          className="rounded-2xl w-full"
-          data-testid="btn-generate-protocol"
-          title="Generate a cultivation protocol from this batch"
-        >
-          <FlaskConical className="mr-2 h-4 w-4" />
-          Generate Protocol
-        </Button>
+        <Link href={`/batches/${batch.id}/history`} className="rounded-2xl w-full border inline-flex items-center justify-center px-3 py-2 hover:bg-muted/50 transition text-sm" data-testid="btn-history">
+          <History className="mr-2 h-4 w-4" />
+          History
+        </Link>
         {!!batch.id && (
           <BatchPhotoUploader batchId={String(batch.id)} onUploaded={onPhotoAdded} />
         )}
@@ -113,6 +98,9 @@ export function BatchActionBar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>More actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={onActionLog} disabled={!onActionLog} data-testid="mi-action-log">
+                <History className="mr-2 h-4 w-4" /> Action Log
+            </DropdownMenuItem>
             {isArchived ? (
               <DropdownMenuItem onClick={onUnarchive} disabled={!onUnarchive} data-testid="mi-unarchive">
                 <ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive
