@@ -25,7 +25,6 @@ import { useToast } from '@/hooks/use-toast';
 import { FeatureGate } from './FeatureGate';
 import { BatchActionBar } from './batches/BatchActionBar';
 import BatchLabelPreview from './BatchLabelPreview';
-import { useGenerateProtocol } from '@/hooks/useGenerateProtocol';
 
 
 interface BatchDetailDialogProps {
@@ -57,7 +56,6 @@ export function BatchDetailDialog({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [photos, setPhotos] = React.useState<Array<{id:string; url:string}>>([]);
-  const { generate } = useGenerateProtocol();
   const [genBusy, setGenBusy] = React.useState(false);
   
   const refreshPhotos = async () => {
@@ -102,7 +100,6 @@ export function BatchDetailDialog({
   
   async function handleGenerateProtocolClick() {
     if (!batch) return;
-    // Always enabled: if not top-performer, ask before proceeding
     if (!batch.isTopPerformer) {
       const proceed = typeof window !== "undefined"
         ? window.confirm("This batch is not marked Top performer. Generate a protocol anyway?")
@@ -112,14 +109,27 @@ export function BatchDetailDialog({
     setGenBusy(true);
     try {
       const name = `Protocol – ${batch.plantVariety || "Batch"} (${new Date().toISOString().slice(0, 10)})`;
-      const protocol = await generate(batch.id!, { publish: true, name });
-      
-      toast?.({ title: "Protocol created", description: protocol.name });
-      console.log("Protocol created", protocol);
-      
+      const res = await fetch("/api/protocols/generate?download=pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/pdf" },
+        body: JSON.stringify({ batchId: batch.id, publish: true, name }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error((() => { try { return JSON.parse(txt).error; } catch { return txt; } })() || "Failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name.replace(/[^\w\-]+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } catch (e: any) {
-      toast?.({ title: "Generate failed", description: e.message, variant: "destructive" });
       console.error("Generate protocol failed", e);
+      alert(`Generate failed: ${e.message || e}`);
     } finally {
       setGenBusy(false);
     }
