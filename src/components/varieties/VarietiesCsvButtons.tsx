@@ -4,8 +4,10 @@
 import * as React from "react";
 import { Button } from "../ui/button";
 import { Download, Upload } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export function VarietiesCsvButtons() {
+  const { toast } = useToast();
   const [busy, setBusy] = React.useState<"down" | "up" | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -24,7 +26,7 @@ export function VarietiesCsvButtons() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      alert(`Download failed: ${e?.message || e}`);
+      toast({ variant: "destructive", title: "Download failed", description: e?.message || String(e) });
     } finally {
       setBusy(null);
     }
@@ -37,19 +39,22 @@ export function VarietiesCsvButtons() {
     try {
       const fd = new FormData();
       fd.set("file", f, f.name);
-      fd.set("dryRun", "false");     // set "true" to validate only
-      fd.set("upsertBy", "id");      // or "name"
+      fd.set("dryRun", "false");
+      fd.set("upsertBy", "name");
       const res = await fetch("/api/plant-varieties/import", { method: "POST", body: fd });
       const text = await res.text();
       let json: any = {};
       try { json = JSON.parse(text); } catch { throw new Error(text); }
       if (!res.ok || json?.error) throw new Error(json?.error || "Import failed");
       const { summary } = json;
-      alert(`Import complete: ${summary.created} created, ${summary.updated} updated, ${summary.errors} errors`);
-      // TODO: you can refresh the table here if needed
+      toast({
+        title: "Import complete",
+        description: `${summary.created} created, ${summary.updated} updated, ${summary.errors} errors.`
+      });
+      // Refresh the page to show new data
       window.location.reload();
     } catch (e: any) {
-      alert(`Upload failed: ${e?.message || e}`);
+      toast({ variant: "destructive", title: "Upload failed", description: e?.message || String(e) });
     } finally {
       setBusy(null);
       if (fileRef.current) fileRef.current.value = "";

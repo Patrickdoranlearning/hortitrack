@@ -5,14 +5,26 @@ import { parse } from "csv-parse/sync";
 import { FieldValue } from "firebase-admin/firestore";
 import type { Variety } from "@/lib/types";
 
+const normName = (s: any) => (typeof s === "string" ? s.trim().toLowerCase() : "");
+
 type Row = Partial<Variety> & { id?: string };
+
+function normBool(v: any): boolean | null {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "string") {
+      const s = v.trim().toLowerCase();
+      if (["true", "t", "1", "yes", "y"].includes(s)) return true;
+      if (["false", "f", "0", "no", "n"].includes(s)) return false;
+    }
+    return null;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
     const dryRun = (form.get("dryRun") ?? "false").toString() === "true";
-    const upsertBy = (form.get("upsertBy") ?? "id").toString(); // "id" | "name"
+    const upsertBy = (form.get("upsertBy") ?? "name").toString(); // default: name
 
     if (!file) return NextResponse.json({ error: "CSV file is required (form field 'file')" }, { status: 400 });
 
@@ -25,7 +37,7 @@ export async function POST(req: NextRequest) {
       trim: true,
     });
 
-    const results: Array<{ index: number; id?: string; name?: string; op?: "create" | "update"; error?: string }> = [];
+    const results: Array<{ index: number; id?: string; name?: string; op?: "create" | "update"; error?: string; matchedBy?: "id" | "name" }> = [];
     const batch = adminDb.batch();
 
     for (let i = 0; i < records.length; i++) {
@@ -33,26 +45,37 @@ export async function POST(req: NextRequest) {
       const name = (r.name ?? "").toString().trim();
       const id = (r.id ?? "").toString().trim();
       
-      if (!name && upsertBy === "name") {
+      if (upsertBy === "name" && !name) {
         results.push({ index: i, error: "Missing 'name' (required for upsertBy=name)" });
         continue;
       }
 
-      let docRef = null;
+      let docRef;
+      let matchedBy: "id" | "name" = "name";
+
       if (upsertBy === "id") {
         if (!id) {
           results.push({ index: i, name, error: "Missing 'id' (upsertBy=id)" });
           continue;
         }
         docRef = adminDb.collection("varieties").doc(id);
+        matchedBy = "id";
       } else {
-        // upsert by name: find existing doc by name
-        const qs = await adminDb.collection("varieties").where("name", "==", name).limit(1).get();
+        const lower = normName(name);
+        let qs = await adminDb.collection("varieties").where("nameLower", "==", lower).limit(2).get();
+        if (qs.size > 1) {
+            results.push({ index: i, name, error: "Multiple existing varieties match this name (case-insensitive). Please resolve duplicates." });
+            continue;
+        }
+        if (qs.empty) {
+            qs = await adminDb.collection("varieties").where("name", "==", name).limit(1).get();
+        }
         docRef = qs.empty ? adminDb.collection("varieties").doc() : qs.docs[0].ref;
       }
       
-      const payload: Omit<Variety, 'id'> = {
+      const payload: Omit<Variety, 'id'> & { nameLower: string } = {
           name,
+          nameLower: normName(name),
           family: (r.family ?? "").toString().trim() || "",
           category: (r.category ?? "").toString().trim() || "",
           grouping: (r.grouping ?? "").toString().trim() || undefined,
@@ -66,10 +89,10 @@ export async function POST(req: NextRequest) {
 
       const existing = await docRef.get();
       if (existing.exists) {
-        results.push({ index: i, id: docRef.id, name, op: "update" });
+        results.push({ index: i, id: docRef.id, name, op: "update", matchedBy });
         if (!dryRun) batch.set(docRef, { ...payload, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       } else {
-        results.push({ index: i, id: docRef.id, name, op: "create" });
+        results.push({ index: i, id: docRef.id, name, op: "create", matchedBy });
         if (!dryRun) batch.set(docRef, { ...payload, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       }
     }
