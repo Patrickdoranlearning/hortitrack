@@ -1,6 +1,6 @@
-
 import { adminDb } from "@/server/db/admin";
 import { isValidDocId } from "@/server/util/ids";
+import { buildBatchRoute } from "@/server/batches/route";
 
 export async function getBatchById(id: string) {
   if (!isValidDocId(id)) {
@@ -35,7 +35,7 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
     media: batch.media ?? batch.substrate ?? null,
     containerType: batch.containerType ?? null,
     supplierName: batch.supplier?.name ?? batch.supplierName ?? batch.vendorName ?? null,
-    supplierId: batch.supplier?.id ?? batch.supplierId ?? d.vendorId ?? null,
+    supplierId: batch.supplier?.id ?? batch.supplierId ?? batch.vendorId ?? null,
 
     targets: {
       tempC: {
@@ -59,7 +59,17 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
       size: batch.size ?? null,
       location: batch.location ?? null,
     },
+    // lineage & timeline will be attached below
   };
+
+  // Route is useful but not critical — don't fail PDF if it errors
+  try {
+    const route = await buildBatchRoute(batchId, 3);
+    (protocol as any).route = route;
+  } catch (e) {
+    console.warn("[createProtocolFromBatch] route build failed", e);
+    (protocol as any).route = { ancestry: [], edges: [], nodes: {}, timeline: [], summary: { hops: 0 } };
+  }
 
   const ref = await adminDb.collection("protocols").add(protocol);
   return { id: ref.id, ...protocol };

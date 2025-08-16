@@ -21,14 +21,29 @@ export async function POST(req: NextRequest) {
   const wantsPdf = url.searchParams.get("download") === "pdf" || req.headers.get("accept")?.includes("application/pdf");
 
   try {
-    const proto = await createProtocolFromBatch(batchId, { name, publish });
+    let proto: any;
+    try {
+      proto = await createProtocolFromBatch(batchId, { name, publish });
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      if (msg.includes("Invalid batch id")) return NextResponse.json({ error: "Invalid batch id", phase: "service" }, { status: 422 });
+      if (msg.includes("Batch not found")) return NextResponse.json({ error: "Batch not found", phase: "service" }, { status: 404 });
+      throw new Error(`service: ${msg}`);
+    }
 
     if (!wantsPdf) {
       return NextResponse.json({ protocol: proto }, { status: 201 });
     }
 
     // Render and return as downloadable PDF
-    const pdf = await renderProtocolPdf(proto);
+    let pdf: Uint8Array;
+    try {
+      pdf = await renderProtocolPdf(proto);
+    } catch (e: any) {
+      const detail = String(e?.message || e);
+      const payload = { error: "PDF render failed", phase: "pdf", detail: process.env.NODE_ENV !== "production" ? detail : undefined };
+      return NextResponse.json(payload, { status: 500 });
+    }
     const filename = `${(proto.name || "Protocol").replace(/[^\w\-]+/g, "_")}.pdf`;
     return new NextResponse(pdf, {
       status: 201,
@@ -40,9 +55,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     const msg = String(err?.message || err);
-    if (msg.includes("Invalid batch id")) return NextResponse.json({ error: "Invalid batch id" }, { status: 422 });
-    if (msg.includes("Batch not found")) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
     console.error("[protocols/generate] error:", { batchId, msg, stack: err?.stack });
-    return NextResponse.json({ error: "Failed to generate protocol" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to generate protocol", phase: "unknown", detail: process.env.NODE_ENV !== "production" ? msg : undefined }, { status: 500 });
   }
 }

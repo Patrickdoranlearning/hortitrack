@@ -1,15 +1,20 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFFont } from "pdf-lib";
 
 type AnyDate = Date | string | number | null | undefined;
-const fmt = (d: AnyDate) => {
+function fmt(d: AnyDate): string {
   if (!d) return "";
   try {
+    // Firestore Timestamp support (admin)
+    if (typeof d === "object" && d && typeof (d as any).toDate === "function") {
+      const iso = ((d as any).toDate() as Date).toISOString();
+      return iso.slice(0, 10);
+    }
     const dd = new Date(d as any);
-    return dd.toISOString().slice(0, 10);
+    return isFinite(dd.getTime()) ? dd.toISOString().slice(0, 10) : String(d);
   } catch {
     return String(d);
   }
-};
+}
 
 function wrapText(text: string, maxChars: number) {
   const words = String(text || "").split(/\s+/);
