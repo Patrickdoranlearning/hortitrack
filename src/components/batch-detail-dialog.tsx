@@ -146,7 +146,13 @@ export function BatchDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent size="xl" className="w-[100vw] h-[100dvh] max-w-none rounded-none p-0 sm:h-auto sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <DialogContent
+          className="min-w-0 overflow-x-hidden"
+          style={{
+            width: "calc(100vw - 2rem)",
+            maxWidth: "min(100vw - 2rem, 1180px)",
+          }}
+        >
           <div className="h-[100dvh] overflow-y-auto sm:h-auto sm:max-h-[80vh]">
             <DialogHeader className="p-6">
                 <DialogTitle>Batch Actions</DialogTitle>
