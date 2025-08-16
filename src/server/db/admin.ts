@@ -11,7 +11,7 @@ if (!getApps().length) {
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
       privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
     }),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET,
   });
 } else {
   app = getApps()[0]!;
@@ -19,5 +19,24 @@ if (!getApps().length) {
 
 export const adminAuth = getAuth(app);
 export const adminDb = getFirestore(app);
-export const adminStorage = getStorage(app);
-export const storageBucket = adminStorage.bucket();
+
+
+/**
+ * Get a Storage bucket by name. Never assumes a default bucket.
+ * Reads (in order): app.options.storageBucket, FIREBASE_STORAGE_BUCKET, GCS_BUCKET.
+ */
+export function getGcsBucket() {
+  const app = getApps()[0]!;
+  const byOptions = (app?.options?.storageBucket as string | undefined)?.trim();
+  const byEnv = (process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET || "").trim();
+  const name = byOptions || byEnv;
+  if (!name) {
+    const msg =
+      "Storage bucket is not configured. Set app.options.storageBucket or FIREBASE_STORAGE_BUCKET/GCS_BUCKET via your secrets manager.";
+    const err = new Error(msg);
+    // Tag for easier detection upstream
+    (err as any).code = "STORAGE_BUCKET_MISSING";
+    throw err;
+  }
+  return getStorage(app).bucket(name);
+}
