@@ -1,16 +1,14 @@
 
-'use client';
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType, Result } from "@zxing/library";
+"use client";
 
-declare global {
-  interface Window { BarcodeDetector?: any; }
-}
+import React, { useEffect, useRef, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import {
+  BarcodeFormat,
+  DecodeHintType,
+} from "@zxing/library";
 
 type Props = {
   open: boolean;
@@ -18,212 +16,177 @@ type Props = {
   onDetected: (text: string) => void;
 };
 
-type Phase = "idle" | "scanning" | "submitting" | "success" | "error";
-
-export default function ScannerDialog({ open, onOpenChange, onDetected }: Props) {
+export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const detectorRef = useRef<any | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [hintText, setHintText] = useState<string>("");
 
-  const [hint, setHint] = useState<string>("");
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [lastScan, setLastScan] = useState<{ raw: string; parsed?: { by: "id"|"batchNumber"; value: string } | null } | null>(null);
+  // stability tracking
+  const lastTextRef = useRef<string>("");
+  const sameCountRef = useRef<number>(0);
+  const cooldownRef = useRef<boolean>(false);
+  const stopReaderRef = useRef<() => void>();
 
-  const lockRef = useRef(false);
-  const lastValueRef = useRef<string>("");
-  const cooldownUntilRef = useRef<number>(0);
-
-  const stopTracks = useCallback(() => {
+  const stop = async () => {
     try { readerRef.current?.reset(); } catch {}
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    readerRef.current = null;
+
+    try {
+      const s = streamRef.current;
+      if (s) s.getTracks().forEach(t => t.stop());
+    } catch {}
     streamRef.current = null;
-    detectorRef.current = null;
-  }, []);
 
-  const closeDialog = useCallback(() => {
-    stopTracks();
-    setPhase("idle");
-    onOpenChange(false);
-  }, [onOpenChange, stopTracks]);
+    try { stopReaderRef.current?.(); } catch {}
+    stopReaderRef.current = undefined;
+  };
 
-  // Minimal normalize: KEEP FNC1/GS so server can parse GS1 DM
-  const normalize = (s: string) => String(s).trim();
-
-  const submit = useCallback(async (raw: string) => {
-    const now = Date.now();
-    if (lockRef.current || now < cooldownUntilRef.current) return;
-    const cleaned = normalize(raw);
-
-    if (cleaned && cleaned === lastValueRef.current) {
-      cooldownUntilRef.current = now + 800;
+  useEffect(() => {
+    if (!open) {
+      stop();
       return;
     }
 
-    lockRef.current = true;
-    setPhase("submitting");
-    setHint("Reading…");
-    setLastScan({ raw: cleaned }); // optimistic
+    let cancelled = false;
 
-    try {
-      // The onDetected prop in this component *is* the submit action
-      // It handles server validation and closing the dialog on success
-      await onDetected(cleaned);
-      // If onDetected doesn't throw, we assume success
-      setPhase("success");
-      setHint("Found! Opening…");
-      try { navigator.vibrate?.(50); } catch {}
-      stopTracks();
-      // The parent component is responsible for closing the dialog on success
-    } catch (e: any) {
-      setPhase("error");
-      const errJson = JSON.parse(e.message || '{}');
-      setHint(errJson?.error || "Unrecognized code. Hold steady and try again.");
-      if (errJson?.echo) {
-        setLastScan(errJson.echo);
-      }
-      lastValueRef.current = cleaned;
-      cooldownUntilRef.current = Date.now() + 1000;
-    } finally {
-      lockRef.current = false;
-    }
-  }, [onDetected, stopTracks]);
+    const start = async () => {
+      setHintText("Opening camera…");
 
-  const start = useCallback(async () => {
-    if (!open) return;
-    if (!navigator?.mediaDevices?.getUserMedia) {
-      setHint("Camera API unavailable.");
-      return;
-    }
+      // ZXing hints — robust for DataMatrix and common prints
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.QR_CODE,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.ITF,
+        BarcodeFormat.AZTEC,
+        BarcodeFormat.PDF_417,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);     // better for small/low-contrast
+      hints.set(DecodeHintType.ALSO_INVERTED, true);  // white-on-black
+      hints.set(DecodeHintType.ASSUME_GS1, true);     // tolerates FNC1/GS1 prefixes
 
-    setPhase("scanning");
-    setHint("Opening camera…");
-    setLastScan(null);
-    lastValueRef.current = "";
-    cooldownUntilRef.current = 0;
+      // 150ms: responsive without thrashing
+      readerRef.current = new BrowserMultiFormatReader(hints, 150);
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } , width: { ideal: 1280 }, height: { ideal: 720 }},
-        audio: false,
-      });
-      streamRef.current = stream;
-
-      const video = videoRef.current!;
-      video.srcObject = stream;
-      await video.play().catch(() => {});
-      setHint("Point at the code…");
-
-      const Native = window.BarcodeDetector;
-      let canNativeDM = false;
+      // Prefer rear camera
+      let deviceId: string | undefined;
       try {
-        if (Native && typeof Native.getSupportedFormats === "function") {
-          const fmts: string[] = await Native.getSupportedFormats();
-          canNativeDM = fmts.includes("data_matrix");
-        }
-      } catch {}
-
-      if (canNativeDM) {
-        detectorRef.current = new Native({ formats: ["data_matrix", "qr_code", "code_128"] });
-        const loop = async () => {
-          if (phase === "success" || phase === "idle") return;
-          try {
-            const codes = await detectorRef.current.detect(video);
-            const hit = codes?.find((c: any) => String(c?.rawValue || "").trim());
-            if (hit && !lockRef.current) {
-              const text = String(hit.rawValue).trim();
-              submit(text);
-            }
-          } catch { /* keep scanning */ }
-          rafRef.current = requestAnimationFrame(loop);
-        };
-        rafRef.current = requestAnimationFrame(loop);
-      } else {
-        const hints = new Map();
-        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-          BarcodeFormat.DATA_MATRIX, BarcodeFormat.QR_CODE, BarcodeFormat.CODE_128,
-        ]);
-        hints.set(DecodeHintType.TRY_HARDER, true);
-        readerRef.current = new BrowserMultiFormatReader(hints, 250);
-        await readerRef.current.decodeFromVideoElement(video, (result?: Result) => {
-          if (!result || lockRef.current) return;
-          const text = result.getText?.();
-          if (text && typeof text === "string" && text.trim()) {
-            submit(text.trim());
-          }
-        });
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        const rear = devices.find(d => /back|rear|environment/i.test(d.label || ""));
+        deviceId = (rear || devices[0])?.deviceId;
+      } catch {
+        deviceId = undefined;
       }
-    } catch (e: any) {
-      setPhase("error");
-      setHint(e?.name === "NotAllowedError" ? "Camera permission denied." : "Unable to start camera.");
-    }
-  }, [open, phase, submit]);
 
-  useEffect(() => {
-    if (open) {
-      start();
-    } else {
-      stopTracks();
-      setPhase("idle");
-    }
+      // Ask for 1080p; browsers downscale if needed; request continuous focus if supported
+      try {
+        const constraints: MediaStreamConstraints = {
+          video: deviceId
+            ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+            : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        };
+        // @ts-expect-error non-standard advanced constraint, harmless if ignored
+        (constraints.video as any).advanced = [{ focusMode: "continuous" }];
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch (e: any) {
+        setHintText(e?.name === "NotAllowedError" ? "Camera permission denied." : "Unable to start camera.");
+        return;
+      }
+
+      setHintText("Hold steady over the DataMatrix / QR label…");
+
+      // reset stability
+      lastTextRef.current = "";
+      sameCountRef.current = 0;
+      cooldownRef.current = false;
+
+      // Continuous decode
+      const reader = readerRef.current!;
+      let stopped = false;
+      stopReaderRef.current = () => { stopped = true; };
+
+      reader
+        .decodeFromVideoDevice(deviceId, videoRef.current!, (result, err) => {
+          if (stopped || cancelled) return;
+          if (!result) return; // ZXing emits frequent errs; ignore
+
+          const raw = String(result.getText() || "").trim();
+          if (!raw) return;
+
+          // Require two identical reads in a row to avoid “jumps”
+          if (raw === lastTextRef.current) {
+            sameCountRef.current += 1;
+          } else {
+            lastTextRef.current = raw;
+            sameCountRef.current = 1;
+          }
+
+          if (!cooldownRef.current && sameCountRef.current >= 2) {
+            cooldownRef.current = true;
+            try { navigator.vibrate?.(50); } catch {}
+            onDetected(raw);
+            onOpenChange(false); // same UX as before
+            setTimeout(() => { cooldownRef.current = false; }, 1000);
+          }
+        })
+        .catch(() => {
+          setHintText("Scanner error. Close and reopen the scanner.");
+        });
+    };
+
+    start();
+
     return () => {
-      stopTracks();
+      cancelled = true;
+      stop();
     };
-  }, [open, start, stopTracks]);
-
-  useEffect(() => {
-    const onVis = () => {
-      if (document.hidden) stopTracks();
-      else if (open) start();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [open, start, stopTracks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 sm:max-w-[480px]">
-        <DialogHeader className="px-4 pt-4">
-          <DialogTitle>Scan Batch Code</DialogTitle>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Scan code</DialogTitle>
         </DialogHeader>
 
-        <div className="relative aspect-video w-full overflow-hidden bg-black">
+        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-black">
           <video
             ref={videoRef}
-            className="h-full w-full object-contain"
+            className="h-full w-full object-cover"
             muted
             playsInline
             autoPlay
           />
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="h-[60%] w-[80%] rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            <div className="h-[72%] w-[72%] rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
           </div>
-          <div className={cn("absolute bottom-2 left-1/2 -translate-x-1/2 rounded px-3 py-1 text-xs text-white",
-            phase === 'submitting' && 'bg-blue-600',
-            phase === 'error' && 'bg-destructive',
-            phase === 'scanning' && 'bg-black/60',
-            phase === 'success' && 'bg-green-600'
-          )}>
-            {phase === 'submitting' ? <Loader2 className="animate-spin" /> : hint}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-black/60 px-3 py-1 text-xs text-white">
+            {hintText || "Aim at the label and hold steady"}
           </div>
-        </div>
-        
-        <div className="p-4 pt-2">
-            {lastScan && (
-              <div className="text-xs mt-1 text-muted-foreground/80 bg-muted p-2 rounded-md">
-                <div>Raw: <code className="break-all font-mono">{lastScan.raw}</code></div>
-                {lastScan.parsed && (
-                  <div>Parsed: <code className="font-mono">{lastScan.parsed.by} = {lastScan.parsed.value}</code></div>
-                )}
-              </div>
-            )}
         </div>
 
-        <DialogFooter className="p-3 border-t">
-          <Button variant="outline" onClick={closeDialog}>Close</Button>
-        </DialogFooter>
+        <div className="flex items-center justify-end gap-2 p-3">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

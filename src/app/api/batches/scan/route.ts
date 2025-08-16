@@ -4,6 +4,54 @@ import { adminDb } from "@/server/db/admin";
 import { declassify } from "@/server/utils/declassify";
 import { parseScanCode } from "@/server/scan/parse";
 
+/** Accepts many real-world scans and extracts a usable key. */
+function parseScanCode(raw: string): { by: "id" | "batchNumber"; value: string } | null {
+  if (!raw) return null;
+
+  // 1) Normalize: strip control chars (FNC1 etc.), trim spaces
+  let code = String(raw)
+    .replace(/[\u0000-\u001F\u007F]/g, "") // control chars
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // 2) Common explicit prefixes we use
+  if (/^ht:batch:/i.test(code)) {
+    const v = code.split(":").pop()!.trim();
+    if (/^\d{4,}$/.test(v) || /^\d{1,2}-\d{6}$/.test(v)) return { by: "batchNumber", value: v };
+  }
+  if (/^ht:id:/i.test(code)) {
+    const v = code.split(":").pop()!.trim();
+    if (/^[A-Za-z0-9_-]{16,32}$/.test(v)) return { by: "id", value: v };
+  }
+
+  // 3) Try pure Firestore-like ids first (16–32 URL-safe chars)
+  if (/^[A-Za-z0-9_-]{16,32}$/.test(code)) return { by: "id", value: code };
+
+  // 4) Try plain batch number (all digits, at least 4) or our hyphenated format (e.g., 1-000123)
+  if (/^\d{4,}$/.test(code) || /^\d{1,2}-\d{6}$/.test(code)) {
+    return { by: "batchNumber", value: code };
+  }
+
+  // 5) If code contains multiple fields (GS1-like), scan for likely tokens
+  //    - Firestore id-like token
+  const idToken = (code.match(/[A-Za-z0-9_-]{16,32}/g) || []).find(Boolean);
+  if (idToken) return { by: "id", value: idToken };
+
+  //    - Batch number-like token (hyphenated or long digits)
+  const batchToken =
+    (code.match(/\b\d{1,2}-\d{6}\b/) || [])[0] ||
+    (code.match(/\b\d{4,}\b/) || [])[0];
+  if (batchToken) return { by: "batchNumber", value: batchToken };
+
+  // 6) URL-encoded? try decodeURIComponent once
+  try {
+    const dec = decodeURIComponent(code);
+    if (dec !== code) return parseScanCode(dec);
+  } catch {}
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
@@ -49,9 +97,8 @@ export async function GET(req: NextRequest) {
       for (const val of candidates) {
         const snap = await adminDb.collection("batches").where("batchNumber", "==", val as any).limit(1).get();
         if (!snap.empty) {
-          const doc = snap.docs[0];
-          id = doc.id;
-          data = doc.data();
+          id = snap.docs[0].id;
+          data = snap.docs[0].data();
           break;
         }
       }
