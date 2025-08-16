@@ -24,15 +24,15 @@ export const adminDb = getFirestore(app);
  * Reads (in order): app.options.storageBucket, FIREBASE_STORAGE_BUCKET, GCS_BUCKET.
  */
 export function getGcsBucket() {
+  const app = getApps()[0]!;
   const byOptions = (app?.options?.storageBucket as string | undefined)?.trim();
   const byEnv = (process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET || "").trim();
   const name = byOptions || byEnv;
   if (!name) {
-    const msg =
-      "Storage bucket is not configured. Set app.options.storageBucket or FIREBASE_STORAGE_BUCKET/GCS_BUCKET via your secrets manager.";
-    const err = new Error(msg);
-    // Tag for easier detection upstream
-    (err as any).code = "STORAGE_BUCKET_MISSING";
+    const err: any = new Error(
+      "Storage bucket is not configured. Set app.options.storageBucket or FIREBASE_STORAGE_BUCKET/GCS_BUCKET via your secrets manager."
+    );
+    err.code = "STORAGE_BUCKET_MISSING";
     throw err;
   }
   return getStorage(app).bucket(name);

@@ -7,21 +7,14 @@ import crypto from "crypto";
 export const runtime = "nodejs";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
+const bad = (status: number, error: string) => NextResponse.json({ error }, { status });
 
-function bad(status: number, error: string) {
-  return NextResponse.json({ error }, { status });
-}
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { batchId: string } }
-) {
+export async function GET(_req: NextRequest, { params }: { params: { batchId: string } }) {
   const id = params.batchId;
   if (!id) return bad(400, "Missing batch id.");
 
   const snap = await adminDb
-    .collection("batches")
-    .doc(id)
+    .collection("batches").doc(id)
     .collection("photos")
     .orderBy("uploadedAt", "desc")
     .limit(50)
@@ -31,10 +24,7 @@ export async function GET(
   return NextResponse.json({ photos });
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { batchId: string } }
-) {
+export async function POST(req: NextRequest, { params }: { params: { batchId: string } }) {
   const id = params.batchId;
   if (!id) return bad(400, "Missing batch id.");
 
@@ -42,13 +32,11 @@ export async function POST(
   if (!form) return bad(400, "Invalid form data.");
 
   const file = form.get("file") as unknown as File | null;
-  if (!file) return bad(400, "Missing file field.");
-  if (typeof (file as any).arrayBuffer !== "function") return bad(400, "Invalid file.");
+  if (!file || typeof file.arrayBuffer !== "function") return bad(400, "Missing or invalid file.");
+  if (!(file.type || "").startsWith("image/")) return bad(415, "Only image uploads allowed.");
+  if (file.size > MAX_BYTES) return bad(413, "Image too large (max 8MB).");
 
-  const type = file.type || "application/octet-stream";
-  if (!type.startsWith("image/")) return bad(415, "Only image uploads allowed.");
-  if ((file as any).size > MAX_BYTES) return bad(413, "Image too large (max 8MB).");
-
+  const type = file.type || "image/jpeg";
   const ext = mime.getExtension(type) || "jpg";
   const buf = Buffer.from(await file.arrayBuffer());
 
@@ -56,9 +44,9 @@ export async function POST(
   const token = crypto.randomUUID();
 
   try {
-    // Get bucket by configured name (never assumes default bucket)
     const bucket = getGcsBucket();
     const gcsFile = bucket.file(objectPath);
+
     await gcsFile.save(buf, {
       resumable: false,
       contentType: type,
@@ -67,27 +55,25 @@ export async function POST(
         cacheControl: "public, max-age=31536000, immutable",
       },
     });
-    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
-      objectPath
-    )}?alt=media&token=${token}`;
+
+    const publicUrl =
+      `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
 
     const doc = await adminDb
-      .collection("batches")
-      .doc(id)
+      .collection("batches").doc(id)
       .collection("photos")
       .add({
         url: publicUrl,
         path: objectPath,
         token,
         contentType: type,
-        size: (file as any).size,
+        size: file.size,
         uploadedAt: FieldValue.serverTimestamp(),
       });
 
     return NextResponse.json({ photo: { id: doc.id, url: publicUrl, path: objectPath } });
   } catch (err: any) {
     if (err?.code === "STORAGE_BUCKET_MISSING") {
-      console.error("photo upload failed: bucket missing");
       return bad(503, "Storage bucket is not configured.");
     }
     console.error("photo upload failed", err);
