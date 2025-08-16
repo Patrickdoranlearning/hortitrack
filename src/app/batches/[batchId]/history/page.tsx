@@ -59,23 +59,22 @@ export default async function BatchHistoryPage({ params }: { params: { batchId: 
         </div>
       </div>
 
-      {/* Details */}
-      <section className="rounded-xl border bg-muted/10 p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="text-sm">
-          <div className="text-muted-foreground">Supplier</div>
-          <div className="font-medium">
-            {batch.supplierName || "—"}
-            {batch.supplierId ? <span className="text-muted-foreground font-normal ml-1">({batch.supplierId})</span> : null}
-          </div>
-        </div>
-        <div className="text-sm">
-          <div className="text-muted-foreground">Pot size</div>
-          <div className="font-medium">{batch.potSize ?? "—"}</div>
-        </div>
-      </section>
-
       <section className="rounded-xl border bg-muted/10 p-4 sm:p-5">
         <h2 className="text-base font-semibold mb-3">Lineage</h2>
+        {/* Details inside the Lineage section */}
+        <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="text-muted-foreground">Supplier</div>
+            <div className="font-medium">
+              {batch.supplierName || "—"}
+              {batch.supplierId ? <span className="text-muted-foreground font-normal ml-1">({batch.supplierId})</span> : null}
+            </div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Pot size</div>
+            <div className="font-medium">{batch.potSize ?? "—"}</div>
+          </div>
+        </div>
         <LineageDiagram ancestry={route.ancestry} />
       </section>
 
