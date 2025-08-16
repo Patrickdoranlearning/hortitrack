@@ -47,8 +47,8 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
     onOpenChange(false);
   }, [onOpenChange, stopTracks]);
 
-  const normalize = (s: string) =>
-    String(s).trim().replace(/[\x1D\x1E\x1F]/g, "");
+  // Minimal normalize: KEEP FNC1/GS so server can parse GS1 DM
+  const normalize = (s: string) => String(s).trim();
 
   const submit = useCallback(async (raw: string) => {
     const now = Date.now();

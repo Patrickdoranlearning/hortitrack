@@ -13,6 +13,11 @@ export async function GET(req: NextRequest) {
 
   const parsed = parseScanCode(code);
   if (!parsed) {
+    // Dev-only observability to diagnose formats safely
+    if (process.env.NODE_ENV !== "production") {
+      const safe = String(code).slice(0, 160).replace(/[^\x20-\x7E]/g, ".");
+      console.warn(`[scan] unrecognized. len=${code.length} sample="${safe}"`);
+    }
     return NextResponse.json({ error: "Unrecognized code format." }, { status: 422 });
   }
 
