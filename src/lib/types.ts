@@ -47,15 +47,28 @@ export type BatchActionType =
   | "Photo"
   | "Note"
   | "Flagged"
-  | "Unflagged";
+  | "Unflagged"
+  | "CREATE"
+  | "ARCHIVE"
+  | "LOSS"
+  | "ADJUST"
+  | "MOVE"
+  | "TRANSPLANT_FROM"
+  | "TRANSPLANT_TO";
+
 
 export interface BatchLog {
+  id?: string;
+  at?: string; // ISO
+  date?: string; // ISO
   type: BatchActionType;
+  kind?: "flag"; // For new event-sourced flags
+  key?: "isTopPerformer" | "quarantined" | "priority";
+  value?: any;
   note?: string;
   photoUrl?: string;
   userId?: string;
   userName?: string;
-  at: string; // ISO
 }
 
 export interface BatchFlag {
