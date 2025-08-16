@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { getFlags, setFlag, type FlagKey } from "@/server/batches/flags";
 
@@ -39,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { batchId: s
     // Return updated aggregate flags
     const { flags } = await getFlags(id);
     return NextResponse.json({ ok: true, flags });
-  } catch (e) {
+  } catch (e: any) {
     console.error("[flags] patch failed", e);
     return NextResponse.json({ error: "Failed to set flag" }, { status: 500 });
   }

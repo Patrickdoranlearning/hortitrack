@@ -42,7 +42,7 @@ export default function FlagBatchDialog({
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!open || !batch?.id) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -58,10 +58,11 @@ export default function FlagBatchDialog({
       }
     })();
     return () => { cancelled = true; };
-  }, [batch.id, open, form]);
+  }, [batch?.id, open, form]);
 
 
   const handleSubmit = async (vals: Values) => {
+    if (!batch?.id) return;
     try {
         // Set isTopPerformer flag
         await fetch(`/api/batches/${batch.id}/flags`, {
