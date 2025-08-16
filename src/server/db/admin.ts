@@ -3,9 +3,9 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
-let app: App;
+// Initialize app once
 if (!getApps().length) {
-  app = initializeApp({
+  initializeApp({
     credential: cert({
       projectId: process.env.FIREBASE_PROJECT_ID!,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
@@ -13,20 +13,17 @@ if (!getApps().length) {
     }),
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET,
   });
-} else {
-  app = getApps()[0]!;
 }
 
+const app = getApps()[0]!;
 export const adminAuth = getAuth(app);
 export const adminDb = getFirestore(app);
-
 
 /**
  * Get a Storage bucket by name. Never assumes a default bucket.
  * Reads (in order): app.options.storageBucket, FIREBASE_STORAGE_BUCKET, GCS_BUCKET.
  */
 export function getGcsBucket() {
-  const app = getApps()[0]!;
   const byOptions = (app?.options?.storageBucket as string | undefined)?.trim();
   const byEnv = (process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET || "").trim();
   const name = byOptions || byEnv;
