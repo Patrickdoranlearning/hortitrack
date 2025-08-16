@@ -1,3 +1,4 @@
+
 'use client';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -28,6 +29,7 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
 
   const [hint, setHint] = useState<string>("");
   const [phase, setPhase] = useState<Phase>("idle");
+  const [lastScan, setLastScan] = useState<{ raw: string; parsed?: { by: "id"|"batchNumber"; value: string } | null } | null>(null);
 
   const lockRef = useRef(false);
   const lastValueRef = useRef<string>("");
@@ -63,6 +65,7 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
     lockRef.current = true;
     setPhase("submitting");
     setHint("Reading…");
+    setLastScan({ raw: cleaned }); // optimistic
 
     try {
       // The onDetected prop in this component *is* the submit action
@@ -76,7 +79,11 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
       // The parent component is responsible for closing the dialog on success
     } catch (e: any) {
       setPhase("error");
-      setHint(e?.message || "Unrecognized code. Hold steady and try again.");
+      const errJson = JSON.parse(e.message || '{}');
+      setHint(errJson?.error || "Unrecognized code. Hold steady and try again.");
+      if (errJson?.echo) {
+        setLastScan(errJson.echo);
+      }
       lastValueRef.current = cleaned;
       cooldownUntilRef.current = Date.now() + 1000;
     } finally {
@@ -93,6 +100,7 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
 
     setPhase("scanning");
     setHint("Opening camera…");
+    setLastScan(null);
     lastValueRef.current = "";
     cooldownUntilRef.current = 0;
 
@@ -181,16 +189,16 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
           <DialogTitle>Scan Batch Code</DialogTitle>
         </DialogHeader>
 
-        <div className="relative aspect-square w-full overflow-hidden">
+        <div className="relative aspect-video w-full overflow-hidden bg-black">
           <video
             ref={videoRef}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             muted
             playsInline
             autoPlay
           />
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="h-[72%] w-[72%] rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            <div className="h-[60%] w-[80%] rounded-xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
           </div>
           <div className={cn("absolute bottom-2 left-1/2 -translate-x-1/2 rounded px-3 py-1 text-xs text-white",
             phase === 'submitting' && 'bg-blue-600',
@@ -201,8 +209,19 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
             {phase === 'submitting' ? <Loader2 className="animate-spin" /> : hint}
           </div>
         </div>
+        
+        <div className="p-4 pt-2">
+            {lastScan && (
+              <div className="text-xs mt-1 text-muted-foreground/80 bg-muted p-2 rounded-md">
+                <div>Raw: <code className="break-all font-mono">{lastScan.raw}</code></div>
+                {lastScan.parsed && (
+                  <div>Parsed: <code className="font-mono">{lastScan.parsed.by} = {lastScan.parsed.value}</code></div>
+                )}
+              </div>
+            )}
+        </div>
 
-        <DialogFooter className="p-3">
+        <DialogFooter className="p-3 border-t">
           <Button variant="outline" onClick={closeDialog}>Close</Button>
         </DialogFooter>
       </DialogContent>
