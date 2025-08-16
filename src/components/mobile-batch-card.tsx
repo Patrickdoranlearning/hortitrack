@@ -18,9 +18,19 @@ export default function MobileBatchCard({
   onTransplant: (b: Batch) => void;
 }) {
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open batch ${batch?.batchNumber ?? ""}`}
       onClick={() => onView(batch)}
-      className="w-full text-left rounded-2xl border p-4 shadow-sm active:scale-[0.99] transition md:pointer-events-none"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onView(batch);
+        }
+      }}
+      className="w-full text-left rounded-2xl border p-4 shadow-sm active:scale-[0.99] transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 md:pointer-events-none"
+      data-testid="mobile-batch-card"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -60,6 +70,7 @@ export default function MobileBatchCard({
       <div
         className="mt-3 flex gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch] pb-1"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <Button size="sm" variant="outline" className="shrink-0" onClick={() => onTransplant(batch)}>
           <MoveRight className="mr-1 h-4 w-4" /> Transplant
@@ -74,6 +85,6 @@ export default function MobileBatchCard({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </div>
-    </button>
+    </div>
   );
 }
