@@ -1,24 +1,33 @@
-
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { createProtocolFromBatch } from "@/server/protocols/service";
 
-const Schema = z.object({
-  batchId: z.string().min(8),
-  name: z.string().min(3).max(120).optional(),
-  publish: z.boolean().optional(),
-});
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  let body: any = null;
   try {
-    const body = await req.json();
-    const input = Schema.parse(body);
-    const proto = await createProtocolFromBatch(input.batchId, { name: input.name, publish: input.publish });
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const batchId = typeof body?.batchId === "string" ? body.batchId.trim() : "";
+  if (!batchId || batchId.length < 6) {
+    return NextResponse.json({ error: "batchId is required" }, { status: 422 });
+  }
+
+  const name = typeof body?.name === "string" ? body.name.slice(0, 120) : undefined;
+  const publish = Boolean(body?.publish);
+
+  try {
+    const proto = await createProtocolFromBatch(batchId, { name, publish });
     return NextResponse.json({ protocol: proto }, { status: 201 });
   } catch (err: any) {
-    if (err?.issues) return NextResponse.json({ error: "Validation failed", details: err.issues }, { status: 422 });
-    if (err?.message === "Batch not found.") return NextResponse.json({ error: "Batch not found" }, { status: 404 });
-    console.error("protocol generate error", err);
+    const msg = String(err?.message || err);
+    if (msg.includes("Batch not found")) {
+      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+    }
+    console.error("[protocols/generate] error:", err);
     return NextResponse.json({ error: "Failed to generate protocol" }, { status: 500 });
   }
 }

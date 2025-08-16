@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FeatureGate } from './FeatureGate';
 import { BatchActionBar } from './batches/BatchActionBar';
 import BatchLabelPreview from './BatchLabelPreview';
+import { useGenerateProtocol } from '@/hooks/useGenerateProtocol';
 
 
 interface BatchDetailDialogProps {
@@ -56,6 +57,8 @@ export function BatchDetailDialog({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [photos, setPhotos] = React.useState<Array<{id:string; url:string}>>([]);
+  const { generate } = useGenerateProtocol();
+  const [genBusy, setGenBusy] = React.useState(false);
   
   const refreshPhotos = async () => {
     if (!batch?.id) return;
@@ -97,24 +100,30 @@ export function BatchDetailDialog({
   const handleTransplant = () => onTransplant(batch);
   const handleLogAction = () => onLogAction(batch);
   
-  const handleGenerateProtocolClick = () => {
-      const name = `Protocol – ${batch.plantVariety || "Batch"} (${new Date().toISOString().slice(0,10)})`;
-      fetch("/api/protocols/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batchId: batch!.id, name, publish: true }),
-      })
-      .then(async (r) => {
-        const j = await r.json();
-        if (!r.ok) throw new Error(j?.error || "Failed to generate");
-        toast({ title: "Protocol Generated", description: "Successfully created a new protocol from this batch." });
-        onGenerateProtocol(batch);
-      })
-      .catch((e) => {
-        toast({ variant: 'destructive', title: "Generation Failed", description: e.message });
-        console.error(e);
-      });
-  };
+  async function handleGenerateProtocolClick() {
+    if (!batch) return;
+    // Always enabled: if not top-performer, ask before proceeding
+    if (!batch.isTopPerformer) {
+      const proceed = typeof window !== "undefined"
+        ? window.confirm("This batch is not marked Top performer. Generate a protocol anyway?")
+        : true;
+      if (!proceed) return;
+    }
+    setGenBusy(true);
+    try {
+      const name = `Protocol – ${batch.plantVariety || "Batch"} (${new Date().toISOString().slice(0, 10)})`;
+      const protocol = await generate(batch.id!, { publish: true, name });
+      
+      toast?.({ title: "Protocol created", description: protocol.name });
+      console.log("Protocol created", protocol);
+      
+    } catch (e: any) {
+      toast?.({ title: "Generate failed", description: e.message, variant: "destructive" });
+      console.error("Generate protocol failed", e);
+    } finally {
+      setGenBusy(false);
+    }
+  }
 
   const handleCareRecommendations = () => onCareRecommendations(batch);
   const handleDelete = () => onDelete?.(batch);
@@ -199,11 +208,15 @@ export function BatchDetailDialog({
                   onPrint={handlePrint}
                   onDelete={onDelete ? handleDelete : undefined}
                   onActionLog={handleLogAction}
-                  onGenerateProtocol={batch.isTopPerformer ? handleGenerateProtocolClick : undefined}
+                  onGenerateProtocol={handleGenerateProtocolClick}
                   onArchive={batch.status !== 'Archived' ? () => { console.log('archive'); } : undefined}
                   onUnarchive={batch.status === 'Archived' ? () => { console.log('unarchive'); } : undefined}
                   onPhotoAdded={refreshPhotos}
               />
+              
+              {genBusy && (
+                <div className="mt-2 text-xs text-muted-foreground">Generating protocol…</div>
+              )}
 
               <section className="mt-4 space-y-1">
                 <div className="flex items-center gap-2 min-w-0">
