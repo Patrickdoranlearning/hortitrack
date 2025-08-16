@@ -23,6 +23,7 @@ import { uploadBatchPhoto } from '@/lib/storage';
 import FlagBatchDialog from '@/components/flag-batch-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { FeatureGate } from './FeatureGate';
+import { BatchActionBar } from './batches/BatchActionBar';
 
 interface BatchDetailDialogProps {
     open: boolean;
