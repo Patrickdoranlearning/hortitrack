@@ -6,7 +6,7 @@ import { adminDb } from "@/server/db/admin";
 import { declassify } from "@/server/utils/declassify";
 
 export async function POST(req: NextRequest) {
-  // --- parser is scoped INSIDE POST to avoid duplicate-name conflicts ---
+  // Parser is scoped INSIDE POST to avoid any duplicate-name conflicts.
   function parseScan(raw: string): { by: "id" | "batchNumber"; value: string } | null {
     if (!raw) return null;
 
@@ -54,7 +54,6 @@ export async function POST(req: NextRequest) {
 
     return null;
   }
-  // ---------------------------------------------------------------------
 
   try {
     const { code } = (await req.json()) as { code?: string };
