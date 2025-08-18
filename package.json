@@ -52,6 +52,7 @@
     "csv-parse": "^5.5.6",
     "date-fns": "^3.6.0",
     "dotenv": "^16.6.1",
+    "elkjs": "^0.9.2",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.5.0",
     "firebase-admin": "^12.7.0",
