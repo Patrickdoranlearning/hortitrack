@@ -29,7 +29,9 @@ export function HistoryFlowchart({ data }: { data: BatchHistory }) {
     const edges = data.graph.edges.map(e => ({
       id: e.id, sources: [e.from], targets: [e.to], labels: e.label ? [{ text: e.label }] : [],
     }));
-    layoutGraph(nodes, edges, "RIGHT").then(setLayout);
+    
+    // @ts-ignore
+    layoutGraph({ children: nodes, edges }).then(setLayout);
   }, [data.graph]);
 
   if (!layout) return <div className="text-sm text-muted-foreground">Rendering flow…</div>;

@@ -1,33 +1,55 @@
-import ELK from "elkjs";
+// Graph layout helper used by HistoryFlowchart.
+// NOTE: No top-level import of 'elkjs'. We dynamic-import it in the browser.
 
-export type LayoutNode = { id: string; width?: number; height?: number; labels?: { text: string }[]; };
-export type LayoutEdge = { id: string; sources: string[]; targets: string[]; labels?: { text: string }[]; };
-export type LayoutResult = { children: Array<LayoutNode & { x?: number; y?: number }>; edges: Array<LayoutEdge & { sections?: any[] }>; };
+export type ElkEdge = {
+  id: string;
+  sources: string[];
+  targets: string[];
+};
 
-const elk = new ELK();
+export type ElkNode = {
+  id: string;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+  children?: ElkNode[];
+  edges?: ElkEdge[];
+  [key: string]: any;
+};
 
-export async function layoutGraph(nodes: LayoutNode[], edges: LayoutEdge[], direction: "RIGHT" | "DOWN" = "RIGHT"): Promise<LayoutResult> {
-  const graph = {
-    id: "root",
-    layoutOptions: {
-      "elk.algorithm": "layered",
-      "elk.direction": direction,
-      "elk.layered.spacing.nodeNodeBetweenLayers": "48",
-      "elk.spacing.nodeNode": "32",
-      "elk.layered.crossingMinimization.semiInteractive": "true",
+export type ElkGraph = ElkNode;
+
+/**
+ * Computes layout using ELK in the browser.
+ * Loaded dynamically to avoid SSR and bundling issues.
+ */
+export async function layoutGraph(
+  graph: ElkGraph,
+  options?: Record<string, any>
+): Promise<ElkGraph> {
+  // Dynamically import elkjs on the client
+  const ELK = (await import("elkjs")).default as any;
+  const elk = new ELK({
+    // Do NOT set workerUrl here; default path avoids extra requires.
+  });
+
+  const layoutOptions = {
+    "elk.algorithm": "layered",
+    "elk.direction": "RIGHT",
+    "elk.layered.spacing.nodeNodeBetweenLayers": "48",
+    "elk.spacing.nodeNode": "24",
+    ...(options?.layoutOptions || {}),
+  };
+
+  const res = await elk.layout(
+    {
+      id: graph.id ?? "root",
+      children: graph.children ?? [],
+      edges: graph.edges ?? [],
     },
-    children: nodes.map(n => ({ id: n.id, width: n.width ?? 200, height: n.height ?? 80, labels: n.labels ?? [{ text: n.id }] })),
-    edges: edges.map(e => ({ id: e.id, sources: e.sources, targets: e.targets, labels: e.labels })),
-  } as any;
+    { layoutOptions }
+  );
 
-  try {
-    const res = await elk.layout(graph);
-    return { children: res.children ?? [], edges: res.edges ?? [] };
-  } catch (e) {
-    // Fallback: simple linear layout
-    return {
-      children: nodes.map((n, i) => ({ ...n, x: 40 + i * 240, y: 40 })),
-      edges: edges,
-    } as any;
-  }
+  return res;
 }

@@ -1,9 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { buildBatchHistory } from "@/server/batches/history";
-import { HistoryFlowchart } from "@/components/history/HistoryFlowchart";
 import { HistoryLog } from "@/components/history/HistoryLog";
 import { GenerateHistoryPdfButton } from "@/components/history/GenerateHistoryPdfButton";
+import dynamic from "next/dynamic";
+
+const HistoryFlowchart = dynamic(
+  () => import("@/components/history/HistoryFlowchart"),
+  { ssr: false, loading: () => <div className="text-sm text-muted-foreground">Loading flowchart...</div> }
+);
+
 
 function normalizeId(raw: unknown): string | null {
   const s = typeof raw === "string" ? decodeURIComponent(raw).trim() : "";
