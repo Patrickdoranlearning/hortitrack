@@ -15,7 +15,7 @@ const icon = (kind: string) => {
   }
 };
 
-export function HistoryFlowchart({ data }: { data: BatchHistory }) {
+export default function HistoryFlowchart({ data }: { data: BatchHistory }) {
   const [highlight, setHighlight] = React.useState<string | null>(null);
   const [layout, setLayout] = React.useState<any>(null);
 
