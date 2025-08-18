@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { getApps } from "firebase-admin/app";
 import { getGcsBucket } from "@/server/db/admin";

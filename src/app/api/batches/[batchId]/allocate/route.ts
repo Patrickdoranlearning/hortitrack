@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateBatchNumber, type BatchStage } from "@/server/services/batchNumber";

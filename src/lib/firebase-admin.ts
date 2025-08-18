@@ -1,4 +1,3 @@
-// src/lib/firebase-admin.ts
 import "server-only";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getFirestore, FieldValue as AdminFieldValue, Timestamp } from "firebase-admin/firestore";

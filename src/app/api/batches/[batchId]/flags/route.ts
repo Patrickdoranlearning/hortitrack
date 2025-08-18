@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { getFlags, setFlag, type FlagKey } from "@/server/batches/flags";
 

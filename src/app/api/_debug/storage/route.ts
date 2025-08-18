@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { getGcsBucket } from "@/server/db/admin";
 

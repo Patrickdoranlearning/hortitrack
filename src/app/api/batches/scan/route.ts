@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 // Ensure Node runtime (Firebase Admin requires Node)
 export const runtime = "nodejs";
 
