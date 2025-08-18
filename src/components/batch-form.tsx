@@ -144,6 +144,12 @@ export function BatchForm({
   );
 
   const onSubmit = async (values: BatchFormValues) => {
+    const stage = values?.status;
+    if (!stage) {
+      alert("Batch status is required to determine the production stage.");
+      return;
+    }
+
     const payload = {
       category: values.category,
       plantFamily: values.plantFamily,
