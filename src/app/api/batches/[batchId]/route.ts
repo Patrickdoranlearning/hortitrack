@@ -1,94 +1,47 @@
-// Ensure Node runtime (Admin SDK won't work on Edge)
-export const runtime = "nodejs";
-
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { adminDb } from "@/server/db/admin";
-import { FieldValue } from "firebase-admin/firestore";
-import { mapError } from "@/lib/validation";
+import { z } from "zod";
+import { BatchSchema } from "@/lib/types";
+import { declassify } from "@/server/utils/declassify";
 
-// ---------- PATCH (update) ----------
-const UpdateBatchSchema = z
-  .object({
-    category: z.string().optional(),
-    plantFamily: z.string().optional(),
-    plantVariety: z.string().optional(),
-    plantingDate: z.string().optional(), // ISO
-    quantity: z.number().int().nonnegative().optional(),
-    status: z
-      .enum([
-        "Propagation",
-        "Plugs/Liners",
-        "Potted",
-        "Ready for Sale",
-        "Looking Good",
-        "Archived",
-      ])
-      .optional(),
-    location: z.string().optional(),
-    size: z.string().optional(),
-    supplier: z.string().nullable().optional(),
-    growerPhotoUrl: z.string().nullable().optional(),
-    salesPhotoUrl: z.string().nullable().optional(),
-  })
-  .strict();
+type Params = { params: { batchId: string } };
 
-export async function PATCH(req: Request, ctx: { params: { batchId: string } }) {
+export async function GET(_req: Request, { params }: Params) {
   try {
-    const { batchId } = ctx.params;
-    const json = await req.json();
-    const parsed = UpdateBatchSchema.parse(json);
-
-    const ref = adminDb.collection("batches").doc(batchId);
+    const ref = adminDb.collection("batches").doc(params.batchId);
     const snap = await ref.get();
-    if (!snap.exists) {
-      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
-    }
-
-    await ref.update({ ...parsed, updatedAt: FieldValue.serverTimestamp() });
-
-    return NextResponse.json({ id: batchId }, { status: 200 });
+    if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ id: snap.id, ...declassify(snap.data()) });
   } catch (e: any) {
-    console.error("PATCH /api/batches/[id] error:", e);
-    const { status, body } = mapError(e);
-    return NextResponse.json(body, { status });
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
 }
 
-// ---------- DELETE (cascade subcollections) ----------
-async function deleteDocWithSubcollections(
-  docRef: FirebaseFirestore.DocumentReference
-) {
-  // delete subcollections (e.g., "logs") in chunks
-  const subcols = await docRef.listCollections();
-  for (const col of subcols) {
-    const docs = await col.listDocuments();
-    // chunk to stay under 500 ops per batch
-    for (let i = 0; i < docs.length; i += 450) {
-      const slice = docs.slice(i, i + 450);
-      const b = adminDb.batch();
-      slice.forEach((d) => b.delete(d));
-      await b.commit();
+const Update = BatchSchema.partial();
+
+export async function PATCH(req: Request, { params }: Params) {
+  try {
+    const body = await req.json();
+    const data = Update.parse(body);
+    const ref = adminDb.collection("batches").doc(params.batchId);
+    await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+    const snap = await ref.get();
+    return NextResponse.json({ id: snap.id, ...declassify(snap.data()) });
+  } catch (e: any) {
+    if (e?.name === "ZodError") {
+      return NextResponse.json({ error: e.errors }, { status: 400 });
     }
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
-  // finally delete the batch doc
-  await docRef.delete();
 }
 
-export async function DELETE(_req: Request, ctx: { params: { batchId: string } }) {
+export async function DELETE(_req: Request, { params }: Params) {
   try {
-    const { batchId } = ctx.params;
-    const ref = adminDb.collection("batches").doc(batchId);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
-    }
-
-    await deleteDocWithSubcollections(ref);
-    return NextResponse.json({ id: batchId }, { status: 200 });
+    // Soft-delete? Archive instead of delete (preferred)
+    const ref = adminDb.collection("batches").doc(params.batchId);
+    await ref.set({ status: "Archived", updatedAt: new Date().toISOString() }, { merge: true });
+    return NextResponse.json({ ok: true });
   } catch (e: any) {
-    console.error("DELETE /api/batches/[id] error:", e);
-    const { status, body } = mapError(e);
-    return NextResponse.json(body, { status });
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
 }

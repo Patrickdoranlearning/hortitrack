@@ -1,79 +1,50 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/server/db/admin";
-import { allocateBatchNumber } from "@/server/services/batchNumber";
-import { mapError } from "@/lib/validation";
-// import { getUser } from "@/server/auth/getUser"; // optional
+import { z } from "zod";
+import { BatchSchema } from "@/lib/types";
+import { declassify } from "@/server/utils/declassify";
 
-const CreateBatchSchema = z.object({
-  category: z.string().min(1),
-  plantFamily: z.string().min(1),
-  plantVariety: z.string().min(1),
-  // We keep plantingDate as ISO string to match your existing data shape
-  plantingDate: z.string().optional(),
-  initialQuantity: z.number().int().nonnegative(),
-  // If omitted, we'll default quantity = initialQuantity
-  quantity: z.number().int().nonnegative().optional(),
-  status: z.enum([
-    "Propagation",
-    "Plugs/Liners",
-    "Potted",
-    "Ready for Sale",
-    "Looking Good",
-    "Archived",
-  ]),
-  location: z.string().min(1),
-  size: z.string().min(1),
-  supplier: z.string().optional(),
+const CreateBatch = BatchSchema.pick({
+  batchNumber: true,
+  category: true,
+  plantFamily: true,
+  plantVariety: true,
+  plantingDate: true,
+  initialQuantity: true,
+  quantity: true,
+  status: true,
+  location: true,
+  locationId: true,
+  size: true,
+  supplierId: true,
+  notes: true,
 });
+
+export async function GET() {
+  try {
+    const snap = await adminDb.collection("batches").orderBy("plantingDate", "desc").limit(100).get();
+    const items = snap.docs.map((d) => ({ id: d.id, ...declassify(d.data()) }));
+    return NextResponse.json({ items });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   try {
-    // const user = await getUser();
-    const raw = await req.json();
-    const parsed = CreateBatchSchema.parse(raw);
-
-    const result = await adminDb.runTransaction(async (tx) => {
-      const batchRef = adminDb.collection("batches").doc();
-      const batchNumber = await allocateBatchNumber(tx);
-
-      const nowServer = FieldValue.serverTimestamp();
-      const nowIso = new Date().toISOString();
-      const quantity = parsed.quantity ?? parsed.initialQuantity;
-
-      const doc = {
-        id: batchRef.id,
-        batchNumber,                          // <- always generated on server
-        category: parsed.category,
-        plantFamily: parsed.plantFamily,
-        plantVariety: parsed.plantVariety,
-        plantingDate: parsed.plantingDate ?? nowIso, // keep as ISO to match UI
-        initialQuantity: parsed.initialQuantity,
-        quantity,
-        status: parsed.status,
-        location: parsed.location,
-        size: parsed.size,
-        supplier: parsed.supplier ?? null,
-        createdAt: nowServer,
-        updatedAt: nowServer,
-        // Your UI reads a document-level logHistory array:
-        logHistory: FieldValue.arrayUnion({
-          id: `log_${Date.now()}_create`,
-          type: "CREATE",
-          note: `Created batch ${batchNumber} with ${quantity} units.`,
-          date: nowIso,
-        }),
-        // createdBy: user.uid,
-      };
-
-      tx.set(batchRef, doc);
-      return { id: batchRef.id, batchNumber };
+    const body = await req.json();
+    const data = CreateBatch.parse(body);
+    const ref = await adminDb.collection("batches").add({
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
-
-    return NextResponse.json(result, { status: 201 });
+    const snap = await ref.get();
+    return NextResponse.json({ id: ref.id, ...declassify(snap.data()) }, { status: 201 });
   } catch (e: any) {
-    const { status, body } = mapError(e);
-    return NextResponse.json(body, { status });
+    if (e?.name === "ZodError") {
+      return NextResponse.json({ error: e.errors }, { status: 400 });
+    }
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
 }

@@ -1,39 +1,47 @@
-import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { initializeApp, cert, getApps, App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { env } from "@/env";
 
-// Initialize app once
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID!,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
-    }),
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET,
-  });
+let app: App | undefined;
+
+function ensureApp() {
+  if (getApps().length) {
+    app = getApps()[0]!;
+    return app;
+  }
+  try {
+    app = initializeApp({
+      credential: cert({
+        projectId: env.FIREBASE_PROJECT_ID,
+        clientEmail: env.FIREBASE_CLIENT_EMAIL,
+        privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      }),
+      storageBucket: env.FIREBASE_STORAGE_BUCKET || env.GCS_BUCKET,
+    });
+    return app;
+  } catch (e: any) {
+    // Fail loudly in dev; in prod you may want to rethrow
+    console.error("Failed to initialize Firebase Admin SDK:", e?.message || e);
+    throw e;
+  }
 }
 
-const app = getApps()[0]!;
-export const adminAuth = getAuth(app);
-export const adminDb = getFirestore(app);
+export const adminApp = ensureApp();
+export const adminDb = getFirestore(adminApp);
+export const adminAuth = getAuth(adminApp);
 
-/**
- * Get a Storage bucket by name. Never assumes a default bucket.
- * Reads (in order): app.options.storageBucket, FIREBASE_STORAGE_BUCKET, GCS_BUCKET.
- */
 export function getGcsBucket() {
-  const app = getApps()[0]!;
-  const byOptions = (app?.options?.storageBucket as string | undefined)?.trim();
-  const byEnv = (process.env.FIREBASE_STORAGE_BUCKET || process.env.GCS_BUCKET || "").trim();
+  const byOptions = (adminApp?.options?.storageBucket as string | undefined)?.trim();
+  const byEnv = (env.FIREBASE_STORAGE_BUCKET || env.GCS_BUCKET || "").trim();
   const name = byOptions || byEnv;
   if (!name) {
     const err: any = new Error(
-      "Storage bucket is not configured. Set app.options.storageBucket or FIREBASE_STORAGE_BUCKET/GCS_BUCKET via your secrets manager."
+      "Storage bucket is not configured. Set app.options.storageBucket or FIREBASE_STORAGE_BUCKET/GCS_BUCKET."
     );
     err.code = "STORAGE_BUCKET_MISSING";
     throw err;
   }
-  return getStorage(app).bucket(name);
+  return getStorage(adminApp).bucket(name);
 }

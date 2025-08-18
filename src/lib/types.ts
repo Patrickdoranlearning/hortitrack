@@ -1,11 +1,40 @@
+import { z } from "zod";
 
-import { z } from 'zod';
+// --- Dictionaries ---
+export const SupplierSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  contact: z.string().optional(),
+});
+export type Supplier = z.infer<typeof SupplierSchema>;
 
-// This is the simplified, universal LogEntry shape for data transfer.
+export const PlantSizeSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1), // e.g., "9cm", "10.5cm"
+  liters: z.number().optional(),
+});
+export type PlantSize = z.infer<typeof PlantSizeSchema>;
+
+export const NurseryLocationSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1), // e.g., "Tunnel A-12"
+  capacity: z.number().int().nonnegative().optional(),
+});
+export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
+
+export const VarietySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  family: z.string().min(1),
+  category: z.string().default("Perennial"),
+});
+export type Variety = z.infer<typeof VarietySchema>;
+
+// --- Logs ---
 export const LogEntrySchema = z.object({
-  id: z.string(),
-  date: z.any(),
-  type: z.string(),
+  id: z.string().optional(),
+  date: z.string().or(z.date()).transform((d) => (d instanceof Date ? d.toISOString() : d)),
+  type: z.string().min(1),
   note: z.string().optional(),
   qty: z.number().optional(),
   reason: z.string().optional(),
@@ -16,201 +45,35 @@ export const LogEntrySchema = z.object({
 });
 export type LogEntry = z.infer<typeof LogEntrySchema>;
 
-// This is the client-side form validation schema.
-// It will be defined inside the form component that uses it.
-export type ActionLogFormValues = {
-  type: 'NOTE' | 'MOVE' | 'LOSS';
-  note?: string;
-  newLocation?: string;
-  newLocationId?: string;
-  qty?: number;
-  reason?: string;
-};
-
-// ---- Domain types ----
-
+// --- Batches ---
 export const BatchStatus = z.enum([
-  'Propagation',
-  'Plugs/Liners',
-  'Potted',
-  'Ready for Sale',
-  'Looking Good',
-  'Archived',
+  "Propagation",
+  "Plug",
+  "Growing",
+  "Ready",
+  "Sold",
+  "Archived",
 ]);
-
-export type BatchActionType =
-  | "Spaced"
-  | "Move"
-  | "Trimmed"
-  | "Dumped"
-  | "Weed"
-  | "Photo"
-  | "Note"
-  | "Flagged"
-  | "Unflagged"
-  | "CREATE"
-  | "ARCHIVE"
-  | "LOSS"
-  | "ADJUST"
-  | "MOVE"
-  | "TRANSPLANT_FROM"
-  | "TRANSPLANT_TO";
-
-
-export interface BatchLog {
-  id?: string;
-  at?: string; // ISO
-  date?: string; // ISO
-  type: BatchActionType;
-  kind?: "flag"; // For new event-sourced flags
-  key?: "isTopPerformer" | "quarantined" | "priority";
-  value?: any;
-  note?: string;
-  photoUrl?: string;
-  userId?: string;
-  userName?: string;
-}
-
-export interface BatchFlag {
-  active: boolean;
-  reason: string;
-  remedy?: string;
-  severity?: "low" | "medium" | "high";
-  flaggedAt: string;   // ISO
-  flaggedBy?: string;
-}
+export type BatchStatus = z.infer<typeof BatchStatus>;
 
 export const BatchSchema = z.object({
   id: z.string().optional(),
-  batchNumber: z.string(),
-  category: z.string(),
-  plantFamily: z.string(),
-  plantVariety: z.string(),
+  batchNumber: z.string().min(3),
+  category: z.string().min(1),
+  plantFamily: z.string().min(1),
+  plantVariety: z.string().min(1),
   plantingDate: z.string(), // ISO
-  initialQuantity: z.number(),
-  quantity: z.number(),
+  initialQuantity: z.number().int().nonnegative(),
+  quantity: z.number().int().nonnegative(),
   status: BatchStatus,
-  location: z.string(),
+  location: z.string().optional(),
   locationId: z.string().optional(),
-  size: z.string(),
-  logHistory: z.array(z.any()), // Temporarily 'any' to accommodate old and new log formats
-  transplantedFrom: z.string().optional(),
-  supplier: z.string().optional(),
-  growerPhotoUrl: z.string().optional(),
-  salesPhotoUrl: z.string().optional(),
-  createdAt: z.any().optional(),
-  updatedAt: z.any().optional(),
-  flag: z.any().optional(), // Accommodate BatchFlag
-  photos: z.array(z.any()).optional(), // For storing photo metadata
-  isTopPerformer: z.boolean().optional(),
-  topPerformerAt: z.any().optional(),
+  size: z.string().optional(),
+  supplierId: z.string().optional(),
+  flagged: z.boolean().default(false),
+  flaggedAt: z.string().optional(), // ISO
+  flaggedBy: z.string().optional(),
+  notes: z.string().optional(),
+  logs: z.array(LogEntrySchema).optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
-
-export const ProtocolSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  version: z.number(),
-  status: z.enum(["draft", "published"]),
-  createdAt: z.any(),
-  createdFromBatchId: z.string(),
-  plantFamily: z.string().optional().nullable(),
-  plantVariety: z.string().optional().nullable(),
-  season: z.string().optional().nullable(),
-  potSize: z.union([z.string(), z.number()]).optional().nullable(),
-  media: z.string().optional().nullable(),
-  containerType: z.string().optional().nullable(),
-  supplierName: z.string().optional().nullable(),
-  supplierId: z.string().optional().nullable(),
-  targets: z.object({
-    tempC: z.object({
-      day: z.number().optional().nullable(),
-      night: z.number().optional().nullable(),
-    }).optional(),
-    humidityPct: z.number().optional().nullable(),
-    lightHours: z.number().optional().nullable(),
-    ec: z.number().optional().nullable(),
-    ph: z.number().optional().nullable(),
-    spacing: z.string().optional().nullable(),
-  }).optional(),
-  steps: z.array(z.object({
-    title: z.string(),
-    kind: z.enum(["irrigation", "fertigation", "pruning", "pinch", "move", "misc"]),
-    notes: z.string().optional(),
-    intervalDays: z.number().optional().nullable(),
-  })).optional(),
-  sourceSnapshot: z.object({
-    batchNumber: z.union([z.string(), z.number()]).optional().nullable(),
-    sowDate: z.string().optional().nullable(),
-    plantingDate: z.string().optional().nullable(),
-    size: z.union([z.string(), z.number()]).optional().nullable(),
-    location: z.string().optional().nullable(),
-  }),
-});
-export type Protocol = z.infer<typeof ProtocolSchema>;
-
-
-export const VarietySchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1, 'Variety name is required'),
-  commonName: z.string().optional(),
-  family: z.string().min(1, 'Family is required'),
-  category: z.string().min(1, 'Category is required'),
-  grouping: z.string().optional(),
-  rating: z.string().optional(),
-  salesPeriod: z.string().optional(),
-  floweringPeriod: z.string().optional(),
-  flowerColour: z.string().optional(),
-  evergreen: z.string().optional(),
-});
-export type Variety = z.infer<typeof VarietySchema>;
-
-export const NurseryLocationSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1),
-  nursery: z.string().min(1),
-  type: z.string().min(1), // e.g., "Tunnel", "Section", ...
-  area: z.coerce.number().min(0).optional(),
-  isCovered: z.boolean().optional(),
-});
-export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
-
-export const PlantSizeSchema = z.object({
-  id: z.string().optional(),
-  size: z.string().min(1), // e.g., "10.5", "54"
-  type: z.enum(['Tray', 'Pot', 'Bareroot']),
-  area: z.coerce.number().min(0),
-  shelfQuantity: z.coerce.number().min(0),
-  multiple: z.coerce.number().min(1),
-});
-export type PlantSize = z.infer<typeof PlantSizeSchema>;
-
-export const SupplierSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1),
-  address: z.string().optional(),
-  country: z.string().optional(),
-  countryCode: z.string().optional(),
-  producerCode: z.string().optional(),
-});
-export type Supplier = z.infer<typeof SupplierSchema>;
-
-
-// ---- AI flow output types ----
-
-/**
- * Output schema for the Production Protocol AI flow.
- * Matches the shape used by <ProductionProtocolDialog />.
- */
-export const ProductionProtocolOutputSchema = z.object({
-    protocolTitle: z.string().describe('A descriptive title for the production protocol.'),
-    summary: z.string().describe('A brief summary of the protocol and its objective.'),
-    timeline: z.array(z.object({
-      day: z.number().describe('The day in the production cycle (e.g., 0, 15, 30).'),
-      action: z.string().describe('The key action or task to be performed on this day.'),
-      date: z.string().describe('The calendar date of the action'),
-      details: z.string().describe('Specific instructions or notes for the action.'),
-    })).describe('A timeline of key production stages and actions.'),
-    recommendations: z.array(z.string()).describe('Additional recommendations for optimizing future batches based on this protocol.'),
-  });
-export type ProductionProtocolOutput = z.infer<typeof ProductionProtocolOutputSchema>;
