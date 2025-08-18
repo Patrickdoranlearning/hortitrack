@@ -1,3 +1,4 @@
+
 import { z } from "zod";
 
 // --- Dictionaries ---
@@ -77,3 +78,106 @@ export const BatchSchema = z.object({
   logs: z.array(LogEntrySchema).optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
+
+// --- Production Protocol (AI output) ---
+export const ProductionProtocolStepSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().optional(),
+  type: z.string().optional(),
+  day: z.number().int().nonnegative().optional(),
+  at: z.string().optional(),
+  durationDays: z.number().int().nonnegative().optional(),
+  params: z.record(z.any()).optional(),
+});
+
+export const ProductionTargetsSchema = z.object({
+  tempC: z
+    .object({
+      day: z.number().nullable().optional(),
+      night: z.number().nullable().optional(),
+    })
+    .optional(),
+  humidityPct: z.number().nullable().optional(),
+  lightHours: z.number().nullable().optional(),
+  ec: z.number().nullable().optional(),
+  ph: z.number().nullable().optional(),
+  spacing: z.union([z.number(), z.string()]).nullable().optional(),
+});
+
+const ProductionProtocolRouteNodeSchema = z.object({
+  id: z.string(),
+  batchNumber: z.union([z.string(), z.number()]).nullable().optional(),
+  plantVariety: z.string().nullable().optional(),
+  sowDate: z.string().nullable().optional(),
+  plantingDate: z.string().nullable().optional(),
+  producedAt: z.string().nullable().optional(),
+  potSize: z.union([z.string(), z.number()]).nullable().optional(),
+  supplierName: z.string().nullable().optional(),
+  supplierId: z.string().nullable().optional(),
+});
+
+export const ProductionProtocolRouteSchema = z.object({
+  ancestry: z
+    .array(
+      z.object({
+        level: z.number().int(),
+        node: ProductionProtocolRouteNodeSchema,
+        via: z
+          .object({
+            action: z.string().optional(),
+            at: z.string().nullable().optional(),
+            week: z.string().nullable().optional(),
+            notes: z.string().nullable().optional(),
+          })
+          .nullable()
+          .optional(),
+      })
+    )
+    .optional()
+    .default([]),
+  timeline: z
+    .array(
+      z.object({
+        at: z.string().nullable().optional(),
+        week: z.string().nullable().optional(),
+        action: z.string(),
+        batchId: z.string(),
+        note: z.string().nullable().optional(),
+      })
+    )
+    .optional()
+    .default([]),
+  summary: z
+    .object({
+      transplantWeek: z.string().nullable().optional(),
+      previousProducedWeek: z.string().nullable().optional(),
+      originBatchId: z.string().nullable().optional(),
+      hops: z.number().int().nullable().optional(),
+    })
+    .optional(),
+});
+
+export const ProductionProtocolOutputSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  version: z.number().int().optional(),
+  status: z.enum(["draft", "published"]).optional(),
+  createdAt: z.any().optional(),
+  createdFromBatchId: z.string(),
+
+  plantFamily: z.string().nullable().optional(),
+  plantVariety: z.string().nullable().optional(),
+  season: z.string().nullable().optional(),
+
+  potSize: z.union([z.string(), z.number()]).nullable().optional(),
+  media: z.string().nullable().optional(),
+  containerType: z.string().nullable().optional(),
+  supplierName: z.string().nullable().optional(),
+  supplierId: z.string().nullable().optional(),
+
+  targets: ProductionTargetsSchema.optional(),
+  steps: z.array(ProductionProtocolStepSchema).optional().default([]),
+
+  sourceSnapshot: z.record(z.any()).optional(),
+  route: ProductionProtocolRouteSchema.optional(),
+});
