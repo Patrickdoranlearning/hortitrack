@@ -3,13 +3,7 @@ import Link from "next/link";
 import { buildBatchHistory } from "@/server/batches/history";
 import { HistoryLog } from "@/components/history/HistoryLog";
 import { GenerateHistoryPdfButton } from "@/components/history/GenerateHistoryPdfButton";
-import dynamic from "next/dynamic";
-
-const HistoryFlowchart = dynamic(
-  () => import("@/components/history/HistoryFlowchart"),
-  { ssr: false, loading: () => <div className="text-sm text-muted-foreground">Loading flowchart...</div> }
-);
-
+import HistoryFlowchartClient from "@/components/history/HistoryFlowchart.client";
 
 function normalizeId(raw: unknown): string | null {
   const s = typeof raw === "string" ? decodeURIComponent(raw).trim() : "";
@@ -47,7 +41,7 @@ export default async function BatchHistoryPage({ params }: { params: { batchId: 
 
       {/* Flowchart */}
       <section className="rounded-xl border bg-muted/10 p-3 sm:p-5">
-        <HistoryFlowchart data={data} />
+        <HistoryFlowchartClient batchId={id} />
       </section>
 
       {/* Action Log */}

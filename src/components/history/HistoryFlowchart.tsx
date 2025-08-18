@@ -15,38 +15,71 @@ const icon = (kind: string) => {
   }
 };
 
-export default function HistoryFlowchart({ data }: { data: BatchHistory }) {
+type GraphLike = BatchHistory["graph"] | undefined;
+type Props = {
+  batchId: string;
+  data?: BatchHistory;
+};
+
+function buildNodes(graph: GraphLike) {
+  const list = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  return list.map(n => ({
+    id: n.id,
+    width: 220,
+    height: 96,
+    labels: [{ text: n.label }],
+  }));
+}
+
+function buildEdges(graph: GraphLike) {
+  const list = Array.isArray(graph?.edges) ? graph.edges : [];
+  return list.map(e => ({
+    id: e.id,
+    sources: [e.from],
+    targets: [e.to],
+    labels: e.label ? [{ text: e.label }] : [],
+  }));
+}
+
+export default function HistoryFlowchart({ batchId, data }: Props) {
   const [highlight, setHighlight] = React.useState<string | null>(null);
-  const [layout, setLayout] = React.useState<any>(null);
+
+  const graph: GraphLike = data?.graph;
+  const nodes = React.useMemo(() => buildNodes(graph), [graph?.nodes]);
+  const edges = React.useMemo(() => buildEdges(graph), [graph?.edges]);
+
+  const [layout, setLayout] = React.useState<any | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const nodes = data.graph.nodes.map(n => ({
-      id: n.id,
-      width: 220,
-      height: 96,
-      labels: [{ text: n.label }],
-    }));
-    const edges = data.graph.edges.map(e => ({
-      id: e.id, sources: [e.from], targets: [e.to], labels: e.label ? [{ text: e.label }] : [],
-    }));
-    
-    // @ts-ignore
-    layoutGraph({ children: nodes, edges }).then(setLayout);
-  }, [data.graph]);
+    setError(null);
+    if (!nodes?.length && !edges?.length) {
+      setLayout(null);
+      return;
+    }
+    let alive = true;
+    layoutGraph({ children: nodes, edges })
+      .then((res) => { if (alive) setLayout(res); })
+      .catch((e: any) => setError(e?.message ?? String(e)));
+    return () => { alive = false; };
+  }, [nodes, edges]);
 
-  if (!layout) return <div className="text-sm text-muted-foreground">Rendering flow…</div>;
-
+  if (error) {
+    return <div className="text-sm text-red-600">Failed to render flow: {error}</div>;
+  }
+  if (!layout) {
+    return <div className="text-sm text-muted-foreground">No history yet.</div>;
+  }
+  
   const width  = Math.max(320, Math.max(...layout.children.map((c: any) => (c.x || 0) + (c.width || 0))) + 40);
   const height = Math.max(120, Math.max(...layout.children.map((c: any) => (c.y || 0) + (c.height || 0))) + 40);
-
-  const nodeById: Record<string, any> = Object.fromEntries(layout.children.map((c: any) => [c.id, c]));
-  const edges = layout.edges || [];
+  const layoutEdges = layout.edges || [];
 
   return (
     <div className="w-full overflow-x-auto">
       <svg width={width} height={height} role="img" aria-label="Batch journey flowchart">
         {/* edges */}
-        {edges.map((e: any) => (e.sections || []).map((s: any, idx: number) => (
+        {layoutEdges.map((e: any) => (e.sections || []).map((s: any, idx: number) => (
           <g key={`${e.id}:${idx}`} opacity={highlight && !e.id.includes(highlight) ? 0.4 : 1}>
             <path d={`M ${s.startPoint.x} ${s.startPoint.y} ${s.bendPoints?.map((p: any) => `L ${p.x} ${p.y}`).join(" ") ?? ""} L ${s.endPoint.x} ${s.endPoint.y}`} stroke="#777" strokeWidth="1.2" fill="none" />
             {(e.labels || []).map((l: any, i: number) => (
@@ -58,14 +91,16 @@ export default function HistoryFlowchart({ data }: { data: BatchHistory }) {
         {/* nodes */}
         {layout.children.map((n: any) => {
           const origin = { x: n.x || 0, y: n.y || 0 };
-          const dataNode = data.graph.nodes.find(x => x.id === n.id)!;
+          const dataNode = graph?.nodes.find(x => x.id === n.id);
+          if (!dataNode) return null;
+          
           const muted = highlight && highlight !== dataNode.batchId;
 
           return (
             <g key={n.id} transform={`translate(${origin.x},${origin.y})`} cursor="pointer"
-               onClick={() => setHighlight(dataNode.batchId)}
-               onMouseEnter={() => setHighlight(dataNode.batchId)}
-               onMouseLeave={() => setHighlight(null)}>
+              onClick={() => setHighlight(dataNode.batchId)}
+              onMouseEnter={() => setHighlight(dataNode.batchId)}
+              onMouseLeave={() => setHighlight(null)}>
               <rect width={n.width} height={n.height} rx="12" fill="#fff" stroke={muted ? "#BBB" : "#888"} strokeWidth="1.2" />
               <text x={10} y={18} fontSize={12} fontWeight="bold">{icon(dataNode.kind)} {n.labels?.[0]?.text}</text>
               {dataNode.stageName ? <text x={10} y={36} fontSize={11} fill="#333">{dataNode.stageName}</text> : null}
@@ -78,7 +113,6 @@ export default function HistoryFlowchart({ data }: { data: BatchHistory }) {
         })}
       </svg>
 
-      {/* small legend */}
       <div className="mt-2 text-xs text-muted-foreground">Tip: hover/click a card to filter the action log to that batch/stage.</div>
     </div>
   );

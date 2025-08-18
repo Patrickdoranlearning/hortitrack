@@ -27,14 +27,15 @@ export const metadata: Metadata = {
     description: "Track batches, locations, and crop data with ease.",
     images: ["/og-image.png"],
   },
-  colorScheme: "light dark",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#6AB04A",
+  themeColor: "#ffffff",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
