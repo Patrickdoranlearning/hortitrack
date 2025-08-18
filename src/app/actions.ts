@@ -7,7 +7,7 @@ import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 import { z } from 'zod';
-import { allocateBatchNumber } from '@/server/services/batchNumber';
+import { allocateBatchNumber, BatchStage } from '@/server/services/batchNumber';
 import { declassify } from '@/server/utils/declassify';
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
@@ -110,13 +110,22 @@ export async function addBatchAction(
   try {
     return await db.runTransaction(async (transaction) => {
         const newDocRef = db.collection('batches').doc();
-        const batchNumber = await allocateBatchNumber(transaction);
+        
+        const stageMap: Record<string, BatchStage> = {
+          'Propagation': 'propagation',
+          'Plugs/Liners': 'plug',
+          'Potted': 'potting',
+          'Ready for Sale': 'potting',
+          'Looking Good': 'potting'
+        };
+        const stage = stageMap[newBatchData.status] || 'potting';
+        const batchNumber = await allocateBatchNumber(transaction, { stage });
         
         const newBatch: Batch = {
           ...(newBatchData as any),
           id: newDocRef.id,
           batchNumber: batchNumber,
-          logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: 'Batch created.' }],
+          logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: `Batch created with number ${batchNumber}.` }],
         };
         
         transaction.set(newDocRef, newBatch);
@@ -229,7 +238,16 @@ export async function transplantBatchAction(
             throw new Error('Insufficient quantity in source batch.');
         }
 
-        const batchNumber = await allocateBatchNumber(transaction);
+        const stageMap: Record<string, BatchStage> = {
+            'Propagation': 'propagation',
+            'Plugs/Liners': 'plug',
+            'Potted': 'potting',
+            'Ready for Sale': 'potting',
+            'Looking Good': 'potting'
+        };
+        const stage = stageMap[newBatchData.status] || 'potting';
+        const batchNumber = await allocateBatchNumber(transaction, { stage });
+
         const newDocRef = db.collection('batches').doc();
         const newBatch: Batch = {
             ...(newBatchData as any),
@@ -404,15 +422,28 @@ export async function addBatchesFromCsvAction(batches: any[]) {
     try {
         const writeBatch = db.batch();
         
-        batches.forEach(batchData => {
+        for (const batchData of batches) {
             const docRef = db.collection('batches').doc();
             
-            const newBatch: Omit<Batch, 'id' | 'batchNumber'> = {
+            const stageMap: Record<string, BatchStage> = {
+              'Propagation': 'propagation',
+              'Plugs/Liners': 'plug',
+              'Potted': 'potting',
+              'Ready for Sale': 'potting',
+              'Looking Good': 'potting'
+            };
+            const stage = stageMap[batchData.status] || 'potting';
+            // Note: This runs the transaction for each row, which is inefficient but safe.
+            // A more performant approach would pre-allocate numbers, but this is simpler.
+            const batchNumber = await db.runTransaction(async (tx) => allocateBatchNumber(tx, { stage }));
+
+            const newBatch: Omit<Batch, 'id'> = {
               ...batchData,
-              logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: 'Batch created from CSV import.' }],
+              batchNumber,
+              logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: `Batch created from CSV import with number ${batchNumber}.` }],
             };
             writeBatch.set(docRef, newBatch);
-        });
+        }
 
         await writeBatch.commit();
         return { success: true, message: `${batches.length} batches imported successfully.` };
@@ -421,5 +452,3 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         return { success: false, error: error.message };
     }
 }
-
-    
