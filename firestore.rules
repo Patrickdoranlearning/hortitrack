@@ -18,5 +18,31 @@ service cloud.firestore {
     match /rateLimits/{key} {
       allow read, write: if false;       // server-only
     }
+
+    // --- Lookup / reference data used by the UI ---
+    match /suppliers/{id} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+    match /sizes/{id} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+    match /locations/{id} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+     match /varieties/{id} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+    match /settings/{doc} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+    match /lookups/{doc} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
   }
 }
