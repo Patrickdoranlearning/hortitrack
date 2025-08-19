@@ -5,12 +5,15 @@ import ScannerClient from "@/components/Scanner/ScannerClient";
 import { getIdTokenOrNull } from "@/lib/auth/client";
 import { track } from "@/lib/telemetry";
 import { useToast } from "@/hooks/use-toast";
+import { parseScanCode, visualize, type Parsed } from "@/lib/scan/parse.client";
 
 export default function ScanPage() {
   const [status, setStatus] = useState<"idle" | "found" | "not_found" | "error">("idle");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const inflight = useRef(false);
+  const [decoded, setDecoded] = useState<string>("");
+  const [parsed, setParsed] = useState<Parsed | null>(null);
 
   async function lookup(code: string) {
     if (inflight.current) return;
@@ -63,6 +66,9 @@ export default function ScanPage() {
   }
 
   function onDecoded(text: string) {
+    setDecoded(text);
+    const p = parseScanCode(text);
+    setParsed(p);
     lookup(text);
   }
 
@@ -113,6 +119,25 @@ export default function ScanPage() {
     <div className="container max-w-3xl space-y-6 py-6">
       <h1 className="text-2xl font-display">Scan Batch</h1>
       <ScannerClient onDecoded={onDecoded} />
+      {/* Live decode & parse debug */}
+      <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+        <div className="mb-1 font-medium">Decoded text ({decoded ? decoded.length : 0} chars)</div>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-background p-2 text-xs">
+          {decoded ? visualize(decoded) : "—"}
+        </pre>
+        <div className="mt-2">
+          <span className="font-medium">Parsed:</span>{" "}
+          {parsed ? (
+            <>
+              <span className="inline-block rounded bg-emerald-600/10 px-2 py-0.5 text-emerald-900">{parsed.by}</span>{" "}
+              <code className="rounded bg-background px-1 py-0.5">{parsed.value}</code>
+            </>
+          ) : (
+            <span className="text-muted-foreground">— (unrecognized)</span>
+          )}
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" onChange={onUploadChange} className="text-sm"/>
         <form onSubmit={onManualSubmit} className="flex items-center gap-2">
@@ -124,4 +149,3 @@ export default function ScanPage() {
     </div>
   );
 }
-
