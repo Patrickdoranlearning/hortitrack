@@ -1,14 +1,20 @@
-/* eslint-disable no-restricted-globals */
-import { readBarcodes, type ReaderOptions } from "zxing-wasm/reader";
 
-// tuned for DM + QR on labels
+/* eslint-disable no-restricted-globals */
+import { readBarcodes, type ReaderOptions, setZXingModuleOverrides } from "zxing-wasm/reader";
+
+// Ensure the worker can fetch the wasm from a stable, public path
+// We'll copy *.wasm into /public/zxing on postinstall (see script below).
+setZXingModuleOverrides({
+  locateFile: (path: string) => `/zxing/${path}`,
+});
+
 const options: ReaderOptions = {
   tryHarder: true,
   tryInvert: true,
   tryDownscale: true,
   maxNumberOfSymbols: 1,
   formats: ["DataMatrix", "QRCode"],
-  textMode: "Plain", // keep raw control chars like GS for GS1
+  textMode: "Plain",
 };
 
 // Tell the UI that the worker bundle is alive

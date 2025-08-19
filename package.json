@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package && node scripts/copy-zxing-wasm.cjs",
     "test": "jest"
   },
   "dependencies": {

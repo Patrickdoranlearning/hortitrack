@@ -14,6 +14,7 @@ export default function ScanPage() {
   const inflight = useRef(false);
   const [decoded, setDecoded] = useState<string>("");
   const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [selfTest, setSelfTest] = useState<"idle"|"pass"|"fail"|"running">("idle");
 
   async function lookup(code: string) {
     if (inflight.current) return;
@@ -93,6 +94,49 @@ export default function ScanPage() {
     return res;
   }
 
+  async function decodeFromUrl(url: string) {
+    // draw remote image to canvas and send ImageData to the same worker codepath
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("load-failed"));
+      img.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const worker = new Worker(new URL("@/workers/decoder.worker.ts", import.meta.url), { type: "module" });
+    const result = await new Promise<string>((resolve, reject) => {
+      worker.onmessage = (ev: MessageEvent) => {
+        const { ok, result, error, type } = ev.data || {};
+        if (type === "READY") return; // ignore
+        worker.terminate();
+        if (ok && result?.text) resolve(result.text);
+        else reject(new Error(error || "decode-failed"));
+      };
+      worker.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
+    });
+    return result;
+  }
+
+  async function runSelfTest() {
+    setSelfTest("running");
+    try {
+      // Uses your server to render a QR → proves the worker/wasm path works
+      const url = `/api/qr?t=SCANNER_SELFTEST_${Date.now()}`;
+      const txt = await decodeFromUrl(url);
+      setDecoded(txt);
+      setParsed(parseScanCode(txt));
+      setSelfTest("pass");
+    } catch {
+      setSelfTest("fail");
+    }
+  }
+
   async function onUploadChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -119,6 +163,18 @@ export default function ScanPage() {
     <div className="container max-w-3xl space-y-6 py-6">
       <h1 className="text-2xl font-display">Scan Batch</h1>
       <ScannerClient onDecoded={onDecoded} />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={runSelfTest}
+          className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
+          disabled={selfTest === "running"}
+        >
+          {selfTest === "running" ? "Self-test…" : "Run self-test"}
+        </button>
+        {selfTest === "pass" && <span className="text-xs text-emerald-700">Self-test: PASS</span>}
+        {selfTest === "fail" && <span className="text-xs text-red-700">Self-test: FAIL</span>}
+      </div>
       {/* Live decode & parse debug */}
       <div className="rounded-lg border bg-muted/30 p-3 text-sm">
         <div className="mb-1 font-medium">Decoded text ({decoded ? decoded.length : 0} chars)</div>
