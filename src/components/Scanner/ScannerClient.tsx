@@ -14,12 +14,12 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number>(0);
+  const rafRef = useRef<number | null>(null);
   const vfcRef = useRef<number | null>(null);
-
-  const [engine, setEngine] = useState<Engine>("none");
+  const streamRef = useRef<MediaStream | null>(null);
+  
   const [camState, setCamState] = useState<CamState>("idle");
+  const [engine, setEngine] = useState<Engine>("none");
   const [torch, setTorch] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
@@ -27,9 +27,33 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   const [lastErr, setLastErr] = useState<string | null>(null);
   const [lastMs, setLastMs] = useState<number | null>(null);
   const [workerStatus, setWorkerStatus] = useState<"loading" | "ready" | "error">("loading");
+  const workerBusyRef = useRef<boolean>(false);
+  const lastDecodeStartRef = useRef<number>(0);
+  const [decodedText, setDecodedText] = useState<string | null>(null); // New state for decoded text
 
   // duplicate suppression: require 2 consecutive identical reads within 2s
   const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
+
+  // devices & resolution
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
+  const [resolution, setResolution] = useState<{ w: number; h: number }>({ w: 1920, h: 1080 });
+  useEffect(() => {
+    // enumerate after permission; called in startCamera too
+    (async () => {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        const vids = list.filter((d) => d.kind === "videoinput");
+        setDevices(vids);
+        // prefer back camera by label if not chosen
+        if (!deviceId) {
+          const back = vids.find((d) => /back|rear|environment/i.test(d.label));
+          setDeviceId(back?.deviceId || vids[0]?.deviceId);
+        }
+      } catch {}
+    })();
+  }, [deviceId]);
 
   /** ---- START/STOP CAMERA ---- */
   const stopAll = useCallback(() => {
@@ -46,6 +70,7 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   }, []);
 
   async function startCamera() {
+    stopAll();
     setLastErr(null);
     setCamState("requesting");
 
@@ -56,23 +81,17 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
+      const video: MediaTrackConstraints = deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: resolution.w }, height: { ideal: resolution.h } }
+        : { facingMode: { ideal: "environment" }, width: { ideal: resolution.w }, height: { ideal: resolution.h } };
+      const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
       streamRef.current = stream;
     } catch (e: any) {
-      const msg = String(e?.name || e?.message || "");
-      if (msg.includes("NotAllowedError")) setCamState("permission_denied");
-      else setCamState("idle");
-      setLastErr("Camera permission denied or unavailable.");
+      setCamState("permission_denied");
+      setLastErr(e?.message || "Permission denied");
       return;
     }
-
+    
     // Attach and wait for real frames
     const vid = videoRef.current!;
     vid.setAttribute("playsinline", "");
@@ -120,18 +139,29 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
 
     setCamState("streaming");
 
-    // Choose engine: Native if supports DataMatrix or QR; otherwise WASM
-    const native = await chooseNativeEngine();
-    if (native) {
+    // Choose engine: Only native if **Data Matrix** is supported
+    const nativeDM = await chooseNativeEngine();
+    if (nativeDM) {
       setEngine("native");
       runNativeLoop();
+      // Auto-failover: if no decode within 1200ms → switch to WASM
+      const failoverAt = Date.now() + 1200;
+      const check = () => {
+        if (engine !== "native" || camState !== "streaming") return;
+        if (lastDecodeStartRef.current && lastDecodeStartRef.current < failoverAt) {
+          setEngine("wasm");
+          runWasmLoop();
+          return;
+        }
+        setTimeout(check, 200);
+      };
+      setTimeout(check, 200);
     } else {
       setEngine("wasm");
       runWasmLoop();
     }
   }
 
-  /** ---- NATIVE BARCODEDETECTOR PATH ---- */
   async function chooseNativeEngine(): Promise<boolean> {
     const hasBD = typeof (window as any).BarcodeDetector !== "undefined";
     if (!hasBD) return false;
@@ -139,11 +169,11 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
       // Some browsers expose getSupportedFormats; prefer DataMatrix when present.
       const fmts: string[] = (await (window as any).BarcodeDetector?.getSupportedFormats?.()) || [];
       const wants = new Set(fmts.map((f) => f.toLowerCase()));
-      // Accept if either datamatrix or qr_code is present (we still try to read DM labels primarily).
-      return wants.has("data_matrix") || wants.has("datamatrix") || wants.has("qr_code");
+      // Only accept native if Data Matrix is supported explicitly.
+      return wants.has("data_matrix") || wants.has("datamatrix");
     } catch {
-      // Older impl—still try
-      return true;
+      // Older impl—assume no Data Matrix (be conservative)
+      return false;
     }
   }
 
@@ -157,6 +187,7 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
     const onFrame = async () => {
       if (!streamRef.current) return;
       try {
+        lastDecodeStartRef.current = Date.now();
         const barcodes = await detector.detect(vid);
         if (barcodes && barcodes.length) {
           const best = barcodes[0];
@@ -164,11 +195,10 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
           handleDecoded(text, /*format*/ best.format || "native");
         }
       } catch (e: any) {
-        setLastErr(e?.message || "native-detect-failed");
+        track("scan_decode_fail", { engine: "native", error: e?.message || "detect-error" });
       }
       rafRef.current = requestAnimationFrame(onFrame);
     };
-
     rafRef.current = requestAnimationFrame(onFrame);
   }
 
@@ -185,10 +215,13 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
       const { ok, result, error, type } = ev.data || {};
       if (type === "READY" || type === "PONG") { setWorkerStatus("ready"); return; }
       if (ok && result?.text) {
+        workerBusyRef.current = false;
         setLastMs(result.ms ?? null);
         handleDecoded(result.text, result.format || "wasm");
       } else if (!ok) {
+        workerBusyRef.current = false;
         setLastErr(error ?? "decode-failed");
+        track("scan_decode_fail", { engine: "wasm", reason: error ?? "not-found" });
       }
     };
     // handshake
@@ -202,7 +235,7 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
       if (!streamRef.current) return;
       const vid = videoRef.current!;
       const canvas = canvasRef.current!;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
       if (!ctx || vid.videoWidth === 0) {
         rafRef.current = requestAnimationFrame(loop);
         return;
@@ -219,8 +252,12 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
         canvas.width = side; canvas.height = side;
         ctx.drawImage(vid, x, y, side, side, 0, 0, side, side);
       }
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      workerRef.current?.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
+      // throttle: don’t enqueue if the worker is still busy
+      if (!workerBusyRef.current) {
+        workerBusyRef.current = true;
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        workerRef.current?.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
+      }
 
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -231,8 +268,10 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   /** ---- COMMON: Handle decoded text with duplicate suppression ---- */
   function handleDecoded(text: string, format: string) {
     if (!text) return;
+    console.log("ScannerClient: Decoded raw text:", text); // LOG ADDED
     const now = Date.now();
     const prev = lastRef.current;
+    setDecodedText(text); // Set the decoded text here
     if (text === prev.text && now - prev.t < 2000 && !prev.confirmed) {
       lastRef.current = { text, t: now, confirmed: true };
       track("scan_decode_success", { format, text_len: text.length, ms: lastMs ?? undefined });
@@ -257,6 +296,10 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   };
 
   useEffect(() => stopAll, [stopAll]);
+
+  useEffect(() => {
+    startCamera();
+  }, []); // Empty dependency array means this runs once on mount
 
   return (
     <div className="space-y-3">
@@ -294,10 +337,60 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Debug/status bar */}
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>Camera: {camState}</span>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1">
+            Engine
+            <select
+              className="rounded border px-1 py-0.5"
+              value={engine}
+              onChange={(e) => {
+                const val = e.target.value as Engine;
+                setEngine(val);
+                if (val === "native") runNativeLoop(); else runWasmLoop();
+              }}>
+              <option value="wasm">WASM</option>
+              <option value="native">Native</option>
+            </select>
+          </label>
+          {engine === "wasm" && <span>Worker: {workerStatus}</span>}
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {devices.length > 1 && (
+          <label className="flex items-center gap-1 text-xs">
+            Camera
+            <select
+              className="rounded border px-1 py-0.5"
+              value={deviceId}
+              onChange={(e) => { setDeviceId(e.target.value); startCamera(); }}>
+              {devices.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0, 6)}`}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="flex items-center gap-1 text-xs">
+          Resolution
+          <select
+            className="rounded border px-1 py-0.5"
+            value={`${resolution.w}x${resolution.h}`}
+            onChange={(e) => {
+              const [w, h] = e.target.value.split("x").map(Number);
+              setResolution({ w, h });
+              startCamera();
+            }}>
+            <option value="1280x720">1280×720</option>
+            <option value="1920x1080">1920×1080</option>
+            <option value="2560x1440">2560×1440</option>
+          </select>
+        </label>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <span>Cam: {camState}</span>
-        <span>Engine: {engine}</span>
-        {engine === "wasm" && <span>Worker: {workerStatus}</span>}
+        {decodedText && <span>Decoded: {decodedText}</span>} {/* Display decoded text here */}
         {lastMs != null && <span>Last decode: {lastMs}ms</span>}
         {lastErr && <span className="text-red-700">Err: {lastErr}</span>}
         {zoomCaps && (

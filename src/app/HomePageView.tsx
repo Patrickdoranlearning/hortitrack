@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -62,6 +61,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { useCollection } from '@/hooks/use-collection';
 import { getCareRecommendationsAction } from './actions';
 import { FeatureGate } from '@/components/FeatureGate';
+import { getIdTokenOrNull } from "@/lib/auth/client"; // Import getIdTokenOrNull
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -288,7 +288,21 @@ export default function HomePageView({
   
   const handleScanDetected = async (text: string) => {
     try {
-      const res = await fetch(`/api/batches/scan?code=${encodeURIComponent(text)}`);
+      const idToken = await getIdTokenOrNull();
+      if (!idToken) {
+        toast({ variant: "destructive", title: "Authentication Error", description: "Please sign in to scan batches." });
+        return;
+      }
+
+      const res = await fetch('/api/batches/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ code: text }),
+      });
+
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: 'Batch not found.' }));
         throw new Error(errBody.error);

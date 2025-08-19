@@ -15,11 +15,13 @@ const options: ReaderOptions = {
 
 (self as any).postMessage({ type: "READY", ok: true });
 
-self.onmessage = async (ev: MessageEvent) => {
-  const { type, imageData } = (ev.data || {}) as { type?: string; imageData?: ImageData };
+onmessage = async (e: MessageEvent) => {
   try {
-    if (type === "PING") { (self as any).postMessage({ type: "PONG", ok: true }); return; }
-    if (type !== "DECODE" || !imageData) { (self as any).postMessage({ ok: false, error: "bad-message" }); return; }
+    const { type, imageData } = e.data || {};
+    if (type !== "DECODE" || !imageData) {
+      (self as any).postMessage({ ok: false, error: "bad-message" });
+      return;
+    }
 
     const t0 = Date.now();
     const results = await readBarcodes(imageData, options);

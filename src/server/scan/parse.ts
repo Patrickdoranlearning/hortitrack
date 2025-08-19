@@ -50,6 +50,7 @@ function parseGS1(text: string): Record<string, string> {
 }
 
 export function parseScanCode(raw: string): Parsed | null {
+  console.log("parseScanCode received raw:", JSON.stringify(raw)); // ADDED LOG
   if (!raw) return null;
 
   // Keep GS, drop other control chars; trim

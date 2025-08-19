@@ -80,20 +80,33 @@ function normalizeBatch(d: any): any {
 
 // --- Batch quick-open via search (Enter) ---
 function normalizeBatchQuery(q: string): string {
+  console.log("normalizeBatchQuery: Input:", q); // LOG ADDED
   // trim + remove common prefixes: "batch ", "#", "b:", "b-"
-  return (q || "")
+  const normalized = (q || "")
     .trim()
     .replace(/^(batch\s*#?|b[:\-]?)\s*/i, ""); // keep leading zeros
+  console.log("normalizeBatchQuery: Output:", normalized); // LOG ADDED
+  return normalized;
 }
 
 function findBatchByNumberOrId(batches: Batch[], query: string): Batch | undefined {
   const q = normalizeBatchQuery(query);
   if (!q) return undefined;
+  
   // exact batchNumber match first (string compare to preserve leading zeros)
-  const byNumber = batches.find(b => String(b.batchNumber) === q);
+  const byNumber = batches.find(b => {
+    const batchNumStr = String(b.batchNumber);
+    console.log("findBatchByNumberOrId: Comparing normalized query '"+q+"' with batch number '"+batchNumStr+"'"); // LOG ADDED
+    return batchNumStr === q;
+  });
   if (byNumber) return byNumber;
+  
   // fallback: exact id
-  return batches.find(b => String(b.id) === q);
+  return batches.find(b => {
+    const batchIdStr = String(b.id);
+    console.log("findBatchByNumberOrId: Comparing normalized query '"+q+"' with batch ID '"+batchIdStr+"'"); // LOG ADDED
+    return batchIdStr === q;
+  });
 }
 
 

@@ -1,4 +1,3 @@
-
 "use client";
 import { useRef, useState } from "react";
 import ScannerClient from "@/components/Scanner/ScannerClient";
@@ -23,6 +22,7 @@ export default function ScanPage() {
 
     try {
         const idToken = await getIdTokenOrNull();
+        console.log("ID Token:", idToken); // LOG ADDED
         if (!idToken) {
             setStatus("error");
             toast({ variant: "destructive", title: "Authentication Error", description: "Please sign in to look up batches." });
