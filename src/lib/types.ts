@@ -4,21 +4,34 @@ import { z } from "zod";
 // --- Dictionaries ---
 export const SupplierSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1),
+  name: z.string().min(1, 'Supplier name is required'),
+  address: z.string().optional(),
+  country: z.string().optional(),
+  countryCode: z.string().optional(),
+  producerCode: z.string().optional(),
+  operatorRegNo: z.string().optional(),
   contact: z.string().optional(),
+  active: z.boolean().default(true).optional(),
 });
 export type Supplier = z.infer<typeof SupplierSchema>;
 
 export const PlantSizeSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1), // e.g., "9cm", "10.5cm"
-  liters: z.number().optional(),
+  size: z.string().min(1, "Size name is required"),
+  type: z.enum(["Pot", "Tray", "Bareroot"]),
+  area: z.number().optional(),
+  shelfQuantity: z.number().optional(),
+  multiple: z.number().optional(),
 });
 export type PlantSize = z.infer<typeof PlantSizeSchema>;
 
 export const NurseryLocationSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1), // e.g., "Tunnel A-12"
+  name: z.string().min(1, "Location name is required"),
+  nursery: z.string().optional(),
+  type: z.string().optional(),
+  area: z.number().optional(),
+  isCovered: z.boolean().optional(),
   capacity: z.number().int().nonnegative().optional(),
 });
 export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
@@ -28,14 +41,42 @@ export const VarietySchema = z.object({
   name: z.string().min(1),
   family: z.string().min(1),
   category: z.string().default("Perennial"),
+  grouping: z.string().optional(),
+  commonName: z.string().optional(),
+  rating: z.string().optional(),
+  salesPeriod: z.string().optional(),
+  floweringPeriod: z.string().optional(),
+  flowerColour: z.string().optional(),
+  evergreen: z.string().optional(),
 });
 export type Variety = z.infer<typeof VarietySchema>;
+
+// --- Plant Passport ---
+export const PlantPassportSchema = z.object({
+    id: z.string(),
+    type: z.enum(["received", "issued"]),
+    botanicalName: z.string(),           // A
+    operatorRegNo: z.string(),           // B e.g. IE-xxxxxxx
+    traceabilityCode: z.string(),        // C (lot/trace code)
+    originCountry: z.string(),           // D (ISO alpha-2)
+    protectedZone: z.object({ codes: z.array(z.string()) }).optional(), // when PZ applies
+    issuerName: z.string().optional(),
+    issueDate: z.date().optional(),
+    rawLabelText: z.string().optional(),
+    rawBarcodeText: z.string().optional(),
+    images: z.array(z.object({ url: z.string(), name: z.string().optional() })).optional(),
+    createdAt: z.date(),
+    createdBy: z.string(),
+});
+export type PlantPassport = z.infer<typeof PlantPassportSchema>;
+
 
 // --- Logs ---
 export const LogEntrySchema = z.object({
   id: z.string().optional(),
   date: z.string().or(z.date()).transform((d) => (d instanceof Date ? d.toISOString() : d)),
   type: z.string().min(1),
+  at: z.string().or(z.date()).optional().transform((d) => (d instanceof Date ? d.toISOString() : d)),
   note: z.string().optional(),
   qty: z.number().optional(),
   reason: z.string().optional(),
@@ -43,23 +84,24 @@ export const LogEntrySchema = z.object({
   newLocationId: z.string().optional(),
   fromBatch: z.string().optional(),
   toBatch: z.string().optional(),
+  action: z.string().optional(),
 });
 export type LogEntry = z.infer<typeof LogEntrySchema>;
 
 // --- Batches ---
 export const BatchStatus = z.enum([
   "Propagation",
-  "Plug",
-  "Growing",
-  "Ready",
-  "Sold",
+  "Plugs/Liners",
+  "Potted",
+  "Ready for Sale",
+  "Looking Good",
   "Archived",
 ]);
 export type BatchStatus = z.infer<typeof BatchStatus>;
 
 export const BatchSchema = z.object({
   id: z.string().optional(),
-  batchNumber: z.string().min(3),
+  batchNumber: z.string(),
   category: z.string().min(1),
   plantFamily: z.string().min(1),
   plantVariety: z.string().min(1),
@@ -69,13 +111,35 @@ export const BatchSchema = z.object({
   status: BatchStatus,
   location: z.string().optional(),
   locationId: z.string().optional(),
-  size: z.string().optional(),
+  size: z.string(),
+  supplier: z.string().optional(),
   supplierId: z.string().optional(),
-  flagged: z.boolean().default(false),
-  flaggedAt: z.string().optional(), // ISO
-  flaggedBy: z.string().optional(),
+  supplierRef: z.string().optional(),
+  deliveryRef: z.string().optional(),
   notes: z.string().optional(),
-  logs: z.array(LogEntrySchema).optional(),
+  logHistory: z.array(LogEntrySchema).default([]),
+  createdAt: z.any().optional(),
+  updatedAt: z.any().optional(),
+  transplantedFrom: z.string().optional(),
+  growerPhotoUrl: z.string().url().optional(),
+  salesPhotoUrl: z.string().url().optional(),
+  isTopPerformer: z.boolean().optional(),
+  
+  // New fields for check-in and passport
+  sourceType: z.enum(["Propagation", "Purchase"]).default("Propagation"),
+  passportReceivedId: z.string().optional(),
+  qcStatus: z.enum(["Pending", "Accepted", "Rejected", "Quarantined"]).default("Pending"),
+  qcNotes: z.string().optional(),
+
+  // Flag object for issue tracking
+  flag: z.object({
+    active: z.boolean().default(false),
+    reason: z.string().optional(),
+    remedy: z.string().optional(),
+    severity: z.enum(["low", "medium", "high"]).optional(),
+    flaggedAt: z.string().optional(),
+    flaggedBy: z.string().optional(),
+  }).optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
@@ -159,25 +223,17 @@ export const ProductionProtocolRouteSchema = z.object({
 
 export const ProductionProtocolOutputSchema = z.object({
   id: z.string().optional(),
-  name: z.string(),
-  version: z.number().int().optional(),
-  status: z.enum(["draft", "published"]).optional(),
-  createdAt: z.any().optional(),
-  createdFromBatchId: z.string(),
-
-  plantFamily: z.string().nullable().optional(),
-  plantVariety: z.string().nullable().optional(),
-  season: z.string().nullable().optional(),
-
-  potSize: z.union([z.string(), z.number()]).nullable().optional(),
-  media: z.string().nullable().optional(),
-  containerType: z.string().nullable().optional(),
-  supplierName: z.string().nullable().optional(),
-  supplierId: z.string().nullable().optional(),
-
+  protocolTitle: z.string().optional(),
+  summary: z.string().optional(),
+  timeline: z.array(z.object({
+    day: z.number(),
+    action: z.string(),
+    details: z.string(),
+    date: z.string().optional(),
+  })).optional(),
+  recommendations: z.array(z.string()).optional(),
   targets: ProductionTargetsSchema.optional(),
-  steps: z.array(ProductionProtocolStepSchema).optional().default([]),
-
-  sourceSnapshot: z.record(z.any()).optional(),
+  steps: z.array(ProductionProtocolStepSchema).default([]),
   route: ProductionProtocolRouteSchema.optional(),
 });
+export type ProductionProtocolOutput = z.infer<typeof ProductionProtocolOutputSchema>;

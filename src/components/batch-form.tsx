@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -22,8 +22,10 @@ import { format } from 'date-fns';
 import type {
   Batch, BatchStatus, NurseryLocation, PlantSize, Supplier, Variety,
 } from '@/lib/types';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 const BatchFormSchema = z.object({
+  sourceType: z.enum(["Propagation", "Purchase"]).default("Propagation"),
   plantVariety: z.string().min(1, 'Variety is required'),
   plantFamily: z.string().min(1, 'Family is required'),
   category: z.string().min(1, 'Category is required'),
@@ -103,6 +105,7 @@ export function BatchForm({
     resolver: zodResolver(BatchFormSchema),
     mode: 'onChange',
     defaultValues: {
+      sourceType: batch?.sourceType ?? "Propagation",
       plantVariety: batch?.plantVariety ?? '',
       plantFamily: batch?.plantFamily ?? '',
       category: batch?.category ?? '',
@@ -151,18 +154,10 @@ export function BatchForm({
     }
 
     const payload = {
-      category: values.category,
-      plantFamily: values.plantFamily,
-      plantVariety: values.plantVariety,
-      plantingDate: values.plantingDate.toISOString(),
+      ...values,
       initialQuantity: isEdit ? (batch?.initialQuantity ?? values.quantity) : values.quantity,
-      quantity: values.quantity,
-      status: values.status,
-      location: values.location,
-      size: values.size,
+      plantingDate: values.plantingDate.toISOString(),
       supplier: values.supplier ? values.supplier : undefined,
-      growerPhotoUrl: values.growerPhotoUrl,
-      salesPhotoUrl: values.salesPhotoUrl,
     };
 
     if (isEdit && batch?.id) {
@@ -192,6 +187,7 @@ export function BatchForm({
     onSuccess(result);
 
     form.reset({
+      sourceType: "Propagation",
       plantVariety: '',
       plantFamily: '',
       category: '',
@@ -227,17 +223,39 @@ export function BatchForm({
         })}
         noValidate
       >
-        {/* Header: batch number info */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <div className="text-sm font-medium text-muted-foreground">
-              {isEdit ? `Batch #${batch?.batchNumber ?? batch?.id}` : 'Batch Number'}
-            </div>
-            <div className="font-semibold">
-              {isEdit ? 'Read-only' : 'Auto-generated on save'}
-            </div>
-          </div>
-        </div>
+        <FormField
+          control={form.control}
+          name="sourceType"
+          render={({ field }) => (
+            <FormItem className="space-y-3">
+              <FormLabel>Source Type</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  className="flex space-x-4"
+                >
+                  <FormItem className="flex items-center space-x-2 space-y-0">
+                    <FormControl>
+                      <RadioGroupItem value="Propagation" />
+                    </FormControl>
+                    <FormLabel className="font-normal">Propagation</FormLabel>
+                  </FormItem>
+                  <FormItem className="flex items-center space-x-2 space-y-0">
+                    <FormControl>
+                      <RadioGroupItem value="Purchase" />
+                    </FormControl>
+                    <FormLabel className="font-normal">Purchase</FormLabel>
+                  </FormItem>
+                </RadioGroup>
+              </FormControl>
+              <FormDescription>
+                Select if this batch was propagated in-house or purchased from a supplier.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 *:min-w-0">
           {/* Hidden fields to carry family & category */}
