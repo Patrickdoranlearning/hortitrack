@@ -2,7 +2,7 @@
 import type { Metadata, Viewport } from "next";
 import {PT_Sans, Playfair_Display} from 'next/font/google';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/sonner"
 import { cn } from '@/lib/utils';
 
 const ptSans = PT_Sans({

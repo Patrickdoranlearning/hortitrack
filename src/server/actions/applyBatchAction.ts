@@ -1,0 +1,142 @@
+import { db, FieldValue } from "@/lib/firebase-admin";
+import type { ActionInput } from "@/lib/actions/schema";
+import { ActionInputSchema } from "@/lib/actions/schema";
+
+type Result<T = unknown> = { ok: true; data: T } | { ok: false; error: string };
+
+async function ensureIdempotent(actionId: string): Promise<boolean> {
+  const ref = db.collection("actionDedup").doc(actionId);
+  const snap = await ref.get();
+  if (snap.exists) return false;
+  await ref.set({ createdAt: FieldValue.serverTimestamp() });
+  return true;
+}
+
+async function logAction(payload: ActionInput & Record<string, unknown>) {
+  await db.collection("actionLogs").add({
+    ...payload,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+}
+
+export async function applyBatchAction(raw: unknown): Promise<Result> {
+  const parsed = ActionInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid action payload" };
+  }
+  const action = parsed.data;
+
+  // Idempotency
+  const firstUse = await ensureIdempotent(action.actionId);
+  if (!firstUse) return { ok: true, data: { idempotent: true } };
+
+  try {
+    switch (action.type) {
+      case "MOVE": {
+        const { batchIds, toLocationId, quantity } = action;
+
+        // Transact each independently to avoid cross-batch aborts
+        for (const batchId of batchIds) {
+          const batchRef = db.collection("batches").doc(batchId);
+          await db.runTransaction(async (tx) => {
+            const snap = await tx.get(batchRef);
+            if (!snap.exists) throw new Error(`Batch ${batchId} not found`);
+            const batch = snap.data() as any;
+
+            const moveQty = quantity ?? batch.quantity;
+            if (moveQty <= 0) throw new Error("Quantity must be > 0");
+            if (moveQty > batch.quantity) throw new Error("Insufficient quantity");
+
+            // If moving full batch, just update location.
+            if (moveQty === batch.quantity) {
+              tx.update(batchRef, {
+                locationId: toLocationId,
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+            } else {
+              // Partial move ⇒ reduce source, create child batch at new location
+              tx.update(batchRef, {
+                quantity: FieldValue.increment(-moveQty),
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+              const newRef = db.collection("batches").doc();
+              tx.set(newRef, {
+                ...batch,
+                parentBatchId: batchId,
+                locationId: toLocationId,
+                quantity: moveQty,
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+            }
+          });
+        }
+
+        await logAction({ ...action });
+        return { ok: true, data: { moved: action.batchIds.length } };
+      }
+
+      case "SPLIT": {
+        const { batchIds: [batchId], toLocationId, splitQuantity } = action;
+
+        const batchRef = db.collection("batches").doc(batchId);
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(batchRef);
+          if (!snap.exists) throw new Error(`Batch ${batchId} not found`);
+          const batch = snap.data() as any;
+
+          if (splitQuantity <= 0) throw new Error("splitQuantity must be > 0");
+          if (splitQuantity >= batch.quantity) throw new Error("splitQuantity must be < batch.quantity");
+
+          tx.update(batchRef, {
+            quantity: FieldValue.increment(-splitQuantity),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+
+          const newRef = db.collection("batches").doc();
+          tx.set(newRef, {
+            ...batch,
+            parentBatchId: batchId,
+            locationId: toLocationId,
+            quantity: splitQuantity,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        });
+
+        await logAction({ ...action });
+        return { ok: true, data: { split: true } };
+      }
+
+      case "FLAGS": {
+        const { batchIds, trimmed, spaced } = action;
+
+        for (const batchId of batchIds) {
+          const batchRef = db.collection("batches").doc(batchId);
+          await db.runTransaction(async (tx) => {
+            const snap = await tx.get(batchRef);
+            if (!snap.exists) throw new Error(`Batch ${batchId} not found`);
+            const patch: Record<string, unknown> = {
+              updatedAt: FieldValue.serverTimestamp(),
+            };
+            if (typeof trimmed === "boolean") patch["trimmed"] = trimmed;
+            if (typeof spaced === "boolean") patch["spaced"] = spaced;
+            tx.update(batchRef, patch);
+          });
+        }
+
+        await logAction({ ...action });
+        return { ok: true, data: { updated: batchIds.length } };
+      }
+
+      case "NOTE": {
+        await logAction({ ...action });
+        return { ok: true, data: { logged: true } };
+      }
+    }
+  } catch (e: any) {
+    // allow next attempt to reuse actionId after failure
+    await db.collection("actionDedup").doc(action.actionId).delete().catch(() => {});
+    return { ok: false, error: e?.message ?? "Unknown error" };
+  }
+}
