@@ -69,14 +69,6 @@ export function BatchActionBar({
         </Button>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button onClick={onQr} variant="outline" size="sm" disabled={!onQr} className="rounded-2xl w-full" data-testid="btn-qr">
-              <QrCode className="mr-2 h-4 w-4" /> QR
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Generate / show QR</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
             <Button onClick={onPrint} variant="outline" size="sm" disabled={!onPrint} className="rounded-2xl w-full" data-testid="btn-print">
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
