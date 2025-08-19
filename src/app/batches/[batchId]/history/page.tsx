@@ -41,7 +41,7 @@ export default async function BatchHistoryPage({ params }: { params: { batchId: 
 
       {/* Flowchart */}
       <section className="rounded-xl border bg-muted/10 p-3 sm:p-5">
-        <HistoryFlowchartClient batchId={id} />
+        <HistoryFlowchartClient batchId={id} data={data} />
       </section>
 
       {/* Action Log */}
