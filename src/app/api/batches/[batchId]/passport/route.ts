@@ -13,13 +13,20 @@ type ComputedPassport = {
 };
 
 async function getBatchWithSupplier(batchId: string): Promise<any | null> {
-    const batchSnap = await adminDb.collection('batches').doc(batchId).get();
+    if (!batchId || typeof batchId !== 'string') {
+        return null;
+    }
+    const batchRef = adminDb.collection('batches').doc(batchId);
+    const batchSnap = await batchRef.get();
+
     if (!batchSnap.exists) {
         return null;
     }
     const batch = { id: batchSnap.id, ...batchSnap.data() };
 
     if (batch.supplier) {
+        // Assuming supplier is stored as a string name.
+        // If it's a reference, this logic would change.
         const supplierSnap = await adminDb.collection('suppliers').where('name', '==', batch.supplier).limit(1).get();
         if (!supplierSnap.empty) {
             batch.supplierData = { id: supplierSnap.docs[0].id, ...supplierSnap.docs[0].data() };
@@ -59,9 +66,13 @@ async function computePassportForBatch(batchId: string): Promise<ComputedPasspor
   };
 }
 
-export async function GET(_: NextRequest, { params }: { params: { id: string }}) {
+export async function GET(_: NextRequest, { params }: { params: { batchId: string }}) {
   try {
-    const data = await computePassportForBatch(params.id);
+    const batchId = params.batchId;
+    if (!batchId) {
+        return NextResponse.json({ error: "Batch ID is required." }, { status: 400 });
+    }
+    const data = await computePassportForBatch(params.batchId);
     return NextResponse.json(declassify(data), { status: 200 });
   } catch (e: any) {
     const status = e.message.includes("Not found") ? 404 : 500;
