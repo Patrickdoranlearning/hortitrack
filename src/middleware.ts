@@ -7,7 +7,14 @@ export function middleware(req: NextRequest) {
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "no-referrer");
-  res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  // Allow camera on this origin; keep mic/geo disabled by default
+  // You can append additional origins via NEXT_CAMERA_ALLOWED_ORIGINS (space-separated), but it's optional.
+  const extra = (process.env.NEXT_CAMERA_ALLOWED_ORIGINS ?? "").trim(); // e.g. "https://your-preview.vercel.app"
+  const allowList = ["self", ...extra.split(/\s+/).filter(Boolean)]
+    .map(v => (v === "self" ? "self" : `"${v}"`))
+    .join(" ");
+  res.headers.set("Permissions-Policy", `camera=(${allowList}), microphone=(), geolocation=()`);
+
   // CSP (opt-in via env to avoid breaking dev)
   if (process.env.NEXT_ENABLE_CSP === "1") {
     const csp = [

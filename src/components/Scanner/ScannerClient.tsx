@@ -16,6 +16,8 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
   const [torch, setTorch] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [camErr, setCamErr] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   // duplicate suppression: require 2 consecutive matches within 2s
   const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
@@ -42,7 +44,8 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
     workerRef.current?.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
   }, [roiScale]);
 
-  useEffect(() => {
+  const startCamera = useCallback(async () => {
+    setCamErr(null);
     let raf = 0;
     let decoding = false;
 
@@ -78,17 +81,33 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
       };
 
       // camera
-      streamRef.current = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
+      // HTTPS (or localhost) required; otherwise browsers throw SecurityError.
+      if (location.protocol !== "https:" && location.hostname !== "localhost") {
+        throw new Error("insecure-origin");
+      }
+      try {
+        streamRef.current = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        });
+      } catch (e: any) {
+        // Normalize common errors for UX
+        const msg = String(e?.name || e?.message || "");
+        if (msg.includes("NotAllowedError")) setCamErr("Camera permission denied. Please allow access.");
+        else if (msg.includes("NotFoundError")) setCamErr("No camera found on this device.");
+        else if (msg.includes("SecurityError") || msg.includes("insecure-origin")) setCamErr("Camera requires HTTPS (or localhost).");
+        else setCamErr("Unable to access camera.");
+        throw e;
+      }
       const vid = videoRef.current!;
       vid.srcObject = streamRef.current;
-      await vid.play();
+      await vid.play().catch(() => {
+        // iOS Safari sometimes needs a user gesture
+      });
 
       // try focus/torch/zoom
       const track = streamRef.current.getVideoTracks()[0];
@@ -108,6 +127,7 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
       }
 
       loop();
+      setReady(true);
     };
 
     setup().catch((e) => {
@@ -119,7 +139,13 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
       workerRef.current?.terminate();
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [decodeFrame, onDecoded, torch]);
+  }, [decodeFrame, onDecoded]);
+
+  useEffect(() => {
+    // Try auto-start; if permission blocked, UI shows Retry button
+    startCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // live-apply zoom/torch when state changes
   useEffect(() => {
@@ -140,6 +166,27 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
     <div className="space-y-3">
       <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline muted />
       <canvas ref={canvasRef} className="hidden" />
+      {camErr && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          {camErr}
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="rounded-md border px-3 py-1" onClick={() => startCamera()}>
+              Retry
+            </button>
+            <a
+              className="rounded-md border px-3 py-1"
+              href="about:blank"
+              onClick={(e) => {
+                e.preventDefault();
+                // helpful hint for users
+                alert("If you previously blocked the camera, click the site lock icon in your browser’s address bar and allow Camera.");
+              }}
+            >
+              How to allow
+            </a>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <button
           type="button"
