@@ -3,6 +3,7 @@
 import * as React from "react";
 import { layoutGraph } from "@/server/batches/graphLayout";
 import type { BatchHistory } from "@/server/batches/history";
+import { sanitizeElkGraph } from "./graph-utils";
 
 const icon = (kind: string) => {
   switch (kind) {
@@ -49,28 +50,35 @@ export default function HistoryFlowchart({ batchId, data }: Props) {
   const edges = React.useMemo(() => buildEdges(graph), [graph?.edges]);
 
   const [layout, setLayout] = React.useState<any | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    setError(null);
-    const safeNodes = (nodes ?? []);
-    const safeEdges = (edges ?? []);
-    if (safeNodes.length || safeEdges.length) {
-        let alive = true;
-        layoutGraph({ children: safeNodes, edges: safeEdges })
-            .then((res) => { if (alive) setLayout(res); })
-            .catch((e: any) => { if(alive) setError(e?.message ?? String(e))});
-        return () => { alive = false; };
-    } else {
+    setErrorMsg(null);
+    const rawGraph = { children: nodes, edges };
+    const sanitizedGraph = sanitizeElkGraph(rawGraph as any);
+    
+    if (!sanitizedGraph.children?.length && !sanitizedGraph.edges?.length) {
       setLayout(null);
+      return;
     }
+  
+    Promise.resolve()
+      // @ts-ignore
+      .then(() => layoutGraph(sanitizedGraph))
+      .then(setLayout)
+      .catch((e) => {
+        console.error("HistoryFlowchart layout error:", e);
+        setErrorMsg("Failed to render flow. The graph will be shown as a list instead.");
+        setLayout(null);
+      });
   }, [nodes, edges]);
 
-  if (error) {
-    return <div className="text-sm text-red-600">Failed to render flow: {error}</div>;
+
+  if (errorMsg) {
+    return <div className="text-sm text-amber-600">{errorMsg}</div>;
   }
   if (!layout) {
-    return <div className="text-sm text-muted-foreground">No history yet.</div>;
+    return <div className="text-sm text-muted-foreground">Rendering flow…</div>;
   }
   
   const width  = Math.max(320, Math.max(...layout.children.map((c: any) => (c.x || 0) + (c.width || 0))) + 40);
@@ -93,7 +101,7 @@ export default function HistoryFlowchart({ batchId, data }: Props) {
         {/* nodes */}
         {layout.children.map((n: any) => {
           const origin = { x: n.x || 0, y: n.y || 0 };
-          const dataNode = graph?.nodes.find(x => x.id === n.id);
+          const dataNode = graph?.nodes.find(x => x.id === n.id.replace(/^n_/, ''));
           if (!dataNode) return null;
           
           const muted = highlight && highlight !== dataNode.batchId;
