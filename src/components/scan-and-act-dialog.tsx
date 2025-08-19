@@ -12,39 +12,19 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onDetected: (text: string) => void;
-  onFound?: (batch: any) => void;
 };
 
-export default function ScanAndActDialog({ open, onOpenChange, onDetected, onFound }: Props) {
+export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Props) {
   const { toast } = useToast();
 
   async function handleDecoded(text: string) {
     onDetected(text);
     try {
-      const idToken = await getIdTokenOrNull();
-      const res = await fetch("/api/batches/scan", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
-        body: JSON.stringify({ code: text }),
-      });
-      if (res.ok) {
-        const { batch, summary } = await res.json();
-        track("scan_lookup_result", { result: "found", by: summary?.by ?? "unknown" });
-        onFound?.(batch);
-        onOpenChange(false);
-      } else if (res.status === 404) {
-        track("scan_lookup_result", { result: "not_found" });
-        toast({ variant: 'destructive', title: 'Not Found', description: 'No batch found for the scanned code.' });
-      } else {
-        track("scan_lookup_result", { result: "error", status: res.status });
-        toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while looking up the batch.' });
-      }
+      // Intentionally not showing toasts here as the parent component (HomePageView) does.
+      // This dialog's only job is to decode and pass the raw text up.
     } catch (e: any) {
       track("scan_lookup_result", { result: "error", message: e?.message });
-      toast({ variant: 'destructive', title: 'Error', description: 'A network error occurred.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'An unexpected client error occurred.' });
     }
   }
 

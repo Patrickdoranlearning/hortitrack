@@ -1,111 +1,79 @@
+
 // src/server/scan/parse.ts
-export type ParsedScan = { by: "id" | "batchNumber"; value: string } | null;
+// Robust parser for DataMatrix/QR payloads.
+// Returns { by: "id" | "batchNumber", value } or null.
+export type Parsed = { by: "id" | "batchNumber"; value: string };
 
-const ID_RE = /^[A-Za-z0-9_-]{15,}$/;
+const GS = String.fromCharCode(29); // FNC1 group separator
 
-/** Extract AI segments from a GS1-like string. Minimal support for common AIs. */
-function parseGs1(rawIn: string): ParsedScan {
-  if (!rawIn) return null;
+export function parseScanCode(raw: string): Parsed | null {
+  if (!raw || raw.length > 512) return null;
 
-  // Keep original for FNC1-based parsing
-  let s = rawIn.trim();
+  // 1) Normalize whitespace, strip control chars except GS (we'll handle GS1)
+  let text = raw.replace(/[\u0000-\u001E\u007F]/g, (c) => (c === GS ? GS : "")) // keep GS, drop others
+                .trim();
 
-  // AIM Symbology prefix for Data Matrix may appear: "]d2"
-  if (s.startsWith("]d2") || s.startsWith("]D2")) s = s.slice(3);
+  if (!text) return null;
 
-  // Fast-path: FNC1 (GS) present → variable-length AIs end at \x1D
-  // AI 10 = batch/lot, variable-length up to 20.
-  const m10WithGS = /(?:^|\x1D)10([A-Za-z0-9\-./]{1,20})(?:\x1D|$)/.exec(s);
-  if (m10WithGS) {
-    const lot = m10WithGS[1];
-    if (/^\d+$/.test(lot)) return { by: "batchNumber", value: lot };
+  // 2) Drop AIM Application Identifier prefix like "]d2", "]Q3", case-insensitive
+  text = text.replace(/^\]([A-Za-z][0-9])/, "");
+
+  // 3) If GS1-like: split on GS, look for AIs that might contain batch number or our id
+  // Common custom payloads often just encode the batchNumber or the doc id plainly.
+  const gsParts = text.includes(GS) ? text.split(GS).filter(Boolean) : [text];
+
+  // Heuristic helpers
+  const looksLikeDocId = (s: string) => /^[A-Za-z0-9_-]{15,}$/.test(s);
+  const looksLikeBatchNumber = (s: string) => /^\d{3,}$/.test(s);
+
+  // 4) Try explicit prefixes first
+  const prefixPatterns: [RegExp, "id" | "batchNumber"][] = [
+    [/^ht:id:([A-Za-z0-9_-]{15,})$/i, "id"],
+    [/^ht:batch:(\d+)$/i, "batchNumber"],
+    [/^batch[:\-\s]+(\d+)$/i, "batchNumber"],
+    [/^https?:\/\/[^\/]+\/batches\/([A-Za-z0-9_-]{15,})/, "id"],
+    [/^https?:\/\/[^\/]+\/batches\/(\d+)/, "batchNumber"],
+  ];
+  for (const [re, by] of prefixPatterns) {
+    const m = re.exec(text);
+    if (m?.[1]) return { by, value: m[1] };
   }
 
-  // No GS present (some encoders omit explicit FNC1 between final AI and EoS).
-  // Heuristic: find AI "10" and cut at the next known AI start, else EoS.
-  const KNOWN_AI = /(01|21|17|11|13|15|30|37|240|241|242|250|251)/g;
-  const idx10 = s.indexOf("10");
-  if (idx10 >= 0) {
-    const rest = s.slice(idx10 + 2);
-    let cut = rest.length;
-    // find earliest next AI occurrence in the remainder
-    let m: RegExpExecArray | null;
-    while ((m = KNOWN_AI.exec(rest))) {
-      cut = Math.min(cut, m.index);
-      break;
-    }
-    const lot = rest.slice(0, cut);
-    const trimmed = lot.replace(/\x1D/g, ""); // just in case
-    if (/^\d{3,}$/.test(trimmed)) {
-      return { by: "batchNumber", value: trimmed };
+
+  // 5) Try to parse GS1 tokens, looking for lot number (AI 10)
+  for (const part of gsParts) {
+    const p = part.trim();
+    // AI 10 (Lot) is variable length, often ends with FNC1 or end of string
+    if (p.startsWith("10")) {
+      const lot = p.substring(2);
+      if (looksLikeBatchNumber(lot)) return { by: "batchNumber", value: lot };
     }
   }
-
-  return null;
-}
-
-/** Normalize & parse any scan payload into a queryable key. */
-export function parseScanCode(raw: string): ParsedScan {
-  if (!raw) return null;
-
-  // Preserve a copy with FNC1 for GS1 parsing
-  const rawTrim = String(raw).trim();
-
-  // Also build a control-stripped variant for non-GS1 paths
-  const stripped = rawTrim.replace(/[\x00-\x1F]/g, ""); // drop control chars incl. \x1D
-
-  // 1) Preferred encodings
-  let m = /^ht:batch:(\d+)$/i.exec(stripped);
-  if (m) return { by: "batchNumber", value: m[1] };
-  m = /^ht:id:([A-Za-z0-9_-]{15,})$/i.exec(stripped);
-  if (m) return { by: "id", value: m[1] };
-
-  // 1b) Legacy: BATCH:123, BATCH-123, BATCH 123
-  m = /^batch[:\-\s]+(\d+)$/i.exec(stripped);
-  if (m) return { by: "batchNumber", value: m[1] };
-
-  // 2) GS1 DataMatrix (use raw with FNC1 first)
-  const gs1 = parseGs1(rawTrim) || parseGs1(stripped);
-  if (gs1) return gs1;
-
-  // 3) Pure number or #number
-  m = /^(?:#)?(\d+)$/.exec(stripped);
-  if (m) return { by: "batchNumber", value: m[1] };
-
-  // 4) URLs that embed id or number
-  try {
-    const u = new URL(stripped);
-    const parts = u.pathname.split("/").filter(Boolean);
-    const idx = parts.findIndex((p) => p.toLowerCase() === "batches");
-    if (idx >= 0 && parts[idx + 1]) {
-      const val = parts[idx + 1];
-      if (/^\d+$/.test(val)) return { by: "batchNumber", value: val };
-      if (ID_RE.test(val)) return { by: "id", value: val };
-    }
-    const qpId = u.searchParams.get("id");
-    if (qpId && ID_RE.test(qpId)) return { by: "id", value: qpId };
-    const qpNum = u.searchParams.get("batchNumber") || u.searchParams.get("batch");
-    if (qpNum && /^\d+$/.test(qpNum)) return { by: "batchNumber", value: qpNum };
-  } catch {
-    // not a URL
-  }
-
-  // 5) JSON {"id":"…"} or {"batchNumber":"123"}
-  const looksJson = (stripped.startsWith("{") && stripped.endsWith("}")) || stripped.toUpperCase().startsWith("%7B");
-  if (looksJson) {
+  
+  // 6) Try URL query params
+  if (text.includes("?")) {
     try {
-      const json = stripped.toUpperCase().startsWith("%7B") ? decodeURIComponent(stripped) : stripped;
-      const obj = JSON.parse(json);
-      if (obj?.id && ID_RE.test(String(obj.id))) return { by: "id", value: String(obj.id) };
-      if (obj?.batchNumber && /^\d+$/.test(String(obj.batchNumber))) {
-        return { by: "batchNumber", value: String(obj.batchNumber) };
-      }
-    } catch { /* ignore */ }
+        const url = new URL(text);
+        const id = url.searchParams.get("id");
+        if (id && looksLikeDocId(id)) return { by: "id", value: id };
+        const num = url.searchParams.get("batchNumber") || url.searchParams.get("batch");
+        if (num && looksLikeBatchNumber(num)) return { by: "batchNumber", value: num };
+    } catch {}
   }
 
-  // 6) Last-resort heuristic: biggest 5+ digit run
-  const bigNum = stripped.match(/\d{5,}/);
-  if (bigNum) return { by: "batchNumber", value: bigNum[0] };
+
+  // 7) Try JSON payload
+  if (text.startsWith("{") && text.endsWith("}")) {
+      try {
+          const obj = JSON.parse(text);
+          if (obj.id && looksLikeDocId(obj.id)) return { by: "id", value: obj.id };
+          if (obj.batchNumber && looksLikeBatchNumber(obj.batchNumber)) return { by: "batchNumber", value: obj.batchNumber };
+      } catch {}
+  }
+
+  // 8) Final fallback: the whole text if it matches simple patterns
+  if (looksLikeDocId(text)) return { by: "id", value: text };
+  if (looksLikeBatchNumber(text)) return { by: "batchNumber", value: text };
 
   return null;
 }

@@ -1,3 +1,4 @@
+
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -9,102 +10,37 @@ import { getUserFromRequest } from "@/server/security/auth";
 
 /** Try to find a batch by several likely keys/variants. */
 async function findBatch(by: "id" | "batchNumber", value: string) {
+  // 1) Direct doc id
   if (by === "id") {
-    // 1) Direct document id
-    const ref = adminDb.collection("batches").doc(value);
-    const snap = await ref.get();
-    if (snap.exists) return { id: snap.id, ...snap.data() };
+    const doc = await adminDb.collection("batches").doc(value).get();
+    if (doc.exists) return { id: doc.id, ...doc.data() };
+  }
+  
+  // 2) batchNumber field
+  const c1 = await adminDb.collection("batches").where("batchNumber", "==", value).limit(1).get();
+  if (!c1.empty) return { id: c1.docs[0].id, ...c1.docs[0].data() };
 
-    // 2) External id arrays (tolerant; these fields can exist or not)
-    //    If your schema doesn't have them, these queries just return empty.
-    const idFields = ["externalIds", "labels", "codes", "altCodes"];
-    for (const field of idFields) {
-      const q = await adminDb
-        .collection("batches")
-        .where(field, "array-contains", value)
-        .limit(1)
-        .get();
-      if (!q.empty) return { id: q.docs[0]!.id, ...q.docs[0]!.data() };
-    }
-
-    // 3) Single-value id mirrors
-    const singleIdFields = ["externalId", "labelCode", "qrCode", "dmCode"];
-    for (const field of singleIdFields) {
-      const q = await adminDb
-        .collection("batches")
-        .where(field, "==", value)
-        .limit(1)
-        .get();
-      if (!q.empty) return { id: q.docs[0]!.id, ...q.docs[0]!.data() };
-    }
-
-    return null;
+  // 3) Common alternate/legacy field names
+  const altFields = ["batch_no", "legacyBatchNumber", "number"];
+  for (const f of altFields) {
+    const snap = await adminDb.collection("batches").where(f, "==", value).limit(1).get();
+    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
   }
 
-  // by === "batchNumber"
-  const exact = await adminDb
-    .collection("batches")
-    .where("batchNumber", "==", value)
-    .limit(1)
-    .get();
-  if (!exact.empty) return { id: exact.docs[0]!.id, ...exact.docs[0]!.data() };
-
-  // Variants:
-  const digitsOnly = value.replace(/\D+/g, "");                  // e.g., "1-000123" -> "1000123" or "000123"
-  const noHyphen = value.replace(/-/g, "");                      // "1-000123" -> "1000123"
-  const hyphenParts = value.match(/^(\d{1,2})-(\d{1,6})$/);
-  const noLeadingZeros =
-    hyphenParts ? `${hyphenParts[1]}-${String(parseInt(hyphenParts[2], 10))}` : value;
-
-  const candidates = Array.from(
-    new Set(
-      [value, digitsOnly, noHyphen, noLeadingZeros].filter(Boolean)
-    )
-  );
-
-  // Try common fields that might store the batch number or its variants
-  const fields = [
-    "batchNumber",
-    "legacyBatchNumber",
-    "labelBatch",
-    "altBatchNumber",
-  ];
-
-  for (const field of fields) {
-    for (const cand of candidates) {
-      const q = await adminDb
-        .collection("batches")
-        .where(field, "==", cand)
-        .limit(1)
-        .get();
-      if (!q.empty) return { id: q.docs[0]!.id, ...q.docs[0]!.data() };
-    }
-  }
-
-  // Array-contains variants (alt numbers kept as an array)
-  const arrayFields = ["altBatchNumbers", "labels", "codes"];
-  for (const field of arrayFields) {
-    for (const cand of candidates) {
-      const q = await adminDb
-        .collection("batches")
-        .where(field, "array-contains", cand)
-        .limit(1)
-        .get();
-      if (!q.empty) return { id: q.docs[0]!.id, ...q.docs[0]!.data() };
-    }
-  }
+  // 4) Aliases/labels array
+  const alias = await adminDb.collection("batches").where("aliases", "array-contains", value).limit(1).get();
+  if (!alias.empty) return { id: alias.docs[0].id, ...alias.docs[0].data() };
 
   return null;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // AuthN (ID token) → required for Admin SDK write-capable routes
     const user = await getUserFromRequest(req);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    // Rate limit
+
     const key = requestKey(req as any, user.uid);
     const rl = await checkRateLimit({ key: `scan:${key}`, windowMs: 60_000, max: 30 });
     if (!rl.allowed) {
