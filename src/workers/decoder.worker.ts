@@ -1,36 +1,34 @@
-
 /* eslint-disable no-restricted-globals */
-import { BarcodeReader, BarcodeFormat, DecodeHintType } from "zxing-wasm";
+import { readBarcodes, type ReaderOptions } from "zxing-wasm/reader";
 
-let reader: BarcodeReader | null = null;
-
-async function ensureReader() {
-  if (reader) return reader;
-  reader = await BarcodeReader.createInstance();
-  const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.DATA_MATRIX, BarcodeFormat.QR_CODE]);
-  hints.set(DecodeHintType.TRY_HARDER, true);
-  hints.set(DecodeHintType.ASSUME_GS1, true);
-  hints.set(DecodeHintType.ALSO_INVERTED, true); // supports light-on-dark labels
-  reader.setHints(hints);
-  return reader;
-}
+// tuned for DM + QR on labels
+const options: ReaderOptions = {
+  tryHarder: true,
+  tryInvert: true,
+  tryDownscale: true,
+  maxNumberOfSymbols: 1,
+  formats: ["DataMatrix", "QRCode"], // string formats, not enums
+  textMode: "Plain", // keep raw control chars like GS for GS1
+};
 
 self.onmessage = async (ev: MessageEvent) => {
-  const { type, imageData } = ev.data || {};
+  const { type, imageData } = (ev.data || {}) as { type?: string; imageData?: ImageData };
+  if (type !== "DECODE" || !imageData) {
+    (self as any).postMessage({ ok: false, error: "bad-message" });
+    return;
+  }
+  const t0 = Date.now();
   try {
-    if (type !== "DECODE" || !imageData) {
-      (self as any).postMessage({ ok: false, error: "bad-message" });
-      return;
+    const results = await readBarcodes(imageData, options);
+    const first = results.find((r) => !r.error && r.text) || results[0];
+    if (first && first.text) {
+      (self as any).postMessage({
+        ok: true,
+        result: { text: first.text, format: first.format, ms: Date.now() - t0 },
+      });
+    } else {
+      (self as any).postMessage({ ok: false, error: first?.error || "not-found" });
     }
-    const r = await ensureReader();
-    const started = Date.now();
-    const result = r.decodeBitmap(imageData); // throws if none
-    const elapsed = Date.now() - started;
-    (self as any).postMessage({
-      ok: true,
-      result: { text: result.text, format: result.barcodeFormat, ms: elapsed },
-    });
   } catch (e: any) {
     (self as any).postMessage({ ok: false, error: e?.message || "decode-failed" });
   }
