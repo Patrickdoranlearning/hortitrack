@@ -23,10 +23,11 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
   const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
 
   const decodeFrame = useCallback(() => {
-    const vid = videoRef.current!;
-    const canvas = canvasRef.current!;
+    const vid = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!vid || !canvas) return; // guard: not mounted yet
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
+    if (!ctx) return; // guard: context unavailable
 
     const w = vid.videoWidth;
     const h = vid.videoHeight;
@@ -110,14 +111,14 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
       });
 
       // try focus/torch/zoom
-      const track = streamRef.current.getVideoTracks()[0];
-      if (track) {
-        const caps: any = track.getCapabilities?.() || {};
+      const vTrack = streamRef.current.getVideoTracks()[0];
+      if (vTrack) {
+        const caps: any = vTrack.getCapabilities?.() || {};
         // focus continuous (best-effort)
-        track.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] } as any).catch(() => {});
+        vTrack.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] } as any).catch(() => {});
         // torch
         if (caps.torch) {
-          track.applyConstraints({ advanced: [{ torch }] } as any).catch(() => {});
+          vTrack.applyConstraints({ advanced: [{ torch }] } as any).catch(() => {});
         }
         // zoom
         if (caps.zoom) {
@@ -139,7 +140,7 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
       workerRef.current?.terminate();
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [decodeFrame, onDecoded]);
+  }, [decodeFrame, onDecoded, torch]);
 
   useEffect(() => {
     // Try auto-start; if permission blocked, UI shows Retry button
@@ -149,14 +150,14 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
 
   // live-apply zoom/torch when state changes
   useEffect(() => {
-    const track = streamRef.current?.getVideoTracks()[0];
-    if (!track) return;
+    const vTrack = streamRef.current?.getVideoTracks()[0];
+    if (!vTrack) return;
     const apply = async () => {
       const adv: any = {};
       if (zoom != null) adv.zoom = zoom;
       if (typeof torch === "boolean") adv.torch = torch;
       if (Object.keys(adv).length) {
-        await track.applyConstraints({ advanced: [adv] } as any).catch(() => {});
+        await vTrack.applyConstraints({ advanced: [adv] } as any).catch(() => {});
       }
     };
     apply();
