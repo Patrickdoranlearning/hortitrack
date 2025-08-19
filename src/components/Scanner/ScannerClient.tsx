@@ -16,11 +16,13 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
   const [torch, setTorch] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
-  const [camErr, setCamErr] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [useFullFrame, setUseFullFrame] = useState(false);
 
   // duplicate suppression: require 2 consecutive matches within 2s
   const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
+  const [workerStatus, setWorkerStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [lastErr, setLastErr] = useState<string | null>(null);
+  const [lastMs, setLastMs] = useState<number | null>(null);
 
   const decodeFrame = useCallback(() => {
     const vid = videoRef.current;
@@ -33,42 +35,78 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
     const h = vid.videoHeight;
     if (!w || !h) return;
 
-    const side = Math.floor(Math.min(w, h) * Math.max(0.5, Math.min(1, roiScale)));
-    const x = Math.floor((w - side) / 2);
-    const y = Math.floor((h - side) / 2);
-
-    canvas.width = side;
-    canvas.height = side;
-    ctx.drawImage(vid, x, y, side, side, 0, 0, side, side);
-    const imageData = ctx.getImageData(0, 0, side, side);
+    if (useFullFrame) {
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(vid, 0, 0, w, h, 0, 0, w, h);
+    } else {
+      const side = Math.floor(Math.min(w, h) * Math.max(0.5, Math.min(1, roiScale)));
+      const x = Math.floor((w - side) / 2);
+      const y = Math.floor((h - side) / 2);
+      canvas.width = side;
+      canvas.height = side;
+      ctx.drawImage(vid, x, y, side, side, 0, 0, side, side);
+    }
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     workerRef.current?.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
-  }, [roiScale]);
+  }, [roiScale, useFullFrame]);
+
+  const [camErr, setCamErr] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   const startCamera = useCallback(async () => {
     setCamErr(null);
     let raf = 0;
     let decoding = false;
+    let watchdog: any = null;
 
     const loop = () => {
+      if (!streamRef.current) return;
       if (!decoding) {
         decoding = true;
         decodeFrame();
+        // watchdog: if worker doesn't answer in 1s, unlock and continue
+        if (!watchdog) {
+          watchdog = setTimeout(() => {
+            decoding = false;
+            setLastErr("decode-timeout");
+          }, 1000);
+        }
       }
       raf = requestAnimationFrame(loop);
     };
 
     const setup = async () => {
-      workerRef.current = new Worker(new URL("@/workers/decoder.worker.ts", import.meta.url), { type: "module" });
+      // Create worker (try alias path, fallback to relative)
+      try {
+        workerRef.current = new Worker(new URL("@/workers/decoder.worker.ts", import.meta.url), { type: "module" });
+      } catch {
+        workerRef.current = new Worker(new URL("../../workers/decoder.worker.ts", import.meta.url), { type: "module" });
+      }
+      workerRef.current.onerror = (e) => {
+        setWorkerStatus("error");
+        setLastErr(e.message || "worker-error");
+      };
       workerRef.current.onmessage = (ev: MessageEvent) => {
-        const { ok, result, error } = ev.data || {};
+        const { ok, result, error, type } = ev.data || {};
+        if (type === "READY" || type === "PONG") {
+          setWorkerStatus("ready");
+          return;
+        }
+        // normal DECODE response
         decoding = false;
+        if (watchdog) {
+          clearTimeout(watchdog);
+          watchdog = null;
+        }
         if (ok && result?.text) {
           const now = Date.now();
           const prev = lastRef.current;
           if (result.text === prev.text && now - prev.t < 2000 && !prev.confirmed) {
             lastRef.current = { text: result.text, t: now, confirmed: true };
             track("scan_decode_success", { format: result.format, text_len: result.text.length, ms: result.ms });
+            setLastMs(result.ms ?? null);
             onDecoded(result.text);
           } else if (result.text !== prev.text) {
             lastRef.current = { text: result.text, t: now, confirmed: false };
@@ -77,9 +115,12 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
             lastRef.current = { text: result.text, t: now, confirmed: false };
           }
         } else if (!ok) {
+          setLastErr(error ?? "unknown");
           track("scan_decode_fail", { reason: error ?? "unknown" });
         }
       };
+      // Handshake to confirm worker wiring
+      workerRef.current.postMessage({ type: "PING" });
 
       // camera
       // HTTPS (or localhost) required; otherwise browsers throw SecurityError.
@@ -165,8 +206,35 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
 
   return (
     <div className="space-y-3">
-      <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline muted />
+      <div className="relative">
+        <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline muted />
+        {/* ROI overlay */}
+        {!useFullFrame && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          >
+            <div className="rounded-xl border-2 border-white/70"
+              style={{
+                width: "70%",
+                height: "70%",
+              }}
+            />
+          </div>
+        )}
+      </div>
       <canvas ref={canvasRef} className="hidden" />
+      {/* Debug bar */}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>Worker: {workerStatus}</span>
+        {lastMs != null && <span>Last decode: {lastMs}ms</span>}
+        {lastErr && <span className="text-red-700">Err: {lastErr}</span>}
+        <label className="ml-auto inline-flex items-center gap-2">
+          <input type="checkbox" checked={useFullFrame} onChange={(e) => setUseFullFrame(e.target.checked)} />
+          Full-frame mode
+        </label>
+      </div>
+
       {camErr && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
           {camErr}
@@ -179,8 +247,7 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
               href="about:blank"
               onClick={(e) => {
                 e.preventDefault();
-                // helpful hint for users
-                alert("If you previously blocked the camera, click the site lock icon in your browser’s address bar and allow Camera.");
+                alert("If you previously blocked the camera, click the site lock icon and allow Camera.");
               }}
             >
               How to allow
