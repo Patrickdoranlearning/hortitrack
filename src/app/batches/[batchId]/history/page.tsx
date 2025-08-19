@@ -1,3 +1,4 @@
+
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { buildBatchHistory } from "@/server/batches/history";
@@ -21,7 +22,7 @@ export default async function BatchHistoryPage({ params }: { params: { batchId: 
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6">
         <h1 className="text-xl font-semibold mb-2">Batch history</h1>
         <p className="text-sm text-muted-foreground">Batch not found.</p>
-        <Link href="/batches" className="underline mt-4 inline-block">Back to batches</Link>
+        <Link href="/" className="underline mt-4 inline-block">Back to home</Link>
       </main>
     );
   }
@@ -34,7 +35,7 @@ export default async function BatchHistoryPage({ params }: { params: { batchId: 
           <div className="text-sm text-muted-foreground truncate">{data.batch.variety ?? data.batch.plantName ?? "—"}</div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Link href="/batches" className="px-3 py-2 rounded-lg border">Back</Link>
+          <Link href="/" className="px-3 py-2 rounded-lg border">Back</Link>
           <GenerateHistoryPdfButton batchId={id!} />
         </div>
       </div>
