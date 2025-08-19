@@ -1,59 +1,82 @@
 // Lightweight ELK graph sanitizer for history flow.
-export type ElkNode = { id?: string; [k: string]: any };
+export type ElkNode = { id?: string; batchId?: string; label?: string; [k: string]: any };
 export type ElkEdge = { id?: string; source: string; target: string; [k: string]: any };
 export type ElkGraph = { id?: string; children?: ElkNode[]; edges?: ElkEdge[]; [k: string]: any };
 
-function prefixNode(idLike: string) {
-  return idLike.startsWith("n_") ? idLike : `n_${idLike}`;
+// --- NEW: id normalizers ----------------------------------------------------
+function stripKnownPrefixes(raw: string): string {
+  // Handle formats: 'batch:<id>', 'n_<id>', 'b_<id>' → '<id>'
+  return String(raw)
+    .replace(/^batch:/i, "")
+    .replace(/^n_/, "")
+    .replace(/^b_/, "")
+    .trim();
 }
-function prefixEdge(idLike: string) {
-  return idLike.startsWith("e_") ? idLike : `e_${idLike}`;
+function nodeId(raw: string) {
+  const base = stripKnownPrefixes(raw);
+  return `n_${base}`; // single canonical form used everywhere
+}
+function edgeId(raw: string) {
+  return raw.startsWith("e_") ? raw : `e_${raw}`;
 }
 
+// --- sanitizer --------------------------------------------------------------
 /**
  * Ensures:
  *  - graph.id present
- *  - every child node has .id (uses node.id || node.batchId || index)
- *  - every edge has .id, and source/target reference normalized node ids
+ *  - every child node has canonical .id of form 'n_<base>'
+ *  - edges use canonical node ids for source/target
+ *  - if an edge references a missing node, we create a "ghost" node placeholder
+ *  - optionally drops self-loops and fully invalid edges
  */
 export function sanitizeElkGraph(input: ElkGraph): ElkGraph {
-  const childrenIn = Array.isArray(input?.children) ? input.children : [];
-  const edgesIn = Array.isArray(input?.edges) ? input.edges : [];
+  const childrenIn = Array.isArray(input?.children) ? [...input.children] : [];
+  const edgesIn = Array.isArray(input?.edges) ? [...input.edges] : [];
 
-  // Build nodes with guaranteed ids and a lookup map for id resolution
-  const idMap = new Map<string, string>();
-  const children = childrenIn.map((n, idx) => {
-    const base = String(n.id ?? n.batchId ?? `idx_${idx}`);
-    const id = prefixNode(base);
-    // Map both raw base and an existing id (if any) to the normalized id
+  const idMap = new Map<string, string>(); // base -> canonical node id
+  const present = new Set<string>();       // canonical node ids present
+
+  // 1) Canonicalize nodes and build lookup
+  const children: ElkNode[] = childrenIn.map((n, idx) => {
+    const base = stripKnownPrefixes(String(n.id ?? n.batchId ?? `idx_${idx}`));
+    const id = nodeId(base);
     idMap.set(base, id);
-    if (n.id) idMap.set(String(n.id), id);
-    if (n.batchId) idMap.set(String(n.batchId), id);
+    idMap.set(stripKnownPrefixes(String(n.id ?? "")), id);
+    if (n.batchId) idMap.set(stripKnownPrefixes(String(n.batchId)), id);
+    present.add(id);
     return { ...n, id };
   });
 
-  // Normalize edges
-  const edges = edgesIn.map((e, idx) => {
-    const id = prefixEdge(String(e.id ?? `idx_${idx}`));
+  // 2) Prepare edges; add ghost nodes for any missing endpoints
+  const edges: ElkEdge[] = [];
+  for (let idx = 0; idx < edgesIn.length; idx++) {
+    const e = edgesIn[idx];
+    const srcBase = stripKnownPrefixes(String(e.source ?? ""));
+    const tgtBase = stripKnownPrefixes(String(e.target ?? ""));
+    if (!srcBase || !tgtBase) continue; // drop invalid
 
-    const srcRaw = String(e.source ?? "");
-    const tgtRaw = String(e.target ?? "");
+    const source = idMap.get(srcBase) ?? nodeId(srcBase);
+    const target = idMap.get(tgtBase) ?? nodeId(tgtBase);
 
-    const source =
-      idMap.get(srcRaw) ??
-      (srcRaw ? prefixNode(srcRaw) : prefixNode(`missing_source_${idx}`));
+    // Ghost nodes if missing
+    if (!present.has(source)) {
+      children.push({ id: source, label: `⟂ ${srcBase}`, ghost: true });
+      present.add(source);
+    }
+    if (!present.has(target)) {
+      children.push({ id: target, label: `⟂ ${tgtBase}`, ghost: true });
+      present.add(target);
+    }
 
-    const target =
-      idMap.get(tgtRaw) ??
-      (tgtRaw ? prefixNode(tgtRaw) : prefixNode(`missing_target_${idx}`));
+    // Drop self-loops
+    if (source === target) continue;
 
-    return { ...e, id, source, target };
-  });
+    const id = edgeId(String(e.id ?? `idx_${idx}`));
+    edges.push({ ...e, id, source, target });
+  }
 
-  // Root id
-  const graphId =
-    input.id ??
-    `g_${children.length}_${edges.length}`;
+  // 3) Root id (stable but not critical)
+  const graphId = input.id ?? `g_${children.length}_${edges.length}`;
 
   return { ...input, id: graphId, children, edges };
 }
