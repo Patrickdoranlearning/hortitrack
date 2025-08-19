@@ -53,15 +53,17 @@ export default function HistoryFlowchart({ batchId, data }: Props) {
 
   React.useEffect(() => {
     setError(null);
-    if (!nodes?.length && !edges?.length) {
+    const safeNodes = (nodes ?? []);
+    const safeEdges = (edges ?? []);
+    if (safeNodes.length || safeEdges.length) {
+        let alive = true;
+        layoutGraph({ children: safeNodes, edges: safeEdges })
+            .then((res) => { if (alive) setLayout(res); })
+            .catch((e: any) => { if(alive) setError(e?.message ?? String(e))});
+        return () => { alive = false; };
+    } else {
       setLayout(null);
-      return;
     }
-    let alive = true;
-    layoutGraph({ children: nodes, edges })
-      .then((res) => { if (alive) setLayout(res); })
-      .catch((e: any) => setError(e?.message ?? String(e)));
-    return () => { alive = false; };
   }, [nodes, edges]);
 
   if (error) {

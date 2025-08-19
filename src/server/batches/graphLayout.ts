@@ -1,24 +1,5 @@
 // Graph layout helper used by HistoryFlowchart.
-// NOTE: No top-level import of 'elkjs'. We dynamic-import it in the browser.
-
-export type ElkEdge = {
-  id: string;
-  sources: string[];
-  targets: string[];
-};
-
-export type ElkNode = {
-  id: string;
-  width?: number;
-  height?: number;
-  x?: number;
-  y?: number;
-  children?: ElkNode[];
-  edges?: ElkEdge[];
-  [key: string]: any;
-};
-
-export type ElkGraph = ElkNode;
+import type Elk, { ElkNode, ElkEdge, ElkGraph } from 'elkjs';
 
 /**
  * Computes layout using ELK in the browser.
@@ -26,30 +7,19 @@ export type ElkGraph = ElkNode;
  */
 export async function layoutGraph(
   graph: ElkGraph,
-  options?: Record<string, any>
 ): Promise<ElkGraph> {
   // Dynamically import elkjs on the client
-  const ELK = (await import("elkjs")).default as any;
+  const ELK = (await import("elkjs/lib/elk.bundled.js")).default as typeof Elk;
   const elk = new ELK({
-    // Do NOT set workerUrl here; default path avoids extra requires.
+    defaultLayoutOptions: {
+        "elk.algorithm": "layered",
+        "elk.direction": "RIGHT",
+        "elk.layered.spacing.nodeNodeBetweenLayers": "48",
+        "elk.spacing.nodeNode": "24",
+    }
   });
 
-  const layoutOptions = {
-    "elk.algorithm": "layered",
-    "elk.direction": "RIGHT",
-    "elk.layered.spacing.nodeNodeBetweenLayers": "48",
-    "elk.spacing.nodeNode": "24",
-    ...(options?.layoutOptions || {}),
-  };
-
-  const res = await elk.layout(
-    {
-      id: graph.id ?? "root",
-      children: graph.children ?? [],
-      edges: graph.edges ?? [],
-    },
-    { layoutOptions }
-  );
+  const res = await elk.layout(graph);
 
   return res;
 }
