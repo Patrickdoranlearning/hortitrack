@@ -1,12 +1,9 @@
-
-"use client";
-
-import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import ScannerClient from "@/components/Scanner/ScannerClient";
-import { track } from "@/lib/telemetry";
-import { getIdTokenOrNull } from "@/lib/auth/client";
-import { useToast } from "@/hooks/use-toast";
+// src/components/scan-and-act-dialog.tsx
+'use client';
+import React, { useCallback, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import ScannerClient from '@/components/Scanner/ScannerClient';
+import { useToast } from '@/hooks/use-toast';
 
 type Props = {
   open: boolean;
@@ -14,29 +11,39 @@ type Props = {
   onDetected: (text: string) => void;
 };
 
-export default function ScanAndActDialog({ open, onOpenChange, onDetected }: Props) {
+export default function ScannerDialog({ open, onOpenChange, onDetected }: Props) {
   const { toast } = useToast();
+  const lockedRef = useRef(false);
 
-  async function handleDecoded(text: string) {
-    onDetected(text);
-    try {
-      // Intentionally not showing toasts here as the parent component (HomePageView) does.
-      // This dialog's only job is to decode and pass the raw text up.
-    } catch (e: any) {
-      track("scan_lookup_result", { result: "error", message: e?.message });
-      toast({ variant: 'destructive', title: 'Error', description: 'An unexpected client error occurred.' });
-    }
-  }
+  const handleDecoded = useCallback(
+    (text: string) => {
+      if (!text) return;
+      if (lockedRef.current) return;
+      lockedRef.current = true;
+      try {
+        onDetected(text);
+      } catch (e: any) {
+        toast({
+          variant: 'destructive',
+          title: 'Scan error',
+          description: e?.message || 'Could not process the scanned code.',
+        });
+      } finally {
+        // small cooldown to prevent multi-fire on the same frame
+        setTimeout(() => (lockedRef.current = false), 750);
+      }
+    },
+    [onDetected, toast]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent /* a11y: include a description to remove the warning */>
         <DialogHeader>
           <DialogTitle>Scan code</DialogTitle>
+          <DialogDescription>Point the camera at a batch QR/DataMatrix.</DialogDescription>
         </DialogHeader>
-
         {open && <ScannerClient onDecoded={handleDecoded} />}
-
       </DialogContent>
     </Dialog>
   );

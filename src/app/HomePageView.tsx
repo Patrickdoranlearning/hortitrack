@@ -62,6 +62,8 @@ import { useCollection } from '@/hooks/use-collection';
 import { getCareRecommendationsAction } from './actions';
 import { FeatureGate } from '@/components/FeatureGate';
 import { getIdTokenOrNull } from "@/lib/auth/client"; // Import getIdTokenOrNull
+import { queryMatchesBatch } from '@/lib/search';
+import { parseScanCode } from '@/lib/scan/parse';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -159,22 +161,14 @@ export default function HomePageView({
 
   const filteredBatches = React.useMemo(() => {
     const dataToFilter = isReadonly ? initialBatches : batches;
+    const q = (searchQuery || '').trim();
     return (dataToFilter || [])
+      .filter((batch) => queryMatchesBatch(q, batch))
       .filter((batch) =>
-        `${batch.plantFamily} ${batch.plantVariety} ${batch.category} ${
-          batch.supplier || ''
-        }`
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
+        filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
       )
-      .filter(
-        (batch) =>
-          filters.plantFamily === 'all' ||
-          batch.plantFamily === filters.plantFamily
-      )
-      .filter(
-        (batch) =>
-          filters.category === 'all' || batch.category === filters.category
+      .filter((batch) =>
+        filters.category === 'all' || batch.category === filters.category
       )
       .filter((batch) => {
         if (filters.status === 'all') return true;
@@ -286,36 +280,19 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
   
-  const handleScanDetected = async (text: string) => {
-    try {
-      const idToken = await getIdTokenOrNull();
-      if (!idToken) {
-        toast({ variant: "destructive", title: "Authentication Error", description: "Please sign in to scan batches." });
-        return;
-      }
-
-      const res = await fetch('/api/batches/scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ code: text }),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: 'Batch not found.' }));
-        throw new Error(errBody.error);
-      }
-      const { batch: foundBatch } = await res.json();
-      setIsScanOpen(false);
-      setSelectedBatch(foundBatch);
+  const handleScanDetected = (text: string) => {
+    const parsed = parseScanCode(text);
+    const query = parsed?.value ?? text;
+    const list = (isReadonly ? initialBatches : batches) || [];
+    const match = list.find((b) => queryMatchesBatch(query, b));
+    if (match) {
+      setSelectedBatch(match as any);
       setIsDetailOpen(true);
-    } catch (err: any) {
+    } else {
       toast({
+        title: 'Batch not found',
+        description: `Scanned: ${text}`,
         variant: 'destructive',
-        title: 'Scan Failed',
-        description: err.message || 'Could not find a batch for the scanned code.',
       });
     }
   };
@@ -353,10 +330,16 @@ export default function HomePageView({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search..."
+              placeholder="Search #batch, ht:batch:…, variety…"
               className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && filteredBatches.length > 0) {
+                  setSelectedBatch(filteredBatches[0] as any);
+                  setIsDetailOpen(true);
+                }
+              }}
             />
           </div>
           <DropdownMenu>

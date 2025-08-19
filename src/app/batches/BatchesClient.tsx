@@ -41,6 +41,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { BatchForm } from "@/components/batch-form";
+import { queryMatchesBatch } from '@/lib/search';
 
 // helpers near top of BatchesPage (inside file, outside component is fine)
 const toMillis = (v: any): number => {
@@ -77,38 +78,6 @@ function normalizeBatch(d: any): any {
       : [],
   };
 }
-
-// --- Batch quick-open via search (Enter) ---
-function normalizeBatchQuery(q: string): string {
-  console.log("normalizeBatchQuery: Input:", q); // LOG ADDED
-  // trim + remove common prefixes: "batch ", "#", "b:", "b-"
-  const normalized = (q || "")
-    .trim()
-    .replace(/^(batch\s*#?|b[:\-]?)\s*/i, ""); // keep leading zeros
-  console.log("normalizeBatchQuery: Output:", normalized); // LOG ADDED
-  return normalized;
-}
-
-function findBatchByNumberOrId(batches: Batch[], query: string): Batch | undefined {
-  const q = normalizeBatchQuery(query);
-  if (!q) return undefined;
-  
-  // exact batchNumber match first (string compare to preserve leading zeros)
-  const byNumber = batches.find(b => {
-    const batchNumStr = String(b.batchNumber);
-    console.log("findBatchByNumberOrId: Comparing normalized query '"+q+"' with batch number '"+batchNumStr+"'"); // LOG ADDED
-    return batchNumStr === q;
-  });
-  if (byNumber) return byNumber;
-  
-  // fallback: exact id
-  return batches.find(b => {
-    const batchIdStr = String(b.id);
-    console.log("findBatchByNumberOrId: Comparing normalized query '"+q+"' with batch ID '"+batchIdStr+"'"); // LOG ADDED
-    return batchIdStr === q;
-  });
-}
-
 
 export default function BatchesClient({ initialBatches }: { initialBatches: Batch[] }) {
   const { user, loading: authLoading } = useAuth();
@@ -167,10 +136,9 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived'], []);
 
   const filteredBatches = useMemo(() => {
+    const q = (searchQuery || '').trim();
     return batches
-      .filter((batch) =>
-        `${batch.plantFamily} ${batch.plantVariety} ${batch.category} ${batch.supplier || ''} ${batch.batchNumber}`.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      .filter((batch) => queryMatchesBatch(q, batch))
       .filter(
         (batch) =>
           filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
@@ -256,7 +224,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
 
   const handleSearchKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key !== "Enter") return;
-    const hit = findBatchByNumberOrId(batches, searchQuery);
+    const hit = filteredBatches.length > 0 ? filteredBatches[0] : undefined; // Use the first filtered batch
     if (hit) {
       e.preventDefault();
       handleViewDetails(hit); // your existing function that opens the dialog
@@ -264,7 +232,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
       toast({
         variant: "outline",
         title: "No matching batch",
-        description: `Couldn't find batch #${normalizeBatchQuery(searchQuery)}.`,
+        description: `Couldn't find batch matching "${searchQuery}".`,
       });
     }
   };
