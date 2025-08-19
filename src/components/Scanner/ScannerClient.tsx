@@ -1,271 +1,307 @@
-
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@/lib/telemetry";
 
 type Props = {
   onDecoded: (text: string) => void;
-  roiScale?: number; // 0.6..1.0 (portion of shorter side)
+  roiScale?: number; // 0.6..1.0
 };
 
-export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
+type CamState = "idle" | "requesting" | "permission_denied" | "streaming" | "no_frames" | "stopped";
+type Engine = "native" | "wasm" | "none";
+
+export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
+  const vfcRef = useRef<number | null>(null);
+
+  const [engine, setEngine] = useState<Engine>("none");
+  const [camState, setCamState] = useState<CamState>("idle");
   const [torch, setTorch] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
   const [useFullFrame, setUseFullFrame] = useState(false);
-
-  // duplicate suppression: require 2 consecutive matches within 2s
-  const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
-  const [workerStatus, setWorkerStatus] = useState<"loading" | "ready" | "error">("loading");
   const [lastErr, setLastErr] = useState<string | null>(null);
   const [lastMs, setLastMs] = useState<number | null>(null);
+  const [workerStatus, setWorkerStatus] = useState<"loading" | "ready" | "error">("loading");
 
-  const decodeFrame = useCallback(() => {
-    const vid = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!vid || !canvas) return; // guard: not mounted yet
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return; // guard: context unavailable
+  // duplicate suppression: require 2 consecutive identical reads within 2s
+  const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
 
-    const w = vid.videoWidth;
-    const h = vid.videoHeight;
-    if (!w || !h) return;
-
-    if (useFullFrame) {
-      canvas.width = w;
-      canvas.height = h;
-      ctx.drawImage(vid, 0, 0, w, h, 0, 0, w, h);
-    } else {
-      const side = Math.floor(Math.min(w, h) * Math.max(0.5, Math.min(1, roiScale)));
-      const x = Math.floor((w - side) / 2);
-      const y = Math.floor((h - side) / 2);
-      canvas.width = side;
-      canvas.height = side;
-      ctx.drawImage(vid, x, y, side, side, 0, 0, side, side);
+  /** ---- START/STOP CAMERA ---- */
+  const stopAll = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (vfcRef.current && "cancelVideoFrameCallback" in HTMLVideoElement.prototype) {
+      (videoRef.current as any)?.cancelVideoFrameCallback?.(vfcRef.current);
     }
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCamState("stopped");
+    setEngine("none");
+  }, []);
 
-    workerRef.current?.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
-  }, [roiScale, useFullFrame]);
+  async function startCamera() {
+    setLastErr(null);
+    setCamState("requesting");
 
-  const [camErr, setCamErr] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+    if (location.protocol !== "https:" && location.hostname !== "localhost") {
+      setCamState("idle");
+      setLastErr("Camera requires HTTPS (or localhost).");
+      return;
+    }
 
-  const startCamera = useCallback(async () => {
-    setCamErr(null);
-    let raf = 0;
-    let decoding = false;
-    let watchdog: any = null;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+    } catch (e: any) {
+      const msg = String(e?.name || e?.message || "");
+      if (msg.includes("NotAllowedError")) setCamState("permission_denied");
+      else setCamState("idle");
+      setLastErr("Camera permission denied or unavailable.");
+      return;
+    }
+
+    // Attach and wait for real frames
+    const vid = videoRef.current!;
+    vid.setAttribute("playsinline", "");
+    vid.setAttribute("autoplay", "");
+    vid.muted = true;
+    vid.srcObject = streamRef.current;
+
+    await vid.play().catch(() => { /* some browsers require another user gesture, but we have the button */ });
+
+    // Wait for metadata/first frame
+    const ok = await new Promise<boolean>((resolve) => {
+      let done = false;
+      const timer = setTimeout(() => { if (!done) { done = true; resolve(false); } }, 2500);
+      const cb = () => {
+        if (done) return;
+        if (vid.videoWidth > 0 && vid.videoHeight > 0) {
+          clearTimeout(timer); done = true; resolve(true);
+        }
+      };
+      vid.addEventListener("loadedmetadata", cb, { once: true });
+      vid.addEventListener("canplay", cb, { once: true });
+      // fallback poll
+      const poll = () => {
+        if (done) return;
+        if (vid.videoWidth > 0) { cb(); } else { setTimeout(poll, 100); }
+      };
+      poll();
+    });
+
+    if (!ok) {
+      setCamState("no_frames");
+      setLastErr("No video frames detected");
+      return;
+    }
+
+    // Focus/torch/zoom best-effort
+    const vTrack = streamRef.current!.getVideoTracks()[0];
+    const caps: any = vTrack.getCapabilities?.() || {};
+    vTrack.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] } as any).catch(() => {});
+    if (caps.torch) vTrack.applyConstraints({ advanced: [{ torch }] } as any).catch(() => {});
+    if (caps.zoom) {
+      setZoomCaps({ min: caps.zoom.min ?? 1, max: caps.zoom.max ?? 5, step: caps.zoom.step ?? 0.1 });
+      setZoom(caps.zoom.min ?? 1);
+    }
+
+    setCamState("streaming");
+
+    // Choose engine: Native if supports DataMatrix or QR; otherwise WASM
+    const native = await chooseNativeEngine();
+    if (native) {
+      setEngine("native");
+      runNativeLoop();
+    } else {
+      setEngine("wasm");
+      runWasmLoop();
+    }
+  }
+
+  /** ---- NATIVE BARCODEDETECTOR PATH ---- */
+  async function chooseNativeEngine(): Promise<boolean> {
+    const hasBD = typeof (window as any).BarcodeDetector !== "undefined";
+    if (!hasBD) return false;
+    try {
+      // Some browsers expose getSupportedFormats; prefer DataMatrix when present.
+      const fmts: string[] = (await (window as any).BarcodeDetector?.getSupportedFormats?.()) || [];
+      const wants = new Set(fmts.map((f) => f.toLowerCase()));
+      // Accept if either datamatrix or qr_code is present (we still try to read DM labels primarily).
+      return wants.has("data_matrix") || wants.has("datamatrix") || wants.has("qr_code");
+    } catch {
+      // Older impl—still try
+      return true;
+    }
+  }
+
+  function runNativeLoop() {
+    const vid = videoRef.current!;
+    // @ts-ignore
+    const detector = new (window as any).BarcodeDetector({
+      formats: ["data_matrix", "qr_code"],
+    });
+
+    const onFrame = async () => {
+      if (!streamRef.current) return;
+      try {
+        const barcodes = await detector.detect(vid);
+        if (barcodes && barcodes.length) {
+          const best = barcodes[0];
+          const text = (best.rawValue || best.value || "").toString();
+          handleDecoded(text, /*format*/ best.format || "native");
+        }
+      } catch (e: any) {
+        setLastErr(e?.message || "native-detect-failed");
+      }
+      rafRef.current = requestAnimationFrame(onFrame);
+    };
+
+    rafRef.current = requestAnimationFrame(onFrame);
+  }
+
+  /** ---- WASM WORKER PATH ---- */
+  function ensureWorker() {
+    if (workerRef.current) return;
+    try {
+      workerRef.current = new Worker(new URL("@/workers/decoder.worker.ts", import.meta.url), { type: "module" });
+    } catch {
+      workerRef.current = new Worker(new URL("../../workers/decoder.worker.ts", import.meta.url), { type: "module" });
+    }
+    setWorkerStatus("loading");
+    workerRef.current.onmessage = (ev: MessageEvent) => {
+      const { ok, result, error, type } = ev.data || {};
+      if (type === "READY" || type === "PONG") { setWorkerStatus("ready"); return; }
+      if (ok && result?.text) {
+        setLastMs(result.ms ?? null);
+        handleDecoded(result.text, result.format || "wasm");
+      } else if (!ok) {
+        setLastErr(error ?? "decode-failed");
+      }
+    };
+    // handshake
+    workerRef.current.postMessage({ type: "PING" });
+  }
+
+  function runWasmLoop() {
+    ensureWorker();
 
     const loop = () => {
       if (!streamRef.current) return;
-      if (!decoding) {
-        decoding = true;
-        decodeFrame();
-        // watchdog: if worker doesn't answer in 1s, unlock and continue
-        if (!watchdog) {
-          watchdog = setTimeout(() => {
-            decoding = false;
-            setLastErr("decode-timeout");
-          }, 1000);
-        }
-      }
-      raf = requestAnimationFrame(loop);
-    };
-
-    const setup = async () => {
-      // Create worker (try alias path, fallback to relative)
-      try {
-        workerRef.current = new Worker(new URL("@/workers/decoder.worker.ts", import.meta.url), { type: "module" });
-      } catch {
-        workerRef.current = new Worker(new URL("../../workers/decoder.worker.ts", import.meta.url), { type: "module" });
-      }
-      workerRef.current.onerror = (e) => {
-        setWorkerStatus("error");
-        setLastErr(e.message || "worker-error");
-      };
-      workerRef.current.onmessage = (ev: MessageEvent) => {
-        const { ok, result, error, type } = ev.data || {};
-        if (type === "READY" || type === "PONG") {
-          setWorkerStatus("ready");
-          return;
-        }
-        // normal DECODE response
-        decoding = false;
-        if (watchdog) {
-          clearTimeout(watchdog);
-          watchdog = null;
-        }
-        if (ok && result?.text) {
-          const now = Date.now();
-          const prev = lastRef.current;
-          if (result.text === prev.text && now - prev.t < 2000 && !prev.confirmed) {
-            lastRef.current = { text: result.text, t: now, confirmed: true };
-            track("scan_decode_success", { format: result.format, text_len: result.text.length, ms: result.ms });
-            setLastMs(result.ms ?? null);
-            onDecoded(result.text);
-          } else if (result.text !== prev.text) {
-            lastRef.current = { text: result.text, t: now, confirmed: false };
-          } else {
-            // same text but took too long; reset timer
-            lastRef.current = { text: result.text, t: now, confirmed: false };
-          }
-        } else if (!ok) {
-          setLastErr(error ?? "unknown");
-          track("scan_decode_fail", { reason: error ?? "unknown" });
-        }
-      };
-      // Handshake to confirm worker wiring
-      workerRef.current.postMessage({ type: "PING" });
-
-      // camera
-      // HTTPS (or localhost) required; otherwise browsers throw SecurityError.
-      if (location.protocol !== "https:" && location.hostname !== "localhost") {
-        throw new Error("insecure-origin");
-      }
-      try {
-        streamRef.current = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-          audio: false,
-        });
-      } catch (e: any) {
-        // Normalize common errors for UX
-        const msg = String(e?.name || e?.message || "");
-        if (msg.includes("NotAllowedError")) setCamErr("Camera permission denied. Please allow access.");
-        else if (msg.includes("NotFoundError")) setCamErr("No camera found on this device.");
-        else if (msg.includes("SecurityError") || msg.includes("insecure-origin")) setCamErr("Camera requires HTTPS (or localhost).");
-        else setCamErr("Unable to access camera.");
-        throw e;
-      }
       const vid = videoRef.current!;
-      vid.srcObject = streamRef.current;
-      await vid.play().catch(() => {
-        // iOS Safari sometimes needs a user gesture
-      });
-
-      // try focus/torch/zoom
-      const vTrack = streamRef.current.getVideoTracks()[0];
-      if (vTrack) {
-        const caps: any = vTrack.getCapabilities?.() || {};
-        // focus continuous (best-effort)
-        vTrack.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] } as any).catch(() => {});
-        // torch
-        if (caps.torch) {
-          vTrack.applyConstraints({ advanced: [{ torch }] } as any).catch(() => {});
-        }
-        // zoom
-        if (caps.zoom) {
-          setZoomCaps({ min: caps.zoom.min ?? 1, max: caps.zoom.max ?? 5, step: caps.zoom.step ?? 0.1 });
-          setZoom(caps.zoom.min ?? 1);
-        }
+      const canvas = canvasRef.current!;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx || vid.videoWidth === 0) {
+        rafRef.current = requestAnimationFrame(loop);
+        return;
       }
 
-      loop();
-      setReady(true);
+      const w = vid.videoWidth, h = vid.videoHeight;
+      if (useFullFrame) {
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(vid, 0, 0, w, h, 0, 0, w, h);
+      } else {
+        const side = Math.floor(Math.min(w, h) * Math.max(0.5, Math.min(1, roiScale)));
+        const x = Math.floor((w - side) / 2);
+        const y = Math.floor((h - side) / 2);
+        canvas.width = side; canvas.height = side;
+        ctx.drawImage(vid, x, y, side, side, 0, 0, side, side);
+      }
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      workerRef.current?.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
+
+      rafRef.current = requestAnimationFrame(loop);
     };
 
-    setup().catch((e) => {
-      console.error("scanner_setup_failed", e);
-    });
+    rafRef.current = requestAnimationFrame(loop);
+  }
 
-    return () => {
-      cancelAnimationFrame(raf);
-      workerRef.current?.terminate();
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, [decodeFrame, onDecoded, torch]);
+  /** ---- COMMON: Handle decoded text with duplicate suppression ---- */
+  function handleDecoded(text: string, format: string) {
+    if (!text) return;
+    const now = Date.now();
+    const prev = lastRef.current;
+    if (text === prev.text && now - prev.t < 2000 && !prev.confirmed) {
+      lastRef.current = { text, t: now, confirmed: true };
+      track("scan_decode_success", { format, text_len: text.length, ms: lastMs ?? undefined });
+      onDecoded(text);
+    } else if (text !== prev.text) {
+      lastRef.current = { text, t: now, confirmed: false };
+    } else {
+      lastRef.current = { text, t: now, confirmed: false };
+    }
+  }
 
-  useEffect(() => {
-    // Try auto-start; if permission blocked, UI shows Retry button
-    startCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // live-apply zoom/torch when state changes
-  useEffect(() => {
+  /** ---- UI handlers ---- */
+  const onToggleTorch = async () => {
+    setTorch((v) => !v);
     const vTrack = streamRef.current?.getVideoTracks()[0];
-    if (!vTrack) return;
-    const apply = async () => {
-      const adv: any = {};
-      if (zoom != null) adv.zoom = zoom;
-      if (typeof torch === "boolean") adv.torch = torch;
-      if (Object.keys(adv).length) {
-        await vTrack.applyConstraints({ advanced: [adv] } as any).catch(() => {});
-      }
-    };
-    apply();
-  }, [zoom, torch]);
+    await vTrack?.applyConstraints?.({ advanced: [{ torch: !torch }] } as any).catch(() => {});
+  };
+  const onZoomChange = async (z: number) => {
+    setZoom(z);
+    const vTrack = streamRef.current?.getVideoTracks()[0];
+    await vTrack?.applyConstraints?.({ advanced: [{ zoom: z }] } as any).catch(() => {});
+  };
+
+  useEffect(() => stopAll, [stopAll]);
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline muted />
-        {/* ROI overlay */}
-        {!useFullFrame && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 flex items-center justify-center"
-          >
-            <div className="rounded-xl border-2 border-white/70"
-              style={{
-                width: "70%",
-                height: "70%",
-              }}
-            />
-          </div>
-        )}
-      </div>
-      <canvas ref={canvasRef} className="hidden" />
-      {/* Debug bar */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <span>Worker: {workerStatus}</span>
-        {lastMs != null && <span>Last decode: {lastMs}ms</span>}
-        {lastErr && <span className="text-red-700">Err: {lastErr}</span>}
-        <label className="ml-auto inline-flex items-center gap-2">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
+          onClick={() => startCamera()}
+          disabled={camState === "requesting" || camState === "streaming"}
+        >
+          {camState === "streaming" ? "Scanning…" : "Start scanning"}
+        </button>
+        <button
+          type="button"
+          className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
+          onClick={() => stopAll()}
+          disabled={camState !== "streaming"}
+        >
+          Stop
+        </button>
+        <label className="ml-3 inline-flex items-center gap-2 text-sm">
           <input type="checkbox" checked={useFullFrame} onChange={(e) => setUseFullFrame(e.target.checked)} />
           Full-frame mode
         </label>
       </div>
 
-      {camErr && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-          {camErr}
-          <div className="mt-2 flex gap-2">
-            <button type="button" className="rounded-md border px-3 py-1" onClick={() => startCamera()}>
-              Retry
-            </button>
-            <a
-              className="rounded-md border px-3 py-1"
-              href="about:blank"
-              onClick={(e) => {
-                e.preventDefault();
-                alert("If you previously blocked the camera, click the site lock icon and allow Camera.");
-              }}
-            >
-              How to allow
-            </a>
+      <div className="relative">
+        <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline muted />
+        {!useFullFrame && (
+          <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="rounded-xl border-2 border-white/70" style={{ width: "80%", height: "80%" }} />
           </div>
-        </div>
-      )}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setTorch((v) => !v)}
-          className="rounded-lg border px-3 py-1 text-sm hover:bg-muted"
-          aria-pressed={torch}
-        >
-          {torch ? "Torch: On" : "Torch: Off"}
-        </button>
+        )}
+      </div>
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Debug/status bar */}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>Cam: {camState}</span>
+        <span>Engine: {engine}</span>
+        {engine === "wasm" && <span>Worker: {workerStatus}</span>}
+        {lastMs != null && <span>Last decode: {lastMs}ms</span>}
+        {lastErr && <span className="text-red-700">Err: {lastErr}</span>}
         {zoomCaps && (
-          <label className="flex items-center gap-2 text-sm">
+          <label className="ml-auto inline-flex items-center gap-2">
             Zoom
             <input
               type="range"
@@ -273,10 +309,13 @@ export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
               max={zoomCaps.max}
               step={zoomCaps.step}
               value={zoom ?? zoomCaps.min}
-              onChange={(e) => setZoom(parseFloat(e.target.value))}
+              onChange={(e) => onZoomChange(parseFloat(e.target.value))}
             />
           </label>
         )}
+        <button type="button" onClick={onToggleTorch} className="rounded-md border px-2 py-0.5">
+          {torch ? "Torch: On" : "Torch: Off"}
+        </button>
       </div>
     </div>
   );
