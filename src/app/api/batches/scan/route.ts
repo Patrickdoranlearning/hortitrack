@@ -1,4 +1,3 @@
-
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,27 +9,48 @@ import { getUserFromRequest } from "@/server/security/auth";
 
 /** Try to find a batch by several likely keys/variants. */
 async function findBatch(by: "id" | "batchNumber", value: string) {
-  // 1) Direct doc id
+  // 1) exact doc id
   if (by === "id") {
     const doc = await adminDb.collection("batches").doc(value).get();
     if (doc.exists) return { id: doc.id, ...doc.data() };
   }
-  
-  // 2) batchNumber field
-  const c1 = await adminDb.collection("batches").where("batchNumber", "==", value).limit(1).get();
-  if (!c1.empty) return { id: c1.docs[0].id, ...c1.docs[0].data() };
+  const col = adminDb.collection("batches");
 
-  // 3) Common alternate/legacy field names
-  const altFields = ["batch_no", "legacyBatchNumber", "number"];
-  for (const f of altFields) {
-    const snap = await adminDb.collection("batches").where(f, "==", value).limit(1).get();
-    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+  // Helpers
+  const tryString = async (field: string, v: string) => {
+    const s = await col.where(field, "==", v).limit(1).get();
+    return s.empty ? null : { id: s.docs[0].id, ...s.docs[0].data() };
+  };
+  const tryNumber = async (field: string, v: string) => {
+    if (!/^\d+$/.test(v)) return null;
+    const n = Number(v);
+    const s = await col.where(field, "==", n).limit(1).get();
+    return s.empty ? null : { id: s.docs[0].id, ...s.docs[0].data() };
+  };
+  const candidates = new Set<string>();
+  candidates.add(value);
+  // also try trimmed leading zeros (common label formatter)
+  if (/^0+\d+$/.test(value)) candidates.add(value.replace(/^0+/, ""));
+
+  const fields = ["batchNumber", "batch_no", "batch_no_str", "number"];
+  for (const v of candidates) {
+    // string first
+    for (const f of fields) {
+      const r = await tryString(f, v);
+      if (r) return r;
+    }
+    // then numeric, if applicable
+    for (const f of fields) {
+      const r = await tryNumber(f, v);
+      if (r) return r;
+    }
   }
 
-  // 4) Aliases/labels array
-  const alias = await adminDb.collection("batches").where("aliases", "array-contains", value).limit(1).get();
-  if (!alias.empty) return { id: alias.docs[0].id, ...alias.docs[0].data() };
-
+  // aliases array (string)
+  for (const v of candidates) {
+    const a = await col.where("aliases", "array-contains", v).limit(1).get();
+    if (!a.empty) return { id: a.docs[0].id, ...a.docs[0].data() };
+  }
   return null;
 }
 
@@ -49,6 +69,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const code = String(body?.code || "");
+    const started = Date.now();
     const parsed = parseScanCode(code);
     if (!parsed) {
       return NextResponse.json({ error: "Unrecognized code" }, { status: 422 });
@@ -56,7 +77,18 @@ export async function POST(req: NextRequest) {
 
     const match = await findBatch(parsed.by, parsed.value);
     if (!match) {
-      return NextResponse.json({ error: "Batch not found." }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "Batch not found",
+          summary: {
+            by: parsed.by,
+            value: parsed.value,
+            rawLen: code.length,
+            ms: Date.now() - started,
+          },
+        },
+        { status: 404 }
+      );
     }
 
     const clean = declassify({ id: (match as any).id, ...(match as any) });
