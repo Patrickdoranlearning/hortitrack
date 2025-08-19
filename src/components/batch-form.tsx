@@ -24,6 +24,15 @@ import type {
 } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
+const PassportFields = {
+  passportType: z.enum(["received", "issued"]).optional(),
+  passportBotanical: z.string().optional(),
+  passportOperator: z.string().optional(),
+  passportTraceCode: z.string().optional(),
+  passportOrigin: z.string().optional(),
+  passportPZ: z.any().optional(),
+};
+
 const BatchFormSchema = z.object({
   sourceType: z.enum(["Propagation", "Purchase"]).default("Propagation"),
   plantVariety: z.string().min(1, 'Variety is required'),
@@ -45,7 +54,23 @@ const BatchFormSchema = z.object({
   location: z.string().min(1, 'Location is required'),
   growerPhotoUrl: z.string().optional(),
   salesPhotoUrl: z.string().optional(),
-});
+  ...PassportFields,
+}).superRefine((data, ctx) => {
+    if (data.sourceType === "Purchase") {
+      if (!data.passportBotanical) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Botanical Name is required for purchases.", path: ["passportBotanical"] });
+      }
+      if (!data.passportOperator) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Operator is required for purchases.", path: ["passportOperator"] });
+      }
+      if (!data.passportTraceCode) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Traceability Code is required for purchases.", path: ["passportTraceCode"] });
+      }
+      if (!data.passportOrigin) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Country of Origin is required for purchases.", path: ["passportOrigin"] });
+      }
+    }
+  });
 
 type BatchFormValues = z.infer<typeof BatchFormSchema>;
 
@@ -88,6 +113,8 @@ export function BatchForm({
 }: Props) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
   const isEdit = !!batch?.id;
+  
+  const doranNurseries = useMemo(() => suppliers.find(s => s.name === 'Doran Nurseries'), [suppliers]);
 
   const onSuccess = React.useMemo(() => {
     if (onSubmitSuccess) return onSubmitSuccess;
@@ -114,12 +141,29 @@ export function BatchForm({
       quantity: batch?.quantity ?? 0,
       status: (batch?.status as BatchStatus) ?? 'Potted',
       plantingDate: parseToDate(batch?.plantingDate),
-      supplier: batch?.supplier ?? '',
+      supplier: batch?.supplier ?? (doranNurseries?.name || ''),
       location: batch?.location ?? '',
       growerPhotoUrl: batch?.growerPhotoUrl ?? '',
       salesPhotoUrl: batch?.salesPhotoUrl ?? '',
     },
   });
+
+  const sourceType = form.watch("sourceType");
+
+  useEffect(() => {
+    if (sourceType === "Propagation") {
+      form.setValue('supplier', doranNurseries?.name || '');
+    } else {
+      // Clear if it's Doran, otherwise let user's selection persist
+      if (form.getValues('supplier') === doranNurseries?.name) {
+        form.setValue('supplier', '');
+      }
+    }
+  }, [sourceType, doranNurseries, form]);
+
+
+  const traySizes = useMemo(() => plantSizes.filter(s => s.type === 'Tray'), [plantSizes]);
+  const visibleSizes = sourceType === 'Propagation' ? traySizes : plantSizes;
 
   useEffect(() => {
     const info = (plantSizes ?? []).find((s) => s.size === form.getValues('size')) || null;
@@ -153,37 +197,30 @@ export function BatchForm({
       return;
     }
 
-    const payload = {
+    const payload: Partial<Batch> = {
       ...values,
       initialQuantity: isEdit ? (batch?.initialQuantity ?? values.quantity) : values.quantity,
       plantingDate: values.plantingDate.toISOString(),
       supplier: values.supplier ? values.supplier : undefined,
     };
-
-    if (isEdit && batch?.id) {
-      const res = await fetch(`/api/batches/${batch.id}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || 'Failed to update batch');
-      }
-      onSuccess({ id: batch.id });
-      return;
+    
+    if (values.sourceType === "Purchase") {
+      payload.passportType = "received";
     }
 
-    const res = await fetch('/api/batches', {
-      method: 'POST',
+    const api = isEdit ? `/api/batches/${batch!.id}` : '/api/batches';
+    const method = isEdit ? 'PATCH' : 'POST';
+
+    const res = await fetch(api, {
+      method,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || 'Failed to create batch');
+      throw new Error(err?.error || 'Failed to save batch');
     }
-    const result = (await res.json()) as { id: string; batchNumber: string };
+    const result = await res.json();
     onSuccess(result);
 
     form.reset({
@@ -218,7 +255,7 @@ export function BatchForm({
             await onSubmit(vals);
           } catch (e: any) {
             console.error(e);
-            alert(e.message || 'Save failed');
+            form.setError("root.serverError", { type: "manual", message: e.message || "Save failed" });
           }
         })}
         noValidate
@@ -231,7 +268,7 @@ export function BatchForm({
               <FormLabel>Source Type</FormLabel>
               <FormControl>
                 <RadioGroup
-                  onValueChange={field.onChange}
+                  onValueChange={(value) => field.onChange(value as "Propagation" | "Purchase")}
                   defaultValue={field.value}
                   className="flex space-x-4"
                 >
@@ -355,7 +392,7 @@ export function BatchForm({
                     <SelectValue placeholder="Select a size" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(plantSizes ?? []).map((s) => (
+                    {(visibleSizes ?? []).map((s) => (
                       <SelectItem key={s.id} value={s.size}>
                         {s.size}
                         {s.type ? ` • ${s.type}` : ''}
@@ -496,7 +533,7 @@ export function BatchForm({
                 <Select
                   value={field.value || ''}
                   onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
-                  disabled={form.formState.isSubmitting}
+                  disabled={form.formState.isSubmitting || sourceType === 'Propagation'}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a supplier" />
@@ -517,6 +554,63 @@ export function BatchForm({
             )}
           />
         </div>
+        
+        {sourceType === "Purchase" && (
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-medium text-lg">Plant Passport Details</h3>
+            <p className="text-sm text-muted-foreground">Required for purchased plants.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="passportBotanical"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>A - Botanical Name</FormLabel>
+                    <Input {...field} value={field.value ?? ''} placeholder="e.g., Lavandula angustifolia"/>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="passportOperator"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>B - Operator Reg. No.</FormLabel>
+                    <Input {...field} value={field.value ?? ''} placeholder="e.g., IE-12345"/>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="passportTraceCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>C - Traceability Code</FormLabel>
+                    <Input {...field} value={field.value ?? ''} placeholder="e.g., Lot-54321"/>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="passportOrigin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>D - Country of Origin</FormLabel>
+                    <Input {...field} value={field.value ?? ''} placeholder="ISO2 code, e.g., NL"/>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        )}
+
+        {form.formState.errors.root?.serverError && (
+            <p className="text-sm font-medium text-destructive">{form.formState.errors.root.serverError.message}</p>
+        )}
 
         <DialogFooter className="sticky bottom-0 z-10 -mx-6 px-6 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t -mb-6 pt-4 pb-4">
           <Button
@@ -532,7 +626,7 @@ export function BatchForm({
             <Button
               type="button"
               variant="secondary"
-              onClick={() => onArchive(batch.id!)}
+              onClick={() => onArchive(batch!.id!)}
               disabled={form.formState.isSubmitting}
             >
               Archive

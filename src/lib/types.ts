@@ -127,7 +127,7 @@ export const BatchSchema = z.object({
   
   // New fields for check-in and passport
   sourceType: z.enum(["Propagation", "Purchase"]).default("Propagation"),
-  passportReceivedId: z.string().optional(),
+  
   qcStatus: z.enum(["Pending", "Accepted", "Rejected", "Quarantined"]).default("Pending"),
   qcNotes: z.string().optional(),
 
@@ -140,6 +140,19 @@ export const BatchSchema = z.object({
     flaggedAt: z.string().optional(),
     flaggedBy: z.string().optional(),
   }).optional(),
+  
+  // --- Plant Passport stored on Batch ---
+  passportType: z.enum(["received", "issued"]).optional(),
+  passportBotanical: z.string().optional(),   // A
+  passportOperator: z.string().optional(),   // B (operator reg no)
+  passportTraceCode: z.string().optional(),  // C
+  passportOrigin: z.string().optional(),     // D (ISO alpha-2)
+  passportPZ: z.any().optional(),            // { codes: string[] }
+  passportRawText: z.string().optional(),
+  passportRawBarcode: z.string().optional(),
+  passportImages: z.any().optional(),        // StoredFile[]
+  passportIssueDate: z.any().optional(),
+  passportIssuerName: z.string().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
