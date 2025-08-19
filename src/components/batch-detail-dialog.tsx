@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FeatureGate } from './FeatureGate';
 import { BatchActionBar } from './batches/BatchActionBar';
 import BatchLabelPreview from './BatchLabelPreview';
+import { PlantPassportCard } from './batches/PlantPassportCard';
 
 
 interface BatchDetailDialogProps {
@@ -275,6 +276,7 @@ export function BatchDetailDialog({
                           </div>
                           <Progress value={stockPercentage} aria-label={`${Math.round(stockPercentage)}% remaining`} />
                         </div>
+                         <PlantPassportCard batchId={batch.id!} />
                       </div>
                       <div className="md:col-span-2 grid grid-cols-2 gap-x-8 gap-y-4">
                         <div>
