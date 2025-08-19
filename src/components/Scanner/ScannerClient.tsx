@@ -1,66 +1,167 @@
-// NEW - client scanner
-"use client";
-import { useEffect, useRef, useState } from "react";
 
-export default function ScannerClient({
-  onDecoded,
-}: { onDecoded: (value: string) => void }) {
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { track } from "@/lib/telemetry";
+
+type Props = {
+  onDecoded: (text: string) => void;
+  roiScale?: number; // 0.6..1.0 (portion of shorter side)
+};
+
+export default function ScannerClient({ onDecoded, roiScale = 0.7 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
-  const [raw, setRaw] = useState<string>("");
+  const streamRef = useRef<MediaStream | null>(null);
+  const [torch, setTorch] = useState(false);
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
+
+  // duplicate suppression: require 2 consecutive matches within 2s
+  const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
+
+  const decodeFrame = useCallback(() => {
+    const vid = videoRef.current!;
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    const w = vid.videoWidth;
+    const h = vid.videoHeight;
+    if (!w || !h) return;
+
+    const side = Math.floor(Math.min(w, h) * Math.max(0.5, Math.min(1, roiScale)));
+    const x = Math.floor((w - side) / 2);
+    const y = Math.floor((h - side) / 2);
+
+    canvas.width = side;
+    canvas.height = side;
+    ctx.drawImage(vid, x, y, side, side, 0, 0, side, side);
+    const imageData = ctx.getImageData(0, 0, side, side);
+
+    workerRef.current?.postMessage({ type: "DECODE", imageData }, [imageData.data.buffer]);
+  }, [roiScale]);
 
   useEffect(() => {
-    let stop = false;
     let raf = 0;
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    let decoding = false;
 
-    async function init() {
-      workerRef.current = new Worker(new URL("../../workers/decoder.worker.ts", import.meta.url));
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    const loop = () => {
+      if (!decoding) {
+        decoding = true;
+        decodeFrame();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+
+    const setup = async () => {
+      workerRef.current = new Worker(new URL("@/workers/decoder.worker.ts", import.meta.url), { type: "module" });
+      workerRef.current.onmessage = (ev: MessageEvent) => {
+        const { ok, result, error } = ev.data || {};
+        decoding = false;
+        if (ok && result?.text) {
+          const now = Date.now();
+          const prev = lastRef.current;
+          if (result.text === prev.text && now - prev.t < 2000 && !prev.confirmed) {
+            lastRef.current = { text: result.text, t: now, confirmed: true };
+            track("scan_decode_success", { format: result.format, text_len: result.text.length, ms: result.ms });
+            onDecoded(result.text);
+          } else if (result.text !== prev.text) {
+            lastRef.current = { text: result.text, t: now, confirmed: false };
+          } else {
+            // same text but took too long; reset timer
+            lastRef.current = { text: result.text, t: now, confirmed: false };
+          }
+        } else if (!ok) {
+          track("scan_decode_fail", { reason: error ?? "unknown" });
+        }
+      };
+
+      // camera
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
       const vid = videoRef.current!;
-      vid.srcObject = stream;
+      vid.srcObject = streamRef.current;
       await vid.play();
 
-      canvas.width = vid.videoWidth;
-      canvas.height = vid.videoHeight;
+      // try focus/torch/zoom
+      const track = streamRef.current.getVideoTracks()[0];
+      if (track) {
+        const caps: any = track.getCapabilities?.() || {};
+        // focus continuous (best-effort)
+        track.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] } as any).catch(() => {});
+        // torch
+        if (caps.torch) {
+          track.applyConstraints({ advanced: [{ torch }] } as any).catch(() => {});
+        }
+        // zoom
+        if (caps.zoom) {
+          setZoomCaps({ min: caps.zoom.min ?? 1, max: caps.zoom.max ?? 5, step: caps.zoom.step ?? 0.1 });
+          setZoom(caps.zoom.min ?? 1);
+        }
+      }
 
-      const tick = () => {
-        if (stop) return;
-        try {
-          ctx!.drawImage(vid, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
-          workerRef.current!.onmessage = (ev: MessageEvent) => {
-            if (ev.data?.ok) {
-              const text = ev.data.result?.text as string;
-              if (text) {
-                setRaw(text);
-                onDecoded(text);
-              }
-            }
-          };
-          workerRef.current!.postMessage({ type: "DECODE", data: { imageData }});
-        } catch (_) {}
-        raf = requestAnimationFrame(tick);
-      };
-      raf = requestAnimationFrame(tick);
-    }
-    init().catch(console.error);
+      loop();
+    };
+
+    setup().catch((e) => {
+      console.error("scanner_setup_failed", e);
+    });
 
     return () => {
-      stop = true;
       cancelAnimationFrame(raf);
-      const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
-      tracks?.forEach(t => t.stop());
       workerRef.current?.terminate();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [onDecoded]);
+  }, [decodeFrame, onDecoded, torch]);
+
+  // live-apply zoom/torch when state changes
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const apply = async () => {
+      const adv: any = {};
+      if (zoom != null) adv.zoom = zoom;
+      if (typeof torch === "boolean") adv.torch = torch;
+      if (Object.keys(adv).length) {
+        await track.applyConstraints({ advanced: [adv] } as any).catch(() => {});
+      }
+    };
+    apply();
+  }, [zoom, torch]);
 
   return (
     <div className="space-y-3">
-      <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline />
-      <div className="text-sm text-muted-foreground">
-        Raw: <span className="font-mono break-all">{raw || "—"}</span>
+      <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline muted />
+      <canvas ref={canvasRef} className="hidden" />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setTorch((v) => !v)}
+          className="rounded-lg border px-3 py-1 text-sm hover:bg-muted"
+          aria-pressed={torch}
+        >
+          {torch ? "Torch: On" : "Torch: Off"}
+        </button>
+        {zoomCaps && (
+          <label className="flex items-center gap-2 text-sm">
+            Zoom
+            <input
+              type="range"
+              min={zoomCaps.min}
+              max={zoomCaps.max}
+              step={zoomCaps.step}
+              value={zoom ?? zoomCaps.min}
+              onChange={(e) => setZoom(parseFloat(e.target.value))}
+            />
+          </label>
+        )}
       </div>
     </div>
   );
