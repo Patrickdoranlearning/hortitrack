@@ -18,7 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Progress } from '@/components/ui/progress';
+import { Progress } from './ui/progress';
 import { Button } from './ui/button';
 import { TransplantIcon } from './icons';
 import BatchLabelPreview from './BatchLabelPreview';
@@ -231,6 +231,7 @@ export function BatchCard({
           plantVariety: batch.plantVariety,
           plantFamily: batch.plantFamily,
           size: batch.size,
+          location: batch.location,
           initialQuantity: batch.initialQuantity ?? batch.quantity ?? 0,
           quantity: batch.quantity,
         }}
@@ -238,4 +239,3 @@ export function BatchCard({
     </>
   );
 }
-

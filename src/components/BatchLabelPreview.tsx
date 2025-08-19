@@ -1,4 +1,3 @@
-
 // src/components/BatchLabelPreview.tsx
 "use client";
 
@@ -16,6 +15,7 @@ type Props = {
     plantVariety: string;
     plantFamily: string;
     size: string;
+    location?: string;
     initialQuantity: number;
     quantity: number;
   };
@@ -35,6 +35,7 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
           family: batch.plantFamily,
           quantity: batch.initialQuantity, // Usually print with initial quantity
           size: batch.size,
+          location: batch.location,
           payload: `ht:batch:${batch.batchNumber}`, // Or batch.id
         }),
       });
@@ -73,6 +74,7 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
                 family={batch.plantFamily}
                 quantity={batch.initialQuantity}
                 size={batch.size}
+                location={batch.location}
                 dataMatrixPayload={`ht:batch:${batch.batchNumber}`}
             />
         </div>
