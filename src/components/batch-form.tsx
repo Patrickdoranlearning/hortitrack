@@ -23,6 +23,8 @@ import type {
   Batch, BatchStatus, NurseryLocation, PlantSize, Supplier, Variety,
 } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { SafeSelect } from '@/components/ui/SafeSelect';
+import { normalizeOptions, type Option } from '@/lib/options';
 
 const PassportFields = {
   passportType: z.enum(["received", "issued"]).optional(),
@@ -162,8 +164,14 @@ export function BatchForm({
   }, [sourceType, doranNurseries, form]);
 
 
-  const traySizes = useMemo(() => plantSizes.filter(s => s.type === 'Tray'), [plantSizes]);
-  const visibleSizes = sourceType === 'Propagation' ? traySizes : plantSizes;
+  const allSizes: Option[] = useMemo(() => normalizeOptions((plantSizes ?? []).map(s => ({
+    value: s.size,
+    label: `${s.size} ${s.type ? ` • ${s.type}` : ''} ${s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)`: ''}`
+  }))), [plantSizes]);
+  
+  const traySizes = useMemo(() => allSizes.filter(s => /tray/i.test(s.label)), [allSizes]);
+  const visibleSizes = sourceType === 'Propagation' ? traySizes : allSizes;
+
 
   useEffect(() => {
     const info = (plantSizes ?? []).find((s) => s.size === form.getValues('size')) || null;
@@ -191,6 +199,11 @@ export function BatchForm({
   );
 
   const onSubmit = async (values: BatchFormValues) => {
+    if (!values.size || values.size.trim().length === 0) {
+      form.setError("size", { type: "manual", message: "Size is required" });
+      return;
+    }
+
     const stage = values?.status;
     if (!stage) {
       alert("Batch status is required to determine the production stage.");
@@ -371,36 +384,25 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Size</FormLabel>
-                <Select
-                  value={field.value || ''}
-                  onValueChange={(val) => {
-                    field.onChange(val);
-                    const info = (plantSizes ?? []).find((s) => s.size === val) || null;
-                    setSelectedSizeInfo(info);
-                    const trays = Number(form.getValues('trayQuantity') ?? 0);
-                    const perTray = info?.multiple && info.multiple > 1 ? info.multiple : 1;
-                    if (perTray > 1 && trays > 0) {
-                      form.setValue('quantity', trays * perTray, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      });
-                    }
-                  }}
-                  disabled={form.formState.isSubmitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(visibleSizes ?? []).map((s) => (
-                      <SelectItem key={s.id} value={s.size}>
-                        {s.size}
-                        {s.type ? ` • ${s.type}` : ''}
-                        {s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SafeSelect
+                    value={field.value}
+                    onChange={(val) => {
+                      field.onChange(val);
+                      const info = (plantSizes ?? []).find((s) => s.size === val) || null;
+                      setSelectedSizeInfo(info);
+                      const trays = Number(form.getValues('trayQuantity') ?? 0);
+                      const perTray = info?.multiple && info.multiple > 1 ? info.multiple : 1;
+                      if (perTray > 1 && trays > 0) {
+                        form.setValue('quantity', trays * perTray, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }
+                    }}
+                    options={visibleSizes}
+                    placeholder="Select pot/tray size"
+                    disabled={form.formState.isSubmitting}
+                />
                 <FormMessage />
               </FormItem>
             )}
