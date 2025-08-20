@@ -14,52 +14,34 @@ const PhotosSchema = z
   .max(10)
   .optional();
 
-const Base = z.object({
+const ActionTypeSchema = z.enum(["MOVE", "SPLIT", "DUMPED", "FLAGS", "NOTE"]);
+
+const BaseSchema = z.object({
   actionId: z.string().uuid(),
-  batchIds: z.array(z.string()).min(1),
+  type: ActionTypeSchema,
   photos: PhotosSchema,
-});
-
-export const DumpedActionSchema = Base.extend({
-  type: z.literal("DUMPED"),
-  reason: z.string().min(1).max(500),
-  quantity: z.number().int().positive(),
-});
-
-export const MoveActionSchema = Base.extend({
-  type: z.literal("MOVE"),
-  toLocationId: z.string().min(1, "Destination is required"),
-  quantity: z.number().int().positive().optional(), // blank → full on server
-  note: z.string().max(2000).optional(),
-});
-
-export const SplitActionSchema = Base.extend({
-  type: z.literal("SPLIT"),
-  batchIds: z.array(z.string()).length(1, "Split acts on one batch"),
-  toLocationId: z.string().min(1),
-  quantity: z.number().int().positive(),
-  note: z.string().max(2000).optional(),
-});
-
-export const FlagsActionSchema = Base.extend({
-  type: z.literal("FLAGS"),
+  // Fields for specific actions
+  quantity: z.number().int().positive().optional(),
+  reason: z.string().min(1).optional(),
+  toLocationId: z.string().min(1).optional(),
   trimmed: z.boolean().optional(),
   spaced: z.boolean().optional(),
   note: z.string().max(2000).optional(),
-});
-
-export const NoteActionSchema = Base.extend({
-  type: z.literal("NOTE"),
+  title: z.string().max(200).optional(),
   body: z.string().max(5000).optional(),
-  title: z.string().min(1).max(200),
 });
 
-export const ActionInputSchema = z.discriminatedUnion("type", [
-  DumpedActionSchema,
-  MoveActionSchema,
-  SplitActionSchema,
-  FlagsActionSchema,
-  NoteActionSchema,
-]);
+const BatchRefSchema = z.union([
+    z.object({ batchNumber: z.string().min(1) }),
+    z.object({ batchId: z.string().min(1) }),
+    z.object({ batchIds: z.array(z.string().min(1)).nonempty() }),
+]).transform((v) => {
+    if ("batchNumber" in v) return { batchNumbers: [v.batchNumber], batchIds: [] as string[] };
+    if ("batchId" in v) return { batchNumbers: [] as string[], batchIds: [v.batchId] };
+    return { batchNumbers: [] as string[], batchIds: v.batchIds };
+});
+
+
+export const ActionInputSchema = z.intersection(BaseSchema, BatchRefSchema);
 
 export type ActionInput = z.infer<typeof ActionInputSchema>;
