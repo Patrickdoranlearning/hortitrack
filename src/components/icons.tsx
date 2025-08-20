@@ -15,10 +15,14 @@ export const TransplantIcon = () => (
     strokeLinejoin="round"
     className="h-5 w-5"
   >
-    <path d="M6 14v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-4" />
-    <path d="M12 14V4" />
-    <path d="M12 4h.01" />
-    <path d="M10 6L7 9" />
-    <path d="M14 6l3 3" />
+    <path d="M2 15l4-4" />
+    <path d="M13 5l4-4" />
+    <path d="M6.5 10.5l9 9" />
+    <path d="M17.5 5.5L13 10l-9 9" />
+    <path d="M18 10l-2 2" />
+    <path d="M10 18l2-2" />
+    <path d="M14 14l-4 4" />
+    <path d="M22 6l-4-4" />
+    <path d="M22 6l-6 6" />
   </svg>
 );
