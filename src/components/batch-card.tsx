@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Progress } from './ui/progress';
 import { Button } from './ui/button';
-import { TransplantIcon } from './icons';
+import { TransplantIcon, CareIcon } from './icons';
 import BatchLabelPreview from './BatchLabelPreview';
 import { ActionDialog } from './actions/ActionDialog';
 
@@ -28,14 +28,12 @@ import { ActionDialog } from './actions/ActionDialog';
 interface BatchCardProps {
   batch: Batch;
   onClick: (batch: Batch) => void;
-  onLogAction: (batch: Batch) => void;
   onTransplant: (batch: Batch) => void;
 }
 
 export function BatchCard({
   batch,
   onClick,
-  onLogAction,
   onTransplant,
 }: BatchCardProps) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
@@ -206,12 +204,12 @@ export function BatchCard({
                     size="icon"
                     onClick={handleOpenActionsDialog}
                   >
-                    <MoreHorizontal className="h-5 w-5" />
-                    <span className="sr-only">More Actions</span>
+                    <CareIcon />
+                    <span className="sr-only">Actions</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>More Actions</p>
+                  <p>Actions</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
