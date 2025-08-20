@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -12,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { uploadActionPhotos } from "@/lib/firebase";
 
 type Props = {
   open: boolean;
@@ -36,51 +38,45 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
     resolver: zodResolver(ActionInputSchema),
     defaultValues: { type: "MOVE", ...baseDefaults } as any,
     mode: "onChange",
+    shouldUnregister: true, // critical for discriminated union
   });
 
   React.useEffect(() => {
     form.reset({ ...form.getValues(), batchIds: defaultBatchIds });
   }, [defaultBatchIds, form]); // Keep selection synced
 
-  async function submit() {
-    // Ensure 'type' is set (prevents silent zod failure)
-    form.setValue("type" as any, tab as any, { shouldValidate: true, shouldDirty: true });
-    const isValid = await form.trigger();
-    if (!isValid) {
-      toast({variant: 'destructive', title: "Please complete required fields"});
-      return;
-    }
-    let photos: AnyAction extends { photos: infer P } ? any : any;
+  const onSubmit = form.handleSubmit(async (validated) => {
+    // Set discriminant explicitly just in case
+    (validated as any).type = tab;
+    let photos: AnyAction["photos"] = undefined;
     if (files.length) {
       try {
-        const { uploadActionPhotos } = await import("@/lib/firebase");
-        // Use first selected batch for path scoping
-        const scopeBatch = (form.getValues() as any).batchIds?.[0] ?? "misc";
-        photos = await uploadActionPhotos(scopeBatch, files);
+        const scopeBatchId = validated.batchIds?.[0] ?? "misc";
+        photos = await uploadActionPhotos(scopeBatchId, files);
       } catch (e: any) {
         toast({variant: 'destructive', title: "Photo upload failed: " + (e?.message ?? "error")});
         return;
       }
     }
-    const values = { ...form.getValues(), photos };
     try {
       const res = await fetch("/api/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...validated, photos }),
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({variant: 'destructive', title: data?.error ?? "Action failed"});
+        toast({variant: 'destructive', title: `Action failed (${res.status})`, description: data?.error });
         return;
       }
       toast({title: "Action applied"});
       setFiles([]);
       onOpenChange(false);
     } catch (e: any) {
-      toast({variant: 'destructive', title: e?.message ?? "Network error"});
+      toast({variant: 'destructive', title: "Network Error", description: e?.message });
     }
-  }
+  });
+
 
   const locOptions = locations;
 
@@ -101,15 +97,25 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
             <TabsTrigger value="FLAGS">Trim/Space</TabsTrigger>
             <TabsTrigger value="NOTE">Note</TabsTrigger>
           </TabsList>
+            
+          {/* IMPORTANT: wrap content in a real <form> */}
+          <form
+            className="space-y-3 pt-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              form.setValue("type" as any, tab as any, { shouldValidate: true });
+              onSubmit();
+            }}
+          >
 
           {/* MOVE */}
-          <TabsContent value="MOVE" className="space-y-3 pt-3">
+          <TabsContent value="MOVE" className="space-y-3">
             <div>
               <label className="text-sm">To Location</label>
               <select
                 className="w-full border rounded-md p-2"
-                onChange={(e) => form.setValue("toLocationId" as any, e.target.value, { shouldValidate: true })}
                 defaultValue=""
+                {...form.register("toLocationId" as any)}
               >
                 <option value="" disabled>Select location…</option>
                 {locOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -121,21 +127,22 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
                 type="number"
                 min={1}
                 placeholder="Move full if empty"
-                onChange={(e) => form.setValue("quantity" as any, e.target.value ? Number(e.target.value) : undefined, { shouldValidate: true })}
+                {...form.register("quantity" as any, { setValueAs: (v) => v ? Number(v) : undefined })}
               />
             </div>
-            <Textarea placeholder="Note (optional)" onChange={(e) => form.setValue("note" as any, e.target.value)} />
+            <Textarea placeholder="Note (optional)" 
+              {...form.register("note" as any)} />
           </TabsContent>
 
           {/* SPLIT */}
-          <TabsContent value="SPLIT" className="space-y-3 pt-3">
+          <TabsContent value="SPLIT" className="space-y-3">
             <p className="text-xs text-muted-foreground">Split acts on a single batch.</p>
             <div>
               <label className="text-sm">To Location</label>
               <select
                 className="w-full border rounded-md p-2"
-                onChange={(e) => form.setValue("toLocationId" as any, e.target.value, { shouldValidate: true })}
                 defaultValue=""
+                {...form.register("toLocationId" as any)}
               >
                 <option value="" disabled>Select location…</option>
                 {locOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -146,52 +153,60 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
               <Input
                 type="number"
                 min={1}
-                onChange={(e) => form.setValue("splitQuantity" as any, Number(e.target.value), { shouldValidate: true })}
+                {...form.register("splitQuantity" as any, { setValueAs: (v) => Number(v) })}
               />
             </div>
-            <Textarea placeholder="Note (optional)" onChange={(e) => form.setValue("note" as any, e.target.value)} />
+            <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
           </TabsContent>
 
           {/* FLAGS */}
-          <TabsContent value="FLAGS" className="space-y-3 pt-3">
+          <TabsContent value="FLAGS" className="space-y-3">
             <div className="flex gap-6">
               <label className="inline-flex items-center gap-2">
-                <input type="checkbox" onChange={(e) => form.setValue("trimmed" as any, e.target.checked)} />
+                <input type="checkbox" {...form.register("trimmed" as any)} />
                 <span>Trimmed</span>
               </label>
               <label className="inline-flex items-center gap-2">
-                <input type="checkbox" onChange={(e) => form.setValue("spaced" as any, e.target.checked)} />
+                <input type="checkbox" {...form.register("spaced" as any)} />
                 <span>Spaced</span>
               </label>
             </div>
-            <Textarea placeholder="Note (optional)" onChange={(e) => form.setValue("note" as any, e.target.value)} />
+            <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
           </TabsContent>
 
           {/* NOTE */}
-          <TabsContent value="NOTE" className="space-y-3 pt-3">
-            <Input placeholder="Title" onChange={(e) => form.setValue("title" as any, e.target.value, { shouldValidate: true })} />
-            <Textarea placeholder="Details (optional)" onChange={(e) => form.setValue("body" as any, e.target.value)} />
+          <TabsContent value="NOTE" className="space-y-3">
+            <Input placeholder="Title" {...form.register("title" as any)} />
+            <Textarea placeholder="Details (optional)" {...form.register("body" as any)} />
           </TabsContent>
 
-          {/* PHOTOS (common) */}
-          <div className="mt-4 space-y-2">
+          {/* PHOTOS (file or camera) */}
+           <div className="mt-4 space-y-2">
             <label className="text-sm font-medium">Photos (optional)</label>
+            {/* File picker */}
             <Input
               type="file"
               accept="image/*"
               multiple
               onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             />
+            {/* Mobile camera (capture attribute is ignored on desktop, works on iOS/Android) */}
+            <Input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])}
+            />
             {files.length > 0 && (
               <p className="text-xs text-muted-foreground">{files.length} file(s) selected</p>
             )}
           </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit">Apply</Button>
+          </DialogFooter>
+          </form>
         </Tabs>
-
-        <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit}>Apply</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
