@@ -73,13 +73,6 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
   });
 
   const onSubmit = async (values: Record<string, any>) => {
-    // Sanity guard: prevent accidental server-action submits
-    if (typeof window !== 'undefined' && (window as any).FormData && headers?.get?.("next-action")) {
-        console.warn("Server Action header detected in client submit — aborting.");
-        toast({ variant: "destructive", title: "Error", description: "Server Action header detected in client submit — aborting." });
-        return;
-    }
-
     console.info('[ActionDialog] submit', values);
     const batchIds = Array.isArray(values.batchIds) && values.batchIds.length ? values.batchIds : defaultBatchIds;
     
@@ -119,10 +112,15 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
       ...values,
     };
 
-   const res = await postJson("/api/actions", payload);
-   if (!res.ok) {
-     toast({ variant: "destructive", title: "Action failed", description: res.error });
-     console.error("[ActionDialog] submit failed", { status: res.status, text: res.text });
+   const res = await fetch("/api/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify(payload),
+   });
+   const data = await res.json().catch(() => null);
+   if (!res.ok || !data?.ok) {
+     toast({ variant: "destructive", title: "Action failed", description: data?.error ?? `Action failed (HTTP ${res.status})` });
+     console.error("[ActionDialog] failed", { status: res.status, data });
      return;
    }
 

@@ -153,13 +153,6 @@ export function TransplantForm({
   };
 
   const onSubmit = async (values: TransplantFormData) => {
-    // Sanity guard: prevent accidental server-action submits
-    if (typeof window !== 'undefined' && (window as any).FormData && headers?.get?.("next-action")) {
-        console.warn("Server Action header detected in client submit — aborting.");
-        toast({ variant: "destructive", title: "Error", description: "Server Action header detected in client submit — aborting." });
-        return;
-    }
-
     if (!batch) return;
 
     const qty = values.quantity ?? batch.quantity;
@@ -176,10 +169,15 @@ export function TransplantForm({
     };
 
     console.log("[Transplant] submitting", payload);
-    const res = await postJson("/api/actions", payload);
-    if (!res.ok) {
-      console.error("[Transplant] failed", res);
-      toast({ variant: 'destructive', title: "Transplant failed", description: res.error ?? "Transplant failed" });
+    const res = await fetch("/api/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) {
+      toast({ variant: 'destructive', title: "Transplant failed", description: data?.error ?? `Transplant failed (HTTP ${res.status})` });
+      console.error("[Transplant] failed", { status: res.status, data });
       return;
     }
     toast({ title: "Transplant created", description: "New batch created" });
