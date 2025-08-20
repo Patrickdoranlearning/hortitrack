@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { uploadActionPhotos } from "@/lib/firebase";
+import PhotoPicker from "@/components/actions/PhotoPicker";
 
 type Props = {
   open: boolean;
@@ -180,26 +181,10 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
             <Textarea placeholder="Details (optional)" {...form.register("body" as any)} />
           </TabsContent>
 
-          {/* PHOTOS (file or camera) */}
-           <div className="mt-4 space-y-2">
+          {/* PHOTOS */}
+          <div className="mt-4 space-y-2">
             <label className="text-sm font-medium">Photos (optional)</label>
-            {/* File picker */}
-            <Input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-            />
-            {/* Mobile camera (capture attribute is ignored on desktop, works on iOS/Android) */}
-            <Input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])}
-            />
-            {files.length > 0 && (
-              <p className="text-xs text-muted-foreground">{files.length} file(s) selected</p>
-            )}
+            <PhotoPicker onChange={setFiles} max={10} enableDesktopCamera={true} />
           </div>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
