@@ -8,17 +8,19 @@ function wildcardMatch(input: string, pattern: string) {
 }
 
 export function isAllowedOrigin(req: NextRequest) {
-  // 0) Server Actions must pass (Next private wire)
-  if (req.headers.get("next-action") === "1") return true;
+  // Next Server Actions: never block
+  if ((req.headers.get("next-action") || "").trim() === "1") return true;
 
-  // 1) Derive origin + host
+  // If browser declares same-origin / same-site, allow
+  const sfs = (req.headers.get("sec-fetch-site") || "").toLowerCase();
+  if (sfs === "same-origin" || sfs === "same-site") return true;
+
   const originHeader = (req.headers.get("origin") || req.headers.get("referer") || "").toLowerCase();
   const hostHeader = (req.headers.get("host") || "").toLowerCase();
 
-  // If no origin header (e.g., curl), allow — there's no CSRF vector without a browser origin
+  // No origin (curl, SSR fetch, some internal calls) => allow
   if (!originHeader) return true;
 
-  // Parse origin to compare hosts
   let originHost = "";
   let originOrigin = "";
   try {
@@ -26,30 +28,25 @@ export function isAllowedOrigin(req: NextRequest) {
     originHost = u.host.toLowerCase();
     originOrigin = u.origin.toLowerCase();
   } catch {
-    // If it's not a URL, be conservative and deny later unless in dev
+    // keep empty; will be handled by dev/prod branches below
   }
 
-  // 2) Always allow same-host requests (safe for CSRF purposes here)
+  // Same-host shortcut
   if (originHost && hostHeader && originHost === hostHeader) return true;
 
-  // 3) In non-production, be permissive to unblock dev/preview environments
+  // In development/preview, be permissive
   if (process.env.NODE_ENV !== "production") return true;
 
-  // 4) Production: allow only configured origins (supports "*" wildcards)
+  // Production allowlist
   const allow: string[] = [];
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").toLowerCase();
   if (appUrl) {
-    try {
-      allow.push(new URL(appUrl).origin);
-    } catch {
-      allow.push(appUrl);
-    }
+    try { allow.push(new URL(appUrl).origin); } catch { allow.push(appUrl); }
   }
   const extra = (process.env.ALLOWED_ORIGINS || "")
     .split(",")
     .map(s => s.trim().toLowerCase())
     .filter(Boolean);
-
   allow.push(...extra);
 
   const origin = originOrigin || originHeader;

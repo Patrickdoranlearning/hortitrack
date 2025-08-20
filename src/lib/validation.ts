@@ -10,17 +10,25 @@ export function mapError(e: unknown): { status: number; body: ErrorBody } {
   if (e instanceof ZodError) {
     return {
       status: 400,
-      body: { error: "Validation failed", issues: e.issues },
+      body: { error: "Bad Request", issues: e.errors },
     };
   }
 
+  // Handle errors with a 'code' property, e.g., from Firebase or custom errors
+  if (typeof e === 'object' && e !== null && 'code' in e) {
+    const code = (e as { code: unknown }).code;
+    if (code === 'UNAUTHORIZED') {
+      return { status: 401, body: { error: 'Unauthorized' } };
+    }
+     if (code === 'NOT_FOUND') {
+      return { status: 404, body: { error: 'Not Found' } };
+    }
+  }
+  
   // Generic error
   const msg =
     (e as any)?.message ||
     (typeof e === "string" ? e : "Internal Server Error");
-
-  // You can branch on Firebase errors here if you want:
-  // if ((e as any)?.code === 'permission-denied') return { status: 403, body: { error: msg } };
 
   return {
     status: 500,
