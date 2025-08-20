@@ -100,6 +100,7 @@ export function BatchCard({
         className="flex flex-col h-full w-full hover:border-primary transition-colors cursor-pointer group"
         onClick={() => onClick(batch)}
         data-testid="batch-card"
+        style={{height: '220px'}}
       >
         <CardHeader className="p-3 pb-2">
             <div className="flex items-start justify-between gap-2">
