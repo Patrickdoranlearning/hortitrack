@@ -49,7 +49,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
   const onSubmit = form.handleSubmit(async (validated) => {
     // Set discriminant explicitly just in case
     (validated as any).type = tab;
-    let photos: AnyAction["photos"] = undefined;
+    let photos: any = undefined;
     if (files.length) {
       try {
         const scopeBatchId = validated.batchIds?.[0] ?? "misc";
@@ -139,7 +139,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
                 {...form.register("toLocationId" as any)}
               >
                 <option value="" disabled>Select location…</option>
-                {locOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {locOptions.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
               </select>
             </div>
             <div>
@@ -166,7 +166,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
                 {...form.register("toLocationId" as any)}
               >
                 <option value="" disabled>Select location…</option>
-                {locOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {locOptions.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
               </select>
             </div>
             <div>
@@ -174,7 +174,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
               <Input
                 type="number"
                 min={1}
-                {...form.register("splitQuantity" as any, { setValueAs: (v) => Number(v) })}
+                {...form.register("quantity" as any, { setValueAs: (v) => Number(v) })}
               />
             </div>
             <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
@@ -204,11 +204,11 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
           {/* PHOTOS */}
           <div className="mt-4 space-y-2">
             <label className="text-sm font-medium">Photos (optional)</label>
-            <PhotoPicker onChange={setFiles} max={10} enableDesktopCamera={true} />
+            <PhotoPicker onChange={(uploadedFiles) => form.setValue('photos', uploadedFiles)} max={10} />
           </div>
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">Apply</Button>
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>Cancel</Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>Apply</Button>
           </DialogFooter>
           </form>
         </Tabs>

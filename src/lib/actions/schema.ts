@@ -1,59 +1,56 @@
-
 import { z } from "zod";
 
-const PhotosSchema = z.array(z.object({
-  url: z.string().url(),
-  path: z.string().min(1),
-  mime: z.string().min(1),
-  size: z.number().int().positive(),
-})).max(10).optional();
+// Common attachments
+const PhotosSchema = z
+  .array(
+    z.object({
+      url: z.string().url(),
+      path: z.string().min(1),
+      mime: z.string().min(1),
+      size: z.number().int().positive(),
+    })
+  )
+  .max(10)
+  .optional();
 
-export const DumpedActionSchema = z.object({
+const Base = z.object({
+  actionId: z.string().uuid(),
+  batchIds: z.array(z.string()).min(1),
+  photos: PhotosSchema,
+});
+
+export const DumpedActionSchema = Base.extend({
   type: z.literal("DUMPED"),
-  batchIds: z.array(z.string()).min(1),     // can dump multiple batches with same reason/qty
   reason: z.string().min(1).max(500),
   quantity: z.number().int().positive(),
-  actionId: z.string().uuid(),
-  photos: PhotosSchema,
 });
 
-export const MoveActionSchema = z.object({
+export const MoveActionSchema = Base.extend({
   type: z.literal("MOVE"),
-  batchIds: z.array(z.string()).min(1),
-  toLocationId: z.string().min(1),
-  quantity: z.number().int().positive().optional(),
-  actionId: z.string().uuid(),
+  toLocationId: z.string().min(1, "Destination is required"),
+  quantity: z.number().int().positive().optional(), // blank → full on server
   note: z.string().max(2000).optional(),
-  photos: PhotosSchema,
 });
 
-export const SplitActionSchema = z.object({
+export const SplitActionSchema = Base.extend({
   type: z.literal("SPLIT"),
-  batchIds: z.array(z.string()).length(1),
+  batchIds: z.array(z.string()).length(1, "Split acts on one batch"),
   toLocationId: z.string().min(1),
-  splitQuantity: z.number().int().positive(),
-  actionId: z.string().uuid(),
+  quantity: z.number().int().positive(),
   note: z.string().max(2000).optional(),
-  photos: PhotosSchema,
 });
 
-export const FlagsActionSchema = z.object({
+export const FlagsActionSchema = Base.extend({
   type: z.literal("FLAGS"),
-  batchIds: z.array(z.string()).min(1),
-  trimmed: z.boolean().default(false),
-  spaced: z.boolean().default(false),
-  actionId: z.string().uuid(),
+  trimmed: z.boolean().optional(),
+  spaced: z.boolean().optional(),
   note: z.string().max(2000).optional(),
-  photos: PhotosSchema,
 });
 
-export const NoteActionSchema = z.object({
+export const NoteActionSchema = Base.extend({
   type: z.literal("NOTE"),
-  batchIds: z.array(z.string()).min(1),
-  title: z.string().min(1).max(200),
   body: z.string().max(5000).optional(),
-  actionId: z.string().uuid(),
-  photos: PhotosSchema,
+  title: z.string().min(1).max(200),
 });
 
 export const ActionInputSchema = z.discriminatedUnion("type", [

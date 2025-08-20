@@ -3,6 +3,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import type { PhotoFile } from "@/components/actions/PhotoPicker";
 
 const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -22,8 +23,8 @@ const db = initializeFirestore(app, {
 const auth = getAuth(app);
 const storage = getStorage(app);
 
-export async function uploadActionPhotos(batchId: string, files: File[]) {
-  const results: { url: string; path: string; mime: string; size: number }[] = [];
+export async function uploadActionPhotos(batchId: string, files: File[]): Promise<PhotoFile[]> {
+  const results: PhotoFile[] = [];
   for (const file of files) {
     const path = `action-photos/${batchId}/${Date.now()}-${file.name}`;
     const r = ref(storage, path);
