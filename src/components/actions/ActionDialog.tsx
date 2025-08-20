@@ -27,7 +27,7 @@ type AnyAction = z.infer<typeof ActionInputSchema>;
 
 export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }: Props) {
   const { toast } = useToast();
-  const [tab, setTab] = React.useState<"MOVE"|"SPLIT"|"FLAGS"|"NOTE">("MOVE");
+  const [tab, setTab] = React.useState<"DUMPED"|"MOVE"|"SPLIT"|"FLAGS"|"NOTE">("MOVE");
   const [files, setFiles] = React.useState<File[]>([]);
 
   const baseDefaults: Partial<AnyAction> = {
@@ -92,7 +92,8 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
           setTab(v as any);
           form.reset({ type: v as any, ...baseDefaults, batchIds: defaultBatchIds } as any);
         }}>
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
+            <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
             <TabsTrigger value="MOVE">Move</TabsTrigger>
             <TabsTrigger value="SPLIT">Split</TabsTrigger>
             <TabsTrigger value="FLAGS">Trim/Space</TabsTrigger>
@@ -108,6 +109,25 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
               onSubmit();
             }}
           >
+
+          {/* DUMPED */}
+          <TabsContent value="DUMPED" className="space-y-3">
+            <div>
+              <label className="text-sm">Reason</label>
+              <Textarea
+                placeholder="Why was this batch dumped?"
+                {...form.register("reason" as any)}
+              />
+            </div>
+            <div>
+              <label className="text-sm">Quantity to dump</label>
+              <Input
+                type="number"
+                min={1}
+                {...form.register("quantity" as any, { setValueAs: (v) => Number(v) })}
+              />
+            </div>
+          </TabsContent>
 
           {/* MOVE */}
           <TabsContent value="MOVE" className="space-y-3">

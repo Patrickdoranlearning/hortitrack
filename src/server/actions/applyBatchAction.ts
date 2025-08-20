@@ -29,6 +29,31 @@ export async function applyBatchAction(raw: unknown): Promise<Result> {
 
   try {
     switch (action.type) {
+      case "DUMPED": {
+        const { batchIds, quantity, reason } = action;
+        for (const batchId of batchIds) {
+          const ref = db.collection("batches").doc(batchId);
+          await db.runTransaction(async (tx) => {
+            const snap = await tx.get(ref);
+            if (!snap.exists) throw new Error(`Batch ${batchId} not found`);
+            const batch = snap.data() as any;
+            if (quantity > batch.quantity) throw new Error("Insufficient quantity to dump");
+            const remaining = (batch.quantity ?? 0) - quantity;
+            const patch: Record<string, any> = {
+              quantity: FieldValue.increment(-quantity),
+              updatedAt: FieldValue.serverTimestamp(),
+              lastDumpedReason: reason,
+            };
+            // Optional: mark empty batches (won't assume your exact schema; just leave quantity @ 0)
+            if (remaining === 0) {
+              // patch.status = "DUMPED"; // enable if you maintain a status field
+            }
+            tx.update(ref, patch);
+          });
+        }
+        await logAction(action);
+        return { ok: true, data: { dumped: batchIds.length, qtyPerBatch: quantity } };
+      }
       case "MOVE": {
         const { batchIds, toLocationId, quantity } = action;
         for (const batchId of batchIds) {

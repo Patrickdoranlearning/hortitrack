@@ -82,8 +82,7 @@ export default function PhotoPicker({ onChange, max = 10, className, enableDeskt
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-3">
-        {/* Single input; on mobile, capture opens the camera; desktop shows file dialog */}
+      <div className="flex flex-col gap-2">
         <input
           ref={inputRef}
           type="file"
@@ -96,7 +95,7 @@ export default function PhotoPicker({ onChange, max = 10, className, enableDeskt
         {enableDesktopCamera && (
           <button
             type="button"
-            className="px-3 py-2 rounded-md border"
+            className="self-start px-3 py-2 rounded-md border text-sm"
             onClick={openCamera}
           >
             Use Camera

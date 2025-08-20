@@ -1,5 +1,4 @@
 
-// Force Node.js runtime (firebase-admin not supported on Edge)
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";

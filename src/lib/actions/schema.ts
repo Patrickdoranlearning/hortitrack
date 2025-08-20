@@ -8,6 +8,15 @@ const PhotosSchema = z.array(z.object({
   size: z.number().int().positive(),
 })).max(10).optional();
 
+export const DumpedActionSchema = z.object({
+  type: z.literal("DUMPED"),
+  batchIds: z.array(z.string()).min(1),     // can dump multiple batches with same reason/qty
+  reason: z.string().min(1).max(500),
+  quantity: z.number().int().positive(),
+  actionId: z.string().uuid(),
+  photos: PhotosSchema,
+});
+
 export const MoveActionSchema = z.object({
   type: z.literal("MOVE"),
   batchIds: z.array(z.string()).min(1),
@@ -48,6 +57,7 @@ export const NoteActionSchema = z.object({
 });
 
 export const ActionInputSchema = z.discriminatedUnion("type", [
+  DumpedActionSchema,
   MoveActionSchema,
   SplitActionSchema,
   FlagsActionSchema,
