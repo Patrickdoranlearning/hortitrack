@@ -1,168 +1,202 @@
+
 export const runtime = "nodejs";
-import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/server/db/admin";
 import { generateNextBatchId } from "@/server/batches/nextId";
-import { mapError } from "@/lib/validation";
-// If you protect this route, uncomment:
-// import { getUser } from "@/server/auth/getUser";
 
-/**
- * Body accepted from TransplantForm.
- * We copy category/family/variety from the source batch (authoritative).
- * New size/location/status come from the form.
- */
-const TransplantSchema = z.object({
-  quantity: z.number().int().positive("Quantity must be at least 1"),
-  location: z.string().min(1, "Location is required"),
-  size: z.string().min(1, "Size is required"),
-  status: z.enum([
-    "Propagation",
-    "Plugs/Liners",
-    "Potted",
-    "Ready for Sale",
-    "Looking Good",
-    "Archived",
-  ]),
-  supplier: z.string().optional(),
-  plantingDate: z.string().optional(), // ISO if provided; we'll default to now
+const Input = z.object({
+  plantingDate: z.string().datetime(),
+  quantity: z.number().int().positive(),
+  size: z.string().min(1),
+  // Either locationId OR location (name) may be provided
+  locationId: z.string().optional(),
+  location: z.string().optional(),
   logRemainingAsLoss: z.boolean().optional().default(false),
+  notes: z.string().optional(),
 });
 
+function corsHeaders() {
+  // In dev, allow any origin (Cloud Workstations, localhost)
+  const allow =
+    process.env.NODE_ENV === "development" ? "*" : undefined;
+  return {
+    "access-control-allow-origin": allow ?? "",
+    "access-control-allow-methods": "POST,OPTIONS",
+    "access-control-allow-headers": "content-type,idempotency-key",
+    "access-control-allow-credentials": "true",
+  };
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders() });
+}
+
 export async function POST(
-  req: Request,
-  ctx: { params: { batchId: string } }
+  req: NextRequest,
+  { params }: { params: { batchId: string } }
 ) {
   try {
-    // const user = await getUser(); // optional auth
-    const { batchId } = ctx.params;
-    const raw = await req.json();
-    const body = TransplantSchema.parse(raw);
+    const idemKey = req.headers.get("idempotency-key") ?? null;
+    const body = await req.json();
+    const parsed = Input.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          issues: parsed.error.issues.map(i => ({
+            path: i.path.join("."),
+            message: i.message,
+            code: i.code,
+          })),
+        },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+    const input = parsed.data;
+
+
+    const param = params.batchId;
+
+    // Resolve source batch by Firestore doc id OR by batchNumber (fallback)
+    let srcRef = adminDb.collection("batches").doc(param);
+    let srcSnap = await srcRef.get();
+
+    if (!srcSnap.exists) {
+      const byNumber = await adminDb
+        .collection("batches")
+        .where("batchNumber", "==", param)
+        .limit(1)
+        .get();
+      if (byNumber.empty) {
+        return NextResponse.json(
+          { error: "source batch not found" },
+          { status: 404, headers: corsHeaders() }
+        );
+      }
+      srcRef = byNumber.docs[0].ref;
+      srcSnap = byNumber.docs[0];
+    }
+
+    const src = srcSnap.data()!;
+    const qty = input.quantity;
+
+    if (qty > (src.quantity ?? 0)) {
+      return NextResponse.json(
+        { error: `quantity ${qty} exceeds available ${src.quantity}` },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+
+    const when = new Date(input.plantingDate);
+    const { id: childBatchNumber } = await generateNextBatchId({ when });
 
     const result = await adminDb.runTransaction(async (tx) => {
-      const srcRef = adminDb.collection("batches").doc(batchId);
-      const srcSnap = await tx.get(srcRef);
-      if (!srcSnap.exists) {
-        throw new Error("Source batch not found");
-      }
-      const src = srcSnap.data() as any;
-
-      const srcQty: number = Number(src.quantity ?? 0);
-      if (body.quantity > srcQty) {
-        throw new Error(
-          `Transplant quantity (${body.quantity}) exceeds available quantity (${srcQty}).`
-        );
+      const fresh = (await tx.get(srcRef)).data();
+      if (!fresh) throw new Error("source batch not found");
+      if (qty > (fresh.quantity ?? 0)) {
+        throw new Error(`quantity ${qty} exceeds available ${fresh.quantity}`);
       }
 
-      // Create destination batch number and doc
-      const dstRef = adminDb.collection("batches").doc();
-      const { id: batchNumber } = await generateNextBatchId({siteCode: '1'});
+      // Idempotency guard
+      if (idemKey) {
+        const idemRef = adminDb
+          .collection("idempotency")
+          .doc(`transplant:${srcRef.id}:${idemKey}`);
+        const idemSnap = await tx.get(idemRef);
+        if (idemSnap.exists) {
+          const { newId } = idemSnap.data() as any;
+          const existing = await adminDb.collection("batches").doc(newId).get();
+          return {
+            batchId: newId,
+            batchNumber: existing.get("batchNumber"),
+          };
+        }
+        tx.set(idemRef, { createdAt: new Date().toISOString() });
+      }
 
+      const newId = adminDb.collection("batches").doc().id;
+      const newRef = adminDb.collection("batches").doc(newId);
 
-      const nowServer = FieldValue.serverTimestamp();
-      const nowIso = new Date().toISOString();
-
-      // Build destination doc (copy authoritative fields from source)
-      const dstDoc = {
-        id: dstRef.id,
-        batchNumber,
-        category: src.category,
-        plantFamily: src.plantFamily,
-        plantVariety: src.plantVariety,
-        plantingDate: body.plantingDate ?? nowIso,
-        initialQuantity: body.quantity,
-        quantity: body.quantity,
-        status: body.status,
-        location: body.location,
-        size: body.size,
-        supplier: body.supplier ?? src.supplier ?? null,
-        transplantedFrom: src.batchNumber ?? batchId,
-        createdAt: nowServer,
-        updatedAt: nowServer,
-        // If you keep a document-level logHistory array (your UI shows this):
-        logHistory: [{
-          id: `log_${Date.now()}_create_from_transplant`,
-          type: "TRANSPLANT_FROM",
-          note: `Created from transplant of ${body.quantity} units from batch ${
-            src.batchNumber ?? batchId
-          }.`,
-          date: nowIso,
-        }],
+      const newDoc = {
+        batchNumber: childBatchNumber,
+        category: fresh.category,
+        plantFamily: fresh.plantFamily,
+        plantVariety: fresh.plantVariety,
+        plantingDate: when.toISOString(),
+        initialQuantity: qty,
+        quantity: qty,
+        status: "Propagation", // initial status after transplant
+        locationId: input.locationId ?? null,
+        location: input.location ?? null,
+        size: input.size,
+        transplantedFrom: fresh.batchNumber,
+        notes: input.notes ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
-      tx.set(dstRef, dstDoc);
+      tx.set(newRef, newDoc);
 
-      // Update source batch quantity (and possibly archive)
-      const remaining = srcQty - body.quantity;
-      const srcUpdates: Record<string, any> = {
+      const remaining = (fresh.quantity ?? 0) - qty;
+      const srcPatch: Record<string, any> = {
         quantity: remaining,
-        updatedAt: nowServer,
+        updatedAt: new Date().toISOString(),
       };
+      if (input.logRemainingAsLoss) srcPatch.status = "Archived";
+      tx.update(srcRef, srcPatch);
 
-      // Append to log history if the field exists
-      const newLogEntries = [];
-      newLogEntries.push({
-          id: `log_${Date.now()}_transplant_to`,
-          type: "TRANSPLANT_TO",
-          note: `Transplanted ${body.quantity} units to new batch ${batchNumber}.`,
-          date: nowIso,
+      // Append history
+      const hist = adminDb.collection("batchHistory");
+      tx.set(hist.doc(), {
+        at: new Date().toISOString(),
+        type: "TRANSPLANT",
+        batchId: srcRef.id,
+        title: `Transplanted ${qty} to ${childBatchNumber} (${input.size})`,
+        details:
+          input.location
+            ? `To ${input.location}`
+            : input.locationId
+            ? `To ${input.locationId}`
+            : undefined,
+      });
+      tx.set(hist.doc(), {
+        at: new Date().toISOString(),
+        type: "BATCH_CREATED",
+        batchId: newId,
+        title: `New batch from ${fresh.batchNumber}`,
+        details: `Initial qty ${qty}, size ${input.size}`,
       });
 
-      // Optional: log remaining as loss and archive original
-      if (body.logRemainingAsLoss && remaining > 0) {
-        srcUpdates.quantity = 0;
-        srcUpdates.status = "Archived";
-        newLogEntries.push(
-          {
-            id: `log_${Date.now()}_loss_auto`,
-            type: "LOSS",
-            note: `Logged remaining ${remaining} units as loss during transplant.`,
-            date: nowIso,
-          },
-          {
-            id: `log_${Date.now()}_archive_auto`,
-            type: "ARCHIVE",
-            note: "Batch quantity reached zero and was automatically archived.",
-            date: nowIso,
-          }
-        );
-      } else if (remaining === 0 && src.status !== "Archived") {
-        // Auto-archive if zero remains
-        srcUpdates.status = "Archived";
-        newLogEntries.push(
-          {
-            id: `log_${Date.now()}_archive_auto`,
-            type: "ARCHIVE",
-            note: "Batch quantity reached zero and was automatically archived.",
-            date: nowIso,
-          }
+      if (idemKey) {
+        tx.set(
+          adminDb
+            .collection("idempotency")
+            .doc(`transplant:${srcRef.id}:${idemKey}`),
+          { newId },
+          { merge: true }
         );
       }
-      
-      if (Array.isArray(src.logHistory)) {
-        srcUpdates.logHistory = [...src.logHistory, ...newLogEntries];
-      } else {
-        srcUpdates.logHistory = newLogEntries;
-      }
 
-
-      tx.update(srcRef, srcUpdates);
-
-
-      return { id: dstRef.id, batchNumber };
+      return { batchId: newId, batchNumber: childBatchNumber };
     });
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(
+      { ok: true, newBatch: result },
+      { status: 201, headers: corsHeaders() }
+    );
   } catch (e: any) {
-    const message = e?.message ?? "Unknown error";
-    if (
-      message.includes("exceeds available quantity") ||
-      message.includes("not found")
-    ) {
-      return NextResponse.json({ error: message }, { status: 400 });
-    }
-    const { status, body } = mapError(e);
-    return NextResponse.json(body, { status });
+    const msg = e?.message ?? "unknown error";
+    const status = /not found/.test(msg)
+      ? 404
+      : /exceeds/.test(msg)
+      ? 400
+      : 500;
+    return NextResponse.json(
+      { error: msg },
+      { status, headers: corsHeaders() }
+    );
   }
 }

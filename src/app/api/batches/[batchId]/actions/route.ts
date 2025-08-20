@@ -1,3 +1,4 @@
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,21 @@ export async function POST(
 
   try {
     const raw = await req.json();
-    const input = Input.parse(raw);
+    const parsed = Input.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          issues: parsed.error.issues.map(i => ({
+            path: i.path.join("."),
+            message: i.message,
+            code: i.code,
+          })),
+        },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+    const input = parsed.data;
     const { type } = input;
 
     // Resolve batch by doc id or batchNumber

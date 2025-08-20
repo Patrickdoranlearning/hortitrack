@@ -18,6 +18,15 @@ import { useToast } from "@/hooks/use-toast";
 import type { Batch, NurseryLocation } from "@/lib/types";
 import { PhotoPicker } from "@/components/photos/PhotoPicker";
 
+function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === "" || v === undefined || v === null) continue; // drop empties
+    out[k] = v;
+  }
+  return out as Partial<T>;
+}
+
 const moveSchema = (max: number) => z.object({
   type: z.literal("MOVE"),
   at: z.date(),
@@ -68,10 +77,10 @@ export function ActionForm({
     defaultValues: {
       type: "MOVE",
       at: new Date(),
-      toLocationId: "",
-      toLocation: "",
-      quantity: undefined,
-      notes: "",
+      toLocationId: "",     // keep Select controlled
+      toLocation: "",       // if you ever bind a free-text location
+      quantity: undefined,  // optional; rendered as "" so still controlled
+      notes: "",            // critical: avoid undefined → string flip
       photos: [],
     },
   });
@@ -82,8 +91,8 @@ export function ActionForm({
     defaultValues: {
       type: "DUMP",
       at: new Date(),
-      reason: "",
-      quantity: undefined,
+      reason: "",           // critical: avoid undefined → string flip
+      quantity: undefined,  // optional; rendered as ""
       notes: "",
       photos: [],
     },
@@ -107,7 +116,8 @@ export function ActionForm({
     if (tab === "DUMP") dumpForm.setValue("photos", [...(dumpForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
     if (tab === "CHECKIN") checkForm.setValue("photos", [...(checkForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
     setUploaded([]);
-  }, [uploaded, tab, checkForm, dumpForm, moveForm]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploaded, tab]);
 
   function idemKey(payload: Record<string, any>) {
     const base = JSON.stringify({
@@ -130,13 +140,35 @@ export function ActionForm({
         "content-type": "application/json",
         "idempotency-key": idemKey(payload),
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(compactPayload(payload)),
       signal: abortRef.current.signal,
     });
 
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      throw new Error(j?.error || `Server error (${res.status})`);
+      // Map Zod issues to fields on the active tab
+      if (j?.issues && Array.isArray(j.issues)) {
+        for (const iss of j.issues) {
+          const p = String(iss.path || "");
+          if (p.includes("toLocation")) {
+            moveForm.setError("toLocationId", { message: iss.message });
+          }
+          if (p === "quantity") {
+            (tab === "DUMP" ? dumpForm : moveForm).setError("quantity", { message: iss.message });
+          }
+          if (p === "reason") dumpForm.setError("reason", { message: iss.message });
+          if (p === "notes") {
+            (tab === "CHECKIN" ? checkForm : moveForm).setError("notes", { message: iss.message });
+          }
+          if (p === "at") {
+            // date errors, extremely rare if using toISOString
+          }
+          if (p === "type") {
+            // should never happen; defensive
+          }
+        }
+      }
+      throw new Error(j?.error || "Invalid input");
     }
     return res.json();
   }
