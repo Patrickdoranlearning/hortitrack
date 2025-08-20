@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { applyBatchAction } from "@/server/actions/applyBatchAction";
 import { ActionInputSchema } from "@/lib/actions/schema";

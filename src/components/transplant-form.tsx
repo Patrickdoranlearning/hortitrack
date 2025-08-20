@@ -38,6 +38,7 @@ import { useMemo, useState } from 'react';
 import { ScrollArea } from './ui/scroll-area';
 import { transplantBatchAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
+import { SubmitButton } from './ui/SubmitButton';
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -154,19 +155,22 @@ export function TransplantForm({
   const handleFormSubmit = async (values: TransplantFormData) => {
     if (!batch) return;
 
-    const { quantity, logRemainingAsLoss, ...newBatchData } = values;
+    const qty = values.quantity ?? batch.quantity;
+
+    const { logRemainingAsLoss, ...newBatchData } = values;
 
     const result = await transplantBatchAction(
         batch.id!,
         {
           ...newBatchData,
+          quantity: qty,
           category: batch.category,
           plantFamily: batch.plantFamily,
           plantVariety: batch.plantVariety,
           supplier: "Doran Nurseries",
           plantingDate: newBatchData.plantingDate.toISOString(),
         },
-        quantity,
+        qty,
         logRemainingAsLoss
     );
 
@@ -196,13 +200,9 @@ export function TransplantForm({
       </DialogHeader>
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit(
-            handleFormSubmit,
-            (errors) => {
-              console.error("Transplant form invalid:", errors);
-            }
-          )}
+          onSubmit={form.handleSubmit(handleFormSubmit)}
           className="space-y-0"
+          noValidate
         >
           <ScrollArea className="h-[70vh] p-6 pr-8 -mr-6">
             <div className="space-y-6">
@@ -445,10 +445,12 @@ export function TransplantForm({
               </div>
             </ScrollArea>
           <DialogFooter className="pt-6 p-6 border-t">
-            <Button type="button" variant="ghost" onClick={onCancel}>
+            <Button type="button" variant="ghost" onClick={onCancel} disabled={form.formState.isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit">Create Transplanted Batch</Button>
+            <SubmitButton type="submit" pending={form.formState.isSubmitting}>
+              Create Transplanted Batch
+            </SubmitButton>
           </DialogFooter>
         </form>
       </Form>
