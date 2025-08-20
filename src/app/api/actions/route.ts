@@ -38,12 +38,12 @@ export async function POST(req: NextRequest) {
     }
     const result = await applyBatchAction(parsed.data);
     if (!result.ok) {
-      console.error("[api/actions] 422", result.error, { type: parsed.data.type });
+      console.error("[api/actions] 422", result.error, { type: parsed.data.type, actionId: parsed.data.actionId });
       return NextResponse.json({ ok: false, error: result.error, issues: [] }, { status: 422 });
     }
     return NextResponse.json({ ok: true, data: result.data }, { status: 200 });
   } catch (e: any) {
-    console.error("[api/actions] 500", e);
+    console.error("[api/actions] 500", { message: e?.message, stack: e?.stack });
     // Force JSON even on unexpected errors
     return NextResponse.json({ ok: false, error: "Internal error", issues: [] }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+
 // src/lib/security/origin.ts
 import type { NextRequest } from "next/server";
 
@@ -13,10 +14,11 @@ export function isAllowedOrigin(req: NextRequest) {
   const proto = req.nextUrl.protocol || "https:"; // dev often https on workstations
   const sameOrigin = `${proto}//${host}`;
 
-  // 1) Always allow requests that are same-origin
+  // 1) Always allow requests that are same-origin.
+  // Some browsers omit the Origin header on same-origin POSTs; fall back to host match.
   if (!origin || origin === sameOrigin) return true;
 
-  // 2) Dev-friendly hosts
+  // 2) In development, allow common local hosts + workstations
   const devAllow = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -32,6 +34,17 @@ export function isAllowedOrigin(req: NextRequest) {
     );
   }
 
-  // 3) In production, only allow exact same‑origin
-  return false;
+  // 3) In production, allow configured origins:
+  // - NEXT_PUBLIC_APP_URL (canonical)
+  // - ALLOWED_ORIGINS (comma-separated list, supports "*" wildcards)
+  const allow: string[] = [];
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").toLowerCase();
+  if (appUrl) allow.push(appUrl);
+  const extra = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+  allow.push(...extra);
+
+  return allow.some((p) => (p.includes("*") ? wildcardMatch(origin, p) : origin === p));
 }

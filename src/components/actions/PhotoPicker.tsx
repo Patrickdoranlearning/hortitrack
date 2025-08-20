@@ -1,6 +1,7 @@
 
 "use client";
 import React, { useRef } from "react";
+import { cn } from "@/lib/utils";
 
 export type PhotoFile = { url: string; path: string; mime: string; size: number };
 type Props = {
@@ -11,15 +12,17 @@ type Props = {
 
 export default function PhotoPicker({ onChange, max = 10, className }: Props) {
   const [files, setFiles] = React.useState<File[]>([]);
-  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleFiles = (newFiles: FileList | null) => {
     if (!newFiles) return;
-    const updatedFiles = [...files, ...Array.from(newFiles)].slice(0, max);
-    setFiles(updatedFiles);
-    onChange(updatedFiles);
+    const arr = Array.from(newFiles);
+    const next = [...files, ...arr].slice(0, max);
+    setFiles(next);
+    onChange(next);
   };
-  
+
   function removeAt(i: number) {
     const next = files.slice();
     next.splice(i, 1);
@@ -29,19 +32,37 @@ export default function PhotoPicker({ onChange, max = 10, className }: Props) {
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-3">
-        <button
+      <div className={cn("flex flex-col gap-2", className)}>
+        <div className="flex items-center gap-2">
+          <button
             type="button"
-            onClick={() => inputRef.current?.click()}
-            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
-        >
-            Add Photo
-        </button>
+            onClick={() => fileInputRef.current?.click()}
+            className="border rounded px-3 py-2 text-sm"
+          >
+            Choose file
+          </button>
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="border rounded px-3 py-2 text-sm"
+          >
+            Use camera
+          </button>
+        </div>
         <input
-          ref={inputRef}
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           multiple
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple={false}
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />

@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { uploadActionPhotos } from "@/lib/firebase";
 import PhotoPicker from "@/components/actions/PhotoPicker";
+import { cn } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -28,7 +29,7 @@ type AnyAction = z.infer<typeof ActionInputSchema>;
 function toMessage(err: unknown): string {
   if (!err) return "Unknown error";
   if (typeof err === "string") return err;
-  if (err instanceof Error) return err.message || err.toString();
+  if (err instanceof Error) return err.message;
   try { return JSON.stringify(err); } catch { return String(err); }
 }
 
@@ -54,16 +55,15 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
     form.reset({ ...form.getValues(), batchIds: defaultBatchIds });
   }, [defaultBatchIds, form]);
 
-  const onSubmit = form.handleSubmit(async (validated) => {
-    // Set discriminant explicitly just in case
-    (validated as any).type = tab;
-    let photos: any = undefined;
+  const onSubmit = form.handleSubmit(async (values) => {
+    let photos: any[] | undefined = undefined;
     if (files.length) {
       try {
+        const validated = ActionInputSchema.parse({ ...values, photos: undefined });
         const scopeBatchId = validated.batchIds?.[0] ?? "misc";
         photos = await uploadActionPhotos(scopeBatchId, files);
       } catch (e: any) {
-        toast({variant: 'destructive', title: "Photo upload failed", description: e?.message ?? "error"});
+        toast({variant: 'destructive', title: "Photo upload failed", description: toMessage(e)});
         return;
       }
     }
@@ -71,12 +71,12 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
       const res = await fetch("/api/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...validated, photos }),
+        body: JSON.stringify({ ...values, photos }),
       });
       
       const txt = await res.text();
       let body: any = {};
-      try { body = JSON.parse(txt); } catch {}
+      try { body = JSON.parse(txt); } catch { /* keep body as {} for non-JSON errors */ }
 
       if (!res.ok || body?.ok === false) {
         const msg = body?.error ?? `Failed to apply action (${res.status})`;
@@ -85,7 +85,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
           for (const issue of body.issues) {
             const path = (issue?.path?.[0] as string) || "_form";
             const message = (issue?.message as string) || "Invalid value";
-            // @ts-expect-error dynamic path from server; RHF accepts string
+            // @ts-expect-error dynamic path
             form.setError(path, { type: "server", message });
           }
         }
