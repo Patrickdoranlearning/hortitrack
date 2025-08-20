@@ -24,16 +24,15 @@ export function isAllowedOrigin(req: NextRequest) {
   if (!origin || origin === sameOrigin) return true;
 
   // 2) In development, allow common local hosts + workstations
-  const devAllow = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://localhost:3000",
-    "https://127.0.0.1:3000",
-    // Google Cloud Workstations (your current dev domain)
-    "https://*.cloudworkstations.dev",
-  ];
-
   if (process.env.NODE_ENV !== "production") {
+    const devAllow = [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "https://localhost:3000",
+      "https://127.0.0.1:3000",
+      // Google Cloud Workstations (your current dev domain)
+      "https://*.cloudworkstations.dev",
+    ];
     return devAllow.some((p) =>
       p.includes("*") ? wildcardMatch(origin, p) : origin === p
     );

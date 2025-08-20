@@ -13,12 +13,13 @@ type ApiErrorIssue = { path: (string | number)[]; message: string };
 export async function POST(req: NextRequest) {
   try {
     if (!isAllowedOrigin(req)) {
-      console.error("[api/actions] Bad Origin", {
+      console.error("[api/actions] 403 Bad Origin", {
+        method: req.method,
         origin: req.headers.get("origin"),
         host: req.headers.get("host"),
-        url: req.nextUrl.href,
+        referer: req.headers.get("referer"),
       });
-      return NextResponse.json({ ok: false, error: "Bad Origin", issues: [] }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "Bad Origin" }, { status: 403 });
     }
 
     const payload = await req.json();
