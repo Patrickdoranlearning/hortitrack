@@ -69,9 +69,6 @@ export function BatchActionBar({
         ].join(" ")}
         data-testid="batch-action-bar"
       >
-        <Button onClick={onEdit} disabled={!onEdit} className="rounded-2xl w-full" data-testid="btn-edit">
-          <Pencil className="mr-2 h-4 w-4" /> Edit
-        </Button>
         <Button onClick={onMove} disabled={!onMove} className="rounded-2xl w-full" data-testid="btn-transplant">
           <TransplantIcon /> Transplant
         </Button>
@@ -117,6 +114,9 @@ export function BatchActionBar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>More actions</DropdownMenuLabel>
+            <DropdownMenuItem onClick={onEdit} disabled={!onEdit} data-testid="mi-edit">
+              <Pencil className="mr-2 h-4 w-4" /> Edit
+            </DropdownMenuItem>
             {isArchived ? (
               <DropdownMenuItem onClick={onUnarchive} disabled={!onUnarchive} data-testid="mi-unarchive">
                 <ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive
