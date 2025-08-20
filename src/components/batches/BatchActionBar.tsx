@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader";
 import Link from "next/link";
 import { ActionDialog } from "@/components/actions/ActionDialog";
 import { TransplantIcon } from "../icons";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type BatchLite = {
   id: string;
@@ -86,18 +89,18 @@ export function BatchActionBar({
         </Button>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button onClick={onPrint} variant="outline" size="sm" disabled={!onPrint} className="rounded-2xl w-full" data-testid="btn-print">
+            <Button onClick={onPrint} variant="outline" disabled={!onPrint} className="rounded-2xl w-full" data-testid="btn-print">
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
           </TooltipTrigger>
           <TooltipContent>Print label</TooltipContent>
         </Tooltip>
         {batch?.id && typeof batch.id === "string" && !String(batch.id).includes("/") ? (
-          <Link
-            href={`/batches/${encodeURIComponent(String(batch.id))}/history`}
-            className="rounded-2xl w-full border inline-flex items-center justify-center px-3 py-2 hover:bg-muted/50 transition text-sm"
-            data-testid="btn-history"
-          >
+           <Link
+              href={`/batches/${encodeURIComponent(String(batch.id))}/history`}
+              className={cn(buttonVariants({ variant: 'outline' }), 'rounded-2xl w-full')}
+              data-testid="btn-history"
+            >
             <History className="mr-2 h-4 w-4" />
             History
           </Link>
