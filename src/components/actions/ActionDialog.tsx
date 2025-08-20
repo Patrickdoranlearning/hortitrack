@@ -25,6 +25,7 @@ type AnyAction = z.infer<typeof ActionInputSchema>;
 export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }: Props) {
   const { toast } = useToast();
   const [tab, setTab] = React.useState<"MOVE"|"SPLIT"|"FLAGS"|"NOTE">("MOVE");
+  const [files, setFiles] = React.useState<File[]>([]);
 
   const baseDefaults: Partial<AnyAction> = {
     batchIds: defaultBatchIds,
@@ -42,7 +43,26 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
   }, [defaultBatchIds, form]); // Keep selection synced
 
   async function submit() {
-    const values = form.getValues();
+    // Ensure 'type' is set (prevents silent zod failure)
+    form.setValue("type" as any, tab as any, { shouldValidate: true, shouldDirty: true });
+    const isValid = await form.trigger();
+    if (!isValid) {
+      toast({variant: 'destructive', title: "Please complete required fields"});
+      return;
+    }
+    let photos: AnyAction extends { photos: infer P } ? any : any;
+    if (files.length) {
+      try {
+        const { uploadActionPhotos } = await import("@/lib/firebase");
+        // Use first selected batch for path scoping
+        const scopeBatch = (form.getValues() as any).batchIds?.[0] ?? "misc";
+        photos = await uploadActionPhotos(scopeBatch, files);
+      } catch (e: any) {
+        toast({variant: 'destructive', title: "Photo upload failed: " + (e?.message ?? "error")});
+        return;
+      }
+    }
+    const values = { ...form.getValues(), photos };
     try {
       const res = await fetch("/api/actions", {
         method: "POST",
@@ -51,13 +71,14 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({variant: "destructive", title: data?.error ?? "Action failed"});
+        toast({variant: 'destructive', title: data?.error ?? "Action failed"});
         return;
       }
       toast({title: "Action applied"});
+      setFiles([]);
       onOpenChange(false);
     } catch (e: any) {
-      toast({variant: "destructive", title: e?.message ?? "Network error"});
+      toast({variant: 'destructive', title: e?.message ?? "Network error"});
     }
   }
 
@@ -151,6 +172,20 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
             <Input placeholder="Title" onChange={(e) => form.setValue("title" as any, e.target.value, { shouldValidate: true })} />
             <Textarea placeholder="Details (optional)" onChange={(e) => form.setValue("body" as any, e.target.value)} />
           </TabsContent>
+
+          {/* PHOTOS (common) */}
+          <div className="mt-4 space-y-2">
+            <label className="text-sm font-medium">Photos (optional)</label>
+            <Input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+            />
+            {files.length > 0 && (
+              <p className="text-xs text-muted-foreground">{files.length} file(s) selected</p>
+            )}
+          </div>
         </Tabs>
 
         <DialogFooter>
