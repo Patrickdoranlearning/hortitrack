@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -53,10 +52,20 @@ export function BatchActionBar({
   const [actionOpen, setActionOpen] = React.useState(false);
   const [locations, setLocations] = React.useState<{id: string; name: string}[]>([]);
   React.useEffect(() => {
-    fetch("/api/locations")
-      .then(r => r.json())
-      .then(data => setLocations(data?.items ?? []))
-      .catch(() => setLocations([]));
+    let canceled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/locations", { headers: { "Accept": "application/json" } });
+        const json = await res.json();
+        // Defensive mapping to ensure `items` array is used
+        const items = Array.isArray(json?.items) ? json.items : (Array.isArray(json) ? json : []);
+        if (!canceled) setLocations(items);
+      } catch (e) {
+        console.error("Failed to load locations", e);
+        if (!canceled) setLocations([]);
+      }
+    })();
+    return () => { canceled = true; };
   }, []);
 
   return (

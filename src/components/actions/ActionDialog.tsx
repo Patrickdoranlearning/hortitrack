@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -11,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { uploadActionPhotos } from "@/lib/firebase";
 import PhotoPicker from "@/components/actions/PhotoPicker";
 import { cn } from "@/lib/utils";
+import { toMessage } from "@/lib/errors";
 
 type Props = {
   open: boolean;
@@ -26,94 +26,146 @@ type Props = {
 
 type AnyAction = z.infer<typeof ActionInputSchema>;
 
-function toMessage(err: unknown): string {
-  if (!err) return "Unknown error";
-  if (typeof err === "string") return err;
-  if (err instanceof Error) return err.message;
-  try { return JSON.stringify(err); } catch { return String(err); }
-}
 
-
-export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }: Props) {
+export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: propLocations = [] }: Props) {
   const { toast } = useToast();
   const [tab, setTab] = React.useState<"DUMPED"|"MOVE"|"SPLIT"|"FLAGS"|"NOTE">("MOVE");
   const [files, setFiles] = React.useState<File[]>([]);
 
-  const baseDefaults: Partial<AnyAction> = {
-    batchIds: defaultBatchIds,
-    actionId: uuid(),
-  };
+  // Use React.useMemo to ensure baseDefaults is stable across renders
+  const baseDefaults = React.useMemo(() => ({
+    // Ensure batchIds is always an array of strings
+    batchIds: Array.isArray(defaultBatchIds) ? defaultBatchIds : [],
+    actionId: uuid(), // Generate a new UUID each time for actionId
+  }), [defaultBatchIds]);
+
+  console.log("ActionDialog rendered. defaultBatchIds:", defaultBatchIds, "locations:", propLocations);
+  console.log("Initial baseDefaults:", baseDefaults);
+
+  const [localLocations, setLocalLocations] = React.useState(propLocations);
+  const [locLoading, setLocLoading] = React.useState(false);
+
+  // one-shot fallback fetch if the prop is empty
+  React.useEffect(() => {
+    if (propLocations?.length) { setLocalLocations(propLocations); return; }
+    let canceled = false;
+    (async () => {
+      try {
+        setLocLoading(true);
+        const res = await fetch("/api/locations", { headers: { Accept: "application/json" } });
+        const json = await res.json();
+        const items = Array.isArray(json?.items) ? json.items
+                    : Array.isArray(json)        ? json
+                    : [];
+        if (!canceled) setLocalLocations(items);
+      } catch (e) {
+        console.error("[ActionDialog] load locations failed:", e);
+      } finally {
+        if (!canceled) setLocLoading(false);
+      }
+    })();
+    return () => { canceled = true; };
+  }, [propLocations]);
 
   const form = useForm<AnyAction>({
     resolver: zodResolver(ActionInputSchema),
+    // Use the memoized baseDefaults here
     defaultValues: { type: "MOVE", ...baseDefaults } as any,
     mode: "onChange",
-    shouldUnregister: true, // critical for discriminated union
+    shouldUnregister: true,
   });
 
-  React.useEffect(() => {
-    form.reset({ ...form.getValues(), batchIds: defaultBatchIds });
-  }, [defaultBatchIds, form]);
-
   const onSubmit = form.handleSubmit(async (values) => {
+    console.log("*** onSubmit triggered (from handleSubmit wrapper)");
+    console.log("*** Validated form values received by onSubmit:", values);
+    console.log("*** Current form errors after validation:", form.formState.errors);
+    console.log("*** Is form valid? ", form.formState.isValid);
+
+    // If form is not valid after handleSubmit, something is wrong with validation or schema
+    if (!form.formState.isValid) {
+      console.error("Form is not valid, preventing submission. Errors:", form.formState.errors);
+      toast({ variant: "destructive", title: "Validation Error", description: "Please correct the form errors." });
+      return; // Stop here if validation failed
+    }
+
     let photos: any[] | undefined = undefined;
     if (files.length) {
+      console.log("Entering photo upload block. Files to upload:", files.length);
       try {
+        // Validate values before proceeding with photo upload
         const validated = ActionInputSchema.parse({ ...values, photos: undefined });
         const scopeBatchId = validated.batchIds?.[0] ?? "misc";
         photos = await uploadActionPhotos(scopeBatchId, files);
       } catch (e: any) {
+        console.error("Photo upload error:", e);
         toast({variant: 'destructive', title: "Photo upload failed", description: toMessage(e)});
         return;
       }
+    } else {
+      console.log("No photos to upload. Skipping photo upload block.");
     }
     try {
+      const payloadToSend = { ...values, photos };
+      console.log("Sending payload to /api/actions:", payloadToSend);
       const res = await fetch("/api/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...values, photos }),
+        body: JSON.stringify(payloadToSend),
       });
+      console.log("Fetch response received, status:", res.status, "ok:", res.ok);
       
-      const txt = await res.text();
-      let body: any = {};
-      try { body = JSON.parse(txt); } catch { /* keep body as {} for non-JSON errors */ }
+      const raw = await res.text();
+      let body: any = null;
+      try { body = JSON.parse(raw); } catch { console.warn("Failed to parse JSON response:", raw); /* keep raw for diagnostics */ }
+      console.log("Parsed response body:", body);
 
-      if (!res.ok || body?.ok === false) {
-        const msg = body?.error ?? `Failed to apply action (${res.status}) ${txt?.slice(0,180)}`;
-        // Map Zod issues to RHF field errors when available
-        if (Array.isArray(body?.issues)) {
+      const ok = res.ok && body && body.ok !== false;
+
+      if (!ok) {
+        const statusMsg = `HTTP ${res.status}`;
+        const serverMsg = (body && (body.error || body.message)) || raw?.slice(0, 200) || "Unknown failure";
+        const msg = `${statusMsg}: ${serverMsg}`;
+        console.error(`Action failed (server response not ok):\n${msg}`);
+
+        // Map zod issues to fields if provided
+        if (body?.issues && Array.isArray(body.issues)) {
           for (const issue of body.issues) {
             const path = (issue?.path?.[0] as string) || "_form";
             const message = (issue?.message as string) || "Invalid value";
-            // @ts-expect-error dynamic path
+            // @ts-expect-error dynamic field
             form.setError(path, { type: "server", message });
           }
         }
-        toast({variant: 'destructive', title: "Action failed", description: msg });
+
+        toast({ variant: "destructive", title: "Action failed", description: msg });
         return;
       }
 
-      toast({title: "Action applied"});
+      toast({ title: "Action applied" });
       setFiles([]);
       onOpenChange(false);
-    } catch (e: any) {
-      toast({variant: 'destructive', title: "Network Error", description: toMessage(e) });
+    } catch (e) {
+      console.error("Network or unexpected error during fetch:", e);
+      toast({ variant: "destructive", title: "Network error", description: toMessage(e) });
     }
   });
 
 
-  const locOptions = locations;
+  // Use localLocations for rendering dropdown options
+  const locOptions = localLocations;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl rounded-2xl">
         <DialogHeader>
           <DialogTitle>Batch Actions</DialogTitle>
+          <DialogDescription id="batch-actions-desc">Apply an action to the selected batch.</DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => {
           setTab(v as any);
-          form.reset({ type: v as any, ...baseDefaults, batchIds: defaultBatchIds } as any);
+          // Explicitly reset on tab change with correct defaults
+          form.reset({ type: v as any, ...baseDefaults, batchIds: defaultBatchIds });
         }}>
           <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
@@ -126,11 +178,11 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
           {/* IMPORTANT: wrap content in a real <form> */}
           <form
             className="space-y-3 pt-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.setValue("type" as any, tab as any, { shouldValidate: true });
-              onSubmit();
-            }}
+            // Use form.handleSubmit directly on the form element
+            // This is the standard react-hook-form way and handles validation internally.
+            // Removing the manual preventDefault and onSubmit() call, as handleSubmit handles this.
+            onSubmit={form.handleSubmit(onSubmit)}
+            aria-describedby="batch-actions-desc" // Link form to description for a11y
           >
           
           {"_form" in form.formState.errors ? (
@@ -166,10 +218,17 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
                 className="w-full border rounded-md p-2"
                 defaultValue=""
                 {...form.register("toLocationId" as any)}
+                // Added onBlur to potentially trigger validation more explicitly
+                onBlur={() => form.trigger("toLocationId")}
               >
                 <option value="" disabled>Select location…</option>
-                {locOptions.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                {locOptions.map(l => <option key={l.id} value={l.id}>{l.name ?? l.id}</option>)}
               </select>
+              {form.formState.errors.toLocationId && (
+                <p className="text-sm font-medium text-destructive mt-1">
+                  {form.formState.errors.toLocationId.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-sm">Quantity (optional)</label>
@@ -193,10 +252,16 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
                 className="w-full border rounded-md p-2"
                 defaultValue=""
                 {...form.register("toLocationId" as any)}
+                onBlur={() => form.trigger("toLocationId")}
               >
                 <option value="" disabled>Select location…</option>
-                {locOptions.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                {locOptions.map(l => <option key={l.id} value={l.id}>{l.name ?? l.id}</option>)}
               </select>
+              {form.formState.errors.toLocationId && (
+                <p className="text-sm font-medium text-destructive mt-1">
+                  {form.formState.errors.toLocationId.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-sm">Split Quantity</label>
@@ -237,7 +302,12 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
           </div>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>Cancel</Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>Apply</Button>
+            <Button
+              type="submit"
+              disabled={locLoading || (localLocations.length === 0) || form.formState.isSubmitting}
+            >
+              {locLoading ? "Loading…" : "Apply"}
+            </Button>
           </DialogFooter>
           </form>
         </Tabs>

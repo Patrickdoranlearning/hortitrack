@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { applyBatchAction } from "@/server/actions/applyBatchAction";
 import { ActionInputSchema } from "@/lib/actions/schema";
 import { isAllowedOrigin } from "@/lib/security/origin";
+import { toMessage } from "@/lib/errors";
 
 type ApiErrorIssue = { path: (string | number)[]; message: string };
 
@@ -38,13 +39,15 @@ export async function POST(req: NextRequest) {
     }
     const result = await applyBatchAction(parsed.data);
     if (!result.ok) {
-      console.error("[api/actions] 422", result.error, { type: parsed.data.type, actionId: parsed.data.actionId });
-      return NextResponse.json({ ok: false, error: result.error, issues: [] }, { status: 422 });
+      const msg = toMessage(result.error);
+      console.error("[api/actions] 422", msg, { type: parsed.data.type, actionId: parsed.data.actionId });
+      return NextResponse.json({ ok: false, error: msg, issues: result.issues ?? [] }, { status: 422 });
     }
     return NextResponse.json({ ok: true, data: result.data }, { status: 200 });
   } catch (e: any) {
-    console.error("[api/actions] 500", { message: e?.message, stack: e?.stack });
+    const msg = toMessage(e);
+    console.error("[api/actions] 500", { message: msg, stack: e?.stack });
     // Force JSON even on unexpected errors
-    return NextResponse.json({ ok: false, error: "Internal error", issues: [] }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg || "Internal error", issues: [] }, { status: 500 });
   }
 }

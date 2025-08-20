@@ -1,6 +1,6 @@
-
 import { db, FieldValue } from "@/lib/firebase-admin";
 import { ActionInputSchema, type ActionInput } from "@/lib/actions/schema";
+import { toMessage } from "@/lib/errors";
 
 type Result<T = unknown> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -152,6 +152,6 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
     }
   } catch (e: any) {
     await db.collection("actionDedup").doc(action.actionId).delete().catch(() => {});
-    return { ok: false, error: e?.message ?? "Unknown error" };
+    return { ok: false, error: toMessage(e) };
   }
 }
