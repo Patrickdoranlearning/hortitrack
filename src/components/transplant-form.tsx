@@ -36,9 +36,9 @@ import { Checkbox } from './ui/checkbox';
 import { SIZE_TYPE_TO_STATUS_MAP } from '@/lib/constants';
 import { useMemo, useState } from 'react';
 import { ScrollArea } from './ui/scroll-area';
-import { transplantBatchAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { SubmitButton } from './ui/SubmitButton';
+import { postJson } from "@/lib/net";
 
 const transplantFormSchema = (maxQuantity: number) =>
   z.object({
@@ -69,7 +69,7 @@ interface TransplantFormProps {
 
 export function TransplantForm({
   batch,
-  onSubmit,
+  onSubmit: onDone,
   onCancel,
   nurseryLocations,
   plantSizes,
@@ -152,34 +152,38 @@ export function TransplantForm({
     }
   };
 
-  const handleFormSubmit = async (values: TransplantFormData) => {
+  const onSubmit = async (values: TransplantFormData) => {
+    // Sanity guard: prevent accidental server-action submits
+    if (typeof window !== 'undefined' && (window as any).FormData && headers?.get?.("next-action")) {
+        console.warn("Server Action header detected in client submit — aborting.");
+        toast({ variant: "destructive", title: "Error", description: "Server Action header detected in client submit — aborting." });
+        return;
+    }
+
     if (!batch) return;
 
     const qty = values.quantity ?? batch.quantity;
 
-    const { logRemainingAsLoss, ...newBatchData } = values;
-
-    const result = await transplantBatchAction(
-        batch.id!,
-        {
-          ...newBatchData,
-          quantity: qty,
-          category: batch.category,
-          plantFamily: batch.plantFamily,
-          plantVariety: batch.plantVariety,
-          supplier: "Doran Nurseries",
-          plantingDate: newBatchData.plantingDate.toISOString(),
+    const payload = {
+        type: "TRANSPLANT",
+        sourceBatchNumber: batch.batchNumber,
+        quantity: qty,
+        target: {
+            locationId: typeof values.location === 'string' ? values.location : null,
+            size: typeof values.size === 'string' ? values.size : null,
+            notes: values.logRemainingAsLoss ? "Remaining logged as loss" : null, // Assuming notes can be derived from logRemainingAsLoss
         },
-        qty,
-        logRemainingAsLoss
-    );
+    };
 
-    if (result.success) {
-        toast({ title: "Transplant Successful", description: `New batch created from batch #${batch.batchNumber}`});
-        onSubmit(result);
-    } else {
-        toast({ variant: 'destructive', title: "Transplant Failed", description: result.error });
+    console.log("[Transplant] submitting", payload);
+    const res = await postJson("/api/actions", payload);
+    if (!res.ok) {
+      console.error("[Transplant] failed", res);
+      toast({ variant: 'destructive', title: "Transplant failed", description: res.error ?? "Transplant failed" });
+      return;
     }
+    toast({ title: "Transplant created", description: "New batch created" });
+    onDone?.();
   };
 
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
@@ -200,7 +204,7 @@ export function TransplantForm({
       </DialogHeader>
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit(handleFormSubmit)}
+          onSubmit={form.handleSubmit(onSubmit)}
           className="space-y-0"
           noValidate
         >

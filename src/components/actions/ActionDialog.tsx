@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -74,6 +73,13 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
   });
 
   const onSubmit = async (values: Record<string, any>) => {
+    // Sanity guard: prevent accidental server-action submits
+    if (typeof window !== 'undefined' && (window as any).FormData && headers?.get?.("next-action")) {
+        console.warn("Server Action header detected in client submit — aborting.");
+        toast({ variant: "destructive", title: "Error", description: "Server Action header detected in client submit — aborting." });
+        return;
+    }
+
     console.info('[ActionDialog] submit', values);
     const batchIds = Array.isArray(values.batchIds) && values.batchIds.length ? values.batchIds : defaultBatchIds;
     
