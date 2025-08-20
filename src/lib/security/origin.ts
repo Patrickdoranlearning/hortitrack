@@ -9,6 +9,11 @@ function wildcardMatch(input: string, pattern: string) {
 }
 
 export function isAllowedOrigin(req: NextRequest) {
+  // Server Actions use a private wire protocol and special header.
+  // If we block or rewrite them, Next.js client throws "Unexpected response".
+  const isServerAction = req.headers.get("next-action") === "1";
+  if (isServerAction) return true;
+
   const origin = (req.headers.get("origin") || "").toLowerCase();
   const host = (req.headers.get("host") || "").toLowerCase();
   const proto = req.nextUrl.protocol || "https:"; // dev often https on workstations

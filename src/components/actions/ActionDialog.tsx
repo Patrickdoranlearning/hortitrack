@@ -79,7 +79,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
       try { body = JSON.parse(txt); } catch { /* keep body as {} for non-JSON errors */ }
 
       if (!res.ok || body?.ok === false) {
-        const msg = body?.error ?? `Failed to apply action (${res.status})`;
+        const msg = body?.error ?? `Failed to apply action (${res.status}) ${txt?.slice(0,180)}`;
         // Map Zod issues to RHF field errors when available
         if (Array.isArray(body?.issues)) {
           for (const issue of body.issues) {
