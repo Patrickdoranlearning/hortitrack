@@ -65,9 +65,12 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...validated, photos }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({variant: 'destructive', title: `Action failed (${res.status})`, description: data?.error });
+      const text = await res.text();
+      let body: any = {};
+      try { body = JSON.parse(text); } catch {}
+
+      if (!res.ok || body?.ok === false) {
+        toast({variant: 'destructive', title: `Action failed (${res.status})`, description: body?.error });
         return;
       }
       toast({title: "Action applied"});

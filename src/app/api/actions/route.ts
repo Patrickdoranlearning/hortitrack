@@ -5,9 +5,19 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { applyBatchAction } from "@/server/actions/applyBatchAction";
 import { ActionInputSchema } from "@/lib/actions/schema";
+import { isAllowedOrigin } from "@/lib/security/origin";
 
 export async function POST(req: NextRequest) {
   try {
+    if (!isAllowedOrigin(req)) {
+      console.error("[api/actions] Bad Origin", {
+        origin: req.headers.get("origin"),
+        host: req.headers.get("host"),
+        url: req.nextUrl.href,
+      });
+      return NextResponse.json({ ok: false, error: "Bad Origin" }, { status: 403 });
+    }
+
     const payload = await req.json();
     const parsed = ActionInputSchema.safeParse(payload);
     if (!parsed.success) {
