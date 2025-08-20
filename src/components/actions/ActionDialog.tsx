@@ -25,6 +25,14 @@ type Props = {
 
 type AnyAction = z.infer<typeof ActionInputSchema>;
 
+function toMessage(err: unknown): string {
+  if (!err) return "Unknown error";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message || err.toString();
+  try { return JSON.stringify(err); } catch { return String(err); }
+}
+
+
 export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }: Props) {
   const { toast } = useToast();
   const [tab, setTab] = React.useState<"DUMPED"|"MOVE"|"SPLIT"|"FLAGS"|"NOTE">("MOVE");
@@ -65,19 +73,31 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...validated, photos }),
       });
-      const text = await res.text();
+      
+      const txt = await res.text();
       let body: any = {};
-      try { body = JSON.parse(text); } catch {}
+      try { body = JSON.parse(txt); } catch {}
 
       if (!res.ok || body?.ok === false) {
-        toast({variant: 'destructive', title: `Action failed (${res.status})`, description: body?.error });
+        const msg = body?.error ?? `Failed to apply action (${res.status})`;
+        // Map Zod issues to RHF field errors when available
+        if (Array.isArray(body?.issues)) {
+          for (const issue of body.issues) {
+            const path = (issue?.path?.[0] as string) || "_form";
+            const message = (issue?.message as string) || "Invalid value";
+            // @ts-expect-error dynamic path from server; RHF accepts string
+            form.setError(path, { type: "server", message });
+          }
+        }
+        toast({variant: 'destructive', title: "Action failed", description: msg });
         return;
       }
+
       toast({title: "Action applied"});
       setFiles([]);
       onOpenChange(false);
     } catch (e: any) {
-      toast({variant: 'destructive', title: "Network Error", description: e.message });
+      toast({variant: 'destructive', title: "Network Error", description: toMessage(e) });
     }
   });
 
@@ -112,6 +132,12 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
               onSubmit();
             }}
           >
+          
+          {"_form" in form.formState.errors ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {(form.formState.errors._form as any)?.message as string}
+            </div>
+          ) : null}
 
           {/* DUMPED */}
           <TabsContent value="DUMPED" className="space-y-3">
