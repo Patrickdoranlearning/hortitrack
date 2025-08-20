@@ -1,3 +1,4 @@
+
 export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { adminDb } from "@/server/db/admin";
@@ -5,8 +6,10 @@ import { z } from "zod";
 import { BatchSchema } from "@/lib/types";
 import { declassify } from "@/server/utils/declassify";
 import { toMessage } from "@/lib/errors";
+import { generateNextBatchId, type BatchPhase } from "@/server/batches/nextId";
 
 const CreateBatch = BatchSchema.pick({
+  // batchNumber is optional in input; we’ll assign if missing
   batchNumber: true,
   category: true,
   plantFamily: true,
@@ -35,8 +38,16 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const data = CreateBatch.parse(body);
-    const ref = await adminDb.collection("batches").add({
+    // Try parse, but allow missing batchNumber on input
+    const maybe = CreateBatch.partial({ batchNumber: true }).parse(body);
+    const batchNumber =
+      typeof maybe.batchNumber === "string" && maybe.batchNumber.length > 0
+        ? maybe.batchNumber
+        : (await generateNextBatchId((body?.phase as BatchPhase) ?? "POTTING")).id;
+    const data = CreateBatch.parse({ ...maybe, batchNumber });
+
+    const ref = adminDb.collection("batches").doc();
+    await ref.set({
       ...data,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -139,22 +139,47 @@ export async function addBatchAction(
 
 export async function updateBatchAction(batchToUpdate: Batch) {
   try {
-    const updatedBatchData = { ...batchToUpdate };
+    const incoming = { ...batchToUpdate };
+    if (!incoming.id) throw new Error("Missing batch id");
 
-    if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
-      updatedBatchData.logHistory.push({ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'ARCHIVE', note: `Batch quantity reached zero and was automatically archived.` });
-      updatedBatchData.status = 'Archived';
+    const ref = db.collection('batches').doc(incoming.id);
+    const snap = await ref.get();
+    if (!snap.exists) return { success: false, error: 'Batch not found.' };
+
+    const stored = declassify({ ...snap.data(), id: snap.id }) as Batch;
+
+    // Enforce invariants on the server (do NOT trust client)
+    const nextQty = incoming.quantity ?? stored.quantity;
+    const initialQty = stored.initialQuantity; // immutable baseline
+    if (nextQty > initialQty) {
+      return { success: false, error: 'Quantity cannot exceed initial quantity.' };
     }
-    
-    if (updatedBatchData.status === 'Archived') {
-        updatedBatchData.quantity = 0;
-    }
 
+    // Auto-archive when quantity hits zero; force zero while archived
+    const nextStatus = incoming.status ?? stored.status;
+    const shouldArchive = nextQty <= 0 || nextStatus === 'Archived';
 
-    const batchesCollection = db.collection('batches');
-    const batchDoc = batchesCollection.doc(updatedBatchData.id!);
-    await batchDoc.set(updatedBatchData, { merge: true });
-    return { success: true, data: declassify(updatedBatchData) };
+    const updated: Batch = {
+      ...stored,
+      ...incoming,
+      quantity: shouldArchive ? 0 : nextQty,
+      status: shouldArchive ? 'Archived' : nextStatus,
+      updatedAt: new Date().toISOString(),
+      logHistory: [
+        ...(stored.logHistory || []),
+        ...((shouldArchive && stored.status !== 'Archived')
+          ? [{
+              id: `log_${Date.now()}`,
+              date: new Date().toISOString(),
+              type: 'ARCHIVE',
+              note: 'Batch quantity reached zero and was automatically archived.'
+            }]
+          : []),
+      ],
+    };
+
+    await ref.set(updated, { merge: true });
+    return { success: true, data: declassify(updated) };
   } catch (error: any) {
     console.error('Error updating batch:', error);
     return { success: false, error: 'Failed to update batch: ' + error.message };

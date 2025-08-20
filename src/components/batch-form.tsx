@@ -204,6 +204,15 @@ export function BatchForm({
       return;
     }
 
+    // Client-side relational guard: do not allow increases beyond initial
+    if (isEdit) {
+      const currentInitial = batch?.initialQuantity ?? values.quantity;
+      if (values.quantity > currentInitial) {
+        form.setError("quantity", { type: "manual", message: "Quantity cannot exceed initial quantity" });
+        return;
+      }
+    }
+
     const stage = values?.status;
     if (!stage) {
       alert("Batch status is required to determine the production stage.");
