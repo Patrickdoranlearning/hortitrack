@@ -30,6 +30,7 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
+import { calculateLosses, type LossEvent } from '@/lib/metrics/losses';
 
 const FamilyDistributionChart = dynamic(
   () => import('@/components/charts/FamilyDistributionChart'),
@@ -89,19 +90,7 @@ export default function DashboardOverviewPage() {
     () => ['all', ...Array.from(new Set(batches.map((b) => b.location)))],
     [batches]
   );
-
-  const calculateLosses = (batch: Batch) => {
-    return batch.logHistory.reduce((sum, log) => {
-      if (log.type === 'LOSS' && typeof log.qty === 'number') {
-        return sum + log.qty;
-      }
-      if (log.type === 'ADJUST' && typeof log.qty === 'number' && log.qty < 0) {
-        return sum - log.qty; // qty is negative, so subtract to make it a positive loss
-      }
-      return sum;
-    }, 0);
-  };
-
+  
   const filteredBatches = useMemo(() => {
     return batches
       .filter((batch) =>
@@ -170,21 +159,21 @@ export default function DashboardOverviewPage() {
   }, [filteredBatches]);
 
   const lossData = useMemo(() => {
-    const lossByFamily = filteredBatches.reduce(
-      (acc, batch) => {
-        const loss = calculateLosses(batch);
-        if (loss > 0) {
-          acc[batch.plantFamily] = (acc[batch.plantFamily] || 0) + loss;
-        }
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-    return Object.entries(lossByFamily).map(([name, value]) => ({
-      name,
-      value,
-    }));
+    const lossEvents: LossEvent[] = filteredBatches.flatMap(batch => {
+        return (batch.logHistory ?? []).map(log => {
+            if ((log.type === 'LOSS' && typeof log.qty === 'number') || (log.type === 'ADJUST' && typeof log.qty === 'number' && log.qty < 0)) {
+                return {
+                    family: batch.plantFamily,
+                    quantity: Math.abs(log.qty!),
+                    date: new Date(log.date)
+                };
+            }
+            return null;
+        }).filter((e): e is LossEvent => e !== null);
+    });
+    return calculateLosses(lossEvents);
   }, [filteredBatches]);
+
 
   if (isLoading) {
     return (
@@ -394,7 +383,7 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent className="min-w-0 pl-2">
             <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <LossesChart data={lossData} />
+              <LossesChart data={lossData.lossByFamily.map(d => ({name: d.label, value: d.value}))} />
             </div>
           </CardContent>
         </Card>
