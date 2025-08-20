@@ -1,44 +1,43 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { isAllowedOrigin } from "@/lib/security/origin";
 
 export function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  // Core security headers
-  res.headers.set("X-Frame-Options", "DENY");
-  res.headers.set("X-Content-Type-Options", "nosniff");
-  res.headers.set("Referrer-Policy", "no-referrer");
-  // Allow camera on this origin; keep mic/geo disabled by default
-  // You can append additional origins via NEXT_CAMERA_ALLOWED_ORIGINS (space-separated), but it's optional.
-  const extra = (process.env.NEXT_CAMERA_ALLOWED_ORIGINS ?? "").trim(); // e.g. "https://your-preview.vercel.app"
-  const allowList = ["self", ...extra.split(/\s+/).filter(Boolean)]
-    .map(v => (v === "self" ? "self" : `"${v}"`))
-    .join(" ");
-  res.headers.set("Permissions-Policy", `camera=(${allowList}), microphone=(), geolocation=()`);
+  const url = new URL(req.url);
+  const { pathname } = url;
 
-  // CSP (opt-in via env to avoid breaking dev)
-  if (process.env.NEXT_ENABLE_CSP === "1") {
-    const csp = [
-      "default-src 'self'",
-      "img-src 'self' https: data:",
-      "font-src 'self' https: data:",
-      "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-      "connect-src 'self' https:",
-    ].join("; ");
-    res.headers.set("Content-Security-Policy", csp);
+  // Always allow Next internal & static assets
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/favicon.ico") ||
+    /\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map)$/.test(pathname)
+  ) {
+    return NextResponse.next();
   }
-  
-  // Basic CSRF/Origin check for state-changing requests
-  if (["POST","PATCH","PUT","DELETE"].includes(req.method)) {
-    const origin = req.headers.get("origin") ?? "";
-    const host = req.headers.get("host") ?? "";
-    const allowed = [ `https://${host}`, `http://${host}` ];
-    const extra = (process.env.NEXT_ALLOWED_ORIGINS ?? "").split(",").filter(Boolean);
-    if (origin && ![...allowed, ...extra].some(a => origin.startsWith(a))) {
-      return NextResponse.json({ error: "Bad Origin" }, { status: 403 });
-    }
+
+  // Allow CORS preflight
+  if (req.method === "OPTIONS") return NextResponse.next();
+
+  // Next.js Server Actions (private wire)
+  // Next adds "Next-Action: 1" for these requests.
+  const nextAction = (req.headers.get("next-action") || "").trim();
+  if (nextAction === "1") return NextResponse.next();
+
+  // If the browser says same-origin or same-site, allow.
+  const sfs = (req.headers.get("sec-fetch-site") || "").toLowerCase();
+  if (sfs === "same-origin" || sfs === "same-site") return NextResponse.next();
+
+  // Fallback to configured origin policy
+  if (!isAllowedOrigin(req)) {
+    return NextResponse.json({ ok: false, error: "Bad Origin (middleware)" }, { status: 403 });
   }
-  return res;
+
+  return NextResponse.next();
 }
 
-export const config = { matcher: ["/((?!api/|_next/static|_next/image|favicon.ico).*)"] };
+// Only run on real app routes (skip _next and static)
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map)$).*)",
+  ],
+};

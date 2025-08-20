@@ -89,7 +89,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
         // This is a stand-in for a real upload function.
         // In a real app, this would call your Firebase Storage upload utility.
         uploadedPhotos = await Promise.all(files.map(async (file) => {
-            const uploadedFile = await uploadActionPhotos([file], firstBatch);
+            const uploadedFile = await uploadActionPhotos(firstBatch, [file]);
             return uploadedFile[0];
         }));
       } catch (e) {
@@ -121,7 +121,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl rounded-2xl">
+      <DialogContent className="max-w-xl rounded-2xl" aria-describedby="batch-actions-desc">
         <DialogHeader>
           <DialogTitle>Batch Actions</DialogTitle>
           <DialogDescription id="batch-actions-desc">Apply an action to the selected batch.</DialogDescription>
@@ -143,6 +143,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
             className="space-y-3 pt-3"
             onSubmit={form.handleSubmit(onSubmit)}
             aria-describedby="batch-actions-desc"
+            noValidate
           >
           
           {"_form" in form.formState.errors ? (
