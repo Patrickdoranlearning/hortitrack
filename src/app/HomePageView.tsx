@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -45,7 +46,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
-import { ActionLogForm } from '../components/action-log-form';
+import { ActionDialog } from '../components/actions/ActionDialog';
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { BatchForm } from '../components/batch-form';
@@ -534,28 +535,12 @@ export default function HomePageView({
         onCareRecommendations={handleRecommendations}
       />
 
-      <Dialog open={isLogActionOpen} onOpenChange={setIsLogActionOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-headline text-2xl">
-              Log Action for Batch #{selectedBatch?.batchNumber}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedBatch && (
-            <ActionLogForm
-              batch={selectedBatch}
-              nurseryLocations={nurseryLocations || []}
-              plantSizes={plantSizes || []}
-              onSubmitted={() => {
-                setIsLogActionOpen(false);
-                setSelectedBatch(null);
-                toast({ title: 'Actions Logged', description: 'The batch has been updated.' });
-              }}
-              onCancel={() => setIsLogActionOpen(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <ActionDialog
+        open={isLogActionOpen}
+        onOpenChange={setIsLogActionOpen}
+        defaultBatchIds={selectedBatch ? [selectedBatch.id!] : []}
+        locations={(nurseryLocations || []).map(l => ({ id: l.id!, name: l.name }))}
+      />
 
       <Dialog open={isTransplantOpen} onOpenChange={setIsTransplantOpen}>
         <DialogContent className="max-w-4xl">

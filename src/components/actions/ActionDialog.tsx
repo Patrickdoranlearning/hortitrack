@@ -70,14 +70,21 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
 
   const onSubmit = async (values: Record<string, any>) => {
     const batchIds = Array.isArray(values.batchIds) && values.batchIds.length ? values.batchIds : defaultBatchIds;
+    
+    let quantity: number | undefined = undefined;
+    if (values.quantity !== undefined && `${values.quantity}`.trim() !== "") {
+      const n = Number(values.quantity); if (Number.isFinite(n)) quantity = n;
+    }
+
+    if (tab === "DUMPED" && (quantity === undefined || quantity <= 0)) {
+      toast({ variant: "destructive", title: "Missing quantity", description: "Enter how many plants to dump." });
+      return;
+    }
+
     const needsLocation = tab === "MOVE" || tab === "SPLIT";
     if (needsLocation && !values.toLocationId) {
       toast({ variant: "destructive", title: "Missing location", description: "Select a destination location." });
       return;
-    }
-    let quantity: number | undefined = undefined;
-    if (values.quantity !== undefined && `${values.quantity}`.trim() !== "") {
-      const n = Number(values.quantity); if (Number.isFinite(n)) quantity = n;
     }
 
     let photos: Array<{ url: string; path: string; mime: string; size: number }> = [];
