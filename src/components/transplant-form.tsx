@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm } from 'react-hook-form';
@@ -51,13 +50,13 @@ const transplantFormSchema = (maxQuantity: number) =>
         `Quantity cannot exceed remaining stock of ${maxQuantity}.`
       ),
     status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
-    location: z.string().min(1, 'Location is required.'),
-    size: z.string().min(1, 'Size is required.'),
+    location: z.string().min(1, 'Location is required.').or(z.object({})), // Allow empty object temporarily for debugging
+    size: z.string().min(1, 'Size is required.').or(z.object({})), // Allow empty object temporarily for debugging
     logRemainingAsLoss: z.boolean(),
     trayQuantity: z.number().optional(),
   });
 
-export type TransplantFormData = z.infer<ReturnType<typeof transplantFormSchema>>;
+export type TransplantFormData = z.infer<typeof transplantFormSchema>;
 
 interface TransplantFormProps {
   batch: Batch | null;
@@ -77,7 +76,7 @@ export function TransplantForm({
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
   const { toast } = useToast();
   
-  const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
+  const form = useForm<z.infer<typeof transplantFormSchema>>({
     resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
       ? {
@@ -239,11 +238,13 @@ export function TransplantForm({
                 <FormField
                     control={form.control}
                     name="location"
-                    render={({ field }) => (
+                    render={({ field }) => {
+                      console.log('Location field value:', field.value);
+                      return (
                       <FormItem>
                         <FormLabel>New Location</FormLabel>
                         <Select
-                          value={field.value}
+                          value={typeof field.value === 'string' ? field.value : ''}
                           onValueChange={field.onChange}
                         >
                           <FormControl>
@@ -261,7 +262,7 @@ export function TransplantForm({
                         </Select>
                         <FormMessage />
                       </FormItem>
-                    )}
+                    )}}
                   />
                 <FormField
                   control={form.control}
@@ -308,7 +309,7 @@ export function TransplantForm({
                       <FormItem>
                         <FormLabel>New Size</FormLabel>
                         <Select
-                          value={field.value}
+                          value={typeof field.value === 'string' ? field.value : ''}
                           onValueChange={(value) => {
                             field.onChange(value);
                             handleSizeChange(value);

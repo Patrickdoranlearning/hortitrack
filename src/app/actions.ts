@@ -99,7 +99,7 @@ export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
         return { success: true, data: newVariety };
     } catch (error: any) {
         console.error('Error adding variety:', error);
-        return { success: false, error: 'Failed to add variety: ' + error.message };
+        return { success: false, error: `Failed to add variety: ${error.message || 'An unknown error occurred'}` };
     }
 }
 
@@ -430,7 +430,7 @@ export async function updateVarietyAction(varietyData: Variety) {
         await docRef.set(varietyData, { merge: true });
         return { success: true, data: varietyData };
     } catch (error: any) {
-        return { success: false, error: error.message };
+        return { success: false, error: `Failed to update variety: ${error.message || 'An unknown error occurred'}` };
     }
 }
 
@@ -460,7 +460,7 @@ export async function addBatchesFromCsvAction(batches: any[]) {
             const phase = stageMap[batchData.status] || 'POTTING';
             // Note: This runs the transaction for each row, which is inefficient but safe.
             // A more performant approach would pre-allocate numbers, but this is simpler.
-            const { id: batchNumber } = await generateNextBatchId(phase, new Date(batchData.plantingDate));
+            const { id: batchNumber } = await generateNextNextBatchId(phase, new Date(batchData.plantingDate));
 
             const newBatch: Omit<Batch, 'id'> = {
               ...batchData,

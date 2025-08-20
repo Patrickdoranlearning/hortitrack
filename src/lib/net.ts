@@ -1,4 +1,3 @@
-
 export async function postJson<T = any>(url: string, body: unknown) {
   const res = await fetch(url, {
     method: "POST",
@@ -8,7 +7,7 @@ export async function postJson<T = any>(url: string, body: unknown) {
   const text = await res.text();
   let data: any;
   try { data = JSON.parse(text); } catch {}
-  const ct = res.headers.get("content-type") || "";
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
   if (!res.ok) {
     const msg = data?.error || data?.message || (ct.includes("text/html") ? `HTTP ${res.status} (HTML)` : `HTTP ${res.status}`);
     return { ok: false as const, status: res.status, error: msg, data, text };
