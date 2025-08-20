@@ -44,7 +44,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
 
   React.useEffect(() => {
     form.reset({ ...form.getValues(), batchIds: defaultBatchIds });
-  }, [defaultBatchIds, form]); // Keep selection synced
+  }, [defaultBatchIds, form]);
 
   const onSubmit = form.handleSubmit(async (validated) => {
     // Set discriminant explicitly just in case
@@ -74,7 +74,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
       setFiles([]);
       onOpenChange(false);
     } catch (e: any) {
-      toast({variant: 'destructive', title: "Network Error", description: e?.message });
+      toast({variant: 'destructive', title: "Network Error", description: e.message });
     }
   });
 
@@ -96,7 +96,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
             <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
             <TabsTrigger value="MOVE">Move</TabsTrigger>
             <TabsTrigger value="SPLIT">Split</TabsTrigger>
-            <TabsTrigger value="FLAGS">Trim/Space</TabsTrigger>
+            <TabsTrigger value="FLAGS">Flags</TabsTrigger>
             <TabsTrigger value="NOTE">Note</TabsTrigger>
           </TabsList>
             

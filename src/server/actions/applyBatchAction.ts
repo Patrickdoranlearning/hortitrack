@@ -47,7 +47,7 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
               lastDumpedReason: reason,
             };
             if (remaining === 0) {
-              // patch.status = "DUMPED"; 
+              patch.status = "Archived"; 
             }
             tx.update(ref, patch);
           });
@@ -69,7 +69,7 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
 
             if (moveQty === batch.quantity) {
               tx.update(ref, {
-                location: toLocationId, // Assuming location stores name, not ID
+                location: toLocationId, 
                 locationId: toLocationId,
                 updatedAt: FieldValue.serverTimestamp(),
               });
@@ -82,7 +82,7 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
               tx.set(newRef, {
                 ...batch,
                 parentBatchId: batchId,
-                location: toLocationId, // Assuming location stores name
+                location: toLocationId,
                 locationId: toLocationId,
                 quantity: moveQty,
                 initialQuantity: moveQty,
@@ -114,7 +114,7 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
           tx.set(newRef, {
             ...batch,
             parentBatchId: batchId,
-            location: toLocationId, // Assuming location stores name
+            location: toLocationId,
             locationId: toLocationId,
             quantity: quantity,
             initialQuantity: quantity,

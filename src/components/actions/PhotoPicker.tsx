@@ -1,8 +1,6 @@
 
 "use client";
 import React, { useRef } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { uploadActionPhotos } from "@/lib/firebase";
 
 export type PhotoFile = { url: string; path: string; mime: string; size: number };
 type Props = {
@@ -14,7 +12,6 @@ type Props = {
 export default function PhotoPicker({ onChange, max = 10, className }: Props) {
   const [files, setFiles] = React.useState<File[]>([]);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
-  const { toast } = useToast();
 
   const handleFiles = (newFiles: FileList | null) => {
     if (!newFiles) return;

@@ -7,6 +7,8 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Camera, Images, Plus } from "lucide-react";
+import { uploadBatchPhoto } from "@/lib/storage";
+import { useToast } from "@/hooks/use-toast";
 
 type Props = {
   batchId: string;
@@ -21,6 +23,7 @@ export function BatchPhotoUploader({ batchId, onUploaded, className }: Props) {
   const [hint, setHint] = useState<string | null>(null);
   const normalizedId = String(batchId ?? "").trim();
   const validId = normalizedId.length > 6;
+  const { toast } = useToast();
 
 
   async function upload(file: File) {
@@ -34,21 +37,23 @@ export function BatchPhotoUploader({ batchId, onUploaded, className }: Props) {
     setHint("Uploading photo…");
 
     try {
-      // Optional client resize (keeps metadata simple). Remove if you want original only.
-      const blob = await downscaleIfNeeded(file, 1600, 0.9);
-      const form = new FormData();
-      form.set("file", blob, file.name);
+      const url = await uploadBatchPhoto(normalizedId, file);
+      
+      const newPhoto = { id: `photo_${Date.now()}`, url };
 
-      const res = await fetch(`/api/batches/${encodeURIComponent(normalizedId)}/photos`, { method: "POST", body: form });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json?.error || "Upload failed");
-      }
-      setHint("Upload complete.");
-      onUploaded?.(json.photo);
+      await fetch(`/api/batches/${encodeURIComponent(normalizedId)}/log`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "Photo", photoUrl: url, note: `Photo added: ${file.name}` }),
+      });
+      
+      toast({ title: "Photo uploaded", description: "The photo has been logged for this batch." });
+      onUploaded?.(newPhoto);
+
     } catch (e: any) {
       console.error(e);
       setHint(e?.message || "Upload failed.");
+      toast({ variant: "destructive", title: "Upload Failed", description: e?.message ?? "An error occurred during upload." });
     } finally {
       setBusy(false);
       // clear file inputs so same file can be reselected
@@ -111,39 +116,4 @@ export function BatchPhotoUploader({ batchId, onUploaded, className }: Props) {
       {!validId && <div className="mt-2 text-xs text-amber-600">Save the batch before adding photos.</div>}
     </div>
   );
-}
-
-// downscale images client-side to save bandwidth; preserves EXIF orientation in most modern browsers
-async function downscaleIfNeeded(file: File, maxDim: number, quality: number): Promise<Blob> {
-  try {
-    if (!file.type.startsWith("image/")) return file;
-    const imgUrl = URL.createObjectURL(file);
-    const img = await loadImage(imgUrl);
-    URL.revokeObjectURL(imgUrl);
-
-    const { width, height } = img;
-    const scale = Math.min(1, maxDim / Math.max(width, height));
-    if (scale >= 1) return file;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const blob: Blob = await new Promise((resolve) =>
-      canvas.toBlob((b) => resolve(b || file), "image/jpeg", quality)
-    );
-    return blob;
-  } catch {
-    return file;
-  }
-}
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = rej;
-    i.src = src;
-  });
 }
