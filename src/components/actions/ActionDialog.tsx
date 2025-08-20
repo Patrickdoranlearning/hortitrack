@@ -31,7 +31,7 @@ type AnyAction = z.infer<typeof ActionInputSchema>;
 
 export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: propLocations = [] }: Props) {
   const { toast } = useToast();
-  const [tab, setTab] = React.useState<"DUMPED"|"MOVE"|"CULTURE"|"NOTE">("MOVE");
+  const [tab, setTab] = React.useState<"CULTURE" | "MOVE" | "DUMPED" | "NOTE">("CULTURE");
   const [files, setFiles] = React.useState<File[]>([]);
   const descId = "batch-actions-desc";
 
@@ -65,7 +65,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
 
   const form = useForm<AnyAction>({
     resolver: zodResolver(ActionInputSchema),
-    defaultValues: { type: "MOVE", ...baseDefaults } as any,
+    defaultValues: { type: "CULTURE", ...baseDefaults } as any,
     mode: "onChange",
     shouldUnregister: true,
   });
@@ -133,9 +133,9 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
           form.reset({ type: v as any, ...baseDefaults, batchIds: defaultBatchIds });
         }}>
           <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
-            <TabsTrigger value="MOVE">Move</TabsTrigger>
             <TabsTrigger value="CULTURE">Culture</TabsTrigger>
+            <TabsTrigger value="MOVE">Move</TabsTrigger>
+            <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
             <TabsTrigger value="NOTE">Note</TabsTrigger>
           </TabsList>
             
@@ -152,24 +152,18 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
             </div>
           ) : null}
 
-          <TabsContent value="DUMPED" className="space-y-3">
-            <div>
-              <label className="text-sm">Reason</label>
-              <Textarea
-                placeholder="Why was this batch dumped?"
-                {...form.register("reason" as any)}
-              />
-            </div>
-            <div>
-              <label className="text-sm">Quantity to dump</label>
-              <Input
-                type="number"
-                min={1}
-                step="1"
-                required
-                {...form.register("quantity" as any, { valueAsNumber: true })}
-              />
-            </div>
+          <TabsContent value="CULTURE" className="space-y-3">
+             <div className="flex flex-col space-y-2">
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="trimmed" {...form.register("trimmed" as any)} />
+                    <Label htmlFor="trimmed">Batch was trimmed</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="spaced" {...form.register("spaced" as any)} />
+                    <Label htmlFor="spaced">Batch was spaced</Label>
+                </div>
+             </div>
+            <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
           </TabsContent>
 
           <TabsContent value="MOVE" className="space-y-3">
@@ -202,18 +196,24 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
             <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
           </TabsContent>
 
-          <TabsContent value="CULTURE" className="space-y-3">
-             <div className="flex flex-col space-y-2">
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="trimmed" {...form.register("trimmed" as any)} />
-                    <Label htmlFor="trimmed">Batch was trimmed</Label>
-                </div>
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="spaced" {...form.register("spaced" as any)} />
-                    <Label htmlFor="spaced">Batch was spaced</Label>
-                </div>
-             </div>
-            <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
+          <TabsContent value="DUMPED" className="space-y-3">
+            <div>
+              <label className="text-sm">Reason</label>
+              <Textarea
+                placeholder="Why was this batch dumped?"
+                {...form.register("reason" as any)}
+              />
+            </div>
+            <div>
+              <label className="text-sm">Quantity to dump</label>
+              <Input
+                type="number"
+                min={1}
+                step="1"
+                required
+                {...form.register("quantity" as any, { valueAsNumber: true })}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="NOTE" className="space-y-3">

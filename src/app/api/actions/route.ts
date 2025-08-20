@@ -1,20 +1,27 @@
 // src/app/api/actions/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { ActionInputSchema } from "@/lib/actions/schema";
+import { ActionInputSchema, type ActionInput } from "@/lib/actions/schema";
 import { isAllowedOrigin } from "@/lib/security/origin";
 import { applyBatchAction } from "@/server/actions/applyBatchAction";
 import { withTimeout } from "@/lib/async/withTimeout";
 import { getBatchesByIds } from "@/server/batches/lookup"; 
+import { toMessage } from "@/lib/errors";
 
 export const runtime = "nodejs"; // 🔑 Firestore-safe runtime
-const ACTION_TIMEOUT_MS = 30_000; // Increased from 10_000
-const JSON_PARSE_TIMEOUT_MS = 5_000; // Increased from 2_000
-const BATCH_LOOKUP_TIMEOUT_MS = 15_000; // Increased from 6_000
+const ACTION_TIMEOUT_MS = 30_000;
+const JSON_PARSE_TIMEOUT_MS = 5_000;
+const BATCH_LOOKUP_TIMEOUT_MS = 15_000;
 
 export async function POST(req: NextRequest) {
   const t0 = Date.now();
   try {
     if (!isAllowedOrigin(req)) {
+      console.error("[api/actions] 403 Bad Origin", {
+        method: req.method,
+        origin: req.headers.get("origin"),
+        host: req.headers.get("host"),
+        referer: req.headers.get("referer"),
+      });
       return NextResponse.json({ ok: false, error: "Bad Origin" }, { status: 403 });
     }
 
@@ -73,13 +80,14 @@ export async function POST(req: NextRequest) {
     const dur = Date.now() - t0;
     const isTimeout = e?.name === "TimeoutError" || /timed out/i.test(String(e?.message));
     const status = e?.issues ? 422 : (isTimeout ? 504 : 500);
+    const msg = toMessage(e);
     const payload = {
       ok: false,
-      error: e?.message ?? "Internal error",
+      error: msg || "Internal error",
       issues: e?.issues ?? [],
       durMs: dur,
     };
-    console.error("[/api/actions] error", { status, ...payload });
+    console.error("[api/actions] error", { status, ...payload });
     return NextResponse.json(payload, { status });
   }
 }
