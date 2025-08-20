@@ -55,7 +55,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
         const scopeBatchId = validated.batchIds?.[0] ?? "misc";
         photos = await uploadActionPhotos(scopeBatchId, files);
       } catch (e: any) {
-        toast({variant: 'destructive', title: "Photo upload failed: " + (e?.message ?? "error")});
+        toast({variant: 'destructive', title: "Photo upload failed", description: e?.message ?? "error"});
         return;
       }
     }
@@ -204,7 +204,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations }:
           {/* PHOTOS */}
           <div className="mt-4 space-y-2">
             <label className="text-sm font-medium">Photos (optional)</label>
-            <PhotoPicker onChange={(uploadedFiles) => form.setValue('photos', uploadedFiles)} max={10} />
+            <PhotoPicker onChange={setFiles} max={10} />
           </div>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>Cancel</Button>

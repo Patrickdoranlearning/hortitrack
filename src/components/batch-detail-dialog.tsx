@@ -26,6 +26,7 @@ import { FeatureGate } from './FeatureGate';
 import { BatchActionBar } from './batches/BatchActionBar';
 import BatchLabelPreview from './BatchLabelPreview';
 import { PlantPassportCard } from './batches/PlantPassportCard';
+import PhotoPicker from './actions/PhotoPicker';
 
 
 interface BatchDetailDialogProps {
@@ -54,7 +55,6 @@ export function BatchDetailDialog({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [flagOpen, setFlagOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [photos, setPhotos] = React.useState<Array<{id:string; url:string}>>([]);
   const [genBusy, setGenBusy] = React.useState(false);
@@ -73,23 +73,22 @@ export function BatchDetailDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batch?.id]);
 
-  const handlePickPhoto = () => fileInputRef.current?.click();
-  const handlePhotoChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f || !batch?.id) return;
+  const handlePhotoUpload = async (files: File[]) => {
+    if (!files.length || !batch?.id) return;
+    
     try {
-      const url = await uploadBatchPhoto(batch.id, f);
-      await fetch(`/api/batches/${batch.id}/log`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ type: "Photo", photoUrl: url }),
-      });
-      toast({ title: "Photo uploaded", description: "The photo has been logged for this batch." });
+      for (const file of files) {
+        const url = await uploadBatchPhoto(batch.id, file);
+        await fetch(`/api/batches/${batch.id}/log`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ type: "Photo", photoUrl: url }),
+        });
+      }
+      toast({ title: "Photo(s) uploaded", description: "The photos have been logged for this batch." });
       refreshPhotos(); // Refresh photos after upload
     } catch (err: any) {
       toast({ variant: "destructive", title: "Upload Failed", description: err?.message ?? "Photo upload failed" });
-    } finally {
-      e.target.value = "";
     }
   };
 
@@ -343,17 +342,8 @@ export function BatchDetailDialog({
                 <TabsContent value="photos">
                   <Card className="mt-2">
                     <CardContent className="p-6">
-                       <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={handlePhotoChosen}
-                      />
-                      <Button variant="outline" size="sm" onClick={handlePickPhoto}><Camera /> Add Photo</Button>
-
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mt-4">
+                      <PhotoPicker onChange={handlePhotoUpload} />
+                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mt-4">
                          {photos.map((p) => (
                           <a key={p.id} href={p.url} target="_blank" rel="noreferrer"
                              className="block aspect-square overflow-hidden rounded-md border bg-muted/30">
