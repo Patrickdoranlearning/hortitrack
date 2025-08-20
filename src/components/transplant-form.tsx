@@ -51,13 +51,13 @@ const transplantFormSchema = (maxQuantity: number) =>
         `Quantity cannot exceed remaining stock of ${maxQuantity}.`
       ),
     status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
-    location: z.string().min(1, 'Location is required.').or(z.object({})), // Allow empty object temporarily for debugging
-    size: z.string().min(1, 'Size is required.').or(z.object({})), // Allow empty object temporarily for debugging
+    location: z.string().min(1, 'Location is required.'),
+    size: z.string().min(1, 'Size is required.'),
     logRemainingAsLoss: z.boolean(),
     trayQuantity: z.number().optional(),
   });
 
-export type TransplantFormData = z.infer<typeof transplantFormSchema>;
+export type TransplantFormData = z.infer<ReturnType<typeof transplantFormSchema>>;
 
 interface TransplantFormProps {
   batch: Batch | null;
@@ -77,7 +77,7 @@ export function TransplantForm({
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
   const { toast } = useToast();
   
-  const form = useForm<z.infer<typeof transplantFormSchema>>({
+  const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
     resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
     defaultValues: batch
       ? {
@@ -161,27 +161,23 @@ export function TransplantForm({
         type: "TRANSPLANT",
         sourceBatchNumber: batch.batchNumber,
         quantity: qty,
-        target: {
-            locationId: typeof values.location === 'string' ? values.location : null,
-            size: typeof values.size === 'string' ? values.size : null,
-            notes: values.logRemainingAsLoss ? "Remaining logged as loss" : null, // Assuming notes can be derived from logRemainingAsLoss
-        },
+        location: values.location,
+        size: values.size,
+        status: values.status,
+        plantingDate: values.plantingDate.toISOString(),
+        logRemainingAsLoss: values.logRemainingAsLoss
     };
 
     console.log("[Transplant] submitting", payload);
-    const res = await fetch("/api/actions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.ok) {
-      toast({ variant: 'destructive', title: "Transplant failed", description: data?.error ?? `Transplant failed (HTTP ${res.status})` });
-      console.error("[Transplant] failed", { status: res.status, data });
+    const res = await postJson(`/api/batches/${batch.id}/transplant`, payload);
+    
+    if (!res.ok) {
+      toast({ variant: 'destructive', title: "Transplant failed", description: res.error ?? `Transplant failed (HTTP ${res.status})` });
+      console.error("[Transplant] failed", { status: res.status, data: res.data });
       return;
     }
     toast({ title: "Transplant created", description: "New batch created" });
-    onDone?.();
+    onDone?.(res.data);
   };
 
   const showTrayFields = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1;
@@ -240,13 +236,11 @@ export function TransplantForm({
                 <FormField
                     control={form.control}
                     name="location"
-                    render={({ field }) => {
-                      console.log('Location field value:', field.value);
-                      return (
+                    render={({ field }) => (
                       <FormItem>
                         <FormLabel>New Location</FormLabel>
                         <Select
-                          value={typeof field.value === 'string' ? field.value : ''}
+                          value={field.value}
                           onValueChange={field.onChange}
                         >
                           <FormControl>
@@ -264,7 +258,7 @@ export function TransplantForm({
                         </Select>
                         <FormMessage />
                       </FormItem>
-                    )}}
+                    )}
                   />
                 <FormField
                   control={form.control}
@@ -276,6 +270,7 @@ export function TransplantForm({
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
+                              type="button"
                               variant={'outline'}
                               className={cn(
                                 'w-full pl-3 text-left font-normal',
@@ -311,7 +306,7 @@ export function TransplantForm({
                       <FormItem>
                         <FormLabel>New Size</FormLabel>
                         <Select
-                          value={typeof field.value === 'string' ? field.value : ''}
+                          value={field.value}
                           onValueChange={(value) => {
                             field.onChange(value);
                             handleSizeChange(value);

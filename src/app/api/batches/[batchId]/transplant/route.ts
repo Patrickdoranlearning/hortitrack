@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/server/db/admin";
-import { allocateBatchNumber } from "@/server/services/batchNumber";
+import { generateNextBatchId } from "@/server/batches/nextId";
 import { mapError } from "@/lib/validation";
 // If you protect this route, uncomment:
 // import { getUser } from "@/server/auth/getUser";
@@ -57,7 +57,8 @@ export async function POST(
 
       // Create destination batch number and doc
       const dstRef = adminDb.collection("batches").doc();
-      const batchNumber = await allocateBatchNumber(tx);
+      const { id: batchNumber } = await generateNextBatchId({siteCode: '1'});
+
 
       const nowServer = FieldValue.serverTimestamp();
       const nowIso = new Date().toISOString();
@@ -80,14 +81,14 @@ export async function POST(
         createdAt: nowServer,
         updatedAt: nowServer,
         // If you keep a document-level logHistory array (your UI shows this):
-        logHistory: FieldValue.arrayUnion({
+        logHistory: [{
           id: `log_${Date.now()}_create_from_transplant`,
           type: "TRANSPLANT_FROM",
           note: `Created from transplant of ${body.quantity} units from batch ${
             src.batchNumber ?? batchId
           }.`,
           date: nowIso,
-        }),
+        }],
       };
 
       tx.set(dstRef, dstDoc);
@@ -97,25 +98,22 @@ export async function POST(
       const srcUpdates: Record<string, any> = {
         quantity: remaining,
         updatedAt: nowServer,
-        logHistory: FieldValue.arrayUnion({
+      };
+
+      // Append to log history if the field exists
+      const newLogEntries = [];
+      newLogEntries.push({
           id: `log_${Date.now()}_transplant_to`,
           type: "TRANSPLANT_TO",
           note: `Transplanted ${body.quantity} units to new batch ${batchNumber}.`,
           date: nowIso,
-        }),
-      };
+      });
 
       // Optional: log remaining as loss and archive original
       if (body.logRemainingAsLoss && remaining > 0) {
         srcUpdates.quantity = 0;
         srcUpdates.status = "Archived";
-        srcUpdates.logHistory = FieldValue.arrayUnion(
-          {
-            id: `log_${Date.now()}_transplant_to`,
-            type: "TRANSPLANT_TO",
-            note: `Transplanted ${body.quantity} units to new batch ${batchNumber}.`,
-            date: nowIso,
-          },
+        newLogEntries.push(
           {
             id: `log_${Date.now()}_loss_auto`,
             type: "LOSS",
@@ -132,13 +130,7 @@ export async function POST(
       } else if (remaining === 0 && src.status !== "Archived") {
         // Auto-archive if zero remains
         srcUpdates.status = "Archived";
-        srcUpdates.logHistory = FieldValue.arrayUnion(
-          {
-            id: `log_${Date.now()}_transplant_to`,
-            type: "TRANSPLANT_TO",
-            note: `Transplanted ${body.quantity} units to new batch ${batchNumber}.`,
-            date: nowIso,
-          },
+        newLogEntries.push(
           {
             id: `log_${Date.now()}_archive_auto`,
             type: "ARCHIVE",
@@ -147,11 +139,16 @@ export async function POST(
           }
         );
       }
+      
+      if (Array.isArray(src.logHistory)) {
+        srcUpdates.logHistory = [...src.logHistory, ...newLogEntries];
+      } else {
+        srcUpdates.logHistory = newLogEntries;
+      }
+
 
       tx.update(srcRef, srcUpdates);
 
-      // If you also maintain a logs subcollection, you can set() there too.
-      // (Your UI currently reads logHistory from the doc; leaving this optional.)
 
       return { id: dstRef.id, batchNumber };
     });

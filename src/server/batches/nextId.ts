@@ -42,7 +42,7 @@ export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
           tx.set(docRef, { seq: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
         }
         const finalSeq = snap.exists ? seq : 1;
-        return `${site}-${yww}-${String(finalSeq).padStart(5, "0")}`;
+        return {id: `${site}-${yww}-${String(finalSeq).padStart(5, "0")}`};
       });
       return id;
     } catch (e) {
