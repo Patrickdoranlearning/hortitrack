@@ -1,70 +1,52 @@
+export const runtime = "nodejs";
+import { NextRequest, NextResponse } from "next/server";
+import "server-only";
 import { adminDb } from "@/server/db/admin";
-import { NextResponse } from "next/server";
+import { generateNextBatchId } from "@/server/batches/nextId";
 import { z } from "zod";
-import { BatchSchema, BatchStatus } from "@/lib/types";
-import { generateNextBatchId, type BatchPhase } from "@/server/batches/nextId";
-import { dualWriteBatchCreate } from "@/server/dualwrite";
-import { declassify } from "@/server/utils/declassify";
 
-const CreateBatch = BatchSchema.omit({
-  id: true,
-  logHistory: true,
-  createdAt: true,
-  updatedAt: true,
-  batchNumber: true,
-  quantity: true, // Initial quantity will be set as current quantity
-}).extend({
-  initialQuantity: z.number().int().nonnegative().min(1, "Initial quantity must be at least 1"),
+// If you already have CreateBatch elsewhere, keep it. Otherwise this one is safe.
+const CreateBatch = z.object({
+  batchNumber: z.string().optional(),
+  siteCode: z.string().optional(),   // used only for ID format if batchNumber not provided
+  category: z.string().min(1),
+  plantFamily: z.string().min(1),
+  plantVariety: z.string().min(1),
+  plantingDate: z.string().min(1), // ISO date
+  initialQuantity: z.number().int().nonnegative(),
+  quantity: z.number().int().nonnegative(),
+  status: z.string().min(1),
+  location: z.string().optional().nullable(),
+  locationId: z.string().optional().nullable(),
+  size: z.string().optional().nullable(),
+  supplierId: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
-export async function POST(req: Request) {
-  const maybe = await req.json();
-  const stageMap: Record<string, BatchPhase> = {
-    'Propagation': 'PROPAGATION',
-    'Plugs/Liners': 'PLUGS',
-    'Potted': 'POTTING',
-    'Ready for Sale': 'POTTING',
-    'Looking Good': 'POTTING'
-  };
-
-  // Determine the phase for batch ID generation based on the incoming status
-  const phase = stageMap[maybe.status as BatchStatus] || 'POTTING';
-
-  let batchNumber: string;
+export async function POST(req: NextRequest) {
+  const t0 = Date.now();
   try {
-    const { id } = await generateNextBatchId(phase, new Date(maybe.plantingDate));
-    batchNumber = id;
-  } catch (error: any) {
-    console.error("Error generating next batch ID:", error);
-    return NextResponse.json({ ok: false, error: "Failed to generate batch number: " + error.message }, { status: 500 });
+    const maybe = await req.json().catch(() => ({} as any));
+    // Generate if caller didn't supply one
+    const batchNumber = maybe.batchNumber ?? await generateNextBatchId({ siteCode: maybe.siteCode });
+    const data = CreateBatch.parse({ ...maybe, batchNumber });
+
+    const ref = adminDb.collection("batches").doc();
+    await ref.set({
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    const snap = await ref.get();
+    return NextResponse.json({ id: ref.id, ...snap.data() }, { status: 201 });
+  } catch (err: any) {
+    console.error("[/api/batches POST] failed", { err: String(err) });
+    if (err?.issues) {
+      return NextResponse.json({ ok: false, error: "Invalid input", issues: err.issues }, { status: 422 });
+    }
+    return NextResponse.json({ ok: false, error: err?.message ?? "Server error" }, { status: 500 });
+  } finally {
+    const ms = Date.now() - t0;
+    if (ms > 1000) console.warn("[/api/batches POST] slow", { ms });
   }
-
-  const data = CreateBatch.parse({ ...maybe, batchNumber });
-
-  const ref = adminDb.collection("batches").doc();
-  await ref.set({
-    ...data,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-  const snap = await ref.get();
-  const out = { id: ref.id, ...declassify(snap.data()) } as any;
-  // non-blocking dual-write
-  dualWriteBatchCreate({
-    id: out.id,
-    batchNumber: out.batchNumber,
-    category: out.category,
-    plantFamily: out.plantFamily,
-    plantVariety: out.plantVariety,
-    plantingDate: out.plantingDate,
-    initialQuantity: out.initialQuantity,
-    quantity: out.quantity,
-    status: out.status,
-    location: out.location ?? null,
-    locationId: out.locationId ?? null,
-    size: out.size ?? null,
-    supplierId: out.supplierId ?? null,
-    notes: out.notes ?? null,
-  }).catch(() => {});
-  return NextResponse.json(out, { status: 201 });
 }
