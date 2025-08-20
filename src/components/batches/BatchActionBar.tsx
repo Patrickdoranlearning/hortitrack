@@ -26,7 +26,6 @@ type Props = {
   batch: BatchLite;
   onEdit?: () => void;
   onMove?: () => void;
-  onQr?: () => void;
   onPrint?: () => void;
   onActionLog?: () => void;
   onArchive?: () => void;
@@ -40,7 +39,6 @@ export function BatchActionBar({
   batch,
   onEdit,
   onMove,
-  onQr,
   onPrint,
   onActionLog,
   onArchive,
@@ -114,9 +112,6 @@ export function BatchActionBar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>More actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={onActionLog} disabled={!onActionLog} data-testid="mi-action-log">
-                <History className="mr-2 h-4 w-4" /> Action Log
-            </DropdownMenuItem>
             {isArchived ? (
               <DropdownMenuItem onClick={onUnarchive} disabled={!onUnarchive} data-testid="mi-unarchive">
                 <ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive
