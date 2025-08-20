@@ -19,6 +19,7 @@ import { uploadActionPhotos } from "@/lib/firebase";
 import { postJson } from "@/lib/net";
 import { Label } from "../ui/label";
 import { Checkbox } from "../ui/checkbox";
+import { SubmitButton } from "../ui/SubmitButton";
 
 type Props = {
   open: boolean;
@@ -28,6 +29,8 @@ type Props = {
 };
 
 type AnyAction = z.infer<typeof ActionInputSchema>;
+
+const FORM_ID = "action-form";
 
 export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: propLocations = [] }: Props) {
   const { toast } = useToast();
@@ -71,6 +74,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
   });
 
   const onSubmit = async (values: Record<string, any>) => {
+    console.info('[ActionDialog] submit', values);
     const batchIds = Array.isArray(values.batchIds) && values.batchIds.length ? values.batchIds : defaultBatchIds;
     
     let quantity: number | undefined = undefined;
@@ -128,114 +132,112 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
           <DialogDescription id={descId}>Apply an action to the selected batch.</DialogDescription>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => {
-          setTab(v as any);
-          form.reset({ type: v as any, ...baseDefaults, batchIds: defaultBatchIds });
-        }}>
-          <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="CULTURE">Culture</TabsTrigger>
-            <TabsTrigger value="MOVE">Move</TabsTrigger>
-            <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
-            <TabsTrigger value="NOTE">Note</TabsTrigger>
-          </TabsList>
-            
-          <form
-            className="space-y-3 pt-3"
-            onSubmit={form.handleSubmit(onSubmit)}
-            aria-describedby={descId}
-            noValidate
+        <form id={FORM_ID} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+            <Tabs value={tab} onValueChange={(v) => {
+            setTab(v as any);
+            form.reset({ type: v as any, ...baseDefaults, batchIds: defaultBatchIds });
+            }}>
+            <TabsList className="grid grid-cols-4 w-full">
+                <TabsTrigger value="CULTURE">Culture</TabsTrigger>
+                <TabsTrigger value="MOVE">Move</TabsTrigger>
+                <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
+                <TabsTrigger value="NOTE">Note</TabsTrigger>
+            </TabsList>
+                
+            {"_form" in form.formState.errors ? (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {(form.formState.errors._form as any)?.message as string}
+                </div>
+            ) : null}
+
+            <TabsContent value="CULTURE" className="space-y-3 pt-3">
+                <div className="flex flex-col space-y-2">
+                    <div className="flex items-center space-x-2">
+                        <Checkbox id="trimmed" {...form.register("trimmed" as any)} />
+                        <Label htmlFor="trimmed">Batch was trimmed</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Checkbox id="spaced" {...form.register("spaced" as any)} />
+                        <Label htmlFor="spaced">Batch was spaced</Label>
+                    </div>
+                </div>
+                <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
+            </TabsContent>
+
+            <TabsContent value="MOVE" className="space-y-3 pt-3">
+                <div>
+                <label className="text-sm">To Location</label>
+                <select
+                    className="w-full border rounded-md p-2"
+                    defaultValue=""
+                    {...form.register("toLocationId" as any)}
+                    onBlur={() => form.trigger("toLocationId")}
+                >
+                    <option value="" disabled>Select location…</option>
+                    {localLocations.map(l => <option key={l.id} value={l.id}>{l.name ?? l.id}</option>)}
+                </select>
+                {form.formState.errors.toLocationId && (
+                    <p className="text-sm font-medium text-destructive mt-1">
+                    {(form.formState.errors.toLocationId as any).message}
+                    </p>
+                )}
+                </div>
+                <div>
+                <label className="text-sm">Quantity (optional)</label>
+                <Input
+                    type="number"
+                    min={1}
+                    placeholder="Move full if empty"
+                    {...form.register("quantity" as any, { setValueAs: (v) => v ? Number(v) : undefined })}
+                />
+                </div>
+                <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
+            </TabsContent>
+
+            <TabsContent value="DUMPED" className="space-y-3 pt-3">
+                <div>
+                <label className="text-sm">Reason</label>
+                <Textarea
+                    placeholder="Why was this batch dumped?"
+                    {...form.register("reason" as any)}
+                />
+                </div>
+                <div>
+                <label className="text-sm">Quantity to dump</label>
+                <Input
+                    type="number"
+                    min={1}
+                    step="1"
+                    required
+                    {...form.register("quantity" as any, { valueAsNumber: true })}
+                />
+                </div>
+            </TabsContent>
+
+            <TabsContent value="NOTE" className="space-y-3 pt-3">
+                <Input placeholder="Title" {...form.register("title" as any)} />
+                <Textarea placeholder="Details (optional)" {...form.register("body" as any)} />
+            </TabsContent>
+
+            <div className="mt-4 space-y-2">
+                <label className="text-sm font-medium">Photos (optional)</label>
+                <PhotoPicker onChange={setFiles} max={10} />
+            </div>
+            </Tabs>
+        </form>
+
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>Cancel</Button>
+          <SubmitButton
+            type="submit"
+            form={FORM_ID}
+            pending={form.formState.isSubmitting}
+            disabled={((tab === "MOVE") && (locLoading || localLocations.length === 0)) || form.formState.isSubmitting}
+            data-testid="action-submit"
           >
-          
-          {"_form" in form.formState.errors ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {(form.formState.errors._form as any)?.message as string}
-            </div>
-          ) : null}
-
-          <TabsContent value="CULTURE" className="space-y-3">
-             <div className="flex flex-col space-y-2">
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="trimmed" {...form.register("trimmed" as any)} />
-                    <Label htmlFor="trimmed">Batch was trimmed</Label>
-                </div>
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="spaced" {...form.register("spaced" as any)} />
-                    <Label htmlFor="spaced">Batch was spaced</Label>
-                </div>
-             </div>
-            <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
-          </TabsContent>
-
-          <TabsContent value="MOVE" className="space-y-3">
-            <div>
-              <label className="text-sm">To Location</label>
-              <select
-                className="w-full border rounded-md p-2"
-                defaultValue=""
-                {...form.register("toLocationId" as any)}
-                onBlur={() => form.trigger("toLocationId")}
-              >
-                <option value="" disabled>Select location…</option>
-                {localLocations.map(l => <option key={l.id} value={l.id}>{l.name ?? l.id}</option>)}
-              </select>
-              {form.formState.errors.toLocationId && (
-                <p className="text-sm font-medium text-destructive mt-1">
-                  {(form.formState.errors.toLocationId as any).message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="text-sm">Quantity (optional)</label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="Move full if empty"
-                {...form.register("quantity" as any, { setValueAs: (v) => v ? Number(v) : undefined })}
-              />
-            </div>
-            <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
-          </TabsContent>
-
-          <TabsContent value="DUMPED" className="space-y-3">
-            <div>
-              <label className="text-sm">Reason</label>
-              <Textarea
-                placeholder="Why was this batch dumped?"
-                {...form.register("reason" as any)}
-              />
-            </div>
-            <div>
-              <label className="text-sm">Quantity to dump</label>
-              <Input
-                type="number"
-                min={1}
-                step="1"
-                required
-                {...form.register("quantity" as any, { valueAsNumber: true })}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="NOTE" className="space-y-3">
-            <Input placeholder="Title" {...form.register("title" as any)} />
-            <Textarea placeholder="Details (optional)" {...form.register("body" as any)} />
-          </TabsContent>
-
-          <div className="mt-4 space-y-2">
-            <label className="text-sm font-medium">Photos (optional)</label>
-            <PhotoPicker onChange={setFiles} max={10} />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>Cancel</Button>
-            <Button
-              type="submit"
-              disabled={((tab === "MOVE") && (locLoading || localLocations.length === 0)) || form.formState.isSubmitting}
-            >
-              {form.formState.isSubmitting ? "Applying..." : locLoading ? "Loading..." : "Apply"}
-            </Button>
-          </DialogFooter>
-          </form>
-        </Tabs>
+            {locLoading ? "Loading..." : "Apply"}
+          </SubmitButton>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
