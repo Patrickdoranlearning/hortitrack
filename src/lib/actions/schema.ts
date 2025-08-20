@@ -1,7 +1,6 @@
 
 import { z } from "zod";
 
-// Common attachments
 const PhotosSchema = z
   .array(
     z.object({

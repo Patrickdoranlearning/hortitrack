@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import PhotoPicker from "@/components/actions/PhotoPicker";
 import { toMessage } from "@/lib/errors";
 import { uploadActionPhotos } from "@/lib/firebase";
+import { postJson } from "@/lib/net";
 
 type Props = {
   open: boolean;
@@ -67,54 +68,44 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
   });
 
   const onSubmit = async (values: Record<string, any>) => {
-    const batchIds = Array.isArray(values.batchIds) && values.batchIds.length ? values.batchIds : baseDefaults.batchIds;
-    const actionId = values.actionId || baseDefaults.actionId;
-    
-    let quantity: number | undefined = undefined;
-    if (values.quantity !== undefined && values.quantity !== null && `${values.quantity}`.trim() !== "") {
-      const n = Number(values.quantity);
-      if (Number.isFinite(n)) quantity = n;
-    }
-
+    const batchIds = Array.isArray(values.batchIds) && values.batchIds.length ? values.batchIds : defaultBatchIds;
     const needsLocation = tab === "MOVE" || tab === "SPLIT";
     if (needsLocation && !values.toLocationId) {
       toast({ variant: "destructive", title: "Missing location", description: "Select a destination location." });
       return;
     }
+    let quantity: number | undefined = undefined;
+    if (values.quantity !== undefined && `${values.quantity}`.trim() !== "") {
+      const n = Number(values.quantity); if (Number.isFinite(n)) quantity = n;
+    }
 
-    let uploadedPhotos: Array<{ url: string; path: string; mime: string; size: number }> = [];
-    if (files.length > 0) {
-      try {
-        const firstBatch = batchIds[0];
-        // This is a stand-in for a real upload function.
-        // In a real app, this would call your Firebase Storage upload utility.
-        uploadedPhotos = await Promise.all(files.map(async (file) => {
-            const uploadedFile = await uploadActionPhotos(firstBatch, [file]);
-            return uploadedFile[0];
-        }));
-      } catch (e) {
-        console.error("[ActionDialog] photo upload failed", e);
-        toast({ variant: "destructive", title: "Photo upload failed", description: toMessage(e) });
-        return;
+    let photos: Array<{ url: string; path: string; mime: string; size: number }> = [];
+    if (files.length) {
+      try { 
+        const firstBatch = batchIds[0] ?? 'misc';
+        photos = await uploadActionPhotos(firstBatch, files);
       }
+      catch (e) { toast({ variant: "destructive", title: "Photo upload failed", description: `${e}` }); return; }
     }
-    
-    const payload = { ...values, type: tab, batchIds, actionId, quantity, photos: uploadedPhotos };
 
-    const res = await fetch("/api/actions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const text = await res.text();
-    let body: any = null;
-    try { body = JSON.parse(text); } catch { /* keep raw */ }
-    const ok = res.ok && body && body.ok !== false;
-    if (!ok) {
-      const msg = (body && (body.error || body.message)) || text || `HTTP ${res.status}`;
-      toast({ variant: "destructive", title: "Action failed", description: msg.slice(0, 500) });
-      return;
-    }
+    const payload = {
+      type: tab,
+      batchIds,
+      toLocationId: values.toLocationId || undefined,
+      reason: values.reason || undefined,
+      quantity,
+      photos,
+      actionId: baseDefaults.actionId,
+      ...values,
+    };
+
+   const res = await postJson("/api/actions", payload);
+   if (!res.ok) {
+     toast({ variant: "destructive", title: "Action failed", description: res.error });
+     console.error("[ActionDialog] submit failed", { status: res.status, text: res.text });
+     return;
+   }
+
     toast({ title: "Action applied", description: "Your changes were saved." });
     onOpenChange(false);
   };
@@ -260,7 +251,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
               type="submit"
               disabled={((tab === "MOVE" || tab === "SPLIT") && (locLoading || localLocations.length === 0)) || form.formState.isSubmitting}
             >
-              {locLoading ? "Loading…" : "Apply"}
+              {locLoading ? "Loading…" : form.formState.isSubmitting ? "Applying…" : "Apply"}
             </Button>
           </DialogFooter>
           </form>

@@ -1,5 +1,4 @@
 
-// src/lib/security/origin.ts
 import type { NextRequest } from "next/server";
 
 function wildcardMatch(input: string, pattern: string) {
@@ -9,46 +8,26 @@ function wildcardMatch(input: string, pattern: string) {
 }
 
 export function isAllowedOrigin(req: NextRequest) {
-  // Server Actions use a private wire protocol and special header.
-  // If we block or rewrite them, Next.js client throws "Unexpected response".
-  const isServerAction = req.headers.get("next-action") === "1";
-  if (isServerAction) return true;
+  if ((req.headers.get("next-action") || "").trim() === "1") return true;
+  const sfs = (req.headers.get("sec-fetch-site") || "").toLowerCase();
+  if (sfs === "same-origin" || sfs === "same-site") return true;
 
-  const origin = (req.headers.get("origin") || "").toLowerCase();
-  const host = (req.headers.get("host") || "").toLowerCase();
-  const proto = req.nextUrl.protocol || "https:"; // dev often https on workstations
-  const sameOrigin = `${proto}//${host}`;
+  const originHeader = (req.headers.get("origin") || req.headers.get("referer") || "").toLowerCase();
+  const hostHeader = (req.headers.get("host") || "").toLowerCase();
 
-  // 1) Always allow requests that are same-origin.
-  // Some browsers omit the Origin header on same-origin POSTs; fall back to host match.
-  if (!origin || origin === sameOrigin) return true;
+  if (!originHeader) return true;
 
-  // 2) In development, allow common local hosts + workstations
-  if (process.env.NODE_ENV !== "production") {
-    const devAllow = [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "https://localhost:3000",
-      "https://127.0.0.1:3000",
-      // Google Cloud Workstations (your current dev domain)
-      "https://*.cloudworkstations.dev",
-    ];
-    return devAllow.some((p) =>
-      p.includes("*") ? wildcardMatch(origin, p) : origin === p
-    );
-  }
+  let originHost = "", originOrigin = "";
+  try { const u = new URL(originHeader); originHost = u.host.toLowerCase(); originOrigin = u.origin.toLowerCase(); } catch {}
 
-  // 3) In production, allow configured origins:
-  // - NEXT_PUBLIC_APP_URL (canonical)
-  // - ALLOWED_ORIGINS (comma-separated list, supports "*" wildcards)
+  if (originHost && hostHeader && originHost === hostHeader) return true;
+  if (process.env.NODE_ENV !== "production") return true;
+
   const allow: string[] = [];
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").toLowerCase();
-  if (appUrl) allow.push(appUrl);
-  const extra = (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map(s => s.trim().toLowerCase())
-    .filter(Boolean);
+  if (appUrl) { try { allow.push(new URL(appUrl).origin); } catch { allow.push(appUrl); } }
+  const extra = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
   allow.push(...extra);
-
+  const origin = originOrigin || originHeader;
   return allow.some((p) => (p.includes("*") ? wildcardMatch(origin, p) : origin === p));
 }
