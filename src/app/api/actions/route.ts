@@ -7,7 +7,9 @@ import { withTimeout } from "@/lib/async/withTimeout";
 import { getBatchesByIds } from "@/server/batches/lookup"; 
 
 export const runtime = "nodejs"; // 🔑 Firestore-safe runtime
-const ACTION_TIMEOUT_MS = 10_000;
+const ACTION_TIMEOUT_MS = 30_000; // Increased from 10_000
+const JSON_PARSE_TIMEOUT_MS = 5_000; // Increased from 2_000
+const BATCH_LOOKUP_TIMEOUT_MS = 15_000; // Increased from 6_000
 
 export async function POST(req: NextRequest) {
   const t0 = Date.now();
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse input quickly
-    const json = await withTimeout(req.json(), 2_000, "request body parse timed out");
+    const json = await withTimeout(req.json(), JSON_PARSE_TIMEOUT_MS, "request body parse timed out");
     const parsed = ActionInputSchema.safeParse(json);
     
     if (!parsed.success) {
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
     
     if (batchIds.length > 0 && batchNumbers.length === 0) {
-        const docs = await withTimeout(getBatchesByIds(batchIds), 6_000, "batch lookup timed out");
+        const docs = await withTimeout(getBatchesByIds(batchIds), BATCH_LOOKUP_TIMEOUT_MS, "batch lookup timed out");
         if (docs.length === 0) {
             return NextResponse.json({ ok: false, error: "No batches found for provided ids" }, { status: 404 });
         }
