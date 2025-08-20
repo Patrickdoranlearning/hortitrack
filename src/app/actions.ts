@@ -7,7 +7,7 @@ import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 import { z } from 'zod';
-import { allocateBatchNumber, BatchStage } from '@/server/services/batchNumber';
+import { generateNextBatchId, type BatchPhase } from '@/server/batches/nextId';
 import { declassify } from '@/server/utils/declassify';
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
@@ -108,29 +108,29 @@ export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber'>
 ) {
   try {
-    return await db.runTransaction(async (transaction) => {
-        const newDocRef = db.collection('batches').doc();
-        
-        const stageMap: Record<string, BatchStage> = {
-          'Propagation': 'propagation',
-          'Plugs/Liners': 'plug',
-          'Potted': 'potting',
-          'Ready for Sale': 'potting',
-          'Looking Good': 'potting'
-        };
-        const stage = stageMap[newBatchData.status] || 'potting';
-        const batchNumber = await allocateBatchNumber(transaction, { stage });
-        
-        const newBatch: Batch = {
-          ...(newBatchData as any),
-          id: newDocRef.id,
-          batchNumber: batchNumber,
-          logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: `Batch created with number ${batchNumber}.` }],
-        };
-        
-        transaction.set(newDocRef, newBatch);
-        return { success: true, data: declassify(newBatch) };
-    });
+    const stageMap: Record<string, BatchPhase> = {
+      'Propagation': 'PROPAGATION',
+      'Plugs/Liners': 'PLUGS',
+      'Potted': 'POTTING',
+      'Ready for Sale': 'POTTING',
+      'Looking Good': 'POTTING'
+    };
+    const phase = stageMap[newBatchData.status] || 'POTTING';
+    
+    // Use the new batch ID generator
+    const { id: batchNumber } = await generateNextBatchId(phase, new Date(newBatchData.plantingDate));
+    
+    const newDocRef = db.collection('batches').doc();
+    const newBatch: Batch = {
+      ...(newBatchData as any),
+      id: newDocRef.id,
+      batchNumber: batchNumber,
+      logHistory: [{ id: `log_${Date.now()}`, date: new Date().toISOString(), type: 'CREATE', note: `Batch created with number ${batchNumber}.` }],
+    };
+    
+    await newDocRef.set(newBatch);
+    return { success: true, data: declassify(newBatch) };
+
   } catch (error: any) {
     console.error('Error adding batch:', error);
     return { success: false, error: 'Failed to add batch: ' + error.message };
@@ -238,15 +238,15 @@ export async function transplantBatchAction(
             throw new Error('Insufficient quantity in source batch.');
         }
 
-        const stageMap: Record<string, BatchStage> = {
-            'Propagation': 'propagation',
-            'Plugs/Liners': 'plug',
-            'Potted': 'potting',
-            'Ready for Sale': 'potting',
-            'Looking Good': 'potting'
+        const stageMap: Record<string, BatchPhase> = {
+            'Propagation': 'PROPAGATION',
+            'Plugs/Liners': 'PLUGS',
+            'Potted': 'POTTING',
+            'Ready for Sale': 'POTTING',
+            'Looking Good': 'POTTING'
         };
-        const stage = stageMap[newBatchData.status] || 'potting';
-        const batchNumber = await allocateBatchNumber(transaction, { stage });
+        const phase = stageMap[newBatchData.status] || 'POTTING';
+        const { id: batchNumber } = await generateNextBatchId(phase, new Date(newBatchData.plantingDate));
 
         const newDocRef = db.collection('batches').doc();
         const newBatch: Batch = {
@@ -425,17 +425,17 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         for (const batchData of batches) {
             const docRef = db.collection('batches').doc();
             
-            const stageMap: Record<string, BatchStage> = {
-              'Propagation': 'propagation',
-              'Plugs/Liners': 'plug',
-              'Potted': 'potting',
-              'Ready for Sale': 'potting',
-              'Looking Good': 'potting'
+            const stageMap: Record<string, BatchPhase> = {
+              'Propagation': 'PROPAGATION',
+              'Plugs/Liners': 'PLUGS',
+              'Potted': 'POTTING',
+              'Ready for Sale': 'POTTING',
+              'Looking Good': 'POTTING'
             };
-            const stage = stageMap[batchData.status] || 'potting';
+            const phase = stageMap[batchData.status] || 'POTTING';
             // Note: This runs the transaction for each row, which is inefficient but safe.
             // A more performant approach would pre-allocate numbers, but this is simpler.
-            const batchNumber = await db.runTransaction(async (tx) => allocateBatchNumber(tx, { stage }));
+            const { id: batchNumber } = await generateNextBatchId(phase, new Date(batchData.plantingDate));
 
             const newBatch: Omit<Batch, 'id'> = {
               ...batchData,
