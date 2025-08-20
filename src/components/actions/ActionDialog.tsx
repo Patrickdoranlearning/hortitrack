@@ -31,6 +31,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
   const { toast } = useToast();
   const [tab, setTab] = React.useState<"DUMPED"|"MOVE"|"SPLIT"|"FLAGS"|"NOTE">("MOVE");
   const [files, setFiles] = React.useState<File[]>([]);
+  const descId = "batch-actions-desc";
 
   const baseDefaults = React.useMemo(() => ({
     batchIds: Array.isArray(defaultBatchIds) ? defaultBatchIds : [],
@@ -112,10 +113,10 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl rounded-2xl" aria-describedby="batch-actions-desc">
+      <DialogContent className="max-w-xl rounded-2xl" aria-describedby={descId}>
         <DialogHeader>
           <DialogTitle>Batch Actions</DialogTitle>
-          <DialogDescription id="batch-actions-desc">Apply an action to the selected batch.</DialogDescription>
+          <DialogDescription id={descId}>Apply an action to the selected batch.</DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => {
@@ -133,7 +134,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
           <form
             className="space-y-3 pt-3"
             onSubmit={form.handleSubmit(onSubmit)}
-            aria-describedby="batch-actions-desc"
+            aria-describedby={descId}
             noValidate
           >
           
