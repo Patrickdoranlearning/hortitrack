@@ -13,7 +13,7 @@ const PhotosSchema = z
   .max(10)
   .optional();
 
-const ActionTypeSchema = z.enum(["MOVE", "SPLIT", "DUMPED", "FLAGS", "NOTE"]);
+const ActionTypeSchema = z.enum(["DUMPED", "MOVE", "CULTURE", "NOTE"]);
 
 const BaseSchema = z.object({
   actionId: z.string().uuid(),

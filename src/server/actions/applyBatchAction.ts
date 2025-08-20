@@ -46,6 +46,9 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
     switch (action.type) {
       case "DUMPED": {
         const { batchIds, quantity, reason } = action;
+        if (!quantity || quantity <= 0) {
+          throw new Error("Quantity must be a positive number for DUMPED action.");
+        }
         for (const batchId of batchIds) {
           const ref = db.collection("batches").doc(batchId);
           await db.runTransaction(async (tx) => {
@@ -71,14 +74,14 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
         return { ok: true, data: { dumped: batchIds.length, qtyPerBatch: quantity } };
       }
       case "MOVE": {
-        const { batchIds, toLocationId } = action;
+        const { batchIds, toLocationId, quantity } = action;
         for (const batchId of batchIds) {
           const ref = db.collection("batches").doc(batchId);
           await db.runTransaction(async (tx) => {
             const snap = await tx.get(ref);
             if (!snap.exists) throw new Error(`Batch ${batchId} not found`);
             const batch = snap.data() as any;
-            const moveQty = action.quantity ?? batch.quantity;
+            const moveQty = quantity ?? batch.quantity;
             if (moveQty <= 0) throw new Error("Quantity must be > 0");
             if (moveQty > batch.quantity) throw new Error("Insufficient quantity");
 
@@ -117,62 +120,20 @@ export async function applyBatchAction(action: ActionInput): Promise<Result> {
         return { ok: true, data: { moved: batchIds.length } };
       }
 
-      case "SPLIT": {
-        const { batchIds: [batchId], toLocationId, quantity } = action;
-        const ref = db.collection("batches").doc(batchId);
-        await db.runTransaction(async (tx) => {
-          const snap = await tx.get(ref);
-          if (!snap.exists) throw new Error(`Batch ${batchId} not found`);
-          const batch = snap.data() as any;
-          if (quantity! <= 0) throw new Error("quantity must be > 0");
-          if (quantity! >= batch.quantity) throw new Error("quantity must be < batch.quantity");
-
-          tx.update(ref, {
-            quantity: FieldValue.increment(-quantity!),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-          const entry = toLegacyLogEntry(action);
-          tx.update(ref, { logHistory: FieldValue.arrayUnion(entry) });
-          const newRef = db.collection("batches").doc();
-          tx.set(newRef, {
-            ...batch,
-            parentBatchId: batchId,
-            location: toLocationId,
-            locationId: toLocationId,
-            quantity: quantity,
-            initialQuantity: quantity,
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-          const entry2 = toLegacyLogEntry(action);
-          tx.set(newRef, { logHistory: [entry2] }, { merge: true });
-        });
-        await logAction(action);
-        return { ok: true, data: { split: true } };
-      }
-
-      case "FLAGS": {
-        const { batchIds, trimmed, spaced } = action;
+      case "CULTURE": {
+        const { batchIds, trimmed, spaced, note } = action;
         for (const batchId of batchIds) {
           const ref = db.collection("batches").doc(batchId);
-          await db.runTransaction(async (tx) => {
-            const snap = await tx.get(ref);
-            if (!snap.exists) throw new Error(`Batch ${batchId} not found`);
-            const patch: Record<string, unknown> = {
-              updatedAt: FieldValue.serverTimestamp(),
-            };
-            if (typeof trimmed === "boolean") patch["trimmed"] = trimmed;
-            if (typeof spaced === "boolean") patch["spaced"] = spaced;
-            tx.update(ref, patch);
+          const entry = toLegacyLogEntry(action);
+          await ref.update({
+            logHistory: FieldValue.arrayUnion(entry),
+            updatedAt: FieldValue.serverTimestamp(),
+            // You might want to store trimmed/spaced status on the batch doc too
+            ...(trimmed && { lastTrimmed: FieldValue.serverTimestamp() }),
+            ...(spaced && { lastSpaced: FieldValue.serverTimestamp() }),
           });
         }
         await logAction(action);
-        // Append legacy history entries for history view
-        await Promise.all(batchIds.map((id) =>
-          db.collection("batches").doc(id)
-            .update({ logHistory: FieldValue.arrayUnion(toLegacyLogEntry(action)) })
-            .catch(() => {})
-        ));
         return { ok: true, data: { updated: batchIds.length } };
       }
 

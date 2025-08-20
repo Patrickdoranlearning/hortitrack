@@ -17,6 +17,8 @@ import PhotoPicker from "@/components/actions/PhotoPicker";
 import { toMessage } from "@/lib/errors";
 import { uploadActionPhotos } from "@/lib/firebase";
 import { postJson } from "@/lib/net";
+import { Label } from "../ui/label";
+import { Checkbox } from "../ui/checkbox";
 
 type Props = {
   open: boolean;
@@ -29,7 +31,7 @@ type AnyAction = z.infer<typeof ActionInputSchema>;
 
 export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: propLocations = [] }: Props) {
   const { toast } = useToast();
-  const [tab, setTab] = React.useState<"DUMPED"|"MOVE"|"SPLIT"|"FLAGS"|"NOTE">("MOVE");
+  const [tab, setTab] = React.useState<"DUMPED"|"MOVE"|"CULTURE"|"NOTE">("MOVE");
   const [files, setFiles] = React.useState<File[]>([]);
   const descId = "batch-actions-desc";
 
@@ -81,7 +83,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
       return;
     }
 
-    const needsLocation = tab === "MOVE" || tab === "SPLIT";
+    const needsLocation = tab === "MOVE";
     if (needsLocation && !values.toLocationId) {
       toast({ variant: "destructive", title: "Missing location", description: "Select a destination location." });
       return;
@@ -130,11 +132,10 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
           setTab(v as any);
           form.reset({ type: v as any, ...baseDefaults, batchIds: defaultBatchIds });
         }}>
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="DUMPED">Dumped</TabsTrigger>
             <TabsTrigger value="MOVE">Move</TabsTrigger>
-            <TabsTrigger value="SPLIT">Split</TabsTrigger>
-            <TabsTrigger value="FLAGS">Flags</TabsTrigger>
+            <TabsTrigger value="CULTURE">Culture</TabsTrigger>
             <TabsTrigger value="NOTE">Note</TabsTrigger>
           </TabsList>
             
@@ -165,6 +166,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
                 type="number"
                 min={1}
                 step="1"
+                required
                 {...form.register("quantity" as any, { valueAsNumber: true })}
               />
             </div>
@@ -200,47 +202,17 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
             <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
           </TabsContent>
 
-          <TabsContent value="SPLIT" className="space-y-3">
-            <p className="text-xs text-muted-foreground">Split acts on a single batch.</p>
-            <div>
-              <label className="text-sm">To Location</label>
-              <select
-                className="w-full border rounded-md p-2"
-                defaultValue=""
-                {...form.register("toLocationId" as any)}
-                onBlur={() => form.trigger("toLocationId")}
-              >
-                <option value="" disabled>Select location…</option>
-                {localLocations.map(l => <option key={l.id} value={l.id}>{l.name ?? l.id}</option>)}
-              </select>
-              {form.formState.errors.toLocationId && (
-                <p className="text-sm font-medium text-destructive mt-1">
-                  {(form.formState.errors.toLocationId as any).message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="text-sm">Split Quantity</label>
-              <Input
-                type="number"
-                min={1}
-                {...form.register("quantity" as any, { valueAsNumber: true })}
-              />
-            </div>
-            <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
-          </TabsContent>
-
-          <TabsContent value="FLAGS" className="space-y-3">
-            <div className="flex gap-6">
-              <label className="inline-flex items-center gap-2">
-                <input type="checkbox" {...form.register("trimmed" as any)} />
-                <span>Trimmed</span>
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input type="checkbox" {...form.register("spaced" as any)} />
-                <span>Spaced</span>
-              </label>
-            </div>
+          <TabsContent value="CULTURE" className="space-y-3">
+             <div className="flex flex-col space-y-2">
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="trimmed" {...form.register("trimmed" as any)} />
+                    <Label htmlFor="trimmed">Batch was trimmed</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="spaced" {...form.register("spaced" as any)} />
+                    <Label htmlFor="spaced">Batch was spaced</Label>
+                </div>
+             </div>
             <Textarea placeholder="Note (optional)" {...form.register("note" as any)} />
           </TabsContent>
 
@@ -257,7 +229,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>Cancel</Button>
             <Button
               type="submit"
-              disabled={((tab === "MOVE" || tab === "SPLIT") && (locLoading || localLocations.length === 0)) || form.formState.isSubmitting}
+              disabled={((tab === "MOVE") && (locLoading || localLocations.length === 0)) || form.formState.isSubmitting}
             >
               {form.formState.isSubmitting ? "Applying..." : locLoading ? "Loading..." : "Apply"}
             </Button>
