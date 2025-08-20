@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -64,19 +65,39 @@ export function ActionForm({
   // ---- MOVE
   const moveForm = useForm<MoveForm>({
     resolver: zodResolver(moveSchema(max)),
-    defaultValues: { type: "MOVE", at: new Date(), photos: [] },
+    defaultValues: {
+      type: "MOVE",
+      at: new Date(),
+      toLocationId: "",
+      toLocation: "",
+      quantity: undefined,
+      notes: "",
+      photos: [],
+    },
   });
 
   // ---- DUMP
   const dumpForm = useForm<DumpForm>({
     resolver: zodResolver(dumpSchema(max)),
-    defaultValues: { type: "DUMP", at: new Date(), photos: [] },
+    defaultValues: {
+      type: "DUMP",
+      at: new Date(),
+      reason: "",
+      quantity: undefined,
+      notes: "",
+      photos: [],
+    },
   });
 
   // ---- CHECKIN
   const checkForm = useForm<CheckForm>({
     resolver: zodResolver(checkinSchema),
-    defaultValues: { type: "CHECKIN", at: new Date(), notes: "", photos: [] },
+    defaultValues: {
+      type: "CHECKIN",
+      at: new Date(),
+      notes: "",
+      photos: [],
+    },
   });
 
   useEffect(() => {
@@ -208,7 +229,12 @@ export function ActionForm({
               </FormItem>
             )}/>
             <FormField control={moveForm.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
+                </FormControl>
+              </FormItem>
             )}/>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
@@ -222,7 +248,13 @@ export function ActionForm({
         <Form {...dumpForm}>
           <form onSubmit={dumpForm.handleSubmit(onSubmitDump)} noValidate className="space-y-4">
             <FormField control={dumpForm.control} name="reason" render={({ field }) => (
-              <FormItem><FormLabel>Reason</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem>
+                <FormLabel>Reason</FormLabel>
+                <FormControl>
+                  <Input value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}/>
             <FormField control={dumpForm.control} name="quantity" render={({ field }) => (
               <FormItem>
@@ -237,7 +269,12 @@ export function ActionForm({
               </FormItem>
             )}/>
             <FormField control={dumpForm.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
+                </FormControl>
+              </FormItem>
             )}/>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
@@ -251,7 +288,13 @@ export function ActionForm({
         <Form {...checkForm}>
           <form onSubmit={checkForm.handleSubmit(onSubmitCheck)} noValidate className="space-y-4">
             <FormField control={checkForm.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}/>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
