@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { Batch } from '@/lib/types';
-import { ImageIcon, ClipboardList, Flag, Printer, Ruler, Package, MapPin } from 'lucide-react';
+import { ImageIcon, ClipboardList, Flag, Printer, Ruler, Package, MapPin, MoreHorizontal } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -22,6 +22,7 @@ import { Progress } from './ui/progress';
 import { Button } from './ui/button';
 import { TransplantIcon } from './icons';
 import BatchLabelPreview from './BatchLabelPreview';
+import { ActionDialog } from './actions/ActionDialog';
 
 
 interface BatchCardProps {
@@ -38,6 +39,15 @@ export function BatchCard({
   onTransplant,
 }: BatchCardProps) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
+  const [isActionDialogOpen, setIsActionDialogOpen] = React.useState(false);
+  const [locations, setLocations] = React.useState<{id: string; name: string}[]>([]);
+
+  React.useEffect(() => {
+    fetch("/api/locations")
+      .then(r => r.json())
+      .then(data => setLocations(data?.items ?? []))
+      .catch(() => setLocations([]));
+  }, []);
 
   const stockPercentage =
     batch.initialQuantity > 0
@@ -79,6 +89,11 @@ export function BatchCard({
   const handlePrintClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsPreviewOpen(true);
+  }
+
+  const handleOpenActionsDialog = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsActionDialogOpen(true);
   }
 
   return (
@@ -189,14 +204,14 @@ export function BatchCard({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => handleActionClick(e, onLogAction)}
+                    onClick={handleOpenActionsDialog}
                   >
-                    <ClipboardList className="h-5 w-5" />
-                    <span className="sr-only">Log Action</span>
+                    <MoreHorizontal className="h-5 w-5" />
+                    <span className="sr-only">More Actions</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Log Action</p>
+                  <p>More Actions</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -235,6 +250,12 @@ export function BatchCard({
           initialQuantity: batch.initialQuantity ?? batch.quantity ?? 0,
           quantity: batch.quantity,
         }}
+      />
+      <ActionDialog
+        open={isActionDialogOpen}
+        onOpenChange={setIsActionDialogOpen}
+        defaultBatchIds={[batch.id!]}
+        locations={locations}
       />
     </>
   );
