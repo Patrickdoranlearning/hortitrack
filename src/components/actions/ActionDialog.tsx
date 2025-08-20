@@ -259,7 +259,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations: p
               type="submit"
               disabled={((tab === "MOVE" || tab === "SPLIT") && (locLoading || localLocations.length === 0)) || form.formState.isSubmitting}
             >
-              {locLoading ? "Loading…" : form.formState.isSubmitting ? "Applying…" : "Apply"}
+              {form.formState.isSubmitting ? "Applying..." : locLoading ? "Loading..." : "Apply"}
             </Button>
           </DialogFooter>
           </form>
