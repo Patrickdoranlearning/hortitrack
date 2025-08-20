@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import * as React from "react";
 import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader";
 import Link from "next/link";
 import { ActionDialog } from "@/components/actions/ActionDialog";
+import { TransplantIcon } from "../icons";
 
 type BatchLite = {
   id: string;
@@ -69,6 +71,9 @@ export function BatchActionBar({
       >
         <Button onClick={onEdit} disabled={!onEdit} className="rounded-2xl w-full" data-testid="btn-edit">
           <Pencil className="mr-2 h-4 w-4" /> Edit
+        </Button>
+        <Button onClick={onMove} disabled={!onMove} className="rounded-2xl w-full" data-testid="btn-transplant">
+          <TransplantIcon /> Transplant
         </Button>
         <Button onClick={() => setActionOpen(true)} className="rounded-2xl w-full" data-testid="btn-actions">
           <MoreHorizontal className="mr-2 h-4 w-4" /> Actions
