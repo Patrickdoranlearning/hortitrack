@@ -12,7 +12,7 @@ import {
   Archive as ArchiveIcon, ArchiveRestore, Trash2, History,
 } from "lucide-react";
 import * as React from "react";
-import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader";
+import BatchPhotoUploader from "@/components/batches/BatchPhotoUploader";
 import Link from "next/link";
 import { ActionDialog } from "@/components/actions/ActionDialog";
 import { TransplantIcon } from "../icons";
@@ -74,11 +74,11 @@ export function BatchActionBar({
   return (
     <TooltipProvider>
       <div
-        className={[
+        className={cn(
           "w-full grid grid-cols-2 md:grid-cols-none md:grid-flow-col md:auto-cols-max md:justify-start gap-2",
           "rounded-xl bg-muted/30 p-2",
-          className ?? "",
-        ].join(" ")}
+          className
+        )}
         data-testid="batch-action-bar"
       >
         <Button onClick={onMove} disabled={!onMove} className="rounded-2xl w-full" data-testid="btn-transplant">

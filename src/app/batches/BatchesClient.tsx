@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   Search,
@@ -32,7 +33,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { useRouter } from "next/navigation";
 import { collection, onSnapshot, getDocs } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +82,8 @@ function normalizeBatch(d: any): any {
 export default function BatchesClient({ initialBatches }: { initialBatches: Batch[] }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlBatch = searchParams.get("batch");
   
   const [batches, setBatches] = useState<Batch[]>(initialBatches);
   const [isDataLoading, setIsDataLoading] = useState(false);
@@ -129,6 +131,16 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     const unsub = loadBatches();
     return typeof unsub === "function" ? unsub : undefined;
   }, [loadBatches]);
+
+  // Open dialog if ?batch=<id> present
+  useEffect(() => {
+    if (!urlBatch || !batches?.length) return;
+    const b = batches.find(x => x.id === urlBatch || x.batchNumber === urlBatch);
+    if (b) {
+      setSelectedBatch(b);
+      setIsBatchDetailDialogOpen(true);
+    }
+  }, [urlBatch, batches]);
 
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily)))], [batches]);

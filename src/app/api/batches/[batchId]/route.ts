@@ -13,10 +13,40 @@ export async function GET(_req: Request, { params }: Params) {
   try {
     const ref = adminDb.collection("batches").doc(params.batchId);
     const snap = await ref.get();
-    if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ id: snap.id, ...declassify(snap.data()) });
+    if (!snap.exists) return NextResponse.json({ ok:false, error: { code:"NOT_FOUND", message:"Not found" } }, { status: 404 });
+    const batch = { id: snap.id, ...declassify(snap.data()) } as any;
+    // Photos
+    const photosSnap = await ref.collection("photos").orderBy("createdAt","desc").limit(60).get();
+    const photos = photosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const photosSplit = {
+      grower: photos.filter(p => p.type === "GROWER"),
+      sales: photos.filter(p => p.type === "SALES"),
+    };
+    // Logs (legacy inline logHistory)
+    const logs = Array.isArray(batch.logHistory) ? batch.logHistory.slice(-50) : [];
+    // Ancestry: follow transplantedFrom up to 3
+    const ancestry: any[] = [];
+    let cur: any = batch; let hops = 0;
+    while (cur?.transplantedFrom && hops < 3) {
+      const prevSnap = await adminDb.collection('batches').where('batchNumber', '==', cur.transplantedFrom).limit(1).get();
+      if (prevSnap.empty) break;
+      const prevDoc = prevSnap.docs[0];
+      const d = prevDoc.data() || {};
+      ancestry.push({
+        id: prevDoc.id,
+        batchNumber: d.batchNumber ?? prevDoc.id,
+        plantVariety: d.plantVariety ?? d.variety ?? "",
+        plantFamily: d.plantFamily ?? "",
+        size: d.size ?? "",
+        supplier: d.supplier ?? d.supplierName ?? null,
+        producedWeek: d.plantingDateWeek ?? null,
+      });
+      cur = { transplantedFrom: d.transplantedFrom };
+      hops++;
+    }
+    return NextResponse.json({ ok:true, data: { batch, logs, photos: photosSplit, ancestry } }, { status: 200 });
   } catch (e: any) {
-    return NextResponse.json({ error: toMessage(e) }, { status: 500 });
+    return NextResponse.json({ ok:false, error: { code:"SERVER_ERROR", message: toMessage(e) } }, { status: 500 });
   }
 }
 

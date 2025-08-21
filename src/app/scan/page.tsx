@@ -43,8 +43,7 @@ export default function ScanPage() {
             setStatus("found");
             track("scan_lookup_result", { result: "found", by: summary?.by ?? "unknown" });
             toast({ title: "Batch Found", description: `#${batch.batchNumber} - ${batch.plantVariety}` });
-            // TODO: navigate/show batch details
-            console.log("Batch found:", batch);
+            window.location.href = `/?batch=${encodeURIComponent(batch.id)}`;
         } else if (res.status === 404) {
             setStatus("not_found");
             track("scan_lookup_result", { result: "not_found" });

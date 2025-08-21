@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import type { Batch, NurseryLocation, PlantSize } from '@/lib/types';
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem
+} from '@/components/ui/select';
+import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf, Camera, Flag, QrCode, Printer, FlaskConical } from 'lucide-react';
@@ -26,8 +29,8 @@ import { FeatureGate } from './FeatureGate';
 import { BatchActionBar } from './batches/BatchActionBar';
 import BatchLabelPreview from './BatchLabelPreview';
 import { PlantPassportCard } from './batches/PlantPassportCard';
-import PhotoPicker from './actions/PhotoPicker';
-
+import BatchPhotoUploader from '@/components/batches/BatchPhotoUploader';
+import AncestryStrip from './ancestry-strip';
 
 interface BatchDetailDialogProps {
     open: boolean;
@@ -39,6 +42,19 @@ interface BatchDetailDialogProps {
     onGenerateProtocol: (batch: Batch) => void;
     onCareRecommendations: (batch: Batch) => void;
     onDelete?: (batch: Batch) => void;
+}
+
+function PhotoGrid({ items }: { items: Array<{id:string; url:string}> }) {
+  if (!items?.length) return <p className="text-sm text-muted-foreground">No photos.</p>;
+  return (
+    <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2">
+      {items.map(p=>(
+        <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" className="block">
+          <img src={p.url} alt="photo" className="rounded-md w-full aspect-square object-cover" />
+        </a>
+      ))}
+    </div>
+  );
 }
 
 export function BatchDetailDialog({ 
@@ -56,41 +72,49 @@ export function BatchDetailDialog({
   const [flagOpen, setFlagOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const { toast } = useToast();
-  const [photos, setPhotos] = React.useState<Array<{id:string; url:string}>>([]);
+  const [photos, setPhotos] = React.useState<{ grower: any[], sales: any[]}>({ grower: [], sales: [] });
   const [genBusy, setGenBusy] = React.useState(false);
+  const [updating, setUpdating] = useState(false);
+  const descId = "batch-desc";
   
   const refreshPhotos = async () => {
     if (!batch?.id) return;
     const r = await fetch(`/api/batches/${batch.id}/photos`);
     const j = await r.json();
-    if (Array.isArray(j.photos)) setPhotos(j.photos);
+    if (j.ok) {
+        const allPhotos = j.data.photos ?? [];
+        setPhotos({
+            grower: allPhotos.filter((p: any) => p.type === 'GROWER'),
+            sales: allPhotos.filter((p: any) => p.type === 'SALES'),
+        });
+    }
   };
-  
-  React.useEffect(() => { 
-    if (batch?.id) {
+
+  useEffect(() => { 
+    if (open && batch?.id) {
         refreshPhotos();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batch?.id]);
+  }, [open, batch?.id]);
 
-  const handlePhotoUpload = async (files: File[]) => {
-    if (!files.length || !batch?.id) return;
-    
+  async function updateStatus(next: Batch['status']) {
+    if (!batch?.id) return;
     try {
-      for (const file of files) {
-        const url = await uploadBatchPhoto(batch.id, file);
-        await fetch(`/api/batches/${batch.id}/log`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ type: "Photo", photoUrl: url }),
-        });
-      }
-      toast({ title: "Photo(s) uploaded", description: "The photos have been logged for this batch." });
-      refreshPhotos(); // Refresh photos after upload
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Upload Failed", description: err?.message ?? "Photo upload failed" });
+      setUpdating(true);
+      const res = await fetch(`/api/batches/${batch.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "Update failed");
+      toast({ title: "Status updated", description: `Now: ${next}` });
+      // You might want to trigger a refresh of the batch data here
+    } catch (e:any) {
+      toast({ variant: "destructive", title: "Failed to update status", description: e?.message ?? "Error" });
+    } finally {
+      setUpdating(false);
     }
-  };
+  }
 
   if (!batch) return null;
 
@@ -138,7 +162,6 @@ export function BatchDetailDialog({
   const handleCareRecommendations = () => onCareRecommendations(batch);
   const handleDelete = () => onDelete?.(batch);
   const handlePrint = () => setIsPreviewOpen(true);
-
 
   const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
     switch (status) {
@@ -204,10 +227,14 @@ export function BatchDetailDialog({
             width: "calc(100vw - 2rem)",
             maxWidth: "min(100vw - 2rem, 1180px)",
           }}
+          aria-describedby={descId}
         >
           <div className="h-[100dvh] overflow-y-auto sm:h-auto sm:max-h-[80vh]">
             <DialogHeader className="p-6">
-                <DialogTitle>Batch Actions</DialogTitle>
+                <DialogTitle>Batch #{batch?.batchNumber}</DialogTitle>
+                <DialogDescription id={descId}>
+                  View details, log actions, upload photos, and print labels.
+                </DialogDescription>
             </DialogHeader>
 
             <div className="px-6 pb-6">
@@ -218,7 +245,6 @@ export function BatchDetailDialog({
                   onPrint={handlePrint}
                   onDelete={onDelete ? handleDelete : undefined}
                   onActionLog={handleLogAction}
-                  onGenerateProtocol={handleGenerateProtocolClick}
                   onArchive={batch.status !== 'Archived' ? () => { console.log('archive'); } : undefined}
                   onUnarchive={batch.status === 'Archived' ? () => { console.log('unarchive'); } : undefined}
                   onPhotoAdded={refreshPhotos}
@@ -245,22 +271,12 @@ export function BatchDetailDialog({
                 </div>
               </section>
 
-              {!!photos.length && (
-                <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {photos.map((p) => (
-                    <a key={p.id} href={p.url} target="_blank" rel="noreferrer"
-                       className="block aspect-square overflow-hidden rounded-md border bg-muted/30">
-                      <img src={p.url} alt="Batch photo" className="h-full w-full object-cover" />
-                    </a>
-                  ))}
-                </div>
-              )}
-
               <Tabs defaultValue="summary" className="w-full mt-4">
                 <TabsList>
                   <TabsTrigger value="summary">Summary</TabsTrigger>
                   <TabsTrigger value="history">Log History</TabsTrigger>
                   <TabsTrigger value="photos">Photos</TabsTrigger>
+                  <TabsTrigger value="ancestry">Ancestry</TabsTrigger>
                   <TabsTrigger value="ai">AI Tools</TabsTrigger>
                 </TabsList>
                 <TabsContent value="summary">
@@ -278,9 +294,18 @@ export function BatchDetailDialog({
                          <PlantPassportCard batchId={batch.id!} />
                       </div>
                       <div className="md:col-span-2 grid grid-cols-2 gap-x-8 gap-y-4">
-                        <div>
-                          <div className="text-sm font-medium text-muted-foreground">Status</div>
-                          <div><Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge></div>
+                        <div className="space-y-1">
+                            <div className="text-sm font-medium text-muted-foreground">Status</div>
+                            <Select disabled={updating} onValueChange={(v)=>updateStatus(v as Batch['status'])} defaultValue={batch.status}>
+                                <SelectTrigger className="w-[220px]">
+                                <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                {["Propagation","Plugs/Liners","Potted","Ready for Sale","Looking Good","Archived"].map(s=>(
+                                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Location</p>
@@ -340,19 +365,21 @@ export function BatchDetailDialog({
                   </Card>
                 </TabsContent>
                 <TabsContent value="photos">
-                  <Card className="mt-2">
-                    <CardContent className="p-6">
-                      <PhotoPicker onChange={handlePhotoUpload} />
-                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mt-4">
-                         {photos.map((p) => (
-                          <a key={p.id} href={p.url} target="_blank" rel="noreferrer"
-                             className="block aspect-square overflow-hidden rounded-md border bg-muted/30">
-                            <img src={p.url} alt="Batch photo" className="h-full w-full object-cover" />
-                          </a>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                        <h4 className="font-medium mb-2">Grower Photos</h4>
+                        <BatchPhotoUploader batchId={batch.id!} type="GROWER" onUploaded={refreshPhotos} />
+                        <PhotoGrid items={photos.grower} />
+                        </div>
+                        <div>
+                        <h4 className="font-medium mb-2">Sales Photos</h4>
+                        <BatchPhotoUploader batchId={batch.id!} type="SALES" onUploaded={refreshPhotos} />
+                        <PhotoGrid items={photos.sales} />
+                        </div>
+                    </div>
+                </TabsContent>
+                <TabsContent value="ancestry">
+                    <AncestryStrip currentId={batch.id!} />
                 </TabsContent>
                  <TabsContent value="ai">
                   <Card className="mt-2">

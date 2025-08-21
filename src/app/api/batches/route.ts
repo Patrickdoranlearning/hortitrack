@@ -4,6 +4,9 @@ import "server-only";
 import { adminDb } from "@/server/db/admin";
 import { generateNextBatchId } from "@/server/batches/nextId";
 import { z } from "zod";
+import { withIdempotency } from "@/server/utils/idempotency";
+import { ok, fail } from "@/server/utils/envelope";
+
 
 // If you already have CreateBatch elsewhere, keep it. Otherwise this one is safe.
 const CreateBatch = z.object({
@@ -26,25 +29,19 @@ const CreateBatch = z.object({
 export async function POST(req: NextRequest) {
   const t0 = Date.now();
   try {
-    const maybe = await req.json().catch(() => ({} as any));
-    // Generate if caller didn't supply one
-    const batchNumber = maybe.batchNumber ?? await generateNextBatchId({ siteCode: maybe.siteCode });
-    const data = CreateBatch.parse({ ...maybe, batchNumber });
-
+    const data = CreateBatch.parse(await req.json());
+    const id = data.batchNumber || (await generateNextBatchId({ siteCode: data.siteCode ?? "IE" })).id;
     const ref = adminDb.collection("batches").doc();
-    await ref.set({
-      ...data,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    const result = await withIdempotency(req.headers.get("x-request-id"), async () => {
+      await ref.set({ ...data, batchNumber: id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      const snap = await ref.get();
+      return { status: 201, body: { id: ref.id, ...snap.data() } };
     });
-    const snap = await ref.get();
-    return NextResponse.json({ id: ref.id, ...snap.data() }, { status: 201 });
+    return ok(result.body, result.status);
   } catch (err: any) {
     console.error("[/api/batches POST] failed", { err: String(err) });
-    if (err?.issues) {
-      return NextResponse.json({ ok: false, error: "Invalid input", issues: err.issues }, { status: 422 });
-    }
-    return NextResponse.json({ ok: false, error: err?.message ?? "Server error" }, { status: 500 });
+    if (err?.issues) return fail(422, "INVALID_INPUT", "Invalid input", err.issues);
+    return fail(500, "SERVER_ERROR", err?.message ?? "Server error");
   } finally {
     const ms = Date.now() - t0;
     if (ms > 1000) console.warn("[/api/batches POST] slow", { ms });
