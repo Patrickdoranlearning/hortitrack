@@ -44,7 +44,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 import { ActionDialog } from '../components/actions/ActionDialog';
 import { BatchCard } from '../components/batch-card';
@@ -55,7 +55,7 @@ import { ProductionProtocolDialog } from '../components/production-protocol-dial
 import ScannerDialog from '../components/scan-and-act-dialog';
 import {
   TransplantForm,
-  TransplantFormData,
+  type TransplantFormData,
 } from '../components/transplant-form';
 import { VarietyForm } from '../components/variety-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -115,6 +115,8 @@ export default function HomePageView({
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const urlBatch = searchParams.get("batch");
 
   const isReadonly = !user;
 
@@ -192,6 +194,15 @@ export default function HomePageView({
       router.replace('/login');
     }
   }, [user, authLoading, router]);
+
+  React.useEffect(() => {
+    if (!urlBatch || !batches?.length) return;
+    const b = batches.find(x => x.id === urlBatch || x.batchNumber === urlBatch);
+    if (b) {
+      setSelectedBatch(b);
+      setIsDetailOpen(true);
+    }
+  }, [urlBatch, batches]);
 
   
   const handleOpenForm = (batch?: Batch) => {
@@ -282,20 +293,7 @@ export default function HomePageView({
   };
   
   const handleScanDetected = (text: string) => {
-    const parsed = parseScanCode(text);
-    const query = parsed?.value ?? text;
-    const list = (isReadonly ? initialBatches : batches) || [];
-    const match = list.find((b) => queryMatchesBatch(query, b));
-    if (match) {
-      setSelectedBatch(match as any);
-      setIsDetailOpen(true);
-    } else {
-      toast({
-        title: 'Batch not found',
-        description: `Scanned: ${text}`,
-        variant: 'destructive',
-      });
-    }
+    window.location.href = `/?batch=${encodeURIComponent(text)}`;
   };
 
 
