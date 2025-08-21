@@ -7,7 +7,7 @@ import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { db } from '@/lib/firebase-admin';
 import { z } from 'zod';
-import { generateNextBatchId, type BatchPhase } from '@/server/batches/nextId';
+import { generateNextBatchId } from '@/server/batches/nextId';
 import { declassify } from '@/server/utils/declassify';
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
@@ -108,17 +108,7 @@ export async function addBatchAction(
   newBatchData: Omit<Batch, 'id' | 'logHistory' | 'batchNumber'>
 ) {
   try {
-    const stageMap: Record<string, BatchPhase> = {
-      'Propagation': 'PROPAGATION',
-      'Plugs/Liners': 'PLUGS',
-      'Potted': 'POTTING',
-      'Ready for Sale': 'POTTING',
-      'Looking Good': 'POTTING'
-    };
-    const phase = stageMap[newBatchData.status] || 'POTTING';
-    
-    // Use the new batch ID generator
-    const { id: batchNumber } = await generateNextBatchId(phase, new Date(newBatchData.plantingDate));
+    const { id: batchNumber } = await generateNextBatchId({ when: new Date(newBatchData.plantingDate) });
     
     const newDocRef = db.collection('batches').doc();
     const newBatch: Batch = {
@@ -263,15 +253,7 @@ export async function transplantBatchAction(
             throw new Error('Insufficient quantity in source batch.');
         }
 
-        const stageMap: Record<string, BatchPhase> = {
-            'Propagation': 'PROPAGATION',
-            'Plugs/Liners': 'PLUGS',
-            'Potted': 'POTTING',
-            'Ready for Sale': 'POTTING',
-            'Looking Good': 'POTTING'
-        };
-        const phase = stageMap[newBatchData.status] || 'POTTING';
-        const { id: batchNumber } = await generateNextBatchId(phase, new Date(newBatchData.plantingDate));
+        const { id: batchNumber } = await generateNextBatchId({ when: new Date(newBatchData.plantingDate) });
 
         const newDocRef = db.collection('batches').doc();
         const newBatch: Batch = {
@@ -450,17 +432,9 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         for (const batchData of batches) {
             const docRef = db.collection('batches').doc();
             
-            const stageMap: Record<string, BatchPhase> = {
-              'Propagation': 'PROPAGATION',
-              'Plugs/Liners': 'PLUGS',
-              'Potted': 'POTTING',
-              'Ready for Sale': 'POTTING',
-              'Looking Good': 'POTTING'
-            };
-            const phase = stageMap[batchData.status] || 'POTTING';
             // Note: This runs the transaction for each row, which is inefficient but safe.
             // A more performant approach would pre-allocate numbers, but this is simpler.
-            const { id: batchNumber } = await generateNextNextBatchId(phase, new Date(batchData.plantingDate));
+            const { id: batchNumber } = await generateNextBatchId({ when: new Date(batchData.plantingDate) });
 
             const newBatch: Omit<Batch, 'id'> = {
               ...batchData,
@@ -477,3 +451,4 @@ export async function addBatchesFromCsvAction(batches: any[]) {
         return { success: false, error: error.message };
     }
 }
+

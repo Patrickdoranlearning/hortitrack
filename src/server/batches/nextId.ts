@@ -55,4 +55,4 @@ export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
 }
 
 // Kept for compatibility if anything imports it:
-export type BatchPhase = "propagation" | "potting" | "growing" | "sales";
+export type BatchPhase = "PROPAGATION" | "PLUGS" | "POTTING" | "POTTING";
