@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
   const t0 = Date.now();
   try {
     const data = CreateBatch.parse(await req.json());
-    const id = data.batchNumber || (await generateNextBatchId({ siteCode: data.siteCode ?? "IE" })).id;
-    const ref = adminDb.collection("batches").doc();
+    const { id } = await generateNextBatchId({ siteCode: data.siteCode ?? "IE", when: new Date(data.plantingDate) });
+    const ref = adminDb.collection("batches").doc(); // Let Firestore generate the document ID
     const result = await withIdempotency(req.headers.get("x-request-id"), async () => {
       await ref.set({ ...data, batchNumber: id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
       const snap = await ref.get();

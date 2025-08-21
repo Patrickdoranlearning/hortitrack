@@ -90,8 +90,7 @@ export async function POST(
       );
     }
 
-    const when = new Date(input.plantingDate);
-    const { id: childBatchNumber } = await generateNextBatchId({ when });
+    const { id: childBatchNumber } = await generateNextBatchId({ when: new Date(input.plantingDate) });
 
     const result = await adminDb.runTransaction(async (tx) => {
       const fresh = (await tx.get(srcRef)).data();
@@ -125,7 +124,7 @@ export async function POST(
         category: fresh.category,
         plantFamily: fresh.plantFamily,
         plantVariety: fresh.plantVariety,
-        plantingDate: when.toISOString(),
+        plantingDate: new Date(input.plantingDate).toISOString(),
         initialQuantity: qty,
         quantity: qty,
         status: "Propagation", // initial status after transplant

@@ -15,13 +15,10 @@ export async function GET(_req: Request, { params }: Params) {
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ ok:false, error: { code:"NOT_FOUND", message:"Not found" } }, { status: 404 });
     const batch = { id: snap.id, ...declassify(snap.data()) } as any;
-    // Photos
-    const photosSnap = await ref.collection("photos").orderBy("createdAt","desc").limit(60).get();
+    // Photos (split by type)
+    const photosSnap = await ref.collection("photos").orderBy("createdAt", "desc").limit(60).get();
     const photos = photosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const photosSplit = {
-      grower: photos.filter(p => p.type === "GROWER"),
-      sales: photos.filter(p => p.type === "SALES"),
-    };
+    const photosSplit = { grower: photos.filter(p => p.type === "GROWER"), sales: photos.filter(p => p.type === "SALES") };
     // Logs (legacy inline logHistory)
     const logs = Array.isArray(batch.logHistory) ? batch.logHistory.slice(-50) : [];
     // Ancestry: follow transplantedFrom up to 3

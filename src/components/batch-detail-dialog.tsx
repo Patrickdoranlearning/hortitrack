@@ -45,7 +45,7 @@ interface BatchDetailDialogProps {
 }
 
 function PhotoGrid({ items }: { items: Array<{id:string; url:string}> }) {
-  if (!items?.length) return <p className="text-sm text-muted-foreground">No photos.</p>;
+  if (!items?.length) return <p className="text-sm text-muted-foreground mt-2">No photos yet.</p>;
   return (
     <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2">
       {items.map(p=>(
@@ -72,10 +72,14 @@ export function BatchDetailDialog({
   const [flagOpen, setFlagOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const { toast } = useToast();
-  const [photos, setPhotos] = React.useState<{ grower: any[], sales: any[]}>({ grower: [], sales: [] });
+  const [photos, setPhotos] = React.useState<Array<{id:string; url:string; type:'GROWER'|'SALES'}>>([]);
   const [genBusy, setGenBusy] = React.useState(false);
   const [updating, setUpdating] = useState(false);
   const descId = "batch-desc";
+  const userRole = "ADMIN"; // Placeholder for role-based access
+  
+  const grower = photos.filter(p => p.type === "GROWER");
+  const sales = photos.filter(p => p.type === "SALES");
   
   const refreshPhotos = async () => {
     if (!batch?.id) return;
@@ -83,10 +87,7 @@ export function BatchDetailDialog({
     const j = await r.json();
     if (j.ok) {
         const allPhotos = j.data.photos ?? [];
-        setPhotos({
-            grower: allPhotos.filter((p: any) => p.type === 'GROWER'),
-            sales: allPhotos.filter((p: any) => p.type === 'SALES'),
-        });
+        setPhotos(allPhotos);
     }
   };
 
@@ -365,18 +366,24 @@ export function BatchDetailDialog({
                   </Card>
                 </TabsContent>
                 <TabsContent value="photos">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                        <h4 className="font-medium mb-2">Grower Photos</h4>
-                        <BatchPhotoUploader batchId={batch.id!} type="GROWER" onUploaded={refreshPhotos} />
-                        <PhotoGrid items={photos.grower} />
-                        </div>
-                        <div>
-                        <h4 className="font-medium mb-2">Sales Photos</h4>
-                        <BatchPhotoUploader batchId={batch.id!} type="SALES" onUploaded={refreshPhotos} />
-                        <PhotoGrid items={photos.sales} />
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">Grower Photos</h4>
+                        <span className="text-xs text-muted-foreground">{grower.length} photos</span>
+                      </div>
+                      <BatchPhotoUploader batchId={batch.id!} type="GROWER" role={userRole as any} onUploaded={refreshPhotos} />
+                      <PhotoGrid items={grower} />
                     </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">Sales Photos</h4>
+                        <span className="text-xs text-muted-foreground">{sales.length}/6</span>
+                      </div>
+                      <BatchPhotoUploader batchId={batch.id!} type="SALES" role={userRole as any} onUploaded={refreshPhotos} />
+                      <PhotoGrid items={sales} />
+                    </div>
+                  </div>
                 </TabsContent>
                 <TabsContent value="ancestry">
                     <AncestryStrip currentId={batch.id!} />

@@ -18,7 +18,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { useToast } from "@/hooks/use-toast";
-import { postJson } from "@/lib/net";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -47,27 +46,30 @@ const formSchema = (maxQuantity: number) => z.object({
   { path: ["locationId"], message: "Select a destination" }
 );
 
-type FormData = z.infer<ReturnType<typeof formSchema>>;
+export type TransplantFormData = z.infer<ReturnType<typeof formSchema>>;
 
 type Props = {
-  batch: Batch;
+  batch: Batch | null;
   nurseryLocations: NurseryLocation[];
   plantSizes: PlantSize[];
+  onSubmit: (data: TransplantFormData) => Promise<void>;
   onCancel: () => void;
   onSuccess?: (newBatch: { batchId: string; batchNumber: string }) => void;
 };
 
 export function TransplantForm({
-  batch, nurseryLocations, plantSizes, onCancel, onSuccess,
+  batch, nurseryLocations, plantSizes, onCancel, onSuccess, onSubmit: onSubmitProp,
 }: Props) {
   const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<PlantSize | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  if (!batch) return null;
+
   // default quantity = full batch until trays/size says otherwise
   const defaultQty = batch.quantity ?? 0;
 
-  const form = useForm<FormData>({
+  const form = useForm<TransplantFormData>({
     resolver: zodResolver(formSchema(defaultQty)),
     defaultValues: {
       plantingDate: new Date(),
@@ -105,9 +107,9 @@ export function TransplantForm({
     );
   }, [plantSizes]);
 
-  function idemKey(values: FormData) {
+  function idemKey(values: TransplantFormData) {
     const key = [
-      batch.id || batch.batchNumber,
+      batch!.id || batch!.batchNumber,
       values.size,
       values.locationId || values.location || "",
       values.quantity,
@@ -117,58 +119,10 @@ export function TransplantForm({
     return typeof window === "undefined" ? key : window.btoa(unescape(encodeURIComponent(key))).slice(0, 128);
   }
 
-  async function onSubmit(values: FormData) {
+  async function onSubmit(values: TransplantFormData) {
     if (!batch) return;
-    // Cancel any in-flight request
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-
-    const payload = {
-      plantingDate: values.plantingDate.toISOString(),
-      quantity: values.quantity ?? defaultQty,
-      size: values.size,
-      locationId: values.locationId,
-      location: values.location,
-      logRemainingAsLoss: values.logRemainingAsLoss,
-      notes: values.notes,
-    };
-
-    const batchKey = batch.id ?? batch.batchNumber;
-    const url = `/api/batches/${encodeURIComponent(String(batchKey))}/transplant`;
-
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": idemKey(values),
-        },
-        body: JSON.stringify(compactPayload(payload)),
-        signal: abortRef.current.signal,
-      });
-
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        if (j?.issues && Array.isArray(j.issues)) {
-          for (const iss of j.issues) {
-            const p = String(iss.path || "");
-            if (p === "size") form.setError("size", { message: iss.message });
-            if (p === "quantity") form.setError("quantity", { message: iss.message });
-            if (p.startsWith("location")) form.setError("locationId", { message: iss.message });
-            if (p === "plantingDate") form.setError("plantingDate", { message: iss.message });
-          }
-        }
-        const msg = j?.error || "Invalid input";
-        toast({ variant: "destructive", title: "Transplant failed", description: String(msg) });
-        return;
-      }
-
-      const j = await res.json();
-      toast({ title: "Transplant created", description: `New batch ${j?.newBatch?.batchNumber}` });
-      onSuccess?.(j.newBatch);
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Network error", description: String(e?.message || e) });
-    }
+    
+    await onSubmitProp(values);
   }
 
   return (
