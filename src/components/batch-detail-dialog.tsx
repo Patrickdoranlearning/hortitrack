@@ -30,7 +30,8 @@ import { BatchActionBar } from './batches/BatchActionBar';
 import BatchLabelPreview from './BatchLabelPreview';
 import { PlantPassportCard } from './batches/PlantPassportCard';
 import BatchPhotoUploader from '@/components/batches/BatchPhotoUploader';
-import AncestryStrip from './ancestry-strip';
+import dynamic from "next/dynamic";
+const AncestryStrip = dynamic(() => import("@/components/ancestry-strip"), { ssr: false });
 
 interface BatchDetailDialogProps {
     open: boolean;

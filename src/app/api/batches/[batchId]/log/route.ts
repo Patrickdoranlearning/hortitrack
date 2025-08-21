@@ -1,78 +1,44 @@
-export const runtime = "nodejs";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/server/db/admin";
-import { mapError } from "@/lib/validation";
+import { ok, fail } from "@/server/utils/envelope";
+import { withIdempotency } from "@/server/utils/idempotency";
+import { FieldValue } from "firebase-admin/firestore";
 
-const LogSchema = z.object({
-  type: z.enum([
-    "Spaced","Move","Trimmed","Dumped","Weed",
-    "Photo","Note","Flagged","Unflagged"
-  ]),
-  note: z.string().optional(),
-  photoUrl: z.string().url().optional(),
-  flag: z.object({
-    reason: z.string().min(1),
-    remedy: z.string().optional(),
-    severity: z.enum(["low","medium","high"]).optional(),
-  }).optional(),
-  userId: z.string().optional(),
-  userName: z.string().optional(),
-}).strict();
+const LogCreate = z.object({
+  action: z.string().min(1),      // e.g., "Move" | "Dump" | "Note"
+  notes: z.string().optional(),
+  photoId: z.string().optional(),
+});
 
-export async function POST(req: Request, ctx: { params: { batchId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: { batchId: string } }) {
+  const ref = adminDb.collection("batches").doc(params.batchId);
+  const snap = await ref.get();
+  if (!snap.exists) return fail(404, "NOT_FOUND", "Batch not found");
+  const logs = Array.isArray(snap.data()?.logHistory) ? snap.data()!.logHistory.slice(-100) : [];
+  return ok({ logs }, 200);
+}
+
+export async function POST(req: NextRequest, { params }: { params: { batchId: string } }) {
   try {
-    const { batchId } = ctx.params;
-    const json = await req.json();
-    const parsed = LogSchema.parse(json);
+    const payload = LogCreate.parse(await req.json());
+    const ref = adminDb.collection("batches").doc(params.batchId);
+    const exist = await ref.get();
+    if (!exist.exists) return fail(404, "NOT_FOUND", "Batch not found");
 
-    const ref = adminDb.collection("batches").doc(batchId);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
-    }
-
-    const now = new Date().toISOString();
-    const logEntry = {
-      type: parsed.type,
-      note: parsed.note,
-      photoUrl: parsed.photoUrl,
-      userId: parsed.userId,
-      userName: parsed.userName,
-      at: now,
-    };
-
-    const updates: Record<string, any> = {
-      updatedAt: FieldValue.serverTimestamp(),
-      logHistory: FieldValue.arrayUnion(logEntry),
-    };
-
-    if (parsed.type === "Flagged" && parsed.flag) {
-      updates.flag = {
-        active: true,
-        reason: parsed.flag.reason,
-        remedy: parsed.flag.remedy ?? "",
-        severity: parsed.flag.severity ?? "medium",
-        flaggedAt: now,
-        flaggedBy: parsed.userName ?? parsed.userId ?? "system",
-      };
-    }
-    if (parsed.type === "Unflagged") {
-      updates.flag = {
-        active: false,
-        reason: "",
-        remedy: "",
-        severity: "low",
-        flaggedAt: now,
-        flaggedBy: parsed.userName ?? parsed.userId ?? "system",
-      };
-    }
-
-    await ref.update(updates);
-    return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (e: any) {
-    const { status, body } = mapError(e);
-    return NextResponse.json(body, { status });
+    const result = await withIdempotency(req.headers.get("x-request-id"), async () => {
+      await ref.update({
+        logHistory: FieldValue.arrayUnion({
+          ...payload,
+          date: new Date().toISOString(),
+        }),
+        updatedAt: new Date().toISOString(),
+      });
+      return { status: 201, body: { ok: true } };
+    });
+    return ok(result.body, result.status);
+  } catch (e:any) {
+    if (e?.issues) return fail(422, "INVALID_INPUT", "Invalid input", e.issues);
+    return fail(500, "SERVER_ERROR", e?.message ?? "Server error");
   }
 }

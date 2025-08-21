@@ -13,20 +13,26 @@ export async function GET(_req: Request, { params }: Params) {
   try {
     const ref = adminDb.collection("batches").doc(params.batchId);
     const snap = await ref.get();
-    if (!snap.exists) return NextResponse.json({ ok:false, error: { code:"NOT_FOUND", message:"Not found" } }, { status: 404 });
+    if (!snap.exists) {
+      return NextResponse.json({ ok:false, error: { code:"NOT_FOUND", message:"Not found" } }, { status: 404 });
+    }
     const batch = { id: snap.id, ...declassify(snap.data()) } as any;
+
     // Photos (split by type)
     const photosSnap = await ref.collection("photos").orderBy("createdAt", "desc").limit(60).get();
     const photos = photosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const photosSplit = { grower: photos.filter(p => p.type === "GROWER"), sales: photos.filter(p => p.type === "SALES") };
+
     // Logs (legacy inline logHistory)
     const logs = Array.isArray(batch.logHistory) ? batch.logHistory.slice(-50) : [];
-    // Ancestry: follow transplantedFrom up to 3
+
+    // Ancestry: follow `transplantedFrom` or `ancestryFromId` up to 3
     const ancestry: any[] = [];
-    let cur: any = batch; let hops = 0;
-    while (cur?.transplantedFrom && hops < 3) {
-      const prevSnap = await adminDb.collection('batches').where('batchNumber', '==', cur.transplantedFrom).limit(1).get();
+    let prevId = batch.transplantedFrom || batch.ancestryFromId || null;
+    for (let hops = 0; prevId && hops < 3; hops++) {
+      const prevSnap = await adminDb.collection('batches').where('batchNumber', '==', prevId).limit(1).get();
       if (prevSnap.empty) break;
+
       const prevDoc = prevSnap.docs[0];
       const d = prevDoc.data() || {};
       ancestry.push({
@@ -36,11 +42,11 @@ export async function GET(_req: Request, { params }: Params) {
         plantFamily: d.plantFamily ?? "",
         size: d.size ?? "",
         supplier: d.supplier ?? d.supplierName ?? null,
-        producedWeek: d.plantingDateWeek ?? null,
+        producedWeek: d.plantingDateWeek ?? d.producedWeek ?? null,
       });
-      cur = { transplantedFrom: d.transplantedFrom };
-      hops++;
+      prevId = d.transplantedFrom || d.ancestryFromId || null;
     }
+
     return NextResponse.json({ ok:true, data: { batch, logs, photos: photosSplit, ancestry } }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ ok:false, error: { code:"SERVER_ERROR", message: toMessage(e) } }, { status: 500 });
