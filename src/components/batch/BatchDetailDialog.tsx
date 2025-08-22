@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -5,9 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { getBatchAncestry, getBatchSummary } from "@/lib/api/batches";
-import { AncestryNode, BatchSummary, PlantPassport } from "@/types/batch";
+import { AncestryNode, BatchSummary } from "@/types/batch";
 import { AncestryTab } from "@/components/batch/AncestryTab";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { ChevronLeft } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { logError, logInfo } from "@/lib/log";
@@ -22,26 +23,10 @@ type Props = {
   batchNumber: string;           // initial batch
 };
 
-function derivePassport(
-  summary: { batchNumber: string; variety?: string | null } | null
-): PlantPassport | null {
-  if (!summary) return null;
-
-  // Fallbacks:
-  // A = Variety, C = Batch Number. B & D left blank unless your API provides them.
-  // If you store these in settings, you can hydrate them here later.
-  return {
-    A_botanicalName: summary.variety ?? undefined,
-    C_traceabilityCode: summary.batchNumber,
-    // B_regNumber: settings?.regNumber,       // optional future enhancement
-    // D_countryOfOrigin: settings?.origin,    // optional future enhancement
-  };
-}
-
 export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
   // Controlled in-dialog navigation
   const [activeBatch, setActiveBatch] = React.useState(batchNumber);
-  const [summary, setSummary] = React.useState<{title: string; subtitle?: string, plantPassport?: PlantPassport; variety?: string; batchNumber: string;} | null>(null);
+  const [summary, setSummary] = React.useState<BatchSummary | null>(null);
   const [ancestry, setAncestry] = React.useState<AncestryNode[] | null>(null);
   const [history, setHistory] = React.useState<string[]>([]); // stack of previous batchNumbers
   const [activeTab, setActiveTab] = React.useState<TabKey>("summary");
@@ -51,6 +36,13 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
   const headerRef = React.useRef<HTMLHeadingElement | null>(null);
   const liveRef = React.useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
+
+  const headerTitle = summary
+    ? `${summary.batchNumber}${summary.variety ? ` — ${summary.variety}` : ""}`
+    : "Loading…";
+  const headerSubtitle = summary
+    ? [summary.variety, summary.size, summary.productionWeek].filter(Boolean).join(" · ")
+    : "";
 
   // Reset on initial open
   React.useEffect(() => {
@@ -74,13 +66,7 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
           getBatchAncestry(activeBatch),
         ]);
         if (cancelled) return;
-        setSummary({
-          title: `${s.batchNumber}${s.variety ? ` — ${s.variety}` : ""}`,
-          subtitle: [s.variety, s.size, s.productionWeek].filter(Boolean).join(" · "),
-          plantPassport: s.plantPassport,
-          variety: s.variety,
-          batchNumber: s.batchNumber,
-        });
+        setSummary(s);
         setAncestry(a);
         // announce for screen readers
         const announcement = `Opened batch ${s.batchNumber}${s.variety ? ` — ${s.variety}` : ""}`;
@@ -141,13 +127,13 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
         <DialogHeader>
           {/* ✅ Required by Radix: fixes your error */}
           <DialogTitle ref={headerRef} tabIndex={-1} className="outline-none">
-            {summary?.title ?? "Loading…"}
+            {headerTitle}
           </DialogTitle>
 
           {/* Subtitle & Back control */}
           <div className="flex items-center justify-between mt-1">
             <DialogDescription>
-              {summary?.subtitle ?? ""}
+              {headerSubtitle}
             </DialogDescription>
 
             {history.length > 0 && (
@@ -171,27 +157,15 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
           </TabsList>
 
           <TabsContent value="summary" className="pt-3">
-             <div className="grid gap-4 md:grid-cols-2">
-              <PlantPassportCard
-                passport={summary?.plantPassport ?? derivePassport(summary)}
-                onCopy={() => {
-                  const p = summary?.plantPassport ?? derivePassport(summary);
-                  const text = [
-                    `EU Plant Passport`,
-                    `A: ${p?.A_botanicalName ?? "—"}`,
-                    `B: ${p?.B_regNumber ?? "—"}`,
-                    `C: ${p?.C_traceabilityCode ?? "—"}`,
-                    `D: ${p?.D_countryOfOrigin ?? "—"}`
-                  ].join("\n");
-                  navigator.clipboard.writeText(text).catch(() => {/* ignore */});
-                  toast({ title: "Copied to clipboard" });
-                }}
-                onPrint={() => {
-                  window.print();
-                }}
-              />
-              {/* Other summary widgets go here */}
-            </div>
+             <div className="space-y-4">
+                <PlantPassportCard
+                  family={summary?.family}
+                  producerCode={summary?.supplier?.producerCode}
+                  batchNumber={activeBatch}
+                  countryCode={summary?.supplier?.countryCode}
+                  status={summary?.status}
+                />
+              </div>
           </TabsContent>
 
           <TabsContent value="log" className="pt-3">

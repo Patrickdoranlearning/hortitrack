@@ -1,80 +1,123 @@
+
 "use client";
 
 import * as React from "react";
-import { PlantPassport } from "@/types/batch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, Printer } from "lucide-react";
+import { Leaf, Clipboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 
 type Props = {
-  passport: PlantPassport | null;      // pass null to hide nicely
+  family?: string | null;               // A
+  producerCode?: string | null;         // B
+  batchNumber: string;                  // C
+  countryCode?: string | null;          // D
+  status?: string | null;               // to gray when archived
   className?: string;
-  onPrint?: () => void;
-  onCopy?: () => void;
+  defaultProducerCode?: string;         // fallback for B
+  defaultCountryCode?: string;          // fallback for D
 };
 
-export function PlantPassportCard({ passport, className, onPrint, onCopy }: Props) {
-  if (!passport) return null;
+export function PlantPassportCard({
+  family,
+  producerCode,
+  batchNumber,
+  countryCode,
+  status,
+  className,
+  defaultProducerCode = "IE2727 Doran Nurseries Producer Code",
+  defaultCountryCode = "IE",
+}: Props) {
+  const { toast } = useToast();
 
-  const A = passport.A_botanicalName || "—";
-  const B = passport.B_regNumber || "—";
-  const C = passport.C_traceabilityCode || "—";
-  const D = passport.D_countryOfOrigin || "—";
+  const A = (family && family.trim()) || "—";
+  const B = (producerCode && producerCode.trim()) || defaultProducerCode;
+  const C = batchNumber;
+  const D = (countryCode && countryCode.trim()) || defaultCountryCode;
+
+  const isArchived = (status ?? "").toLowerCase().includes("archiv");
+
+  function copy(value: string, label: string) {
+    navigator.clipboard.writeText(value).then(
+      () => toast({ title: `${label} copied` }),
+      () => toast({ title: `Couldn’t copy ${label}`, variant: "destructive" })
+    );
+  }
+
+  const Row = ({
+    code,
+    label,
+    value,
+    canCopy,
+    onCopy,
+  }: {
+    code: "A" | "B" | "C" | "D";
+    label: string;
+    value: string;
+    canCopy?: boolean;
+    onCopy?: () => void;
+  }) => (
+    <div className="grid grid-cols-[28px_1fr_auto] items-center gap-3 py-2 border-b last:border-b-0 border-black/10">
+      <div className="font-semibold">{code})</div>
+      <div>
+        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="font-serif text-base leading-tight">{value}</div>
+      </div>
+      <div className="pl-2">
+        {canCopy ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label={`Copy ${label}`}
+            onClick={(e) => { e.stopPropagation(); onCopy?.(); }}
+          >
+            <Clipboard className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
 
   return (
-    <div
+    <Card
       className={cn(
-        "relative rounded-2xl border bg-card text-card-foreground shadow-sm p-4",
+        "rounded-2xl border shadow-sm",
+        "bg-[#E5E8E3] text-foreground",
+        isArchived && "opacity-80",
         className
       )}
       data-testid="plant-passport-card"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div
-            aria-hidden
-            className="h-5 w-7 rounded-sm"
-            style={{ background:
-              "radial-gradient(circle at 50% 50%, #F7C948 2px, #1B4DB1 3px) repeat, #1B4DB1",
-              backgroundSize: "8px 8px" }}
-            title="EU Flag (stylised)"
+      <CardHeader className="py-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium tracking-tight">
+            Plant Passport
+          </CardTitle>
+          <Leaf aria-hidden className="h-4 w-4" />
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-1">
+          <Row code="A" label="Family" value={A} />
+          <Row
+            code="B"
+            label="Producer Code"
+            value={B}
+            canCopy
+            onCopy={() => copy(B, "Producer Code")}
           />
-          <div className="text-sm font-medium tracking-tight">EU Plant Passport</div>
+          <Row
+            code="C"
+            label="Batch No."
+            value={C}
+            canCopy
+            onCopy={() => copy(C, "Batch No.")}
+          />
+          <Row code="D" label="Country Code" value={D} />
         </div>
-
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Copy passport details"
-            onClick={(e) => { e.stopPropagation(); onCopy?.(); }}
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Print passport card"
-            onClick={(e) => { e.stopPropagation(); onPrint?.(); }}
-          >
-            <Printer className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-[24px_1fr] gap-y-1.5 text-sm">
-        <div className="font-semibold">A</div>
-        <div className="font-serif">{A}</div>
-
-        <div className="font-semibold">B</div>
-        <div>{B}</div>
-
-        <div className="font-semibold">C</div>
-        <div className="font-mono">{C}</div>
-
-        <div className="font-semibold">D</div>
-        <div>{D}</div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
