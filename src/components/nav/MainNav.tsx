@@ -30,19 +30,17 @@ export default function MainNav() {
   });
 
   return (
-    <nav className="flex items-center space-x-4 lg:space-x-6">
+    <nav className="space-y-1 p-2">
+      <div className="px-2 text-xs uppercase text-muted-foreground">Sales</div>
       {visible.map(item => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active = pathname === item.href || pathname.startsWith(item.href + "/");
+        const Icon = item.icon!;
         return (
-          <Link 
-            key={item.href} 
-            href={item.href}
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              active ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            {item.label}
+          <Link key={item.href} href={item.href} className="block">
+            <Button variant={active ? "secondary" : "ghost"} className={cn("w-full justify-start gap-2")}>
+              {Icon && <Icon className="h-4 w-4" />}
+              <span>{item.label}</span>
+            </Button>
           </Link>
         );
       })}

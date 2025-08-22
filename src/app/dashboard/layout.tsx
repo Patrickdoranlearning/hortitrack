@@ -1,6 +1,5 @@
 
 import React from "react";
-import dynamic from "next/dynamic";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,9 +17,7 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import Link from "next/link";
-import { MainNav } from "@/components/nav/MainNav";
-
-const MainNavDynamic = dynamic(() => import('@/components/nav/MainNav'), { ssr: false });
+import MainNav from "@/components/nav/MainNav";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,11 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Link>
           </div>
           <div className="flex-1">
-            <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
-              <Link href="/dashboard" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-                Dashboard
-              </Link>
-            </nav>
+            <MainNav />
           </div>
         </div>
       </div>
