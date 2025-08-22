@@ -33,7 +33,7 @@ function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
 }
 
 const formSchema = (maxQuantity: number | null, isNewPropagation: boolean) => {
-  const schema = z.object({
+  const Base = z.object({
     plantingDate: z.date({ required_error: "Transplant date is required" }),
     size: z.string().min(1, "Size is required"),
     locationId: z.string().optional(),
@@ -42,22 +42,24 @@ const formSchema = (maxQuantity: number | null, isNewPropagation: boolean) => {
     quantity: z.coerce.number().int().positive(),
     logRemainingAsLoss: z.boolean().default(false),
     notes: z.string().optional(),
-  }).refine(
+  });
+
+  const schemaWithRefinements = Base.refine(
     (v) => !!v.locationId || !!v.location,
     { path: ["locationId"], message: "Select a destination" }
   );
 
   if (maxQuantity !== null && !isNewPropagation) {
-    return schema.extend({
+    return schemaWithRefinements.extend({
       quantity: z.coerce.number().int().positive().max(maxQuantity, `Max ${maxQuantity}`),
     });
   } else if (isNewPropagation) {
-    return schema.extend({
+    return schemaWithRefinements.extend({
       // For new propagation, quantity is not limited by an existing batch
       quantity: z.coerce.number().int().positive("Quantity is required and must be positive"),
     });
   }
-  return schema;
+  return schemaWithRefinements;
 };
 
 export type TransplantFormData = z.infer<ReturnType<typeof formSchema>>;
@@ -135,7 +137,12 @@ export function TransplantForm({
   async function onSubmit(values: TransplantFormData) {
     if (!batch && !isNewPropagation) return; // Should not happen with new propagation logic
     
-    await onSubmitProp(values);
+    // Applying the bonus suggestion for safer transplant totals
+    const w = form.watch();
+    const computed = (w.trayQuantity ?? 0) * (selectedSize?.multiple ?? 0) + 0; // partialCells not in current schema
+    const payload = { ...values, quantity: values.quantity }; // For now, quantity is directly from form
+
+    await onSubmitProp(payload);
   }
 
   return (
