@@ -15,6 +15,7 @@ import {
   LogOut,
   Settings,
   Users,
+  ShoppingCart,
 } from 'lucide-react';
 import Link from "next/link";
 import { MainNav } from "@/components/nav/MainNav";
@@ -59,6 +60,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                <DropdownMenuItem asChild>
                 <Link href="/">
                   Nursery Stock
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/sales">
+                  <ShoppingCart />
+                  Sales
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

@@ -43,7 +43,8 @@ import {
   Sparkles,
   Users,
   Printer,
-  MoreHorizontal
+  MoreHorizontal,
+  ShoppingCart,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -377,6 +378,12 @@ export default function HomePageView({
                 <Link href="/dashboard">
                   <LayoutGrid />
                   Dashboard
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/sales">
+                  <ShoppingCart />
+                  Sales
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
