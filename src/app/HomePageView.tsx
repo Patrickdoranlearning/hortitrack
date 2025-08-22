@@ -42,6 +42,8 @@ import {
   Settings,
   Sparkles,
   Users,
+  Printer,
+  MoreHorizontal
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -65,6 +67,9 @@ import { FeatureGate } from '@/components/FeatureGate';
 import { getIdTokenOrNull } from "@/lib/auth/client"; // Import getIdTokenOrNull
 import { queryMatchesBatch } from '@/lib/search';
 import { parseScanCode } from '@/lib/scan/parse';
+import BatchLabelPreview from '@/components/BatchLabelPreview';
+import { TransplantIcon, CareIcon } from '@/components/icons';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -116,11 +121,10 @@ export default function HomePageView({
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
-  const urlBatch = searchParams.get("batch");
+  const urlBatchId = searchParams.get("batch");
 
   const isReadonly = !user;
 
-  // Use the initial data passed from the server component
   const { data: batchesData, forceRefresh } = useCollection<Batch>('batches', initialBatches);
   const batches = batchesData || [];
 
@@ -142,7 +146,7 @@ export default function HomePageView({
   );
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
-  const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = React.useState(false);
   const [isLogActionOpen, setIsLogActionOpen] = React.useState(false);
   const [isTransplantOpen, setIsTransplantOpen] = React.useState(false);
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
@@ -150,6 +154,7 @@ export default function HomePageView({
     React.useState(false);
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
   const [isScanOpen, setIsScanOpen] = React.useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
 
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
@@ -196,13 +201,13 @@ export default function HomePageView({
   }, [user, authLoading, router]);
 
   React.useEffect(() => {
-    if (!urlBatch || !batches?.length) return;
-    const b = batches.find(x => x.id === urlBatch || x.batchNumber === urlBatch);
+    if (!urlBatchId || !batches?.length) return;
+    const b = batches.find(x => x.id === urlBatchId || x.batchNumber === urlBatchId);
     if (b) {
       setSelectedBatch(b);
-      setIsDetailOpen(true);
+      setIsDetailDialogOpen(true);
     }
-  }, [urlBatch, batches]);
+  }, [urlBatchId, batches]);
 
   
   const handleOpenForm = (batch?: Batch) => {
@@ -212,7 +217,7 @@ export default function HomePageView({
 
   const handleOpenDetail = (batch: Batch) => {
     setSelectedBatch(batch);
-    setIsDetailOpen(true);
+    setIsDetailDialogOpen(true);
   };
 
   const handleLogAction = (batch: Batch) => {
@@ -224,6 +229,11 @@ export default function HomePageView({
     setSelectedBatch(batch);
     setIsTransplantOpen(true);
   };
+  
+  const handlePrintClick = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsPreviewOpen(true);
+  }
 
   const handleGenerateProtocol = (batch: Batch) => {
     setSelectedBatch(batch);
@@ -285,8 +295,6 @@ export default function HomePageView({
 
   const handleAiCareClick = async () => {
     if (!batches || batches.length === 0) return;
-    // For simplicity, let's just pick the first batch for now.
-    // In a real app, you might let the user select a batch or use a different trigger.
     const batchForRecs = batches[0];
     setSelectedBatch(batchForRecs);
     setIsRecommendationsOpen(true);
@@ -336,7 +344,7 @@ export default function HomePageView({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && filteredBatches.length > 0) {
                   setSelectedBatch(filteredBatches[0] as any);
-                  setIsDetailOpen(true);
+                  setIsDetailDialogOpen(true);
                 }
               }}
             />
@@ -478,9 +486,44 @@ export default function HomePageView({
                 <BatchCard
                   key={batch.id}
                   batch={batch}
-                  onClick={handleOpenDetail}
-                  onLogAction={handleLogAction}
-                  onTransplant={handleTransplant}
+                  onOpen={handleOpenDetail}
+                  actionsSlot={
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => handlePrintClick(batch)}>
+                                  <Printer className="h-5 w-5" />
+                                  <span className="sr-only">Print Label</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Print Label</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => handleLogAction(batch)}>
+                                  <CareIcon />
+                                  <span className="sr-only">Actions</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Log Action</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => handleTransplant(batch)} disabled={batch.quantity === 0}>
+                                  <TransplantIcon />
+                                  <span className="sr-only">Transplant</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Transplant</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                  }
                 />
               ))}
         </div>
@@ -521,17 +564,19 @@ export default function HomePageView({
           </div>
         </DialogContent>
       </Dialog>
-
-      <BatchDetailDialog
-        open={isDetailOpen}
-        onOpenChange={setIsDetailOpen}
-        batch={selectedBatch}
-        onEdit={handleOpenForm}
-        onTransplant={handleTransplant}
-        onLogAction={handleLogAction}
-        onGenerateProtocol={handleGenerateProtocol}
-        onCareRecommendations={handleRecommendations}
-      />
+      
+      {selectedBatch && (
+        <BatchDetailDialog
+          open={isDetailDialogOpen}
+          onOpenChange={setIsDetailDialogOpen}
+          batch={selectedBatch}
+          onEdit={handleOpenForm}
+          onTransplant={handleTransplant}
+          onLogAction={handleLogAction}
+          onGenerateProtocol={handleGenerateProtocol}
+          onCareRecommendations={handleRecommendations}
+        />
+      )}
 
       <ActionDialog
         open={isLogActionOpen}
@@ -577,6 +622,20 @@ export default function HomePageView({
         onOpenChange={setIsScanOpen} 
         onDetected={handleScanDetected}
       />
+       {selectedBatch && <BatchLabelPreview
+        open={isPreviewOpen}
+        onOpenChange={setIsPreviewOpen}
+        batch={{
+          id: selectedBatch.id!,
+          batchNumber: selectedBatch.batchNumber,
+          plantVariety: selectedBatch.plantVariety,
+          plantFamily: selectedBatch.plantFamily,
+          size: selectedBatch.size,
+          location: selectedBatch.location,
+          initialQuantity: selectedBatch.initialQuantity ?? selectedBatch.quantity ?? 0,
+          quantity: selectedBatch.quantity,
+        }}
+      />}
     </div>
   );
 }
