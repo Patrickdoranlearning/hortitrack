@@ -6,9 +6,10 @@ import { ok, fail } from "@/server/utils/envelope";
 import { CreateOrderSchema, type AllocatedLine } from "@/lib/sales/types";
 import { allocateForProductLine } from "@/server/sales/allocation";
 import { adminDb } from "@/server/db/admin";
-import { getUser } from "@/server/auth/getUser"; // existing
+import { getUser } from "@/server/auth/getUser";
 import { nanoid } from "nanoid";
-import { checkRateLimit, requestKey } from "@/server/security/rateLimit"; 
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { requireRoles } from "@/server/auth/roles";
 
 const BodySchema = CreateOrderSchema;
 
@@ -94,5 +95,26 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("[sales:orders:POST] error", err);
     return fail(500, "server_error", err?.message ?? "Unexpected error.");
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const authz = await requireRoles(["sales:read"]);
+    if (!authz.ok) return fail(authz.reason === "unauthenticated" ? 401 : 403, authz.reason, "Not allowed.");
+
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+    const limit = Math.min(Number(searchParams.get("limit") || 50), 200);
+
+    let q = adminDb.collection("sales_orders").orderBy("createdAt", "desc").limit(limit);
+    if (status) q = q.where("status", "==", status);
+
+    const snap = await q.get();
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return ok({ items: data });
+  } catch (e: any) {
+    console.error("[sales:orders:GET]", e);
+    return fail(500, "server_error", e?.message || "Unexpected");
   }
 }
