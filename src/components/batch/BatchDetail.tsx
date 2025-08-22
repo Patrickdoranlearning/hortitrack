@@ -5,11 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBatchDetail } from "@/hooks/useBatchDetail";
 import { AncestryTab } from "./AncestryTab";
-import { useBatchDetailDialog } from "@/stores/useBatchDetailDialog";
-import { useAncestryNavPreference } from "@/lib/prefs";
-import { logError } from "@/lib/log";
-import { useToast } from "@/hooks/use-toast";
-import { track } from "@/lib/analytics";
+import { PlantPassportCard } from "./PlantPassportCard";
 
 type TabKey = "summary" | "log" | "photos" | "ancestry" | "ai";
 
@@ -17,29 +13,9 @@ export function BatchDetail({
   batchId,
   initialTab = "summary",
 }: { batchId: string; initialTab?: TabKey }) {
-  const { data, error, isLoading, mutate } = useBatchDetail(batchId);
-  const [activeTab, setActiveTab] = React.useState<TabKey>(initialTab);
-  const { open } = useBatchDetailDialog();
-  const { stayOnAncestry, setStayOnAncestry } = useAncestryNavPreference();
-  const [loadingToId, setLoadingToId] = React.useState<string | null>(null);
-  const { toast } = useToast();
-
-  React.useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
-
-  const handleOpenAncestor = (toBatchNumber: string, cardIndex: number) => {
-    track("ui.ancestry.card_click", { fromBatchId: batchId, toBatchId: toBatchNumber, cardIndex });
-    setLoadingToId(toBatchNumber);
-    try {
-        open(toBatchNumber, stayOnAncestry ? "ancestry" : "summary");
-    } catch (e) {
-        logError("ancestry_nav_failed", { toBatchNumber, error: String(e) });
-        toast({ title: "Couldn’t open that batch. Please try again.", variant: "destructive" });
-    } finally {
-        setLoadingToId(null);
-    }
-  };
+  const { data, error, isLoading } = useBatchDetail(batchId);
+  const [tab, setTab] = React.useState<TabKey>(initialTab);
+  React.useEffect(() => setTab(initialTab), [initialTab]);
 
   if (isLoading) {
     return (
@@ -63,7 +39,7 @@ export function BatchDetail({
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="w-full">
+    <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
       <TabsList>
         <TabsTrigger value="summary">Summary</TabsTrigger>
         <TabsTrigger value="log">Log History</TabsTrigger>
@@ -72,15 +48,46 @@ export function BatchDetail({
         <TabsTrigger value="ai">AI Tools</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="summary">
-        <div className="p-6 space-y-2">
-          <div className="text-sm"><span className="font-medium">Batch #:</span> {data.batchNumber}</div>
-          <div className="text-sm"><span className="font-medium">Variety:</span> {data.variety}</div>
-          {data.family && <div className="text-sm"><span className="font-medium">Family:</span> {data.family}</div>}
-          {data.size && <div className="text-sm"><span className="font-medium">Size:</span> {data.size}</div>}
-          {data.supplierName && <div className="text-sm"><span className="font-medium">Supplier:</span> {data.supplierName}</div>}
-          {data.productionWeek && <div className="text-sm"><span className="font-medium">Production Week:</span> {data.productionWeek}</div>}
-          <div className="text-sm"><span className="font-medium">Status:</span> {data.status}</div>
+      <TabsContent value="summary" className="pt-3">
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm p-4 border rounded-lg">
+                <div>
+                    <p className="text-muted-foreground">Batch #</p>
+                    <p className="font-medium">{data.batchNumber}</p>
+                </div>
+                 <div>
+                    <p className="text-muted-foreground">Variety</p>
+                    <p className="font-medium">{data.variety}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Family</p>
+                    <p className="font-medium">{data.family || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Size</p>
+                    <p className="font-medium">{data.size || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Supplier</p>
+                    <p className="font-medium">{data.supplierName || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Prod. Week</p>
+                    <p className="font-medium">{data.productionWeek || 'N/A'}</p>
+                </div>
+                 <div>
+                    <p className="text-muted-foreground">Status</p>
+                    <p className="font-medium">{data.status}</p>
+                </div>
+            </div>
+
+            <PlantPassportCard
+                family={data.family}
+                producerCode={data.supplier?.producerCode}
+                batchNumber={batchId}
+                countryCode={data.supplier?.countryCode}
+                status={data.status}
+            />
         </div>
       </TabsContent>
 
@@ -95,14 +102,7 @@ export function BatchDetail({
       </TabsContent>
 
       <TabsContent value="ancestry">
-        <AncestryTab 
-            nodes={data.ancestryNodes || null} 
-            currentBatchNumber={data.batchNumber} 
-            onOpenBatch={handleOpenAncestor} 
-            loadingToId={loadingToId}
-            stayOnAncestry={stayOnAncestry}
-            onToggleStayOnAncestry={setStayOnAncestry}
-        />
+        <AncestryTab batchId={batchId} />
       </TabsContent>
 
       <TabsContent value="ai">
