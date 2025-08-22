@@ -1,6 +1,7 @@
 
 import { z } from "zod";
 
+// NEW: supplier shape (all optional)
 export const SupplierSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
@@ -8,6 +9,8 @@ export const SupplierSchema = z.object({
   countryCode: z.string().nullable().optional(),    // D
 });
 
+
+// ⬇️ Add this schema
 export const PlantPassportSchema = z.object({
   aFamily: z.string().nullable().optional(),        // A
   bProducerCode: z.string().nullable().optional(),  // B
@@ -15,6 +18,7 @@ export const PlantPassportSchema = z.object({
   dCountryCode: z.string().nullable().optional(),   // D
 });
 
+// ⬇️ Extend BatchSummarySchema to include plantPassport (optional)
 export const BatchSummarySchema = z.object({
   id: z.string(),
   batchNumber: z.string(),
@@ -23,12 +27,13 @@ export const BatchSummarySchema = z.object({
   productionWeek: z.string().nullable().optional(),
   status: z.string().optional(),
   family: z.string().nullable().optional(),         // A
-  supplier: SupplierSchema.nullable().optional(),   // B, D
+  supplier: SupplierSchema.nullable().optional(),   // B, D (and name if you need)
 });
 
 export type PlantPassport = z.infer<typeof PlantPassportSchema>;
 export type Supplier = z.infer<typeof SupplierSchema>;
 export type BatchSummary = z.infer<typeof BatchSummarySchema>;
+
 
 export const AncestryNodeSchema = z.object({
   id: z.string(),

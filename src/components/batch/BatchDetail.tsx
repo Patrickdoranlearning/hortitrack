@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -6,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBatchDetail } from "@/hooks/useBatchDetail";
 import { AncestryTab } from "./AncestryTab";
-import { PlantPassportCard } from "./PlantPassportCard";
+import PlantPassportCard from "@/components/batch/PlantPassportCard";
+import { computePassportFromBatch } from "@/lib/passport";
 
 type TabKey = "summary" | "log" | "photos" | "ancestry" | "ai";
 
@@ -39,6 +39,8 @@ export function BatchDetail({
     return <div className="p-6 text-sm text-muted-foreground">Batch not found.</div>;
   }
 
+  const passport = computePassportFromBatch(data);
+
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
       <TabsList>
@@ -50,47 +52,50 @@ export function BatchDetail({
       </TabsList>
 
       <TabsContent value="summary" className="pt-3">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
-                  <div>
-                      <p className="text-muted-foreground">Batch #</p>
-                      <p className="font-medium">{data.batchNumber}</p>
-                  </div>
-                   <div>
-                      <p className="text-muted-foreground">Variety</p>
-                      <p className="font-medium">{data.variety}</p>
-                  </div>
-                  <div>
-                      <p className="text-muted-foreground">Family</p>
-                      <p className="font-medium">{data.family || 'N/A'}</p>
-                  </div>
-                  <div>
-                      <p className="text-muted-foreground">Size</p>
-                      <p className="font-medium">{data.size || 'N/A'}</p>
-                  </div>
-                  <div>
-                      <p className="text-muted-foreground">Supplier</p>
-                      <p className="font-medium">{data.supplierName || 'N/A'}</p>
-                  </div>
-                  <div>
-                      <p className="text-muted-foreground">Prod. Week</p>
-                      <p className="font-medium">{data.productionWeek || 'N/A'}</p>
-                  </div>
-                   <div>
-                      <p className="text-muted-foreground">Status</p>
-                      <p className="font-medium">{data.status}</p>
-                  </div>
-              </div>
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
+                <div>
+                    <p className="text-muted-foreground">Batch #</p>
+                    <p className="font-medium">{data.batchNumber}</p>
+                </div>
+                 <div>
+                    <p className="text-muted-foreground">Variety</p>
+                    <p className="font-medium">{data.variety}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Family</p>
+                    <p className="font-medium">{data.family || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Size</p>
+                    <p className="font-medium">{data.size || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Supplier</p>
+                    <p className="font-medium">{data.supplierName || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Prod. Week</p>
+                    <p className="font-medium">{data.productionWeek || 'N/A'}</p>
+                </div>
+                 <div>
+                    <p className="text-muted-foreground">Status</p>
+                    <p className="font-medium">{data.status}</p>
+                </div>
             </div>
             <PlantPassportCard
-                family={data.family}
-                producerCode={data.supplier?.producerCode}
-                batchNumber={data.batchNumber}
-                countryCode={data.supplier?.countryCode}
-                status={data.status}
-              />
-          </div>
+                family={passport.aFamily}
+                producerCode={passport.bProducerCode}
+                batchNumber={passport.cBatchNumber}
+                countryCode={passport.dCountryCode}
+                status={data.status ?? null}
+            />
+            {passport.warnings.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                {passport.warnings.join(" ")}
+                </p>
+            ) : null}
+        </div>
       </TabsContent>
 
       <TabsContent value="log">
