@@ -52,7 +52,7 @@ export default function PropagationPage() {
       return;
     }
     const batch = await res.json();
-    router.push(`/`); // or open dialog
+    router.push(`/?batch=${batch.id}`);
   }
 
   return (

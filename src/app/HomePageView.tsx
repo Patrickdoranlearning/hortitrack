@@ -155,6 +155,7 @@ export default function HomePageView({
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
   const [isScanOpen, setIsScanOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
+  const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
 
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
@@ -269,15 +270,26 @@ export default function HomePageView({
   };
 
   const handleTransplantSubmit = async (data: TransplantFormData) => {
-    if (!selectedBatch?.id) return;
+    // If selectedBatch is null, it's a new propagation
+    const sourceBatchId = selectedBatch?.id;
     const { quantity, logRemainingAsLoss, ...newBatchData } = data;
-    await actions.transplantBatch(
-      selectedBatch.id,
-      newBatchData,
-      quantity,
-      logRemainingAsLoss
-    );
+
+    // For new propagation, call addBatch directly, not transplantBatch
+    if (!sourceBatchId) {
+      await actions.addBatch({
+        ...newBatchData,
+        quantity,
+      } as Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'logHistory'>);
+    } else {
+      await actions.transplantBatch(
+        sourceBatchId,
+        newBatchData,
+        quantity,
+        logRemainingAsLoss
+      );
+    }
     setIsTransplantOpen(false);
+    setIsNewPropagationOpen(false); // Close the new propagation dialog
     setSelectedBatch(null);
   };
 
@@ -410,9 +422,22 @@ export default function HomePageView({
                 <Sparkles /> AI Care
               </Button>
             </FeatureGate>
-            <Button onClick={() => handleOpenForm()} disabled={isReadonly} className="w-full sm:w-auto">
-              <Plus /> New Batch
-            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={isReadonly} className="w-full sm:w-auto">
+                  <Plus /> New Batch
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/production/batches/new/propagation">New Propagation</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/production/batches/new/checkin">New Check-in</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -585,14 +610,18 @@ export default function HomePageView({
         locations={(nurseryLocations || []).map(l => ({ id: l.id!, name: l.name }))}
       />
 
-      <Dialog open={isTransplantOpen} onOpenChange={setIsTransplantOpen}>
+      <Dialog open={isTransplantOpen || isNewPropagationOpen} onOpenChange={isTransplantOpen ? setIsTransplantOpen : setIsNewPropagationOpen}>
         <DialogContent className="max-w-4xl">
           <TransplantForm
             batch={selectedBatch}
             onSubmit={handleTransplantSubmit}
-            onCancel={() => setIsTransplantOpen(false)}
+            onCancel={() => {
+              setIsTransplantOpen(false);
+              setIsNewPropagationOpen(false);
+            }}
             nurseryLocations={nurseryLocations || []}
             plantSizes={plantSizes || []}
+            isNewPropagation={isNewPropagationOpen} // New prop
           />
         </DialogContent>
       </Dialog>

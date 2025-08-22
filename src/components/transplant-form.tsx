@@ -32,19 +32,33 @@ function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
   return out as Partial<T>;
 }
 
-const formSchema = (maxQuantity: number) => z.object({
-  plantingDate: z.date({ required_error: "Transplant date is required" }),
-  size: z.string().min(1, "Size is required"),
-  locationId: z.string().optional(),
-  location: z.string().optional(),
-  trayQuantity: z.coerce.number().int().nonnegative().optional(),
-  quantity: z.coerce.number().int().positive().max(maxQuantity, `Max ${maxQuantity}`),
-  logRemainingAsLoss: z.boolean().default(false),
-  notes: z.string().optional(),
-}).refine(
-  (v) => !!v.locationId || !!v.location,
-  { path: ["locationId"], message: "Select a destination" }
-);
+const formSchema = (maxQuantity: number | null, isNewPropagation: boolean) => {
+  const schema = z.object({
+    plantingDate: z.date({ required_error: "Transplant date is required" }),
+    size: z.string().min(1, "Size is required"),
+    locationId: z.string().optional(),
+    location: z.string().optional(),
+    trayQuantity: z.coerce.number().int().nonnegative().optional(),
+    quantity: z.coerce.number().int().positive(),
+    logRemainingAsLoss: z.boolean().default(false),
+    notes: z.string().optional(),
+  }).refine(
+    (v) => !!v.locationId || !!v.location,
+    { path: ["locationId"], message: "Select a destination" }
+  );
+
+  if (maxQuantity !== null && !isNewPropagation) {
+    return schema.extend({
+      quantity: z.coerce.number().int().positive().max(maxQuantity, `Max ${maxQuantity}`),
+    });
+  } else if (isNewPropagation) {
+    return schema.extend({
+      // For new propagation, quantity is not limited by an existing batch
+      quantity: z.coerce.number().int().positive("Quantity is required and must be positive"),
+    });
+  }
+  return schema;
+};
 
 export type TransplantFormData = z.infer<ReturnType<typeof formSchema>>;
 
@@ -55,22 +69,21 @@ type Props = {
   onSubmit: (data: TransplantFormData) => Promise<void>;
   onCancel: () => void;
   onSuccess?: (newBatch: { batchId: string; batchNumber: string }) => void;
+  isNewPropagation: boolean; // New prop
 };
 
 export function TransplantForm({
-  batch, nurseryLocations, plantSizes, onCancel, onSuccess, onSubmit: onSubmitProp,
+  batch, nurseryLocations, plantSizes, onCancel, onSuccess, onSubmit: onSubmitProp, isNewPropagation,
 }: Props) {
   const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<PlantSize | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  if (!batch) return null;
-
   // default quantity = full batch until trays/size says otherwise
-  const defaultQty = batch.quantity ?? 0;
+  const defaultQty = isNewPropagation ? 0 : (batch?.quantity ?? 0);
 
   const form = useForm<TransplantFormData>({
-    resolver: zodResolver(formSchema(defaultQty)),
+    resolver: zodResolver(formSchema(isNewPropagation ? null : defaultQty, isNewPropagation)),
     defaultValues: {
       plantingDate: new Date(),
       size: "",
@@ -91,14 +104,14 @@ export function TransplantForm({
     if (t && m && m > 1) {
       const q = t * m;
       form.setValue("quantity", q, { shouldValidate: true, shouldDirty: true });
-    } else {
-      // if user hasn’t typed anything, keep full batch by default
+    } else if (!isNewPropagation) {
+      // if user hasn’t typed anything, keep full batch by default, only for transplant
       const current = form.getValues("quantity");
       if (!current || current <= 0) {
         form.setValue("quantity", defaultQty, { shouldValidate: true });
       }
     }
-  }, [form, selectedSize, defaultQty, form.watch("trayQuantity")]);
+  }, [form, selectedSize, defaultQty, isNewPropagation, form.watch("trayQuantity")]);
 
   const sortedPlantSizes = useMemo(() => {
     // Example sort by size string; adjust to your preference
@@ -109,7 +122,7 @@ export function TransplantForm({
 
   function idemKey(values: TransplantFormData) {
     const key = [
-      batch!.id || batch!.batchNumber,
+      batch?.id || batch?.batchNumber || "new-propagation",
       values.size,
       values.locationId || values.location || "",
       values.quantity,
@@ -120,7 +133,7 @@ export function TransplantForm({
   }
 
   async function onSubmit(values: TransplantFormData) {
-    if (!batch) return;
+    if (!batch && !isNewPropagation) return; // Should not happen with new propagation logic
     
     await onSubmitProp(values);
   }
@@ -129,10 +142,12 @@ export function TransplantForm({
     <>
     <DialogHeader>
         <DialogTitle className="font-headline text-2xl">
-          Transplant Batch
+          {isNewPropagation ? "New Propagation" : "Transplant Batch"}
         </DialogTitle>
         <DialogDescription>
-          Create a new batch from existing batch #{batch?.batchNumber}.
+          {isNewPropagation 
+            ? "Create a brand new batch for propagation." 
+            : `Create a new batch from existing batch #${batch?.batchNumber}.`}
         </DialogDescription>
       </DialogHeader>
     <Form {...form}>
@@ -266,32 +281,42 @@ export function TransplantForm({
                   <FormItem>
                     <FormLabel>Total Plants</FormLabel>
                     <FormControl>
-                      <Input readOnly className="bg-muted" type="number" value={field.value ?? ""} />
+                      <Input 
+                        readOnly={!isNewPropagation} 
+                        className={cn({ "bg-muted": !isNewPropagation })} 
+                        type="number" 
+                        min={isNewPropagation ? 1 : 0} // For new propagation, min quantity is 1
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                      />
                     </FormControl>
-                    <FormDescription>Max available: {batch.quantity}</FormDescription>
+                    {!isNewPropagation && <FormDescription>Max available: {batch?.quantity}</FormDescription>}
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="logRemainingAsLoss"
-              render={({ field }) => (
-                <FormItem className="flex gap-3 items-start rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Log remaining units as loss and archive original batch</FormLabel>
-                    <FormDescription>
-                      Any untransplanted units will be logged as a loss and the original batch will be archived.
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
+            {!isNewPropagation && (
+              <FormField
+                control={form.control}
+                name="logRemainingAsLoss"
+                render={({ field }) => (
+                  <FormItem className="flex gap-3 items-start rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Log remaining units as loss and archive original batch</FormLabel>
+                      <FormDescription>
+                        Any untransplanted units will be logged as a loss and the original batch will be archived.
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
         </ScrollArea>
 
@@ -300,7 +325,7 @@ export function TransplantForm({
             Cancel
           </Button>
           <SubmitButton pending={form.formState.isSubmitting}>
-            Create Transplanted Batch
+            {isNewPropagation ? "Create New Propagation Batch" : "Create Transplanted Batch"}
           </SubmitButton>
         </DialogFooter>
       </form>

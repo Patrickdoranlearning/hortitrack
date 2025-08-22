@@ -55,7 +55,7 @@ export default function CheckinPage() {
       return;
     }
     const batch = await res.json();
-    router.push(`/`);
+    router.push(`/?batch=${batch.id}`);
   }
 
   return (
