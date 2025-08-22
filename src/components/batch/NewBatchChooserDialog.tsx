@@ -4,6 +4,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { CheckinDialog } from "@/components/checkin-dialog";
 
 export default function NewBatchChooserDialog({
   open, onOpenChange
@@ -18,9 +19,13 @@ export default function NewBatchChooserDialog({
           <Link href="/production/batches/new/propagation">
             <Button className="w-full" size="lg">Propagation Batch</Button>
           </Link>
-          <Link href="/production/batches/new/checkin">
-            <Button className="w-full" variant="secondary" size="lg">Check-in Batch</Button>
-          </Link>
+          <CheckinDialog 
+            trigger={
+              <Button className="w-full" variant="secondary" size="lg" onClick={() => onOpenChange(false)}>
+                Check-in Batch
+              </Button>
+            }
+          />
         </div>
       </DialogContent>
     </Dialog>
