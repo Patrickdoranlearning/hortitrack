@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { adminDb } from "@/server/db/admin";
 import { generateNextBatchId } from "@/server/batches/nextId";
+import { switchPassportToInternal } from "@/server/batches/service";
 
 const Input = z.object({
   plantingDate: z.string().datetime(),
@@ -56,6 +57,10 @@ export async function POST(
       );
     }
     const input = parsed.data;
+
+    // Switch passport to internal on transplant
+    const userId = null; // TODO auth
+    await switchPassportToInternal(params.batchId, userId);
 
 
     const param = params.batchId;

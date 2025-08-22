@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBatchDetail } from "@/hooks/useBatchDetail";
 import { AncestryTab } from "./AncestryTab";
-import PlantPassportCard from "@/components/batch/PlantPassportCard";
+import { PlantPassportCard } from "./PlantPassportCard";
 import { computePassportFromBatch } from "@/lib/passport";
 
 type TabKey = "summary" | "log" | "photos" | "ancestry" | "ai";
@@ -39,7 +39,8 @@ export function BatchDetail({
     return <div className="p-6 text-sm text-muted-foreground">Batch not found.</div>;
   }
 
-  const passport = computePassportFromBatch(data);
+  const passport = data.currentPassport ? null : computePassportFromBatch(data);
+  const p = data.currentPassport ?? passport;
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
@@ -53,44 +54,26 @@ export function BatchDetail({
 
       <TabsContent value="summary" className="pt-3">
         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
-                <div>
-                    <p className="text-muted-foreground">Batch #</p>
-                    <p className="font-medium">{data.batchNumber}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground">Variety</p>
-                    <p className="font-medium">{data.variety}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Family</p>
-                    <p className="font-medium">{data.family || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Size</p>
-                    <p className="font-medium">{data.size || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Supplier</p>
-                    <p className="font-medium">{data.supplierName || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Prod. Week</p>
-                    <p className="font-medium">{data.productionWeek || 'N/A'}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground">Status</p>
-                    <p className="font-medium">{data.status}</p>
-                </div>
+            <div className="p-6 space-y-2">
+                <div className="text-sm"><span className="font-medium">Batch #:</span> {data.batchNumber}</div>
+                <div className="text-sm"><span className="font-medium">Variety:</span> {data.variety}</div>
+                {data.family && <div className="text-sm"><span className="font-medium">Family:</span> {data.family}</div>}
+                {data.size && <div className="text-sm"><span className="font-medium">Size:</span> {data.size}</div>}
+                {data.supplierName && <div className="text-sm"><span className="font-medium">Supplier:</span> {data.supplierName}</div>}
+                {data.productionWeek && <div className="text-sm"><span className="font-medium">Production Week:</span> {data.productionWeek}</div>}
+                <div className="text-sm"><span className="font-medium">Status:</span> {data.status}</div>
             </div>
-            <PlantPassportCard
-                family={passport.aFamily}
-                producerCode={passport.bProducerCode}
-                batchNumber={passport.cBatchNumber}
-                countryCode={passport.dCountryCode}
-                status={data.status ?? null}
-            />
-            {passport.warnings.length > 0 ? (
+            {p && <PlantPassportCard
+                family={p.aFamily}
+                producerCode={p.bProducerCode}
+                batchNumber={p.cBatchNumber}
+                countryCode={p.dCountryCode}
+                source={p.source}
+                hasHistoryLink={p.source === "Internal"}
+                onOpenHistory={() => {/* open a dialog listing /batches/{id}/passports */}}
+            />}
+
+            {passport?.warnings.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
                 {passport.warnings.join(" ")}
                 </p>

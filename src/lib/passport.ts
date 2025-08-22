@@ -1,53 +1,42 @@
-// src/lib/passport.ts
-import type { BatchSummary } from "@/types/batch";
+import type { PlantPassport, PassportSource } from "@/types/batch";
 
-export type ComputedPassport = {
-  aFamily: string | null;
-  bProducerCode: string | null;
-  cBatchNumber: string;
-  dCountryCode: string | null;
-  warnings: string[];
-};
+const DEFAULT_PRODUCER = "IE2727 Doran Nurseries Producer Code";
+const DEFAULT_COUNTRY = "IE";
 
-/**
- * Computes A–D passport fields without extra API calls.
- * Tolerates older field names and incomplete supplier data.
- */
-export function computePassportFromBatch(
-  batch: Partial<BatchSummary> & Record<string, any>,
-  opts?: { fallbackProducer?: string; fallbackCountry?: string }
-): ComputedPassport {
-  const fallbackProducer =
-    opts?.fallbackProducer ?? "IE2727 Doran Nurseries Producer Code";
-  const fallbackCountry = opts?.fallbackCountry ?? "IE";
-
-  const aFamily =
-    (batch.family ?? batch.plantFamily ?? batch.varietyFamily ?? null) as string | null;
-
-  const cBatchNumber =
-    (batch.batchNumber ?? batch.batch_number ?? batch.id ?? "—") as string;
-
-  // Supplier can be embedded or referenced/flattened
-  const supplier = (batch.supplier ?? batch.supplierData ?? {}) as Record<string, any>;
-
-  let bProducerCode = (supplier.producerCode ?? null) as string | null;
-  let dCountryCode = (supplier.countryCode ?? null) as string | null;
-
-  const warnings: string[] = [];
-  if (!bProducerCode) {
-    bProducerCode = fallbackProducer;
-    warnings.push("B defaulted to fallback producer code.");
-  }
-  if (!dCountryCode) {
-    dCountryCode = fallbackCountry;
-    warnings.push("D defaulted to fallback country code.");
-  }
-
+export function makeInternalPassport(args: {
+  family: string | null | undefined;
+  ourBatchNumber: string;
+  userId?: string | null;
+}): PlantPassport {
   return {
-    aFamily,
-    bProducerCode,
-    cBatchNumber,
-    dCountryCode,
-    warnings,
+    source: "Internal",
+    aFamily: args.family ?? null,
+    bProducerCode: DEFAULT_PRODUCER,
+    cBatchNumber: args.ourBatchNumber,
+    dCountryCode: DEFAULT_COUNTRY,
+    createdAt: new Date().toISOString(),
+    createdBy: args.userId ?? null,
   };
+}
+
+export function makeSupplierPassport(args: {
+  family: string | null | undefined;
+  producerCode: string | null | undefined;
+  supplierBatchNo: string;
+  countryCode: string | null | undefined;
+  userId?: string | null;
+}): PlantPassport {
+  return {
+    source: "Supplier",
+    aFamily: args.family ?? null,
+    bProducerCode: args.producerCode ?? DEFAULT_PRODUCER,
+    cBatchNumber: args.supplierBatchNo,
+    dCountryCode: args.countryCode ?? DEFAULT_COUNTRY,
+    createdAt: new Date().toISOString(),
+    createdBy: args.userId ?? null,
+  };
+}
+
+export function isSupplierPassport(passport: PlantPassport) {
+  return passport.source === "Supplier";
 }
