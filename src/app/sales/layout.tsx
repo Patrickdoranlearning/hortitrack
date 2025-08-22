@@ -1,6 +1,5 @@
 
 import React from "react";
-import dynamic from "next/dynamic";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,9 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from "next/link";
-import { MainNav } from "@/components/nav/MainNav";
-
-const MainNavDynamic = dynamic(() => import('@/components/nav/MainNav'), { ssr: false });
+import MainNav from "@/components/nav/MainNav";
 
 export default function SalesLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -28,7 +25,7 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
         <Logo />
         <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
             <div className="ml-auto flex-1 sm:flex-initial">
-               <MainNavDynamic />
+               <MainNav />
             </div>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>

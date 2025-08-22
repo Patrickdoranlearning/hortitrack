@@ -18,7 +18,7 @@ async function fetchRoles(): Promise<string[]> {
   } catch { return []; }
 }
 
-export function MainNav() {
+export default function MainNav() {
   const pathname = usePathname();
   const [roles, setRoles] = useState<string[] | null>(null);
 
