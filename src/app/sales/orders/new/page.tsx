@@ -1,3 +1,4 @@
+
 // src/app/sales/orders/new/page.tsx
 "use client";
 
@@ -8,13 +9,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Supplier } from "@/lib/types";
 
 type FormValues = z.infer<typeof CreateOrderSchema>;
 
-export default function NewSalesOrderPage() {
+export default function NewSalesOrderPage({ customers, onOrderCreated }: { customers: Supplier[], onOrderCreated?: () => void }) {
   const { toast } = useToast();
   const [printing, setPrinting] = useState(false);
 
@@ -48,6 +51,7 @@ export default function NewSalesOrderPage() {
         if (!pr.ok || !pj?.ok) throw new Error(pj?.error?.message || "Print failed");
         toast({ title: "Labels sent to printer", description: `${pj.data.printed} lines printed` });
       }
+      onOrderCreated?.();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
@@ -69,7 +73,18 @@ export default function NewSalesOrderPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Customer</FormLabel>
-                      <FormControl><Input placeholder="customer id or name" {...field} /></FormControl>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a customer" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customers.map((c) => (
+                            <SelectItem key={c.id!} value={c.id!}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -80,7 +95,7 @@ export default function NewSalesOrderPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Store / Branch</FormLabel>
-                      <FormControl><Input placeholder="store id" {...field} /></FormControl>
+                      <FormControl><Input placeholder="e.g. Main Street" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -139,14 +154,16 @@ export default function NewSalesOrderPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <FormField
+              <div className="flex items-center justify-between">
+                 <FormField
                   control={form.control}
                   name="autoPrint"
                   render={({ field }) => (
-                    <FormItem className="flex items-center gap-2">
-                      <input id="autoPrint" type="checkbox" className="h-4 w-4" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
-                      <FormLabel htmlFor="autoPrint">Auto-print pre-pricing labels on submit</FormLabel>
+                    <FormItem className="flex items-center gap-2 pt-2">
+                       <FormControl>
+                         <Input type="checkbox" className="h-4 w-4" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                       </FormControl>
+                      <FormLabel htmlFor="autoPrint" className="!mt-0">Auto-print pre-pricing labels on submit</FormLabel>
                     </FormItem>
                   )}
                 />
