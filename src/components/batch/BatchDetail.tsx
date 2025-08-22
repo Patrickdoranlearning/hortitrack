@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -49,46 +50,47 @@ export function BatchDetail({
       </TabsList>
 
       <TabsContent value="summary" className="pt-3">
-        <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm p-4 border rounded-lg">
-                <div>
-                    <p className="text-muted-foreground">Batch #</p>
-                    <p className="font-medium">{data.batchNumber}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground">Variety</p>
-                    <p className="font-medium">{data.variety}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Family</p>
-                    <p className="font-medium">{data.family || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Size</p>
-                    <p className="font-medium">{data.size || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Supplier</p>
-                    <p className="font-medium">{data.supplierName || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Prod. Week</p>
-                    <p className="font-medium">{data.productionWeek || 'N/A'}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground">Status</p>
-                    <p className="font-medium">{data.status}</p>
-                </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm p-4 border rounded-lg">
+                  <div>
+                      <p className="text-muted-foreground">Batch #</p>
+                      <p className="font-medium">{data.batchNumber}</p>
+                  </div>
+                   <div>
+                      <p className="text-muted-foreground">Variety</p>
+                      <p className="font-medium">{data.variety}</p>
+                  </div>
+                  <div>
+                      <p className="text-muted-foreground">Family</p>
+                      <p className="font-medium">{data.family || 'N/A'}</p>
+                  </div>
+                  <div>
+                      <p className="text-muted-foreground">Size</p>
+                      <p className="font-medium">{data.size || 'N/A'}</p>
+                  </div>
+                  <div>
+                      <p className="text-muted-foreground">Supplier</p>
+                      <p className="font-medium">{data.supplierName || 'N/A'}</p>
+                  </div>
+                  <div>
+                      <p className="text-muted-foreground">Prod. Week</p>
+                      <p className="font-medium">{data.productionWeek || 'N/A'}</p>
+                  </div>
+                   <div>
+                      <p className="text-muted-foreground">Status</p>
+                      <p className="font-medium">{data.status}</p>
+                  </div>
+              </div>
             </div>
-
             <PlantPassportCard
                 family={data.family}
                 producerCode={data.supplier?.producerCode}
-                batchNumber={batchId}
+                batchNumber={data.batchNumber}
                 countryCode={data.supplier?.countryCode}
                 status={data.status}
-            />
-        </div>
+              />
+          </div>
       </TabsContent>
 
       <TabsContent value="log">

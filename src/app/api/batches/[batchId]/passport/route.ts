@@ -1,7 +1,7 @@
-// src/app/api/batches/[id]/passport/route.ts
+
+// src/app/api/batches/[batchId]/passport/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/server/db/admin";
-import { declassify } from "@/server/utils/declassify";
 
 type ComputedPassport = {
   batchId: string;
@@ -12,70 +12,86 @@ type ComputedPassport = {
   warnings: string[];
 };
 
-async function getBatchWithSupplier(batchId: string): Promise<any | null> {
-    if (!batchId || typeof batchId !== 'string') {
-        return null;
-    }
-    const batchRef = adminDb.collection('batches').doc(batchId);
-    const batchSnap = await batchRef.get();
-
-    if (!batchSnap.exists) {
-        return null;
-    }
-    const batch = { id: batchSnap.id, ...batchSnap.data() };
-
-    if (batch.supplier) {
-        // Assuming supplier is stored as a string name.
-        // If it's a reference, this logic would change.
-        const supplierSnap = await adminDb.collection('suppliers').where('name', '==', batch.supplier).limit(1).get();
-        if (!supplierSnap.empty) {
-            batch.supplierData = { id: supplierSnap.docs[0].id, ...supplierSnap.docs[0].data() };
-        }
-    }
-    return batch;
+async function getBatchDoc(batchId: string) {
+  const snap = await adminDb.collection("batches").doc(batchId).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } as any : null;
 }
 
-
-async function computePassportForBatch(batchId: string): Promise<ComputedPassport> {
-  const batch = await getBatchWithSupplier(batchId);
-  if (!batch) {
-    throw new Error("Batch not found");
-  }
-
-  const warnings: string[] = [];
-
-  const aFamily = batch.plantFamily ?? null;
-  const cBatchNumber = batch.batchNumber ?? batch.id;
-  const bProducerCode = batch.supplierData?.producerCode ?? null;
-  const dCountryCode = batch.supplierData?.countryCode ?? null;
-
-  if (batch.sourceType === "Purchase") {
-    if (!bProducerCode) warnings.push("Supplier producer code (B) missing.");
-    if (!dCountryCode) warnings.push("Supplier country code (D) missing.");
-  }
-  if (!aFamily) warnings.push("Family (A) missing on batch.");
-  if (!cBatchNumber) warnings.push("Batch number (C) missing on batch.");
-
-  return {
-    batchId,
-    aFamily,
-    bProducerCode,
-    cBatchNumber: String(cBatchNumber),
-    dCountryCode,
-    warnings,
-  };
+async function getSupplierDoc(supplierId: string) {
+  const snap = await adminDb.collection("suppliers").doc(supplierId).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } as any : null;
 }
 
-export async function GET(_: NextRequest, { params }: { params: { batchId: string }}) {
+function pick<T extends object, K extends keyof T>(obj: T | null | undefined, keys: readonly K[]): Partial<T> {
+  const out: Partial<T> = {};
+  if (!obj) return out;
+  for (const k of keys) (out as any)[k] = (obj as any)[k] ?? null;
+  return out;
+}
+
+export async function GET(_req: NextRequest, { params }: { params: { batchId: string } }) {
   try {
-    const batchId = params.batchId;
+    const batchId = params.batchId?.trim();
     if (!batchId) {
-        return NextResponse.json({ error: "Batch ID is required." }, { status: 400 });
+      return NextResponse.json({ error: "Batch ID is required." }, { status: 400 });
     }
-    const data = await computePassportForBatch(params.batchId);
-    return NextResponse.json(declassify(data), { status: 200 });
+
+    const batch = await getBatchDoc(batchId);
+    if (!batch) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const aFamily =
+      (batch.family ?? batch.plantFamily ?? batch.varietyFamily ?? null) as string | null;
+
+    const cBatchNumber =
+      (batch.batch_number ?? batch.batchNumber ?? batchId) as string;
+
+    let bProducerCode: string | null = null;
+    let dCountryCode: string | null = null;
+    const warnings: string[] = [];
+
+    // embedded supplier support
+    const embeddedSupplier = batch.supplier ?? batch.supplierData ?? null;
+    if (embeddedSupplier) {
+      const picked = pick(embeddedSupplier, ["producerCode", "countryCode"]);
+      bProducerCode = (picked as any).producerCode ?? null;
+      dCountryCode = (picked as any).countryCode ?? null;
+    }
+
+    // referenced supplier support
+    const supplierId: string | null =
+      (batch.supplier_id ?? batch.supplierId ?? null) as string | null;
+
+    if ((!bProducerCode || !dCountryCode) && supplierId) {
+      const supplier = await getSupplierDoc(supplierId);
+      if (supplier) {
+        bProducerCode = (supplier.producerCode ?? bProducerCode) ?? null;
+        dCountryCode = (supplier.countryCode ?? dCountryCode) ?? null;
+      }
+    }
+
+    if (!bProducerCode) warnings.push("Supplier producer code (B) missing; using default.");
+    if (!dCountryCode) warnings.push("Supplier country code (D) missing; using default.");
+
+    const fallbackProducer = process.env.DEFAULT_PRODUCER_CODE ?? "IE2727 Doran Nurseries Producer Code";
+    const fallbackCountry = process.env.DEFAULT_COUNTRY_CODE ?? "IE";
+
+    const computed: ComputedPassport = {
+      batchId,
+      aFamily,
+      bProducerCode: bProducerCode ?? fallbackProducer,
+      cBatchNumber,
+      dCountryCode: dCountryCode ?? fallbackCountry,
+      warnings,
+    };
+
+    return NextResponse.json(computed, {
+      status: 200,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (e: any) {
-    const status = e.message.includes("Not found") ? 404 : 500;
-    return NextResponse.json({ error: e.message }, { status });
+    console.error("passport_route_error", { message: e?.message });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

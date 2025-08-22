@@ -13,10 +13,7 @@ type Props = {
   producerCode?: string | null;         // B
   batchNumber: string;                  // C
   countryCode?: string | null;          // D
-  status?: string | null;               // to gray when archived
-  className?: string;
-  defaultProducerCode?: string;         // fallback for B
-  defaultCountryCode?: string;          // fallback for D
+  status?: string | null;               // used to gray when archived
 };
 
 export function PlantPassportCard({
@@ -25,25 +22,24 @@ export function PlantPassportCard({
   batchNumber,
   countryCode,
   status,
-  className,
-  defaultProducerCode = "IE2727 Doran Nurseries Producer Code",
-  defaultCountryCode = "IE",
 }: Props) {
   const { toast } = useToast();
 
-  const A = (family && family.trim()) || "—";
-  const B = (producerCode && producerCode.trim()) || defaultProducerCode;
+  const A = family ?? "—";
+  const B = producerCode ?? "—";
   const C = batchNumber;
-  const D = (countryCode && countryCode.trim()) || defaultCountryCode;
+  const D = countryCode ?? "IE";
 
-  const isArchived = (status ?? "").toLowerCase().includes("archiv");
+  const isArchived = (status ?? "").toLowerCase() === "archived";
 
-  function copy(value: string, label: string) {
-    navigator.clipboard.writeText(value).then(
-      () => toast({ title: `${label} copied` }),
-      () => toast({ title: `Couldn’t copy ${label}`, variant: "destructive" })
-    );
-  }
+  const copy = (text: string, label: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      toast({ title: `${label} copied`, description: text });
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  };
 
   const Row = ({
     code,
@@ -64,60 +60,34 @@ export function PlantPassportCard({
         <div className="text-xs text-muted-foreground">{label}</div>
         <div className="font-serif text-base leading-tight">{value}</div>
       </div>
-      <div className="pl-2">
-        {canCopy ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            aria-label={`Copy ${label}`}
-            onClick={(e) => { e.stopPropagation(); onCopy?.(); }}
-          >
-            <Clipboard className="h-4 w-4" />
-          </Button>
-        ) : null}
-      </div>
+      {canCopy && value !== "—" ? (
+        <Button size="icon" variant="ghost" aria-label={`Copy ${label}`} onClick={onCopy}>
+          <Clipboard className="h-4 w-4" />
+        </Button>
+      ) : (
+        <div />
+      )}
     </div>
   );
 
   return (
-    <Card
-      className={cn(
-        "rounded-2xl border shadow-sm",
-        "bg-[#E5E8E3] text-foreground",
-        isArchived && "opacity-80",
-        className
-      )}
-      data-testid="plant-passport-card"
-    >
+    <Card className={cn("border-2", isArchived && "opacity-60")}>
       <CardHeader className="py-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium tracking-tight">
-            Plant Passport
-          </CardTitle>
-          <Leaf aria-hidden className="h-4 w-4" />
-        </div>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Leaf className="h-4 w-4" aria-hidden />
+          EU Plant Passport
+        </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="grid grid-cols-1">
-          <Row code="A" label="Family" value={A} />
-          <Row
-            code="B"
-            label="Producer Code"
-            value={B}
-            canCopy
-            onCopy={() => copy(B, "Producer Code")}
-          />
-          <Row
-            code="C"
-            label="Batch No."
-            value={C}
-            canCopy
-            onCopy={() => copy(C, "Batch No.")}
-          />
+        <div className="divide-y">
+          <Row code="A" label="Family" value={A} canCopy onCopy={() => copy(A, "Family")} />
+          <Row code="B" label="Producer Code" value={B} canCopy onCopy={() => copy(B, "Producer Code")} />
+          <Row code="C" label="Batch No." value={C} canCopy onCopy={() => copy(C, "Batch No.")} />
           <Row code="D" label="Country Code" value={D} />
         </div>
       </CardContent>
     </Card>
   );
 }
+
+export default PlantPassportCard;
