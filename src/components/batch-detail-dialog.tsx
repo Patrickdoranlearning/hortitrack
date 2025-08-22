@@ -1,467 +1,57 @@
+"use client";
 
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem
-} from '@/components/ui/select';
+import * as React from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { getBatchAncestry, getBatchSummary } from "@/lib/api/batches";
+import { AncestryNode } from "@/types/batch";
+import { AncestryTab } from "@/components/batch/AncestryTab";
+import { useToast } from "@/components/ui/use-toast";
+import { ChevronLeft } from "lucide-react";
+import { track } from "@/lib/analytics";
+import { logError, logInfo } from "@/lib/log";
+import { useAncestryNavPreference } from "@/lib/prefs";
 import type { Batch } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Pencil, MoveRight, ClipboardList, FileText, MessageSquare, Trash2, Leaf, Camera, Flag, QrCode, Printer, FlaskConical } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format, parseISO, isValid } from 'date-fns';
-import { BatchChatDialog } from '@/components/batch-chat-dialog';
-import { uploadBatchPhoto } from '@/lib/storage';
-import FlagBatchDialog from '@/components/flag-batch-dialog';
-import { useToast } from '@/hooks/use-toast';
-import { FeatureGate } from './FeatureGate';
-import { BatchActionBar } from './batches/BatchActionBar';
-import BatchLabelPreview from './BatchLabelPreview';
-import { PlantPassportCard } from './batches/PlantPassportCard';
-import BatchPhotoUploader from '@/components/batches/BatchPhotoUploader';
-import dynamic from "next/dynamic";
-const AncestryStrip = dynamic(() => import("@/components/ancestry-strip"), { ssr: false });
+import { useBatchDetailDialog } from "@/stores/useBatchDetailDialog";
+import { BatchDetail } from "@/components/batch/BatchDetail";
 
-interface BatchDetailDialogProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    batch: Batch | null;
-    onEdit: (batch: Batch) => void;
-    onTransplant: (batch: Batch) => void;
-    onLogAction: (batch: Batch) => void;
-    onGenerateProtocol: (batch: Batch) => void;
-    onCareRecommendations: (batch: Batch) => void;
-    onDelete?: (batch: Batch) => void;
-}
+export function BatchDetailDialog() {
+  const { isOpen, batchId, initialTab, close, back, history } = useBatchDetailDialog();
+  const [activeBatch, setActiveBatch] = React.useState(batchId);
 
-function PhotoGrid({ items }: { items: Array<{id:string; url:string}> }) {
-  if (!items?.length) return <p className="text-sm text-muted-foreground mt-2">No photos yet.</p>;
-  return (
-    <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2">
-      {items.map(p=>(
-        <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" className="block">
-          <img src={p.url} alt="photo" className="rounded-md w-full aspect-square object-cover" />
-        </a>
-      ))}
-    </div>
-  );
-}
-
-export function BatchDetailDialog({ 
-    open, 
-    onOpenChange, 
-    batch,
-    onEdit,
-    onTransplant,
-    onLogAction,
-    onGenerateProtocol,
-    onCareRecommendations,
-    onDelete,
-}: BatchDetailDialogProps) {
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [flagOpen, setFlagOpen] = React.useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
-  const { toast } = useToast();
-  const [photos, setPhotos] = React.useState<Array<{id:string; url:string; type:'GROWER'|'SALES'}>>([]);
-  const [genBusy, setGenBusy] = React.useState(false);
-  const [updating, setUpdating] = useState(false);
-  const descId = "batch-desc";
-  const userRole = "ADMIN"; // Placeholder for role-based access
-  
-  const grower = photos.filter(p => p.type === "GROWER");
-  const sales = photos.filter(p => p.type === "SALES");
-  
-  const refreshPhotos = async () => {
-    if (!batch?.id) return;
-    const r = await fetch(`/api/batches/${batch.id}/photos`);
-    const j = await r.json();
-    if (j.ok) {
-        const allPhotos = j.data.photos ?? [];
-        setPhotos(allPhotos);
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveBatch(batchId);
     }
-  };
+  }, [isOpen, batchId]);
 
-  useEffect(() => { 
-    if (open && batch?.id) {
-        refreshPhotos();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, batch?.id]);
-
-  async function updateStatus(next: Batch['status']) {
-    if (!batch?.id) return;
-    try {
-      setUpdating(true);
-      const res = await fetch(`/api/batches/${batch.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: next }),
-      });
-      if (!res.ok) throw new Error((await res.json())?.error || "Update failed");
-      toast({ title: "Status updated", description: `Now: ${next}` });
-      // You might want to trigger a refresh of the batch data here
-    } catch (e:any) {
-      toast({ variant: "destructive", title: "Failed to update status", description: e?.message ?? "Error" });
-    } finally {
-      setUpdating(false);
-    }
-  }
-
-  if (!batch) return null;
-
-  const handleEdit = () => onEdit(batch);
-  const handleTransplant = () => onTransplant(batch);
-  const handleLogAction = () => onLogAction(batch);
-  
-  async function handleGenerateProtocolClick() {
-    if (!batch) return;
-    if (!batch.isTopPerformer) {
-      const proceed = typeof window !== "undefined"
-        ? window.confirm("This batch is not marked Top performer. Generate a protocol anyway?")
-        : true;
-      if (!proceed) return;
-    }
-    setGenBusy(true);
-    try {
-      const name = `Protocol – ${batch.plantVariety || "Batch"} (${new Date().toISOString().slice(0, 10)})`;
-      const res = await fetch("/api/protocols/generate?download=pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/pdf" },
-        body: JSON.stringify({ batchId: batch.id, publish: true, name }),
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error((() => { try { return JSON.parse(txt).error; } catch { return txt; } })() || "Failed");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name.replace(/[^\w\-]+/g, "_")}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      console.error("Generate protocol failed", e);
-      alert(`Generate failed: ${e.message || e}`);
-    } finally {
-      setGenBusy(false);
-    }
-  }
-
-  const handleCareRecommendations = () => onCareRecommendations(batch);
-  const handleDelete = () => onDelete?.(batch);
-  const handlePrint = () => setIsPreviewOpen(true);
-
-  const getStatusVariant = (status: Batch['status']): "default" | "secondary" | "destructive" | "outline" | "accent" | "info" => {
-    switch (status) {
-      case 'Ready for Sale':
-      case 'Looking Good':
-        return 'accent';
-      case 'Propagation':
-      case 'Plugs/Liners':
-        return 'info';
-      case 'Potted':
-        return 'default';
-      case 'Archived':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
-
-  const stockPercentage = batch.initialQuantity > 0 ? (batch.quantity / batch.initialQuantity) * 100 : 0;
-  
-  const formatDate = (date: any, fmt: string = 'PPP p'): string => {
-    if (!date) return '—';
-    if (date.toDate) {
-      const d = date.toDate();
-      return isValid(d) ? format(d, fmt) : '—';
-    }
-    if (typeof date === 'string') {
-        const parsedDate = parseISO(date);
-        return isValid(parsedDate) ? format(parsedDate, fmt) : '—';
-    }
-    if (date instanceof Date) {
-      return isValid(date) ? format(date, fmt) : '—';
-    }
-    try {
-        const d = new Date(date);
-        return isValid(d) ? format(d, fmt) : '—';
-    } catch {
-        return '—';
-    }
-  };
-
-  const dateToMillis = (date: any): number => {
-    try {
-      if (!date) return 0;
-      if (typeof date?.toDate === 'function') return date.toDate().getTime();
-      if (typeof date === 'string') {
-        const d = parseISO(date);
-        return isValid(d) ? d.getTime() : 0;
-      }
-      if (date instanceof Date) return isValid(date) ? date.getTime() : 0;
-      const d = new Date(date);
-      return isValid(d) ? d.getTime() : 0;
-    } catch { return 0; }
-  };
-
+  if (!isOpen || !activeBatch) return null;
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="min-w-0 overflow-x-hidden"
-          style={{
-            width: "calc(100vw - 2rem)",
-            maxWidth: "min(100vw - 2rem, 1180px)",
-          }}
-          aria-describedby={descId}
-        >
-          <div className="h-[100dvh] overflow-y-auto sm:h-auto sm:max-h-[80vh]">
-            <DialogHeader className="p-6">
-                <DialogTitle>Batch #{batch?.batchNumber}</DialogTitle>
-                <DialogDescription id={descId}>
-                  View details, log actions, upload photos, and print labels.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="px-6 pb-6">
-              <BatchActionBar
-                  batch={{ id: batch.id!, batchNumber: batch.batchNumber, status: batch.status }}
-                  onEdit={handleEdit}
-                  onMove={handleTransplant}
-                  onPrint={handlePrint}
-                  onDelete={onDelete ? handleDelete : undefined}
-                  onActionLog={handleLogAction}
-                  onArchive={batch.status !== 'Archived' ? () => { console.log('archive'); } : undefined}
-                  onUnarchive={batch.status === 'Archived' ? () => { console.log('unarchive'); } : undefined}
-                  onPhotoAdded={refreshPhotos}
-              />
-              
-              {genBusy && (
-                <div className="mt-2 text-xs text-muted-foreground">Generating protocol…</div>
-              )}
-
-              <section className="mt-4 space-y-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs text-muted-foreground">Batch</span>
-                  <span className="font-semibold whitespace-nowrap">{batch.batchNumber}</span>
-                  <span className="text-muted-foreground select-none">•</span>
-                  <span className="font-medium truncate min-w-0 flex-1" title={String(batch.plantVariety ?? "")}>
-                    {batch.plantVariety}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                  {batch.plantFamily && <span>Family: <b className="text-foreground">{batch.plantFamily}</b></span>}
-                  {batch.size && <span>Size: <b className="text-foreground">{batch.size}</b></span>}
-                  {batch.location && <span>Location: <b className="text-foreground">{batch.location}</b></span>}
-                  {batch.status && <span>Status: <b className="text-foreground">{batch.status}</b></span>}
-                </div>
-              </section>
-
-              <Tabs defaultValue="summary" className="w-full mt-4">
-                <TabsList>
-                  <TabsTrigger value="summary">Summary</TabsTrigger>
-                  <TabsTrigger value="history">Log History</TabsTrigger>
-                  <TabsTrigger value="photos">Photos</TabsTrigger>
-                  <TabsTrigger value="ancestry">Ancestry</TabsTrigger>
-                  <TabsTrigger value="ai">AI Tools</TabsTrigger>
-                </TabsList>
-                <TabsContent value="summary">
-                  <Card className="mt-2">
-                    <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="md:col-span-1 space-y-4">
-                        
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm font-semibold">
-                            <span>Stock</span>
-                            <span>{batch.quantity.toLocaleString()} / {batch.initialQuantity.toLocaleString()}</span>
-                          </div>
-                          <Progress value={stockPercentage} aria-label={`${Math.round(stockPercentage)}% remaining`} />
-                        </div>
-                         <PlantPassportCard batchId={batch.id!} />
-                      </div>
-                      <div className="md:col-span-2 grid grid-cols-2 gap-x-8 gap-y-4">
-                        <div className="space-y-1">
-                            <div className="text-sm font-medium text-muted-foreground">Status</div>
-                            <Select disabled={updating} onValueChange={(v)=>updateStatus(v as Batch['status'])} defaultValue={batch.status}>
-                                <SelectTrigger className="w-[220px]">
-                                <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                {["Propagation","Plugs/Liners","Potted","Ready for Sale","Looking Good","Archived"].map(s=>(
-                                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                                ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Location</p>
-                          <p className="font-semibold">{batch.location}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Size</p>
-                          <p className="font-semibold">{batch.size}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Supplier</p>
-                          <p className="font-semibold">{batch.supplier || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Planting Date</p>
-                          <p className="font-semibold">
-                            {formatDate(batch.plantingDate, 'PPP')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Category</p>
-                          <p className="font-semibold">{batch.category}</p>
-                        </div>
-                        {batch.transplantedFrom && (
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Transplanted From</p>
-                            <p className="font-semibold">#{batch.transplantedFrom}</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="history">
-                  <Card className="mt-2">
-                    <CardContent className="p-6">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[200px]">Date</TableHead>
-                            <TableHead>Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(batch.logHistory ?? [])
-                            .slice()
-                            .sort((a, b) => dateToMillis(b.at || b.date) - dateToMillis(a.at || a.date))
-                            .map((log, index) => (
-                              <TableRow key={log.id || index}>
-                                <TableCell>{formatDate(log.at || log.date)}</TableCell>
-                                <TableCell>{log.note || log.type || log.action}</TableCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="photos">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">Grower Photos</h4>
-                        <span className="text-xs text-muted-foreground">{grower.length} photos</span>
-                      </div>
-                      <BatchPhotoUploader batchId={batch.id!} type="GROWER" role={userRole as any} onUploaded={refreshPhotos} />
-                      <PhotoGrid items={grower} />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">Sales Photos</h4>
-                        <span className="text-xs text-muted-foreground">{sales.length}/6</span>
-                      </div>
-                      <BatchPhotoUploader batchId={batch.id!} type="SALES" role={userRole as any} onUploaded={refreshPhotos} />
-                      <PhotoGrid items={sales} />
-                    </div>
-                  </div>
-                </TabsContent>
-                <TabsContent value="ancestry">
-                    <AncestryStrip currentId={batch.id!} />
-                </TabsContent>
-                 <TabsContent value="ai">
-                  <Card className="mt-2">
-                    <CardContent className="p-6 space-y-4">
-                       <div className="space-y-2">
-                         <h3 className="font-semibold">AI Tools</h3>
-                         <p className="text-sm text-muted-foreground">
-                           Use AI to get insights and automate tasks for this batch.
-                         </p>
-                       </div>
-                       <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" onClick={() => setIsChatOpen(true)}>
-                              <MessageSquare /> AI Chat
-                          </Button>
-                           <Button variant="outline" onClick={() => onGenerateProtocol(batch)}>
-                               <FileText /> Generate Protocol
-                           </Button>
-                           <FeatureGate name="aiCare">
-                              <Button variant="outline" onClick={handleCareRecommendations}>
-                                  <Leaf /> Care Recommendations
-                              </Button>
-                           </FeatureGate>
-                           <Button variant={batch?.flag?.active ? "destructive" : "outline"} onClick={() => {
-                                if (batch?.flag?.active) {
-                                fetch(`/api/batches/${batch!.id}/log`, {
-                                    method: "POST",
-                                    headers: { "content-type": "application/json" },
-                                    body: JSON.stringify({ type: "Unflagged" }),
-                                }).catch(() => {});
-                                } else {
-                                setFlagOpen(true);
-                                }
-                            }}>
-                                <Flag className="mr-1 h-4 w-4" />
-                                {batch?.flag?.active ? "Clear Flag" : "Flag Batch"}
-                            </Button>
-                       </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </div>
+    <Dialog open={isOpen} onOpenChange={close}>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            {history.length > 0 && (
+              <Button variant="ghost" size="icon" onClick={back} className="-ml-2">
+                <ChevronLeft />
+                <span className="sr-only">Back to previous batch</span>
+              </Button>
+            )}
+            <DialogTitle>{`Batch ${activeBatch}`}</DialogTitle>
           </div>
-        </DialogContent>
-      </Dialog>
-      
-      <BatchChatDialog
-        open={isChatOpen}
-        onOpenChange={setIsChatOpen}
-        batchId={batch?.id}
-        batchNumber={batch?.batchNumber}
-      />
-      
-      <FlagBatchDialog
-        open={flagOpen}
-        onOpenChange={setFlagOpen}
-        batch={batch}
-        onDone={() => {
-          toast({ title: "Batch flagged", description: "The issue has been recorded."});
-        }}
-      />
-       <BatchLabelPreview
-        open={isPreviewOpen}
-        onOpenChange={setIsPreviewOpen}
-        batch={{
-          id: batch.id!,
-          batchNumber: batch.batchNumber,
-          plantVariety: batch.plantVariety,
-          plantFamily: batch.plantFamily,
-          size: batch.size,
-          quantity: batch.quantity,
-          initialQuantity: batch.initialQuantity,
-        }}
-      />
-    </>
+          <DialogDescription>
+            View Summary, Log History, Photos, Ancestry, and AI Tools.
+          </DialogDescription>
+        </DialogHeader>
+        <BatchDetail key={activeBatch} batchId={activeBatch} initialTab={initialTab} />
+      </DialogContent>
+    </Dialog>
   );
+}
+
+// Kept for compatibility, can be removed once all references are updated.
+export function BatchSummaryDialog() {
+    return <BatchDetailDialog />
 }
