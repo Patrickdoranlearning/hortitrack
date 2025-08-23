@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Clipboard, Leaf } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
+import { copyToClipboard } from "@/lib/copy";
 
 type PassportDto = {
   batchId: string;
@@ -50,8 +51,6 @@ export function PlantPassportCard({ batchId }: { batchId: string }) {
   if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;
   if (!data) return <div className="text-sm text-muted-foreground">No passport data.</div>;
 
-  const copy = async (t: string) => { try { await navigator.clipboard.writeText(t) } catch {} };
-
   const Row = ({ code, label, value, copyable }:{
     code: "A"|"B"|"C"|"D"; label: string; value: string; copyable?: boolean;
   }) => (
@@ -62,7 +61,7 @@ export function PlantPassportCard({ batchId }: { batchId: string }) {
         <div className="font-serif text-base leading-tight">{value}</div>
       </div>
       {copyable ? (
-        <Button size="icon" variant="ghost" aria-label={`Copy ${label}`} onClick={() => copy(value)}>
+        <Button size="icon" variant="ghost" aria-label={`Copy ${label}`} onClick={() => copyToClipboard(value)}>
           <Clipboard className="h-4 w-4" />
         </Button>
       ) : <div/>}

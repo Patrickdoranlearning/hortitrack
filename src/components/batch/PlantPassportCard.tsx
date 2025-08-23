@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Leaf, Clipboard } from "lucide-react";
+import { copyToClipboard } from "@/lib/copy";
 
 type Props = {
   family?: string | null;
@@ -31,8 +32,7 @@ export function PlantPassportCard({
   const B = producerCode ?? "—";
   const C = batchNumber;
   const D = countryCode ?? "IE";
-  const copy = (text: string) => navigator.clipboard.writeText(text).catch(() => {});
-
+  
   const Row = (p:{code:"A"|"B"|"C"|"D"; label:string; value:string; copyable?:boolean}) => (
     <div className="grid grid-cols-[28px_1fr_auto] items-center gap-3 py-2 border-b last:border-b-0 border-border">
       <div className="font-semibold">{p.code})</div>
@@ -41,7 +41,7 @@ export function PlantPassportCard({
         <div className="font-serif text-base leading-tight">{p.value}</div>
       </div>
       {p.copyable ? (
-        <Button size="icon" variant="ghost" onClick={()=>copy(p.value)} aria-label={`Copy ${p.label}`}>
+        <Button size="icon" variant="ghost" onClick={()=>copyToClipboard(p.value)} aria-label={`Copy ${p.label}`}>
           <Clipboard className="h-4 w-4" />
         </Button>
       ) : <div/>}
