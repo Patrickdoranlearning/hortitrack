@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 import { adminDb } from "@/server/db/admin";
 import type { Supplier } from "@/lib/types";
+import type { Batch } from "@/lib/types";
 
 export const OrderSchema = z.object({
   id: z.string(),
@@ -65,4 +66,53 @@ export async function getOrderById(orderId: string): Promise<Order & { lines: an
 export async function getCustomers(): Promise<Supplier[]> {
     const snap = await adminDb.collection("suppliers").orderBy("name").get();
     return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Supplier);
+}
+
+export interface SaleableProduct {
+    id: string;
+    plantVariety: string;
+    size: string;
+    category?: string;
+    totalQuantity: number;
+    barcode?: string;
+    cost?: number;
+    status?: string;
+    imageUrl?: string;
+    availableBatches: Batch[];
+}
+
+export async function getSaleableProducts(): Promise<SaleableProduct[]> {
+    const saleableStatuses = ["Ready for Sale", "Looking Good"];
+    const snapshot = await adminDb.collection('batches')
+        .where('status', 'in', saleableStatuses)
+        .where('quantity', '>', 0)
+        .get();
+
+    const productsMap = new Map<string, SaleableProduct>();
+
+    snapshot.docs.forEach(doc => {
+        const batch = { id: doc.id, ...doc.data() } as Batch;
+        const productKey = `${batch.plantVariety}-${batch.size}`;
+
+        if (productsMap.has(productKey)) {
+            const existingProduct = productsMap.get(productKey)!;
+            existingProduct.totalQuantity += batch.quantity;
+            existingProduct.availableBatches.push(batch);
+        } else {
+            productsMap.set(productKey, {
+                id: productKey,
+                plantVariety: batch.plantVariety,
+                size: batch.size,
+                category: batch.category,
+                totalQuantity: batch.quantity,
+                barcode: `BARCODE-${batch.plantVariety.replace(/\s+/g, '')}`, // Example barcode
+                cost: 1.53, // Example cost
+                status: 'Bud & flower', // Example status
+                imageUrl: batch.growerPhotoUrl || batch.salesPhotoUrl || `https://placehold.co/100x100.png`,
+                availableBatches: [batch],
+            });
+        }
+    });
+
+    return Array.from(productsMap.values());
 }
