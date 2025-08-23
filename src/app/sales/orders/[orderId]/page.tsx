@@ -1,3 +1,4 @@
+
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OrderStatusBadge from "@/components/sales/OrderStatusBadge";
@@ -6,14 +7,11 @@ import { UpdateStatusButton } from "@/components/sales/UpdateStatusButton";
 import { getOrderById } from "@/server/sales/queries";
 
 export const runtime = "nodejs";
+export const dynamic = 'force-dynamic';
 
 export default async function OrderDetailPage({ params }: { params: { orderId: string } }) {
   const order = await getOrderById(params.orderId);
   if (!order) notFound();
-
-  // For now, we'll simplify and not fetch lines here, as the prompt focuses on orders.
-  // If line fetching is still needed, it would also need to be moved to a server-side query.
-  const lines: any[] = []; // Placeholder for now
 
   return (
     <div className="space-y-4">
@@ -58,7 +56,7 @@ export default async function OrderDetailPage({ params }: { params: { orderId: s
               </tr>
             </thead>
             <tbody>
-              {lines.map((l: any) => (
+              {order.lines.map((l: any) => (
                 <tr key={l.id} className="border-b align-top">
                   <td className="py-2">{l.plantVariety}</td>
                   <td className="py-2">{l.size}</td>
@@ -78,7 +76,7 @@ export default async function OrderDetailPage({ params }: { params: { orderId: s
                   </td>
                 </tr>
               ))}
-              {lines.length === 0 && (
+              {order.lines.length === 0 && (
                 <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No lines.</td></tr>
               )}
             </tbody>

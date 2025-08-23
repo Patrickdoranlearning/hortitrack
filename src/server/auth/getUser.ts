@@ -8,15 +8,15 @@ export type ServerUser = DecodedIdToken & { uid: string };
 
 function readBearer(): string | undefined {
   const h = headers();
-  const auth = h.get("authorization") || h.get("Authorization");
-  if (auth?.startsWith("Bearer ")) return auth.slice(7);
-  return undefined;
+  const auth = h.get("authorization") ?? h.get("Authorization");
+  if (!auth) return undefined;
+  const m = /^Bearer\s+(.+)$/i.exec(auth);
+  return m?.[1]?.trim();
 }
 
 function readCookie(): string | undefined {
-  const c = cookies();
-  // Align with whatever you set on login
-  return c.get("idToken")?.value || c.get("__session")?.value;
+  // Firebase Hosting/Functions convention
+  return cookies().get("__session")?.value;
 }
 
 export async function getUser(): Promise<ServerUser> {
