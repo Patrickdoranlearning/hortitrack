@@ -22,7 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
-import type { Order } from '@/server/sales/queries';
+import type { Order } from '@/server/sales/queries.server';
 import { signOut } from 'firebase/auth';
 import {
   Grid,
@@ -38,22 +38,43 @@ import OrderCard from '@/components/sales/OrderCard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import NewSalesOrderPage from './orders/new/page';
 
-type Props = { initialOrders: Order[], initialCustomers: any[] };
+type Props = { initialCustomers: any[] };
 
-export default function SalesPageClient({ initialOrders, initialCustomers }: Props) {
+export default function SalesPageClient({ initialCustomers }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [orders, setOrders] = React.useState<Order[] | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   const [filters, setFilters] = React.useState({
     status: 'all',
   });
   const [searchQuery, setSearchQuery] = React.useState('');
 
+  React.useEffect(() => {
+    let alive = true;
+    setError(null);
+    fetch("/api/sales/orders", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((res) => {
+        if (!alive) return;
+        if (res.ok) setOrders(res.orders as Order[]);
+        else setError(res.error ?? "Failed to load orders");
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setError(e.message ?? "Network error");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const filteredOrders = React.useMemo(() => {
-    return (initialOrders || [])
+    return (orders || [])
       .filter((order) => {
         if (filters.status === 'all') return true;
         return order.status === filters.status;
@@ -66,7 +87,7 @@ export default function SalesPageClient({ initialOrders, initialCustomers }: Pro
           order.customerName?.toLowerCase().includes(q)
         );
       });
-  }, [initialOrders, filters, searchQuery]);
+  }, [orders, filters, searchQuery]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -87,7 +108,7 @@ export default function SalesPageClient({ initialOrders, initialCustomers }: Pro
     router.push(`/sales/orders/${orderId}`);
   };
   
-  if (authLoading) {
+  if (authLoading || orders === null) {
     return (
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
           {[...Array(8)].map((_, i) => (
@@ -95,6 +116,10 @@ export default function SalesPageClient({ initialOrders, initialCustomers }: Pro
           ))}
         </div>
     );
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>
   }
 
   return (

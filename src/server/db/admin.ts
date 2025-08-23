@@ -1,41 +1,21 @@
 // src/server/db/admin.ts
 import "server-only";
-import {
-  initializeApp,
-  getApps,
-  applicationDefault,
-  cert,
-  type App,
-} from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
-import { getAuth } from "firebase-admin/auth";
 
-function buildCredential() {
-  const {
-    FIREBASE_PROJECT_ID,
-    FIREBASE_CLIENT_EMAIL,
-    FIREBASE_PRIVATE_KEY,
-  } = process.env;
+import { getApps, initializeApp, type App, applicationDefault } from "firebase-admin/app";
+import { getAuth, type Auth } from "firebase-admin/auth";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage, type Storage } from "firebase-admin/storage";
 
-  // Prefer explicit service account from env; normalize escaped newlines.
-  if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
-    const normalizedKey = FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n");
-    return cert({
-      projectId: FIREBASE_PROJECT_ID,
-      clientEmail: FIREBASE_CLIENT_EMAIL,
-      privateKey: normalizedKey,
-    });
-  }
-
-  // Fallback to ADC in GCP/Workstations/local gcloud.
-  return applicationDefault();
+let app: App;
+if (!getApps().length) {
+  // Use Application Default Credentials or platform identity.
+  // Do not read .env.local here (secrets managed externally).
+  app = initializeApp({});
+} else {
+  app = getApps()[0]!;
 }
 
-const app: App =
-  getApps()[0] ?? initializeApp({ credential: buildCredential() });
-
-export const adminApp = app;
-export const adminDb = getFirestore(app);
-export const adminStorage = getStorage(app);
-export const adminAuth = getAuth(app);
+export const adminApp: App = app;
+export const adminAuth: Auth = getAuth(app);
+export const adminDb: Firestore = getFirestore(app);
+export const adminStorage: Storage = getStorage(app);
