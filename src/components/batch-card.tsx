@@ -52,10 +52,20 @@ export function BatchCard({
     }
   };
 
+  // Determine phase based on batch status or other logic
+  const getPhase = (batch: Batch): string | null => {
+    if (batch.status === 'Propagation') return 'Propagation';
+    if (batch.status === 'Plugs/Liners') return 'Plugs/Liners';
+    if (batch.status === 'Potted' || batch.status === 'Ready for Sale' || batch.status === 'Looking Good') return 'Potted';
+    return null;
+  }
+
+  const phase = getPhase(batch);
+
   return (
     <div
       className={cn(
-        "relative group rounded-2xl border bg-card text-card-foreground shadow-sm p-4 h-full",
+        "relative group rounded-2xl border bg-card text-card-foreground shadow-sm p-4 h-full flex flex-col",
         "hover:shadow-md transition-shadow",
         className
       )}
@@ -75,20 +85,27 @@ export function BatchCard({
         </div>
       </div>
 
-      <div className="mt-2 flex justify-between text-xs font-semibold">
-          <span>Stock</span>
-          <span>
-            {batch.quantity.toLocaleString()} / {batch.initialQuantity.toLocaleString()}
-          </span>
-        </div>
-      <Progress value={stockPercentage} className="mt-1" />
+      <div className="mt-2 flex-grow">
+        <div className="flex justify-between text-xs font-semibold">
+            <span>Stock</span>
+            <span>
+              {batch.quantity.toLocaleString()} / {batch.initialQuantity.toLocaleString()}
+            </span>
+          </div>
+        <Progress value={stockPercentage} className="mt-1" />
+      </div>
 
 
-      {batch.status && (
-        <Badge className="mt-3" variant={getStatusVariant(batch.status)}>
-          {batch.status}
-        </Badge>
-      )}
+      <div className="flex flex-wrap gap-1 mt-3">
+        {phase && (
+            <Badge variant="secondary" className="capitalize">{phase}</Badge>
+        )}
+        {batch.status && (
+          <Badge variant={getStatusVariant(batch.status)}>
+            {batch.status}
+          </Badge>
+        )}
+      </div>
 
       {/* Full-card overlay button to capture click & focus accessibly */}
       <button
