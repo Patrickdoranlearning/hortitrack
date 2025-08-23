@@ -1,11 +1,7 @@
 
-import { getCustomers } from "@/server/sales/queries.server";
+// Server Component
 import SalesPageClient from "./SalesPageClient";
-
-export const runtime = "nodejs";
-export const dynamic = 'force-dynamic';
-
-export default async function SalesPage() {
-  const customers = await getCustomers();
-  return <SalesPageClient initialCustomers={customers} />;
+export default function SalesPage() {
+  // Avoid server-time Firestore call; let the client fetch via API
+  return <SalesPageClient />;
 }

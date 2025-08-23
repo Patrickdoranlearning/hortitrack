@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,7 +22,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
-import type { Order } from '@/server/sales/queries.server';
 import { signOut } from 'firebase/auth';
 import {
   Grid,
@@ -37,10 +36,17 @@ import * as React from 'react';
 import OrderCard from '@/components/sales/OrderCard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import NewSalesOrderPage from './orders/new/page';
+import { useEffect, useState } from "react";
 
-type Props = { initialCustomers: any[] };
+type Order = {
+  id: string;
+  customerName: string;
+  total: number;
+  status: "draft" | "open" | "fulfilled" | "cancelled";
+  createdAt: string;
+};
 
-export default function SalesPageClient({ initialCustomers }: Props) {
+export default function SalesPageClient() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
@@ -119,7 +125,16 @@ export default function SalesPageClient({ initialCustomers }: Props) {
   }
 
   if (error) {
-    return <div className="text-red-500">Error: {error}</div>
+    return (
+        <div className="p-3 rounded-md bg-red-50 text-red-700">
+            {error}
+            {error.includes("credentials") && (
+            <div className="text-sm mt-1">
+                Ask admin to set FIREBASE_SERVICE_ACCOUNT_* secret.
+            </div>
+            )}
+        </div>
+    );
   }
 
   return (
@@ -181,7 +196,7 @@ export default function SalesPageClient({ initialCustomers }: Props) {
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-4xl">
-          <NewSalesOrderPage customers={initialCustomers || []} onOrderCreated={() => setIsFormOpen(false)} />
+          <NewSalesOrderPage customers={[]} onOrderCreated={() => setIsFormOpen(false)} />
         </DialogContent>
       </Dialog>
     </>
