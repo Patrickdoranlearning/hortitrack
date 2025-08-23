@@ -1,6 +1,6 @@
+
 'use client';
 
-import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,10 +36,11 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import OrderCard from '@/components/sales/OrderCard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import NewSalesOrderPage from './orders/new/page';
 
-type Props = { initialOrders: Order[] };
+type Props = { initialOrders: Order[], initialCustomers: any[] };
 
-export default function SalesPageClient({ initialOrders }: Props) {
+export default function SalesPageClient({ initialOrders, initialCustomers }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
@@ -86,71 +87,18 @@ export default function SalesPageClient({ initialOrders }: Props) {
     router.push(`/sales/orders/${orderId}`);
   };
   
-
-  if (authLoading || !user) {
+  if (authLoading) {
     return (
-      <div className="flex min-h-screen w-full flex-col p-6">
-        <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 justify-between">
-          <Logo />
-          <Skeleton className="h-8 w-8 rounded-full" />
-        </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-          <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-            {[...Array(8)].map((_, i) => (
-              <Skeleton key={i} className="h-40" />
-            ))}
-          </div>
-        </main>
-      </div>
+        <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="h-40" />
+          ))}
+        </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col">
-      <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 justify-between z-10">
-        <Logo />
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search by Order ID, Customer..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="rounded-full">
-                <Users className="h-5 w-5" />
-                <span className="sr-only">Toggle user menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>
-                {user?.email || 'My Account'}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/">Nursery Stock</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings">Settings</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut}>
-                <LogOut />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+    <>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="font-headline text-3xl sm:text-4xl truncate">Sales Orders</h1>
@@ -188,9 +136,6 @@ export default function SalesPageClient({ initialOrders }: Props) {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-          {filteredOrders.length === 0 && (
-            <Skeleton key="loading-1" className="h-48" />
-          )}
           {filteredOrders.map((order) => (
             <OrderCard
               key={order.id}
@@ -199,7 +144,7 @@ export default function SalesPageClient({ initialOrders }: Props) {
             />
           ))}
         </div>
-        {filteredOrders.length === 0 && (
+        {filteredOrders.length === 0 && !authLoading && (
           <div className="text-center col-span-full py-20">
             <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">No Orders Found</h3>
@@ -208,15 +153,12 @@ export default function SalesPageClient({ initialOrders }: Props) {
             </p>
           </div>
         )}
-      </main>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-4xl">
-          {/* NewSalesOrderPage would need to be updated to not rely on initialCustomers prop */}
-          {/* For now, we'll remove it as per the prompt's implied simplification */}
-          {/* <NewSalesOrderPage customers={customersData || []} onOrderCreated={() => setIsFormOpen(false)} /> */}
+          <NewSalesOrderPage customers={initialCustomers || []} onOrderCreated={() => setIsFormOpen(false)} />
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
