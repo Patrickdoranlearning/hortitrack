@@ -36,7 +36,6 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import OrderCard from '@/components/sales/OrderCard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import OrderDetailPage from './orders/[orderId]/page';
 
 type Props = { initialOrders: Order[] };
 
@@ -46,7 +45,6 @@ export default function SalesPageClient({ initialOrders }: Props) {
   const { user, loading: authLoading } = useAuth();
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
-  const [selectedOrderId, setSelectedOrderId] = React.useState<string | null>(null);
 
   const [filters, setFilters] = React.useState({
     status: 'all',
@@ -85,12 +83,9 @@ export default function SalesPageClient({ initialOrders }: Props) {
   }, [user, authLoading, router]);
   
   const handleOpenDetail = (orderId: string) => {
-    setSelectedOrderId(orderId);
+    router.push(`/sales/orders/${orderId}`);
   };
   
-  const handleCloseDetail = () => {
-    setSelectedOrderId(null);
-  };
 
   if (authLoading || !user) {
     return (
@@ -222,14 +217,6 @@ export default function SalesPageClient({ initialOrders }: Props) {
           {/* <NewSalesOrderPage customers={customersData || []} onOrderCreated={() => setIsFormOpen(false)} /> */}
         </DialogContent>
       </Dialog>
-      
-      {selectedOrderId && (
-        <Dialog open={!!selectedOrderId} onOpenChange={(open) => !open && handleCloseDetail()}>
-            <DialogContent className="max-w-4xl">
-                 <OrderDetailPage params={{ orderId: selectedOrderId }} />
-            </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
