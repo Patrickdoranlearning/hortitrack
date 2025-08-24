@@ -66,3 +66,26 @@ export const SalesOrderDocSchema = z.object({
   updatedAt: z.any().optional(),
 });
 export type SalesOrderDoc = z.infer<typeof SalesOrderDocSchema>;
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  availableStock: number;
+}
+
+export interface OrderItem {
+  productId: string;
+  productName: string; // Optional: for easier display
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface Order {
+  id: string;
+  customerId: string;
+  items: OrderItem[];
+  totalAmount: number;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; // Example statuses
+}

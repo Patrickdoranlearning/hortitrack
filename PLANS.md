@@ -44,10 +44,11 @@ Transform the app into a multi-user platform with distinct roles and capabilitie
 *   **User Roles:**
     *   **Nursery Operative:** Focused on batch management, logging actions, and completing assigned tasks within the Production Module.
     *   **Sales Person:** Can view inventory, check what's ready for sale, and potentially create quotes or orders in the Sales Module.
-    *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly in the Sales Module.
+        *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly in the Sales Module. **They will use the same UI as Sales Persons for creating orders.**
 *   **Implementation:**
     *   Use **Firebase Authentication** to manage user accounts, logins, and security.
     *   Build different UI views and dashboards tailored to each user role.
+    *   **Note:** Sales Persons and Customers will share the same UI for order creation to reduce program size.
 
 ## 3. Product & Alias Management (Sales Module)
 
