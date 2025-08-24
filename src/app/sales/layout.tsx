@@ -57,7 +57,7 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
                 <Link href="/dashboard">
-                Dashboard
+                Production Dashboard
                 </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>

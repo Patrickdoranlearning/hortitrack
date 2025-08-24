@@ -377,7 +377,7 @@ export default function HomePageView({
               <DropdownMenuItem asChild>
                 <Link href="/dashboard">
                   <LayoutGrid />
-                  Dashboard
+                  Production Dashboard
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
