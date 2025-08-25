@@ -1,7 +1,43 @@
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { SalesOrdersPanel } from "@/components/sales/SalesOrdersPanel";
+"use client";
+
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
+import {
+  Grid,
+  LogOut,
+  Plus,
+  Search,
+  Users,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import * as React from 'react';
+import OrderCard from '@/components/sales/OrderCard';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import NewSalesOrderPage from './orders/new/page';
+import { useEffect, useState } from "react";
+import { SalesOrdersPanel } from '@/components/sales/SalesOrdersPanel';
 
 export default function SalesLandingPage() {
   return (
