@@ -21,8 +21,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PlantVariety } from "@/lib/varieties";
-import { getVarieties } from "@/lib/varieties"; // Assuming this function exists
+import { type Variety, VARIETIES } from "@/lib/varieties";
 
 type CheckinFormProps = {
   onSubmit: (data: CheckinFormInput) => Promise<void>;
@@ -32,16 +31,8 @@ type CheckinFormProps = {
 };
 
 export function CheckinForm({ onSubmit, onCancel, isLoading, error }: CheckinFormProps) {
-  const [varieties, setVarieties] = useState<PlantVariety[]>([]);
+  const [varieties, setVarieties] = useState<Variety[]>(VARIETIES);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    async function fetchVarieties() {
-      const fetchedVarieties = await getVarieties();
-      setVarieties(fetchedVarieties);
-    }
-    fetchVarieties();
-  }, []);
 
   const form = useForm<CheckinFormInput>({
     resolver: zodResolver(CheckinFormSchema),
@@ -77,10 +68,10 @@ export function CheckinForm({ onSubmit, onCancel, isLoading, error }: CheckinFor
 
   const handleVarietyChange = (selectedValue: string) => {
     const selectedVariety = varieties.find(
-      (variety) => variety.variety === selectedValue
+      (variety) => variety.name === selectedValue
     );
     if (selectedVariety) {
-      form.setValue("variety", selectedVariety.variety, { shouldValidate: true });
+      form.setValue("variety", selectedVariety.name, { shouldValidate: true });
       form.setValue("passportA", selectedVariety.family ?? "", { shouldValidate: true }); // Auto-fill family
     } else {
       form.setValue("variety", selectedValue, { shouldValidate: true });
@@ -112,7 +103,7 @@ export function CheckinForm({ onSubmit, onCancel, isLoading, error }: CheckinFor
                       )}
                     >
                       {field.value
-                        ? varieties.find((variety) => variety.variety === field.value)?.variety
+                        ? varieties.find((variety) => variety.name === field.value)?.name
                         : "Select variety"}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -126,22 +117,22 @@ export function CheckinForm({ onSubmit, onCancel, isLoading, error }: CheckinFor
                       <CommandGroup>
                         {varieties.map((variety) => (
                           <CommandItem
-                            value={variety.variety}
-                            key={variety.variety}
+                            value={variety.name}
+                            key={variety.name}
                             onSelect={() => {
-                              handleVarietyChange(variety.variety);
+                              handleVarietyChange(variety.name);
                               setOpen(false);
                             }}
                           >
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                variety.variety === field.value
+                                variety.name === field.value
                                   ? "opacity-100"
                                   : "opacity-0"
                               )}
                             />
-                            {variety.variety}
+                            {variety.name}
                           </CommandItem>
                         ))}
                       </CommandGroup>

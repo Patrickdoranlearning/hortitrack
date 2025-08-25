@@ -71,6 +71,7 @@ import { parseScanCode } from '@/lib/scan/parse';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { CheckinDialog } from '@/components/checkin-dialog';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -437,12 +438,13 @@ export default function HomePageView({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/production/batches/new/propagation">Propagation</Link>
+                <DropdownMenuItem onSelect={() => {
+                  setSelectedBatch(null);
+                  setIsNewPropagationOpen(true);
+                }}>
+                  Propagation
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/production/batches/new/checkin">Check-in</Link>
-                </DropdownMenuItem>
+                <CheckinDialog trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Check-in</DropdownMenuItem>} />
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -617,7 +619,7 @@ export default function HomePageView({
         locations={(nurseryLocations || []).map(l => ({ id: l.id!, name: l.name }))}
       />
 
-      <Dialog open={isTransplantOpen || isNewPropagationOpen} onOpenChange={isTransplantOpen ? setIsTransplantOpen : setIsNewPropagationOpen}>
+      <Dialog open={isTransplantOpen || isNewPropagationOpen} onOpenChange={isNewPropagationOpen ? setIsNewPropagationOpen : setIsTransplantOpen}>
         <DialogContent className="max-w-4xl">
           <TransplantForm
             batch={selectedBatch}
