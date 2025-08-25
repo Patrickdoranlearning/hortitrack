@@ -438,10 +438,10 @@ export default function HomePageView({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link href="/production/batches/new/propagation">New Propagation</Link>
+                  <Link href="/production/batches/new/propagation">Propagation</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/production/batches/new/checkin">New Check-in</Link>
+                  <Link href="/production/batches/new/checkin">Check-in</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
