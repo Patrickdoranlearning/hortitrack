@@ -5,14 +5,21 @@ export async function GET(req: Request) {
   const supabase = await supabaseServer();
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
-  const orgId = searchParams.get("orgId");
 
-  if (!orgId) return NextResponse.json({ error: "orgId required" }, { status: 400 });
+  const { data, error } = await supabase
+    .from("plant_varieties")
+    .select("id, name, family, genus, species, cultivar, colour, rating")
+    .ilike("name", q ? `%${q}%` : "%")
+    .order("name")
+    .limit(20);
 
-  let query = supabase.from("plant_varieties").select("id,name,family,genus,species").eq("org_id", orgId).limit(6);
-  if (q) query = query.ilike("name", `%${q}%`); // trigram index speeds fuzzy. :contentReference[oaicite:7]{index=7}
+  if (error) return NextResponse.json({ items: [], error: error.message }, { status: 200 });
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  return NextResponse.json({
+    items: (data ?? []).map(v => ({
+      id: v.id,
+      name: v.name,
+      meta: { family: v.family, genus: v.genus, species: v.species, cultivar: v.cultivar, colour: v.colour, rating: v.rating }
+    }))
+  });
 }
