@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -48,21 +49,21 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
-import { ActionDialog } from '../components/actions/ActionDialog';
-import { BatchCard } from '../components/batch-card';
-import { BatchDetailDialog } from '../components/batch-detail-dialog';
-import { BatchForm } from '../components/batch-form';
-import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
-import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
-import ScannerDialog from '../components/scan-and-act-dialog';
+import { ActionDialog } from '@/components/actions/ActionDialog';
+import { BatchCard } from '@/components/batch-card';
+import { BatchDetailDialog } from '@/components/batch-detail-dialog';
+import { BatchForm } from '@/components/batch-form';
+import { CareRecommendationsDialog } from '@/components/care-recommendations-dialog';
+import { ProductionProtocolDialog } from '@/components/production-protocol-dialog';
+import ScannerDialog from '@/components/scan-and-act-dialog';
 import {
   TransplantForm,
   type TransplantFormData,
-} from '../components/transplant-form';
-import { VarietyForm } from '../components/variety-form';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+} from '@/components/transplant-form';
+import { VarietyForm } from '@/components/variety-form';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCollection } from '@/hooks/use-collection';
-import { getCareRecommendationsAction } from './actions';
+import { getCareRecommendationsAction } from '@/app/actions';
 import { FeatureGate } from '@/components/FeatureGate';
 import { getIdTokenOrNull } from "@/lib/auth/client"; // Import getIdTokenOrNull
 import { queryMatchesBatch } from '@/lib/search';
