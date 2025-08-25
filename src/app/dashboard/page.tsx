@@ -78,16 +78,27 @@ export default function DashboardOverviewPage() {
     return () => unsubscribe();
   }, []);
 
+  // Helper: keep only truthy string values (avoid undefined/null → invalid keys)
+  const toStringOptions = (values: Array<string | null | undefined>) =>
+    Array.from(
+      new Set(
+        values
+          .filter((v): v is string => typeof v === "string")
+          .map((v) => v.trim())
+          .filter((v) => v.length > 0)
+      )
+    );
+
   const statuses = useMemo(
-    () => ['all', ...Array.from(new Set(batches.map((b) => b.status)))],
+    () => ["all", ...toStringOptions(batches.map((b) => b.status))],
     [batches]
   );
   const sizes = useMemo(
-    () => ['all', ...Array.from(new Set(batches.map((b) => b.size)))],
+    () => ["all", ...toStringOptions(batches.map((b) => b.size))],
     [batches]
   );
   const locations = useMemo(
-    () => ['all', ...Array.from(new Set(batches.map((b) => b.location)))],
+    () => ["all", ...toStringOptions(batches.map((b) => b.location))],
     [batches]
   );
   
@@ -233,11 +244,14 @@ export default function DashboardOverviewPage() {
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              {statuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status === 'all' ? 'All Statuses' : status}
-                </SelectItem>
-              ))}
+              {statuses.map((status) => {
+                const key = status; // always a non-empty string now
+                return (
+                  <SelectItem key={key} value={status}>
+                    {status === "all" ? "All Statuses" : status}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           <Select
@@ -248,11 +262,14 @@ export default function DashboardOverviewPage() {
               <SelectValue placeholder="Filter by size" />
             </SelectTrigger>
             <SelectContent>
-              {sizes.map((size) => (
-                <SelectItem key={size} value={size}>
-                  {size === 'all' ? 'All Sizes' : size}
-                </SelectItem>
-              ))}
+              {sizes.map((size) => {
+                const key = size;
+                return (
+                  <SelectItem key={key} value={size}>
+                    {size === "all" ? "All Sizes" : size}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           <Select
@@ -265,11 +282,14 @@ export default function DashboardOverviewPage() {
               <SelectValue placeholder="Filter by location" />
             </SelectTrigger>
             <SelectContent>
-              {locations.map((location) => (
-                <SelectItem key={location} value={location}>
-                  {location === 'all' ? 'All Locations' : location}
-                </SelectItem>
-              ))}
+              {locations.map((location) => {
+                const key = location;
+                return (
+                  <SelectItem key={key} value={location}>
+                    {location === "all" ? "All Locations" : location}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </CardContent>
