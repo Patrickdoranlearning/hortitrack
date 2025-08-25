@@ -1,24 +1,36 @@
+// src/app/api/search/sizes/route.ts
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/server/supabase/client";
 
 export async function GET(req: Request) {
-  const supabase = await supabaseServer();
-  const { searchParams } = new URL(req.url);
-  const q = (searchParams.get("q") ?? "").trim();
-  const orgId = searchParams.get("orgId");
-  const trayOnly = searchParams.get("trayOnly") === "1";
+  try {
+    const { searchParams } = new URL(req.url);
+    const q = (searchParams.get("q") ?? "").trim();
+    const trayOnly = searchParams.get("trayOnly") === "1";
 
-  if (!orgId) return NextResponse.json({ error: "orgId required" }, { status: 400 });
+    const supabase = await supabaseServer();
 
-  let query = supabase.from("plant_sizes")
-    .select("id,name,container_type,cell_multiple")
-    .eq("org_id", orgId)
-    .limit(6);
+    let query = supabase
+      .from("plant_sizes")
+      .select("id,name,container_type,cell_multiple")
+      .limit(20);
 
-  if (trayOnly) query = query.in("container_type", ["prop_tray","plug_tray"]); // enum values. :contentReference[oaicite:8]{index=8}
-  if (q) query = query.ilike("name", `%${q}%`);
+    if (trayOnly) query = query.in("container_type", ["prop_tray", "plug_tray"]);
+    if (q) query = query.ilike("name", `%${q}%`);
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+    const { data, error } = await query;
+    if (error) {
+        return NextResponse.json({ items: [], error: error.message }, { status: 200 });
+    }
+
+    return NextResponse.json({
+        items: (data ?? []).map(v => ({
+            id: v.id,
+            label: v.name,
+            meta: { container_type: v.container_type, cell_multiple: v.cell_multiple }
+        }))
+    });
+  } catch (e: any) {
+    return NextResponse.json({ items: [], error: e?.message ?? "Unknown error" }, { status: 200 });
+  }
 }
