@@ -1,43 +1,47 @@
 
 "use client";
 import * as React from "react";
-import { getSaleableProducts, getCustomers } from "@/server/sales/queries.server";
 import { OrderPlacementClient } from "./OrderPlacementClient";
 
 type Props = {
-    customers: any[];
-    onOrderCreated: () => void;
+    customers?: any[];
+    onOrderCreated?: () => void;
 };
 
-export default function NewSalesOrderPage({ customers, onOrderCreated }: Props) {
+export default function NewSalesOrderPage({ customers = [], onOrderCreated }: Props) {
   const [products, setProducts] = React.useState<any[]>([]);
   const [categories, setCategories] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    // This is a client component, so we must fetch data via an API
-    // or receive it as props. We can create an API endpoint if needed.
-    // For now, let's assume products are fetched. A real implementation
-    // would fetch from `/api/sales/products`
-    const fetchProducts = async () => {
-      // In a real app, this would be an API call:
-      // const res = await fetch('/api/sales/products');
-      // const data = await res.json();
-      // setProducts(data.products);
-      // setCategories(data.categories);
-      
-      // Simulating fetch
-      setLoading(false);
-    };
-
-    fetchProducts();
+    let alive = true;
+    (async () => {
+      try {
+        const [pRes] = await Promise.all([
+          fetch("/api/sales/products", { cache: "no-store" }),
+          // customers endpoint already exists if you want to use it in the UI later:
+          // fetch("/api/sales/customers", { cache: "no-store" }),
+        ]);
+        const pJson = await pRes.json();
+        if (!alive) return;
+        if (!pRes.ok || !pJson.ok) throw new Error(pJson.error || "Failed to load products");
+        const prods = pJson.products as any[];
+        setProducts(prods);
+        const cats = Array.from(new Set(prods.map(p => p.category || "General")));
+        setCategories(["all", ...cats]);
+        setLoading(false);
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e.message ?? "Failed to load");
+        setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
   }, []);
 
-  if (loading) {
-      return <div>Loading products...</div>;
-  }
+  if (loading) return <div className="p-4">Loading products…</div>;
+  if (error)   return <div className="p-4 text-red-600">{error}</div>;
 
-  return (
-    <OrderPlacementClient products={products} categories={categories} />
-  );
+  return <OrderPlacementClient products={products} categories={categories} />;
 }

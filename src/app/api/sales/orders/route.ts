@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 import { requireRoles } from "@/server/auth/roles";
 import { CreateOrderSchema } from "@/lib/sales/types";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer";
 
 export async function GET(req: Request) {
   try {
@@ -20,11 +21,42 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
     const limit = Math.min(Number(searchParams.get("limit") || 50), 200);
 
-    const orders = await listOrders(limit, status || undefined);
-    return NextResponse.json({ ok: true, orders });
+    if (process.env.USE_SUPABASE_READS === "1") {
+      const sb = getSupabaseForRequest();
+      // Base select
+      let q = sb.from("orders")
+        .select("id, customer_id, status, created_at", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (status && status !== "all") q = q.eq("status", status);
+      const { data, error } = await q;
+      if (error) return fail(400, "query_failed", error.message);
+
+      const orders = (data ?? []).map(o => ({
+        id: o.id,
+        customerName: o.customer_id ?? "Unknown",
+        customerId: o.customer_id ?? null,
+        status: o.status ?? "draft",
+        createdAt: o.created_at,
+      }));
+
+      // Enrich customer names (best-effort)
+      const ids = [...new Set(orders.map(o => o.customerId).filter(Boolean))] as string[];
+      if (ids.length) {
+        const { data: cust, error: cErr } = await sb.from("customers").select("id,name").in("id", ids);
+        if (!cErr && cust) {
+          const map = new Map(cust.map(c => [c.id, c.name]));
+          orders.forEach(o => { if (o.customerId && map.has(o.customerId)) o.customerName = map.get(o.customerId)!; });
+        }
+      }
+      return NextResponse.json({ ok: true, orders });
+    } else {
+      const orders = await listOrders(limit, status || undefined);
+      return NextResponse.json({ ok: true, orders });
+    }
   } catch (err) {
     console.error("[api:sales/orders][GET]", err);
-    return NextResponse.json({ ok: false, error: "Failed to fetch orders" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: String((err as any)?.message ?? err) }, { status: 500 });
   }
 }
 
