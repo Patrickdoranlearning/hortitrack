@@ -3,7 +3,7 @@ import { supabaseServer } from "@/server/supabase/client";
 export async function createBatchLog(params: {
   orgId: string; batchId: string; type: string; note?: string; qty_change?: number | null;
 }) {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const { error } = await supabase
     .from("batch_logs")
     .insert({

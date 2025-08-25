@@ -4,7 +4,7 @@ import { BatchCheckInSchema } from "@/lib/validators/batchSchemas";
 import { createBatchLog } from "@/server/batches/log";
 
 export async function POST(req: Request) {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const body = await req.json();
   const orgId = body.orgId as string;
   if (!orgId) return NextResponse.json({ error: "orgId missing" }, { status: 400 });

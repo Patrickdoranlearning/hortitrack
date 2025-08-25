@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/server/supabase/client";
 
 export async function GET(req: Request) {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
   const orgId = searchParams.get("orgId");
