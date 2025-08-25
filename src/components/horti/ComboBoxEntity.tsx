@@ -24,20 +24,60 @@ export function ComboBoxEntity({ label, value, onChange, entity, orgId, trayOnly
   const [q, setQ] = React.useState("");
   const [items, setItems] = React.useState<Item[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const ctrlRef = React.useRef<AbortController | null>(null);
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => () => { mountedRef.current = false; }, []);
 
   React.useEffect(() => {
+    if (!orgId) { setItems([]); return; }
     const t = setTimeout(async () => {
-      setLoading(true);
-      const url = new URL(`/api/search/${entity}`, window.location.origin);
-      url.searchParams.set("q", q);
-      url.searchParams.set("orgId", orgId);
-      if (trayOnly) url.searchParams.set("trayOnly", "1");
-      const res = await fetch(url);
-      const data = await res.json();
-      setItems(Array.isArray(data) ? data : []);
-      setLoading(false);
+      // cancel any in-flight request
+      ctrlRef.current?.abort();
+      const controller = new AbortController();
+      ctrlRef.current = controller;
+
+      try {
+        setLoading(true);
+        const url = `/api/search/${entity}?q=${encodeURIComponent(q)}&orgId=${encodeURIComponent(orgId)}${trayOnly ? "&trayOnly=1" : ""}`;
+        const res = await fetch(url, { signal: controller.signal });
+
+        if (!res.ok) {
+          // Try to capture body for debugging in dev, but never throw
+          const body = await res.text().catch(() => "");
+          console.warn(`[ComboBoxEntity] ${entity} search failed`, { status: res.status, body });
+          setItems([]);
+          return;
+        }
+
+        const ct = res.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) {
+          const body = await res.text().catch(() => "");
+          console.warn(`[ComboBoxEntity] ${entity} non-JSON response`, { ct, bodyPreview: body.slice(0, 140) });
+          setItems([]);
+          return;
+        }
+
+        let data: unknown = [];
+        try {
+          data = await res.json();
+        } catch (e) {
+          console.warn(`[ComboBoxEntity] ${entity} JSON parse error`, e);
+          data = [];
+        }
+        if (!mountedRef.current) return;
+        setItems(Array.isArray(data) ? (data as Item[]) : []);
+      } catch (err: any) {
+        if (err?.name === "AbortError") return; // expected
+        console.warn(`[ComboBoxEntity] ${entity} fetch error`, err);
+        setItems([]);
+      } finally {
+        if (mountedRef.current) setLoading(false);
+      }
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ctrlRef.current?.abort();
+    };
   }, [q, entity, orgId, trayOnly]);
 
   return (
@@ -55,12 +95,14 @@ export function ComboBoxEntity({ label, value, onChange, entity, orgId, trayOnly
             <CommandInput value={q} onValueChange={setQ} placeholder={`Search ${label}...`} />
             <CommandList>
               <CommandEmpty>
-                {loading ? "Searching..." : (
-                  <div className="p-2 flex items-center gap-2">
-                    No results.
-                    {quickAdd ? <div className="ml-auto">{quickAdd}</div> : null}
-                  </div>
-                )}
+                {loading
+                  ? "Searching..."
+                  : q
+                    ? (<div className="p-2 flex items-center gap-2">
+                         No results.
+                         {quickAdd ? <div className="ml-auto">{quickAdd}</div> : null}
+                       </div>)
+                    : "Type to search"}
               </CommandEmpty>
               <CommandGroup>
                 {items.map((it) => (
