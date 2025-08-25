@@ -104,19 +104,16 @@ export async function getSaleableProducts(): Promise<SaleableProduct[]> {
         // Use v_sku_available + join lookup data we need for UI
         const { data, error } = await sb
         .from("v_sku_available")
-        .select("sku_id, sku_code, description, default_vat_rate, available_qty");
-        if (error) throw error;
+        .select("sku_code, description, available_qty")
+        .order("sku_code");
+        if (error) throw new Error(`[supabase] v_sku_available: ${error.message}`);
         return (data ?? []).map(r => ({
             id: r.sku_code,
             plantVariety: r.description ?? r.sku_code,
             size: '',
-            category: undefined,
             totalQuantity: Number(r.available_qty ?? 0),
-            barcode: r.sku_code,
-            cost: 0,
-            status: "Available",
-            imageUrl: undefined,
             availableBatches: [],
+            status: Number(r.available_qty ?? 0) > 0 ? "Available" : "Out",
         }));
     }
 
