@@ -71,7 +71,8 @@ import { parseScanCode } from '@/lib/scan/parse';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckinDialog } from '@/components/checkin-dialog';
+import { NewBatchButton } from '@/components/horti/NewBatchButton';
+import { OrgProvider } from '@/server/org/context';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -157,8 +158,6 @@ export default function HomePageView({
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
   const [isScanOpen, setIsScanOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
-  const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
-
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
   const [newVarietyName, setNewVarietyName] = React.useState('');
@@ -291,7 +290,6 @@ export default function HomePageView({
       );
     }
     setIsTransplantOpen(false);
-    setIsNewPropagationOpen(false); // Close the new propagation dialog
     setSelectedBatch(null);
   };
 
@@ -343,6 +341,7 @@ export default function HomePageView({
   }
 
   return (
+    <OrgProvider orgId="Doran Nurseries">
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 justify-between z-10">
         <Logo />
@@ -431,22 +430,7 @@ export default function HomePageView({
               </Button>
             </FeatureGate>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button disabled={isReadonly} className="w-full sm:w-auto">
-                  <Plus /> New Batch
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => {
-                  setSelectedBatch(null);
-                  setIsNewPropagationOpen(true);
-                }}>
-                  Propagation
-                </DropdownMenuItem>
-                <CheckinDialog trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Check-in</DropdownMenuItem>} />
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <NewBatchButton />
           </div>
         </div>
 
@@ -619,18 +603,17 @@ export default function HomePageView({
         locations={(nurseryLocations || []).map(l => ({ id: l.id!, name: l.name }))}
       />
 
-      <Dialog open={isTransplantOpen || isNewPropagationOpen} onOpenChange={isNewPropagationOpen ? setIsNewPropagationOpen : setIsTransplantOpen}>
+      <Dialog open={isTransplantOpen} onOpenChange={setIsTransplantOpen}>
         <DialogContent className="max-w-4xl">
           <TransplantForm
             batch={selectedBatch}
             onSubmit={handleTransplantSubmit}
             onCancel={() => {
               setIsTransplantOpen(false);
-              setIsNewPropagationOpen(false);
             }}
             nurseryLocations={nurseryLocations || []}
             plantSizes={plantSizes || []}
-            isNewPropagation={isNewPropagationOpen} // New prop
+            isNewPropagation={false}
           />
         </DialogContent>
       </Dialog>
@@ -675,5 +658,6 @@ export default function HomePageView({
         }}
       />}
     </div>
+    </OrgProvider>
   );
 }
