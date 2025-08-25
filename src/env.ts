@@ -21,9 +21,12 @@ const Schema = z.object({
   ALLOWED_ORIGINS: z.string().optional(),
 
   // Supabase (for dual-write)
-  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_URL: z.string().optional(),
   SUPABASE_SERVICE_ROLE: z.string().optional(),
-  DUAL_WRITE: z.enum(["0", "1"]).optional(),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().optional(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
+  USE_SUPABASE_READS: z.string().optional(),  // "1" to prefer Supabase for reads
+  DUAL_WRITE: z.string().optional(),
 
   // Runtime hints (optional)
   VERCEL_URL: z.string().optional(),
@@ -44,6 +47,9 @@ const raw = {
 
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  USE_SUPABASE_READS: process.env.USE_SUPABASE_READS,
   DUAL_WRITE: process.env.DUAL_WRITE,
 
   VERCEL_URL: process.env.VERCEL_URL,

@@ -1,6 +1,8 @@
+
 // src/server/sales/queries.server.ts
 import "server-only";
 import { adminDb } from "@/server/db/admin";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer";
 import { z } from "zod";
 import type { Supplier, Batch } from "@/lib/types";
 
@@ -97,6 +99,27 @@ export interface SaleableProduct {
 }
 
 export async function getSaleableProducts(): Promise<SaleableProduct[]> {
+    if (process.env.USE_SUPABASE_READS === "1") {
+        const sb = getSupabaseForRequest();
+        // Use v_sku_available + join lookup data we need for UI
+        const { data, error } = await sb
+        .from("v_sku_available")
+        .select("sku_id, sku_code, description, default_vat_rate, available_qty");
+        if (error) throw error;
+        return (data ?? []).map(r => ({
+            id: r.sku_code,
+            plantVariety: r.description ?? r.sku_code,
+            size: '',
+            category: undefined,
+            totalQuantity: Number(r.available_qty ?? 0),
+            barcode: r.sku_code,
+            cost: 0,
+            status: "Available",
+            imageUrl: undefined,
+            availableBatches: [],
+        }));
+    }
+
     const saleableStatuses = ["Ready for Sale", "Looking Good"];
     const snapshot = await adminDb.collection('batches')
         .where('status', 'in', saleableStatuses)
@@ -131,4 +154,3 @@ export async function getSaleableProducts(): Promise<SaleableProduct[]> {
 
     return Array.from(productsMap.values());
 }
-
