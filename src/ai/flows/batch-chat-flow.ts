@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -49,11 +48,11 @@ const batchChatPrompt = ai.definePrompt(
           'Handlebars helper to stringify JSON objects. Use as `{{{JSONstringify anObject}}}`.',
       },
     ],
-  },
-  {
-    templateFormat: 'handlebars',
-    helpers: {
-      JSONstringify: (value: any) => JSON.stringify(value, null, 2),
+    config: {
+      templateFormat: 'handlebars',
+      helpers: {
+        JSONstringify: (value: any) => JSON.stringify(value, null, 2),
+      },
     },
   }
 );

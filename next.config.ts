@@ -1,4 +1,3 @@
-// next.config.ts
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
@@ -19,10 +18,6 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: process.env.NEXT_STRICT_TYPECHECK !== '1',
   },
   experimental: {
-    allowedDevOrigins: (process.env.NEXT_ALLOWED_DEV_ORIGINS || "")
-      .split(",")
-      .map(s => s.trim())
-      .filter(Boolean),
   },
 }
 
