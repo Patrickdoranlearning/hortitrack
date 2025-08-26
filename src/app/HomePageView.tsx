@@ -73,6 +73,7 @@ import { TransplantIcon, CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { NewBatchButton } from '@/components/horti/NewBatchButton';
 import { OrgProvider } from '@/server/org/context';
+import { fetchJson } from '@/lib/http';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -312,8 +313,34 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
   
-  const handleScanDetected = (text: string) => {
-    window.location.href = `/?batch=${encodeURIComponent(text)}`;
+  const handleScanDetected = async (text: string) => {
+    try {
+      const idToken = await getIdTokenOrNull();
+      if (!idToken) throw new Error("Authentication required.");
+
+      const { data } = await fetchJson<{ batch: Batch }>('/api/batches/scan', {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ code: text }),
+      });
+      
+      if (data?.batch) {
+        setIsScanOpen(false);
+        setSelectedBatch(data.batch);
+        setIsDetailDialogOpen(true);
+      } else {
+        throw new Error("Batch not found.");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Scan Failed",
+        description: error?.message ?? "Could not find a matching batch for the scanned code.",
+      });
+    }
   };
 
 
