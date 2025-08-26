@@ -66,6 +66,7 @@ import { fetchJson } from '@/lib/http';
 import { useSWRConfig } from 'swr';
 import useSWR from 'swr';
 import { getBatchesAction } from './actions';
+import { PageFrame } from '@/ui/templates/PageFrame';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -77,6 +78,12 @@ interface HomePageViewProps {
   categories: string[];
   actions: {};
 }
+
+const TABS = [
+    { label: "Production", href: "/" },
+    { label: "Sales", href: "/sales" },
+    { label: "Actions", href: "/actions" },
+];
 
 export default function HomePageView({
   initialBatches,
@@ -245,65 +252,7 @@ export default function HomePageView({
 
   return (
     <OrgProvider orgId="Doran Nurseries">
-    <div className="flex min-h-screen w-full flex-col">
-      <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 justify-between z-10">
-        <Logo />
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search #batch, ht:batch:…, variety…"
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && filteredBatches.length > 0) {
-                  setSelectedBatch(filteredBatches[0] as any);
-                  setIsDetailDialogOpen(true);
-                }
-              }}
-            />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="rounded-full">
-                <Users className="h-5 w-5" />
-                <span className="sr-only">Toggle user menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>
-                {user.email || 'My Account'}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard">
-                  <LayoutGrid />
-                  Production Dashboard
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/sales">
-                  <ShoppingCart />
-                  Sales
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings">
-                  <Settings />
-                  Settings
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut}>
-                <LogOut />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
+    <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
@@ -509,7 +458,7 @@ export default function HomePageView({
           quantity: selectedBatch.quantity,
         }}
       />}
-    </div>
+    </PageFrame>
     </OrgProvider>
   );
 }
