@@ -22,29 +22,31 @@ export function AppHeader({ companyName, moduleKey, moduleTabs, className }: App
       "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60",
       className
     )}>
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-2 px-4 py-2 md:grid-cols-[auto_1fr_auto] md:items-end">
-        {/* Left: Logo + Company */}
+      {/* Top bar: Logo, Search, Profile */}
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
             <LogoHortitrack className="h-8 w-8" />
             <div className="leading-tight">
-              <div className="font-display text-base">Hortitrack</div>
-              <div className="text-[11px] text-muted-foreground">{companyName}</div>
+                <div className="font-display text-base">HortiTrack</div>
+                <div className="text-[11px] text-muted-foreground">{companyName}</div>
             </div>
-          </Link>
+            </Link>
         </div>
 
-        {/* Middle: Module tabs (between logo and search) */}
-        <div className="md:px-4">
-          <ModuleTabs items={moduleTabs} ariaLabel={`${moduleKey} module navigation`} />
-        </div>
-
-        {/* Right: Search + Profile */}
         <div className="flex items-center justify-end gap-2">
           <SearchInput placeholder="Search batches, varieties, locations…" />
           <ProfileMenu moduleKey={moduleKey} />
         </div>
       </div>
+      
+      {/* Bottom bar: Module Tabs */}
+      <div className="border-t bg-background/50">
+        <div className="mx-auto max-w-7xl px-4">
+             <ModuleTabs items={moduleTabs} ariaLabel={`${moduleKey} module navigation`} />
+        </div>
+      </div>
+
     </header>
   )
 }

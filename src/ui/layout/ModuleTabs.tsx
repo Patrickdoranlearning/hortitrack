@@ -12,7 +12,7 @@ export function ModuleTabs({ items, ariaLabel }: { items: ModuleTabItem[]; ariaL
   const pathname = usePathname()
   return (
     <nav aria-label={ariaLabel} className="overflow-x-auto">
-      <ul className="flex items-center gap-2">
+      <ul className="-mb-px flex h-10 items-center gap-4 text-sm">
         {items.map((item) => {
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
           return (
@@ -20,10 +20,10 @@ export function ModuleTabs({ items, ariaLabel }: { items: ModuleTabItem[]; ariaL
               <Link
                 href={item.href}
                 className={cn(
-                  "inline-flex items-center rounded-full px-3 py-1.5 text-sm transition",
+                  "inline-flex items-center border-b-2 px-1 pt-1 font-medium transition",
                   active
-                    ? "bg-horti-green/15 text-foreground ring-1 ring-horti-green/30"
-                    : "text-muted-foreground hover:bg-muted"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                 )}
               >
                 {item.label}
