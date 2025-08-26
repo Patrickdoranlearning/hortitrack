@@ -67,6 +67,7 @@ import { useSWRConfig } from 'swr';
 import useSWR from 'swr';
 import { getBatchesAction } from './actions';
 import { PageFrame } from '@/ui/templates/PageFrame';
+import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -254,36 +255,33 @@ export default function HomePageView({
     <OrgProvider orgId="Doran Nurseries">
     <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-headline text-3xl sm:text-4xl truncate">Nursery Stock</h1>
-            <p className="text-muted-foreground">
-              A real-time overview of all plant batches currently in production.
-            </p>
-          </div>
-          <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsScanOpen(true)}
-              className="w-full sm:w-auto"
-            >
-              <QrCode />
-              Scan
-            </Button>
-            <FeatureGate name="aiCare">
-              <Button
-                onClick={handleAiCareClick}
-                variant="outline"
-                disabled={batches.length === 0}
-                className="w-full sm:w-auto"
-              >
-                <Sparkles /> AI Care
-              </Button>
-            </FeatureGate>
-            
-            <NewBatchButton />
-          </div>
-        </div>
+        <ModulePageHeader 
+            title="Nursery Stock"
+            description="A real-time overview of all plant batches currently in production."
+            actionsSlot={
+                <>
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsScanOpen(true)}
+                        className="w-full sm:w-auto"
+                    >
+                        <QrCode />
+                        Scan
+                    </Button>
+                    <FeatureGate name="aiCare">
+                    <Button
+                        onClick={handleAiCareClick}
+                        variant="outline"
+                        disabled={batches.length === 0}
+                        className="w-full sm:w-auto"
+                    >
+                        <Sparkles /> AI Care
+                    </Button>
+                    </FeatureGate>
+                    <NewBatchButton />
+                </>
+            }
+        />
 
         <div className="flex items-center gap-4">
           <Select
