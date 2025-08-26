@@ -9,10 +9,10 @@ let _onceLogged = false;
 function assertEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) {
+  // Make the check more robust: ensure the URL is a valid http/https string.
+  if (!url || !url.startsWith("http") || !anon) {
     throw new Error(
-      "Supabase env missing: expected NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY. " +
-      "Routes that use supabaseServer() cannot run without them."
+      "Supabase env missing or invalid: Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment."
     );
   }
   if (!_onceLogged) {
