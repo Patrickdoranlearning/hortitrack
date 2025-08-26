@@ -24,7 +24,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import {
-  ActionLogFormValues,
   Batch,
   NurseryLocation,
   PlantSize,
@@ -43,7 +42,6 @@ import {
   Sparkles,
   Users,
   Printer,
-  MoreHorizontal,
   ShoppingCart,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -52,28 +50,22 @@ import * as React from 'react';
 import { ActionDialog } from '../components/actions/ActionDialog';
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
-import { BatchForm } from '../components/batch-form';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
 import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
 import ScannerDialog from '../components/scan-and-act-dialog';
-import {
-  TransplantForm,
-  type TransplantFormData,
-} from '../components/transplant-form';
-import { VarietyForm } from '../components/variety-form';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { useCollection } from '@/hooks/use-collection';
-import { getCareRecommendationsAction } from './actions';
+import { Dialog } from '@/components/ui/dialog';
 import { FeatureGate } from '@/components/FeatureGate';
-import { getIdTokenOrNull } from "@/lib/auth/client"; // Import getIdTokenOrNull
+import { getIdTokenOrNull } from "@/lib/auth/client";
 import { queryMatchesBatch } from '@/lib/search';
-import { parseScanCode } from '@/lib/scan/parse';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { NewBatchButton } from '@/components/horti/NewBatchButton';
 import { OrgProvider } from '@/server/org/context';
 import { fetchJson } from '@/lib/http';
+import { useSWRConfig } from 'swr';
+import useSWR from 'swr';
+import { getBatchesAction } from './actions';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -83,32 +75,7 @@ interface HomePageViewProps {
   initialSuppliers: Supplier[];
   plantFamilies: string[];
   categories: string[];
-  actions: {
-    addBatch: (
-      data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'logHistory'>
-    ) => Promise<any>;
-    updateBatch: (data: Batch) => Promise<any>;
-    archiveBatch: (batchId: string, loss: number) => Promise<any>;
-    transplantBatch: (
-      sourceBatchId: string,
-      newBatchData: Omit<
-        Batch,
-        | 'id'
-        | 'batchNumber'
-        | 'logHistory'
-        | 'transplantedFrom'
-        | 'createdAt'
-        | 'updatedAt'
-      >,
-      transplantQuantity: number,
-      logRemainingAsLoss: boolean
-    ) => Promise<any>;
-    logAction: (
-      batchId: string,
-      logData: Partial<ActionLogFormValues>
-    ) => Promise<any>;
-    addVariety: (data: Omit<Variety, 'id'>) => Promise<any>;
-  };
+  actions: {};
 }
 
 export default function HomePageView({
@@ -119,49 +86,29 @@ export default function HomePageView({
   initialSuppliers,
   plantFamilies,
   categories,
-  actions,
 }: HomePageViewProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const urlBatchId = searchParams.get("batch");
+  
+  const { data: swrBatches, isLoading: batchesLoading } = useSWR('batches', getBatchesAction, {
+    fallbackData: { success: true, data: initialBatches },
+    revalidateOnFocus: false,
+  });
 
-  const isReadonly = !user;
+  const batches = swrBatches?.data || initialBatches;
 
-  const { data: batchesData, forceRefresh } = useCollection<Batch>('batches', initialBatches);
-  const batches = batchesData || [];
-
-  const { data: varieties } = useCollection<Variety>(
-    'varieties',
-    initialVarieties
-  );
-  const { data: nurseryLocations } = useCollection<NurseryLocation>(
-    'locations',
-    initialNurseryLocations
-  );
-  const { data: plantSizes } = useCollection<PlantSize>(
-    'sizes',
-    initialPlantSizes
-  );
-  const { data: suppliers } = useCollection<Supplier>(
-    'suppliers',
-    initialSuppliers
-  );
-
-  const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = React.useState(false);
   const [isLogActionOpen, setIsLogActionOpen] = React.useState(false);
-  const [isTransplantOpen, setIsTransplantOpen] = React.useState(false);
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] =
     React.useState(false);
-  const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
   const [isScanOpen, setIsScanOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
-  const [newVarietyName, setNewVarietyName] = React.useState('');
   
   const [filters, setFilters] = React.useState({
     plantFamily: 'all',
@@ -171,9 +118,8 @@ export default function HomePageView({
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const filteredBatches = React.useMemo(() => {
-    const dataToFilter = isReadonly ? initialBatches : batches;
     const q = (searchQuery || '').trim();
-    return (dataToFilter || [])
+    return (batches || [])
       .filter((batch) => queryMatchesBatch(q, batch))
       .filter((batch) =>
         filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
@@ -186,7 +132,7 @@ export default function HomePageView({
         if (filters.status === 'Active') return batch.status !== 'Archived';
         return batch.status === filters.status;
       });
-  }, [isReadonly, initialBatches, batches, searchQuery, filters]);
+  }, [batches, searchQuery, filters]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -211,13 +157,7 @@ export default function HomePageView({
       setIsDetailDialogOpen(true);
     }
   }, [urlBatchId, batches]);
-
   
-  const handleOpenForm = (batch?: Batch) => {
-    setSelectedBatch(batch || null);
-    setIsFormOpen(true);
-  };
-
   const handleOpenDetail = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsDetailDialogOpen(true);
@@ -226,11 +166,6 @@ export default function HomePageView({
   const handleLogAction = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsLogActionOpen(true);
-  };
-
-  const handleTransplant = (batch: Batch) => {
-    setSelectedBatch(batch);
-    setIsTransplantOpen(true);
   };
   
   const handlePrintClick = (batch: Batch) => {
@@ -246,64 +181,6 @@ export default function HomePageView({
   const handleRecommendations = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsRecommendationsOpen(true);
-  };
-
-  const handleFormSubmit = async (data: any) => {
-    const result = selectedBatch
-      ? await actions.updateBatch(data)
-      : await actions.addBatch(data);
-    if (result?.success) {
-      setIsFormOpen(false);
-      setSelectedBatch(null);
-    }
-  };
-
-  const handleArchive = async (batchId: string) => {
-    await actions.archiveBatch(batchId, selectedBatch?.quantity || 0);
-    setIsFormOpen(false);
-    setSelectedBatch(null);
-  };
-
-  const handleLogActionSubmit = async (values: ActionLogFormValues) => {
-    if (!selectedBatch?.id) return;
-    await actions.logAction(selectedBatch.id, values);
-    setIsLogActionOpen(false);
-    setSelectedBatch(null);
-  };
-
-  const handleTransplantSubmit = async (data: TransplantFormData) => {
-    // If selectedBatch is null, it's a new propagation
-    const sourceBatchId = selectedBatch?.id;
-    const { quantity, logRemainingAsLoss, ...newBatchData } = data;
-
-    // For new propagation, call addBatch directly, not transplantBatch
-    if (!sourceBatchId) {
-      await actions.addBatch({
-        ...newBatchData,
-        quantity,
-      } as Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'logHistory'>);
-    } else {
-      await actions.transplantBatch(
-        sourceBatchId,
-        newBatchData,
-        quantity,
-        logRemainingAsLoss
-      );
-    }
-    setIsTransplantOpen(false);
-    setSelectedBatch(null);
-  };
-
-  const handleCreateNewVariety = (name: string) => {
-    setNewVarietyName(name);
-    setIsVarietyFormOpen(true);
-  };
-
-  const handleVarietyFormSubmit = async (data: Omit<Variety, 'id'>) => {
-    const result = await actions.addVariety(data);
-    if (result.success) {
-      setIsVarietyFormOpen(false);
-    }
   };
 
   const handleAiCareClick = async () => {
@@ -342,7 +219,6 @@ export default function HomePageView({
       });
     }
   };
-
 
   if (authLoading) {
     return (
@@ -440,8 +316,7 @@ export default function HomePageView({
             <Button
               variant="outline"
               onClick={() => setIsScanOpen(true)}
-              disabled={isReadonly}
-               className="w-full sm:w-auto"
+              className="w-full sm:w-auto"
             >
               <QrCode />
               Scan
@@ -450,7 +325,7 @@ export default function HomePageView({
               <Button
                 onClick={handleAiCareClick}
                 variant="outline"
-                disabled={isReadonly || batches.length === 0}
+                disabled={batches.length === 0}
                 className="w-full sm:w-auto"
               >
                 <Sparkles /> AI Care
@@ -523,7 +398,7 @@ export default function HomePageView({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-          {authLoading
+          {batchesLoading && batches.length === 0
             ? [...Array(8)].map((_, i) => (
                 <Skeleton key={i} className="h-40" />
               ))
@@ -559,7 +434,7 @@ export default function HomePageView({
                         <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => handleTransplant(batch)} disabled={batch.quantity === 0}>
+                                <Button variant="ghost" size="icon" disabled={batch.quantity === 0}>
                                   <TransplantIcon />
                                   <span className="sr-only">Transplant</span>
                                 </Button>
@@ -572,7 +447,7 @@ export default function HomePageView({
                 />
               ))}
         </div>
-        {filteredBatches.length === 0 && !authLoading && (
+        {filteredBatches.length === 0 && !batchesLoading && (
           <div className="text-center col-span-full py-20">
             <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">No Batches Found</h3>
@@ -584,39 +459,14 @@ export default function HomePageView({
       </main>
 
       {/* Dialogs */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent
-            size="xl"
-            className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden"
-          >
-          <DialogHeader className="shrink-0 pr-6">
-            <DialogTitle className="font-headline text-3xl">
-              {selectedBatch ? 'Edit Batch' : 'Create New Batch'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <BatchForm
-              batch={selectedBatch}
-              onSubmitSuccess={() => setIsFormOpen(false)}
-              onCancel={() => setIsFormOpen(false)}
-              onArchive={handleArchive}
-              nurseryLocations={nurseryLocations || []}
-              plantSizes={plantSizes || []}
-              suppliers={suppliers || []}
-              varieties={varieties || []}
-              onCreateNewVariety={handleCreateNewVariety}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
       
       {selectedBatch && (
         <BatchDetailDialog
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           batch={selectedBatch}
-          onEdit={handleOpenForm}
-          onTransplant={handleTransplant}
+          onEdit={() => {}}
+          onTransplant={() => {}}
           onLogAction={handleLogAction}
           onGenerateProtocol={handleGenerateProtocol}
           onCareRecommendations={handleRecommendations}
@@ -627,34 +477,9 @@ export default function HomePageView({
         open={isLogActionOpen}
         onOpenChange={setIsLogActionOpen}
         defaultBatchIds={selectedBatch ? [selectedBatch.id!] : []}
-        locations={(nurseryLocations || []).map(l => ({ id: l.id!, name: l.name }))}
+        locations={(initialNurseryLocations || []).map(l => ({ id: l.id!, name: l.name }))}
       />
-
-      <Dialog open={isTransplantOpen} onOpenChange={setIsTransplantOpen}>
-        <DialogContent className="max-w-4xl">
-          <TransplantForm
-            batch={selectedBatch}
-            onSubmit={handleTransplantSubmit}
-            onCancel={() => {
-              setIsTransplantOpen(false);
-            }}
-            nurseryLocations={nurseryLocations || []}
-            plantSizes={plantSizes || []}
-            isNewPropagation={false}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
-        <DialogContent>
-          <VarietyForm
-            variety={{ name: newVarietyName } as Variety}
-            onSubmit={handleVarietyFormSubmit}
-            onCancel={() => setIsVarietyFormOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
+      
       <ProductionProtocolDialog
         open={isProtocolOpen}
         onOpenChange={setIsProtocolOpen}

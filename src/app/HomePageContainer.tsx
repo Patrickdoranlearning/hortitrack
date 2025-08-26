@@ -1,58 +1,24 @@
 import HomePageView from '@/app/HomePageView';
-import {
-  addBatchAction,
-  addVarietyAction,
-  archiveBatchAction,
-  getBatchesAction,
-  logAction,
-  transplantBatchAction,
-  updateBatchAction,
-  addLocationAction,
-  updateLocationAction,
-  deleteLocationAction,
-  addSizeAction,
-  updateSizeAction,
-  deleteSizeAction,
-  addSupplierAction,
-  updateSupplierAction,
-  deleteSupplierAction,
-  addBatchesFromCsvAction,
-} from '@/app/actions';
-import { INITIAL_PLANT_SIZES } from '@/lib/constants';
-import { db } from '@/lib/firebase-admin';
-import { INITIAL_SUPPLIERS } from '@/lib/suppliers';
-import type { NurseryLocation, PlantSize, Supplier, Variety, Batch } from '@/lib/types';
-import { VARIETIES as INITIAL_VARIETIES } from '@/lib/varieties';
-import { INITIAL_LOCATIONS } from '@/lib/locations';
+import { supabaseServer } from '@/server/supabase/client';
+import type {
+  NurseryLocation,
+  PlantSize,
+  Supplier,
+  Variety,
+  Batch,
+} from '@/lib/types';
 
 async function getCollectionData<T>(
-  collectionName: string,
-  initialData: any[] = []
+  supabase: any,
+  collectionName: string
 ): Promise<T[]> {
   try {
-    const ref = db.collection(collectionName);
-    const snapshot = await ref.get();
-
-    if (snapshot.empty && initialData.length > 0) {
-      console.log(`Seeding ${collectionName}...`);
-      const batch = db.batch();
-      initialData.forEach((item) => {
-        const { id, ...data } = item;
-        const docRef = id ? ref.doc(id) : ref.doc();
-        batch.set(docRef, data);
-      });
-      await batch.commit();
-      const seededSnapshot = await ref.get();
-      const docs = seededSnapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
-      return JSON.parse(JSON.stringify(docs)) as T[];
-    }
-
-    const docs = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
-    return JSON.parse(JSON.stringify(docs)) as T[];
+    const { data, error } = await supabase.from(collectionName).select('*');
+    if (error) throw error;
+    return (data as T[]) || [];
   } catch (error: any) {
     console.error(`Error fetching ${collectionName}:`, error?.message ?? error);
-    // On error, return a serialized version of initial data
-    return JSON.parse(JSON.stringify(initialData)) as T[];
+    return [];
   }
 }
 
@@ -71,23 +37,22 @@ function dedupeByName<T extends { id?: string; name?: string; size?: string }>(
 }
 
 export default async function HomePageContainer() {
-  const batchesResult = await getBatchesAction();
-  const batches = batchesResult.success ? JSON.parse(JSON.stringify(batchesResult.data)) : [];
+  const supabase = await supabaseServer();
+  const { data: batches } = await supabase
+    .from('batches')
+    .select('*')
+    .order('plantingDate', { ascending: false });
 
-  const varieties = await getCollectionData<Variety>('varieties', INITIAL_VARIETIES);
-  const filteredVarieties = varieties.filter(
-    v => (v as any).name && String((v as any).name).trim() !== ''
+  const varieties = await getCollectionData<Variety>(
+    supabase,
+    'plant_varieties'
   );
-  const nurseryLocations =
-    await getCollectionData<NurseryLocation>('locations', INITIAL_LOCATIONS);
-  const plantSizes = await getCollectionData<PlantSize>(
-    'sizes',
-    INITIAL_PLANT_SIZES
+  const nurseryLocations = await getCollectionData<NurseryLocation>(
+    supabase,
+    'nursery_locations'
   );
-  const suppliers = await getCollectionData<Supplier>(
-    'suppliers',
-    INITIAL_SUPPLIERS
-  );
+  const plantSizes = await getCollectionData<PlantSize>(supabase, 'plant_sizes');
+  const suppliers = await getCollectionData<Supplier>(supabase, 'suppliers');
 
   const uniqueSuppliers = dedupeByName(suppliers);
   const uniquePlantSizes = dedupeByName(plantSizes);
@@ -95,40 +60,27 @@ export default async function HomePageContainer() {
 
   const plantFamilies = [
     'all',
-    ...Array.from(new Set(batches.map((b: Batch) => b.plantFamily).filter(Boolean))),
+    ...Array.from(
+      new Set((batches || []).map((b: Batch) => b.plantFamily).filter(Boolean))
+    ),
   ];
   const categories = [
     'all',
-    ...Array.from(new Set(batches.map((b: Batch) => b.category).filter(Boolean))),
+    ...Array.from(
+      new Set((batches || []).map((b: Batch) => b.category).filter(Boolean))
+    ),
   ];
 
   return (
     <HomePageView
-      initialBatches={batches}
-      initialVarieties={filteredVarieties}
+      initialBatches={batches || []}
+      initialVarieties={varieties}
       initialNurseryLocations={uniqueNurseryLocations}
       initialPlantSizes={uniquePlantSizes}
       initialSuppliers={uniqueSuppliers}
       plantFamilies={plantFamilies}
       categories={categories}
-      actions={{
-        addBatch: addBatchAction,
-        updateBatch: updateBatchAction,
-        archiveBatch: archiveBatchAction,
-        transplantBatch: transplantBatchAction,
-        logAction: logAction,
-        addVariety: addVarietyAction,
-        addLocation: addLocationAction,
-        updateLocation: updateLocationAction,
-        deleteLocation: deleteLocationAction,
-        addSize: addSizeAction,
-        updateSize: updateSizeAction,
-        deleteSize: deleteSizeAction,
-        addSupplier: addSupplierAction,
-        updateSupplier: updateSupplierAction,
-        deleteSupplier: deleteSupplierAction,
-        addBatchesFromCsv: addBatchesFromCsvAction,
-      }}
+      actions={{}}
     />
   );
 }

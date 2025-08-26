@@ -1,6 +1,5 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import type { PhotoFile } from "@/components/actions/PhotoPicker";
@@ -17,9 +16,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
 const auth = getAuth(app);
 const storage = getStorage(app);
 
@@ -39,4 +35,4 @@ export async function uploadActionPhotos(batchId: string, files: File[]): Promis
 }
 
 
-export { app, db, auth, storage };
+export { app, auth, storage };
