@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { ModuleTabs, type ModuleTabItem } from "./ModuleTabs"
 import { SearchInput } from "@/components/ui/search-input"
 import { ProfileMenu } from "./ProfileMenu"
-import { LogoHortitrack } from "./LogoHortitrack"
+import { Logo } from "@/components/logo"
 
 type AppHeaderProps = {
   companyName: string
@@ -26,11 +26,7 @@ export function AppHeader({ companyName, moduleKey, moduleTabs, className }: App
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2">
         <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3">
-            <LogoHortitrack className="h-8 w-8" />
-            <div className="leading-tight">
-                <div className="font-display text-base">HortiTrack</div>
-                <div className="text-[11px] text-muted-foreground">{companyName}</div>
-            </div>
+            <Logo />
             </Link>
         </div>
 
