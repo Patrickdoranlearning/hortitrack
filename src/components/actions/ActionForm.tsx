@@ -17,6 +17,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { useToast } from "@/hooks/use-toast";
 import type { Batch, NurseryLocation } from "@/lib/types";
 import { PhotoPicker } from "@/components/photos/PhotoPicker";
+import { fetchJson } from "@/lib/http";
 
 function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
   const out: Record<string, any> = {};
@@ -134,7 +135,7 @@ export function ActionForm({
     abortRef.current = new AbortController();
 
     const url = `/api/batches/${encodeURIComponent(String(batch.id ?? batch.batchNumber))}/actions`;
-    const res = await fetch(url, {
+    const { data } = await fetchJson<any>(url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -142,11 +143,9 @@ export function ActionForm({
       },
       body: JSON.stringify(compactPayload(payload)),
       signal: abortRef.current.signal,
-    });
-
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      // Map Zod issues to fields on the active tab
+    }).catch((e: any) => {
+      const j = e?.data ?? {};
+      // Map Zod issues to fields on the active tab (if server sent them)
       if (j?.issues && Array.isArray(j.issues)) {
         for (const iss of j.issues) {
           const p = String(iss.path || "");
@@ -160,17 +159,11 @@ export function ActionForm({
           if (p === "notes") {
             (tab === "CHECKIN" ? checkForm : moveForm).setError("notes", { message: iss.message });
           }
-          if (p === "at") {
-            // date errors, extremely rare if using toISOString
-          }
-          if (p === "type") {
-            // should never happen; defensive
-          }
         }
       }
-      throw new Error(j?.error || "Invalid input");
-    }
-    return res.json();
+      throw new Error(j?.error || e?.message || "Invalid input");
+    });
+    return data;
   }
 
   async function onSubmitMove(values: MoveForm) {

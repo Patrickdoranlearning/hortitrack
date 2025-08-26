@@ -42,6 +42,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { BatchForm } from "@/components/batch-form";
 import { queryMatchesBatch } from '@/lib/search';
+import { fetchJson } from "@/lib/http";
 
 // helpers near top of BatchesPage (inside file, outside component is fine)
 const toMillis = (v: any): number => {
@@ -285,7 +286,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const handleTransplantSubmit = async (data: TransplantFormData) => {
     if (!batchToTransplant) return;
     try {
-      const res = await fetch(`/api/batches/${batchToTransplant.id}/transplant`, {
+      const { data: responseData } = await fetchJson<{ batchNumber: string }>(`/api/batches/${batchToTransplant.id}/transplant`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -298,11 +299,10 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
           logRemainingAsLoss: !!data.logRemainingAsLoss,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || "Transplant failed");
-      }
-      const { batchNumber } = await res.json(); // { id, batchNumber }
+
+      const batchNumber = responseData?.batchNumber;
+      if (!batchNumber) throw new Error("API did not return a new batch number.");
+
       toast({
         title: "Transplant Successful",
         description: `Created new batch #${batchNumber}`,

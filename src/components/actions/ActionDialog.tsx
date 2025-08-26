@@ -4,6 +4,7 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ActionForm } from "./ActionForm";
 import type { Batch, NurseryLocation } from "@/lib/types";
+import { fetchJson } from "@/lib/http";
 
 type Props = {
   open: boolean;
@@ -26,8 +27,7 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations = 
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/locations", { headers: { Accept: "application/json" } });
-        const json = await res.json();
+        const { data: json } = await fetchJson<any>("/api/locations", { headers: { Accept: "application/json" } });
         const items = Array.isArray(json?.items) ? json.items : (Array.isArray(json) ? json : []);
         if (!cancelled) setLocalLocations(items);
       } catch (e) {
