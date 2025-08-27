@@ -30,23 +30,22 @@ export default function AncestryStrip({ currentId }: { currentId: string }) {
         toast({ variant: "destructive", title: "Failed to load ancestry", description: e.message });
       }
     })(); 
-  }, [currentId, toast]);
-
-  if (!items.length) return <p className="text-sm text-muted-foreground">No ancestry data.</p>;
-
+  }, [currentId]); // Removed toast from dependency array
+  
+  // Render logic will go here
   return (
-    <div className="flex items-stretch gap-3 overflow-x-auto py-2">
-      {items.map((b) => (
-        <a key={b.id} href={`/?batch=${encodeURIComponent(b.id)}`} className="min-w-[220px]">
-          <Card className="p-3 hover:border-primary transition h-full">
-            <div className="text-xs text-muted-foreground">#{b.batchNumber}</div>
-            <div className="font-medium truncate">{b.plantVariety}</div>
-            <div className="text-sm truncate">{b.plantFamily} • {b.size}</div>
-            {b.supplier && <div className="text-xs truncate">Supplier: {b.supplier}</div>}
-            {b.producedWeek && <div className="text-xs">Week: {b.producedWeek}</div>}
+    <div className="flex items-center gap-2 overflow-x-auto p-2">
+      {items.map((item, index) => (
+        <React.Fragment key={item.id}>
+          <Card className="p-2 text-sm shrink-0">
+            <div className="font-bold">{item.batchNumber}</div>
+            <div>{item.plantVariety}</div>
+            <div className="text-xs text-muted-foreground">{item.size}</div>
           </Card>
-        </a>
+          {index < items.length - 1 && <span className="text-muted-foreground">&rarr;</span>}
+        </React.Fragment>
       ))}
+      {items.length === 0 && <div className="text-sm text-muted-foreground">No ancestry data available.</div>}
     </div>
   );
 }
