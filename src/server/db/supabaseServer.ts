@@ -10,7 +10,7 @@ export function getSupabaseForRequest() {
   const cookieStore = cookies();
   return createServerClient(url, anon, {
     cookies: {
-      get: (key) => cookieStore.get(key)?.value,
+      get: async (key) => await cookieStore.get(key)?.value,
       set: (key, value, options) => cookieStore.set({ name: key, value, ...options }),
       remove: (key, options) => cookieStore.set({ name: key, value: "", ...options, maxAge: 0 }),
     },

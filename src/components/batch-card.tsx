@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -28,9 +27,11 @@ export function BatchCard({
   actionsSlot,
   className,
 }: BatchCardProps) {
+  console.log("BatchCard received batch:", batch); // Added console log
+
   const stockPercentage =
-    batch.initialQuantity > 0
-      ? (batch.quantity / batch.initialQuantity) * 100
+    (batch.initialQuantity ?? 0) > 0
+      ? ((batch.quantity ?? 0) / (batch.initialQuantity ?? 0)) * 100
       : 0;
 
   const getStatusVariant = (
@@ -89,7 +90,7 @@ export function BatchCard({
         <div className="flex justify-between text-xs font-semibold">
             <span>Stock</span>
             <span>
-              {batch.quantity.toLocaleString()} / {batch.initialQuantity.toLocaleString()}
+              {(batch.quantity ?? 0).toLocaleString()} / {(batch.initialQuantity ?? 0).toLocaleString()}
             </span>
           </div>
         <Progress value={stockPercentage} className="mt-1" />

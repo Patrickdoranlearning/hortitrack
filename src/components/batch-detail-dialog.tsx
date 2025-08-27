@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -75,7 +74,7 @@ export function BatchDetailDialog({
     let transplanted = 0;
     let lost = 0;
 
-    (batch.logHistory || []).forEach(log => {
+    (batch.logHistory ?? []).forEach(log => {
       if (log.type === 'TRANSPLANT_TO') {
         transplanted += log.qty || 0;
       }
@@ -85,14 +84,14 @@ export function BatchDetailDialog({
     });
     
     // Ensure consistency: inStock should be what's left
-    const inStock = batch.initialQuantity - transplanted - lost;
+    const inStock = (batch.initialQuantity ?? 0) - transplanted - lost;
     
     // Adjust if current quantity doesn't match calculation (e.g. from manual adjustments)
-    if (inStock !== batch.quantity) {
-        lost += (inStock - batch.quantity);
+    if (inStock !== (batch.quantity ?? 0)) {
+        lost += (inStock - (batch.quantity ?? 0));
     }
     
-    return { inStock: batch.quantity, transplanted, lost };
+    return { inStock: (batch.quantity ?? 0), transplanted, lost };
   }, [batch]);
 
 
@@ -147,7 +146,7 @@ export function BatchDetailDialog({
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Stock Distribution</p>
-                    <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity} />
+                    <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity ?? 0} />
                   </div>
                   {batch.sourceType === "Purchase" && batch.id && (
                      <PlantPassportCard batchId={batch.id} />
@@ -155,7 +154,7 @@ export function BatchDetailDialog({
                 </TabsContent>
                 <TabsContent value="history">
                   <div className="max-h-60 overflow-y-auto text-sm space-y-2 mt-4">
-                    {batch.logHistory.slice().reverse().map((log, index) => (
+                    {(batch.logHistory ?? []).slice().reverse().map((log, index) => (
                       <div key={index} className="flex justify-between">
                         <span>{log.note || `${log.type} action`}</span>
                         <span className="text-muted-foreground">
@@ -174,7 +173,7 @@ export function BatchDetailDialog({
             <div className="space-y-3 flex flex-col">
               <h4 className="font-semibold text-lg">Actions</h4>
               <Button onClick={() => onEdit(batch)} variant="outline"><Pencil /> Edit Batch</Button>
-              <Button onClick={() => onTransplant(batch)} variant="outline" disabled={batch.quantity === 0}><Sprout /> Transplant</Button>
+              <Button onClick={() => onTransplant(batch)} variant="outline" disabled={(batch.quantity ?? 0) === 0}><Sprout /> Transplant</Button>
               <Button onClick={() => onLogAction(batch)} variant="outline"><ClipboardList /> Log Action</Button>
               <Button onClick={() => setIsChatOpen(true)} variant="outline"><Share2 /> Chat about Batch</Button>
               

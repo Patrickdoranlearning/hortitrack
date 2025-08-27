@@ -7,6 +7,7 @@ import type {
   Variety,
   Batch,
 } from '@/lib/types';
+import { snakeToCamel } from '@/lib/utils'; // Import snakeToCamel
 
 async function getCollectionData<T>(
   supabase: any,
@@ -15,7 +16,7 @@ async function getCollectionData<T>(
   try {
     const { data, error } = await supabase.from(collectionName).select('*');
     if (error) throw error;
-    return (data as T[]) || [];
+    return (snakeToCamel(data) as T[]) || []; // Apply snakeToCamel here
   } catch (error: any) {
     console.error(`Error fetching ${collectionName}:`, error?.message ?? error);
     return [];
@@ -38,14 +39,16 @@ function dedupeByName<T extends { id?: string; name?: string; size?: string }>(
 
 export default async function HomePageContainer() {
   const supabase = await supabaseServer();
-  const { data: batches, error: batchesError } = await supabase
+  const { data: batchesData, error: batchesError } = await supabase
     .from('batches')
     .select('*');
 
+  let batches: Batch[] = [];
   if (batchesError) {
     console.error("Error fetching batches in HomePageContainer:", batchesError.message);
   } else {
-    console.log("Batches fetched in HomePageContainer:", batches);
+    batches = snakeToCamel(batchesData) as Batch[]; // Apply snakeToCamel here
+    console.log("Batches fetched in HomePageContainer (camelCase):", batches);
   }
 
   const varieties = await getCollectionData<Variety>(

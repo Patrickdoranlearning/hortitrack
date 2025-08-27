@@ -8,35 +8,64 @@ import type { Batch } from '@/lib/types';
 import { supabaseServer } from '@/server/supabase/client';
 import { z } from 'zod';
 import { declassify } from '@/server/utils/declassify';
+import { snakeToCamel } from '@/lib/utils'; // Import snakeToCamel
+
+// Helper to transform Supabase data to Batch type, including joined variety data
+function transformBatchData(data: any): Batch {
+    console.log('[transformBatchData] Raw data received for transformation:', data); // Added log
+    const camelCaseData = snakeToCamel(data);
+
+    // Supabase often returns the joined object under the foreign key name (camelCased)
+    // So, plant_varieties data will likely be under 'plantVarietyId' or 'plantVarieties'
+    // Let's assume it's directly under 'plantVariety' (camelCase of plant_varieties table name)
+    // or the foreign key name 'plantVarietyId'
+    const plantVarietyData = camelCaseData.plantVarieties || camelCaseData.plantVariety; // Try both possible inferred names
+
+    return {
+        ...camelCaseData,
+        plantVariety: plantVarietyData?.name || camelCaseData.plantVariety || '', 
+        plantFamily: plantVarietyData?.family || camelCaseData.plantFamily || '',
+    };
+}
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
     const supabase = await supabaseServer();
+    console.log(`[getBatchById] Fetching batch with ID: ${batchId}`); // Added logging
     const { data, error } = await supabase
         .from('batches')
-        .select('*')
+        .select('*, plant_varieties(name, family)') // Use the table name directly for join
         .eq('id', batchId)
         .single();
     
     if (error) {
-        console.error('Error fetching batch by id:', error);
+        console.error('[getBatchById] Supabase error:', error); // Added logging
         return null;
     }
-    return data as Batch | null;
+    console.log('[getBatchById] Raw Supabase data:', data); // Added logging
+    return transformBatchData(data) as Batch | null; // Use the transformation
 }
 
 export async function getBatchesAction() {
     try {
         const supabase = await supabaseServer();
+        console.log('[getBatchesAction] Fetching all batches with variety join'); // Added logging
         const { data: batches, error } = await supabase
             .from('batches')
-            .select('*')
+            .select('*, plant_varieties(name, family)') // Use the table name directly for join
             .order('plantingDate', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('[getBatchesAction] Supabase error:', error); // More verbose logging
+            throw error;
+        }
+        console.log('[getBatchesAction] Raw Supabase data (before transform):', batches); // Added logging
         
-        return { success: true, data: declassify(batches) as Batch[] };
+        // Transform each batch item
+        const transformedBatches = (batches || []).map(transformBatchData);
+        
+        return { success: true, data: declassify(transformedBatches) as Batch[] };
     } catch (error: any) {
-        console.error('Error getting batches:', error);
+        console.error('[getBatchesAction] Error in action:', error); // More verbose logging
         return { success: false, error: 'Failed to fetch batches: ' + error.message };
     }
 }
