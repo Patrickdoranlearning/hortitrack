@@ -101,6 +101,8 @@ export default function HomePageView({
   const searchParams = useSearchParams();
   const urlBatchId = searchParams.get("batch");
   
+  console.log("[HomePageView] initialBatches received:", initialBatches);
+
   const { data: swrBatches, isLoading: batchesLoading } = useSWR('batches', getBatchesAction, {
     fallbackData: { success: true, data: initialBatches },
     revalidateOnFocus: false,
@@ -127,7 +129,7 @@ export default function HomePageView({
 
   const filteredBatches = React.useMemo(() => {
     const q = (searchQuery || '').trim();
-    return (batches || [])
+    const filtered = (batches || [])
       .filter((batch) => queryMatchesBatch(q, batch))
       .filter((batch) =>
         filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
@@ -140,6 +142,8 @@ export default function HomePageView({
         if (filters.status === 'Active') return batch.status !== 'Archived';
         return batch.status === filters.status;
       });
+    console.log("[HomePageView] filteredBatches:", filtered);
+    return filtered;
   }, [batches, searchQuery, filters]);
 
   const handleSignOut = async () => {

@@ -38,10 +38,15 @@ function dedupeByName<T extends { id?: string; name?: string; size?: string }>(
 
 export default async function HomePageContainer() {
   const supabase = await supabaseServer();
-  const { data: batches } = await supabase
+  const { data: batches, error: batchesError } = await supabase
     .from('batches')
-    .select('*')
-    .order('plantingDate', { ascending: false });
+    .select('*');
+
+  if (batchesError) {
+    console.error("Error fetching batches in HomePageContainer:", batchesError.message);
+  } else {
+    console.log("Batches fetched in HomePageContainer:", batches);
+  }
 
   const varieties = await getCollectionData<Variety>(
     supabase,

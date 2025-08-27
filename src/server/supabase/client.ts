@@ -38,7 +38,8 @@ export async function supabaseServer() {
     {
       cookies: {
         get(name: string) {
-          return cookieStore.get(name)?.value;
+          // Correctly await the cookies().get() call
+          return await cookieStore.get(name)?.value;
         },
         // no-ops in route handlers / server components (we don't mutate cookies here)
         set(name: string, value: string, options: CookieOptions) {
