@@ -1,23 +1,21 @@
-
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/server/supabase/client";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer"; // Updated import
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const supabase = getSupabaseForRequest(); // Updated call
+
   try {
-    const supabase = await supabaseServer();
+    const { data: dbTime, error } = await supabase.rpc("now_service_role");
 
-    // Run a cheap, read-only query to prove we’re on the expected DB
-    const { count, error } = await supabase
-      .from("organizations")
-      .select("*", { count: "exact", head: true });
-
-    return NextResponse.json({
-      using: "supabase",
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL, // safe to show URL domain
-      orgRows: error ? null : count ?? 0,
-      error: error?.message ?? null,
-    });
+    if (error) {
+      console.error("[api/_debug/firebase] Supabase error:", error);
+      return NextResponse.json({ db: "supabase", error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ db: "supabase", time: dbTime }, { status: 200 });
   } catch (e: any) {
-    return NextResponse.json({ using: "supabase", error: e?.message ?? "unknown" }, { status: 500 });
+    console.error("[api/_debug/firebase] Error:", e);
+    return NextResponse.json({ db: "supabase", error: e?.message || "unknown" }, { status: 500 });
   }
 }

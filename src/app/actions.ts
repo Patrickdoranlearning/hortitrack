@@ -5,13 +5,14 @@ import { productionProtocol } from '@/ai/flows/production-protocol';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
-import { supabaseServer } from '@/server/supabase/client';
+import { getSupabaseForRequest } from '@/server/db/supabaseServer'; // Updated import
 import { z } from 'zod';
 import { declassify } from '@/server/utils/declassify';
-import { snakeToCamel } from '@/lib/utils'; // Import snakeToCamel
+import { snakeToCamel } from '@/lib/utils'; 
 
 // Helper to transform Supabase v_batch_search data to Batch type
 function transformVBatchSearchData(data: any): Batch {
+    console.log('[transformVBatchSearchData] Raw data received for transformation:', data);
     const camelCaseData = snakeToCamel(data);
     return {
         ...camelCaseData,
@@ -21,25 +22,23 @@ function transformVBatchSearchData(data: any): Batch {
         size: camelCaseData.sizeName ?? '',
         location: camelCaseData.locationName ?? null,
         supplier: camelCaseData.supplierName ?? null,
-        // Ensure other necessary Batch properties are mapped or defaulted
         initialQuantity: camelCaseData.initialQuantity ?? camelCaseData.quantity ?? 0,
-        plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt, // Use plantedAt from view, fallback to createdAt
-        plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt, // For compatibility
-        category: camelCaseData.category ?? '', // If category is in the view, use it, else default
+        plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
+        plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
+        category: camelCaseData.category ?? '',
         createdAt: camelCaseData.createdAt,
         updatedAt: camelCaseData.updatedAt,
-        logHistory: [], // v_batch_search doesn't include full log history, default to empty
-        // Add other defaults as needed based on the Batch type
+        logHistory: [], 
     };
 }
 
 // This is now fetching from v_batch_search
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const supabase = await supabaseServer();
+    const supabase = getSupabaseForRequest(); // Updated call
     console.log(`[getBatchById] Fetching batch with ID from v_batch_search: ${batchId}`);
     const { data, error } = await supabase
-        .from("v_batch_search") // Query the view
-        .select("*") // Select all flattened columns from the view
+        .from("v_batch_search") 
+        .select("*") 
         .eq("id", batchId)
         .maybeSingle();
     
@@ -53,11 +52,11 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
 
 export async function getBatchesAction() {
     try {
-        const supabase = await supabaseServer();
+        const supabase = getSupabaseForRequest(); // Updated call
         console.log('[getBatchesAction] Fetching all batches from v_batch_search');
         const { data: batches, error } = await supabase
-            .from("v_batch_search") // Query the view
-            .select("*") // Select all flattened columns from the view
+            .from("v_batch_search") 
+            .select("*") 
             .order("created_at", { ascending: false });
 
         if (error) {

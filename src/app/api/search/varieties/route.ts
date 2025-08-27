@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/server/supabase/client";
+import { searchVarieties } from "@/server/refdata/queries"; // Import the Supabase search function
 
 export async function GET(req: Request) {
-  const supabase = await supabaseServer();
-  const { searchParams } = new URL(req.url);
-  const q = (searchParams.get("q") ?? "").trim();
+  try {
+    const { searchParams } = new URL(req.url);
+    const q = (searchParams.get("q") ?? "").trim();
 
-  const { data, error } = await supabase
-    .from("plant_varieties")
-    .select("id, name, family, genus, species, colour, rating") // Removed 'cultivar'
-    .ilike("name", q ? `%${q}%` : "%")
-    .order("name")
-    .limit(20);
-
-  if (error) return NextResponse.json({ items: [], error: error.message }, { status: 200 });
-
-  return NextResponse.json({
-    items: (data ?? []).map((v: any) => ({
+    const items = await searchVarieties(q); // Call the Supabase search function
+    
+    // The searchVarieties function already returns camelCase data in the expected format.
+    // If the client needs a 'meta' property, we can construct it here.
+    const formattedItems = items.map((v: any) => ({
       id: v.id,
       name: v.name,
-      meta: { family: v.family, genus: v.genus, species: v.species, colour: v.colour, rating: v.rating } // Removed 'cultivar'
-    }))
-  });
+      meta: { family: v.family, genus: v.genus, species: v.species, colour: v.colour, rating: v.rating }
+    }));
+
+    return NextResponse.json({ items: formattedItems }, { status: 200 });
+  } catch (e: any) {
+    console.error("[api/search/varieties] 500", e);
+    return NextResponse.json({ items: [], error: e?.message || "Failed to fetch varieties" }, { status: 500 });
+  }
 }

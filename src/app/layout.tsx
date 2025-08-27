@@ -1,9 +1,10 @@
-
 import type { Metadata, Viewport } from "next";
 import {PT_Sans, Playfair_Display} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from '@/lib/utils';
+import OrgBoundary from "@/components/providers/OrgBoundary";
+import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -38,15 +39,16 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
+  const orgId = await resolveActiveOrgId();
   return (
     <html lang="en">
        <body className={cn(ptSans.variable, playfairDisplay.variable, 'font-body', 'antialiased', 'overflow-x-hidden')}>
-        {children}
+        <OrgBoundary orgId={orgId}>
+          {children}
+        </OrgBoundary>
         <Toaster />
       </body>
     </html>

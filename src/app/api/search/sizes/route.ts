@@ -1,31 +1,26 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/server/supabase/client";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer"; // Updated import
+import { snakeToCamel } from "@/lib/utils";
 
 export async function GET(req: Request) {
-  const supabase = await supabaseServer();
+  const supabase = getSupabaseForRequest(); // Updated call
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
-  const trayOnly = searchParams.get("trayOnly") === "1";
 
-  let query = supabase
+  const { data, error } = await supabase
     .from("plant_sizes")
-    .select("id, name, container_type, cell_multiple, cell_diameter_mm, cell_volume_l")
+    .select("id,name,container_type,multiple") // Added multiple to selection
     .ilike("name", q ? `%${q}%` : "%")
     .order("name")
     .limit(20);
 
-  if (trayOnly) {
-    query = query.in("container_type", ["prop_tray", "plug_tray"]);
-  }
-
-  const { data, error } = await query;
   if (error) return NextResponse.json({ items: [], error: error.message }, { status: 200 });
 
   return NextResponse.json({
-    items: (data ?? []).map(s => ({
+    items: (data ?? []).map((s: any) => ({
       id: s.id,
       name: s.name,
-      meta: { container_type: s.container_type, cell_multiple: s.cell_multiple, cell_diameter_mm: s.cell_diameter_mm, cell_volume_l: s.cell_volume_l }
+      meta: { containerType: s.container_type, multiple: s.multiple }
     }))
   });
 }
