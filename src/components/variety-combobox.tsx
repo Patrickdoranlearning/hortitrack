@@ -20,6 +20,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { searchVarieties } from '@/server/refdata/queries'; // Import searchVarieties
 
 export type VarietyOption = {
   id?: string;
@@ -30,7 +31,6 @@ export type VarietyOption = {
 
 type Props = {
   value: string; // current variety name (not id)
-  varieties: VarietyOption[];
   disabled?: boolean;
   placeholder?: string;
   emptyMessage?: string;
@@ -40,7 +40,6 @@ type Props = {
 
 export function VarietyCombobox({
   value,
-  varieties,
   disabled,
   placeholder = 'Select variety…',
   emptyMessage = 'No results.',
@@ -49,19 +48,40 @@ export function VarietyCombobox({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [fetchedVarieties, setFetchedVarieties] = useState<VarietyOption[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return varieties;
-    return varieties.filter(
-      (v) =>
-        v.name.toLowerCase().includes(q) ||
-        (v.family ?? '').toLowerCase().includes(q) ||
-        (v.category ?? '').toLowerCase().includes(q)
-    );
-  }, [query, varieties]);
+  const deferredQuery = React.useDeferredValue(query); // Debounce the input
 
-  const current = varieties.find((v) => v.name === value);
+  React.useEffect(() => {
+    let active = true;
+    const fetchVarieties = async () => {
+      setLoading(true);
+      try {
+        const data = await searchVarieties(deferredQuery);
+        if (active) {
+          setFetchedVarieties(data as VarietyOption[]); 
+        }
+      } catch (error) {
+        console.error("Failed to fetch varieties:", error);
+        if (active) {
+          setFetchedVarieties([]); 
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchVarieties();
+
+    return () => {
+      active = false;
+    };
+  }, [deferredQuery]); 
+
+  const current = fetchedVarieties.find((v) => v.name === value); 
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -72,10 +92,10 @@ export function VarietyCombobox({
           role="combobox"
           aria-expanded={open}
           className="w-full justify-between"
-          disabled={disabled}
+          disabled={disabled || loading}
         >
           <span className={cn(!value && 'text-muted-foreground')}>
-            {value || placeholder}
+            {loading ? 'Loading...' : value || placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
         </Button>
@@ -88,60 +108,65 @@ export function VarietyCombobox({
             onValueChange={setQuery}
           />
           <CommandList>
-            <CommandEmpty>
-              <div className="px-3 py-2 text-sm">{emptyMessage}</div>
-              {onCreate && query.trim() && (
-                <Button
-                  type="button"
-                  className="m-2"
-                  onClick={() => {
-                    const name = query.trim();
-                    if (!name) return;
-                    onCreate(name);
-                    setOpen(false);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create “{query.trim()}”
-                </Button>
-              )}
-            </CommandEmpty>
-
-            <CommandGroup heading="Varieties">
-              {filtered.map((v) => (
-                <CommandItem
-                  key={v.id ?? v.name}
-                  value={v.name}
-                  onSelect={() => {
-                    onSelect(v);
-                    setOpen(false);
-                    setQuery('');
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      current?.name === v.name ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <div className="flex min-w-0 flex-col">
-                    <div className="truncate">{v.name}</div>
-                    <div className="mt-1 flex gap-2">
-                      {v.family ? (
-                        <Badge variant="secondary" className="text-xs">
-                          {v.family}
-                        </Badge>
-                      ) : null}
-                      {v.category ? (
-                        <Badge variant="outline" className="text-xs">
-                          {v.category}
-                        </Badge>
-                      ) : null}
+            {loading && <CommandEmpty>Loading varieties...</CommandEmpty>}
+            {!loading && fetchedVarieties.length === 0 && (
+              <CommandEmpty>
+                <div className="px-3 py-2 text-sm">{emptyMessage}</div>
+                {onCreate && query.trim() && (
+                  <Button
+                    type="button"
+                    className="m-2"
+                    onClick={() => {
+                      const name = query.trim();
+                      if (!name) return;
+                      onCreate(name);
+                      setOpen(false);
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create “{query.trim()}”
+                  </Button>
+                )}
+              </CommandEmpty>
+            )}
+            
+            {!loading && fetchedVarieties.length > 0 && (
+              <CommandGroup heading="Varieties">
+                {fetchedVarieties.map((v) => (
+                  <CommandItem
+                    key={v.id ?? v.name}
+                    value={v.name}
+                    onSelect={() => {
+                      onSelect(v);
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        current?.name === v.name ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    <div className="flex min-w-0 flex-col">
+                      <div className="truncate">{v.name}</div>
+                      <div className="mt-1 flex gap-2">
+                        {v.family ? (
+                          <Badge variant="secondary" className="text-xs">
+                            {v.family}
+                          </Badge>
+                        ) : null}
+                        {v.category ? (
+                          <Badge variant="outline" className="text-xs">
+                            {v.category}
+                          </Badge>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
