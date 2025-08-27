@@ -4,8 +4,11 @@ import { createContext, useContext } from "react";
 type OrgContextValue = { orgId: string | null };
 const OrgContext = createContext<OrgContextValue>({ orgId: null });
 
-export function OrgProvider({ orgId, children }: { orgId: string; children: React.ReactNode }) {
-  return <OrgContext.Provider value={{ orgId }}>{children}</OrgContext.Provider>;
+export function OrgProvider({ orgId, children }: { 
+  orgId: string | null; 
+  children: React.ReactNode 
+}) {
+  return <OrgContext.Provider value={{ orgId: orgId ?? null }}>{children}</OrgContext.Provider>;
 }
 
 export function useActiveOrg() {
