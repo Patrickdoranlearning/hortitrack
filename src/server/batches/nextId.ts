@@ -1,5 +1,6 @@
 import "server-only";
-import { adminDb } from "@/server/db/admin";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { getUserIdAndOrgId } from "@/server/auth/getUser"; // Assuming this helper exists or needs to be created
 
 /**
  * Batch IDs: <site>-<yyww>-<seq5>
@@ -20,39 +21,42 @@ function isoWeek(date: Date) {
 }
 
 export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
+  const supabase = getSupabaseForRequest();
+  const { orgId } = await getUserIdAndOrgId(); // Get orgId from current user's session
+
+  if (!orgId) {
+    throw new Error("User must be associated with an organization to generate batch IDs.");
+  }
+
   const site = String(opts.siteCode ?? "1");
   const now = opts.when ?? new Date();
   const { isoYear, isoWeek: ww } = isoWeek(now);
   const yy = String(isoYear).slice(2);
   const yww = `${yy}${String(ww).padStart(2, "0")}`;
-  const docRef = adminDb.collection("counters").doc(`batch-${site}-${yww}`);
+  const counterKey = `batch-${site}-${yww}`;
 
-  // Transaction with small retry loop for high-concurrency safety
-  const MAX_TRIES = 3;
-  for (let i = 0; i < MAX_TRIES; i++) {
-    try {
-      const id = await adminDb.runTransaction(async (tx) => {
-        const snap = await tx.get(docRef);
-        let seq = 1;
-        if (snap.exists) {
-          const current = Number(snap.get("seq") ?? 0);
-          seq = current + 1;
-          tx.update(docRef, { seq, updatedAt: new Date().toISOString() });
-        } else {
-          tx.set(docRef, { seq: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-        }
-        const finalSeq = snap.exists ? seq : 1;
-        return {id: `${site}-${yww}-${String(finalSeq).padStart(5, "0")}`};
-      });
-      return id;
-    } catch (e) {
-      if (i === MAX_TRIES - 1) throw e;
-      await new Promise((r) => setTimeout(r, 25 * (i + 1)));
+  try {
+    // Call the Supabase RPC function to atomically increment the counter
+    const { data: newSeq, error } = await supabase.rpc('increment_org_counter', {
+      p_org_id: orgId,
+      p_key: counterKey,
+    });
+
+    if (error) {
+      console.error("Error incrementing org counter:", error);
+      throw new Error(`Failed to generate batch ID: ${error.message}`);
     }
+
+    if (typeof newSeq !== 'number') {
+        throw new Error("Invalid response from counter function.");
+    }
+
+    return { id: `${site}-${yww}-${String(newSeq).padStart(5, "0")}` };
+
+  } catch (e) {
+    console.error("Failed to generate batch id via Supabase RPC:", e);
+    throw e; // Re-throw the error after logging
   }
-  // Should never reach here
-  throw new Error("failed to generate batch id");
 }
 
-// Kept for compatibility if anything imports it:
 export type BatchPhase = "PROPAGATION" | "PLUGS" | "POTTING" | "POTTING";

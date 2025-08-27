@@ -7,9 +7,9 @@ import {
   cert,
   type AppOptions,
 } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
+// import { getAuth } from "firebase-admin/auth"; // Commented out
+// import { getFirestore } from "firebase-admin/firestore"; // Commented out
+// import { getStorage } from "firebase-admin/storage"; // Commented out
 
 function resolveCredential() {
   const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -19,19 +19,19 @@ function resolveCredential() {
     const decoded = Buffer.from(b64, "base64").toString("utf8");
     return cert(JSON.parse(decoded));
   }
-  // Fallback to ADC (gcloud or metadata server). May fail in some envs.
   return applicationDefault();
 }
 
 function buildOptions(): AppOptions {
   const opts: AppOptions = { credential: resolveCredential() };
-  // Optional, helps some environments without GOOGLE_CLOUD_PROJECT set
   if (process.env.FIREBASE_PROJECT_ID) opts.projectId = process.env.FIREBASE_PROJECT_ID;
   return opts;
 }
 
 const app = getApps()[0] ?? initializeApp(buildOptions());
 
-export const adminAuth = getAuth(app);
-export const adminDb = getFirestore(app);
-export const adminStorage = getStorage(app);
+// Removed exports as part of Firebase migration. 
+// If needed for specific Firebase Admin tasks, uncomment and ensure proper usage.
+// export const adminAuth = getAuth(app);
+// export const const adminDb = getFirestore(app);
+// export const adminStorage = getStorage(app);

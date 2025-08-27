@@ -26,6 +26,13 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { SafeSelect } from '@/components/ui/SafeSelect';
 import { normalizeOptions, type Option } from '@/lib/options';
 
+import { 
+  searchVarieties,
+  searchSizes,
+  searchLocations,
+  searchSuppliers,
+} from '@/server/refdata/queries'; // Import new search functions
+
 const PassportFields = {
   passportType: z.enum(["received", "issued"]).optional(),
   passportBotanical: z.string().optional(),
@@ -82,10 +89,7 @@ type Props = {
   onCreated?: (res: { id: string; batchNumber: string }) => void;
   onCancel: () => void;
   onArchive?: (batchId: string) => void;
-  nurseryLocations: NurseryLocation[];
-  plantSizes: PlantSize[];
-  suppliers?: Supplier[];
-  varieties: Variety[];
+  // Removed reference data props, will fetch dynamically
   onCreateNewVariety: (name: string) => void;
 };
 
@@ -107,14 +111,23 @@ export function BatchForm({
   onCreated,
   onCancel,
   onArchive,
-  varieties = [],
-  nurseryLocations = [],
-  plantSizes = [],
-  suppliers = [],
+  // Removed varieties, nurseryLocations, plantSizes, suppliers from props
   onCreateNewVariety,
 }: Props) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
   const isEdit = !!batch?.id;
+
+  // State for dynamically fetched reference data
+  const [varieties, setVarieties] = useState<VarietyOption[]>([]);
+  const [sizes, setSizes] = useState<PlantSize[]>([]);
+  const [locations, setLocations] = useState<NurseryLocation[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  // State for loading indicators
+  const [loadingVarieties, setLoadingVarieties] = useState(false);
+  const [loadingSizes, setLoadingSizes] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   
   const doranNurseries = useMemo(() => suppliers.find(s => s.name === 'Doran Nurseries'), [suppliers]);
 
@@ -147,6 +160,11 @@ export function BatchForm({
       location: batch?.location ?? '',
       growerPhotoUrl: batch?.growerPhotoUrl ?? '',
       salesPhotoUrl: batch?.salesPhotoUrl ?? '',
+      // Passport fields
+      passportBotanical: batch?.passportBotanical ?? '',
+      passportOperator: batch?.passportOperator ?? '',
+      passportTraceCode: batch?.passportTraceCode ?? '',
+      passportOrigin: batch?.passportOrigin ?? '',
     },
   });
 
@@ -156,47 +174,113 @@ export function BatchForm({
     if (sourceType === "Propagation") {
       form.setValue('supplier', doranNurseries?.name || '');
     } else {
-      // Clear if it's Doran, otherwise let user's selection persist
       if (form.getValues('supplier') === doranNurseries?.name) {
         form.setValue('supplier', '');
       }
     }
   }, [sourceType, doranNurseries, form]);
 
+  // Dynamic fetching for Varieties
+  const [varietySearchQuery, setVarietySearchQuery] = useState('');
+  const deferredVarietyQuery = React.useDeferredValue(varietySearchQuery);
+  useEffect(() => {
+    let active = true;
+    const fetchOptions = async () => {
+      setLoadingVarieties(true);
+      try {
+        const data = await searchVarieties(deferredVarietyQuery);
+        if (active) setVarieties(data as VarietyOption[]);
+      } catch (e) {
+        console.error("Error fetching varieties:", e);
+      } finally {
+        if (active) setLoadingVarieties(false);
+      }
+    };
+    fetchOptions();
+    return () => { active = false; };
+  }, [deferredVarietyQuery]);
 
-  const allSizes: Option[] = useMemo(() => normalizeOptions((plantSizes ?? []).map(s => ({
-    value: s.size,
-    label: `${s.size} ${s.type ? ` • ${s.type}` : ''} ${s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)`: ''}`
-  }))), [plantSizes]);
+  // Dynamic fetching for Sizes
+  const [sizeSearchQuery, setSizeSearchQuery] = useState('');
+  const deferredSizeQuery = React.useDeferredValue(sizeSearchQuery);
+  useEffect(() => {
+    let active = true;
+    const fetchOptions = async () => {
+      setLoadingSizes(true);
+      try {
+        const data = await searchSizes(deferredSizeQuery);
+        if (active) setSizes(data as PlantSize[]);
+      } catch (e) {
+        console.error("Error fetching sizes:", e);
+      } finally {
+        if (active) setLoadingSizes(false);
+      }
+    };
+    fetchOptions();
+    return () => { active = false; };
+  }, [deferredSizeQuery]);
+
+  // Dynamic fetching for Locations
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const deferredLocationQuery = React.useDeferredValue(locationSearchQuery);
+  useEffect(() => {
+    let active = true;
+    const fetchOptions = async () => {
+      setLoadingLocations(true);
+      try {
+        const data = await searchLocations(deferredLocationQuery);
+        if (active) setLocations(data as NurseryLocation[]);
+      } catch (e) {
+        console.error("Error fetching locations:", e);
+      } finally {
+        if (active) setLoadingLocations(false);
+      }
+    };
+    fetchOptions();
+    return () => { active = false; };
+  }, [deferredLocationQuery]);
+
+  // Dynamic fetching for Suppliers
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
+  const deferredSupplierQuery = React.useDeferredValue(supplierSearchQuery);
+  useEffect(() => {
+    let active = true;
+    const fetchOptions = async () => {
+      setLoadingSuppliers(true);
+      try {
+        const data = await searchSuppliers(deferredSupplierQuery);
+        if (active) setSuppliers(data as Supplier[]);
+      } catch (e) {
+        console.error("Error fetching suppliers:", e);
+      } finally {
+        if (active) setLoadingSuppliers(false);
+      }
+    };
+    fetchOptions();
+    return () => { active = false; };
+  }, [deferredSupplierQuery]);
+
+  const allSizes: Option[] = useMemo(() => normalizeOptions((sizes ?? []).map(s => ({
+    value: s.name, // Use s.name for value, as size in Batch is a string name
+    label: `${s.name} ${s.containerType ? ` • ${s.containerType}` : ''} ${s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)`: ''}`
+  }))), [sizes]);
   
   const traySizes = useMemo(() => allSizes.filter(s => /tray/i.test(s.label)), [allSizes]);
   const visibleSizes = sourceType === 'Propagation' ? traySizes : allSizes;
 
-
   useEffect(() => {
-    const info = (plantSizes ?? []).find((s) => s.size === form.getValues('size')) || null;
+    const info = (sizes ?? []).find((s) => s.name === form.getValues('size')) || null; // Use s.name for comparison
     setSelectedSizeInfo(info);
     if (info?.multiple && info.multiple > 1 && batch?.quantity) {
       form.setValue('trayQuantity', Math.round(batch.quantity / info.multiple));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batch, plantSizes]);
+  }, [batch, sizes, form.getValues('size')]); // Added form.getValues dependency
 
   const sizeMultiple = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1
     ? selectedSizeInfo.multiple
     : 1;
   const isTrayMode = sizeMultiple > 1;
-
-  const varietyOptions: VarietyOption[] = useMemo(
-    () =>
-      (varieties ?? []).map((v) => ({
-        id: v.id!,
-        name: v.name,
-        family: v.family,
-        category: v.category,
-      })),
-    [varieties]
-  );
 
   const onSubmit = async (values: BatchFormValues) => {
     if (!values.size || values.size.trim().length === 0) {
@@ -219,11 +303,21 @@ export function BatchForm({
       return;
     }
 
+    // Convert variety name to ID for payload
+    const selectedVariety = varieties.find(v => v.name === values.plantVariety);
+    const selectedLocation = locations.find(l => l.name === values.location);
+    const selectedSize = sizes.find(s => s.name === values.size);
+    const selectedSupplier = suppliers.find(s => s.name === values.supplier);
+
     const payload: Partial<Batch> = {
       ...values,
+      plantVariety: selectedVariety?.id, // Send ID to backend
+      location: selectedLocation?.id,   // Send ID to backend
+      size: selectedSize?.id,           // Send ID to backend
+      supplier: selectedSupplier?.id,   // Send ID to backend
       initialQuantity: isEdit ? (batch?.initialQuantity ?? values.quantity) : values.quantity,
       plantingDate: values.plantingDate.toISOString(),
-      supplier: values.supplier ? values.supplier : undefined,
+      // supplier: values.supplier ? values.supplier : undefined, // Handled by selectedSupplier?.id
     };
     
     if (values.sourceType === "Purchase") {
@@ -331,7 +425,8 @@ export function BatchForm({
                 <VarietyCombobox
                   value={field.value || ''}
                   disabled={form.formState.isSubmitting}
-                  varieties={varietyOptions}
+                  // Pass dynamic varieties from state
+                  varieties={varieties}
                   onSelect={(v) => {
                     field.onChange(v.name);
                     if (v.family) {
@@ -343,7 +438,7 @@ export function BatchForm({
                   }}
                   onCreate={(name) => onCreateNewVariety(name)}
                   placeholder="Search or create variety…"
-                  emptyMessage="No matches."
+                  emptyMessage={loadingVarieties ? "Loading..." : "No matches."}
                 />
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <span className="rounded bg-muted px-2 py-1">
@@ -367,14 +462,18 @@ export function BatchForm({
                 <FormLabel>Location</FormLabel>
                 <Select
                   value={field.value || ''}
-                  onValueChange={field.onChange}
-                  disabled={form.formState.isSubmitting}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    // No search query state needed for simple Select, fetches all
+                    // when component mounts or relevant state changes.
+                  }}
+                  disabled={form.formState.isSubmitting || loadingLocations}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a location" />
+                    <SelectValue placeholder={loadingLocations ? "Loading..." : "Select a location"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {(nurseryLocations ?? []).map((l) => (
+                    {(locations ?? []).map((l) => (
                       <SelectItem key={l.id} value={l.name}>
                         {l.name}
                       </SelectItem>
@@ -397,7 +496,7 @@ export function BatchForm({
                     value={field.value}
                     onChange={(val) => {
                       field.onChange(val);
-                      const info = (plantSizes ?? []).find((s) => s.size === val) || null;
+                      const info = (sizes ?? []).find((s) => s.name === val) || null;
                       setSelectedSizeInfo(info);
                       const trays = Number(form.getValues('trayQuantity') ?? 0);
                       const perTray = info?.multiple && info.multiple > 1 ? info.multiple : 1;
@@ -409,8 +508,8 @@ export function BatchForm({
                       }
                     }}
                     options={visibleSizes}
-                    placeholder="Select pot/tray size"
-                    disabled={form.formState.isSubmitting}
+                    placeholder={loadingSizes ? "Loading..." : "Select pot/tray size"}
+                    disabled={form.formState.isSubmitting || loadingSizes}
                 />
                 <FormMessage />
               </FormItem>
@@ -427,7 +526,7 @@ export function BatchForm({
                   <FormLabel>Tray Quantity</FormLabel>
                   <Input
                     type="number"
-                    value={field.value ?? ''} // never null warning
+                    value={field.value ?? ''} 
                     onChange={(e) => {
                       const trays = Number(e.target.value || 0);
                       field.onChange(trays);
@@ -544,15 +643,15 @@ export function BatchForm({
                 <Select
                   value={field.value || ''}
                   onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
-                  disabled={form.formState.isSubmitting || sourceType === 'Propagation'}
+                  disabled={form.formState.isSubmitting || sourceType === 'Propagation' || loadingSuppliers}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a supplier" />
+                    <SelectValue placeholder={loadingSuppliers ? "Loading..." : "Select a supplier"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">None</SelectItem>
                     {(suppliers ?? [])
-                      .filter((s) => s?.name?.trim()) // avoid accidental empty values
+                      .filter((s) => s?.name?.trim()) 
                       .map((s) => (
                         <SelectItem key={s.id} value={s.name}>
                           {s.name}

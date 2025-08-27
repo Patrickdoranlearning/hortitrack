@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -53,15 +54,7 @@ export function BatchCard({
     }
   };
 
-  // Determine phase based on batch status or other logic
-  const getPhase = (batch: Batch): string | null => {
-    if (batch.status === 'Propagation') return 'Propagation';
-    if (batch.status === 'Plugs/Liners') return 'Plugs/Liners';
-    if (batch.status === 'Potted' || batch.status === 'Ready for Sale' || batch.status === 'Looking Good') return 'Potted';
-    return null;
-  }
-
-  const phase = getPhase(batch);
+  const phase = batch.phase;
 
   return (
     <div

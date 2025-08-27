@@ -1,4 +1,4 @@
-import { adminDb } from "@/server/db/admin";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer";
 import { z } from "zod";
 import {
   BatchSchema,
@@ -6,69 +6,129 @@ import {
   PropagationFormSchema,
   PlantPassport,
   BatchEvent,
-} from "@/types/batch";
+} from "@/lib/types"; // Assuming BatchEvent and PlantPassport are defined in types.ts
 import { calcUnitsFromTrays, calcUnitsFromContainers } from "@/lib/quantity";
 import { makeInternalPassport, makeSupplierPassport, isSupplierPassport } from "@/lib/passport";
+import { generateNextBatchId } from "@/server/batches/nextId"; // Use Supabase-compatible nextId
+import { getUserIdAndOrgId } from "@/server/auth/getUser";
 
-async function nextSequence(prefix: "1" | "2") {
-  const year = new Date().getFullYear();
-  const key = `batch_seq_${prefix}_${year}`;
-  const ref = adminDb.collection("counters").doc(key);
-  const res = await adminDb.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const curr = (snap.exists ? (snap.data() as any).value : 0) as number;
-    const next = curr + 1;
-    tx.set(ref, { value: next }, { merge: true });
-    return next;
-  });
-  const seq = String(res).padStart(5, "0");
-  return `${prefix}-${year}-${seq}`;
+// Helper to convert PlantPassport type to snake_case for Supabase insert
+function passportToSupabase(passport: PlantPassport, orgId: string, batchId: string, userId: string | null) {
+  return {
+    batch_id: batchId,
+    org_id: orgId,
+    passport_type: passport.type,
+    botanical_name: passport.botanicalName,
+    operator_reg_no: passport.operatorRegNo,
+    traceability_code: passport.traceabilityCode,
+    origin_country: passport.originCountry,
+    pz_codes: passport.protectedZone ? JSON.stringify(passport.protectedZone) : null,
+    issuer_name: passport.issuerName,
+    issue_date: passport.issueDate ? passport.issueDate.toISOString() : null,
+    raw_label_text: passport.rawLabelText,
+    raw_barcode_text: passport.rawBarcodeText,
+    images: passport.images ? JSON.stringify(passport.images) : null,
+    created_at: passport.createdAt.toISOString(),
+    created_by_user_id: userId,
+  };
+}
+
+// Helper to convert BatchEvent type to snake_case for Supabase insert
+function eventToSupabase(event: Omit<BatchEvent, "id">, orgId: string, batchId: string, userId: string | null) {
+  return {
+    batch_id: batchId,
+    org_id: orgId,
+    type: event.type,
+    at: event.at.toISOString(),
+    by_user_id: userId,
+    payload: event.payload ? JSON.stringify(event.payload) : null,
+    created_at: new Date().toISOString(),
+  };
 }
 
 export async function createPropagationBatch(args: {
   input: z.infer<typeof PropagationFormSchema>;
   userId?: string | null;
 }) {
+  const supabase = getSupabaseForRequest();
+  const { userId, orgId } = await getUserIdAndOrgId();
+
+  if (!userId || !orgId) {
+    throw new Error("User must be authenticated and belong to an organization.");
+  }
+
   const input = PropagationFormSchema.parse(args.input);
 
   const units = calcUnitsFromTrays(input.fullTrays, input.partialCells ?? 0, input.sizeMultiple);
 
-  const batchNumber = await nextSequence("1");
-  const nowISO = new Date().toISOString();
+  const { id: batchNumber } = await generateNextBatchId({ when: new Date(input.plantingDate) });
+  const now = new Date();
 
-  const batchRef = adminDb.collection("batches").doc();
-  const passport = makeInternalPassport({
+  // Generate initial internal passport
+  const initialPassport = makeInternalPassport({
     family: input.family ?? null,
     ourBatchNumber: batchNumber,
-    userId: args.userId ?? null,
+    userId: userId,
   });
-  const batchDoc = {
-    id: batchRef.id,
-    batchNumber,
-    phase: "Propagation",
-    varietyId: input.varietyId ?? null,
-    variety: input.variety,
-    family: input.family ?? null,
-    category: input.category ?? null,
-    sizeId: input.sizeId,
-    sizeMultipleAtStart: input.sizeMultiple,
-    containersStart: input.fullTrays, // trays
-    unitsStart: units,
-    unitsCurrent: units,
-    quantityOverridden: false,
-    locationId: input.locationId,
-    supplierId: null,
-    createdAt: nowISO,
-    createdBy: args.userId ?? null,
-    plantingDate: input.plantingDate,
-    currentPassport: passport,
-  };
 
-  const eventRef = batchRef.collection("events").doc();
+  // Insert the new batch
+  const { data: newBatchData, error: batchError } = await supabase
+    .from("batches")
+    .insert({
+      org_id: orgId,
+      batch_number: batchNumber,
+      phase: "Propagation",
+      plant_variety_id: input.varietyId ?? null, // Assuming varietyId is the actual FK
+      size_id: input.sizeId, // Assuming sizeId is the actual FK
+      initial_quantity: units,
+      quantity: units,
+      location_id: input.locationId,
+      status: "Growing", // Initial status for propagation
+      planted_at: input.plantingDate, // Use planted_at from input
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      // Additional fields if needed from Batch type
+      // e.g., category: input.category, plant_family: input.family
+    })
+    .select("id, batch_number")
+    .single();
+
+  if (batchError) {
+    console.error("Error creating propagation batch:", batchError);
+    throw new Error(`Failed to create propagation batch: ${batchError.message}`);
+  }
+
+  const newBatchId = newBatchData.id;
+
+  // Insert the passport record into batch_passports table
+  const supabasePassport = passportToSupabase(initialPassport, orgId, newBatchId, userId);
+  const { data: newPassportRecord, error: passportInsertError } = await supabase
+    .from("batch_passports")
+    .insert(supabasePassport)
+    .select("id")
+    .single();
+
+  if (passportInsertError) {
+    console.error("Error inserting initial passport:", passportInsertError);
+    throw new Error(`Failed to record initial passport: ${passportInsertError.message}`);
+  }
+
+  // Update batch with reference to its current passport
+  const { error: updateBatchPassportError } = await supabase
+    .from("batches")
+    .update({ current_passport_id: newPassportRecord.id })
+    .eq("id", newBatchId);
+
+  if (updateBatchPassportError) {
+    console.error("Error updating batch with current passport ID:", updateBatchPassportError);
+    throw new Error(`Failed to link passport to batch: ${updateBatchPassportError.message}`);
+  }
+
+  // Insert the event record into batch_events table
   const event: Omit<BatchEvent, "id"> = {
     type: "PROPAGATION_IN",
-    at: nowISO,
-    by: args.userId ?? null,
+    at: now,
+    by: userId,
     payload: {
       sizeId: input.sizeId,
       sizeMultiple: input.sizeMultiple,
@@ -79,68 +139,116 @@ export async function createPropagationBatch(args: {
       plantingDate: input.plantingDate,
     },
   };
+  const supabaseEvent = eventToSupabase(event, orgId, newBatchId, userId);
+  const { error: eventError } = await supabase.from("batch_events").insert(supabaseEvent);
 
-  await adminDb.runTransaction(async (tx) => {
-    tx.set(batchRef, batchDoc);
-    tx.set(eventRef, { id: eventRef.id, ...event });
-    // also snapshot passport
-    const passRef = batchRef.collection("passports").doc();
-    tx.set(passRef, { id: passRef.id, ...passport });
-  });
+  if (eventError) {
+    console.error("Error creating propagation event:", eventError);
+    throw new Error(`Failed to log propagation event: ${eventError.message}`);
+  }
 
-  const parsed = BatchSchema.parse(batchDoc);
-  return parsed;
+  // Return the newly created batch (you might want to fetch it fully to conform to BatchSchema.parse)
+  const { data: finalBatch, error: fetchError } = await supabase
+    .from("batches")
+    .select("*, plant_varieties(name, family), plant_sizes(name, container_type), nursery_locations(name), suppliers(name)")
+    .eq("id", newBatchId)
+    .single();
+
+  if (fetchError) {
+    console.error("Error fetching final batch after creation:", fetchError);
+    throw new Error(`Failed to retrieve new batch details: ${fetchError.message}`);
+  }
+
+  // Need to transform back to camelCase for the frontend if this function returns a Batch type
+  // For now, let's return the raw data and let client-side handle it, or we can use the transform helper.
+  return finalBatch; // This will still be in snake_case initially
 }
 
 export async function createCheckinBatch(args: {
   input: z.infer<typeof CheckinFormSchema>;
   userId?: string | null;
 }) {
+  const supabase = getSupabaseForRequest();
+  const { userId, orgId } = await getUserIdAndOrgId();
+
+  if (!userId || !orgId) {
+    throw new Error("User must be authenticated and belong to an organization.");
+  }
+
   const input = CheckinFormSchema.parse(args.input);
-  const batchNumber = await nextSequence("2");
-  const nowISO = new Date().toISOString();
+  const { id: batchNumber } = await generateNextBatchId({ when: new Date(input.incomingDate) });
+  const now = new Date();
 
   const units = input.overrideTotal
     ? input.totalUnits
     : calcUnitsFromContainers(input.containers, input.sizeMultiple);
 
-  const passport = makeSupplierPassport({
+  const supplierPassport = makeSupplierPassport({
     family: input.family ?? null,
     producerCode: input.passportB,
     supplierBatchNo: input.passportC,
     countryCode: input.passportD,
-    userId: args.userId ?? null,
+    userId: userId,
   });
 
-  const batchRef = adminDb.collection("batches").doc();
-  const batchDoc = {
-    id: batchRef.id,
-    batchNumber,
-    phase: input.phase,
-    varietyId: input.varietyId ?? null,
-    variety: input.variety,
-    family: input.family ?? null,
-    category: input.category ?? null,
-    sizeId: input.sizeId,
-    sizeMultipleAtStart: input.sizeMultiple,
-    containersStart: input.containers,
-    unitsStart: units,
-    unitsCurrent: units,
-    quantityOverridden: input.overrideTotal,
-    locationId: input.locationId,
-    supplierId: input.supplierId,
-    createdAt: nowISO,
-    createdBy: args.userId ?? null,
-    incomingDate: input.incomingDate,
-    photos: input.photos ?? [],
-    currentPassport: passport,
-  };
+  // Insert the new batch
+  const { data: newBatchData, error: batchError } = await supabase
+    .from("batches")
+    .insert({
+      org_id: orgId,
+      batch_number: batchNumber,
+      phase: input.phase,
+      plant_variety_id: input.varietyId ?? null,
+      size_id: input.sizeId,
+      initial_quantity: units,
+      quantity: units,
+      location_id: input.locationId,
+      supplier_id: input.supplierId,
+      status: "Growing", // Default status for checked-in plants
+      planted_at: input.incomingDate, // Use incomingDate as planted_at for check-in
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      // photos: JSON.stringify(input.photos ?? []), // photos should probably go into a separate table or storage
+    })
+    .select("id, batch_number")
+    .single();
 
-  const eventRef = batchRef.collection("events").doc();
+  if (batchError) {
+    console.error("Error creating check-in batch:", batchError);
+    throw new Error(`Failed to create check-in batch: ${batchError.message}`);
+  }
+
+  const newBatchId = newBatchData.id;
+
+  // Insert the passport record into batch_passports table
+  const supabasePassport = passportToSupabase(supplierPassport, orgId, newBatchId, userId);
+  const { data: newPassportRecord, error: passportInsertError } = await supabase
+    .from("batch_passports")
+    .insert(supabasePassport)
+    .select("id")
+    .single();
+
+  if (passportInsertError) {
+    console.error("Error inserting supplier passport:", passportInsertError);
+    throw new Error(`Failed to record supplier passport: ${passportInsertError.message}`);
+  }
+
+  // Update batch with reference to its current passport
+  const { error: updateBatchPassportError } = await supabase
+    .from("batches")
+    .update({ current_passport_id: newPassportRecord.id })
+    .eq("id", newBatchId);
+
+  if (updateBatchPassportError) {
+    console.error("Error updating batch with current passport ID:", updateBatchPassportError);
+    throw new Error(`Failed to link passport to batch: ${updateBatchPassportError.message}`);
+  }
+
+  // Insert the event record into batch_events table
   const event: Omit<BatchEvent, "id"> = {
     type: "CHECKIN",
-    at: nowISO,
-    by: args.userId ?? null,
+    at: now,
+    by: userId,
     payload: {
       sizeId: input.sizeId,
       sizeMultiple: input.sizeMultiple,
@@ -164,44 +272,92 @@ export async function createCheckinBatch(args: {
       },
     },
   };
+  const supabaseEvent = eventToSupabase(event, orgId, newBatchId, userId);
+  const { error: eventError } = await supabase.from("batch_events").insert(supabaseEvent);
 
-  await adminDb.runTransaction(async (tx) => {
-    tx.set(batchRef, batchDoc);
-    tx.set(eventRef, { id: eventRef.id, ...event });
-    const passRef = batchRef.collection("passports").doc();
-    tx.set(passRef, { id: passRef.id, ...passport });
-  });
+  if (eventError) {
+    console.error("Error creating check-in event:", eventError);
+    throw new Error(`Failed to log check-in event: ${eventError.message}`);
+  }
 
-  return batchDoc;
+  const { data: finalBatch, error: fetchError } = await supabase
+    .from("batches")
+    .select("*, plant_varieties(name, family), plant_sizes(name, container_type), nursery_locations(name), suppliers(name)")
+    .eq("id", newBatchId)
+    .single();
+
+  if (fetchError) {
+    console.error("Error fetching final batch after creation:", fetchError);
+    throw new Error(`Failed to retrieve new batch details: ${fetchError.message}`);
+  }
+  return finalBatch;
 }
 
 export async function switchPassportToInternal(batchId: string, userId?: string | null) {
-  const batchRef = adminDb.collection("batches").doc(batchId);
-  await adminDb.runTransaction(async (tx) => {
-    const snap = await tx.get(batchRef);
-    if (!snap.exists) throw new Error("Batch not found");
-    const batch = snap.data() as any;
-    const current: PlantPassport = batch.currentPassport;
-    if (!isSupplierPassport(current)) return; // already internal, no-op
+  const supabase = getSupabaseForRequest();
+  const { orgId } = await getUserIdAndOrgId();
 
-    const newPassport = makeInternalPassport({
-      family: batch.family ?? null,
-      ourBatchNumber: batch.batchNumber,
-      userId: userId ?? null,
-    });
+  if (!orgId) {
+    throw new Error("User must belong to an organization to switch passport.");
+  }
 
-    tx.update(batchRef, { currentPassport: newPassport });
+  // Fetch the batch and its current passport to determine if it's a supplier passport
+  const { data: batch, error: batchFetchError } = await supabase
+    .from("batches")
+    .select("*, current_passport:batch_passports(*)") // Select current passport details
+    .eq("id", batchId)
+    .single();
 
-    const passRef = batchRef.collection("passports").doc();
-    tx.set(passRef, { id: passRef.id, ...newPassport });
+  if (batchFetchError) throw batchFetchError;
+  if (!batch) throw new Error("Batch not found");
 
-    const eventRef = batchRef.collection("events").doc();
-    tx.set(eventRef, {
-      id: eventRef.id,
-      type: "TRANSPLANT",
-      at: new Date().toISOString(),
-      by: userId ?? null,
-      payload: { reason: "Transplant or lifecycle", from: current.source, to: "Internal" },
-    });
+  const currentPassport = batch.current_passport as PlantPassport; // Assuming structure is compatible
+
+  if (!currentPassport || !isSupplierPassport(currentPassport)) return; // Already internal or no passport, no-op
+
+  // Create new internal passport
+  const newInternalPassport = makeInternalPassport({
+    family: (batch as any).plant_family ?? null, // Access directly from batch, or from joined variety if available
+    ourBatchNumber: batch.batch_number,
+    userId: userId ?? null,
   });
+
+  // Insert new internal passport into batch_passports table
+  const supabaseNewPassport = passportToSupabase(newInternalPassport, orgId, batchId, userId);
+  const { data: insertedPassport, error: insertPassportError } = await supabase
+    .from("batch_passports")
+    .insert(supabaseNewPassport)
+    .select("id")
+    .single();
+
+  if (insertPassportError) {
+    console.error("Error inserting new internal passport:", insertPassportError);
+    throw new Error(`Failed to create internal passport: ${insertPassportError.message}`);
+  }
+
+  // Update the batch to point to the new current_passport_id
+  const { error: updateBatchError } = await supabase
+    .from("batches")
+    .update({ current_passport_id: insertedPassport.id })
+    .eq("id", batchId);
+
+  if (updateBatchError) {
+    console.error("Error updating batch with new internal passport ID:", updateBatchError);
+    throw new Error(`Failed to update batch's current passport: ${updateBatchError.message}`);
+  }
+
+  // Log the event
+  const event: Omit<BatchEvent, "id"> = {
+    type: "TRANSPLANT",
+    at: new Date(),
+    by: userId ?? null,
+    payload: { reason: "Transplant or lifecycle", from: currentPassport.type, to: "Internal" },
+  };
+  const supabaseEvent = eventToSupabase(event, orgId, batchId, userId);
+  const { error: eventError } = await supabase.from("batch_events").insert(supabaseEvent);
+
+  if (eventError) {
+    console.error("Error logging passport switch event:", eventError);
+    throw new Error(`Failed to log passport switch event: ${eventError.message}`);
+  }
 }

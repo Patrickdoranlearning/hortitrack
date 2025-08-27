@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 
 // --- Dictionaries ---
@@ -17,8 +16,9 @@ export type Supplier = z.infer<typeof SupplierSchema>;
 
 export const PlantSizeSchema = z.object({
   id: z.string().optional(),
-  size: z.string().min(1, "Size name is required"),
-  type: z.enum(["Pot", "Tray", "Bareroot"]),
+  name: z.string().min(1, "Size name is required"), // Renamed 'size' to 'name' for consistency with searches and view
+  type: z.enum(["Pot", "Tray", "Bareroot"]), // Renamed 'type' to 'containerType' for consistency
+  containerType: z.enum(["Pot", "Tray", "Bareroot"]).optional(), // Added for consistency with searchSizes
   area: z.number().optional(),
   shelfQuantity: z.number().optional(),
   multiple: z.number().optional(),
@@ -40,7 +40,7 @@ export const VarietySchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
   family: z.string().min(1),
-  category: z.string().default("Perennial"),
+  category: z.string().default("Perennial").optional(), // Made optional based on previous observation
   grouping: z.string().optional(),
   commonName: z.string().optional(),
   rating: z.string().optional(),
@@ -102,33 +102,36 @@ export type BatchStatus = z.infer<typeof BatchStatus>;
 export const BatchSchema = z.object({
   id: z.string().optional(),
   batchNumber: z.string(),
-  category: z.string().min(1),
-  plantFamily: z.string().min(1),
-  plantVariety: z.string().min(1),
-  plantingDate: z.string(), // ISO
-  initialQuantity: z.number().int().nonnegative(),
-  quantity: z.number().int().nonnegative(),
+  category: z.string().optional(), // Made optional as it's not directly from view yet
+  plantFamily: z.string().nullable().optional(), // Now nullable as per view/mapping
+  plantVariety: z.string().optional(), // Now optional as per view/mapping
+  plantedAt: z.string().nullable().optional(), // Renamed from plantingDate to plantedAt for consistency
+  plantingDate: z.string().nullable().optional(), // Kept for compatibility if still used
+  initialQuantity: z.number().int().nonnegative().optional(), // Made optional and non-negative
+  quantity: z.number().int().nonnegative().optional(),
   status: BatchStatus,
-  location: z.string().optional(),
-  locationId: z.string().optional(),
-  size: z.string(),
-  supplier: z.string().optional(),
-  supplierId: z.string().optional(),
+  phase: z.string().nullable().optional(), // Made nullable and optional for consistency with view
+  location: z.string().nullable().optional(), // Now nullable as per view/mapping
+  locationId: z.string().optional(), // Assuming ID is still part of the underlying data
+  size: z.string().optional(), // Now optional as per view/mapping
+  sizeId: z.string().optional(), // Assuming ID is still part of the underlying data
+  supplier: z.string().nullable().optional(), // Now nullable as per view/mapping
+  supplierId: z.string().optional(), // Assuming ID is still part of the underlying data
   supplierRef: z.string().optional(),
   deliveryRef: z.string().optional(),
   notes: z.string().optional(),
-  logHistory: z.array(LogEntrySchema).default([]),
-  createdAt: z.any().optional(),
-  updatedAt: z.any().optional(),
+  logHistory: z.array(LogEntrySchema).default([]).optional(), // Made optional
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
   transplantedFrom: z.string().optional(),
   growerPhotoUrl: z.string().url().optional(),
   salesPhotoUrl: z.string().url().optional(),
   isTopPerformer: z.boolean().optional(),
   
   // New fields for check-in and passport
-  sourceType: z.enum(["Propagation", "Purchase"]).default("Propagation"),
+  sourceType: z.enum(["Propagation", "Purchase"]).default("Propagation").optional(),
   
-  qcStatus: z.enum(["Pending", "Accepted", "Rejected", "Quarantined"]).default("Pending"),
+  qcStatus: z.enum(["Pending", "Accepted", "Rejected", "Quarantined"]).default("Pending").optional(),
   qcNotes: z.string().optional(),
 
   // Flag object for issue tracking
@@ -153,6 +156,7 @@ export const BatchSchema = z.object({
   passportImages: z.any().optional(),        // StoredFile[]
   passportIssueDate: z.any().optional(),
   passportIssuerName: z.string().optional(),
+  currentPassportId: z.string().optional().nullable(), // Added for linking to batch_passports table
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
@@ -188,7 +192,7 @@ const ProductionProtocolRouteNodeSchema = z.object({
   sowDate: z.string().nullable().optional(),
   plantingDate: z.string().nullable().optional(),
   producedAt: z.string().nullable().optional(),
-  potSize: z.union([z.string(), z.number()]).nullable().optional(),
+  potSize: z.union([z.number(), z.string()]).nullable().optional(),
   supplierName: z.string().nullable().optional(),
   supplierId: z.string().nullable().optional(),
 });

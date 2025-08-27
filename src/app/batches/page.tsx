@@ -3,7 +3,7 @@ import BatchesClient from "./BatchesClient";
 export const dynamic = "force-dynamic";
 
 type Row = {
-  id: string; batch_number: string; status: string; phase: string;
+  id: string; batch_number: string; status: string; phase: string; // Ensure phase is explicitly typed
   quantity: number; planted_at: string | null;
   variety_name: string | null; variety_family: string | null;
   size_name: string | null; container_type: string | null;
@@ -23,21 +23,19 @@ export default async function Page() {
   const initialBatches = (data as Row[] | null)?.map((r) => ({
     id: r.id,
     batchNumber: r.batch_number,
-    plantVariety: r.variety_name ?? "", // Mapping to 'plantVariety'
-    plantFamily: r.variety_family ?? null, // Mapping to 'plantFamily'
+    plantVariety: r.variety_name ?? "",
+    plantFamily: r.variety_family ?? null,
     size: r.size_name ?? null,
-    // container: r.container_type ?? null, // Removed as 'container' is not in Batch type
     location: r.location_name ?? null,
     supplier: r.supplier_name ?? null,
     status: r.status,
-    phase: r.phase,
+    phase: r.phase, // Ensure phase is mapped directly from the view
     quantity: r.quantity,
     plantedAt: r.planted_at ?? null,
-    // Add other Batch properties with default/placeholder values if they are not in the view
-    initialQuantity: r.quantity, // Assuming initial_quantity is same as quantity from view
-    createdAt: new Date().toISOString(), // Placeholder, replace if view has it
-    updatedAt: new Date().toISOString(), // Placeholder, replace if view has it
-    logHistory: [], // Placeholder
+    initialQuantity: r.quantity, 
+    createdAt: new Date().toISOString(), 
+    updatedAt: new Date().toISOString(), 
+    logHistory: [], 
   })) ?? [];
 
   return <BatchesClient initialBatches={initialBatches} />;
