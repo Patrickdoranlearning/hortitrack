@@ -22,12 +22,11 @@ import { useActiveOrg } from "@/lib/org/context";
 import { Label } from "@/components/ui/label";
 
 type FilterOp = "eq" | "ilike" | "in" | "neq" | "gte" | "lte";
-type ColumnFilter = { column: string; op?: FilterOp; value: string | number | boolean };
+type ColumnFilter = { column: string; op?: FilterOp; value: any };
 
 export type ComboItem = { id: string; name: string; meta?: Record<string, any> };
 
 type Props = {
-  entity: "varieties" | "sizes" | "locations" | "suppliers";
   table: string;
   select: string;
   labelKey?: string;
@@ -40,9 +39,9 @@ type Props = {
   placeholder?: string;
   quickAdd?: React.ReactNode;
   loadOnOpen?: boolean;
-} & Omit<React.ComponentProps<typeof Button>, "onSelect"> & {
+} & Omit<React.ComponentProps<typeof Button>, "onChange"> & {
   value?: string | null;
-  onSelect?: (id: string | null, row?: any) => void;
+  onChange?: (item: ComboItem | null) => void;
 };
 
 
@@ -80,65 +79,54 @@ export function ComboBoxEntity(props: Props) {
   );
 
   const fetchItems = React.useCallback(async (term?: string) => {
-    setError(null);
-    if (orgScoped && !orgId) {
-      setItems([]);
-      setError("NO_ORG");
-      return;
-    }
     setLoading(true);
-    ctrlRef.current?.abort();
-    const controller = new AbortController();
-    ctrlRef.current = controller;
-
+    setError(null);
     try {
-      const supabase = supabaseClient();
-      let query = supabase.from(table).select(select);
+      let q = supabaseClient().from(table).select(select);
 
-      if (orgScoped && orgId) {
-        query = query.eq("org_id", orgId);
+      if (orgScoped) {
+        if (!orgId) {
+          setItems([]);
+          setError("NO_ORG");
+          setLoading(false);
+          return;
+        }
+        q = q.eq("org_id", orgId);
       }
-      
+
       for (const f of filters) {
         const op = f.op ?? "eq";
         // @ts-expect-error op is a keyof the query builder
-        query = query[op](f.column as any, op === "ilike" ? `%${String(f.value)}%` : f.value);
+        q = q[op](f.column as any, op === "ilike" ? String(f.value) : f.value);
       }
 
-      if (term) {
-        const key = searchKey ?? labelKey;
-        query = query.ilike(key, `%${term}%`);
-      }
+      const by = orderBy ?? labelKey;
+      if (by) q = q.order(by, { ascending: true });
 
-      if (orderBy) {
-        query = query.order(orderBy, { ascending: true });
-      }
+      const key = searchKey ?? labelKey;
+      if (term && key) q = q.ilike(key, `%${term}%`);
 
-      query = query.limit(25);
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data } = await q.limit(25).throwOnError();
       
-      if (!controller.signal.aborted) {
-        const rows = (data ?? []).map((r: any) =>
-          r.multiple === undefined && r.cell_multiple !== undefined
-            ? { ...r, multiple: r.cell_multiple }
-            : r
-        );
-        setItems(rows.map(r => ({id: r[valueKey], name: r[labelKey], meta: r})));
-      }
+      const rows = (data ?? []).map((r: any) =>
+        r.multiple === undefined && r.cell_multiple !== undefined
+          ? { ...r, multiple: r.cell_multiple }
+          : r
+      );
+      setItems(rows.map(r => ({id: r[valueKey], name: r[labelKey], meta: r})));
+
     } catch (e: any) {
-      if (e?.name !== "AbortError") {
-        console.error(`[ComboBoxEntity] ${table} fetch failed`, {
-          code: e?.code, message: e?.message, details: e?.details, hint: e?.hint
-        });
-        setError(e.message || "Network error");
-        setItems([]);
-      }
+      const normalized =
+        e && typeof e === "object"
+          ? { code: e.code, message: e.message, details: e.details, hint: e.hint }
+          : { message: String(e) };
+      console.error(`[ComboBoxEntity] ${table} fetch failed`, normalized);
+      setError(normalized.message || "Fetch failed");
     } finally {
-      if (mounted.current && !controller.signal.aborted) setLoading(false);
+      if (mounted.current) setLoading(false);
     }
-  }, [q, table, select, labelKey, valueKey, searchKey, orderBy, orgId, orgScoped, filters]);
+  }, [table, select, orgScoped, orgId, filters, orderBy, labelKey, searchKey, valueKey]);
+
 
   React.useEffect(() => {
     if (!open) return;
@@ -183,7 +171,7 @@ export function ComboBoxEntity(props: Props) {
                     key={it.id}
                     value={it.name}
                     onSelect={() => {
-                      props.onSelect?.(it.id, it.meta);
+                      props.onChange?.(it);
                       setOpen(false);
                     }}
                   >

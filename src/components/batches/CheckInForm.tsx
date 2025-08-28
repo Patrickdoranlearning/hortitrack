@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,6 +22,7 @@ import { Checkbox } from "../ui/checkbox";
 import { Textarea } from "../ui/textarea";
 import { supabaseClient } from "@/lib/supabase/client";
 import { ComboBoxEntity } from "../horti/ComboBoxEntity";
+import { DialogFooter } from "@/components/ui/dialog";
 
 const CheckinFormSchema = z.object({
   varietyId: z.string().uuid({ message: "Variety is required." }),
@@ -254,7 +255,7 @@ export function CheckinForm({
                 orgScoped={false}
                 placeholder="Select variety"
                 value={form.watch("varietyId")}
-                onSelect={(id) => form.setValue("varietyId", id)}
+                onChange={(item) => form.setValue("varietyId", item?.id ?? "")}
             />
             <ComboBoxEntity
                 table="plant_sizes"
@@ -263,9 +264,9 @@ export function CheckinForm({
                 orgScoped={false}
                 placeholder="Select size"
                 value={form.watch("sizeId")}
-                onSelect={(id, row) => {
-                    form.setValue("sizeId", id);
-                    setSelectedSize(row);
+                onChange={(item) => {
+                    form.setValue("sizeId", item?.id ?? "");
+                    setSelectedSize(item);
                 }}
             />
         </div>
@@ -277,7 +278,7 @@ export function CheckinForm({
                 orgScoped={true}
                 placeholder="Select location"
                 value={form.watch("locationId")}
-                onSelect={(id) => form.setValue("locationId", id)}
+                onChange={(item) => form.setValue("locationId", item?.id ?? "")}
             />
             <ComboBoxEntity
                 table="suppliers"
@@ -286,7 +287,7 @@ export function CheckinForm({
                 orgScoped={true}
                 placeholder="Select supplier"
                 value={form.watch("supplierId")}
-                onSelect={(id) => form.setValue("supplierId", id)}
+                onChange={(item) => form.setValue("supplierId", item?.id ?? "")}
             />
         </div>
 
@@ -301,4 +302,3 @@ export function CheckinForm({
     </Form>
   );
 }
-
