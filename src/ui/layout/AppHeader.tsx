@@ -5,7 +5,6 @@ import * as React from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { ModuleTabs, type ModuleTabItem } from "./ModuleTabs"
-import { SearchInput } from "@/components/ui/search-input"
 import { ProfileMenu } from "./ProfileMenu"
 import { Logo } from "@/components/logo"
 
@@ -31,7 +30,7 @@ export function AppHeader({ companyName, moduleKey, moduleTabs, className }: App
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <SearchInput placeholder="Search batches, varieties, locations…" />
+          {/* SearchInput removed from here */}
           <ProfileMenu moduleKey={moduleKey} />
         </div>
       </div>
