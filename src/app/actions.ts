@@ -134,3 +134,87 @@ export async function batchChatAction(batchId: string, query: string) {
     return { success: false, error: 'Failed to get AI response.' };
   }
 }
+
+export async function addLocationAction(locationData: Omit<NurseryLocation, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('locations').insert([locationData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function updateLocationAction(locationData: NurseryLocation) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('locations').update(locationData).eq('id', locationData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function deleteLocationAction(locationId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('locations').delete().eq('id', locationId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+export async function addSizeAction(sizeData: Omit<PlantSize, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('sizes').insert([sizeData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function updateSizeAction(sizeData: PlantSize) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('sizes').update(sizeData).eq('id', sizeData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function deleteSizeAction(sizeId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('sizes').delete().eq('id', sizeId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+export async function addSupplierAction(supplierData: Omit<Supplier, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('suppliers').insert([supplierData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function updateSupplierAction(supplierData: Supplier) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('suppliers').update(supplierData).eq('id', supplierData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function deleteSupplierAction(supplierId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('varieties').insert([varietyData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function updateVarietyAction(varietyData: Variety) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('varieties').update(varietyData).eq('id', varietyData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
+
+export async function deleteVarietyAction(varietyId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('varieties').delete().eq('id', varietyId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
