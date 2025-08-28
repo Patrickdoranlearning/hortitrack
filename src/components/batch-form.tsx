@@ -25,6 +25,7 @@ import type {
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { SafeSelect } from '@/components/ui/SafeSelect';
 import { normalizeOptions, type Option } from '@/lib/options';
+import { cn } from '@/lib/utils';
 
 import { 
   searchVarieties,
@@ -611,7 +612,7 @@ export function BatchForm({
                       <Button
                         type="button"
                         variant="outline"
-                        className="justify-between"
+                        className={cn("justify-between", !field.value && "text-muted-foreground")}
                         disabled={form.formState.isSubmitting}
                       >
                         {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
