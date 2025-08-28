@@ -90,7 +90,6 @@ type Props = {
   onCreated?: (res: { id: string; batchNumber: string }) => void;
   onCancel: () => void;
   onArchive?: (batchId: string) => void;
-  // Removed reference data props, will fetch dynamically
   onCreateNewVariety: (name: string) => void;
 };
 
@@ -112,7 +111,6 @@ export function BatchForm({
   onCreated,
   onCancel,
   onArchive,
-  // Removed varieties, nurseryLocations, plantSizes, suppliers from props
   onCreateNewVariety,
 }: Props) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
@@ -120,9 +118,9 @@ export function BatchForm({
 
   // State for dynamically fetched reference data
   const [varieties, setVarieties] = useState<VarietyOption[]>([]);
-  const [sizes, setSizes] = useState<PlantSize[]>([]);
-  const [locations, setLocations] = useState<NurseryLocation[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [sizes, setSizes] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   // State for loading indicators
   const [loadingVarieties, setLoadingVarieties] = useState(false);
@@ -210,7 +208,7 @@ export function BatchForm({
       setLoadingSizes(true);
       try {
         const data = await searchSizes(deferredSizeQuery);
-        if (active) setSizes(data as PlantSize[]);
+        if (active) setSizes(data);
       } catch (e) {
         console.error("Error fetching sizes:", e);
       } finally {
@@ -230,7 +228,7 @@ export function BatchForm({
       setLoadingLocations(true);
       try {
         const data = await searchLocations(deferredLocationQuery);
-        if (active) setLocations(data as NurseryLocation[]);
+        if (active) setLocations(data);
       } catch (e) {
         console.error("Error fetching locations:", e);
       } finally {
@@ -250,7 +248,7 @@ export function BatchForm({
       setLoadingSuppliers(true);
       try {
         const data = await searchSuppliers(deferredSupplierQuery);
-        if (active) setSuppliers(data as Supplier[]);
+        if (active) setSuppliers(data);
       } catch (e) {
         console.error("Error fetching suppliers:", e);
       } finally {
@@ -262,21 +260,20 @@ export function BatchForm({
   }, [deferredSupplierQuery]);
 
   const allSizes: Option[] = useMemo(() => normalizeOptions((sizes ?? []).map(s => ({
-    value: s.name, // Use s.name for value, as size in Batch is a string name
-    label: `${s.name} ${s.containerType ? ` • ${s.containerType}` : ''} ${s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)`: ''}`
+    value: s.name, 
+    label: `${s.name} ${s.container_type ? ` • ${s.container_type}` : ''} ${s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)`: ''}`
   }))), [sizes]);
   
   const traySizes = useMemo(() => allSizes.filter(s => /tray/i.test(s.label)), [allSizes]);
   const visibleSizes = sourceType === 'Propagation' ? traySizes : allSizes;
 
   useEffect(() => {
-    const info = (sizes ?? []).find((s) => s.name === form.getValues('size')) || null; // Use s.name for comparison
+    const info = (sizes ?? []).find((s) => s.name === form.getValues('size')) || null;
     setSelectedSizeInfo(info);
     if (info?.multiple && info.multiple > 1 && batch?.quantity) {
       form.setValue('trayQuantity', Math.round(batch.quantity / info.multiple));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batch, sizes, form.getValues('size')]); // Added form.getValues dependency
+  }, [batch, sizes, form]);
 
   const sizeMultiple = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1
     ? selectedSizeInfo.multiple
@@ -289,7 +286,6 @@ export function BatchForm({
       return;
     }
 
-    // Client-side relational guard: do not allow increases beyond initial
     if (isEdit) {
       const currentInitial = batch?.initialQuantity ?? values.quantity;
       if (values.quantity > currentInitial) {
@@ -298,27 +294,10 @@ export function BatchForm({
       }
     }
 
-    const stage = values?.status;
-    if (!stage) {
-      alert("Batch status is required to determine the production stage.");
-      return;
-    }
-
-    // Convert variety name to ID for payload
-    const selectedVariety = varieties.find(v => v.name === values.plantVariety);
-    const selectedLocation = locations.find(l => l.name === values.location);
-    const selectedSize = sizes.find(s => s.name === values.size);
-    const selectedSupplier = suppliers.find(s => s.name === values.supplier);
-
     const payload: Partial<Batch> = {
       ...values,
-      plantVariety: selectedVariety?.id, // Send ID to backend
-      location: selectedLocation?.id,   // Send ID to backend
-      size: selectedSize?.id,           // Send ID to backend
-      supplier: selectedSupplier?.id,   // Send ID to backend
       initialQuantity: isEdit ? (batch?.initialQuantity ?? values.quantity) : values.quantity,
       plantingDate: values.plantingDate.toISOString(),
-      // supplier: values.supplier ? values.supplier : undefined, // Handled by selectedSupplier?.id
     };
     
     if (values.sourceType === "Purchase") {
@@ -364,7 +343,6 @@ export function BatchForm({
         className="space-y-6 min-w-0"
         onSubmit={form.handleSubmit(async (vals) => {
           try {
-            // compute total when in tray mode before submit
             if (isTrayMode) {
               const trays = Number(form.getValues('trayQuantity') ?? 0);
               form.setValue('quantity', trays * sizeMultiple, { shouldValidate: true });
@@ -412,11 +390,9 @@ export function BatchForm({
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 *:min-w-0">
-          {/* Hidden fields to carry family & category */}
           <input type="hidden" {...form.register('plantFamily')} />
           <input type="hidden" {...form.register('category')} />
 
-          {/* Variety */}
           <FormField
             control={form.control}
             name="plantVariety"
@@ -426,7 +402,6 @@ export function BatchForm({
                 <VarietyCombobox
                   value={field.value || ''}
                   disabled={form.formState.isSubmitting}
-                  // Pass dynamic varieties from state
                   varieties={varieties}
                   onSelect={(v) => {
                     field.onChange(v.name);
@@ -454,7 +429,6 @@ export function BatchForm({
             )}
           />
 
-          {/* Location */}
           <FormField
             control={form.control}
             name="location"
@@ -463,11 +437,7 @@ export function BatchForm({
                 <FormLabel>Location</FormLabel>
                 <Select
                   value={field.value || ''}
-                  onValueChange={(val) => {
-                    field.onChange(val);
-                    // No search query state needed for simple Select, fetches all
-                    // when component mounts or relevant state changes.
-                  }}
+                  onValueChange={field.onChange}
                   disabled={form.formState.isSubmitting || loadingLocations}
                 >
                   <SelectTrigger>
@@ -486,7 +456,6 @@ export function BatchForm({
             )}
           />
 
-          {/* Size */}
           <FormField
             control={form.control}
             name="size"
@@ -517,7 +486,6 @@ export function BatchForm({
             )}
           />
 
-          {/* Tray Quantity (only if multiple > 1) */}
           {isTrayMode && (
             <FormField
               control={form.control}
@@ -547,7 +515,6 @@ export function BatchForm({
             />
           )}
 
-          {/* Total Quantity (always shown) */}
           <FormField
             control={form.control}
             name="quantity"
@@ -570,7 +537,6 @@ export function BatchForm({
             )}
           />
 
-          {/* Status */}
           <FormField
             control={form.control}
             name="status"
@@ -599,7 +565,6 @@ export function BatchForm({
             )}
           />
 
-          {/* Planting date */}
           <FormField
             control={form.control}
             name="plantingDate"
@@ -634,7 +599,6 @@ export function BatchForm({
             )}
           />
 
-          {/* Supplier (optional) */}
           <FormField
             control={form.control}
             name="supplier"

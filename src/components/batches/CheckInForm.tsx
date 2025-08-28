@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -34,6 +35,10 @@ import {
   searchSuppliers,
 } from '@/server/refdata/queries';
 import { cn } from "@/lib/utils";
+import { Checkbox } from "../ui/checkbox";
+import { Textarea } from "../ui/textarea";
+import { Loader2 } from "lucide-react";
+import { supabaseClient } from "@/lib/supabase/client";
 
 // Zod schema for CheckinForm input
 const CheckinFormSchema = z.object({
@@ -70,6 +75,53 @@ type CheckinFormProps = {
   error?: string | null;
 };
 
+// ---------- Helper: upload up to 3 photos, try Firebase first then Supabase Storage
+async function uploadPhotos(files: File[]): Promise<string[]> {
+    const toUpload = files.slice(0, 3);
+    const urls: string[] = [];
+  
+    if (toUpload.length === 0) return urls;
+  
+    // Try Firebase Storage (preferred)
+    try {
+      const { getStorage, ref, uploadBytes, getDownloadURL } = await import("firebase/storage");
+      const { app } = await import("@/lib/firebase"); // expected to export initialized Firebase app
+      const storage = getStorage(app);
+  
+      for (const f of toUpload) {
+        const path = `batches/${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name}`;
+        const r = ref(storage, path);
+        await uploadBytes(r, f, { contentType: f.type });
+        const u = await getDownloadURL(r);
+        urls.push(u);
+      }
+      return urls;
+    } catch (e) {
+      console.warn("Firebase Storage not available, falling back to Supabase Storage.", e);
+    }
+  
+    // Fallback: Supabase Storage (bucket: photos)
+    try {
+      const supabase = supabaseClient();
+      for (const f of toUpload) {
+        const path = `batches/${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name}`;
+        const { data, error } = await supabase.storage.from("photos").upload(path, f, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: f.type,
+        });
+        if (error) throw error;
+        const { data: pub } = supabase.storage.from("photos").getPublicUrl(data.path);
+        urls.push(pub.publicUrl);
+      }
+      return urls;
+    } catch (e) {
+      console.error("Photo upload failed.", e);
+      throw new Error("Photo upload failed. Configure Firebase or Supabase Storage.");
+    }
+}
+  
+
 export function CheckinForm({
   onSubmitSuccess,
   onCancel,
@@ -81,17 +133,17 @@ export function CheckinForm({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-  const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
 
   const form = useForm<CheckinFormInput>({
     resolver: zodResolver(CheckinFormSchema),
     defaultValues: {
-      phase: "potted", // Default to potted based on common flow
+      phase: "potted",
       containers: 1,
+      overrideTotal: false,
       incomingDate: new Date(),
-      supplierBatchNumber: '',
+      supplierBatchNumber: "",
       photos: [],
-      quality: { pests: false, disease: false, stars: 3, notes: '' },
+      quality: { pests: false, disease: false, stars: 3, notes: "" },
       passportOverrides: {},
     },
     mode: "onChange",
@@ -119,36 +171,40 @@ export function CheckinForm({
   const deferredSupplierQuery = React.useDeferredValue(supplierSearchQuery);
 
   useEffect(() => { // Fetch Varieties
+    if (!activeOrgId) return;
     let active = true;
-    searchVarieties(deferredVarietyQuery).then(data => {
+    searchVarieties(deferredVarietyQuery, activeOrgId).then(data => {
       if (active) setVarieties(data as VarietyOption[]);
-    }).catch(e => console.error("Failed to fetch varieties:", e));
+    }).catch(e => console.error("Failed to fetch varieties:", e?.message ?? e));
     return () => { active = false; };
-  }, [deferredVarietyQuery]);
+  }, [deferredVarietyQuery, activeOrgId]);
 
   useEffect(() => { // Fetch Sizes
+    if (!activeOrgId) return;
     let active = true;
-    searchSizes(deferredSizeQuery).then(data => {
+    searchSizes(deferredSizeQuery, activeOrgId).then(data => {
       if (active) setSizes(data as PlantSize[]);
-    }).catch(e => console.error("Failed to fetch sizes:", e));
+    }).catch(e => console.error("Failed to fetch sizes:", e?.message ?? e));
     return () => { active = false; };
-  }, [deferredSizeQuery]);
+  }, [deferredSizeQuery, activeOrgId]);
 
   useEffect(() => { // Fetch Locations
+    if (!activeOrgId) return;
     let active = true;
-    searchLocations(deferredLocationQuery).then(data => {
+    searchLocations(deferredLocationQuery, activeOrgId).then(data => {
       if (active) setLocations(data as NurseryLocation[]);
-    }).catch(e => console.error("Failed to fetch locations:", e));
+    }).catch(e => console.error("Failed to fetch locations:", e?.message ?? e));
     return () => { active = false; };
-  }, [deferredLocationQuery]);
+  }, [deferredLocationQuery, activeOrgId]);
 
   useEffect(() => { // Fetch Suppliers
+    if (!activeOrgId) return;
     let active = true;
-    searchSuppliers(deferredSupplierQuery).then(data => {
+    searchSuppliers(deferredSupplierQuery, activeOrgId).then(data => {
       if (active) setSuppliers(data as Supplier[]);
-    }).catch(e => console.error("Failed to fetch suppliers:", e));
+    }).catch(e => console.error("Failed to fetch suppliers:", e?.message ?? e));
     return () => { active = false; };
-  }, [deferredSupplierQuery]);
+  }, [deferredSupplierQuery, activeOrgId]);
 
   // --- Calculated Values ---
   const selectedSizeInfo = useMemo(
@@ -158,9 +214,9 @@ export function CheckinForm({
 
   const calculatedTotalUnits = useMemo(() => {
     if (selectedSizeInfo?.multiple) {
-      return containers * selectedSizeInfo.multiple;
+      return (Number.isFinite(containers) ? containers : 0) * selectedSizeInfo.multiple;
     }
-    return containers; // Default to 1:1 if no multiple or not found
+    return Number.isFinite(containers) ? containers : 0;
   }, [containers, selectedSizeInfo]);
 
   useEffect(() => {
@@ -170,22 +226,18 @@ export function CheckinForm({
   }, [calculatedTotalUnits, overrideTotal, form]);
 
   // --- Photo Handling ---
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    if (files.length > 3 - photoFiles.length) {
+    if (files.length > 3) {
       toast({ variant: "destructive", title: "Too many photos", description: "You can upload a maximum of 3 photos." });
+      setPhotoFiles([]);
       return;
     }
-    setPhotoFiles(prev => [...prev, ...files]);
-    // In a real app, you'd upload these to Firebase Storage/Supabase Storage here
-    // and then get URLs. For this example, we'll simulate it or expect external upload.
-    // For now, let's just add a placeholder URL.
-    setUploadedPhotoUrls(prev => [...prev, ...files.map(f => `https://placeholder.com/${f.name}`)]);
+    setPhotoFiles(files);
   };
 
   const handleRemovePhoto = (index: number) => {
     setPhotoFiles(prev => prev.filter((_, i) => i !== index));
-    setUploadedPhotoUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   // --- Form Submission ---
@@ -196,6 +248,8 @@ export function CheckinForm({
     }
     setIsSubmitting(true);
     try {
+      const uploadedUrls = await uploadPhotos(photoFiles);
+
       const payload = {
         orgId: activeOrgId,
         varietyId: values.varietyId,
@@ -206,7 +260,7 @@ export function CheckinForm({
         supplierId: values.supplierId || null,
         supplierBatchNumber: values.supplierBatchNumber,
         incomingDate: format(values.incomingDate, 'yyyy-MM-dd'),
-        photos: uploadedPhotoUrls, // Use uploaded URLs
+        photos: uploadedUrls,
         quality: values.quality,
         passportOverrides: values.passportOverrides,
       };
@@ -226,7 +280,6 @@ export function CheckinForm({
       toast({ title: "Check-in Successful", description: `Batch #${result.batch?.batch_number} created.` });
       form.reset();
       setPhotoFiles([]);
-      setUploadedPhotoUrls([]);
       onSubmitSuccess?.(result.batch);
     } catch (e: any) {
       console.error("Check-in failed:", e);
@@ -241,9 +294,11 @@ export function CheckinForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {formErrorProp && (
+          <p className="text-sm font-medium text-destructive">{formErrorProp}</p>
+        )}
         {/* Basic Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Variety */}
           <FormField
             control={form.control}
             name="varietyId"
@@ -256,7 +311,6 @@ export function CheckinForm({
                   varieties={varieties}
                   onSelect={(v) => {
                     field.onChange(v.id);
-                    // You might want to set form values for family/category here if needed elsewhere
                   }}
                   placeholder="Select a variety"
                   emptyMessage="No varieties found."
@@ -266,7 +320,6 @@ export function CheckinForm({
             )}
           />
 
-          {/* Size */}
           <FormField
             control={form.control}
             name="sizeId"
@@ -288,7 +341,6 @@ export function CheckinForm({
             }}
           />
 
-          {/* Location */}
           <FormField
             control={form.control}
             name="locationId"
@@ -310,7 +362,6 @@ export function CheckinForm({
             }}
           />
 
-          {/* Phase */}
           <FormField
             control={form.control}
             name="phase"
@@ -332,7 +383,6 @@ export function CheckinForm({
             )}
           />
 
-          {/* Containers */}
           <FormField
             control={form.control}
             name="containers"
@@ -340,7 +390,10 @@ export function CheckinForm({
               <FormItem>
                 <FormLabel>Containers</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} disabled={formLoading} />
+                  <Input type="number" min={1} {...field} disabled={formLoading} onChange={(e) => {
+                    const n = e.target.value === "" ? 0 : Number(e.target.value);
+                    field.onChange(Number.isFinite(n) ? n : 0);
+                  }} value={Number.isFinite(field.value) ? field.value : 0} />
                 </FormControl>
                 <FormDescription>Number of trays or pots.</FormDescription>
                 <FormMessage />
@@ -348,7 +401,6 @@ export function CheckinForm({
             )}
           />
 
-          {/* Total Units */}
           <FormField
             control={form.control}
             name="totalUnits"
@@ -356,7 +408,10 @@ export function CheckinForm({
               <FormItem>
                 <FormLabel>Total Units</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} disabled={!overrideTotal || formLoading} />
+                  <Input type="number" {...field} disabled={!overrideTotal || formLoading} onChange={(e) => {
+                    const n = e.target.value === "" ? 0 : Number(e.target.value);
+                    field.onChange(Number.isFinite(n) ? n : 0);
+                  }} value={Number.isFinite(field.value) ? field.value : 0} />
                 </FormControl>
                 <FormDescription>
                   {overrideTotal
@@ -368,26 +423,24 @@ export function CheckinForm({
             )}
           />
 
-          {/* Override Total Checkbox */}
           <FormField
             control={form.control}
             name="overrideTotal"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm col-span-full">
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm md:col-span-2">
                 <FormControl>
-                  <Input type="checkbox" className="h-4 w-4" checked={field.value} onChange={field.onChange} disabled={formLoading} />
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={formLoading} />
                 </FormControl>
                 <div className="space-y-1 leading-none">
                   <FormLabel>Override Calculated Total</FormLabel>
                   <FormDescription>
-                    Check this to manually enter the total number of plants instead of calculating from containers and size.
+                    Check this to manually enter the total number of plants.
                   </FormDescription>
                 </div>
               </FormItem>
             )}
           />
 
-          {/* Incoming Date */}
           <FormField
             control={form.control}
             name="incomingDate"
@@ -411,7 +464,7 @@ export function CheckinForm({
                     <Calendar
                       mode="single"
                       selected={field.value}
-                      onSelect={field.onChange}
+                      onSelect={(d) => field.onChange(d!)}
                       initialFocus
                     />
                   </PopoverContent>
@@ -421,7 +474,6 @@ export function CheckinForm({
             )}
           />
 
-          {/* Supplier */}
           <FormField
             control={form.control}
             name="supplierId"
@@ -444,7 +496,6 @@ export function CheckinForm({
             }}
           />
 
-          {/* Supplier Batch Number */}
           <FormField
             control={form.control}
             name="supplierBatchNumber"
@@ -452,7 +503,7 @@ export function CheckinForm({
               <FormItem className="md:col-span-2">
                 <FormLabel>Supplier Batch Number</FormLabel>
                 <FormControl>
-                  <Input {...field} disabled={formLoading} />
+                  <Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -460,14 +511,13 @@ export function CheckinForm({
           />
         </div>
 
-        {/* Photos */}
         <div className="space-y-2 pt-4 border-t">
-          <h3 className="font-medium text-lg">Photos ({uploadedPhotoUrls.length}/3)</h3>
-          <Input type="file" multiple accept="image/*" onChange={handlePhotoUpload} disabled={uploadedPhotoUrls.length >= 3 || formLoading} />
+          <h3 className="font-medium text-lg">Photos ({photoFiles.length}/3)</h3>
+          <Input type="file" multiple accept="image/*" onChange={handlePhotoChange} disabled={photoFiles.length >= 3 || formLoading} />
           <div className="flex flex-wrap gap-2">
-            {uploadedPhotoUrls.map((url, index) => (
+            {photoFiles.map((file, index) => (
               <div key={index} className="relative w-24 h-24 rounded-md overflow-hidden group">
-                <img src={url} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
+                <img src={URL.createObjectURL(file)} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
                 <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemovePhoto(index)} disabled={formLoading}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -475,47 +525,33 @@ export function CheckinForm({
             ))}
           </div>
           <FormDescription>Upload up to 3 photos for quality control.</FormDescription>
-          <FormMessage />
         </div>
 
-        {/* Quality */}        
         <div className="space-y-2 pt-4 border-t">
           <h3 className="font-medium text-lg">Quality Check</h3>
-          <FormField
+           <FormField
             control={form.control}
             name="quality.stars"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Quality Rating</FormLabel>
                 <FormControl>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5, 6].map(star => (
-                      <Star
-                        key={star}
-                        className={cn(
-                          "h-6 w-6 cursor-pointer",
-                          field.value && star <= field.value ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground"
-                        )}
-                        onClick={() => field.onChange(star)}
-                      />
-                    ))}
-                  </div>
+                    <StarRating value={field.value ?? 0} onChange={field.onChange} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <FormField
+           <FormField
             control={form.control}
             name="quality.pests"
             render={({ field }) => (
               <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
                 <FormControl>
-                  <Input type="checkbox" className="h-4 w-4" checked={field.value} onChange={field.onChange} disabled={formLoading} />
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={formLoading} />
                 </FormControl>
                 <div className="space-y-1 leading-none">
                   <FormLabel>Pests Present</FormLabel>
-                  <FormDescription>Check if any pests were observed.</FormDescription>
                 </div>
               </FormItem>
             )}
@@ -526,11 +562,10 @@ export function CheckinForm({
             render={({ field }) => (
               <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
                 <FormControl>
-                  <Input type="checkbox" className="h-4 w-4" checked={field.value} onChange={field.onChange} disabled={formLoading} />
+                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={formLoading} />
                 </FormControl>
                 <div className="space-y-1 leading-none">
                   <FormLabel>Disease Present</FormLabel>
-                  <FormDescription>Check if any disease symptoms were observed.</FormDescription>
                 </div>
               </FormItem>
             )}
@@ -542,7 +577,7 @@ export function CheckinForm({
               <FormItem>
                 <FormLabel>Quality Notes</FormLabel>
                 <FormControl>
-                  <Input {...field} disabled={formLoading} />
+                  <Textarea {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -550,10 +585,8 @@ export function CheckinForm({
           />
         </div>
 
-        {/* Passport Overrides */}
         <div className="space-y-2 pt-4 border-t">
           <h3 className="font-medium text-lg">Passport Overrides (Optional)</h3>
-          <p className="text-sm text-muted-foreground">Use these to manually set passport fields if different from defaults.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -561,7 +594,7 @@ export function CheckinForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Family Override</FormLabel>
-                  <FormControl><Input {...field} disabled={formLoading} /></FormControl>
+                  <FormControl><Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -572,7 +605,7 @@ export function CheckinForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Producer Code Override</FormLabel>
-                  <FormControl><Input {...field} disabled={formLoading} /></FormControl>
+                  <FormControl><Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -583,7 +616,7 @@ export function CheckinForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Country Code Override</FormLabel>
-                  <FormControl><Input {...field} disabled={formLoading} /></FormControl>
+                  <FormControl><Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")}/></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -591,15 +624,15 @@ export function CheckinForm({
           </div>
         </div>
 
-        {formErrorProp && (
-          <p className="text-sm font-medium text-destructive">{formErrorProp}</p>
-        )}
-
         <DialogFooter className="sticky bottom-0 z-10 -mx-6 px-6 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t -mb-6 pt-4 pb-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={formLoading}>Cancel</Button>
-          <Button type="submit" disabled={formLoading} aria-disabled={formLoading}>Check-in Batch</Button>
+          <Button type="submit" disabled={formLoading} aria-disabled={formLoading}>
+            {formLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Check-in Batch
+          </Button>
         </DialogFooter>
       </form>
     </Form>
   );
 }
+
