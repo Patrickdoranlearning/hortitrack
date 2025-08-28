@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -17,7 +16,7 @@ import {
 import { DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Star, Trash2 } from "lucide-react";
+import { CalendarIcon, Star, Trash2, Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { VarietyCombobox, type VarietyOption } from "@/components/ui/variety-combobox";
 import { format } from "date-fns";
 import type {
@@ -37,7 +36,6 @@ import {
 import { cn } from "@/lib/utils";
 import { Checkbox } from "../ui/checkbox";
 import { Textarea } from "../ui/textarea";
-import { Loader2 } from "lucide-react";
 import { supabaseClient } from "@/lib/supabase/client";
 
 // Zod schema for CheckinForm input
@@ -120,8 +118,38 @@ async function uploadPhotos(files: File[]): Promise<string[]> {
       throw new Error("Photo upload failed. Configure Firebase or Supabase Storage.");
     }
 }
-  
 
+// 6-star rating control used by Quality field
+function StarRating({
+  value = 0,
+  onChange,
+}: {
+  value?: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5, 6].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          aria-label={`Set ${n} stars`}
+          className={cn(
+            "p-1 rounded-md",
+            value >= n ? "opacity-100" : "opacity-40 hover:opacity-70"
+          )}
+        >
+          <Star
+            className="h-5 w-5"
+            fill={value >= n ? "currentColor" : "none"}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+  
 export function CheckinForm({
   onSubmitSuccess,
   onCancel,
@@ -635,4 +663,3 @@ export function CheckinForm({
     </Form>
   );
 }
-
