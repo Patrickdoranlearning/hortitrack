@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Camera, Images, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 type Props = {
   batchId: string;
@@ -46,7 +47,7 @@ export default function BatchPhotoUploader({ batchId, type, role, onUploaded, cl
   }
 
   return (
-    <div className={className}>
+    <div className={cn(className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button className="w-full rounded-2xl" disabled={busy}>

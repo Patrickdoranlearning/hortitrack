@@ -1,24 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabaseClient } from "@/lib/supabase/client"; // Import your existing browser client
+import { supabaseClient } from "@/lib/supabase/client"; // CORRECT: Using your existing browser client
+import type { Database } from "@/types/supabase";
 
-// Legacy \u2192 Supabase table mapping to keep old callsites working
 const TABLE_MAP: Record<string, string> = {
   batches: "batches",
   varieties: "plant_varieties",
   sizes: "plant_sizes",
-  locations: "nursery_locations", 
+  locations: "nursery_locations", // Corrected from 'locations' to match schema
   suppliers: "suppliers",
-  // add more aliases here if needed
 };
 
 type Options = {
-  select?: string; // e.g. "*,plant_varieties(name)"
+  select?: string;
   orderBy?: { column: string; ascending?: boolean };
   filters?: Array<{ column: string; op?: "eq" | "ilike" | "gt" | "lt" | "gte" | "lte"; value: any }>;
   limit?: number;
-  realtime?: boolean; // default true
+  realtime?: boolean;
 };
 
 export function useCollection<T = any>(
@@ -26,7 +25,7 @@ export function useCollection<T = any>(
   initialData?: T[] | null,
   opts?: Options
 ) {
-  const supabase = supabaseClient(); // Use your existing browser client
+  const supabase = supabaseClient(); // CORRECT: Using your existing browser client function
   const table = TABLE_MAP[tableOrAlias] ?? tableOrAlias;
 
   const [data, setData] = useState<T[] | null>(initialData ?? null);
@@ -42,13 +41,11 @@ export function useCollection<T = any>(
     try {
       let query: any = supabase.from(table).select(optsRef.current?.select ?? "*");
 
-      // Filters
       for (const f of optsRef.current?.filters ?? []) {
         const op = f.op ?? "eq";
         query = query[op](f.column as any, f.value);
       }
 
-      // Order
       if (optsRef.current?.orderBy) {
         const { column, ascending = true } = optsRef.current.orderBy;
         query = query.order(column, { ascending });
@@ -58,9 +55,9 @@ export function useCollection<T = any>(
         query = query.limit(optsRef.current.limit);
       }
 
-      const { data: supabaseData, error: supabaseError } = await query;
-      if (supabaseError) throw supabaseError;
-      setData((supabaseData as T[]) ?? []);
+      const { data, error } = await query;
+      if (error) throw error;
+      setData((data as T[]) ?? []);
     } catch (e: any) {
       console.error(`useCollection(${table}) fetch error:`, e);
       setError(e?.message ?? "Unknown error");
@@ -69,39 +66,28 @@ export function useCollection<T = any>(
     }
   }, [supabase, table]);
 
-  // Initial fetch (if no initialData provided)
   useEffect(() => {
     if (!initialData) fetchNow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table, initialData]);
 
-  // Realtime subscription
   useEffect(() => {
     const enabled = optsRef.current?.realtime ?? true;
     if (!enabled) return;
 
     const channel = supabase
       .channel(`rt-${table}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table },
-        () => {
-          // Re-fetch on any change
-          fetchNow();
-        }
-      )
-      .subscribe((status) => {
-        // optional: console.log("realtime status", table, status)
-      });
+      .on("postgres_changes", { event: "*", schema: "public", table }, () => {
+        fetchNow();
+      })
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [supabase, table, fetchNow]);
 
-  const forceRefresh = useCallback(async () => {
-    await fetchNow();
-  }, [fetchNow]);
+  const forceRefresh = useCallback(() => fetchNow(), [fetchNow]);
 
   return { data, loading, error, forceRefresh };
 }

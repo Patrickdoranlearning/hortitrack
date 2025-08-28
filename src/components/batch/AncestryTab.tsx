@@ -46,7 +46,7 @@ export function AncestryTab({
       </div>
 
       <TooltipProvider>
-        <div className="flex items-stretch gap-2 overflow-x-auto py-1">
+        <div className="flex items-center gap-2 overflow-x-auto py-1">
           {nodes.map((node, idx) => {
             const isCurrent = node.batchNumber === currentBatchNumber && idx === 0;
             const disabled = !!node.locked || node.batchNumber === currentBatchNumber;

@@ -1,8 +1,8 @@
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { getSupabaseServerApp } from "@/server/db/supabaseServerApp";
 import { snakeToCamel } from "@/lib/utils";
 
 export async function searchVarieties(q: string) {
-  const supabase = getSupabaseForRequest();
+  const supabase = getSupabaseServerApp();
   const { data, error } = await supabase
     .from("plant_varieties")
     .select("id,name,family")
@@ -14,7 +14,7 @@ export async function searchVarieties(q: string) {
 }
 
 export async function searchSizes(q: string) {
-  const supabase = getSupabaseForRequest();
+  const supabase = getSupabaseServerApp();
   const { data, error } = await supabase
     .from("plant_sizes")
     .select("id,name,container_type")
@@ -26,7 +26,7 @@ export async function searchSizes(q: string) {
 }
 
 export async function searchLocations(q: string) {
-  const supabase = getSupabaseForRequest();
+  const supabase = getSupabaseServerApp();
   const { data, error } = await supabase
     .from("nursery_locations")
     .select("id,name")
@@ -38,10 +38,10 @@ export async function searchLocations(q: string) {
 }
 
 export async function searchSuppliers(q: string) {
-  const supabase = getSupabaseForRequest();
+  const supabase = getSupabaseServerApp();
   const { data, error } = await supabase
     .from("suppliers")
-    .select("id,name,country_code") // Assuming these are relevant fields for supplier search
+    .select("id,name,country_code")
     .ilike("name", `%${q}%`)
     .order("name")
     .limit(25);

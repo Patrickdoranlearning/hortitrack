@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer"; // Updated import
+import { getSupabaseServerApp } from "@/server/db/supabaseServerApp";
 import { snakeToCamel } from "@/lib/utils";
 
 export async function GET(req: Request) {
-  const supabase = getSupabaseForRequest(); // Updated call
+  const supabase = getSupabaseServerApp();
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
-  const orgId = searchParams.get("orgId"); // Get orgId from URL params
+  const orgId = searchParams.get("orgId");
 
   let query = supabase
     .from("suppliers")
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     .limit(20);
 
   if (orgId) {
-    query = query.eq("org_id", orgId); // Filter by orgId
+    query = query.eq("org_id", orgId);
   }
 
   const { data, error } = await query;

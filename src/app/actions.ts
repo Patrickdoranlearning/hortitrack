@@ -5,14 +5,23 @@ import { productionProtocol } from '@/ai/flows/production-protocol';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
-import { getSupabaseForRequest } from '@/server/db/supabaseServer'; // Updated import
+import { createSupabaseServerWithCookies, type CookieBridge } from '@/server/db/supabaseServerApp';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { declassify } from '@/server/utils/declassify';
-import { snakeToCamel } from '@/lib/utils'; 
+import { snakeToCamel } from '@/lib/utils';
 
-// Helper to transform Supabase v_batch_search data to Batch type
+function getSupabaseForApp() {
+  const store = cookies();
+  const cookieBridge: CookieBridge = {
+    get: (n) => store.get(n)?.value,
+    set: (n, v, o) => store.set(n, v, o),
+    remove: (n, o) => store.set(n, "", { ...o, maxAge: 0 }),
+  };
+  return createSupabaseServerWithCookies(cookieBridge);
+}
+
 function transformVBatchSearchData(data: any): Batch {
-    console.log('[transformVBatchSearchData] Raw data received for transformation:', data);
     const camelCaseData = snakeToCamel(data);
     return {
         ...camelCaseData,
@@ -32,10 +41,8 @@ function transformVBatchSearchData(data: any): Batch {
     };
 }
 
-// This is now fetching from v_batch_search
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const supabase = getSupabaseForRequest(); // Updated call
-    console.log(`[getBatchById] Fetching batch with ID from v_batch_search: ${batchId}`);
+    const supabase = getSupabaseForApp();
     const { data, error } = await supabase
         .from("v_batch_search") 
         .select("*") 
@@ -46,14 +53,12 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
         console.error('[getBatchById] Supabase error from v_batch_search:', error);
         return null;
     }
-    console.log('[getBatchById] Raw Supabase data from v_batch_search:', data);
     return data ? transformVBatchSearchData(data) : null;
 }
 
 export async function getBatchesAction() {
     try {
-        const supabase = getSupabaseForRequest(); // Updated call
-        console.log('[getBatchesAction] Fetching all batches from v_batch_search');
+        const supabase = getSupabaseForApp();
         const { data: batches, error } = await supabase
             .from("v_batch_search") 
             .select("*") 
@@ -63,7 +68,6 @@ export async function getBatchesAction() {
             console.error('[getBatchesAction] Supabase error from v_batch_search:', error);
             throw error;
         }
-        console.log('[getBatchesAction] Raw Supabase data from v_batch_search (before transform):', batches);
         
         const transformedBatches = (batches || []).map(transformVBatchSearchData);
         

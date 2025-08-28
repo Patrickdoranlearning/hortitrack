@@ -33,6 +33,7 @@ import {
   searchLocations,
   searchSuppliers,
 } from '@/server/refdata/queries';
+import { cn } from "@/lib/utils";
 
 // Zod schema for CheckinForm input
 const CheckinFormSchema = z.object({
@@ -398,7 +399,7 @@ export function CheckinForm({
                     <FormControl>
                       <Button
                         variant="outline"
-                        className="justify-between"
+                        className={cn("justify-between", !field.value && "text-muted-foreground")}
                         disabled={formLoading}
                       >
                         {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
