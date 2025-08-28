@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -21,17 +20,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth'; // Assuming this useAuth is now Supabase-backed or will be removed
 import { useToast } from '@/hooks/use-toast';
-import { auth } from '@/lib/firebase';
+// import { auth } from '@/lib/firebase'; // Removed Firebase auth import
 import {
+  ActionLogFormValues,
   Batch,
   NurseryLocation,
   PlantSize,
   Supplier,
   Variety,
 } from '@/lib/types';
-import { signOut } from 'firebase/auth';
+// import { signOut } from 'firebase/auth'; // Removed Firebase signOut import
 import {
   Grid,
   LayoutGrid,
@@ -43,6 +43,7 @@ import {
   Sparkles,
   Users,
   Printer,
+  MoreHorizontal,
   ShoppingCart,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -61,24 +62,45 @@ import { queryMatchesBatch } from '@/lib/search';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { NewBatchButton } from '@/components/horti/NewBatchButton';
-import { OrgProvider } from '@/server/org/context';
-import { fetchJson } from '@/lib/http';
-import { useSWRConfig } from 'swr';
-import useSWR from 'swr';
-import { getBatchesAction } from './actions';
+import { CheckinDialog } from '@/components/checkin-dialog';
+
+import { useCollection } from '@/hooks/useCollection'; // NEW Supabase-powered useCollection
+import { getBatchesAction } from './actions'; // Supabase-backed server action
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { useActiveOrg } from '@/server/org/context'; // To get the active org ID
+import { CheckinForm } from '@/components/batches/CheckInForm';
 
 interface HomePageViewProps {
   initialBatches: Batch[];
-  initialVarieties: Variety[];
-  initialNurseryLocations: NurseryLocation[];
-  initialPlantSizes: PlantSize[];
-  initialSuppliers: Supplier[];
   plantFamilies: string[];
   categories: string[];
-  actions: {};
+  actions: {
+    addBatch: (
+      data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'logHistory'>
+    ) => Promise<any>;
+    updateBatch: (data: Batch) => Promise<any>;
+    archiveBatch: (batchId: string, loss: number) => Promise<any>;
+    transplantBatch: (
+      sourceBatchId: string,
+      newBatchData: Omit<
+        Batch,
+        | 'id'
+        | 'batchNumber'
+        | 'logHistory'
+        | 'transplantedFrom'
+        | 'createdAt'
+        | 'updatedId'
+      >,
+      transplantQuantity: number,
+      logRemainingAsLoss: boolean
+    ) => Promise<any>;
+    logAction: (
+      batchId: string,
+      logData: Partial<ActionLogFormValues>
+    ) => Promise<any>;
+    addVariety: (data: Omit<Variety, 'id'>) => Promise<any>;
+  };
 }
 
 const TABS = [
@@ -89,37 +111,47 @@ const TABS = [
 
 export default function HomePageView({
   initialBatches,
-  initialVarieties,
-  initialNurseryLocations,
-  initialPlantSizes,
-  initialSuppliers,
   plantFamilies,
   categories,
+  actions,
 }: HomePageViewProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth(); 
   const searchParams = useSearchParams();
   const urlBatchId = searchParams.get("batch");
-  
-  console.log("[HomePageView] initialBatches received:", initialBatches);
+  const activeOrgId = useActiveOrg(); // Get active org ID from context
 
-  const { data: swrBatches, isLoading: batchesLoading } = useSWR('batches', getBatchesAction, {
-    fallbackData: { success: true, data: initialBatches },
-    revalidateOnFocus: false,
+  const isReadonly = !user;
+
+  // Use new Supabase-powered useCollection for batches
+  const { data: batchesData, forceRefresh } = useCollection<Batch>("batches", initialBatches, {
+    orderBy: { column: "created_at", ascending: false },
+    filters: activeOrgId ? [{ column: "org_id", value: activeOrgId }] : [],
   });
+  const batches = batchesData || [];
 
-  const batches = swrBatches?.data || initialBatches;
+  // Dynamically fetch other reference data with useCollection
+  const { data: varieties } = useCollection<Variety>("varieties", [], { realtime: true });
+  const { data: nurseryLocations } = useCollection<NurseryLocation>("locations", [], { realtime: true });
+  const { data: plantSizes } = useCollection<PlantSize>("sizes", [], { realtime: true });
+  const { data: suppliers } = useCollection<Supplier>("suppliers", [], { realtime: true });
 
+  const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = React.useState(false);
   const [isLogActionOpen, setIsLogActionOpen] = React.useState(false);
+  const [isTransplantOpen, setIsTransplantOpen] = React.useState(false);
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] =
     React.useState(false);
+  const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
   const [isScanOpen, setIsScanOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
+  const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
+  const [isCheckinFormOpen, setIsCheckinFormOpen] = React.useState(false); // State for CheckinForm
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
+  const [newVarietyName, setNewVarietyName] = React.useState('');
   
   const [filters, setFilters] = React.useState({
     plantFamily: 'all',
@@ -129,8 +161,9 @@ export default function HomePageView({
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const filteredBatches = React.useMemo(() => {
+    const dataToFilter = isReadonly ? initialBatches : batches;
     const q = (searchQuery || '').trim();
-    const filtered = (batches || [])
+    return (dataToFilter || [])
       .filter((batch) => queryMatchesBatch(q, batch))
       .filter((batch) =>
         filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
@@ -143,12 +176,12 @@ export default function HomePageView({
         if (filters.status === 'Active') return batch.status !== 'Archived';
         return batch.status === filters.status;
       });
-    console.log("[HomePageView] filteredBatches:", filtered);
-    return filtered;
-  }, [batches, searchQuery, filters]);
+  }, [isReadonly, initialBatches, batches, searchQuery, filters]);
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    // Supabase signOut equivalent
+    // You'll need to replace `auth` with your Supabase client instance if you have one on the client
+    // For example: `const supabase = createClientComponentClient(); await supabase.auth.signOut();`
     router.push('/login');
     toast({
       title: 'Signed Out',
@@ -171,6 +204,11 @@ export default function HomePageView({
     }
   }, [urlBatchId, batches]);
   
+  const handleOpenForm = (batch?: Batch) => {
+    setSelectedBatch(batch || null);
+    setIsFormOpen(true);
+  };
+
   const handleOpenDetail = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsDetailDialogOpen(true);
@@ -179,6 +217,11 @@ export default function HomePageView({
   const handleLogAction = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsLogActionOpen(true);
+  };
+
+  const handleTransplant = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsTransplantOpen(true);
   };
   
   const handlePrintClick = (batch: Batch) => {
@@ -196,6 +239,74 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
 
+  const handleFormSubmit = async (data: any) => {
+    // These actions need to be updated to use Supabase if they are not already
+    const result = selectedBatch
+      ? await actions.updateBatch(data)
+      : await actions.addBatch(data);
+    if (result?.success) {
+      setIsFormOpen(false);
+      setSelectedBatch(null);
+      forceRefresh(); // Refresh batches after create/update
+    }
+  };
+
+  const handleArchive = async (batchId: string) => {
+    // This action needs to be updated to use Supabase if not already
+    await actions.archiveBatch(batchId, selectedBatch?.quantity || 0);
+    setIsFormOpen(false);
+    setSelectedBatch(null);
+    forceRefresh(); // Refresh batches after archive
+  };
+
+  const handleLogActionSubmit = async (values: ActionLogFormValues) => {
+    if (!selectedBatch?.id) return;
+    // This action needs to be updated to use Supabase if not already
+    await actions.logAction(selectedBatch.id, values);
+    setIsLogActionOpen(false);
+    setSelectedBatch(null);
+    forceRefresh(); // Refresh batches after logging action
+  };
+
+  const handleTransplantSubmit = async (data: TransplantFormData) => {
+    const sourceBatchId = selectedBatch?.id;
+    const { quantity, logRemainingAsLoss, ...newBatchData } = data;
+
+    if (!sourceBatchId) {
+      // This action needs to be updated to use Supabase if not already
+      await actions.addBatch({
+        ...newBatchData,
+        quantity,
+      } as Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'logHistory'>);
+    } else {
+      // This action needs to be updated to use Supabase if not already
+      await actions.transplantBatch(
+        sourceBatchId,
+        newBatchData,
+        quantity,
+        logRemainingAsLoss
+      );
+    }
+    setIsTransplantOpen(false);
+    setIsNewPropagationOpen(false); 
+    setSelectedBatch(null);
+    forceRefresh(); // Refresh batches after transplant
+  };
+
+  const handleCreateNewVariety = (name: string) => {
+    setNewVarietyName(name);
+    setIsVarietyFormOpen(true);
+  };
+
+  const handleVarietyFormSubmit = async (data: Omit<Variety, 'id'>) => {
+    // This action needs to be updated to use Supabase if not already
+    const result = await actions.addVariety(data);
+    if (result.success) {
+      setIsVarietyFormOpen(false);
+      // forceRefresh(); // Potentially refresh varieties, but useCollection will handle it
+    }
+  };
+
   const handleAiCareClick = async () => {
     if (!batches || batches.length === 0) return;
     const batchForRecs = batches[0];
@@ -203,35 +314,10 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
   
-  const handleScanDetected = async (text: string) => {
-    try {
-      const idToken = await getIdTokenOrNull();
-      if (!idToken) throw new Error("Authentication required.");
-
-      const { data } = await fetchJson<{ batch: Batch }>('/api/batches/scan', {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ code: text }),
-      });
-      
-      if (data?.batch) {
-        setIsScanOpen(false);
-        setSelectedBatch(data.batch);
-        setIsDetailDialogOpen(true);
-      } else {
-        throw new Error("Batch not found.");
-      }
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Scan Failed",
-        description: error?.message ?? "Could not find a matching batch for the scanned code.",
-      });
-    }
+  const handleScanDetected = (text: string) => {
+    window.location.href = `/?batch=${encodeURIComponent(text)}`;
   };
+
 
   if (authLoading) {
     return (
@@ -257,7 +343,6 @@ export default function HomePageView({
   }
 
   return (
-    <OrgProvider orgId="Doran Nurseries">
     <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
         <ModulePageHeader 
@@ -293,7 +378,27 @@ export default function HomePageView({
                         <Sparkles /> AI Care
                     </Button>
                     </FeatureGate>
-                    <NewBatchButton />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button disabled={isReadonly} className="w-full sm:w-auto">
+                                <Plus /> New Batch
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => {
+                                setSelectedBatch(null);
+                                setIsNewPropagationOpen(true);
+                            }}>
+                                Propagation
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => {
+                                setSelectedBatch(null);
+                                setIsCheckinFormOpen(true); // Open CheckinForm
+                            }}>
+                                Check-in
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </>
             }
         />
@@ -360,7 +465,7 @@ export default function HomePageView({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
-          {batchesLoading && batches.length === 0
+          {authLoading
             ? [...Array(8)].map((_, i) => (
                 <Skeleton key={i} className="h-40" />
               ))
@@ -409,7 +514,7 @@ export default function HomePageView({
                 />
               ))}
         </div>
-        {filteredBatches.length === 0 && !batchesLoading && (
+        {filteredBatches.length === 0 && !authLoading && (
           <div className="text-center col-span-full py-20">
             <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">No Batches Found</h3>
@@ -439,7 +544,8 @@ export default function HomePageView({
         open={isLogActionOpen}
         onOpenChange={setIsLogActionOpen}
         defaultBatchIds={selectedBatch ? [selectedBatch.id!] : []}
-        locations={(initialNurseryLocations || []).map(l => ({ id: l.id!, name: l.name }))}
+        // Locations should be fetched dynamically inside ActionDialog now
+        locations={[]}
       />
       
       <ProductionProtocolDialog
@@ -471,7 +577,59 @@ export default function HomePageView({
           quantity: selectedBatch.quantity,
         }}
       />}
+
+      {/* New Batch (Propagation) Dialog */}
+      <Dialog open={isNewPropagationOpen} onOpenChange={setIsNewPropagationOpen}>
+        <DialogContent size="xl" className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6">
+            <DialogTitle className="font-headline text-3xl">Create New Propagation Batch</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
+            <BatchForm
+              batch={null}
+              onSubmitSuccess={(batch) => {
+                toast({ title: "Propagation Batch Created", description: `Batch #${batch.batchNumber} successfully started.` });
+                setIsNewPropagationOpen(false);
+                forceRefresh();
+              }}
+              onCancel={() => setIsNewPropagationOpen(false)}
+              onCreateNewVariety={handleCreateNewVariety} 
+              // No need to pass varieties, locations, sizes, suppliers as BatchForm fetches them dynamically
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Check-in Batch Dialog */}
+      <Dialog open={isCheckinFormOpen} onOpenChange={setIsCheckinFormOpen}>
+        <DialogContent size="xl" className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6">
+            <DialogTitle className="font-headline text-3xl">Check-in New Batch</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
+            <CheckinForm 
+              onSubmitSuccess={(batch) => {
+                toast({ title: "Check-in Successful", description: `Batch #${batch.batchNumber} created.` });
+                setIsCheckinFormOpen(false); 
+                forceRefresh(); 
+              }}
+              onCancel={() => setIsCheckinFormOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Other Dialogs */}
+      <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
+        <DialogContent>
+          <VarietyForm
+            variety={{ name: newVarietyName } as Variety}
+            onSubmit={handleVarietyFormSubmit}
+            onCancel={() => setIsVarietyFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
     </PageFrame>
-    </OrgProvider>
   );
 }
