@@ -47,6 +47,7 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
+import dynamic from 'next/dynamic'; // Import dynamic
 import { ActionDialog } from '../components/actions/ActionDialog';
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
@@ -64,7 +65,10 @@ import { useCollection } from '@/hooks/useCollection';
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { useActiveOrg } from '@/server/org/context'; 
-import { supabaseClient } from '@/lib/supabase/client'; // CORRECT import for browser client
+import { supabaseClient } from '@/lib/supabase/client'; 
+
+const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
+const VarietyForm = dynamic(() => import('@/components/catalog/VarietyForm'), { ssr: false });
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -278,7 +282,6 @@ export default function HomePageView({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onSelect={() => {
-                                setSelectedBatch(null);
                                 setIsNewPropagationOpen(true);
                             }}>
                                 Propagation
@@ -469,7 +472,16 @@ export default function HomePageView({
       />}
 
       {/* New Propagation Dialog */}
-      {/* ... similar dialog for propagation if needed */}
+      <Dialog open={isNewPropagationOpen} onOpenChange={setIsNewPropagationOpen}>
+        <DialogContent size="xl" className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6">
+            <DialogTitle className="font-headline text-3xl">Create New Propagation Batch</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
+            <PropagationForm orgId={activeOrgId ?? undefined} />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Check-in Batch Dialog */}
       <Dialog open={isCheckinFormOpen} onOpenChange={setIsCheckinFormOpen}>
@@ -487,6 +499,28 @@ export default function HomePageView({
               onCancel={() => setIsCheckinFormOpen(false)}
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Other Dialogs */}
+      <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
+        <DialogContent>
+          <VarietyForm
+            variety={{ name: newVarietyName }}
+            onSubmit={async (data) => {
+              const supabase = supabaseClient();
+              const { error } = await supabase.from('plant_varieties').insert({
+                name: data.name, genus: data.genus, species: data.species, family: data.family, notes: data.notes
+              });
+              if (error) {
+                toast({ variant: 'destructive', title: 'Failed to create variety', description: error.message });
+                throw error;
+              };
+              setIsVarietyFormOpen(false);
+              setNewVarietyName('');
+            }}
+            onCancel={() => setIsVarietyFormOpen(false)}
+          />
         </DialogContent>
       </Dialog>
     </PageFrame>
