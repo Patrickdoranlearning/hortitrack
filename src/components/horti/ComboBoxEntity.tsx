@@ -1,3 +1,4 @@
+
 "use client";
 import * as React from "react";
 import {
@@ -16,44 +17,51 @@ import {
 import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabaseClient } from "@/lib/supabase/client"; // Use the browser-safe client
-import { useActiveOrg } from "@/server/org/context";
+import { supabaseClient } from "@/lib/supabase/client";
+import { useActiveOrg } from "@/lib/org/context";
 import { Label } from "@/components/ui/label";
 
-type Entity = "varieties" | "sizes" | "locations" | "suppliers";
+type FilterOp = "eq" | "ilike" | "in" | "neq" | "gte" | "lte";
+type ColumnFilter = { column: string; op?: FilterOp; value: string | number | boolean };
 
 export type ComboItem = { id: string; name: string; meta?: Record<string, any> };
 
 type Props = {
-  entity: Entity;
+  entity: "varieties" | "sizes" | "locations" | "suppliers";
+  table: string;
+  select: string;
+  labelKey?: string;
+  valueKey?: string;
+  searchKey?: string;
+  orderBy?: string;
   orgScoped?: boolean;
-  trayOnly?: boolean;
-  value: ComboItem | null;
-  onChange: (item: ComboItem | null) => void;
+  label?: React.ReactNode;
+  filters?: ColumnFilter[];
   placeholder?: string;
   quickAdd?: React.ReactNode;
   loadOnOpen?: boolean;
-  label?: React.ReactNode;
+} & Omit<React.ComponentProps<typeof Button>, "onSelect"> & {
+  value?: string | null;
+  onSelect?: (id: string | null, row?: any) => void;
 };
 
-const SEARCH_META_MAP: Record<Entity, { table: string; select: string; }> = {
-    varieties: { table: 'plant_varieties', select: 'id, name, family, genus, species, category' },
-    sizes: { table: 'plant_sizes', select: 'id,name,container_type,cell_multiple:multiple' },
-    locations: { table: 'nursery_locations', select: 'id, name' },
-    suppliers: { table: 'suppliers', select: 'id, name, country_code' },
-}
 
-export function ComboBoxEntity({
-  entity,
-  orgScoped = true,
-  trayOnly,
-  value,
-  onChange,
-  placeholder = "Search…",
-  quickAdd,
-  loadOnOpen = true,
-  label,
-}: Props) {
+export function ComboBoxEntity(props: Props) {
+  const {
+    table,
+    select,
+    labelKey = "name",
+    valueKey = "id",
+    searchKey,
+    orderBy,
+    orgScoped = true,
+    label,
+    filters = [],
+    placeholder = "Search…",
+    quickAdd,
+    loadOnOpen = true,
+    ...buttonProps
+  } = props;
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
   const [items, setItems] = React.useState<ComboItem[]>([]);
@@ -61,7 +69,7 @@ export function ComboBoxEntity({
   const [error, setError] = React.useState<string | null>(null);
   const ctrlRef = React.useRef<AbortController | null>(null);
   const mounted = React.useRef(true);
-  const orgId = useActiveOrg();
+  const { orgId } = useActiveOrg();
 
   React.useEffect(
     () => () => {
@@ -71,10 +79,9 @@ export function ComboBoxEntity({
     []
   );
 
-  const fetchItems = React.useCallback(async () => {
+  const fetchItems = React.useCallback(async (term?: string) => {
     setError(null);
-    const scoped = orgScoped ?? true;
-    if (scoped && !orgId) {
+    if (orgScoped && !orgId) {
       setItems([]);
       setError("NO_ORG");
       return;
@@ -85,110 +92,110 @@ export function ComboBoxEntity({
     ctrlRef.current = controller;
 
     try {
-        const supabase = supabaseClient();
-        const meta = SEARCH_META_MAP[entity];
-        let query = supabase.from(meta.table).select(meta.select);
-        
-        if (scoped && orgId) {
-            query = query.eq('org_id', orgId);
-        }
+      const supabase = supabaseClient();
+      let query = supabase.from(table).select(select);
 
-        if (q) {
-            query = query.ilike('name', `%${q}%`);
-        }
+      if (orgScoped && orgId) {
+        query = query.eq("org_id", orgId);
+      }
+      
+      for (const f of filters) {
+        const op = f.op ?? "eq";
+        // @ts-expect-error op is a keyof the query builder
+        query = query[op](f.column as any, op === "ilike" ? `%${String(f.value)}%` : f.value);
+      }
 
-        if (trayOnly) {
-            query = query.ilike('container_type', 'Tray');
-        }
+      if (term) {
+        const key = searchKey ?? labelKey;
+        query = query.ilike(key, `%${term}%`);
+      }
 
-        query = query.order('name').limit(25);
+      if (orderBy) {
+        query = query.order(orderBy, { ascending: true });
+      }
 
-        const { data, error } = await query;
-        if (error) throw error;
+      query = query.limit(25);
 
-        if (!controller.signal.aborted) {
-            setItems((data || []).map(r => ({id: r.id, name: r.name, meta: r})));
-        }
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      if (!controller.signal.aborted) {
+        const rows = (data ?? []).map((r: any) =>
+          r.multiple === undefined && r.cell_multiple !== undefined
+            ? { ...r, multiple: r.cell_multiple }
+            : r
+        );
+        setItems(rows.map(r => ({id: r[valueKey], name: r[labelKey], meta: r})));
+      }
     } catch (e: any) {
-        if (e?.name !== "AbortError") {
-            console.warn(`[ComboBoxEntity] ${entity} error`, e);
-            setError(e.message || "Network error");
-            setItems([]);
-        }
+      if (e?.name !== "AbortError") {
+        console.error(`[ComboBoxEntity] ${table} fetch failed`, {
+          code: e?.code, message: e?.message, details: e?.details, hint: e?.hint
+        });
+        setError(e.message || "Network error");
+        setItems([]);
+      }
     } finally {
-        if (mounted.current && !controller.signal.aborted) setLoading(false);
+      if (mounted.current && !controller.signal.aborted) setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, entity, orgId, orgScoped, trayOnly]);
+  }, [q, table, select, labelKey, valueKey, searchKey, orderBy, orgId, orgScoped, filters]);
 
   React.useEffect(() => {
     if (!open) return;
-    const t = setTimeout(() => fetchItems(), 250);
+    const t = setTimeout(() => fetchItems(q), q ? 250 : 0); // fetch immediately if no search term
     return () => clearTimeout(t);
   }, [q, open, fetchItems]);
 
-  React.useEffect(() => {
-    if (open && loadOnOpen && items.length === 0) {
-      fetchItems();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, loadOnOpen]);
-
-  const requiresOrg = (orgScoped ?? true) && !orgId;
+  const selectedItem = items.find(it => it.id === props.value);
 
   return (
     <div className="space-y-1">
-    {label && <Label>{label}</Label>}
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={loading || requiresOrg}>
-          {value ? value.name : placeholder}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={placeholder}
-            value={q}
-            onValueChange={setQ}
-          />
-          <CommandList>
-            <CommandEmpty>
-              {requiresOrg
-                ? "Select an organization first"
-                : loading
-                ? "Searching…"
-                : q
-                ? error
-                  ? `Error: ${error}`
-                  : "No results."
-                : error
-                ? `Error: ${error}`
-                : "Type to search"}
-              {!loading && !requiresOrg && quickAdd ? (
-                <div className="ml-2 inline-block">{quickAdd}</div>
-              ) : null}
-            </CommandEmpty>
-            <CommandGroup>
-              {items.map((it) => (
-                <CommandItem
-                  key={it.id}
-                  value={it.name}
-                  onSelect={() => {
-                    onChange(it);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={cn("mr-2 h-4 w-4", value?.id === it.id ? "opacity-100" : "opacity-0")} />
-                  {it.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+      {label && <Label>{label}</Label>}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={loading || (orgScoped && !orgId)} {...buttonProps}>
+            {selectedItem ? selectedItem.name : placeholder}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder={placeholder}
+              value={q}
+              onValueChange={setQ}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {loading
+                  ? "Searching…"
+                  : error === "NO_ORG"
+                  ? "Select an organization first."
+                  : error ? `Error: ${error}` : "No results."
+                }
+                {!loading && quickAdd ? (
+                  <div className="ml-2 inline-block">{quickAdd}</div>
+                ) : null}
+              </CommandEmpty>
+              <CommandGroup>
+                {items.map((it) => (
+                  <CommandItem
+                    key={it.id}
+                    value={it.name}
+                    onSelect={() => {
+                      props.onSelect?.(it.id, it.meta);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", props.value === it.id ? "opacity-100" : "opacity-0")} />
+                    {it.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

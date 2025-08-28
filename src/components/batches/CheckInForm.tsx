@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -10,18 +11,10 @@ import { Input } from "@/components/ui/input";
 import {
   Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Star, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import type {
-  NurseryLocation, PlantSize, Supplier, Variety,
-} from "@/lib/types";
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useActiveOrg } from "@/server/org/context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -93,6 +86,7 @@ function StarRating({
   );
 }
 
+
 // ---------- Helper: upload up to 3 photos, try Firebase first then Supabase Storage
 async function uploadPhotos(files: File[]): Promise<string[]> {
     const toUpload = files.slice(0, 3);
@@ -138,13 +132,18 @@ async function uploadPhotos(files: File[]): Promise<string[]> {
       throw new Error("Photo upload failed. Configure Firebase or Supabase Storage.");
     }
 }
+
+const VARIETY_SELECT = "id,name,family,genus,species";
+const SIZE_SELECT = "id,name,container_type,multiple:cell_multiple";
+const LOCATION_SELECT = "id,name";
+const SUPPLIER_SELECT = "id,name";
   
 export function CheckinForm({
   onSubmitSuccess,
   onCancel,
 }: CheckinFormProps) {
   const { toast } = useToast();
-  const activeOrgId = useActiveOrg();
+  const { orgId } = useActiveOrg();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
@@ -194,7 +193,7 @@ export function CheckinForm({
   };
 
   const onSubmit = async (values: CheckinFormInput) => {
-    if (!activeOrgId) {
+    if (!orgId) {
       toast({ variant: "destructive", title: "Organization Missing", description: "Please ensure you are associated with an organization." });
       return;
     }
@@ -203,7 +202,7 @@ export function CheckinForm({
       const uploadedUrls = await uploadPhotos(photoFiles);
 
       const payload = {
-        orgId: activeOrgId,
+        orgId: orgId,
         varietyId: values.varietyId,
         sizeId: values.sizeId,
         locationId: values.locationId,
@@ -248,322 +247,47 @@ export function CheckinForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="varietyId"
-            render={({ field }) => (
-              <FormItem>
-                <ComboBoxEntity
-                    entity="varieties"
-                    label="Variety"
-                    orgScoped={false}
-                    placeholder="Select variety"
-                    value={null}
-                    onChange={(item) => field.onChange(item?.id)}
-                />
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="sizeId"
-            render={({ field }) => (
-                <FormItem>
-                  <ComboBoxEntity
-                    entity="sizes"
-                    label="Size"
-                    orgScoped={false}
-                    placeholder="Select size"
-                    value={selectedSize}
-                    onChange={(item) => {
-                        field.onChange(item?.id);
-                        setSelectedSize(item);
-                    }}
-                   />
-                  <FormMessage />
-                </FormItem>
-              )
-            }
-          />
-
-          <FormField
-            control={form.control}
-            name="locationId"
-            render={({ field }) => (
-                <FormItem>
-                  <ComboBoxEntity
-                    entity="locations"
-                    label="Location"
-                    orgScoped={true}
-                    placeholder="Select location"
-                    value={null}
-                    onChange={(item) => field.onChange(item?.id)}
-                   />
-                  <FormMessage />
-                </FormItem>
-              )
-            }
-          />
-
-          <FormField
-            control={form.control}
-            name="phase"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phase</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={formLoading}>
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Select phase" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="propagation">Propagation</SelectItem>
-                    <SelectItem value="plug_linear">Plug / Liner</SelectItem>
-                    <SelectItem value="potted">Potted</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="containers"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Containers</FormLabel>
-                <FormControl>
-                  <Input type="number" min={1} {...field} disabled={formLoading} onChange={(e) => {
-                    const n = e.target.value === "" ? 0 : Number(e.target.value);
-                    field.onChange(Number.isFinite(n) ? n : 0);
-                  }} value={Number.isFinite(field.value) ? field.value : 0} />
-                </FormControl>
-                <FormDescription>Number of trays or pots.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="totalUnits"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Total Units</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} disabled={!overrideTotal || formLoading} onChange={(e) => {
-                    const n = e.target.value === "" ? 0 : Number(e.target.value);
-                    field.onChange(Number.isFinite(n) ? n : 0);
-                  }} value={Number.isFinite(field.value) ? field.value : 0} />
-                </FormControl>
-                <FormDescription>
-                  {overrideTotal
-                    ? "Manually override total units."
-                    : `Calculated: ${calculatedTotalUnits}`}
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="overrideTotal"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm md:col-span-2">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={formLoading} />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Override Calculated Total</FormLabel>
-                  <FormDescription>
-                    Check this to manually enter the total number of plants.
-                  </FormDescription>
-                </div>
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="incomingDate"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Incoming Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn("justify-between", !field.value && "text-muted-foreground")}
-                        disabled={formLoading}
-                      >
-                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                        <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={(d) => field.onChange(d!)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="supplierId"
-            render={({ field }) => (
-                <FormItem>
-                  <ComboBoxEntity
-                    entity="suppliers"
-                    label="Supplier"
-                    orgScoped={true}
-                    placeholder="Select supplier"
-                    value={null}
-                    onChange={(item) => field.onChange(item?.id)}
-                   />
-                  <FormMessage />
-                </FormItem>
-              )
-            }
-          />
-
-          <FormField
-            control={form.control}
-            name="supplierBatchNumber"
-            render={({ field }) => (
-              <FormItem className="md:col-span-2">
-                <FormLabel>Supplier Batch Number</FormLabel>
-                <FormControl>
-                  <Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="space-y-2 pt-4 border-t">
-          <h3 className="font-medium text-lg">Photos ({photoFiles.length}/3)</h3>
-          <Input type="file" multiple accept="image/*" onChange={handlePhotoChange} disabled={photoFiles.length >= 3 || formLoading} />
-          <div className="flex flex-wrap gap-2">
-            {photoFiles.map((file, index) => (
-              <div key={index} className="relative w-24 h-24 rounded-md overflow-hidden group">
-                <img src={URL.createObjectURL(file)} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
-                <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemovePhoto(index)} disabled={formLoading}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <FormDescription>Upload up to 3 photos for quality control.</FormDescription>
-        </div>
-
-        <div className="space-y-2 pt-4 border-t">
-          <h3 className="font-medium text-lg">Quality Check</h3>
-           <FormField
-            control={form.control}
-            name="quality.stars"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Quality Rating</FormLabel>
-                <FormControl>
-                    <StarRating value={field.value ?? 0} onChange={field.onChange} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-           <FormField
-            control={form.control}
-            name="quality.pests"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={formLoading} />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Pests Present</FormLabel>
-                </div>
-              </FormItem>
-            )}
-          />
-           <FormField
-            control={form.control}
-            name="quality.disease"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={formLoading} />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Disease Present</FormLabel>
-                </div>
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="quality.notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Quality Notes</FormLabel>
-                <FormControl>
-                  <Textarea {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")}/>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="space-y-2 pt-4 border-t">
-          <h3 className="font-medium text-lg">Passport Overrides (Optional)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="passportOverrides.family"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Family Override</FormLabel>
-                  <FormControl><Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+            <ComboBoxEntity
+                table="plant_varieties"
+                select={VARIETY_SELECT}
+                label="Variety"
+                orgScoped={false}
+                placeholder="Select variety"
+                value={form.watch("varietyId")}
+                onSelect={(id) => form.setValue("varietyId", id)}
             />
-            <FormField
-              control={form.control}
-              name="passportOverrides.producer_code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Producer Code Override</FormLabel>
-                  <FormControl><Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+            <ComboBoxEntity
+                table="plant_sizes"
+                select={SIZE_SELECT}
+                label="Size"
+                orgScoped={false}
+                placeholder="Select size"
+                value={form.watch("sizeId")}
+                onSelect={(id, row) => {
+                    form.setValue("sizeId", id);
+                    setSelectedSize(row);
+                }}
             />
-            <FormField
-              control={form.control}
-              name="passportOverrides.country_code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Country Code Override</FormLabel>
-                  <FormControl><Input {...field} disabled={formLoading} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ?? "")}/></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ComboBoxEntity
+                table="nursery_locations"
+                select={LOCATION_SELECT}
+                label="Location"
+                orgScoped={true}
+                placeholder="Select location"
+                value={form.watch("locationId")}
+                onSelect={(id) => form.setValue("locationId", id)}
             />
-          </div>
+            <ComboBoxEntity
+                table="suppliers"
+                select={SUPPLIER_SELECT}
+                label="Supplier"
+                orgScoped={true}
+                placeholder="Select supplier"
+                value={form.watch("supplierId")}
+                onSelect={(id) => form.setValue("supplierId", id)}
+            />
         </div>
 
         <DialogFooter className="sticky bottom-0 z-10 -mx-6 px-6 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t -mb-6 pt-4 pb-4">
@@ -577,3 +301,4 @@ export function CheckinForm({
     </Form>
   );
 }
+

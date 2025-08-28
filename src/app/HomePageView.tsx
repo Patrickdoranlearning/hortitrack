@@ -64,7 +64,7 @@ import { CheckinForm } from '@/components/batches/CheckInForm';
 import { useCollection } from '@/hooks/useCollection'; 
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import { useActiveOrg } from '@/server/org/context'; 
+import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
 
 const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
@@ -74,6 +74,14 @@ interface HomePageViewProps {
   initialBatches: Batch[];
   plantFamilies: string[];
   categories: string[];
+  actions: {
+    addBatch: (data: Omit<Batch, 'id' | 'batchNumber' | 'createdAt' | 'updatedAt' | 'logHistory'>) => Promise<any>;
+    updateBatch: (data: Batch) => Promise<any>;
+    archiveBatch: (batchId: string, loss: number) => Promise<any>;
+    transplantBatch: (sourceBatchId: string, newBatchData: Omit<Batch, 'id' | 'batchNumber' | 'logHistory' | 'transplantedFrom' | 'createdAt' | 'updatedAt'>, transplantQuantity: number, logRemainingAsLoss: boolean) => Promise<any>;
+    logAction: (batchId: string, logData: Partial<ActionLogFormValues>) => Promise<any>;
+    addVariety: (data: Omit<Variety, 'id'>) => Promise<any>;
+  };
 }
 
 const TABS = [
@@ -92,14 +100,22 @@ export default function HomePageView({
   const { user, loading: authLoading } = useAuth(); 
   const searchParams = useSearchParams();
   const urlBatchId = searchParams.get("batch");
-  const activeOrgId = useActiveOrg();
+  const { orgId, setOrgId } = useActiveOrg();
 
   const isReadonly = !user;
 
-  const { data: batches, forceRefresh } = useCollection<Batch>("batches", initialBatches, {
+  const { data: batchesData, forceRefresh } = useCollection<Batch>("batches", initialBatches, {
     orderBy: { column: "created_at", ascending: false },
-    filters: activeOrgId ? [{ column: "org_id", value: activeOrgId }] : [],
+    filters: orgId ? [{ column: "org_id", value: orgId }] : [],
   });
+  const batches = batchesData ?? [];
+
+  React.useEffect(() => {
+    // If no active org yet, but we loaded batches, pick their org
+    if (!orgId && batches?.length && (batches[0] as any).orgId) {
+        setOrgId((batches[0] as any).orgId);
+    }
+  }, [orgId, batches, setOrgId]);
 
   const { data: nurseryLocations } = useCollection<NurseryLocation>("locations");
 
@@ -478,7 +494,7 @@ export default function HomePageView({
             <DialogTitle className="font-headline text-3xl">Create New Propagation Batch</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <PropagationForm orgId={activeOrgId ?? undefined} />
+            <PropagationForm orgId={orgId ?? undefined} />
           </div>
         </DialogContent>
       </Dialog>

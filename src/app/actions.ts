@@ -11,8 +11,8 @@ import { z } from 'zod';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
 
-function getSupabaseForApp() {
-  const store = cookies();
+async function getSupabaseForApp() {
+  const store = await cookies();
   const cookieBridge: CookieBridge = {
     get: (n) => store.get(n)?.value,
     set: (n, v, o) => store.set(n, v, o),
@@ -42,7 +42,7 @@ function transformVBatchSearchData(data: any): Batch {
 }
 
 async function getBatchById(batchId: string): Promise<Batch | null> {
-    const supabase = getSupabaseForApp();
+    const supabase = await getSupabaseForApp();
     const { data, error } = await supabase
         .from("v_batch_search") 
         .select("*") 
@@ -58,7 +58,7 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
 
 export async function getBatchesAction() {
     try {
-        const supabase = getSupabaseForApp();
+        const supabase = await getSupabaseForApp();
         const { data: batches, error } = await supabase
             .from("v_batch_search") 
             .select("*") 

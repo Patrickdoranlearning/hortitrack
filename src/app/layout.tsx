@@ -1,9 +1,10 @@
+
 import type { Metadata, Viewport } from "next";
 import {PT_Sans, Playfair_Display} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from '@/lib/utils';
-import { OrgProvider } from "@/lib/org/context"; // Import OrgProvider
+import { OrgProvider } from "@/lib/org/context";
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -43,7 +44,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const activeOrgId = null; // TODO: wire to profile.active_org_id (Supabase) if you have that.
+  const activeOrgId = null; 
 
   return (
     <html lang="en">

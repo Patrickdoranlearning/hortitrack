@@ -1,14 +1,13 @@
+
 'use client';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCatalog } from '@/hooks/useCatalog';
 import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { ComboBoxEntity } from '../horti/ComboBoxEntity';
-import { useActiveOrg } from '@/server/org/context';
+import { useActiveOrg } from '@/lib/org/context';
 
 const Schema = z.object({
   variety_id: z.string().min(1),
@@ -18,8 +17,12 @@ const Schema = z.object({
   planted_at: z.string().min(1),
 });
 
+const VARIETY_SELECT = "id,name,family,genus,species";
+const SIZE_SELECT = "id,name,container_type,multiple:cell_multiple";
+const LOCATION_SELECT = "id,name";
+
 export default function PropagationForm({ orgId }: { orgId?: string }) {
-  const activeOrgId = useActiveOrg();
+  const { orgId: activeOrgId } = useActiveOrg();
   const form = useForm<z.infer<typeof Schema>>({
     resolver: zodResolver(Schema),
     defaultValues: { variety_id: '', size_id: '', location_id: '', trays: 0, planted_at: new Date().toISOString().slice(0,10) },
@@ -29,29 +32,32 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
     <Form {...form}>
       <form className="space-y-4">
          <ComboBoxEntity
-            entity="varieties"
+            table="plant_varieties"
+            select={VARIETY_SELECT}
             label="Variety"
             orgScoped={false}
             placeholder="Select variety"
             value={null}
-            onChange={(item) => form.setValue("variety_id", item?.id ?? "")}
+            onSelect={(id) => form.setValue("variety_id", id ?? "")}
         />
         <ComboBoxEntity
-            entity="sizes"
+            table="plant_sizes"
+            select={SIZE_SELECT}
             label="Tray Size"
             orgScoped={false}
-            trayOnly={true}
+            filters={[{ column: "container_type", op: "eq", value: "Tray" }]}
             placeholder="Select tray size"
             value={null}
-            onChange={(item) => form.setValue("size_id", item?.id ?? "")}
+            onSelect={(id) => form.setValue("size_id", id ?? "")}
         />
         <ComboBoxEntity
-            entity="locations"
+            table="nursery_locations"
+            select={LOCATION_SELECT}
             label="Location"
             orgScoped={true}
             placeholder="Select location"
             value={null}
-            onChange={(item) => form.setValue("location_id", item?.id ?? "")}
+            onSelect={(id) => form.setValue("location_id", id ?? "")}
         />
 
         <FormField name="trays" render={({ field }) => (
