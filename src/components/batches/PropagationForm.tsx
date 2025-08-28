@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { ComboBoxEntity } from '../horti/ComboBoxEntity';
+import { useActiveOrg } from '@/server/org/context';
 
 const Schema = z.object({
   variety_id: z.string().min(1),
@@ -17,7 +19,7 @@ const Schema = z.object({
 });
 
 export default function PropagationForm({ orgId }: { orgId?: string }) {
-  const { varieties, sizes, locations } = useCatalog(orgId);
+  const activeOrgId = useActiveOrg();
   const form = useForm<z.infer<typeof Schema>>({
     resolver: zodResolver(Schema),
     defaultValues: { variety_id: '', size_id: '', location_id: '', trays: 0, planted_at: new Date().toISOString().slice(0,10) },
@@ -26,48 +28,32 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
   return (
     <Form {...form}>
       <form className="space-y-4">
-        <FormField name="variety_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Variety</FormLabel>
-            <FormControl>
-              <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={varieties.isLoading}>
-                <SelectTrigger><SelectValue placeholder="Select variety" /></SelectTrigger>
-                <SelectContent>
-                  {(varieties.data ?? []).map((v:any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-        <FormField name="size_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Tray Size</FormLabel>
-            <FormControl>
-              <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={sizes.isLoading}>
-                <SelectTrigger><SelectValue placeholder="Select tray" /></SelectTrigger>
-                <SelectContent>
-                  {(sizes.data ?? []).map((s:any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-        <FormField name="location_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Location</FormLabel>
-            <FormControl>
-              <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={locations.isLoading}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-                <SelectContent>
-                  {(locations.data ?? []).map((l:any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+         <ComboBoxEntity
+            entity="varieties"
+            label="Variety"
+            orgScoped={false}
+            placeholder="Select variety"
+            value={null}
+            onChange={(item) => form.setValue("variety_id", item?.id ?? "")}
+        />
+        <ComboBoxEntity
+            entity="sizes"
+            label="Tray Size"
+            orgScoped={false}
+            trayOnly={true}
+            placeholder="Select tray size"
+            value={null}
+            onChange={(item) => form.setValue("size_id", item?.id ?? "")}
+        />
+        <ComboBoxEntity
+            entity="locations"
+            label="Location"
+            orgScoped={true}
+            placeholder="Select location"
+            value={null}
+            onChange={(item) => form.setValue("location_id", item?.id ?? "")}
+        />
+
         <FormField name="trays" render={({ field }) => (
           <FormItem>
             <FormLabel>Trays</FormLabel>

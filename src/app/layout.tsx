@@ -3,8 +3,7 @@ import {PT_Sans, Playfair_Display} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from '@/lib/utils';
-import OrgBoundary from "@/components/providers/OrgBoundary";
-import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { OrgProvider } from "@/lib/org/context"; // Import OrgProvider
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -39,16 +38,19 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
-  const orgId = await resolveActiveOrgId();
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const activeOrgId = null; // TODO: wire to profile.active_org_id (Supabase) if you have that.
+
   return (
     <html lang="en">
        <body className={cn(ptSans.variable, playfairDisplay.variable, 'font-body', 'antialiased', 'overflow-x-hidden')}>
-        <OrgBoundary orgId={orgId}>
+        <OrgProvider initialOrgId={activeOrgId}>
           {children}
-        </OrgBoundary>
+        </OrgProvider>
         <Toaster />
       </body>
     </html>

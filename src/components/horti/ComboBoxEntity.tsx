@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabaseClient } from "@/lib/supabase/client"; // Use the browser-safe client
+import { useActiveOrg } from "@/server/org/context";
 
 type Entity = "varieties" | "sizes" | "locations" | "suppliers";
 
@@ -24,31 +25,33 @@ export type ComboItem = { id: string; name: string; meta?: Record<string, any> }
 
 type Props = {
   entity: Entity;
-  orgId?: string | null;
+  orgScoped?: boolean; // NEW: defaults true
   trayOnly?: boolean;
   value: ComboItem | null;
   onChange: (item: ComboItem | null) => void;
   placeholder?: string;
   quickAdd?: React.ReactNode;
   loadOnOpen?: boolean;
+  label?: string; // Add label for accessibility and context
 };
 
 const SEARCH_META_MAP: Record<Entity, { table: string; select: string; }> = {
-    varieties: { table: 'plant_varieties', select: 'id, name, family' },
-    sizes: { table: 'plant_sizes', select: 'id, name, container_type, multiple:cell_multiple' }, // CORRECTED ALIAS
+    varieties: { table: 'plant_varieties', select: 'id, name, family, genus, species, category' },
+    sizes: { table: 'plant_sizes', select: 'id,name,container_type,multiple:cell_multiple' },
     locations: { table: 'nursery_locations', select: 'id, name' },
     suppliers: { table: 'suppliers', select: 'id, name, country_code' },
 }
 
 export function ComboBoxEntity({
   entity,
-  orgId,
+  orgScoped = true, // Default to true for backward compatibility
   trayOnly,
   value,
   onChange,
   placeholder = "Search…",
   quickAdd,
   loadOnOpen = true,
+  label,
 }: Props) {
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
@@ -57,6 +60,8 @@ export function ComboBoxEntity({
   const [error, setError] = React.useState<string | null>(null);
   const ctrlRef = React.useRef<AbortController | null>(null);
   const mounted = React.useRef(true);
+  const orgId = useActiveOrg();
+
   React.useEffect(
     () => () => {
       mounted.current = false;
@@ -65,11 +70,9 @@ export function ComboBoxEntity({
     []
   );
 
-  const requiresOrg = entity === "locations" || entity === "suppliers";
-
   const fetchItems = React.useCallback(async () => {
     setError(null);
-    if (requiresOrg && !orgId) {
+    if (orgScoped && !orgId) {
       setItems([]);
       return;
     }
@@ -83,7 +86,7 @@ export function ComboBoxEntity({
         const meta = SEARCH_META_MAP[entity];
         let query = supabase.from(meta.table).select(meta.select);
         
-        if (requiresOrg && orgId) {
+        if (orgScoped && orgId) {
             query = query.eq('org_id', orgId);
         }
 
@@ -113,7 +116,7 @@ export function ComboBoxEntity({
         if (mounted.current && !controller.signal.aborted) setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, entity, orgId, requiresOrg, trayOnly]);
+  }, [q, entity, orgId, orgScoped, trayOnly]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -128,10 +131,14 @@ export function ComboBoxEntity({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, loadOnOpen]);
 
+  const requiresOrg = orgScoped && !orgId;
+
   return (
+    <div className="space-y-1">
+    {label && <Label>{label}</Label>}
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal" disabled={loading || requiresOrg}>
           {value ? value.name : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -145,7 +152,7 @@ export function ComboBoxEntity({
           />
           <CommandList>
             <CommandEmpty>
-              {requiresOrg && !orgId
+              {requiresOrg
                 ? "Select an organization first"
                 : loading
                 ? "Searching…"
@@ -179,5 +186,6 @@ export function ComboBoxEntity({
         </Command>
       </PopoverContent>
     </Popover>
+    </div>
   );
 }

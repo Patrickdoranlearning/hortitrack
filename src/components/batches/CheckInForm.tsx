@@ -30,7 +30,6 @@ import { Textarea } from "../ui/textarea";
 import { supabaseClient } from "@/lib/supabase/client";
 import { ComboBoxEntity } from "../horti/ComboBoxEntity";
 
-// Zod schema for CheckinForm input
 const CheckinFormSchema = z.object({
   varietyId: z.string().uuid({ message: "Variety is required." }),
   sizeId: z.string().uuid({ message: "Size is required." }),
@@ -62,6 +61,37 @@ type CheckinFormProps = {
   onSubmitSuccess?: (batch: { batchId: string; batchNumber: string }) => void;
   onCancel: () => void;
 };
+
+// 6-star rating control used by Quality field
+function StarRating({
+  value = 0,
+  onChange,
+}: {
+  value?: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5, 6].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          aria-label={`Set ${n} stars`}
+          className={cn(
+            "p-1 rounded-md",
+            value >= n ? "opacity-100" : "opacity-40 hover:opacity-70"
+          )}
+        >
+          <Star
+            className="h-5 w-5"
+            fill={value >= n ? "currentColor" : "none"}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 // ---------- Helper: upload up to 3 photos, try Firebase first then Supabase Storage
 async function uploadPhotos(files: File[]): Promise<string[]> {
@@ -107,37 +137,6 @@ async function uploadPhotos(files: File[]): Promise<string[]> {
       console.error("Photo upload failed.", e);
       throw new Error("Photo upload failed. Configure Firebase or Supabase Storage.");
     }
-}
-
-// 6-star rating control used by Quality field
-function StarRating({
-  value = 0,
-  onChange,
-}: {
-  value?: number;
-  onChange: (n: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5, 6].map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(n)}
-          aria-label={`Set ${n} stars`}
-          className={cn(
-            "p-1 rounded-md",
-            value >= n ? "opacity-100" : "opacity-40 hover:opacity-70"
-          )}
-        >
-          <Star
-            className="h-5 w-5"
-            fill={value >= n ? "currentColor" : "none"}
-          />
-        </button>
-      ))}
-    </div>
-  );
 }
   
 export function CheckinForm({
@@ -254,10 +253,10 @@ export function CheckinForm({
             name="varietyId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Variety</FormLabel>
                 <ComboBoxEntity
                     entity="varieties"
-                    orgId={activeOrgId}
+                    label="Variety"
+                    orgScoped={false}
                     placeholder="Select variety"
                     value={null}
                     onChange={(item) => field.onChange(item?.id)}
@@ -272,10 +271,10 @@ export function CheckinForm({
             name="sizeId"
             render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Size</FormLabel>
                   <ComboBoxEntity
                     entity="sizes"
-                    orgId={activeOrgId}
+                    label="Size"
+                    orgScoped={false}
                     placeholder="Select size"
                     value={selectedSize}
                     onChange={(item) => {
@@ -294,10 +293,10 @@ export function CheckinForm({
             name="locationId"
             render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Location</FormLabel>
                   <ComboBoxEntity
                     entity="locations"
-                    orgId={activeOrgId}
+                    label="Location"
+                    orgScoped={true}
                     placeholder="Select location"
                     value={null}
                     onChange={(item) => field.onChange(item?.id)}
@@ -425,10 +424,10 @@ export function CheckinForm({
             name="supplierId"
             render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Supplier</FormLabel>
-                   <ComboBoxEntity
+                  <ComboBoxEntity
                     entity="suppliers"
-                    orgId={activeOrgId}
+                    label="Supplier"
+                    orgScoped={true}
                     placeholder="Select supplier"
                     value={null}
                     onChange={(item) => field.onChange(item?.id)}
