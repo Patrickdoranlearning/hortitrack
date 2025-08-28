@@ -53,6 +53,7 @@ function StarRating({
   );
 }
 
+
 // Validation Schema
 const CheckinFormSchema = z.object({
   varietyId: z.string().uuid({ message: "Variety is required." }),
@@ -364,6 +365,45 @@ export function CheckinForm({
                     <FormItem>
                         <FormLabel>Quality Notes</FormLabel>
                         <Textarea {...field} value={field.value ?? ""} placeholder="e.g., Some leaf yellowing, but overall healthy." />
+                        <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
+        </div>
+
+        <div className="space-y-2">
+            <Label>Plant Passport Overrides (Optional)</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-md border p-4">
+               <FormField
+                  control={form.control}
+                  name="passportOverrides.family"
+                  render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Family</FormLabel>
+                        <Input {...field} value={field.value ?? ""} placeholder="Auto-filled from variety"/>
+                        <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="passportOverrides.producer_code"
+                  render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Producer Code</FormLabel>
+                        <Input {...field} value={field.value ?? ""} placeholder="Auto-filled from supplier"/>
+                        <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="passportOverrides.country_code"
+                  render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Country Code</FormLabel>
+                        <Input {...field} value={field.value ?? ""} placeholder="Auto-filled from supplier"/>
                         <FormMessage />
                     </FormItem>
                   )}
