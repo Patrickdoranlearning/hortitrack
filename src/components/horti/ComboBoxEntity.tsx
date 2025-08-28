@@ -18,6 +18,7 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabaseClient } from "@/lib/supabase/client"; // Use the browser-safe client
 import { useActiveOrg } from "@/server/org/context";
+import { Label } from "@/components/ui/label";
 
 type Entity = "varieties" | "sizes" | "locations" | "suppliers";
 
@@ -25,26 +26,26 @@ export type ComboItem = { id: string; name: string; meta?: Record<string, any> }
 
 type Props = {
   entity: Entity;
-  orgScoped?: boolean; // NEW: defaults true
+  orgScoped?: boolean;
   trayOnly?: boolean;
   value: ComboItem | null;
   onChange: (item: ComboItem | null) => void;
   placeholder?: string;
   quickAdd?: React.ReactNode;
   loadOnOpen?: boolean;
-  label?: string; // Add label for accessibility and context
+  label?: React.ReactNode;
 };
 
 const SEARCH_META_MAP: Record<Entity, { table: string; select: string; }> = {
     varieties: { table: 'plant_varieties', select: 'id, name, family, genus, species, category' },
-    sizes: { table: 'plant_sizes', select: 'id,name,container_type,multiple:cell_multiple' },
+    sizes: { table: 'plant_sizes', select: 'id,name,container_type,cell_multiple:multiple' },
     locations: { table: 'nursery_locations', select: 'id, name' },
     suppliers: { table: 'suppliers', select: 'id, name, country_code' },
 }
 
 export function ComboBoxEntity({
   entity,
-  orgScoped = true, // Default to true for backward compatibility
+  orgScoped = true,
   trayOnly,
   value,
   onChange,
@@ -72,8 +73,10 @@ export function ComboBoxEntity({
 
   const fetchItems = React.useCallback(async () => {
     setError(null);
-    if (orgScoped && !orgId) {
+    const scoped = orgScoped ?? true;
+    if (scoped && !orgId) {
       setItems([]);
+      setError("NO_ORG");
       return;
     }
     setLoading(true);
@@ -86,7 +89,7 @@ export function ComboBoxEntity({
         const meta = SEARCH_META_MAP[entity];
         let query = supabase.from(meta.table).select(meta.select);
         
-        if (orgScoped && orgId) {
+        if (scoped && orgId) {
             query = query.eq('org_id', orgId);
         }
 
@@ -104,7 +107,7 @@ export function ComboBoxEntity({
         if (error) throw error;
 
         if (!controller.signal.aborted) {
-            setItems(data.map(r => ({id: r.id, name: r.name, meta: r})));
+            setItems((data || []).map(r => ({id: r.id, name: r.name, meta: r})));
         }
     } catch (e: any) {
         if (e?.name !== "AbortError") {
@@ -131,7 +134,7 @@ export function ComboBoxEntity({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, loadOnOpen]);
 
-  const requiresOrg = orgScoped && !orgId;
+  const requiresOrg = (orgScoped ?? true) && !orgId;
 
   return (
     <div className="space-y-1">
