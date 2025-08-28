@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Star, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { useActiveOrg } from "@/server/org/context";
+import { useActiveOrg } from "@/lib/org/context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "../ui/checkbox";
@@ -30,7 +30,7 @@ const CheckinFormSchema = z.object({
   locationId: z.string().uuid({ message: "Location is required." }),
   phase: z.enum(["propagation", "plug_linear", "potted"], { required_error: "Phase is required." }),
   containers: z.coerce.number().int().positive({ message: "Number of containers must be positive." }),
-  totalUnits: z.coerce.number().int().positive().optional(),
+  totalQuantity: z.coerce.number().int().positive().optional(),
   overrideTotal: z.boolean().default(false),
   incomingDate: z.date({ required_error: "Incoming date is required." }),
   supplierId: z.string().uuid().nullable().optional(),
@@ -175,7 +175,7 @@ export function CheckinForm({
 
   useEffect(() => {
     if (!overrideTotal) {
-      form.setValue("totalUnits", calculatedTotalUnits, { shouldValidate: true });
+      form.setValue("totalQuantity", calculatedTotalUnits, { shouldValidate: true });
     }
   }, [calculatedTotalUnits, overrideTotal, form]);
 
@@ -209,7 +209,7 @@ export function CheckinForm({
         locationId: values.locationId,
         phase: values.phase,
         containers: values.containers,
-        totalUnits: values.totalUnits,
+        totalUnits: values.totalQuantity,
         supplierId: values.supplierId || null,
         supplierBatchNumber: values.supplierBatchNumber,
         incomingDate: format(values.incomingDate, 'yyyy-MM-dd'),
@@ -302,3 +302,4 @@ export function CheckinForm({
     </Form>
   );
 }
+
