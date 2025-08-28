@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { CalendarDays, Loader2, Star, Trash2 } from "lucide-react";
 import { ComboBoxEntity } from "../horti/ComboBoxEntity";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 
 // 6-star rating control used by Quality field
 function StarRating({
