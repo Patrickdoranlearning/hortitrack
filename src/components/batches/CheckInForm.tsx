@@ -16,27 +16,19 @@ import {
 import { DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Star, Trash2, Check, ChevronsUpDown, Loader2 } from "lucide-react";
-import { VarietyCombobox, type VarietyOption } from "@/components/ui/variety-combobox";
+import { CalendarIcon, Star, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import type {
   NurseryLocation, PlantSize, Supplier, Variety,
 } from "@/lib/types";
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { SafeSelect } from '@/components/ui/SafeSelect';
-import { normalizeOptions, type Option } from '@/lib/options';
 import { useActiveOrg } from "@/server/org/context";
 import { useToast } from "@/hooks/use-toast";
-import {
-  searchVarieties,
-  searchSizes,
-  searchLocations,
-  searchSuppliers,
-} from '@/server/refdata/queries';
 import { cn } from "@/lib/utils";
 import { Checkbox } from "../ui/checkbox";
 import { Textarea } from "../ui/textarea";
 import { supabaseClient } from "@/lib/supabase/client";
+import { ComboBoxEntity } from "../horti/ComboBoxEntity";
 
 // Zod schema for CheckinForm input
 const CheckinFormSchema = z.object({
@@ -69,8 +61,6 @@ type CheckinFormInput = z.infer<typeof CheckinFormSchema>;
 type CheckinFormProps = {
   onSubmitSuccess?: (batch: { batchId: string; batchNumber: string }) => void;
   onCancel: () => void;
-  isLoading?: boolean;
-  error?: string | null;
 };
 
 // ---------- Helper: upload up to 3 photos, try Firebase first then Supabase Storage
@@ -153,14 +143,13 @@ function StarRating({
 export function CheckinForm({
   onSubmitSuccess,
   onCancel,
-  isLoading: formIsLoadingProp,
-  error: formErrorProp,
 }: CheckinFormProps) {
   const { toast } = useToast();
   const activeOrgId = useActiveOrg();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [selectedSize, setSelectedSize] = useState<{id:string; name:string; meta?:any}|null>(null);
 
   const form = useForm<CheckinFormInput>({
     resolver: zodResolver(CheckinFormSchema),
@@ -177,75 +166,13 @@ export function CheckinForm({
     mode: "onChange",
   });
 
-  const selectedPhase = form.watch("phase");
-  const selectedSizeId = form.watch("sizeId");
   const containers = form.watch("containers");
   const overrideTotal = form.watch("overrideTotal");
 
-  // --- Dynamic Data Fetching ---
-  const [varieties, setVarieties] = useState<VarietyOption[]>([]);
-  const [sizes, setSizes] = useState<PlantSize[]>([]);
-  const [locations, setLocations] = useState<NurseryLocation[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-
-  const [varietySearchQuery, setVarietySearchQuery] = useState('');
-  const [sizeSearchQuery, setSizeSearchQuery] = useState('');
-  const [locationSearchQuery, setLocationSearchQuery] = useState('');
-  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
-
-  const deferredVarietyQuery = React.useDeferredValue(varietySearchQuery);
-  const deferredSizeQuery = React.useDeferredValue(sizeSearchQuery);
-  const deferredLocationQuery = React.useDeferredValue(locationSearchQuery);
-  const deferredSupplierQuery = React.useDeferredValue(supplierSearchQuery);
-
-  useEffect(() => { // Fetch Varieties
-    if (!activeOrgId) return;
-    let active = true;
-    searchVarieties(deferredVarietyQuery, activeOrgId).then(data => {
-      if (active) setVarieties(data as VarietyOption[]);
-    }).catch(e => console.error("Failed to fetch varieties:", e?.message ?? e));
-    return () => { active = false; };
-  }, [deferredVarietyQuery, activeOrgId]);
-
-  useEffect(() => { // Fetch Sizes
-    if (!activeOrgId) return;
-    let active = true;
-    searchSizes(deferredSizeQuery, activeOrgId).then(data => {
-      if (active) setSizes(data as PlantSize[]);
-    }).catch(e => console.error("Failed to fetch sizes:", e?.message ?? e));
-    return () => { active = false; };
-  }, [deferredSizeQuery, activeOrgId]);
-
-  useEffect(() => { // Fetch Locations
-    if (!activeOrgId) return;
-    let active = true;
-    searchLocations(deferredLocationQuery, activeOrgId).then(data => {
-      if (active) setLocations(data as NurseryLocation[]);
-    }).catch(e => console.error("Failed to fetch locations:", e?.message ?? e));
-    return () => { active = false; };
-  }, [deferredLocationQuery, activeOrgId]);
-
-  useEffect(() => { // Fetch Suppliers
-    if (!activeOrgId) return;
-    let active = true;
-    searchSuppliers(deferredSupplierQuery, activeOrgId).then(data => {
-      if (active) setSuppliers(data as Supplier[]);
-    }).catch(e => console.error("Failed to fetch suppliers:", e?.message ?? e));
-    return () => { active = false; };
-  }, [deferredSupplierQuery, activeOrgId]);
-
-  // --- Calculated Values ---
-  const selectedSizeInfo = useMemo(
-    () => sizes.find((s) => s.id === selectedSizeId) || null,
-    [sizes, selectedSizeId]
-  );
-
   const calculatedTotalUnits = useMemo(() => {
-    if (selectedSizeInfo?.multiple) {
-      return (Number.isFinite(containers) ? containers : 0) * selectedSizeInfo.multiple;
-    }
-    return Number.isFinite(containers) ? containers : 0;
-  }, [containers, selectedSizeInfo]);
+    const multiple = selectedSize?.meta?.multiple ?? 1;
+    return (Number.isFinite(containers) ? containers : 0) * multiple;
+  }, [containers, selectedSize]);
 
   useEffect(() => {
     if (!overrideTotal) {
@@ -253,7 +180,6 @@ export function CheckinForm({
     }
   }, [calculatedTotalUnits, overrideTotal, form]);
 
-  // --- Photo Handling ---
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 3) {
@@ -268,7 +194,6 @@ export function CheckinForm({
     setPhotoFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // --- Form Submission ---
   const onSubmit = async (values: CheckinFormInput) => {
     if (!activeOrgId) {
       toast({ variant: "destructive", title: "Organization Missing", description: "Please ensure you are associated with an organization." });
@@ -285,6 +210,7 @@ export function CheckinForm({
         locationId: values.locationId,
         phase: values.phase,
         containers: values.containers,
+        totalUnits: values.totalUnits,
         supplierId: values.supplierId || null,
         supplierBatchNumber: values.supplierBatchNumber,
         incomingDate: format(values.incomingDate, 'yyyy-MM-dd'),
@@ -317,15 +243,11 @@ export function CheckinForm({
     }
   };
 
-  const formLoading = formIsLoadingProp || isSubmitting;
+  const formLoading = isSubmitting;
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {formErrorProp && (
-          <p className="text-sm font-medium text-destructive">{formErrorProp}</p>
-        )}
-        {/* Basic Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -333,15 +255,12 @@ export function CheckinForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Variety</FormLabel>
-                <VarietyCombobox
-                  value={varieties.find(v => v.id === field.value)?.name || ""}
-                  disabled={formLoading}
-                  varieties={varieties}
-                  onSelect={(v) => {
-                    field.onChange(v.id);
-                  }}
-                  placeholder="Select a variety"
-                  emptyMessage="No varieties found."
+                <ComboBoxEntity
+                    entity="varieties"
+                    orgId={activeOrgId}
+                    placeholder="Select variety"
+                    value={null}
+                    onChange={(item) => field.onChange(item?.id)}
                 />
                 <FormMessage />
               </FormItem>
@@ -351,43 +270,42 @@ export function CheckinForm({
           <FormField
             control={form.control}
             name="sizeId"
-            render={({ field }) => {
-              const sizeOptions = useMemo(() => normalizeOptions(sizes.map(s => ({ value: s.id!, label: `${s.name} ${s.containerType ? ` • ${s.containerType}` : ''}` }))), [sizes]);
-              return (
+            render={({ field }) => (
                 <FormItem>
                   <FormLabel>Size</FormLabel>
-                  <SafeSelect
-                    value={field.value}
-                    onChange={field.onChange}
-                    options={sizeOptions}
-                    placeholder="Select a size"
-                    disabled={formLoading}
-                  />
+                  <ComboBoxEntity
+                    entity="sizes"
+                    orgId={activeOrgId}
+                    placeholder="Select size"
+                    value={selectedSize}
+                    onChange={(item) => {
+                        field.onChange(item?.id);
+                        setSelectedSize(item);
+                    }}
+                   />
                   <FormMessage />
                 </FormItem>
-              );
-            }}
+              )
+            }
           />
 
           <FormField
             control={form.control}
             name="locationId"
-            render={({ field }) => {
-              const locationOptions = useMemo(() => normalizeOptions(locations.map(l => ({ value: l.id!, label: l.name }))), [locations]);
-              return (
+            render={({ field }) => (
                 <FormItem>
                   <FormLabel>Location</FormLabel>
-                  <SafeSelect
-                    value={field.value}
-                    onChange={field.onChange}
-                    options={locationOptions}
-                    placeholder="Select a location"
-                    disabled={formLoading}
-                  />
+                  <ComboBoxEntity
+                    entity="locations"
+                    orgId={activeOrgId}
+                    placeholder="Select location"
+                    value={null}
+                    onChange={(item) => field.onChange(item?.id)}
+                   />
                   <FormMessage />
                 </FormItem>
-              );
-            }}
+              )
+            }
           />
 
           <FormField
@@ -505,23 +423,20 @@ export function CheckinForm({
           <FormField
             control={form.control}
             name="supplierId"
-            render={({ field }) => {
-              const supplierOptions = useMemo(() => normalizeOptions(suppliers.map(s => ({ value: s.id!, label: s.name }))), [suppliers]);
-              return (
+            render={({ field }) => (
                 <FormItem>
                   <FormLabel>Supplier</FormLabel>
-                  <SafeSelect
-                    value={field.value ?? ""}
-                    onChange={field.onChange}
-                    options={supplierOptions}
-                    placeholder="Select a supplier"
-                    disabled={formLoading}
-                    hasNone={true}
-                  />
+                   <ComboBoxEntity
+                    entity="suppliers"
+                    orgId={activeOrgId}
+                    placeholder="Select supplier"
+                    value={null}
+                    onChange={(item) => field.onChange(item?.id)}
+                   />
                   <FormMessage />
                 </FormItem>
-              );
-            }}
+              )
+            }
           />
 
           <FormField

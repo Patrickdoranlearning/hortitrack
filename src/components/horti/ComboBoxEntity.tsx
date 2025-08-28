@@ -1,8 +1,22 @@
 "use client";
 import * as React from "react";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { searchVarieties, searchSizes, searchLocations, searchSuppliers } from "@/server/refdata/queries";
 
 type Entity = "varieties" | "sizes" | "locations" | "suppliers";
 
@@ -10,14 +24,21 @@ export type ComboItem = { id: string; name: string; meta?: Record<string, any> }
 
 type Props = {
   entity: Entity;
-  orgId?: string | null;             // required for locations & suppliers, ignored for varieties/sizes
-  trayOnly?: boolean;                // sizes only
+  orgId?: string | null;
+  trayOnly?: boolean;
   value: ComboItem | null;
   onChange: (item: ComboItem | null) => void;
   placeholder?: string;
   quickAdd?: React.ReactNode;
-  loadOnOpen?: boolean;              // default true
+  loadOnOpen?: boolean;
 };
+
+const SEARCH_FN_MAP: Record<Entity, (q: string, orgId?: string) => Promise<any[]>> = {
+    varieties: (q, orgId) => searchVarieties(q, orgId),
+    sizes: (q, orgId) => searchSizes(q, orgId),
+    locations: (q, orgId) => searchLocations(q, orgId),
+    suppliers: (q, orgId) => searchSuppliers(q, orgId),
+}
 
 export function ComboBoxEntity({
   entity,
@@ -36,110 +57,101 @@ export function ComboBoxEntity({
   const [error, setError] = React.useState<string | null>(null);
   const ctrlRef = React.useRef<AbortController | null>(null);
   const mounted = React.useRef(true);
-  React.useEffect(() => () => { mounted.current = false; ctrlRef.current?.abort(); }, []);
+  React.useEffect(
+    () => () => {
+      mounted.current = false;
+      ctrlRef.current?.abort();
+    },
+    []
+  );
 
   const requiresOrg = entity === "locations" || entity === "suppliers";
 
-  async function fetchItems(signal: AbortSignal) {
+  const fetchItems = React.useCallback(async () => {
     setError(null);
-    // Early guard: if org is required but missing, show hint and bail fast
     if (requiresOrg && !orgId) {
       setItems([]);
       return;
     }
     setLoading(true);
+    ctrlRef.current?.abort();
+    const controller = new AbortController();
+    ctrlRef.current = controller;
+
     try {
-      const url = new URL(`/api/search/${entity}`, window.location.origin);
-      if (q) url.searchParams.set("q", q);
-      if (requiresOrg && orgId) url.searchParams.set("orgId", orgId);
-      if (entity === "sizes" && trayOnly) url.searchParams.set("trayOnly", "1");
-
-      const res = await fetch(url.toString(), { signal });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        console.warn(`[ComboBoxEntity] ${entity} ${res.status}`, body.slice(0, 140));
-        setItems([]);
-        setError("Search failed");
-        return;
-      }
-
-      const ct = res.headers.get("content-type") || "";
-      if (!ct.includes("application/json")) {
-        const body = await res.text().catch(() => "");
-        console.warn(`[ComboBoxEntity] ${entity} non-JSON`, body.slice(0, 140));
-        setItems([]);
-        setError("Bad response");
-        return;
-      }
-
-      const payload = (await res.json().catch(() => ({ items: [] }))) as { items?: ComboItem[]; error?: string };
-      setItems(Array.isArray(payload.items) ? payload.items : []);
-      if (payload.error) setError(payload.error);
+        const searchFn = SEARCH_FN_MAP[entity];
+        const results = await searchFn(q, orgId);
+        if (!controller.signal.aborted) {
+            setItems(results.map(r => ({id: r.id, name: r.name, meta: r})));
+        }
     } catch (e: any) {
-      if (e?.name !== "AbortError") {
-        console.warn(`[ComboBoxEntity] ${entity} error`, e);
-        setError("Network error");
-        setItems([]);
-      }
+        if (e?.name !== "AbortError") {
+            console.warn(`[ComboBoxEntity] ${entity} error`, e);
+            setError(e.message || "Network error");
+            setItems([]);
+        }
     } finally {
-      if (mounted.current) setLoading(false);
+        if (mounted.current && !controller.signal.aborted) setLoading(false);
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, entity, orgId, requiresOrg]);
 
-  // Debounced search
   React.useEffect(() => {
     if (!open) return;
-    ctrlRef.current?.abort();
-    const controller = new AbortController();
-    ctrlRef.current = controller;
-    const t = setTimeout(() => fetchItems(controller.signal), 250);
-    return () => { clearTimeout(t); controller.abort(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, open, entity, orgId, trayOnly]);
+    const t = setTimeout(() => fetchItems(), 250);
+    return () => clearTimeout(t);
+  }, [q, open, fetchItems]);
 
-  // First open → optionally load with empty q
   React.useEffect(() => {
-    if (!open || !loadOnOpen) return;
-    ctrlRef.current?.abort();
-    const controller = new AbortController();
-    ctrlRef.current = controller;
-    fetchItems(controller.signal);
-    // only run when open toggles
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    if (open && loadOnOpen && items.length === 0) {
+      fetchItems();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, loadOnOpen]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between">
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
           {value ? value.name : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 w-[400px]">
+      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={placeholder}
             value={q}
-            onValueChange={(v) => setQ(v)}
+            onValueChange={setQ}
           />
           <CommandList>
             <CommandEmpty>
               {requiresOrg && !orgId
                 ? "Select an organization first"
                 : loading
-                  ? "Searching…"
-                  : q
-                    ? (error ? `No results • ${error}` : "No results.")
-                    : (error ? `Error • ${error}` : "Type to search")}
-              {(!loading && !requiresOrg && quickAdd) ? <div className="ml-2 inline-block">{quickAdd}</div> : null}
+                ? "Searching…"
+                : q
+                ? error
+                  ? `Error: ${error}`
+                  : "No results."
+                : error
+                ? `Error: ${error}`
+                : "Type to search"}
+              {!loading && !requiresOrg && quickAdd ? (
+                <div className="ml-2 inline-block">{quickAdd}</div>
+              ) : null}
             </CommandEmpty>
             <CommandGroup>
               {items.map((it) => (
                 <CommandItem
                   key={it.id}
                   value={it.name}
-                  onSelect={() => { onChange(it); setOpen(false); }}
+                  onSelect={() => {
+                    onChange(it);
+                    setOpen(false);
+                  }}
                 >
+                  <Check className={cn("mr-2 h-4 w-4", value?.id === it.id ? "opacity-100" : "opacity-0")} />
                   {it.name}
                 </CommandItem>
               ))}

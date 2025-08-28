@@ -20,19 +20,14 @@ import { CalendarIcon } from 'lucide-react';
 import { VarietyCombobox, type VarietyOption } from '@/components/ui/variety-combobox';
 import { format } from 'date-fns';
 import type {
-  Batch, BatchStatus, NurseryLocation, PlantSize, Supplier, Variety,
+  Batch, BatchStatus, PlantSize, Supplier, Variety,
 } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { SafeSelect } from '@/components/ui/SafeSelect';
-import { normalizeOptions, type Option } from '@/lib/options';
+import { Option } from '@/lib/options';
 import { cn } from '@/lib/utils';
-
-import { 
-  searchVarieties,
-  searchSizes,
-  searchLocations,
-  searchSuppliers,
-} from '@/server/refdata/queries'; // Import new search functions
+import { ComboBoxEntity } from './horti/ComboBoxEntity';
+import { useActiveOrg } from '@/server/org/context';
 
 const PassportFields = {
   passportType: z.enum(["received", "issued"]).optional(),
@@ -91,6 +86,10 @@ type Props = {
   onCancel: () => void;
   onArchive?: (batchId: string) => void;
   onCreateNewVariety: (name: string) => void;
+  nurseryLocations: any[];
+  plantSizes: any[];
+  suppliers: any[];
+  varieties: any[];
 };
 
 function parseToDate(value: any): Date {
@@ -115,20 +114,9 @@ export function BatchForm({
 }: Props) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
   const isEdit = !!batch?.id;
+  const activeOrgId = useActiveOrg();
 
-  // State for dynamically fetched reference data
-  const [varieties, setVarieties] = useState<VarietyOption[]>([]);
-  const [sizes, setSizes] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-
-  // State for loading indicators
-  const [loadingVarieties, setLoadingVarieties] = useState(false);
-  const [loadingSizes, setLoadingSizes] = useState(false);
-  const [loadingLocations, setLoadingLocations] = useState(false);
-  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
-  
-  const doranNurseries = useMemo(() => suppliers.find(s => s.name === 'Doran Nurseries'), [suppliers]);
+  const doranNurseries = useMemo(() => (suppliers ?? []).find(s => s.name === 'Doran Nurseries'), [suppliers]);
 
   const onSuccess = React.useMemo(() => {
     if (onSubmitSuccess) return onSubmitSuccess;
@@ -178,102 +166,6 @@ export function BatchForm({
       }
     }
   }, [sourceType, doranNurseries, form]);
-
-  // Dynamic fetching for Varieties
-  const [varietySearchQuery, setVarietySearchQuery] = useState('');
-  const deferredVarietyQuery = React.useDeferredValue(varietySearchQuery);
-  useEffect(() => {
-    let active = true;
-    const fetchOptions = async () => {
-      setLoadingVarieties(true);
-      try {
-        const data = await searchVarieties(deferredVarietyQuery);
-        if (active) setVarieties(data as VarietyOption[]);
-      } catch (e) {
-        console.error("Error fetching varieties:", e);
-      } finally {
-        if (active) setLoadingVarieties(false);
-      }
-    };
-    fetchOptions();
-    return () => { active = false; };
-  }, [deferredVarietyQuery]);
-
-  // Dynamic fetching for Sizes
-  const [sizeSearchQuery, setSizeSearchQuery] = useState('');
-  const deferredSizeQuery = React.useDeferredValue(sizeSearchQuery);
-  useEffect(() => {
-    let active = true;
-    const fetchOptions = async () => {
-      setLoadingSizes(true);
-      try {
-        const data = await searchSizes(deferredSizeQuery);
-        if (active) setSizes(data);
-      } catch (e) {
-        console.error("Error fetching sizes:", e);
-      } finally {
-        if (active) setLoadingSizes(false);
-      }
-    };
-    fetchOptions();
-    return () => { active = false; };
-  }, [deferredSizeQuery]);
-
-  // Dynamic fetching for Locations
-  const [locationSearchQuery, setLocationSearchQuery] = useState('');
-  const deferredLocationQuery = React.useDeferredValue(locationSearchQuery);
-  useEffect(() => {
-    let active = true;
-    const fetchOptions = async () => {
-      setLoadingLocations(true);
-      try {
-        const data = await searchLocations(deferredLocationQuery);
-        if (active) setLocations(data);
-      } catch (e) {
-        console.error("Error fetching locations:", e);
-      } finally {
-        if (active) setLoadingLocations(false);
-      }
-    };
-    fetchOptions();
-    return () => { active = false; };
-  }, [deferredLocationQuery]);
-
-  // Dynamic fetching for Suppliers
-  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
-  const deferredSupplierQuery = React.useDeferredValue(supplierSearchQuery);
-  useEffect(() => {
-    let active = true;
-    const fetchOptions = async () => {
-      setLoadingSuppliers(true);
-      try {
-        const data = await searchSuppliers(deferredSupplierQuery);
-        if (active) setSuppliers(data);
-      } catch (e) {
-        console.error("Error fetching suppliers:", e);
-      } finally {
-        if (active) setLoadingSuppliers(false);
-      }
-    };
-    fetchOptions();
-    return () => { active = false; };
-  }, [deferredSupplierQuery]);
-
-  const allSizes: Option[] = useMemo(() => normalizeOptions((sizes ?? []).map(s => ({
-    value: s.name, 
-    label: `${s.name} ${s.container_type ? ` • ${s.container_type}` : ''} ${s.multiple && s.multiple > 1 ? ` (x${s.multiple}/tray)`: ''}`
-  }))), [sizes]);
-  
-  const traySizes = useMemo(() => allSizes.filter(s => /tray/i.test(s.label)), [allSizes]);
-  const visibleSizes = sourceType === 'Propagation' ? traySizes : allSizes;
-
-  useEffect(() => {
-    const info = (sizes ?? []).find((s) => s.name === form.getValues('size')) || null;
-    setSelectedSizeInfo(info);
-    if (info?.multiple && info.multiple > 1 && batch?.quantity) {
-      form.setValue('trayQuantity', Math.round(batch.quantity / info.multiple));
-    }
-  }, [batch, sizes, form]);
 
   const sizeMultiple = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1
     ? selectedSizeInfo.multiple
@@ -399,22 +291,18 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Variety</FormLabel>
-                <VarietyCombobox
-                  value={field.value || ''}
-                  disabled={form.formState.isSubmitting}
-                  varieties={varieties}
-                  onSelect={(v) => {
-                    field.onChange(v.name);
-                    if (v.family) {
-                      form.setValue('plantFamily', v.family, { shouldValidate: true, shouldDirty: true });
-                    }
-                    if (v.category) {
-                      form.setValue('category', v.category, { shouldValidate: true, shouldDirty: true });
-                    }
-                  }}
-                  onCreate={(name) => onCreateNewVariety(name)}
-                  placeholder="Search or create variety…"
-                  emptyMessage={loadingVarieties ? "Loading..." : "No matches."}
+                <ComboBoxEntity
+                    entity="varieties"
+                    orgId={activeOrgId}
+                    placeholder="Search variety"
+                    value={null}
+                    onChange={(item) => {
+                         if (item) {
+                            field.onChange(item.name);
+                            if (item.meta?.family) form.setValue('plantFamily', item.meta.family, { shouldValidate: true, shouldDirty: true });
+                            if (item.meta?.category) form.setValue('category', item.meta.category, { shouldValidate: true, shouldDirty: true });
+                         }
+                    }}
                 />
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <span className="rounded bg-muted px-2 py-1">
@@ -435,22 +323,13 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Location</FormLabel>
-                <Select
-                  value={field.value || ''}
-                  onValueChange={field.onChange}
-                  disabled={form.formState.isSubmitting || loadingLocations}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingLocations ? "Loading..." : "Select a location"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(locations ?? []).map((l) => (
-                      <SelectItem key={l.id} value={l.name}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ComboBoxEntity
+                    entity="locations"
+                    orgId={activeOrgId}
+                    placeholder="Select location"
+                    value={null}
+                    onChange={(item) => field.onChange(item?.name)}
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -462,24 +341,18 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Size</FormLabel>
-                <SafeSelect
-                    value={field.value}
-                    onChange={(val) => {
-                      field.onChange(val);
-                      const info = (sizes ?? []).find((s) => s.name === val) || null;
-                      setSelectedSizeInfo(info);
-                      const trays = Number(form.getValues('trayQuantity') ?? 0);
-                      const perTray = info?.multiple && info.multiple > 1 ? info.multiple : 1;
-                      if (perTray > 1 && trays > 0) {
-                        form.setValue('quantity', trays * perTray, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                      }
+                <ComboBoxEntity
+                    entity="sizes"
+                    orgId={activeOrgId}
+                    trayOnly={sourceType === "Propagation"}
+                    placeholder="Select size"
+                    value={null}
+                    onChange={(item) => {
+                        if(item) {
+                            field.onChange(item.name);
+                            setSelectedSizeInfo({id: item.id, name: item.name, ...item.meta});
+                        }
                     }}
-                    options={visibleSizes}
-                    placeholder={loadingSizes ? "Loading..." : "Select pot/tray size"}
-                    disabled={form.formState.isSubmitting || loadingSizes}
                 />
                 <FormMessage />
               </FormItem>
@@ -605,25 +478,13 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Supplier</FormLabel>
-                <Select
-                  value={field.value || ''}
-                  onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
-                  disabled={form.formState.isSubmitting || sourceType === 'Propagation' || loadingSuppliers}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingSuppliers ? "Loading..." : "Select a supplier"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {(suppliers ?? [])
-                      .filter((s) => s?.name?.trim()) 
-                      .map((s) => (
-                        <SelectItem key={s.id} value={s.name}>
-                          {s.name}
-                        </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ComboBoxEntity
+                    entity="suppliers"
+                    orgId={activeOrgId}
+                    placeholder="Select supplier"
+                    value={null}
+                    onChange={(item) => field.onChange(item?.name)}
+                />
                 <FormMessage />
               </FormItem>
             )}
