@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { searchVarieties, searchSizes, searchLocations, searchSuppliers } from "@/server/refdata/queries";
+import { supabaseClient } from "@/lib/supabase/client"; // Use the browser-safe client
 
 type Entity = "varieties" | "sizes" | "locations" | "suppliers";
 
@@ -33,11 +33,11 @@ type Props = {
   loadOnOpen?: boolean;
 };
 
-const SEARCH_FN_MAP: Record<Entity, (q: string, orgId?: string) => Promise<any[]>> = {
-    varieties: (q, orgId) => searchVarieties(q, orgId),
-    sizes: (q, orgId) => searchSizes(q, orgId),
-    locations: (q, orgId) => searchLocations(q, orgId),
-    suppliers: (q, orgId) => searchSuppliers(q, orgId),
+const SEARCH_META_MAP: Record<Entity, { table: string; select: string; }> = {
+    varieties: { table: 'plant_varieties', select: 'id, name, family' },
+    sizes: { table: 'plant_sizes', select: 'id, name, container_type, multiple:cell_multiple' }, // CORRECTED ALIAS
+    locations: { table: 'nursery_locations', select: 'id, name' },
+    suppliers: { table: 'suppliers', select: 'id, name, country_code' },
 }
 
 export function ComboBoxEntity({
@@ -79,10 +79,29 @@ export function ComboBoxEntity({
     ctrlRef.current = controller;
 
     try {
-        const searchFn = SEARCH_FN_MAP[entity];
-        const results = await searchFn(q, orgId);
+        const supabase = supabaseClient();
+        const meta = SEARCH_META_MAP[entity];
+        let query = supabase.from(meta.table).select(meta.select);
+        
+        if (requiresOrg && orgId) {
+            query = query.eq('org_id', orgId);
+        }
+
+        if (q) {
+            query = query.ilike('name', `%${q}%`);
+        }
+
+        if (trayOnly) {
+            query = query.ilike('container_type', 'Tray');
+        }
+
+        query = query.order('name').limit(25);
+
+        const { data, error } = await query;
+        if (error) throw error;
+
         if (!controller.signal.aborted) {
-            setItems(results.map(r => ({id: r.id, name: r.name, meta: r})));
+            setItems(data.map(r => ({id: r.id, name: r.name, meta: r})));
         }
     } catch (e: any) {
         if (e?.name !== "AbortError") {
@@ -94,7 +113,7 @@ export function ComboBoxEntity({
         if (mounted.current && !controller.signal.aborted) setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, entity, orgId, requiresOrg]);
+  }, [q, entity, orgId, requiresOrg, trayOnly]);
 
   React.useEffect(() => {
     if (!open) return;
