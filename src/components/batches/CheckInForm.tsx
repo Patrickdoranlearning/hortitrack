@@ -22,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 const CheckinFormSchema = z.object({
   plant_variety_id: z.string().uuid({ message: "Variety is required." }),
   size_id: z.string().uuid({ message: "Size is required." }),
+  site_id: z.string().uuid({ message: "Nursery is required." }), // Added site_id
   location_id: z.string().uuid({ message: "Location is required." }),
   supplier_id: z.string().uuid().optional().nullable(),
   quantity: z.coerce.number().int().min(0, { message: "Quantity cannot be negative." }),
@@ -54,6 +55,7 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
     defaultValues: {
       plant_variety_id: "" as any,
       size_id: "" as any,
+      site_id: "" as any, // Added default value for site_id
       location_id: "" as any,
       supplier_id: null,
       quantity: 0,
@@ -66,6 +68,12 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
       disease_notes: "",
     },
   });
+
+  const siteId = form.watch("site_id"); // Watch for changes in site_id
+  React.useEffect(() => {
+    // when nursery changes, clear location selection
+    form.setValue("location_id", "" as any);
+  }, [siteId, form]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 6-star rating control used by Quality field
   function StarRating({
@@ -183,6 +191,26 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
           )}
         />
 
+        {/* Nursery (Site) */}
+        <FormField
+          control={form.control}
+          name="site_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nursery</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  endpoint="/api/options/sites"
+                  value={field.value ?? null}
+                  onChange={(v) => field.onChange(v)}
+                  placeholder="Select nursery (e.g., Main Nursery, Alberts)"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {/* Location */}
         <FormField
           control={form.control}
@@ -192,10 +220,11 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
               <FormLabel>Location</FormLabel>
               <FormControl>
                 <AsyncCombobox
-                  endpoint="/api/options/locations"
+                  endpoint={`/api/options/locations${siteId ? `?site_id=${siteId}` : ""}`}
                   value={field.value ?? null}
                   onChange={(v) => field.onChange(v)}
-                  placeholder="Search locations"
+                  placeholder={siteId ? "Search locations" : "Select nursery first"}
+                  disabled={!siteId}
                 />
               </FormControl>
               <FormMessage />
