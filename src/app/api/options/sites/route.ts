@@ -14,36 +14,39 @@ export async function GET(req: Request) {
 
   const supabase = getSupabaseForRequest();
 
-  // must be signed in + have an active org
+  // require auth + active org
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ options: [] });
 
   const { data: profile } = await supabase
-    .from("profiles")
-    .select("active_org_id")
-    .eq("id", auth.user.id)
-    .maybeSingle();
-
+    .from("profiles").select("active_org_id").eq("id", auth.user.id).maybeSingle();
   if (!profile?.active_org_id) return NextResponse.json({ options: [] });
 
   const { q, limit } = parse.data;
 
-  let query = supabase
-    .from("sites")
-    .select("id,name")
-    .eq("org_id", profile.active_org_id)
-    .order("name", { ascending: true })
-    .limit(limit);
+  // DISTINCT site names from locations in this org
+  const { data, error } = await supabase
+    .from("nursery_locations")
+    .select("nursery_site")
+    .eq("org_id", profile.active_org_id);
 
-  if (q) query = query.ilike("name", `%${q}%`);
-
-  const { data, error } = await query;
   if (error) {
     console.error("[options.sites]", error);
     return NextResponse.json({ options: [] });
   }
 
+  let names = Array.from(new Set((data ?? []).map(r => (r as any).nursery_site as string))).sort((a, b) =>
+    (a || "").localeCompare(b || "")
+  );
+
+  if (q) {
+    const ql = q.toLowerCase();
+    names = names.filter(n => n.toLowerCase().includes(ql));
+  }
+
+  names = names.slice(0, limit);
+
   return NextResponse.json({
-    options: (data ?? []).map(s => ({ value: s.id, label: s.name })),
+    options: names.map(n => ({ value: n, label: n })),
   });
 }

@@ -13,7 +13,7 @@ import React from 'react';
 const Schema = z.object({
   variety_id: z.string().min(1),
   size_id: z.string().min(1),
-  site_id: z.string().uuid({ message: "Nursery is required." }), // Added site_id
+  nursery_site: z.string().min(1, "Nursery is required."), // Changed to nursery_site (string)
   location_id: z.string().min(1),
   trays: z.coerce.number().int().min(0),
   planted_at: z.string().min(1),
@@ -30,7 +30,7 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
     defaultValues: { 
       variety_id: '', 
       size_id: '', 
-      site_id: "" as any, // Added default value for site_id
+      nursery_site: "", // Changed default value for nursery_site
       location_id: '', 
       trays: 0, 
       planted_at: new Date().toISOString().slice(0,10) 
@@ -41,11 +41,11 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
   const [size, setSize] = React.useState<{ value: string; label: string; meta?: any } | null>(null);
   const [location, setLocation] = React.useState<{ value: string; label: string } | null>(null);
 
-  const siteId = form.watch("site_id"); // Watch for changes in site_id
+  const nurserySite = form.watch("nursery_site"); // Watch for changes in nursery_site
   React.useEffect(() => {
     // when nursery changes, clear location selection
     form.setValue("location_id", "" as any);
-  }, [siteId, form]); 
+  }, [nurserySite, form]); 
 
   return (
     <Form {...form}>
@@ -86,7 +86,7 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
         {/* Nursery (Site) */}
         <FormField
           control={form.control}
-          name="site_id"
+          name="nursery_site"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nursery</FormLabel>
@@ -113,9 +113,9 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
                     <AsyncCombobox
                         value={location?.value ?? null}
                         onChange={(opt) => { setLocation(opt ? {value: opt, label: opt} : null); field.onChange(opt); }}
-                        endpoint={`/api/options/locations${siteId ? `?site_id=${siteId}` : ""}`}
-                        placeholder={siteId ? "Search locations" : "Select nursery first"}
-                        disabled={!siteId}
+                        endpoint={`/api/options/locations${nurserySite ? `?site=${encodeURIComponent(nurserySite)}` : ""}`}
+                        placeholder={nurserySite ? "Search locations" : "Select nursery first"}
+                        disabled={!nurserySite}
                     />
                     <FormMessage />
                 </FormItem>
