@@ -54,7 +54,7 @@ import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
 import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
 import ScannerDialog from '../components/scan-and-act-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { FeatureGate } from '@/components/FeatureGate';
 import { queryMatchesBatch } from '@/lib/search';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
@@ -68,7 +68,7 @@ import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
 
 const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
-const VarietyForm = dynamic(() => import('@/components/catalog/VarietyForm'), { ssr: false });
+const VarietyForm = dynamic(() => import('@/components/varieties/VarietyForm'), { ssr: false });
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -521,22 +521,23 @@ export default function HomePageView({
       {/* Other Dialogs */}
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
         <DialogContent>
-          <VarietyForm
-            variety={{ name: newVarietyName }}
-            onSubmit={async (data) => {
-              const supabase = supabaseClient();
-              const { error } = await supabase.from('plant_varieties').insert({
-                name: data.name, genus: data.genus, species: data.species, family: data.family, notes: data.notes
-              });
-              if (error) {
-                toast({ variant: 'destructive', title: 'Failed to create variety', description: error.message });
-                throw error;
-              };
-              setIsVarietyFormOpen(false);
-              setNewVarietyName('');
-            }}
-            onCancel={() => setIsVarietyFormOpen(false)}
-          />
+            <DialogDescription>Fill in the plant variety details.</DialogDescription>
+            <VarietyForm
+                variety={{ name: newVarietyName } as Variety}
+                onSubmit={async (data) => {
+                const supabase = supabaseClient();
+                const { error } = await supabase.from('plant_varieties').insert({
+                    name: data.name, genus: data.genus, species: data.species, family: data.family, notes: data.notes
+                });
+                if (error) {
+                    toast({ variant: 'destructive', title: 'Failed to create variety', description: error.message });
+                    throw error;
+                };
+                setIsVarietyFormOpen(false);
+                setNewVarietyName('');
+                }}
+                onCancel={() => setIsVarietyFormOpen(false)}
+            />
         </DialogContent>
       </Dialog>
     </PageFrame>

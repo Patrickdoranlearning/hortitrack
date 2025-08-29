@@ -1,22 +1,20 @@
-'use client';
-import { useMemo } from 'react';
+// src/components/ui/StarRating.tsx
+"use client";
+import { Star } from "lucide-react";
+import React from "react";
 
-export default function StarRating({
-  value = 0, max = 6, onChange,
-}: { value?: number; max?: number; onChange?: (v: number) => void }) {
-  const stars = useMemo(() => Array.from({ length: max }, (_, i) => i + 1), [max]);
+export default function StarRating({ value = 0, onChange }: { value?: number; onChange: (n: number) => void }) {
   return (
-    <div role="radiogroup" aria-label="Quality rating" className="flex gap-1">
-      {stars.map((n) => (
+    <div className="flex gap-1">
+      {[1,2,3,4,5,6].map(n => (
         <button
-          key={n}
           type="button"
-          role="radio"
-          aria-checked={value === n}
-          onClick={() => onChange?.(n)}
-          className={`size-8 rounded-md border transition ${n <= value ? 'bg-yellow-300' : 'bg-muted'}`}
+          key={n}
+          aria-label={`Rate ${n}`}
+          onClick={() => onChange(n)}
+          className="p-0.5"
         >
-          {n <= value ? '★' : '☆'}
+          <Star className={n <= (value ?? 0) ? "fill-current" : ""} />
         </button>
       ))}
     </div>
