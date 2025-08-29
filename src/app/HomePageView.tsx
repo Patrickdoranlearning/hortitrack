@@ -504,6 +504,9 @@ export default function HomePageView({
         <DialogContent size="xl" className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden">
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="font-headline text-3xl">Check-in New Batch</DialogTitle>
+            <DialogDescription>
+              Enter variety, size, quantity, supplier, location, quality, and optional plant passport overrides.
+            </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
             <CheckinForm 
