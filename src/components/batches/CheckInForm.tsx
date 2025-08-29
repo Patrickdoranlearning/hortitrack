@@ -2,58 +2,30 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useActiveOrg } from "@/lib/org/context";
-import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { supabaseClient } from '@/lib/supabase/client';
+import type { Database } from "@/types/supabase"; 
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Star } from "lucide-react";
-import { DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { CalendarDays, ChevronDown, Check, Loader2, Star } from "lucide-react";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { AsyncCombobox } from "@/components/ui/AsyncCombobox";
-import { Loader2 } from "lucide-react";
-import { Switch } from "../ui/switch";
+import { AsyncCombobox } from "@/components/common/AsyncCombobox";
+import { useActiveOrg } from "@/lib/org/context";
+import { useToast } from "@/hooks/use-toast";
+import { DialogFooter } from "../ui/dialog";
 
-// 6-star rating control used by Quality field
-function StarRating({
-  value = 0,
-  onChange,
-}: {
-  value?: number;
-  onChange: (n: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5, 6].map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(n)}
-          aria-label={`Set ${n} stars`}
-          className={cn(
-            "p-1 rounded-md",
-            value >= n ? "opacity-100" : "opacity-40 hover:opacity-70"
-          )}
-        >
-          <Star
-            className="h-5 w-5"
-            fill={value >= n ? "currentColor" : "none"}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-
-// Validation Schema
 const CheckinFormSchema = z.object({
   plant_variety_id: z.string().uuid({ message: "Variety is required." }),
   size_id: z.string().uuid({ message: "Size is required." }),
@@ -84,9 +56,11 @@ export function CheckinForm({
   const { toast } = useToast();
   const { orgId } = useActiveOrg();
   const [formLoading, setFormLoading] = useState(false);
-  const [ppOverrideEnabled, setPpOverrideEnabled] = useState<boolean>(false);
-  const [pestObserved, setPestObserved] = useState<boolean>(false);
-  const [diseaseObserved, setDiseaseObserved] = useState<boolean>(false);
+  
+  const [variety, setVariety] = React.useState<{ value: string; label: string; hint?: string } | null>(null);
+  const [size, setSize] = React.useState<{ value: string; label: string; meta?: any } | null>(null);
+  const [location, setLocation] = React.useState<{ value: string; label: string } | null>(null);
+  const [supplier, setSupplier] = React.useState<{ value: string; label: string; meta?: any } | null>(null);
 
 
   const form = useForm<CheckinFormInput>({
@@ -102,7 +76,6 @@ export function CheckinForm({
     }
     setFormLoading(true);
     try {
-      // Omitted photo upload logic for brevity, can be added back
       const payload = { ...values, orgId: orgId };
 
       const res = await fetch("/api/batches/checkin", {
@@ -139,14 +112,19 @@ export function CheckinForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Variety</FormLabel>
-              <FormControl>
                 <AsyncCombobox
-                  endpoint="/api/options/varieties"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search varieties"
+                    value={variety}
+                    onChange={(opt) => {
+                    setVariety(opt);
+                    field.onChange(opt?.value ?? "");
+                    if (opt?.hint && !form.getValues("passport_override_a")) {
+                        form.setValue("passport_override_a", opt.hint);
+                    }
+                    }}
+                    fetchUrl="/api/catalog/varieties"
+                    placeholder="Search variety..."
+                    autofocus
                 />
-              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -157,14 +135,15 @@ export function CheckinForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Size</FormLabel>
-              <FormControl>
                 <AsyncCombobox
-                  endpoint="/api/options/sizes"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search sizes"
+                    value={size}
+                    onChange={(opt) => {
+                    setSize(opt);
+                    field.onChange(opt?.value ?? "");
+                    }}
+                    fetchUrl="/api/catalog/sizes?for=checkin"
+                    placeholder="Select size..."
                 />
-              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -175,14 +154,12 @@ export function CheckinForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Location</FormLabel>
-              <FormControl>
                 <AsyncCombobox
-                  endpoint="/api/options/locations"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search locations"
+                    value={location}
+                    onChange={(opt) => { setLocation(opt); field.onChange(opt?.value ?? ""); }}
+                    fetchUrl="/api/catalog/locations"
+                    placeholder="Search location..."
                 />
-              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -193,140 +170,23 @@ export function CheckinForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Supplier</FormLabel>
-              <FormControl>
                 <AsyncCombobox
-                  endpoint="/api/options/suppliers"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search suppliers"
+                    value={supplier}
+                    onChange={(opt) => {
+                    setSupplier(opt);
+                    field.onChange(opt?.value ?? "");
+                    const pc = opt?.meta?.producer_code ?? "IE2727";
+                    const cc = opt?.meta?.country_code ?? "IE";
+                    if (!form.getValues("passport_override_b")) form.setValue("passport_override_b", pc);
+                    if (!form.getValues("passport_override_d")) form.setValue("passport_override_d", cc);
+                    }}
+                    fetchUrl="/api/catalog/suppliers"
+                    placeholder="Search supplier..."
                 />
-              </FormControl>
-              <FormMessage />
+                <FormMessage />
             </FormItem>
           )}
         />
-        
-        {/* Quantity */}
-        <FormField
-          control={form.control}
-          name="quantity"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Quantity</FormLabel>
-              <FormControl>
-                <Input type="number" min={0} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="quality_rating"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Quality Rating</FormLabel>
-              <FormControl>
-                <StarRating value={field.value ?? 0} onChange={field.onChange} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        {/* Plant Passport Override */}
-        <div className="rounded-lg border p-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <FormLabel>Plant Passport Override</FormLabel>
-            <Switch checked={ppOverrideEnabled} onCheckedChange={setPpOverrideEnabled} />
-          </div>
-          {ppOverrideEnabled && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="passport_override_a"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override A</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="passport_override_b"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override B</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="passport_override_c"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override C</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="passport_override_d"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override D</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Pest & Disease */}
-        <div className="rounded-lg border p-3 space-y-3">
-          <FormLabel>Pest &amp; Disease</FormLabel>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex items-center justify-between">
-              <span>Pests observed?</span>
-              <Switch checked={pestObserved} onCheckedChange={setPestObserved} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Disease observed?</span>
-              <Switch checked={diseaseObserved} onCheckedChange={setDiseaseObserved} />
-            </div>
-            <FormField
-              control={form.control}
-              name="pest_notes"
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Pest Notes (optional)</FormLabel>
-                  <FormControl><Textarea rows={3} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="disease_notes"
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Disease Notes (optional)</FormLabel>
-                  <FormControl><Textarea rows={3} {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
 
         <DialogFooter className="sticky bottom-0 z-10 -mx-6 px-6 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t -mb-6 pt-4 pb-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={formLoading}>Cancel</Button>
@@ -339,3 +199,4 @@ export function CheckinForm({
     </Form>
   );
 }
+

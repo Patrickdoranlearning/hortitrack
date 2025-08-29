@@ -1,6 +1,6 @@
 // src/server/db/supabaseServer.ts
-import { cookies } from "next/headers";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { cookies, headers } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
 export function getSupabaseForRequest() {
   const cookieStore = cookies();
@@ -12,25 +12,15 @@ export function getSupabaseForRequest() {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options: CookieOptions) {
-          cookieStore.set({ name, value, ...options });
+        set() {
+          // Next.js App Router manages cookies; no-op here.
         },
-        remove(name: string, options: CookieOptions) {
-          cookieStore.set({ name, value: "", ...options, maxAge: 0 });
+        remove() {
+          // Next.js App Router manages cookies; no-op here.
         },
       },
+      // Forward client IP for Supabase logs (optional)
+      global: { headers: { "x-forwarded-for": headers().get("x-forwarded-for") ?? "" } },
     }
   );
-}
-
-export async function getActiveOrgIdOrThrow(client: ReturnType<typeof getSupabaseForRequest>) {
-  const { data: userRes, error: userErr } = await client.auth.getUser();
-  if (userErr || !userRes.user) throw new Error("Unauthenticated");
-  const { data, error } = await client
-    .from("profiles")
-    .select("active_org_id")
-    .eq("id", userRes.user.id)
-    .single();
-  if (error || !data?.active_org_id) throw new Error("No active org selected");
-  return data.active_org_id as string;
 }

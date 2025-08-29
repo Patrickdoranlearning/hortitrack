@@ -6,8 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { ComboBoxEntity } from '../horti/ComboBoxEntity';
 import { useActiveOrg } from '@/lib/org/context';
+import { AsyncCombobox } from '../common/AsyncCombobox';
+import React from 'react';
 
 const Schema = z.object({
   variety_id: z.string().min(1),
@@ -28,39 +29,63 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
     defaultValues: { variety_id: '', size_id: '', location_id: '', trays: 0, planted_at: new Date().toISOString().slice(0,10) },
   });
 
+  const [variety, setVariety] = React.useState<{ value: string; label: string; hint?: string } | null>(null);
+  const [size, setSize] = React.useState<{ value: string; label: string; meta?: any } | null>(null);
+  const [location, setLocation] = React.useState<{ value: string; label: string } | null>(null);
+
   return (
     <Form {...form}>
       <form className="space-y-4">
-         <ComboBoxEntity
-            table="plant_varieties"
-            select={VARIETY_SELECT}
-            label="Variety"
-            orgScoped={false}
-            placeholder="Select variety"
-            value={null}
-            onSelect={(id) => form.setValue("variety_id", id ?? "")}
+        <FormField
+            name="variety_id"
+            control={form.control}
+            render={({field}) => (
+                <FormItem>
+                    <FormLabel>Variety</FormLabel>
+                    <AsyncCombobox
+                        value={variety}
+                        onChange={(opt) => { setVariety(opt); field.onChange(opt?.value); }}
+                        fetchUrl="/api/catalog/varieties"
+                        placeholder="Search variety..."
+                    />
+                    <FormMessage />
+                </FormItem>
+            )}
         />
-        <ComboBoxEntity
-            table="plant_sizes"
-            select={SIZE_SELECT}
-            label="Tray Size"
-            orgScoped={false}
-            filters={[{ column: "container_type", op: "eq", value: "Tray" }]}
-            placeholder="Select tray size"
-            value={null}
-            onSelect={(id) => form.setValue("size_id", id ?? "")}
+         <FormField
+            name="size_id"
+            control={form.control}
+            render={({field}) => (
+                <FormItem>
+                    <FormLabel>Tray Size</FormLabel>
+                    <AsyncCombobox
+                        value={size}
+                        onChange={(opt) => { setSize(opt); field.onChange(opt?.value); }}
+                        fetchUrl="/api/catalog/sizes?for=propagation"
+                        placeholder="Select tray size"
+                    />
+                    <FormMessage />
+                </FormItem>
+            )}
         />
-        <ComboBoxEntity
-            table="nursery_locations"
-            select={LOCATION_SELECT}
-            label="Location"
-            orgScoped={true}
-            placeholder="Select location"
-            value={null}
-            onSelect={(id) => form.setValue("location_id", id ?? "")}
+         <FormField
+            name="location_id"
+            control={form.control}
+            render={({field}) => (
+                <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <AsyncCombobox
+                        value={location}
+                        onChange={(opt) => { setLocation(opt); field.onChange(opt?.value); }}
+                        fetchUrl="/api/catalog/locations"
+                        placeholder="Select location"
+                    />
+                    <FormMessage />
+                </FormItem>
+            )}
         />
 
-        <FormField name="trays" render={({ field }) => (
+        <FormField control={form.control} name="trays" render={({ field }) => (
           <FormItem>
             <FormLabel>Trays</FormLabel>
             <FormControl>
@@ -69,7 +94,7 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
             <FormMessage />
           </FormItem>
         )} />
-        <FormField name="planted_at" render={({ field }) => (
+        <FormField control={form.control} name="planted_at" render={({ field }) => (
           <FormItem>
             <FormLabel>Planted Date</FormLabel>
             <FormControl>
