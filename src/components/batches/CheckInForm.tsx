@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Star, Loader2 } from "lucide-react";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { AsyncCombobox } from "@/components/ui/AsyncCombobox";
+import AsyncCombobox from "@/components/ui/AsyncCombobox"; // Changed to default import
 import { Switch } from "@/components/ui/switch";
 
 const CheckinFormSchema = z.object({

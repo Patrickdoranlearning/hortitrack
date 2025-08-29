@@ -1,121 +1,114 @@
-// src/components/ui/AsyncCombobox.tsx
 "use client";
+
 import * as React from "react";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChevronsUpDown } from "lucide-react";
 
-type Option = { value: string; label: string; meta?: Record<string, unknown> };
+export type Option = { value: string; label: string; hint?: string; meta?: Record<string, any> };
 
-export function AsyncCombobox({
-  endpoint,
-  value,
-  onChange,
-  placeholder = "Search…",
-  emptyText = "No results.",
-  className,
-}: {
-  endpoint: `/api/options/${"varieties"|"sizes"|"locations"|"suppliers"}`;
-  value?: string | null;
-  onChange: (v: string | null) => void;
+type Props = {
+  endpoint: string;              // e.g. "/api/options/varieties"
+  value: string | null;          // stores 'value' (id) in the form
+  onChange: (value: string | null) => void;
   placeholder?: string;
-  emptyText?: string;
-  className?: string;
-}) {
+  disabled?: boolean;
+  debounceMs?: number;
+};
+
+const AsyncCombobox = React.forwardRef<HTMLButtonElement, Props>(function AsyncCombobox(
+  { endpoint, value, onChange, placeholder = "Search…", disabled, debounceMs = 250 }: Props,
+  ref
+) {
   const [open, setOpen] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [options, setOptions] = React.useState<Option[]>([]);
-  const [label, setLabel] = React.useState<string>("");
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+
+  const debounced = useDebounce(query, debounceMs);
 
   const fetcher = React.useCallback(async (q: string) => {
-    setBusy(true);
-    setErrorMsg(null);
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`, { cache: "no-store" });
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        const text = await res.text();
-        throw new Error(`Non-JSON response (${res.status}): ${text.slice(0,180)}`);
-      }
-      if (!res.ok) {
-        throw new Error(payload?.error || `Request failed with ${res.status}`);
-      }
+      const url = new URL(endpoint, window.location.origin);
+      if (q) url.searchParams.set("q", q);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || `Request failed with ${res.status}`);
       const opts: Option[] = payload.options ?? [];
       setOptions(opts);
-      if (value && !label) {
-        const m = opts.find(o => o.value === value);
-        if (m) setLabel(m.label);
-      }
     } catch (e: any) {
+      console.error("[AsyncCombobox] fetch error:", e);
       setOptions([]);
-      setErrorMsg(e?.message || "Failed to load options");
-      console.error("[AsyncCombobox] load error:", e);
+      setError(e?.message ?? "Failed to load.");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }, [endpoint, value, label]);
+  }, [endpoint]);
 
+  React.useEffect(() => { fetcher(""); }, [fetcher]);
+  React.useEffect(() => { fetcher(debounced); }, [debounced, fetcher]);
 
-  // initial load when opened
-  React.useEffect(() => { if (open) fetcher(""); }, [open, fetcher]);
-
-  // keep label in sync if value changes externally
-  React.useEffect(() => {
-    if (!value) setLabel("");
-    else {
-      const m = options.find(o => o.value === value);
-      if (m) setLabel(m.label);
-    }
-  }, [value, options]);
+  const selected = options.find(o => o.value === value) || null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className={cn("w-full justify-between", className)}>
-          {label || "Select…"}
-          {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />}
+        <Button
+          ref={ref}
+          type="button"
+          variant="outline"
+          role="combobox"
+          className="justify-between w-full"
+          disabled={disabled}
+        >
+          <span className="truncate">{selected?.label ?? placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command
-          filter={(value, search, keywords) => 1} // server-side filtered
-          shouldFilter={false}
-        >
-          <CommandInput
-            placeholder={placeholder}
-            onValueChange={(q) => {
-              const t = setTimeout(() => fetcher(q), 250);
-              return () => clearTimeout(t);
-            }}
-          />
+      <PopoverContent className="p-0 w-[--radix-popover-trigger-width] min-w-56">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder={placeholder} value={query} onValueChange={setQuery} />
           <CommandList>
-            <CommandEmpty>
-              {busy ? "Searching…" : (errorMsg ?? emptyText)}
-            </CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => (
-                <CommandItem
-                  key={opt.value}
-                  value={opt.value}
-                  onSelect={() => {
-                    onChange(opt.value);
-                    setLabel(opt.label);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={cn("mr-2 h-4 w-4", value === opt.value ? "opacity-100" : "opacity-0")} />
-                  {opt.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {loading && <CommandEmpty>Searching…</CommandEmpty>}
+            {!loading && error && <CommandEmpty>{error}</CommandEmpty>}
+            {!loading && !error && options.length === 0 && <CommandEmpty>No results.</CommandEmpty>}
+            {!loading && !error && options.length > 0 && (
+              <CommandGroup>
+                {options.map(opt => (
+                  <CommandItem
+                    key={opt.value}
+                    value={opt.label}
+                    onSelect={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-sm">{opt.label}</span>
+                      {opt.hint && <span className="text-xs text-muted-foreground">{opt.hint}</span>}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
   );
+});
+
+export default AsyncCombobox;
+
+function useDebounce<T>(value: T, delay: number) {
+  const [v, setV] = React.useState(value);
+  React.useEffect(() => {
+    const id = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return v;
 }

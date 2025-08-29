@@ -1,37 +1,44 @@
-// src/app/api/options/locations/route.ts
 import { NextResponse } from "next/server";
-import { getActiveOrgIdOrThrow, getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { z } from "zod";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+
+const Q = z.object({
+  q: z.string().trim().optional(),
+  limit: z.coerce.number().min(1).max(50).default(50),
+});
 
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const q = searchParams.get("q")?.trim() ?? "";
-    const supabase = getSupabaseForRequest();
-    let orgId: string;
-    try {
-      orgId = await getActiveOrgIdOrThrow(supabase);
-    } catch (e: any) {
-      return NextResponse.json({ options: [], error: e?.message || "Unauthorized" }, { status: 401 });
-    }
+  const { searchParams } = new URL(req.url);
+  const parse = Q.safeParse(Object.fromEntries(searchParams));
+  if (!parse.success) return NextResponse.json({ options: [] });
 
-    const base = supabase
-      .from("nursery_locations")
-      .select("id,name,site_id,covered")
-      .eq("org_id", orgId)
-      .order("name", { ascending: true })
-      .limit(50);
+  const supabase = getSupabaseForRequest();
 
-    const { data, error } = await (q ? base.ilike("name", `%${q}%`) : base);
-    if (error) return NextResponse.json({ options: [], error: error.message }, { status: 500 });
+  // derive active org; if unauthenticated or none -> empty list (200)
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return NextResponse.json({ options: [] });
 
-    const options = (data ?? []).map(l => ({
-      value: l.id,
-      label: l.name,
-      meta: { covered: l.covered, site_id: l.site_id },
-    }));
-    return NextResponse.json({ options });
-  } catch (e: any) {
-    console.error("[options/locations] unhandled", e);
-    return NextResponse.json({ options: [], error: "Unexpected error" }, { status: 500 });
+  const { data: profile, error: pErr } = await supabase
+    .from("profiles").select("active_org_id").eq("id", auth.user.id).maybeSingle();
+  if (pErr || !profile?.active_org_id) return NextResponse.json({ options: [] });
+
+  const { q, limit } = parse.data;
+
+  let query = supabase.from("nursery_locations")
+    .select("id,name")
+    .eq("org_id", profile.active_org_id)
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  if (q) query = query.ilike("name", `%${q}%`);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[options.locations]", error);
+    return NextResponse.json({ options: [] });
   }
+
+  return NextResponse.json({
+    options: (data ?? []).map(l => ({ value: l.id, label: l.name })),
+  });
 }

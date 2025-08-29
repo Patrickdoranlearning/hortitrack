@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useActiveOrg } from '@/lib/org/context';
-import { AsyncCombobox } from '../common/AsyncCombobox';
+import AsyncCombobox from '@/components/ui/AsyncCombobox'; // Changed to default import
 import React from 'react';
 
 const Schema = z.object({
@@ -43,9 +43,9 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
                 <FormItem>
                     <FormLabel>Variety</FormLabel>
                     <AsyncCombobox
-                        value={variety}
-                        onChange={(opt) => { setVariety(opt); field.onChange(opt?.value); }}
-                        fetchUrl="/api/catalog/varieties"
+                        value={variety?.value ?? null}
+                        onChange={(opt) => { setVariety(opt ? {value: opt, label: opt} : null); field.onChange(opt); }}
+                        endpoint="/api/options/varieties"
                         placeholder="Search variety..."
                     />
                     <FormMessage />
@@ -59,9 +59,9 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
                 <FormItem>
                     <FormLabel>Tray Size</FormLabel>
                     <AsyncCombobox
-                        value={size}
-                        onChange={(opt) => { setSize(opt); field.onChange(opt?.value); }}
-                        fetchUrl="/api/catalog/sizes?for=propagation"
+                        value={size?.value ?? null}
+                        onChange={(opt) => { setSize(opt ? {value: opt, label: opt} : null); field.onChange(opt); }}
+                        endpoint="/api/options/sizes"
                         placeholder="Select tray size"
                     />
                     <FormMessage />
@@ -75,9 +75,9 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
                 <FormItem>
                     <FormLabel>Location</FormLabel>
                     <AsyncCombobox
-                        value={location}
-                        onChange={(opt) => { setLocation(opt); field.onChange(opt?.value); }}
-                        fetchUrl="/api/catalog/locations"
+                        value={location?.value ?? null}
+                        onChange={(opt) => { setLocation(opt ? {value: opt, label: opt} : null); field.onChange(opt); }}
+                        endpoint="/api/options/locations"
                         placeholder="Select location"
                     />
                     <FormMessage />
