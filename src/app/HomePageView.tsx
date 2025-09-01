@@ -47,7 +47,7 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
-import dynamic from 'next/dynamic'; // Import dynamic
+import dynamic from 'next/dynamic';
 import { ActionDialog } from '../components/actions/ActionDialog';
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
@@ -104,11 +104,8 @@ export default function HomePageView({
 
   const isReadonly = !user;
 
-  const { data: batchesData, forceRefresh } = useCollection<Batch>("batches", initialBatches, {
-    orderBy: { column: "created_at", ascending: false },
-    filters: orgId ? [{ column: "org_id", value: orgId }] : [],
-  });
-  const batches = batchesData ?? [];
+  // Use the server-fetched data directly
+  const [batches, setBatches] = React.useState(initialBatches);
 
   React.useEffect(() => {
     // If no active org yet, but we loaded batches, pick their org
@@ -491,7 +488,10 @@ export default function HomePageView({
       <Dialog open={isNewPropagationOpen} onOpenChange={setIsNewPropagationOpen}>
         <DialogContent size="xl" className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden">
           <DialogHeader className="shrink-0 pr-6">
-            <DialogTitle className="font-headline text-3xl">Create New Propagation Batch</DialogTitle>
+            <DialogTitle className="font-headline text-3xl">Start Propagation</DialogTitle>
+            <DialogDescription>
+              Pick variety, tray size, quantity and starting location for propagation.
+            </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
             <PropagationForm orgId={orgId ?? undefined} />
@@ -513,7 +513,7 @@ export default function HomePageView({
               onSubmitSuccess={(batch) => {
                 toast({ title: "Check-in Successful", description: `Batch #${batch.batchNumber} created.` });
                 setIsCheckinFormOpen(false); 
-                forceRefresh(); 
+                // Consider adding a manual refetch here if needed
               }}
               onCancel={() => setIsCheckinFormOpen(false)}
             />

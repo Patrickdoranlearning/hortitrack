@@ -1,5 +1,4 @@
 // src/server/db/admin.ts
-"use client";
 import "server-only";
 import {
   getApps,

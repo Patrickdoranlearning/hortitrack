@@ -1,7 +1,6 @@
 
 'use server';
 
-import { productionProtocol } from '@/ai/flows/production-protocol';
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
@@ -80,6 +79,7 @@ export async function getBatchesAction() {
 
 export async function getProductionProtocolAction(batchId: string) {
   try {
+    const { productionProtocol } = await import('@/ai/flows/production-protocol');
     const batch = await getBatchById(batchId);
     if (!batch) {
         return { success: false, error: 'Batch not found.' };
