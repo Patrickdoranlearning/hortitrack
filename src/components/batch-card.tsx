@@ -2,18 +2,18 @@
 "use client";
 
 import * as React from "react";
+import { useState } from "react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+  Card
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from './ui/progress';
 import { cn } from "@/lib/utils";
 import type { Batch } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { TransplantForm } from "@/components/batches/TransplantForm";
+
 
 type BatchCardProps = {
   batch: Batch;
@@ -28,7 +28,14 @@ export function BatchCard({
   actionsSlot,
   className,
 }: BatchCardProps) {
-  console.log("BatchCard received batch:", batch); // Added console log
+  const [open, setOpen] = useState(false);
+  const parentSummary = {
+    id: (batch as any).id,
+    batch_number: batch.batchNumber,
+    quantity: batch.quantity ?? 0,
+    plant_variety_id: (batch as any).plant_variety_id,
+    supplier_id: (batch as any).supplier_id ?? null,
+  };
 
   const stockPercentage =
     (batch.initialQuantity ?? 0) > 0
@@ -74,8 +81,23 @@ export function BatchCard({
           </div>
         </div>
         {/* Place actions here; they must stop propagation */}
-        <div onClick={(e) => e.stopPropagation()} className="relative z-10">
+        <div onClick={(e) => e.stopPropagation()} className="relative z-10 flex items-center gap-2">
           {actionsSlot}
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button variant="default">Transplant</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Transplant from {batch.batchNumber}</DialogTitle>
+              </DialogHeader>
+              <TransplantForm
+                parentBatch={parentSummary}
+                onSuccess={() => { setOpen(false); /* You may want to trigger a data refresh here */ }}
+                onCancel={() => setOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
