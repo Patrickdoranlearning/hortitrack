@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useActiveOrg } from '@/lib/org/context';
-import AsyncCombobox from '@/components/ui/AsyncCombobox';
+import { AsyncCombobox } from "@/components/common/AsyncCombobox";
 import React from 'react';
 
 const Schema = z.object({
@@ -50,76 +50,30 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
   return (
     <Form {...form}>
       <form className="space-y-4">
-        <FormField
-            name="variety_id"
-            control={form.control}
-            render={({field}) => (
-                <FormItem>
-                    <FormLabel>Variety</FormLabel>
-                    <AsyncCombobox
-                        value={variety?.value ?? null}
-                        onChange={(opt) => { setVariety(opt ? {value: opt, label: opt} : null); field.onChange(opt); }}
-                        endpoint="/api/options/varieties"
-                        placeholder="Search variety..."
-                    />
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
-         <FormField
-            name="size_id"
-            control={form.control}
-            render={({field}) => (
-                <FormItem>
-                    <FormLabel>Tray Size</FormLabel>
-                    <AsyncCombobox
-                        value={size?.value ?? null}
-                        onChange={(opt) => { setSize(opt ? {value: opt, label: opt} : null); field.onChange(opt); }}
-                        endpoint="/api/options/sizes"
-                        placeholder="Select tray size"
-                    />
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
-
-        {/* Nursery (Site) */}
-        <FormField
+        <AsyncCombobox
+          name="plant_variety_id"
           control={form.control}
-          name="nursery_site"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nursery</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/options/sites"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Select nursery"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          resource="varieties"
+          placeholder="Search variety"
         />
-
-         {/* Location */}
-         <FormField
-            name="location_id"
-            control={form.control}
-            render={({field}) => (
-                <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <AsyncCombobox
-                        value={location?.value ?? null}
-                        onChange={(opt) => { setLocation(opt ? {value: opt, label: opt} : null); field.onChange(opt); }}
-                        endpoint={`/api/options/locations${nurserySite ? `?site=${encodeURIComponent(nurserySite)}` : ""}`}
-                        placeholder={nurserySite ? "Search locations" : "Select nursery first"}
-                        disabled={!nurserySite}
-                    />
-                    <FormMessage />
-                </FormItem>
-            )}
+        <AsyncCombobox
+          name="size_id"
+          control={form.control}
+          resource="sizes"
+          placeholder="Select tray size"
+        />
+        <AsyncCombobox
+          name="site_id"
+          control={form.control}
+          resource="sites"
+          placeholder="Select nursery"
+        />
+        <AsyncCombobox
+          name="location_id"
+          control={form.control}
+          resource="locations"
+          params={() => ({ siteId: form.getValues("site_id") })}
+          placeholder="Search location"
         />
 
         <FormField control={form.control} name="trays" render={({ field }) => (

@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Star, Loader2 } from "lucide-react";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import AsyncCombobox from "@/components/ui/AsyncCombobox"; // Changed to default import
+import { AsyncCombobox } from "@/components/common/AsyncCombobox";
 import { Switch } from "@/components/ui/switch";
 
 const CheckinFormSchema = z.object({
@@ -48,6 +48,7 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
   const [ppOverrideEnabled, setPpOverrideEnabled] = useState<boolean>(false);
   const [pestObserved, setPestObserved] = useState<boolean>(false);
   const [diseaseObserved, setDiseaseObserved] = useState<boolean>(false);
+  const [siteId, setSiteId] = React.useState<string | undefined>(undefined);
 
   const form = useForm<CheckinFormInput>({
     resolver: zodResolver(CheckinFormSchema),
@@ -152,104 +153,45 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {/* Variety */}
-        <FormField
-          control={form.control}
+        <AsyncCombobox
           name="plant_variety_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Variety</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/options/varieties"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search varieties"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          control={form.control}
+          resource="varieties"
+          placeholder="Search variety"
         />
 
         {/* Size */}
-        <FormField
-          control={form.control}
+        <AsyncCombobox
           name="size_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Size</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/options/sizes"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search sizes"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          control={form.control}
+          resource="sizes"
+          placeholder="Select size"
         />
 
-        {/* Nursery (Site) */}
-        <FormField
+        {/* Nursery / Site */}
+        <AsyncCombobox
+          name="site_id"
           control={form.control}
-          name="nursery_site"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nursery</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/options/sites"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Select nursery (e.g., Main Nursery, Alberts)"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          resource="sites"
+          placeholder="Select nursery"
+          onSelected={(opt) => setSiteId(opt?.id)}
         />
 
-        {/* Location */}
-        <FormField
-          control={form.control}
+        {/* Location (depends on Nursery) */}
+        <AsyncCombobox
           name="location_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Location</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint={`/api/options/locations${nurserySite ? `?site=${encodeURIComponent(nurserySite)}` : ""}`}
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder={nurserySite ? "Search locations" : "Select nursery first"}
-                  disabled={!nurserySite}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          control={form.control}
+          resource="locations"
+          placeholder={siteId ? "Search location" : "Select nursery first"}
+          params={() => ({ siteId })}
         />
 
         {/* Supplier */}
-        <FormField
-          control={form.control}
+        <AsyncCombobox
           name="supplier_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Supplier</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/options/suppliers"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search suppliers"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          control={form.control}
+          resource="suppliers"
+          placeholder="Search supplier"
         />
 
         {/* Quantity */}
