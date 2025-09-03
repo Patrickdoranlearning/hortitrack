@@ -1,6 +1,6 @@
 // src/lib/production/phase.ts
 // Infer phase from size metadata (best-effort until sizes carry explicit phase).
-// DB: plant_sizes.container_type ('pot'|'tray'), cell_multiple >=1. :contentReference[oaicite:8]{index=8}
+// DB: plant_sizes.container_type ('pot'|'tray'), cell_multiple >=1.
 export type ProductionPhase = "propagation" | "plug" | "potted";
 
 export function inferPhase(opts: { containerType: "pot" | "tray"; cellMultiple: number }): ProductionPhase {

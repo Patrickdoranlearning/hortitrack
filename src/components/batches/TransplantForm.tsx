@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { toast } from "sonner";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { getBrowserSupabase } from "@/lib/supabase/browserClient";
 
 // You likely have generic Select components:
 import { Select, SelectTrigger, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectValue } from "@/components/ui/select";
@@ -33,10 +33,10 @@ export function TransplantForm(props: {
   onSuccess?: (childBatchId: string) => void;
   onCancel?: () => void;
 }) {
-  const sb = createClientComponentClient();
   const [sizes, setSizes] = useState<SizeRow[]>([]);
   const [locations, setLocations] = useState<LocationRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const sb = getBrowserSupabase();
 
   const form = useForm<TransplantRequest>({
     resolver: zodResolver(TransplantRequestSchema),
@@ -62,10 +62,25 @@ export function TransplantForm(props: {
 
   useEffect(() => {
     (async () => {
-      const { data: s, error: se } = await sb.from("plant_sizes").select("id, name, container_type, cell_multiple").order("name");
-      if (!se && s) setSizes(s as any);
-      const { data: l, error: le } = await sb.from("nursery_locations").select("id, name").order("name");
-      if (!le && l) setLocations(l as any);
+      try {
+        // Get the current access token and forward it to API
+        const { data: sessionData } = await sb.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const [sRes, lRes] = await Promise.all([
+          fetch("/api/lookups/sizes", { cache: "no-store", headers }),
+          fetch("/api/lookups/locations", { cache: "no-store", headers }),
+        ]);
+        const sJson = await sRes.json();
+        const lJson = await lRes.json();
+        if (!sRes.ok) throw new Error(sJson?.error || "Sizes load failed");
+        if (!lRes.ok) throw new Error(lJson?.error || "Locations load failed");
+        setSizes(sJson.sizes as SizeRow[]);
+        setLocations(lJson.locations as LocationRow[]);
+      } catch (e: any) {
+        console.error("[TransplantForm] lookups failed:", e);
+      }
     })();
   }, [sb]);
 
@@ -201,7 +216,7 @@ export function TransplantForm(props: {
               <FormItem><FormLabel>Passport A (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="passportOverrideB" render={({ field }) => (
-              <FormItem><FormLabel>Passport B (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormMessage></FormItem>
+              <FormItem><FormLabel>Passport B (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="passportOverrideC" render={({ field }) => (
               <FormItem><FormLabel>Passport C (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>

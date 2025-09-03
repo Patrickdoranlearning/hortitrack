@@ -1,16 +1,16 @@
 // src/app/api/production/transplants/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { TransplantRequestSchema, TransplantResponseSchema } from "@/lib/validators/transplant";
 import { performTransplant } from "@/server/production/transplantService";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     // Quick validation for clear 400s
     const body = await req.json();
     TransplantRequestSchema.parse(body);
 
-    // Execute service
-    const result = await performTransplant(new NextRequest(req.url, { method: "POST", body: JSON.stringify(body), headers: req.headers }));
+    // Execute service with already-validated body
+    const result = await performTransplant(body);
     const parsed = TransplantResponseSchema.parse(result);
 
     return NextResponse.json(parsed, { status: 201 });

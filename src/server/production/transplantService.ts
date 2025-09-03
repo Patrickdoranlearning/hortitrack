@@ -1,32 +1,18 @@
 // src/server/production/transplantService.ts
 import { z } from "zod";
-import { TransplantRequestSchema } from "@/lib/validators/transplant";
+import { TransplantRequestSchema, type TransplantRequest } from "@/lib/validators/transplant";
 import { inferPhase } from "@/lib/production/phase";
 import { getSupabaseForRequest } from "@/server/db/supabaseServer";
-import { NextRequest } from "next/server";
+import { getActiveOrgId } from "@/server/auth/org";
 
 const uuid = z.string().uuid();
 
 type Supabase = ReturnType<typeof getSupabaseForRequest>;
 
-async function getActiveOrgId(sb: Supabase) {
-  const { data: { user }, error: userErr } = await sb.auth.getUser();
-  if (userErr || !user) throw new Error("Unauthenticated");
-  const { data, error } = await sb
-    .from("profiles")
-    .select("active_org_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (error || !data?.active_org_id) throw new Error("No active org set");
-  return data.active_org_id as string;
-}
-
-export async function performTransplant(req: NextRequest) {
-  const sb = getSupabaseForRequest(req);
+export async function performTransplant(inputRaw: TransplantRequest) {
+  const sb = getSupabaseForRequest();
   const orgId = await getActiveOrgId(sb);
-
-  const body = await req.json();
-  const input = TransplantRequestSchema.parse(body);
+  const input = TransplantRequestSchema.parse(inputRaw);
 
   // 1) Load parent batch (with variety/supplier) and ensure org matches
   const { data: parent, error: pErr } = await sb
@@ -52,7 +38,7 @@ export async function performTransplant(req: NextRequest) {
     .maybeSingle();
   if (lErr || !loc) throw new Error("Location not found");
 
-  const sizeMultiple = Number(size.cell_multiple ?? 1); // trays>1, pots=1  :contentReference[oaicite:9]{index=9}
+  const sizeMultiple = Number(size.cell_multiple ?? 1); // trays>1, pots=1
   const unitsToProduce = input.containers * sizeMultiple;
 
   if (unitsToProduce <= 0) throw new Error("Nothing to transplant");
@@ -70,12 +56,12 @@ export async function performTransplant(req: NextRequest) {
   const newBatchInsert = {
     org_id: orgId,
     batch_number: childBatchNumber,
-    phase, // text enum in DB (production_phase) :contentReference[oaicite:10]{index=10}
+    phase, // text enum in DB (production_phase)
     supplier_id: parent.supplier_id ?? null,
     plant_variety_id: parent.plant_variety_id,
     size_id: input.newSizeId,
     location_id: input.newLocationId,
-    status: "Growing", // default per schema; explicit for clarity :contentReference[oaicite:11]{index=11}
+    status: "Growing", // default per schema; explicit for clarity
     quantity: unitsToProduce,
     initial_quantity: unitsToProduce,
     quantity_produced: unitsToProduce,
