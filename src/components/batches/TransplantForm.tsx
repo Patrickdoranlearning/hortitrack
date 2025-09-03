@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { toast } from "sonner";
-import { getBrowserSupabase } from "@/lib/supabase/browserClient";
+import { getBrowserSupabase, getAccessToken } from "@/lib/supabase/browserClient";
 
 // You likely have generic Select components:
 import { Select, SelectTrigger, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectValue } from "@/components/ui/select";
@@ -33,10 +33,11 @@ export function TransplantForm(props: {
   onSuccess?: (childBatchId: string) => void;
   onCancel?: () => void;
 }) {
+  const sb = getBrowserSupabase();
   const [sizes, setSizes] = useState<SizeRow[]>([]);
   const [locations, setLocations] = useState<LocationRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const sb = getBrowserSupabase();
+  const [authIssue, setAuthIssue] = useState<string | null>(null);
 
   const form = useForm<TransplantRequest>({
     resolver: zodResolver(TransplantRequestSchema),
@@ -63,9 +64,11 @@ export function TransplantForm(props: {
   useEffect(() => {
     (async () => {
       try {
-        // Get the current access token and forward it to API
-        const { data: sessionData } = await sb.auth.getSession();
-        const token = sessionData?.session?.access_token;
+        const token = await getAccessToken(sb);
+        if (!token) {
+          setAuthIssue("Please sign in to load sizes and locations.");
+          return;
+        }
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         const [sRes, lRes] = await Promise.all([
@@ -78,8 +81,10 @@ export function TransplantForm(props: {
         if (!lRes.ok) throw new Error(lJson?.error || "Locations load failed");
         setSizes(sJson.sizes as SizeRow[]);
         setLocations(lJson.locations as LocationRow[]);
+        setAuthIssue(null);
       } catch (e: any) {
         console.error("[TransplantForm] lookups failed:", e);
+        setAuthIssue(e?.message ?? "Failed to load lookups");
       }
     })();
   }, [sb]);
@@ -91,9 +96,12 @@ export function TransplantForm(props: {
         return;
       }
       setLoading(true);
+      const token = await getAccessToken(sb);
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (token) (headers as any).Authorization = `Bearer ${token}`;
       const res = await fetch("/api/production/transplants", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(values),
       });
       const json = await res.json();
@@ -111,6 +119,9 @@ export function TransplantForm(props: {
 
   return (
     <Card className="p-4 space-y-4">
+      {authIssue ? (
+        <div className="text-sm text-red-600">{authIssue}</div>
+      ) : null}
       <div className="text-sm text-muted-foreground">
         Parent: <span className="font-semibold">{props.parentBatch.batch_number}</span> · Available units:{" "}
         <span className="font-semibold">{props.parentBatch.quantity}</span>

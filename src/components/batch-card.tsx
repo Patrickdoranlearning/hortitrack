@@ -87,13 +87,16 @@ export function BatchCard({
             <DialogTrigger asChild>
               <Button variant="default">Transplant</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl" aria-describedby="transplant-desc">
               <DialogHeader>
                 <DialogTitle>Transplant from {batch.batchNumber}</DialogTitle>
+                <p id="transplant-desc" className="text-sm text-muted-foreground">
+                  Create a new batch from this parent. Full trays/pots only.
+                </p>
               </DialogHeader>
               <TransplantForm
                 parentBatch={parentSummary}
-                onSuccess={() => { setOpen(false); /* You may want to trigger a data refresh here */ }}
+                onSuccess={() => { setOpen(false); /* trigger refresh */ }}
                 onCancel={() => setOpen(false)}
               />
             </DialogContent>
