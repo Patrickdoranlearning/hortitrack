@@ -89,6 +89,7 @@ const TABS = [
     { label: "Production", href: "/", exact: true },
     { label: "Sales", href: "/sales" },
     { label: "Plant Health", href: "/actions" },
+    { label: "Dispatch", href: "/dispatch" },
 ];
 
 export default function HomePageView({
