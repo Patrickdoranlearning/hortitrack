@@ -31,6 +31,7 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
           <DropdownMenuItem asChild className={moduleKey === "production" ? "bg-muted" : ""}><Link href="/production">Production</Link></DropdownMenuItem>
           <DropdownMenuItem asChild className={moduleKey === "plantHealth" ? "bg-muted" : ""}><Link href="/actions">Plant Health</Link></DropdownMenuItem>
           <DropdownMenuItem asChild className={moduleKey === "sales" ? "bg-muted" : ""}><Link href="/sales">Sales</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild className={moduleKey === "dispatch" ? "bg-muted" : ""}><Link href="/dispatch">Dispatch</Link></DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild><Link href="/logout">Log out</Link></DropdownMenuItem>
