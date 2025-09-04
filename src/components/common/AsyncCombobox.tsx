@@ -1,3 +1,4 @@
+
 "use client";
 import * as React from "react";
 import { useController, Control } from "react-hook-form";
@@ -5,6 +6,8 @@ import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from "@
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
+import { useContext, useMemo } from "react";
+import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 
 type Option = { id: string; label: string; [k: string]: any };
 
@@ -17,13 +20,25 @@ function useDebounced<T>(value: T, delay = 250) {
   return debounced;
 }
 
-async function fetchOptions(resource: string, params: Record<string, string | number | undefined>) {
-  const qs = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "") qs.set(k, String(v)); });
-  const url = `/api/options/${resource}?` + qs.toString();
-  // 3s hard timeout so we never hang
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort("timeout"), 3000);
+export async function fetchOptions(resource: string, url: string, controller: AbortController) {
+  // Zero-fetch short-circuit: use in-memory context for golden tables
+  const ctx = (() => {
+    try { return useContext(ReferenceDataContext); } catch { return null; }
+  })();
+  if (ctx?.data) {
+    if (resource === "locations") {
+      return ctx.data.locations.map((l) => ({ value: l.name, label: `${l.nursery_site} · ${l.name}` }));
+    }
+    if (resource === "sizes") {
+      return ctx.data.sizes.map((s) => ({ value: s.id, label: s.name }));
+    }
+    if (resource === "varieties") {
+      return ctx.data.varieties.map((v) => ({ value: v.name, label: v.name }));
+    }
+    if (resource === "suppliers") {
+      return ctx.data.suppliers.map((s) => ({ value: s.name, label: s.name }));
+    }
+  }
   const started = performance.now();
   const res = await fetch(url, { cache: "no-store", signal: controller.signal }).catch((err) => {
     console.error(`AsyncCombobox(${resource}) request failed`, { url, err });
@@ -118,7 +133,11 @@ export function AsyncCombobox({ name, control, resource, placeholder, params, on
         const queryParams = { q: debouncedQ, ...extra, limit: 20, debug: 1 };
         let data: Option[] = [];
         try {
-          data = await fetchOptions(resource, queryParams);
+          const url = new URL(`/api/options/${resource}`, window.location.origin);
+          Object.entries(queryParams).forEach(([k,v]) => {
+            if (v !== undefined) url.searchParams.set(k, String(v));
+          });
+          data = await fetchOptions(resource, url.toString(), new AbortController());
         } catch (err) {
           // API timed out or failed; fall through to fallback
         }

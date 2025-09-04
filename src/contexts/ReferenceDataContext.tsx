@@ -3,13 +3,8 @@
 
 import React from "react";
 import { fetchReferenceData, type ReferenceData } from "@/lib/referenceData/service";
-import { useToast } from "@/components/ui/use-toast";
 
-type Ctx = {
-  data: Omit<ReferenceData, "errors"> | null;
-  loading: boolean;
-  reload: () => void;
-};
+type Ctx = { data: Omit<ReferenceData, "errors"> | null; loading: boolean; reload: () => void; error?: string };
 
 export const ReferenceDataContext = React.createContext<Ctx>({
   data: null,
@@ -18,20 +13,14 @@ export const ReferenceDataContext = React.createContext<Ctx>({
 });
 
 export function ReferenceDataProvider({ children }: { children: React.ReactNode }) {
-  const { toast } = useToast();
   const [data, setData] = React.useState<Ctx["data"]>(null);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | undefined>(undefined);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     const res = await fetchReferenceData();
-    if (res.errors.length) {
-      toast({
-        variant: "destructive",
-        title: "Reference data partially failed",
-        description: "Using partial/empty lists. Check console for details.",
-      });
-    }
+    if (res.errors.length) setError(res.errors.join("; "));
     setData({
       varieties: res.varieties,
       sizes: res.sizes,
@@ -39,15 +28,11 @@ export function ReferenceDataProvider({ children }: { children: React.ReactNode 
       suppliers: res.suppliers,
     });
     setLoading(false);
-  }, [toast]);
+  }, []);
 
   React.useEffect(() => {
     void load();
   }, [load]);
 
-  return (
-    <ReferenceDataContext.Provider value={{ data, loading, reload: load }}>
-      {children}
-    </ReferenceDataContext.Provider>
-  );
+  return <ReferenceDataContext.Provider value={{ data, loading, reload: load, error }}>{children}</ReferenceDataContext.Provider>;
 }

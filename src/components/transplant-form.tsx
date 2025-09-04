@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +22,7 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
+import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 
 function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
   const out: Record<string, any> = {};
@@ -75,8 +76,10 @@ type Props = {
 };
 
 export function TransplantForm({
-  batch, nurseryLocations, plantSizes, onCancel, onSuccess, onSubmit: onSubmitProp, isNewPropagation,
+  batch, nurseryLocations, plantSizes = [], onSubmit: onSubmitProp, isNewPropagation, onCancel
 }: Props) {
+  const { data } = useContext(ReferenceDataContext);
+  const sizesSafe = (plantSizes && plantSizes.length ? plantSizes : data?.sizes ?? []) as Array<{ id: string; size: string; multiple?: number }>;
   const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<PlantSize | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -115,12 +118,19 @@ export function TransplantForm({
     }
   }, [form, selectedSize, defaultQty, isNewPropagation, form.watch("trayQuantity")]);
 
+  const newSizeId = form.watch("size");
+  const selectedSizeMemo = useMemo(
+    () => sizesSafe.find((s) => s.id === newSizeId),
+    [sizesSafe, newSizeId]
+  );
+  const sizeMultiple = selectedSizeMemo?.multiple ?? 1;
+
   const sortedPlantSizes = useMemo(() => {
     // Example sort by size string; adjust to your preference
-    return [...(plantSizes || [])].sort((a, b) =>
+    return [...(sizesSafe || [])].sort((a, b) =>
       String(a.size).localeCompare(String(b.size))
     );
-  }, [plantSizes]);
+  }, [sizesSafe]);
 
   function idemKey(values: TransplantFormData) {
     const key = [

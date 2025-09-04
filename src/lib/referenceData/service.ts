@@ -37,9 +37,11 @@ export async function fetchReferenceData(): Promise<ReferenceData> {
   const res = await fetch("/api/reference-data", { method: "GET", cache: "no-store" });
 
   if (!res.ok && res.status !== 207) {
-    const text = await res.text().catch(() => "");
-    console.error("[refdata] HTTP error", res.status, text);
-    return { varieties: [], sizes: [], locations: [], suppliers: [], errors: [`HTTP ${res.status}`] };
+    let payload: any = null;
+    try { payload = await res.json(); } catch { /* fall back */ }
+    const msg = payload?.errors ? JSON.stringify(payload.errors) : await res.text().catch(() => "");
+    console.error("[refdata] HTTP error", res.status, msg);
+    return { varieties: [], sizes: [], locations: [], suppliers: [], errors: [`HTTP ${res.status}: ${msg}`] };
   }
 
   const json = await res.json().catch((e) => {

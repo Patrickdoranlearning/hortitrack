@@ -66,7 +66,7 @@ import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
-import { BatchForm } from '@/components/batch-form';
+import EditBatchForm from '@/components/batches/EditBatchForm';
 
 const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
 const VarietyForm = dynamic(() => import('@/components/varieties/VarietyForm'), { ssr: false });
@@ -116,7 +116,7 @@ export default function HomePageView({
     }
   }, [orgId, batches, setOrgId]);
 
-  const { data: nurseryLocations } = useCollection<NurseryLocation>("nursery_locations");
+  const { data: nurseryLocations, forceRefresh } = useCollection<NurseryLocation>("nursery_locations");
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = React.useState(false);
@@ -466,7 +466,7 @@ export default function HomePageView({
             <DialogHeader>
               <DialogTitle>{editingBatch ? 'Edit Batch' : 'New Batch'}</DialogTitle>
             </DialogHeader>
-            <BatchForm
+            <EditBatchForm
               batch={editingBatch}
               onSubmitSuccess={(res) => {
                 toast({
@@ -570,7 +570,7 @@ export default function HomePageView({
               onSubmitSuccess={(batch) => {
                 toast({ title: "Check-in Successful", description: `Batch #${batch.batchNumber} created.` });
                 setIsCheckinFormOpen(false); 
-                // Consider adding a manual refetch here if needed
+                forceRefresh(); 
               }}
               onCancel={() => setIsCheckinFormOpen(false)}
             />
