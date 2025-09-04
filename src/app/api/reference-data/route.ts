@@ -1,3 +1,4 @@
+
 // src/app/api/reference-data/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -34,9 +35,11 @@ type Supplier = {
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const keyToUse = serviceKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  // Use service role if present (best), else anon (requires RLS read). Never expose service key to client.
-  return createClient(url, keyToUse, {
+  if (!serviceKey) {
+    // Make this loud and obvious in responses — anon key would trigger RLS/policy recursion
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured on the server");
+  }
+  return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
@@ -46,7 +49,8 @@ export async function GET() {
     const supabase = getClient();
     // Fetch in parallel; return a narrow, safe shape.
     const [varietiesRes, sizesRes, locationsRes, suppliersRes] = await Promise.all([
-      supabase.from("plant_varieties").select("id,name,family,genus,species,category").order("name", { ascending: true }),
+      // IMPORTANT: DB column is "Category" (case-sensitive), not "category"
+      supabase.from("plant_varieties").select('id,name,family,genus,species,"Category"').order("name", { ascending: true }),
       supabase.from("plant_sizes").select("id,name,container_type,cell_multiple").order("name", { ascending: true }),
       supabase.from("nursery_locations").select("id,name,nursery_site").order("name", { ascending: true }),
       supabase.from("suppliers").select("id,name,producer_code,country_code").order("name", { ascending: true }),
@@ -74,11 +78,21 @@ export async function GET() {
       );
     }
 
+    // Map "Category" -> category for consistency
+    const varieties = (varietiesRes.data ?? []).map((v: any) => ({
+      id: v.id,
+      name: v.name,
+      family: v.family ?? null,
+      genus: v.genus ?? null,
+      species: v.species ?? null,
+      category: v["Category"] ?? null,
+    }));
+
     return NextResponse.json(
       {
         ok: true,
         errors: [],
-        varieties: (varietiesRes.data ?? []) as Variety[],
+        varieties,
         sizes: (sizesRes.data ?? []) as PlantSize[],
         locations: (locationsRes.data ?? []) as NurseryLocation[],
         suppliers: (suppliersRes.data ?? []) as Supplier[],

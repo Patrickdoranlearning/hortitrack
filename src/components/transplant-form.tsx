@@ -68,7 +68,7 @@ export type TransplantFormData = z.infer<ReturnType<typeof formSchema>>;
 type Props = {
   batch: Batch | null;
   nurseryLocations: NurseryLocation[];
-  plantSizes: PlantSize[];
+  plantSizes?: PlantSize[];
   onSubmit: (data: TransplantFormData) => Promise<void>;
   onCancel: () => void;
   onSuccess?: (newBatch: { batchId: string; batchNumber: string }) => void;
@@ -79,7 +79,7 @@ export function TransplantForm({
   batch, nurseryLocations, plantSizes = [], onSubmit: onSubmitProp, isNewPropagation, onCancel
 }: Props) {
   const { data } = useContext(ReferenceDataContext);
-  const sizesSafe = (plantSizes && plantSizes.length ? plantSizes : data?.sizes ?? []) as Array<{ id: string; size: string; multiple?: number }>;
+  const sizesSafe = (plantSizes && plantSizes.length ? plantSizes : data?.sizes ?? []) as Array<PlantSize>;
   const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<PlantSize | null>(null);
   const abortRef = useRef<AbortController | null>(null);

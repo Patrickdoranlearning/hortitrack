@@ -21,34 +21,17 @@ function useDebounced<T>(value: T, delay = 250) {
 }
 
 export async function fetchOptions(resource: string, url: string, controller: AbortController) {
-  // Zero-fetch short-circuit: use in-memory context for golden tables
-  const ctx = (() => {
-    try { return useContext(ReferenceDataContext); } catch { return null; }
-  })();
-  if (ctx?.data) {
-    if (resource === "locations") {
-      return ctx.data.locations.map((l) => ({ value: l.name, label: `${l.nursery_site} · ${l.name}` }));
-    }
-    if (resource === "sizes") {
-      return ctx.data.sizes.map((s) => ({ value: s.id, label: s.name }));
-    }
-    if (resource === "varieties") {
-      return ctx.data.varieties.map((v) => ({ value: v.name, label: v.name }));
-    }
-    if (resource === "suppliers") {
-      return ctx.data.suppliers.map((s) => ({ value: s.name, label: s.name }));
-    }
-  }
   const started = performance.now();
   const res = await fetch(url, { cache: "no-store", signal: controller.signal }).catch((err) => {
     console.error(`AsyncCombobox(${resource}) request failed`, { url, err });
     throw err;
   });
-  clearTimeout(timeout);
+  const timeout = setTimeout(() => controller.abort(), 3000);
   if (!res.ok) {
     console.warn(`AsyncCombobox(${resource}) HTTP ${res.status} ${res.statusText}`, { url });
     throw new Error(`Failed to fetch options: ${res.status} ${res.statusText}`);
   }
+  clearTimeout(timeout);
   const count = res.headers.get("X-Horti-Count");
   const timedOut = res.headers.get("X-Horti-Timeout") === "1";
   const dur = Math.round(performance.now() - started);
@@ -107,59 +90,59 @@ async function fetchOptionsFallback(resource: string, params: Record<string, any
 type Props = {
   name: string;
   control: Control<any>;
-  resource: "varieties" | "sizes" | "suppliers" | "sites" | "locations";
+  resource: "varieties" | "sizes" | "suppliers" | "sites" | "locations" | string;
+  url?: string;
   placeholder?: string;
   // Extra query params e.g. { siteId }
   params?: () => Record<string, string | undefined>;
   onSelected?: (opt: Option | null) => void;
 };
 
-export function AsyncCombobox({ name, control, resource, placeholder, params, onSelected }: Props) {
+export function AsyncCombobox({ name, control, resource, url, placeholder, params, onSelected }: Props) {
+  const ref = useContext(ReferenceDataContext);
   const { field } = useController({ name, control });
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
   const debouncedQ = useDebounced(q);
   const [options, setOptions] = React.useState<Option[] | unknown>([]);
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<Error | null>(null);
 
   // Fetch on open and q change
   React.useEffect(() => {
     let abort = false;
     (async () => {
-      if (!open) return;
-      setLoading(true);
       try {
-        const extra = params?.() ?? {};
-        const queryParams = { q: debouncedQ, ...extra, limit: 20, debug: 1 };
-        let data: Option[] = [];
-        try {
-          const url = new URL(`/api/options/${resource}`, window.location.origin);
-          Object.entries(queryParams).forEach(([k,v]) => {
-            if (v !== undefined) url.searchParams.set(k, String(v));
-          });
-          data = await fetchOptions(resource, url.toString(), new AbortController());
-        } catch (err) {
-          // API timed out or failed; fall through to fallback
-        }
-        if (Array.isArray(data) && data.length > 0) {
-          if (!abort) setOptions(data);
+        setLoading(true);
+        // Golden tables: use context directly, skip network
+        if (ref.data && ["locations", "sizes", "varieties", "suppliers"].includes(resource)) {
+          const o =
+            resource === "locations"
+              ? ref.data.locations.map((l) => ({ value: l.name, label: `${l.nursery_site} · ${l.name}`, ...l }))
+              : resource === "sizes"
+              ? ref.data.sizes.map((s) => ({ value: s.id, label: s.name, ...s }))
+              : resource === "varieties"
+              ? ref.data.varieties.map((v) => ({ value: v.name, label: v.name, ...v }))
+              : ref.data.suppliers.map((s) => ({ value: s.name, label: s.name, ...s }));
+          if (!abort) setOptions(o as any);
+        } else if (url) {
+          const controller = new AbortController();
+          const opts = await fetchOptions(resource, url, controller);
+          if (!abort) setOptions(opts);
         } else {
-          // Fallback to direct Supabase (browser) to prove data path
-          const started = performance.now();
-          const fb = await fetchOptionsFallback(resource, queryParams);
-          const dur = Math.round(performance.now() - started);
-          console.info(`AsyncCombobox(${resource}) fallback`, { size: fb.length, durMs: dur });
-          if (!abort) setOptions(fb);
+          if (!abort) setOptions([]);
         }
       } catch (e) {
-        if (!abort) setOptions([]);
-        console.error(`AsyncCombobox(${resource}) fetch failed`, e);
+        if (!abort) setError(e as Error);
       } finally {
         if (!abort) setLoading(false);
       }
     })();
-    return () => { abort = true; };
-  }, [open, debouncedQ, resource, params]);
+    return () => {
+      abort = true;
+    };
+  }, [resource, url, ref.data, debouncedQ]);
+
 
   // Normalize runtime values to avoid ".find is not a function"
   const list: Option[] = Array.isArray(options) ? (options as Option[]) : [];

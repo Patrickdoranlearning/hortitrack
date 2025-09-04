@@ -1,3 +1,4 @@
+
 // src/lib/referenceData/service.ts
 export type ReferenceData = {
   varieties: Array<{
@@ -6,7 +7,7 @@ export type ReferenceData = {
     family: string | null;
     genus: string | null;
     species: string | null;
-    category: string | null;
+    category: string | null; // mapped from "Category" on the server
   }>;
   sizes: Array<{ id: string; name: string; container_type: string; cell_multiple: number }>;
   locations: Array<{ id: string; name: string; nursery_site: string }>;
@@ -41,7 +42,7 @@ export async function fetchReferenceData(): Promise<ReferenceData> {
     try { payload = await res.json(); } catch { /* fall back */ }
     const msg = payload?.errors ? JSON.stringify(payload.errors) : await res.text().catch(() => "");
     console.error("[refdata] HTTP error", res.status, msg);
-    return { varieties: [], sizes: [], locations: [], suppliers: [], errors: [`HTTP ${res.status}: ${msg}`] };
+    return { varieties: [], sizes: [], locations: [], suppliers: [], errors: [`HTTP ${res.status}: ${msg || "no body"}`] };
   }
 
   const json = await res.json().catch((e) => {
