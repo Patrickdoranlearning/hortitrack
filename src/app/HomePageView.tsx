@@ -88,7 +88,7 @@ interface HomePageViewProps {
 const TABS = [
     { label: "Production", href: "/", exact: true },
     { label: "Sales", href: "/sales" },
-    { label: "Actions", href: "/actions" },
+    { label: "Plant Health", href: "/actions" },
 ];
 
 export default function HomePageView({
@@ -586,5 +586,3 @@ export default function HomePageView({
     </PageFrame>
   );
 }
-
-    

@@ -29,7 +29,7 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
         <DropdownMenuLabel>Switch Module</DropdownMenuLabel>
         <DropdownMenuGroup>
           <DropdownMenuItem asChild className={moduleKey === "production" ? "bg-muted" : ""}><Link href="/production">Production</Link></DropdownMenuItem>
-          <DropdownMenuItem asChild className={moduleKey === "actions" ? "bg-muted" : ""}><Link href="/actions">Actions</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild className={moduleKey === "plantHealth" ? "bg-muted" : ""}><Link href="/actions">Plant Health</Link></DropdownMenuItem>
           <DropdownMenuItem asChild className={moduleKey === "sales" ? "bg-muted" : ""}><Link href="/sales">Sales</Link></DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

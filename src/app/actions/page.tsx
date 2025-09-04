@@ -15,7 +15,7 @@ import type { NurseryLocation } from '@/lib/types';
 const TABS = [
     { label: "Production", href: "/", exact: true },
     { label: "Sales", href: "/sales" },
-    { label: "Actions", href: "/actions" },
+    { label: "Plant Health", href: "/actions" },
 ];
 
 export default function ActionsPage() {
@@ -23,11 +23,11 @@ export default function ActionsPage() {
   const { data: locations, loading: locationsLoading } = useCollection<NurseryLocation>('locations');
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="actions" moduleTabs={TABS}>
+    <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth" moduleTabs={TABS}>
       <div className="space-y-6">
         <ModulePageHeader 
-            title="Log Actions"
-            description="Record nursery activities like moving, dumping, or adding notes to batches."
+            title="Plant Health"
+            description="Log and manage activities related to plant health, such as treatments, inspections, and notes."
             actionsSlot={
                 <Button onClick={() => setIsActionLogOpen(true)}>
                     <Plus />
@@ -43,7 +43,7 @@ export default function ActionsPage() {
                     Recent Activity
                 </CardTitle>
                 <CardDescription>
-                    A live feed of all actions logged across the nursery will be displayed here.
+                    A live feed of all plant health actions logged across the nursery will be displayed here.
                 </CardDescription>
             </CardHeader>
             <CardContent>

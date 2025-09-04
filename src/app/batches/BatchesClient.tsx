@@ -114,7 +114,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     { label: "Production", href: "/", exact: true },
     { label: "Batches", href: "/batches" },
     { label: "Sales", href: "/sales" },
-    { label: "Actions", href: "/actions" },
+    { label: "Plant Health", href: "/actions" },
 ];
 
   if (isDataLoading && !batches.length) {
