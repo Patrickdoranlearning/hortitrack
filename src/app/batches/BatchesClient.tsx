@@ -33,6 +33,7 @@ import { BatchCard } from '@/components/batch-card';
 import { Grid } from 'lucide-react';
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 export default function BatchesClient({ initialBatches }: { initialBatches: Batch[] }) {
@@ -77,7 +78,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
 
   const plantFamilies = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.plantFamily).filter(Boolean)))], [batches]);
   const categories = useMemo(() => ['all', ...Array.from(new Set(batches.map((b) => b.category).filter(Boolean)))], [batches]);
-  const statuses = useMemo(() => ['all', 'Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived'], []);
+  const statuses = useMemo(() => ['all', ...Array.from(new Set(batches.map(b => b.status)))], [batches]);
 
   const filteredBatches = useMemo(() => {
     const q = (searchQuery || '').trim();
@@ -113,8 +114,8 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const TABS = [
     { label: "Production", href: "/", exact: true },
     { label: "Batches", href: "/batches" },
-    { label: "Sales", href: "/sales" },
     { label: "Plant Health", href: "/actions" },
+    { label: "Dispatch", href: "/dispatch" },
 ];
 
   if (isDataLoading && !batches.length) {
@@ -147,93 +148,85 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
             }
         />
         
-        <Card>
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex gap-2">
-                        <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="shrink-0 w-full sm:w-auto">
-                            <Filter className="mr-2" />
-                            Filter by Status
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuRadioGroup value={filters.status} onValueChange={(value) => setFilters(f => ({ ...f, status: value }))}>
-                            {statuses.map(status => (
-                                <DropdownMenuRadioItem key={status} value={status}>{status === 'all' ? 'All Statuses' : status}</DropdownMenuRadioItem>
-                            ))}
-                            </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                        </DropdownMenu>
+        <div className="flex items-center gap-4">
+          <Select
+            value={filters.status}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, status: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {statuses.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
 
-                         <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="shrink-0 w-full sm:w-auto">
-                            <Filter className="mr-2" />
-                            Filter by Category
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuRadioGroup value={filters.category} onValueChange={(value) => setFilters(f => ({ ...f, category: value }))}>
-                            {categories.map(cat => (
-                                <DropdownMenuRadioItem key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</DropdownMenuRadioItem>
-                            ))}
-                            </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                        </DropdownMenu>
-                        
-                         <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="shrink-0 w-full sm:w-auto">
-                            <Filter className="mr-2" />
-                            Filter by Family
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                             <DropdownMenuLabel>Filter by Plant Family</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuRadioGroup value={filters.plantFamily} onValueChange={(value) => setFilters(f => ({ ...f, plantFamily: value }))}>
-                            {plantFamilies.map(fam => (
-                                <DropdownMenuRadioItem key={fam} value={fam}>{fam === 'all' ? 'All Families' : fam}</DropdownMenuRadioItem>
-                            ))}
-                            </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent>
-                {isDataLoading ? (
-                    <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
-                        {[...Array(9)].map((_, i) => <Skeleton key={i} className="h-40 w-full" />)}
-                    </div>
-                ) : (
-                    <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
-                      {filteredBatches.map((batch) => (
-                          <BatchCard
-                            key={batch.id}
-                            batch={batch}
-                            onOpen={handleViewDetails}
-                          />
-                      ))}
-                    </div>
-                )}
-                 {filteredBatches.length === 0 && !isDataLoading && (
-                    <div className="flex h-[20vh] flex-col items-center justify-center rounded-lg text-center">
-                         <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="mt-4 text-lg font-semibold">No Batches Found</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            Try adjusting your search or filters.
-                        </p>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+          <Select
+            value={filters.category}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, category: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by category" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {(categories || []).map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.plantFamily}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, plantFamily: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by family" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Families</SelectItem>
+                {(plantFamilies || []).map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
+          {isDataLoading ? (
+              [...Array(9)].map((_, i) => <Skeleton key={i} className="h-40 w-full" />)
+          ) : (
+              filteredBatches.map((batch) => (
+                  <BatchCard
+                    key={batch.id}
+                    batch={batch}
+                    onOpen={handleViewDetails}
+                  />
+              ))
+          )}
+          </div>
+          {filteredBatches.length === 0 && !isDataLoading && (
+              <div className="text-center col-span-full py-20">
+                    <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">No Batches Found</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    Try adjusting your search or filters.
+                </p>
+            </div>
+        )}
 
       <BatchDetailDialog
         open={isDetailDialogOpen}
