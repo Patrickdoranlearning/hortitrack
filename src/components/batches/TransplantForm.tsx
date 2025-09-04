@@ -16,7 +16,7 @@ import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 // You likely have generic Select components:
 import { Select, SelectTrigger, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectValue } from "@/components/ui/select";
-import { AsyncCombobox } from "../common/AsyncCombobox";
+import { AsyncCombobox } from "@/components/ui/AsyncCombobox"; // Corrected import path
 
 type BatchSummary = {
   id: string;

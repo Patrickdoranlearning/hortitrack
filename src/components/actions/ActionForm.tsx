@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { useToast } from "@/hooks/use-toast";
 import type { Batch, NurseryLocation } from "@/lib/types";
-import { PhotoPicker } from "@/components/photos/PhotoPicker";
+import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader"; // Corrected import path to use BatchPhotoUploader
 import { fetchJson } from "@/lib/http";
 
 function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
@@ -220,7 +219,7 @@ export function ActionForm({
         <TabsTrigger value="CHECKIN">Check-in</TabsTrigger>
       </TabsList>
 
-      <PhotoPicker batchId={String(batch.id ?? batch.batchNumber)} onUploaded={setUploaded} />
+      <BatchPhotoUploader batchId={String(batch.id ?? batch.batchNumber)} onUploaded={setUploaded} />
 
       <TabsContent value="MOVE">
         <Form {...moveForm}>
