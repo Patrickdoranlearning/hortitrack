@@ -1,9 +1,8 @@
-
 // src/components/batches/CheckInForm.tsx
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Star, Loader2 } from "lucide-react";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { AsyncCombobox } from "@/components/common/AsyncCombobox";
+import AsyncCombobox from "@/components/ui/AsyncCombobox";
 import { Switch } from "@/components/ui/switch";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
@@ -118,7 +117,7 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
     try {
       const payload = { ...values, orgId };
 
-      const res = await fetchWithAuth("/api/batches/checkin", {
+      const res = await fetch("/api/batches/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -154,9 +153,9 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
               <FormLabel>Variety</FormLabel>
               <FormControl>
                 <AsyncCombobox
-                  resource="varieties"
+                  endpoint="/api/catalog/varieties"
                   value={field.value ?? null}
-                  onChange={(opt) => field.onChange(opt?.id)}
+                  onChange={(v) => field.onChange(v)}
                   placeholder="Search varieties"
                 />
               </FormControl>
@@ -174,9 +173,9 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
               <FormLabel>Size</FormLabel>
               <FormControl>
                 <AsyncCombobox
-                  resource="sizes"
+                  endpoint="/api/catalog/sizes"
                   value={field.value ?? null}
-                  onChange={(opt) => field.onChange(opt?.id)}
+                  onChange={(v) => field.onChange(v)}
                   placeholder="Search sizes"
                 />
               </FormControl>
@@ -194,9 +193,9 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
               <FormLabel>Location</FormLabel>
               <FormControl>
                 <AsyncCombobox
-                  resource="locations"
+                  endpoint="/api/catalog/locations"
                   value={field.value ?? null}
-                  onChange={(opt) => field.onChange(opt?.id)}
+                  onChange={(v) => field.onChange(v)}
                   placeholder="Search locations"
                 />
               </FormControl>
@@ -214,9 +213,9 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
               <FormLabel>Supplier</FormLabel>
               <FormControl>
                 <AsyncCombobox
-                  resource="suppliers"
+                  endpoint="/api/catalog/suppliers"
                   value={field.value ?? null}
-                  onChange={(opt) => field.onChange(opt?.id)}
+                  onChange={(v) => field.onChange(v)}
                   placeholder="Search suppliers"
                 />
               </FormControl>

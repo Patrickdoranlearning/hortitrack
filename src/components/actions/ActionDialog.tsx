@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -27,9 +28,9 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations = 
     (async () => {
       try {
         setLoading(true);
-        const { data: json } = await fetchJson<any>("/api/locations", { headers: { Accept: "application/json" } });
-        const items = Array.isArray(json?.items) ? json.items : (Array.isArray(json) ? json : []);
-        if (!cancelled) setLocalLocations(items);
+        const json = await fetchJson<any>("/api/catalog/locations");
+        const items = Array.isArray(json) ? json : [];
+        if (!cancelled) setLocalLocations(items.map((item: any) => ({id: item.value, name: item.label})));
       } catch (e) {
         console.error("[ActionDialog] load locations failed", e);
       } finally {

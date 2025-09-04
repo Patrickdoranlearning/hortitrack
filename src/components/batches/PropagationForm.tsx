@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useActiveOrg } from '@/lib/org/context';
-import { AsyncCombobox } from "@/components/common/AsyncCombobox";
+import AsyncCombobox from "@/components/ui/AsyncCombobox";
 import React from 'react';
 import { fetchWithAuth } from '@/lib/fetchWithAuth';
 
@@ -51,26 +51,59 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <AsyncCombobox
+        <FormField
+          control={form.control}
           name="plant_variety_id"
-          control={form.control}
-          resource="varieties"
-          placeholder="Search variety"
-          fetcher={fetchWithAuth}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Variety</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  endpoint="/api/catalog/varieties"
+                  value={field.value ?? null}
+                  onChange={(v) => field.onChange(v)}
+                  placeholder="Search variety"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-        <AsyncCombobox
+        <FormField
+          control={form.control}
           name="size_id"
-          control={form.control}
-          resource="sizes"
-          placeholder="Select tray size"
-          fetcher={fetchWithAuth}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Size</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  endpoint="/api/catalog/sizes"
+                  value={field.value ?? null}
+                  onChange={(v) => field.onChange(v)}
+                  placeholder="Select tray size"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-        <AsyncCombobox
-          name="location_id"
+        <FormField
           control={form.control}
-          resource="locations"
-          placeholder="Search location"
-          fetcher={fetchWithAuth}
+          name="location_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Location</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  endpoint="/api/catalog/locations"
+                  value={field.value ?? null}
+                  onChange={(v) => field.onChange(v)}
+                  placeholder="Search location"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
         <FormField control={form.control} name="containers" render={({ field }) => (
