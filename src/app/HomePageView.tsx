@@ -408,28 +408,6 @@ export default function HomePageView({
                               <TooltipContent><p>Print Label</p></TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
-                        <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => handleLogAction(batch)}>
-                                  <CareIcon />
-                                  <span className="sr-only">Actions</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Log Action</p></TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" disabled={batch.quantity === 0}>
-                                  <TransplantIcon />
-                                  <span className="sr-only">Transplant</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Transplant</p></TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
                     </div>
                   }
                 />
