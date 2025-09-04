@@ -9,78 +9,75 @@ import { Input } from '@/components/ui/input';
 import { useActiveOrg } from '@/lib/org/context';
 import { AsyncCombobox } from "@/components/common/AsyncCombobox";
 import React from 'react';
+import { fetchWithAuth } from '@/lib/fetchWithAuth';
 
 const Schema = z.object({
-  variety_id: z.string().min(1),
+  plant_variety_id: z.string().min(1),
   size_id: z.string().min(1),
-  nursery_site: z.string().min(1, "Nursery is required."), // Changed to nursery_site (string)
   location_id: z.string().min(1),
-  trays: z.coerce.number().int().min(0),
+  containers: z.coerce.number().int().min(0),
   planted_at: z.string().min(1),
 });
-
-const VARIETY_SELECT = "id,name,family,genus,species";
-const SIZE_SELECT = "id,name,container_type,multiple:cell_multiple";
-const LOCATION_SELECT = "id,name";
 
 export default function PropagationForm({ orgId }: { orgId?: string }) {
   const { orgId: activeOrgId } = useActiveOrg();
   const form = useForm<z.infer<typeof Schema>>({
     resolver: zodResolver(Schema),
     defaultValues: { 
-      variety_id: '', 
+      plant_variety_id: '', 
       size_id: '', 
-      nursery_site: "", // Changed default value for nursery_site
       location_id: '', 
-      trays: 0, 
+      containers: 0, 
       planted_at: new Date().toISOString().slice(0,10) 
     },
   });
 
-  const [variety, setVariety] = React.useState<{ value: string; label: string; hint?: string } | null>(null);
-  const [size, setSize] = React.useState<{ value: string; label: string; meta?: any } | null>(null);
-  const [location, setLocation] = React.useState<{ value: string; label: string } | null>(null);
-
-  const nurserySite = form.watch("nursery_site"); // Watch for changes in nursery_site
-  React.useEffect(() => {
-    // when nursery changes, clear location selection
-    form.setValue("location_id", "" as any);
-  }, [nurserySite, form]); 
+  const onSubmit = async (values: z.infer<typeof Schema>) => {
+    try {
+      await fetchWithAuth('/api/batches/propagation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      });
+      // TODO: Add success toast
+    } catch (error) {
+      // TODO: Add error toast
+      console.error(error);
+    }
+  };
 
   return (
     <Form {...form}>
-      <form className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <AsyncCombobox
           name="plant_variety_id"
           control={form.control}
           resource="varieties"
           placeholder="Search variety"
+          fetcher={fetchWithAuth}
         />
         <AsyncCombobox
           name="size_id"
           control={form.control}
           resource="sizes"
           placeholder="Select tray size"
-        />
-        <AsyncCombobox
-          name="site_id"
-          control={form.control}
-          resource="sites"
-          placeholder="Select nursery"
+          fetcher={fetchWithAuth}
         />
         <AsyncCombobox
           name="location_id"
           control={form.control}
           resource="locations"
-          params={() => ({ siteId: form.getValues("site_id") })}
           placeholder="Search location"
+          fetcher={fetchWithAuth}
         />
 
-        <FormField control={form.control} name="trays" render={({ field }) => (
+        <FormField control={form.control} name="containers" render={({ field }) => (
           <FormItem>
             <FormLabel>Trays</FormLabel>
             <FormControl>
-              <Input type="number" value={field.value ?? 0} onChange={(e) => field.onChange(e.target.value)} />
+              <Input type="number" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -89,7 +86,7 @@ export default function PropagationForm({ orgId }: { orgId?: string }) {
           <FormItem>
             <FormLabel>Planted Date</FormLabel>
             <FormControl>
-              <Input type="date" value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value)} />
+              <Input type="date" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>

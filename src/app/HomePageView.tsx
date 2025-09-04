@@ -114,7 +114,7 @@ export default function HomePageView({
     }
   }, [orgId, batches, setOrgId]);
 
-  const { data: nurseryLocations } = useCollection<NurseryLocation>("locations");
+  const { data: nurseryLocations } = useCollection<NurseryLocation>("nursery_locations");
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = React.useState(false);
@@ -486,10 +486,14 @@ export default function HomePageView({
 
       {/* New Propagation Dialog */}
       <Dialog open={isNewPropagationOpen} onOpenChange={setIsNewPropagationOpen}>
-        <DialogContent size="xl" className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden">
+        <DialogContent
+          aria-describedby="new-propagation-desc"
+          size="xl"
+          className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden"
+        >
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="font-headline text-3xl">Start Propagation</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="new-propagation-desc">
               Pick variety, tray size, quantity and starting location for propagation.
             </DialogDescription>
           </DialogHeader>
@@ -501,10 +505,14 @@ export default function HomePageView({
 
       {/* Check-in Batch Dialog */}
       <Dialog open={isCheckinFormOpen} onOpenChange={setIsCheckinFormOpen}>
-        <DialogContent size="xl" className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden">
+        <DialogContent
+          aria-describedby="checkin-desc"
+          size="xl"
+          className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden"
+        >
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="font-headline text-3xl">Check-in New Batch</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="checkin-desc">
               Enter variety, size, quantity, supplier, location, quality, and optional plant passport overrides.
             </DialogDescription>
           </DialogHeader>
@@ -523,8 +531,13 @@ export default function HomePageView({
 
       {/* Other Dialogs */}
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
-        <DialogContent>
-            <DialogDescription>Fill in the plant variety details.</DialogDescription>
+        <DialogContent aria-describedby="variety-form-desc">
+            <DialogHeader>
+              <DialogTitle>New Variety</DialogTitle>
+              <DialogDescription id="variety-form-desc">
+                Fill in the plant variety details.
+              </DialogDescription>
+            </DialogHeader>
             <VarietyForm
                 variety={{ name: newVarietyName } as Variety}
                 onSubmit={async (data) => {

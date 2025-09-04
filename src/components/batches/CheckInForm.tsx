@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,11 +18,11 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { AsyncCombobox } from "@/components/common/AsyncCombobox";
 import { Switch } from "@/components/ui/switch";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 const CheckinFormSchema = z.object({
   plant_variety_id: z.string().uuid({ message: "Variety is required." }),
   size_id: z.string().uuid({ message: "Size is required." }),
-  nursery_site: z.string().min(1, "Nursery is required."), // Changed to nursery_site (string)
   location_id: z.string().uuid({ message: "Location is required." }),
   supplier_id: z.string().uuid().optional().nullable(),
   quantity: z.coerce.number().int().min(0, { message: "Quantity cannot be negative." }),
@@ -46,9 +46,6 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
   const { orgId } = useActiveOrg();
   const [formLoading, setFormLoading] = useState(false);
   const [ppOverrideEnabled, setPpOverrideEnabled] = useState<boolean>(false);
-  const [pestObserved, setPestObserved] = useState<boolean>(false);
-  const [diseaseObserved, setDiseaseObserved] = useState<boolean>(false);
-  const [siteId, setSiteId] = React.useState<string | undefined>(undefined);
 
   const form = useForm<CheckinFormInput>({
     resolver: zodResolver(CheckinFormSchema),
@@ -56,7 +53,6 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
     defaultValues: {
       plant_variety_id: "" as any,
       size_id: "" as any,
-      nursery_site: "", // Changed default value for nursery_site
       location_id: "" as any,
       supplier_id: null,
       quantity: 0,
@@ -69,12 +65,6 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
       disease_notes: "",
     },
   });
-
-  const nurserySite = form.watch("nursery_site"); // Watch for changes in nursery_site
-  React.useEffect(() => {
-    // when nursery changes, clear location selection
-    form.setValue("location_id", "" as any);
-  }, [nurserySite, form]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 6-star rating control used by Quality field
   function StarRating({
@@ -125,7 +115,7 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
     try {
       const payload = { ...values, orgId };
 
-      const res = await fetch("/api/batches/checkin", {
+      const res = await fetchWithAuth("/api/batches/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -158,6 +148,7 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
           control={form.control}
           resource="varieties"
           placeholder="Search variety"
+          fetcher={fetchWithAuth}
         />
 
         {/* Size */}
@@ -166,15 +157,7 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
           control={form.control}
           resource="sizes"
           placeholder="Select size"
-        />
-
-        {/* Nursery / Site */}
-        <AsyncCombobox
-          name="site_id"
-          control={form.control}
-          resource="sites"
-          placeholder="Select nursery"
-          onSelected={(opt) => setSiteId(opt?.id)}
+          fetcher={fetchWithAuth}
         />
 
         {/* Location (depends on Nursery) */}
@@ -182,8 +165,8 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
           name="location_id"
           control={form.control}
           resource="locations"
-          placeholder={siteId ? "Search location" : "Select nursery first"}
-          params={() => ({ siteId })}
+          placeholder="Search location"
+          fetcher={fetchWithAuth}
         />
 
         {/* Supplier */}
@@ -192,6 +175,7 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
           control={form.control}
           resource="suppliers"
           placeholder="Search supplier"
+          fetcher={fetchWithAuth}
         />
 
         {/* Quantity */}
@@ -282,17 +266,6 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
 
         {/* Pests & Disease */}
         <div className="rounded-lg border p-3 space-y-3">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Checkbox id="pestObserved" checked={pestObserved} onCheckedChange={(v) => setPestObserved(Boolean(v))} />
-              <label htmlFor="pestObserved" className="text-sm">Pests Observed</label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox id="diseaseObserved" checked={diseaseObserved} onCheckedChange={(v) => setDiseaseObserved(Boolean(v))} />
-              <label htmlFor="diseaseObserved" className="text-sm">Disease Observed</label>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField
               control={form.control}

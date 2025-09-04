@@ -69,7 +69,7 @@ import { getIdTokenOrNull } from "@/lib/auth/client"; // Import getIdTokenOrNull
 import { queryMatchesBatch } from '@/lib/search';
 import { parseScanCode } from '@/lib/scan/parse';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
-import { TransplantIcon, CareIcon } from '@/components/icons';
+import { CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CheckinDialog } from '@/components/checkin-dialog';
 
@@ -543,17 +543,6 @@ export default function HomePageView({
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent><p>Log Action</p></TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => handleTransplant(batch)} disabled={batch.quantity === 0}>
-                                  <TransplantIcon />
-                                  <span className="sr-only">Transplant</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Transplant</p></TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
                     </div>

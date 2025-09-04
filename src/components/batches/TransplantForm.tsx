@@ -12,10 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { toast } from "sonner";
-import { getBrowserSupabase, getAccessToken } from "@/lib/supabase/browserClient";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 // You likely have generic Select components:
 import { Select, SelectTrigger, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectValue } from "@/components/ui/select";
+import { AsyncCombobox } from "../common/AsyncCombobox";
 
 type BatchSummary = {
   id: string;
@@ -26,16 +27,13 @@ type BatchSummary = {
 };
 
 type SizeRow = { id: string; name: string; container_type: "pot" | "tray"; cell_multiple: number };
-type LocationRow = { id: string; name: string };
 
 export function TransplantForm(props: {
   parentBatch: BatchSummary;
   onSuccess?: (childBatchId: string) => void;
   onCancel?: () => void;
 }) {
-  const sb = getBrowserSupabase();
   const [sizes, setSizes] = useState<SizeRow[]>([]);
-  const [locations, setLocations] = useState<LocationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [authIssue, setAuthIssue] = useState<string | null>(null);
 
@@ -64,30 +62,17 @@ export function TransplantForm(props: {
   useEffect(() => {
     (async () => {
       try {
-        const token = await getAccessToken(sb);
-        if (!token) {
-          setAuthIssue("Please sign in to load sizes and locations.");
-          return;
-        }
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-        const [sRes, lRes] = await Promise.all([
-          fetch("/api/lookups/sizes", { cache: "no-store", headers }),
-          fetch("/api/lookups/locations", { cache: "no-store", headers }),
-        ]);
-        const sJson = await sRes.json();
-        const lJson = await lRes.json();
-        if (!sRes.ok) throw new Error(sJson?.error || "Sizes load failed");
-        if (!lRes.ok) throw new Error(lJson?.error || "Locations load failed");
-        setSizes(sJson.sizes as SizeRow[]);
-        setLocations(lJson.locations as LocationRow[]);
+        const res = await fetchWithAuth("/api/lookups/sizes");
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || "Sizes load failed");
+        setSizes(json.options as SizeRow[]);
         setAuthIssue(null);
       } catch (e: any) {
         console.error("[TransplantForm] lookups failed:", e);
         setAuthIssue(e?.message ?? "Failed to load lookups");
       }
     })();
-  }, [sb]);
+  }, []);
 
   async function onSubmit(values: TransplantRequest) {
     try {
@@ -96,12 +81,9 @@ export function TransplantForm(props: {
         return;
       }
       setLoading(true);
-      const token = await getAccessToken(sb);
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (token) (headers as any).Authorization = `Bearer ${token}`;
-      const res = await fetch("/api/production/transplants", {
+      const res = await fetchWithAuth("/api/production/transplants", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
       const json = await res.json();
@@ -168,26 +150,12 @@ export function TransplantForm(props: {
               )}
             />
 
-            <FormField
-              control={form.control}
+            <AsyncCombobox
               name="newLocationId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Location</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Locations</SelectLabel>
-                        {locations.map(l => (
-                          <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+              control={form.control}
+              resource="locations"
+              placeholder="Search location"
+              fetcher={fetchWithAuth}
             />
           </div>
 
