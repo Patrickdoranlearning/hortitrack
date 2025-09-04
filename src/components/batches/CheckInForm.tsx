@@ -1,8 +1,9 @@
+
 // src/components/batches/CheckInForm.tsx
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,6 +47,8 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
   const { orgId } = useActiveOrg();
   const [formLoading, setFormLoading] = useState(false);
   const [ppOverrideEnabled, setPpOverrideEnabled] = useState<boolean>(false);
+  const [pestObserved, setPestObserved] = useState<boolean>(false);
+  const [diseaseObserved, setDiseaseObserved] = useState<boolean>(false);
 
   const form = useForm<CheckinFormInput>({
     resolver: zodResolver(CheckinFormSchema),
@@ -143,39 +146,83 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {/* Variety */}
-        <AsyncCombobox
-          name="plant_variety_id"
+        <FormField
           control={form.control}
-          resource="varieties"
-          placeholder="Search variety"
-          fetcher={fetchWithAuth}
+          name="plant_variety_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Variety</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  resource="varieties"
+                  value={field.value ?? null}
+                  onChange={(opt) => field.onChange(opt?.id)}
+                  placeholder="Search varieties"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
         {/* Size */}
-        <AsyncCombobox
-          name="size_id"
+        <FormField
           control={form.control}
-          resource="sizes"
-          placeholder="Select size"
-          fetcher={fetchWithAuth}
+          name="size_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Size</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  resource="sizes"
+                  value={field.value ?? null}
+                  onChange={(opt) => field.onChange(opt?.id)}
+                  placeholder="Search sizes"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
-        {/* Location (depends on Nursery) */}
-        <AsyncCombobox
-          name="location_id"
+        {/* Location */}
+        <FormField
           control={form.control}
-          resource="locations"
-          placeholder="Search location"
-          fetcher={fetchWithAuth}
+          name="location_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Location</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  resource="locations"
+                  value={field.value ?? null}
+                  onChange={(opt) => field.onChange(opt?.id)}
+                  placeholder="Search locations"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
         {/* Supplier */}
-        <AsyncCombobox
-          name="supplier_id"
+        <FormField
           control={form.control}
-          resource="suppliers"
-          placeholder="Search supplier"
-          fetcher={fetchWithAuth}
+          name="supplier_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Supplier</FormLabel>
+              <FormControl>
+                <AsyncCombobox
+                  resource="suppliers"
+                  value={field.value ?? null}
+                  onChange={(opt) => field.onChange(opt?.id)}
+                  placeholder="Search suppliers"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
         {/* Quantity */}
@@ -266,6 +313,17 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
 
         {/* Pests & Disease */}
         <div className="rounded-lg border p-3 space-y-3">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Checkbox id="pestObserved" checked={pestObserved} onCheckedChange={(v) => setPestObserved(Boolean(v))} />
+              <label htmlFor="pestObserved" className="text-sm">Pests Observed</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="diseaseObserved" checked={diseaseObserved} onCheckedChange={(v) => setDiseaseObserved(Boolean(v))} />
+              <label htmlFor="diseaseObserved" className="text-sm">Disease Observed</label>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField
               control={form.control}
