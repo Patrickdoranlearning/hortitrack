@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -87,7 +86,7 @@ interface HomePageViewProps {
 }
 
 const TABS = [
-    { label: "Production", href: "/" },
+    { label: "Production", href: "/", exact: true },
     { label: "Sales", href: "/sales" },
     { label: "Actions", href: "/actions" },
 ];
@@ -268,7 +267,7 @@ export default function HomePageView({
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+      <div className="space-y-6">
         <ModulePageHeader 
             title="Nursery Stock"
             description="A real-time overview of all plant batches currently in production."
@@ -423,7 +422,7 @@ export default function HomePageView({
             </p>
           </div>
         )}
-      </main>
+      </div>
 
       {/* Dialogs */}
       
@@ -587,3 +586,5 @@ export default function HomePageView({
     </PageFrame>
   );
 }
+
+    
