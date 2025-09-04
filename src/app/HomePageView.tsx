@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Logo } from '@/components/logo';
@@ -86,8 +87,9 @@ interface HomePageViewProps {
 }
 
 const TABS = [
-    { label: "Production", href: "/", exact: true },
-    { label: "Sales", href: "/sales" },
+    { label: "Dashboard", href: "/production", exact: true },
+    { label: "Batches", href: "/" },
+    { label: "Planning", href: "/production/planning"},
     { label: "Plant Health", href: "/actions" },
     { label: "Dispatch", href: "/dispatch" },
 ];

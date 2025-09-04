@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -14,6 +15,7 @@ const tabs = [
   { label: "Batches", href: "/production/batches" },
   { label: "Propagation", href: "/production/propagation" },
   { label: "Potting", href: "/production/potting" },
+  { label: "Planning", href: "/production/planning"},
   { label: "Reports", href: "/production/reports" },
 ]
 
