@@ -5,6 +5,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from '@/lib/utils';
 import { OrgProvider } from "@/lib/org/context";
+import { ReferenceDataProvider } from "@/contexts/ReferenceDataContext";
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -50,7 +51,7 @@ export default async function RootLayout({
     <html lang="en">
        <body className={cn(ptSans.variable, playfairDisplay.variable, 'font-body', 'antialiased', 'overflow-x-hidden')}>
         <OrgProvider initialOrgId={activeOrgId}>
-          {children}
+          <ReferenceDataProvider>{children}</ReferenceDataProvider>
         </OrgProvider>
         <Toaster />
       </body>

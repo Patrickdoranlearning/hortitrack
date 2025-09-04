@@ -17,15 +17,13 @@ import { DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
-import { VarietyCombobox, type VarietyOption } from '@/components/ui/variety-combobox';
 import { format } from 'date-fns';
 import type {
-  Batch, BatchStatus, PlantSize, Supplier, Variety,
+  Batch, BatchStatus, PlantSize as PlantSizeType,
 } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { SafeSelect } from '@/components/ui/SafeSelect';
-import { Option } from '@/lib/options';
 import { cn } from '@/lib/utils';
+import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { ComboBoxEntity } from './horti/ComboBoxEntity';
 import { useActiveOrg } from '@/server/org/context';
 
@@ -86,10 +84,6 @@ type Props = {
   onCancel: () => void;
   onArchive?: (batchId: string) => void;
   onCreateNewVariety: (name: string) => void;
-  nurseryLocations: any[];
-  plantSizes: any[];
-  suppliers: any[];
-  varieties: any[];
 };
 
 function parseToDate(value: any): Date {
@@ -112,11 +106,14 @@ export function BatchForm({
   onArchive,
   onCreateNewVariety,
 }: Props) {
-  const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSize | null>(null);
+  const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSizeType | null>(null);
   const isEdit = !!batch?.id;
   const activeOrgId = useActiveOrg();
 
-  const doranNurseries = useMemo(() => (suppliers ?? []).find(s => s.name === 'Doran Nurseries'), [suppliers]);
+  const { data, loading } = React.useContext(ReferenceDataContext);
+
+
+  const doranNurseries = useMemo(() => (data?.suppliers ?? []).find(s => s.name === 'Doran Nurseries'), [data?.suppliers]);
 
   const onSuccess = React.useMemo(() => {
     if (onSubmitSuccess) return onSubmitSuccess;
@@ -228,6 +225,27 @@ export function BatchForm({
     });
   };
 
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Loading options…</p>;
+  }
+
+  const varieties = data?.varieties ?? [];
+  const sizes = data?.sizes ?? [];
+  const locations = data?.locations ?? [];
+  const suppliers = data?.suppliers ?? [];
+
+  const varietyOptions = varieties.map(v => ({ value: v.name, label: v.name }));
+
+  const sortedSizes = [...sizes].sort((a, b) => {
+    const order = (t: string) => (t === "pot" ? 0 : t.toLowerCase().includes("plug") ? 1 : 2);
+    return order(a.containerType) - order(b.containerType) || a.name.localeCompare(b.name);
+  });
+  const sizeOptions = sortedSizes.map(s => ({ value: s.name, label: s.name }));
+
+  const locationOptions = locations.map(l => ({ value: l.name, label: `${l.nursery_site} · ${l.name}` }));
+  const supplierOptions = suppliers.map(s => ({ value: s.name, label: s.name }));
+
+
   return (
     <Form {...form}>
       <form
@@ -239,6 +257,12 @@ export function BatchForm({
               const trays = Number(form.getValues('trayQuantity') ?? 0);
               form.setValue('quantity', trays * sizeMultiple, { shouldValidate: true });
             }
+            const selectedVariety = varieties.find(v => v.name === vals.plantVariety);
+            if (selectedVariety) {
+              vals.plantFamily = selectedVariety.family ?? '';
+              vals.category = selectedVariety.category ?? '';
+            }
+
             await onSubmit(vals);
           } catch (e: any) {
             console.error(e);
@@ -291,19 +315,18 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Variety</FormLabel>
-                <ComboBoxEntity
-                    entity="varieties"
-                    orgId={activeOrgId}
-                    placeholder="Search variety"
-                    value={null}
-                    onChange={(item) => {
-                         if (item) {
-                            field.onChange(item.name);
-                            if (item.meta?.family) form.setValue('plantFamily', item.meta.family, { shouldValidate: true, shouldDirty: true });
-                            if (item.meta?.category) form.setValue('category', item.meta.category, { shouldValidate: true, shouldDirty: true });
-                         }
-                    }}
-                />
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-autofocus="plant-variety"><SelectValue placeholder="Select a variety" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {varietyOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {field.value && !varietyOptions.some(o => o.value === field.value) && (
+                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <span className="rounded bg-muted px-2 py-1">
                     Family: {form.watch('plantFamily') || '—'}
@@ -323,13 +346,17 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Location</FormLabel>
-                <ComboBoxEntity
-                    entity="locations"
-                    orgId={activeOrgId}
-                    placeholder="Select location"
-                    value={null}
-                    onChange={(item) => field.onChange(item?.name)}
-                />
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {locationOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {field.value && !locationOptions.some(o => o.value === field.value) && (
+                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -341,19 +368,21 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Size</FormLabel>
-                <ComboBoxEntity
-                    entity="sizes"
-                    orgId={activeOrgId}
-                    trayOnly={sourceType === "Propagation"}
-                    placeholder="Select size"
-                    value={null}
-                    onChange={(item) => {
-                        if(item) {
-                            field.onChange(item.name);
-                            setSelectedSizeInfo({id: item.id, name: item.name, ...item.meta});
-                        }
-                    }}
-                />
+                <Select onValueChange={(value) => {
+                  field.onChange(value);
+                  const sizeInfo = sizes.find(s => s.name === value);
+                  setSelectedSizeInfo(sizeInfo as PlantSizeType ?? null);
+                }} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {sizeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {field.value && !sizeOptions.some(o => o.value === field.value) && (
+                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -368,7 +397,7 @@ export function BatchForm({
                   <FormLabel>Tray Quantity</FormLabel>
                   <Input
                     type="number"
-                    value={field.value ?? ''} 
+                    value={field.value ?? ''}
                     onChange={(e) => {
                       const trays = Number(e.target.value || 0);
                       field.onChange(trays);
@@ -478,13 +507,17 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Supplier</FormLabel>
-                <ComboBoxEntity
-                    entity="suppliers"
-                    orgId={activeOrgId}
-                    placeholder="Select supplier"
-                    value={null}
-                    onChange={(item) => field.onChange(item?.name)}
-                />
+                <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {supplierOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                     {field.value && !supplierOptions.some(o => o.value === field.value) && (
+                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -535,7 +568,9 @@ export function BatchForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>D - Country of Origin</FormLabel>
-                    <Input {...field} value={field.value ?? ''} placeholder="ISO2 code, e.g., NL"/>
+                    <FormControl>
+                        <Input {...field} value={field.value ?? ''} placeholder="ISO2 code, e.g., NL"/>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

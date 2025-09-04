@@ -66,6 +66,7 @@ import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
+import { BatchForm } from '@/components/batch-form';
 
 const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
 const VarietyForm = dynamic(() => import('@/components/varieties/VarietyForm'), { ssr: false });
@@ -94,6 +95,7 @@ export default function HomePageView({
   initialBatches,
   plantFamilies,
   categories,
+  actions,
 }: HomePageViewProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -110,7 +112,7 @@ export default function HomePageView({
   React.useEffect(() => {
     // If no active org yet, but we loaded batches, pick their org
     if (!orgId && batches?.length && (batches[0] as any).orgId) {
-        setOrgId((batches[0] as any).orgId);
+        setOrgId((batches[0]as any).orgId);
     }
   }, [orgId, batches, setOrgId]);
 
@@ -129,6 +131,7 @@ export default function HomePageView({
   const [isCheckinFormOpen, setIsCheckinFormOpen] = React.useState(false);
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
+  const [editingBatch, setEditingBatch] = React.useState<Batch | null>(null);
   const [newVarietyName, setNewVarietyName] = React.useState('');
   
   const [filters, setFilters] = React.useState({
@@ -180,13 +183,7 @@ export default function HomePageView({
       setIsDetailDialogOpen(true);
     }
   }, [urlBatchId, batches]);
-
   
-  const handleOpenForm = (batch?: Batch) => {
-    setSelectedBatch(batch || null);
-    setIsFormOpen(true);
-  };
-
   const handleOpenDetail = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsDetailDialogOpen(true);
@@ -195,11 +192,6 @@ export default function HomePageView({
   const handleLogAction = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsLogActionOpen(true);
-  };
-
-  const handleTransplant = (batch: Batch) => {
-    setSelectedBatch(batch);
-    setIsTransplantOpen(true);
   };
   
   const handlePrintClick = (batch: Batch) => {
@@ -227,6 +219,28 @@ export default function HomePageView({
   const handleScanDetected = (text: string) => {
     window.location.href = `/?batch=${encodeURIComponent(text)}`;
   };
+  
+  const handleEditBatch = React.useCallback((batch: Batch) => {
+    setEditingBatch(batch);
+    setIsDetailDialogOpen(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (!isDetailDialogOpen && editingBatch) {
+      const t = setTimeout(() => setIsFormOpen(true), 50);
+      return () => clearTimeout(t);
+    }
+  }, [isDetailDialogOpen, editingBatch]);
+
+  React.useEffect(() => {
+    if (isFormOpen) {
+      const id = requestAnimationFrame(() => {
+        (document.querySelector('[data-autofocus="plant-variety"]') as HTMLElement | null)?.focus();
+      });
+      return () => cancelAnimationFrame(id);
+    }
+  }, [isFormOpen]);
+
 
   if (authLoading) {
     return (
@@ -439,13 +453,48 @@ export default function HomePageView({
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           batch={selectedBatch}
-          onEdit={() => {}}
+          onEdit={() => handleEditBatch(selectedBatch)}
           onTransplant={() => {}}
           onLogAction={handleLogAction}
           onGenerateProtocol={handleGenerateProtocol}
           onCareRecommendations={handleRecommendations}
         />
       )}
+
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingBatch ? 'Edit Batch' : 'New Batch'}</DialogTitle>
+            </DialogHeader>
+            <BatchForm
+              batch={editingBatch}
+              onSubmitSuccess={(res) => {
+                toast({
+                  title: editingBatch ? 'Batch Updated' : 'Batch Created',
+                  description: `Batch #${res.batchNumber} has been saved.`,
+                });
+                setIsFormOpen(false);
+                setEditingBatch(null);
+                // In a real app, you'd refetch or update the local state
+              }}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setEditingBatch(null);
+              }}
+              onArchive={async (batchId) => {
+                await actions.archiveBatch(batchId, 0); // Assuming 0 loss for now
+                toast({ title: 'Batch Archived' });
+                setIsFormOpen(false);
+                setEditingBatch(null);
+              }}
+              onCreateNewVariety={(name) => {
+                setNewVarietyName(name);
+                setIsVarietyFormOpen(true);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+
 
       <ActionDialog
         open={isLogActionOpen}
