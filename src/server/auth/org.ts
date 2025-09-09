@@ -1,14 +1,18 @@
-// NEW: src/server/auth/org.ts
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseServerClient } from "@/server/db/supabaseServer";
 
-export async function getActiveOrgId(sb: SupabaseClient): Promise<string> {
-  const { data: { user }, error: userErr } = await sb.auth.getUser();
+export async function getUserAndOrg() {
+  const supabase = getSupabaseServerClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr || !user) throw new Error("Unauthenticated");
-  const { data, error } = await sb
+
+  const { data: profile, error: profErr } = await supabase
     .from("profiles")
-    .select("active_org_id")
+    .select("active_org_id, display_name")
     .eq("id", user.id)
-    .maybeSingle();
-  if (error || !data?.active_org_id) throw new Error("No active org set");
-  return data.active_org_id as string;
+    .single();
+
+  if (profErr) throw new Error(`Profile lookup failed: ${profErr.message}`);
+  if (!profile?.active_org_id) throw new Error("No active org selected");
+
+  return { user, orgId: profile.active_org_id as string, supabase };
 }
