@@ -6,21 +6,37 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
-import {
   NavigationMenu,
+  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
+  NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
-import { NavItem } from "@/config/nav"
+import { NavItem, NavSubItem } from "@/config/nav"
 
+
+function ListItem({ item, active }: { item: NavSubItem, active: boolean }) {
+    return (
+      <li>
+        <NavigationMenuLink asChild>
+          <a
+            href={item.href}
+            className={cn(
+              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+              active && "bg-accent/50 text-accent-foreground"
+            )}
+          >
+            <div className="text-sm font-medium leading-none">{item.label}</div>
+            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+              {item.description}
+            </p>
+          </a>
+        </NavigationMenuLink>
+      </li>
+    )
+}
 
 export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?: string }) {
   const pathname = usePathname()
@@ -29,47 +45,39 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
     <NavigationMenu aria-label={ariaLabel}>
       <NavigationMenuList>
         {items.map((item) => {
-          const active = item.key === 'production' ? pathname === '/' || pathname.startsWith('/production') || pathname.startsWith('/batches') : pathname.startsWith(item.href)
-          
+          const isModuleActive = item.key === 'production' 
+            ? pathname === '/' || pathname.startsWith('/production') || pathname.startsWith('/batches') 
+            : pathname.startsWith(item.href);
+
           if (!item.items || item.items.length === 0) {
             return (
               <NavigationMenuItem key={item.key}>
                 <Link href={item.href} legacyBehavior passHref>
-                  <NavigationMenuLink active={active} className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), isModuleActive && "bg-accent/50 font-semibold text-primary")}>
                     {item.label}
                   </NavigationMenuLink>
                 </Link>
               </NavigationMenuItem>
-            )
+            );
           }
 
           return (
              <NavigationMenuItem key={item.key}>
-               <div className={cn(navigationMenuTriggerStyle(), "flex items-center p-0", active ? "bg-accent/50" : "")}>
-                 <Link href={item.href} legacyBehavior passHref>
-                    <NavigationMenuLink active={active} className="px-3 py-2">
-                      {item.label}
-                    </NavigationMenuLink>
-                  </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <div
-                        className="h-full px-2 flex items-center border-l border-transparent hover:border-border"
-                      >
-                        <ChevronDown className="h-4 w-4 transition-transform duration-200" />
-                        <span className="sr-only">Open module menu</span>
-                      </div>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {item.items.map(subItem => (
-                        <DropdownMenuItem key={subItem.href} asChild>
-                          <Link href={subItem.href}>{subItem.label}</Link>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-               </div>
-            </NavigationMenuItem>
+                <NavigationMenuTrigger className={cn(isModuleActive && "bg-accent/50 font-semibold text-primary")}>
+                    <Link href={item.href} className="mr-2">{item.label}</Link>
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
+                    {item.items.map((subItem) => (
+                      <ListItem
+                        key={subItem.label}
+                        item={subItem}
+                        active={pathname === subItem.href}
+                      />
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
           )
         })}
       </NavigationMenuList>
