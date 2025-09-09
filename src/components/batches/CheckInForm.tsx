@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ProductionAPI, CheckInInput } from "@/lib/production/client";
 import { HttpError } from "@/lib/http/fetchJson";
+import { useLookup } from "@/hooks/useLookup";
+import { useActiveOrg } from "@/lib/org/context"; // Assuming you have this context for orgId
 
 import { Button } from "@/components/ui/button";
 import {
@@ -45,37 +47,23 @@ type Supplier = { id: string; name: string; producer_code?: string | null; count
 export default function CheckInForm(props: { onCreated?: (batch: any) => void }) {
   const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
   const form = useForm<CheckInInput>({ resolver: zodResolver(Schema) });
+  const { orgId } = useActiveOrg();
+
   const [loading, setLoading] = React.useState(false);
   const [overrideOn, setOverrideOn] = React.useState(false);
+  
+  const { options: varieties, isLoading: varietiesLoading, error: varietiesError } = useLookup("varieties", null); // varieties are global
+  const { options: sizes, isLoading: sizesLoading, error: sizesError } = useLookup("sizes", null); // sizes are global
+  const { options: locations, isLoading: locationsLoading, error: locationsError } = useLookup("locations", orgId); // locations are org-scoped
+  const { options: suppliers, isLoading: suppliersLoading, error: suppliersError } = useLookup("suppliers", orgId); // suppliers are org-scoped
 
-  const [varieties, setVarieties] = React.useState<Variety[]>([]);
-  const [sizes, setSizes] = React.useState<Size[]>([]);
-  const [locations, setLocations] = React.useState<Location[]>([]);
-  const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
-
+  // Handle lookup errors
   React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [v, s, l, sup] = await Promise.all([
-          fetch("/api/lookups/varieties").then(r => r.json()),
-          fetch("/api/lookups/sizes").then(r => r.json()),
-          fetch("/api/lookups/locations").then(r => r.json()),
-          fetch("/api/lookups/suppliers").then(r => r.json()),
-        ]);
-        if (!cancelled) {
-          setVarieties(v.items ?? []);
-          setSizes(s.items ?? []);
-          setLocations(l.items ?? []);
-          setSuppliers(sup.items ?? []);
-        }
-      } catch (e) {
-        console.error("[CheckInForm] lookups failed", e);
-        toast({ title: "Failed to load lookups", description: String((e as any)?.message ?? e), variant: "destructive" });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []); // once
+    if (varietiesError) toast({ title: "Failed to load varieties", description: varietiesError.message, variant: "destructive" });
+    if (sizesError) toast({ title: "Failed to load sizes", description: sizesError.message, variant: "destructive" });
+    if (locationsError) toast({ title: "Failed to load locations", description: locationsError.message, variant: "destructive" });
+    if (suppliersError) toast({ title: "Failed to load suppliers", description: suppliersError.message, variant: "destructive" });
+  }, [varietiesError, sizesError, locationsError, suppliersError, toast]);
 
   async function onSubmit(values: CheckInInput) {
     setLoading(true);
@@ -97,14 +85,16 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
     }
   }
 
+  const isLookupsLoading = varietiesLoading || sizesLoading || locationsLoading || suppliersLoading;
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField name="plant_variety_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Variety</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue placeholder="Select variety" /></SelectTrigger>
+            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading varieties..." : "Select variety"} /></SelectTrigger>
               <SelectContent>{varieties.map(v => (
                 <SelectItem key={v.id} value={v.id}>
                   {v.name}{v.category ? ` — ${v.category}` : ""}
@@ -119,8 +109,8 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
           <FormField name="size_id" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Size</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+              <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+                <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading sizes..." : "Select size"} /></SelectTrigger>
                 <SelectContent>{sizes.map(s => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
@@ -134,8 +124,8 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
           <FormField name="phase" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Phase</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger><SelectValue placeholder="Select phase" /></SelectTrigger>
+              <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+                <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading phases..." : "Select phase"} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="propagation">Propagation</SelectItem>
                   <SelectItem value="plug">Plug / Liner</SelectItem>
@@ -150,8 +140,8 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
         <FormField name="location_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Location</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading locations..." : "Select location"} /></SelectTrigger>
               <SelectContent>{locations.map(l => (
                 <SelectItem key={l.id} value={l.id}>
                   {l.name}{l.covered ? " (covered)" : ""}
@@ -165,8 +155,8 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
         <FormField name="supplier_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Supplier</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading suppliers..." : "Select supplier"} /></SelectTrigger>
               <SelectContent>{suppliers.map(s => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name}
@@ -181,21 +171,21 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
           <FormField name="containers" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Containers</FormLabel>
-              <FormControl><Input type="number" min={1} step={1} {...field} /></FormControl>
+              <FormControl><Input type="number" min={1} step={1} {...field} disabled={isLookupsLoading} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
           <FormField name="incoming_date" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Incoming date</FormLabel>
-              <FormControl><Input type="date" {...field} /></FormControl>
+              <FormControl><Input type="date" {...field} disabled={isLookupsLoading} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
           <FormField name="quality_rating" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Quality (1–6)</FormLabel>
-              <FormControl><Input type="number" min={1} max={6} step={1} {...field} /></FormControl>
+              <FormControl><Input type="number" min={1} max={6} step={1} {...field} disabled={isLookupsLoading} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -204,7 +194,7 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
         <FormField name="supplier_batch_number" control={form.control} render={({ field }) => (
            <FormItem>
              <FormLabel>Supplier Batch No.</FormLabel>
-             <FormControl><Input {...field} /></FormControl>
+             <FormControl><Input {...field} disabled={isLookupsLoading} /></FormControl>
              <FormMessage />
            </FormItem>
          )} />
@@ -220,6 +210,7 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
                 checked={overrideOn}
                 onChange={(e) => setOverrideOn(e.target.checked)}
                 className="h-4 w-4"
+                disabled={isLookupsLoading}
               />
             </div>
           </div>
@@ -235,7 +226,7 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Operator Reg No.</FormLabel>
-                  <FormControl><Input placeholder="e.g. IE2727" {...field} /></FormControl>
+                  <FormControl><Input placeholder="e.g. IE2727" {...field} disabled={isLookupsLoading} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -246,7 +237,7 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Origin Country (ISO)</FormLabel>
-                  <FormControl><Input placeholder="IE, NL, GB..." {...field} /></FormControl>
+                  <FormControl><Input placeholder="IE, NL, GB..." {...field} disabled={isLookupsLoading} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -257,7 +248,7 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Traceability Code</FormLabel>
-                  <FormControl><Input placeholder="Overrides supplier batch no." {...field} /></FormControl>
+                  <FormControl><Input placeholder="Overrides supplier batch no." {...field} disabled={isLookupsLoading} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -269,7 +260,7 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
           <FormField name="pest_or_disease" control={form.control} render={({ field }) => (
             <FormItem className="flex items-center gap-2">
               <FormControl>
-                <Checkbox checked={!!field.value} onCheckedChange={(v) => field.onChange(!!v)} />
+                <Checkbox checked={!!field.value} onCheckedChange={(v) => field.onChange(!!v)} disabled={isLookupsLoading} />
               </FormControl>
               <FormLabel>Pest or disease present</FormLabel>
               <FormMessage />
@@ -280,13 +271,13 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
         <FormField name="notes" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Notes</FormLabel>
-            <FormControl><Textarea rows={3} {...field} /></FormControl>
+            <FormControl><Textarea rows={3} {...field} disabled={isLookupsLoading} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
 
         <div className="flex justify-end gap-2">
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || isLookupsLoading}>
             {loading ? "Saving…" : "Check in batch"}
           </Button>
         </div>

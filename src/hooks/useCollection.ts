@@ -16,12 +16,15 @@ export function useCollection<T extends { id?: string }>(collectionName: string,
 
   const fetchData = useCallback(async () => {
     const lookupMap: Record<string, string> = {
-    plant_varieties: "/api/lookups/varieties",
-    plant_sizes: "/api/lookups/sizes",
-    nursery_locations: "/api/lookups/locations",
-    suppliers: "/api/lookups/suppliers",
+      plant_varieties: "/api/lookups/varieties",
+      plant_sizes: "/api/lookups/sizes",
+      nursery_locations: "/api/lookups/locations",
+      suppliers: "/api/lookups/suppliers",
     };
-    const url = lookupMap[collectionName] ?? `/api/collections/${collectionName}`;
+    const lookupTables = new Set(Object.keys(lookupMap));
+    const url = lookupTables.has(collectionName)
+        ? lookupMap[collectionName]
+        : `/api/collections/${collectionName}`;
 
     setLoading(true);
     setError(null);

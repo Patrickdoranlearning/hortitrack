@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getUserAndOrg } from "@/server/auth/org";
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
         status: "Growing",                  // enum production_status
         quantity: units,
         initial_quantity: units,
+        unit: "plants",
         planted_at: input.planted_at ?? null,
         supplier_batch_number: "",          // internal propagation
       })

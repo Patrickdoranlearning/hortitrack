@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ProductionAPI, PropagationInput } from "@/lib/production/client";
 import { HttpError } from "@/lib/http/fetchJson";
+import { useLookup } from "@/hooks/useLookup";
+import { useActiveOrg } from "@/lib/org/context"; // Assuming you have this context for orgId
 
 // Ensure these imports match your UI kit (shadcn)
 import { Button } from "@/components/ui/button";
@@ -37,35 +39,27 @@ export default function PropagationForm(props: {
 }) {
   const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
   const form = useForm<PropagationInput>({ resolver: zodResolver(Schema) });
+  const { orgId } = useActiveOrg();
 
   const [loading, setLoading] = React.useState(false);
-  const [varieties, setVarieties] = React.useState<Variety[]>([]);
-  const [sizes, setSizes] = React.useState<Size[]>([]);
-  const [locations, setLocations] = React.useState<Location[]>([]);
+  
+  const { options: varieties, isLoading: varietiesLoading, error: varietiesError } = useLookup("varieties", null); // varieties are global
+  const { options: sizes, isLoading: sizesLoading, error: sizesError } = useLookup("sizes", null); // sizes are global
+  const { options: locations, isLoading: locationsLoading, error: locationsError } = useLookup("locations", orgId); // locations are org-scoped
 
-  // Load lookups
+  // Set default location if provided
   React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [v, s, l] = await Promise.all([
-          fetch("/api/lookups/varieties").then(r => r.json()),
-          fetch("/api/lookups/sizes").then(r => r.json()),
-          fetch("/api/lookups/locations").then(r => r.json()),
-        ]);
-        if (!cancelled) {
-          setVarieties(v.items ?? []);
-          setSizes(s.items ?? []);
-          setLocations(l.items ?? []);
-          if (props.defaultLocationId) form.setValue("location_id", props.defaultLocationId as any);
-        }
-      } catch (e) {
-        console.error("[PropagationForm] lookups failed", e);
-        toast({ title: "Failed to load lookups", description: String((e as any)?.message ?? e), variant: "destructive" });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [props.defaultLocationId]); // eslint-disable-line
+    if (props.defaultLocationId && locations.length > 0) {
+      form.setValue("location_id", props.defaultLocationId as any);
+    }
+  }, [props.defaultLocationId, locations, form]);
+
+  // Handle lookup errors
+  React.useEffect(() => {
+    if (varietiesError) toast({ title: "Failed to load varieties", description: varietiesError.message, variant: "destructive" });
+    if (sizesError) toast({ title: "Failed to load sizes", description: sizesError.message, variant: "destructive" });
+    if (locationsError) toast({ title: "Failed to load locations", description: locationsError.message, variant: "destructive" });
+  }, [varietiesError, sizesError, locationsError, toast]);
 
   async function onSubmit(values: PropagationInput) {
     setLoading(true);
@@ -87,14 +81,16 @@ export default function PropagationForm(props: {
     }
   }
 
+  const isLookupsLoading = varietiesLoading || sizesLoading || locationsLoading;
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField name="plant_variety_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Variety</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue placeholder="Select variety" /></SelectTrigger>
+            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading varieties..." : "Select variety"} /></SelectTrigger>
               <SelectContent>
                 {varieties.map(v => (
                   <SelectItem key={v.id} value={v.id}>
@@ -110,8 +106,8 @@ export default function PropagationForm(props: {
         <FormField name="size_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Size</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading sizes..." : "Select size"} /></SelectTrigger>
               <SelectContent>
                 {sizes.map(s => (
                   <SelectItem key={s.id} value={s.id}>
@@ -127,8 +123,8 @@ export default function PropagationForm(props: {
         <FormField name="location_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Location</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
+              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading locations..." : "Select location"} /></SelectTrigger>
               <SelectContent>
                 {locations.map(l => (
                   <SelectItem key={l.id} value={l.id}>
@@ -145,7 +141,7 @@ export default function PropagationForm(props: {
           <FormItem>
             <FormLabel>Containers</FormLabel>
             <FormControl>
-              <Input type="number" min={1} step={1} {...field} />
+              <Input type="number" min={1} step={1} {...field} disabled={isLookupsLoading} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -155,7 +151,7 @@ export default function PropagationForm(props: {
           <FormItem>
             <FormLabel>Planted date</FormLabel>
             <FormControl>
-              <Input type="date" {...field} />
+              <Input type="date" {...field} disabled={isLookupsLoading} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -164,13 +160,13 @@ export default function PropagationForm(props: {
         <FormField name="notes" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Notes</FormLabel>
-            <FormControl><Textarea rows={3} {...field} /></FormControl>
+            <FormControl><Textarea rows={3} {...field} disabled={isLookupsLoading} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
 
         <div className="flex justify-end gap-2">
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || isLookupsLoading}>
             {loading ? "Saving…" : "Create propagation"}
           </Button>
         </div>
