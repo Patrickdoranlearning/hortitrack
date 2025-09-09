@@ -70,8 +70,8 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
                         {item.label}
                     </Link>
                 </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
+                <NavigationMenuContent className="w-[400px] md:w-[500px] lg:w-[600px]">
+                  <ul className="grid w-full gap-3 p-4 md:grid-cols-2">
                     <ListItem
                         item={{ label: `${item.label} Home`, href: item.href, description: `Go to the main ${item.label} dashboard.` }}
                         active={pathname === item.href}
