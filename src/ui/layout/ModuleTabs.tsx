@@ -29,7 +29,7 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
     <NavigationMenu aria-label={ariaLabel}>
       <NavigationMenuList>
         {items.map((item) => {
-          const active = item.key === 'production' ? pathname === '/' : pathname.startsWith(item.href)
+          const active = item.key === 'production' ? pathname === '/' || pathname.startsWith('/production') || pathname.startsWith('/batches') : pathname.startsWith(item.href)
           
           if (!item.items || item.items.length === 0) {
             return (
@@ -45,29 +45,30 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
 
           return (
              <NavigationMenuItem key={item.key}>
-               <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        navigationMenuTriggerStyle(),
-                        "flex items-center gap-1",
-                        active ? "font-semibold text-primary" : ""
-                      )}
-                      onMouseOver={(e) => (e.target as HTMLElement).click()}
-                    >
+               <div className={cn(navigationMenuTriggerStyle(), "flex items-center p-0", active ? "bg-accent/50" : "")}>
+                 <Link href={item.href} legacyBehavior passHref>
+                    <NavigationMenuLink active={active} className="px-3 py-2">
                       {item.label}
-                      <ChevronDown className="h-4 w-4 transition-transform duration-200 group-hover:rotate-180" />
-                    </Link>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {item.items.map(subItem => (
-                       <DropdownMenuItem key={subItem.href} asChild>
-                        <Link href={subItem.href}>{subItem.label}</Link>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    </NavigationMenuLink>
+                  </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div
+                        className="h-full px-2 flex items-center border-l border-transparent hover:border-border"
+                      >
+                        <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                        <span className="sr-only">Open module menu</span>
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {item.items.map(subItem => (
+                        <DropdownMenuItem key={subItem.href} asChild>
+                          <Link href={subItem.href}>{subItem.label}</Link>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+               </div>
             </NavigationMenuItem>
           )
         })}
