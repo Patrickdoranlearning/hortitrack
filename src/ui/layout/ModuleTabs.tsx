@@ -23,11 +23,11 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
           <span className="sr-only">Open main menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="p-0">
-        <div className="flex items-center gap-4 px-6 py-2 border-b">
+      <SheetContent side="left" className="p-0 flex flex-col">
+        <div className="flex items-center gap-4 px-6 py-3 border-b shrink-0">
           <Logo />
         </div>
-        <ScrollArea className="h-[calc(100dvh-3.5rem)]">
+        <ScrollArea className="flex-1">
           <nav className="py-4 px-6">
             <ul className="space-y-2">
               {items.map((item) => (
