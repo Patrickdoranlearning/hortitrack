@@ -21,11 +21,12 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
       "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60",
       className
     )}>
-      {/* Top bar: Logo, Search, Profile */}
+      {/* Top bar: Burger Menu, Logo, Search, Profile */}
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2">
         <div className="flex items-center gap-3">
+            <ModuleTabs items={APP_NAV} ariaLabel="Main application navigation" />
             <Link href="/" className="flex items-center gap-3">
-            <Logo />
+              <Logo />
             </Link>
         </div>
 
@@ -34,14 +35,6 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
           <ProfileMenu moduleKey={moduleKey} />
         </div>
       </div>
-      
-      {/* Bottom bar: Module Tabs */}
-      <div className="border-t bg-background/50">
-        <div className="mx-auto max-w-7xl px-4">
-             <ModuleTabs items={APP_NAV} ariaLabel="Main application navigation" />
-        </div>
-      </div>
-
     </header>
   )
 }

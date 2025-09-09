@@ -4,91 +4,59 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Menu } from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu"
-import { NavItem, NavSubItem } from "@/config/nav"
-
-
-function ListItem({ item, active }: { item: NavSubItem, active: boolean }) {
-    return (
-      <li>
-        <NavigationMenuLink asChild>
-          <a
-            href={item.href}
-            className={cn(
-              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-              active && "bg-accent/50 text-accent-foreground"
-            )}
-          >
-            <div className="text-sm font-medium leading-none">{item.label}</div>
-            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-              {item.description}
-            </p>
-          </a>
-        </NavigationMenuLink>
-      </li>
-    )
-}
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { NavItem } from "@/config/nav"
+import { Logo } from "@/components/logo"
 
 export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?: string }) {
   const pathname = usePathname()
 
   return (
-    <NavigationMenu aria-label={ariaLabel}>
-      <NavigationMenuList>
-        {items.map((item) => {
-          const isModuleActive = item.key === 'production' 
-            ? pathname === '/' || pathname.startsWith('/production') || pathname.startsWith('/batches') 
-            : pathname.startsWith(item.href);
-
-          // If there are no sub-items, render a simple link.
-          if (!item.items || item.items.length === 0) {
-            return (
-              <NavigationMenuItem key={item.key}>
-                <Link href={item.href} legacyBehavior passHref>
-                  <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), isModuleActive && "bg-accent/50 font-semibold text-primary")}>
-                    {item.label}
-                  </NavigationMenuLink>
-                </Link>
-              </NavigationMenuItem>
-            );
-          }
-          
-          // If there are sub-items, render the trigger and content.
-          return (
-             <NavigationMenuItem key={item.key}>
-                <NavigationMenuTrigger className={cn(isModuleActive && "bg-accent/50 font-semibold text-primary")}>
-                  <Link href={item.href} className="focus:outline-none" onFocus={(e) => e.preventDefault()}>
-                      {item.label}
-                  </Link>
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
-                    <ListItem
-                        item={{ label: `${item.label} Home`, href: item.href, description: `Go to the main ${item.label} dashboard.` }}
-                        active={pathname === item.href}
-                      />
-                    {item.items.map((subItem) => (
-                      <ListItem
-                        key={subItem.label}
-                        item={subItem}
-                        active={pathname === subItem.href}
-                      />
-                    ))}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-          )
-        })}
-      </NavigationMenuList>
-    </NavigationMenu>
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <Menu className="h-6 w-6" />
+          <span className="sr-only">Open main menu</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="p-0">
+        <div className="flex items-center gap-4 px-6 py-2 border-b">
+          <Logo />
+          <span className="font-semibold">HortiTrack</span>
+        </div>
+        <ScrollArea className="h-[calc(100vh-3.5rem)]">
+          <nav className="py-4 px-6">
+            <ul className="space-y-2">
+              {items.map((item) => (
+                <li key={item.key}>
+                  <h4 className="py-2 font-semibold text-lg">{item.label}</h4>
+                  {item.items && (
+                    <ul className="space-y-1">
+                      {item.items.map((subItem) => (
+                        <li key={subItem.href}>
+                          <Link
+                            href={subItem.href}
+                            className={cn(
+                              "block rounded-md px-2 py-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                              pathname.startsWith(subItem.href) && "bg-accent/50 text-accent-foreground"
+                            )}
+                          >
+                            {subItem.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
   )
 }
