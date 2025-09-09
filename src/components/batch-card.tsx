@@ -12,7 +12,32 @@ import { cn } from "@/lib/utils";
 import type { Batch } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { TransplantForm } from "@/components/batches/TransplantForm";
+import TransplantForm from "@/components/batches/TransplantForm";
+import EditBatchForm from "@/components/batches/EditBatchForm";
+import EventsCard from "@/components/batches/EventsCard";
+import PassportsCard from "@/components/batches/PassportsCard";
+import AncestryCard from "@/components/batches/AncestryCard";
+import MoveForm from "@/components/batches/actions/MoveForm";
+import StatusForm from "@/components/batches/actions/StatusForm";
+import DumpForm from "@/components/batches/actions/DumpForm";
+
+// --- runtime guard: logs undefined imports without crashing ---
+const _ensure = (x: any, name: string) => {
+  if (!x) {
+    // This will tell you exactly which component is undefined
+    console.error(`[BatchCard] ${name} is undefined (import/export mismatch)`);
+    // render no-op to avoid crash
+    return ((_: any) => null) as any;
+  }
+  return x;
+};
+
+// Wrap likely suspects
+const SafeTransplantForm = _ensure(TransplantForm, "TransplantForm");
+const SafeEditBatchForm = _ensure(EditBatchForm, "EditBatchForm");
+const SafeEventsCard = _ensure(EventsCard, "EventsCard");
+const SafePassportsCard = _ensure(PassportsCard, "PassportsCard");
+const SafeAncestryCard = _ensure(AncestryCard, "AncestryCard");
 
 
 type BatchCardProps = {
@@ -94,10 +119,9 @@ export function BatchCard({
                   Create a new batch from this parent. Full trays/pots only.
                 </p>
               </DialogHeader>
-              <TransplantForm
-                parentBatch={parentSummary}
-                onSuccess={() => { setOpen(false); /* trigger refresh */ }}
-                onCancel={() => setOpen(false)}
+              <SafeTransplantForm
+                parentBatchId={parentSummary.id}
+                onCreated={() => { setOpen(false); /* trigger refresh */ }}
               />
             </DialogContent>
           </Dialog>

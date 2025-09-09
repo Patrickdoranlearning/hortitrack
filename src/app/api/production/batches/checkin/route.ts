@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { randomUUID } from "crypto";
 import { getUserAndOrg } from "@/server/auth/org";
 import { CheckInInputSchema } from "@/lib/production/schemas";
 import { nextBatchNumber } from "@/server/numbering/batches";
@@ -7,10 +7,12 @@ import { nextBatchNumber } from "@/server/numbering/batches";
 const PhaseMap = { propagation: 1, plug: 2, potted: 3 } as const;
 
 export async function POST(req: NextRequest) {
+  const requestId = randomUUID();
   try {
     const input = CheckInInputSchema.parse(await req.json());
     const { supabase, orgId, user } = await getUserAndOrg();
 
+    // derive units
     const { data: size, error: sizeErr } = await supabase
       .from("plant_sizes")
       .select("id, cell_multiple")
@@ -21,12 +23,13 @@ export async function POST(req: NextRequest) {
     const units = input.containers * (size.cell_multiple ?? 1);
     const batchNumber = await nextBatchNumber(PhaseMap[input.phase]);
 
+    // 1) batch
     const { data: batch, error: bErr } = await supabase
       .from("batches")
       .insert({
         org_id: orgId,
         batch_number: batchNumber,
-        phase: input.phase,                // production_phase enum
+        phase: input.phase,
         plant_variety_id: input.plant_variety_id,
         size_id: input.size_id,
         location_id: input.location_id,
@@ -34,17 +37,15 @@ export async function POST(req: NextRequest) {
         status: "Growing",
         quantity: units,
         initial_quantity: units,
-        unit: "plants",
         planted_at: input.incoming_date,
         supplier_batch_number: input.supplier_batch_number,
-        log_history: [],
       })
       .select("*")
       .single();
-
     if (bErr || !batch) throw new Error(bErr?.message ?? "Batch insert failed");
 
-    await supabase.from("batch_events").insert({
+    // 2) event
+    const { error: eErr } = await supabase.from("batch_events").insert({
       batch_id: batch.id,
       org_id: orgId,
       type: "CHECKIN",
@@ -60,33 +61,59 @@ export async function POST(req: NextRequest) {
         notes: input.notes ?? null,
         photo_urls: input.photo_urls ?? [],
       },
+      request_id: requestId,
     });
+    if (eErr) {
+      await supabase.from("batches").delete().eq("id", batch.id);
+      throw new Error(`Event insert failed: ${eErr.message}`);
+    }
 
-    // Supplier passport (current)
-    // Producer code & country from supplier
+    // 3) passport from supplier defaults
     const { data: supplier, error: sErr } = await supabase
       .from("suppliers")
-      .select("producer_code, country_code, name")
+      .select("producer_code, country_code")
       .eq("id", input.supplier_id)
       .single();
-    if (sErr || !supplier) throw new Error("Supplier not found");
+    if (sErr || !supplier) {
+      await supabase.from("batch_events").delete().eq("batch_id", batch.id);
+      await supabase.from("batches").delete().eq("id", batch.id);
+      throw new Error("Supplier not found");
+    }
+    
+    const operator_reg_no =
+      input.passport_override?.operator_reg_no ??
+      supplier.producer_code ?? "IE2727";
+    const origin_country =
+      input.passport_override?.origin_country ??
+      supplier.country_code ?? "IE";
+    const traceability_code =
+      input.passport_override?.traceability_code ??
+      input.supplier_batch_number;
 
-    await supabase.from("batch_passports").insert({
+
+    const { error: pErr } = await supabase.from("batch_passports").insert({
       batch_id: batch.id,
       org_id: orgId,
       passport_type: "supplier",
-      operator_reg_no: supplier.producer_code ?? "IE2727",
-      traceability_code: input.supplier_batch_number,
-      origin_country: supplier.country_code ?? "IE",
-      raw_label_text: null,
+      operator_reg_no,
+      traceability_code,
+      origin_country,
       images: (input.photo_urls ?? []).length ? { photos: input.photo_urls } : null,
       created_by_user_id: user.id,
+      request_id: requestId,
     });
+    if (pErr) {
+      await supabase.from("batch_events").delete().eq("batch_id", batch.id);
+      await supabase.from("batches").delete().eq("id", batch.id);
+      throw new Error(`Passport insert failed: ${pErr.message}`);
+    }
 
-    return NextResponse.json({ batch }, { status: 201 });
+    return NextResponse.json({ batch, requestId }, { status: 201 });
   } catch (e: any) {
-    console.error("[batches/checkin] error", e);
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 400;
-    return NextResponse.json({ error: e?.message ?? "Invalid request" }, { status });
+    console.error("[checkin]", { requestId, error: e?.message });
+    const status =
+      /Unauthenticated/i.test(e?.message) ? 401 :
+      /parse|invalid/i.test(e?.message) ? 400 : 500;
+    return NextResponse.json({ error: e?.message ?? "Server error", requestId }, { status });
   }
 }

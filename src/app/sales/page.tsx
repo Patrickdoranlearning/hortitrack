@@ -9,10 +9,19 @@ import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
 const TABS = [
-    { label: "Sales Dashboard", href: "/sales", exact: true },
-    { label: "Orders", href: "/sales/orders" },
-    { label: "Customers", href: "/sales/customers" },
-    { label: "Products", href: "/sales/products" },
+    { label: "Production", href: "/production" },
+    { 
+        label: "Sales", 
+        href: "/sales", 
+        items: [
+            { label: "Sales Dashboard", href: "/sales"},
+            { label: "Orders", href: "/sales/orders"},
+            { label: "Customers", href: "/sales/customers"},
+            { label: "Products", href: "/sales/products"},
+        ]
+    },
+    { label: "Plant Health", href: "/actions" },
+    { label: "Dispatch", href: "/dispatch" },
 ];
 
 export default function SalesLandingPage() {

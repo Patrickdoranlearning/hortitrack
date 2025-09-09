@@ -1,347 +1,263 @@
-// src/components/batches/CheckInForm.tsx
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useActiveOrg } from "@/lib/org/context";
-import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { z } from "zod";
+import { ProductionAPI, CheckInInput } from "@/lib/production/client";
+import { HttpError } from "@/lib/http/fetchJson";
+
 import { Button } from "@/components/ui/button";
+import {
+  Form, FormField, FormItem, FormLabel, FormMessage, FormControl
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Star, Loader2 } from "lucide-react";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import AsyncCombobox from "@/components/ui/AsyncCombobox";
-import { Switch } from "@/components/ui/switch";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useToast } from "@/components/ui/use-toast";
 
-const CheckinFormSchema = z.object({
-  plant_variety_id: z.string().uuid({ message: "Variety is required." }),
-  size_id: z.string().uuid({ message: "Size is required." }),
-  location_id: z.string().uuid({ message: "Location is required." }),
-  supplier_id: z.string().uuid().optional().nullable(),
-  quantity: z.coerce.number().int().min(0, { message: "Quantity cannot be negative." }),
-  quality_rating: z.number().int().min(0).max(6).optional(),
-  passport_override_a: z.string().optional().nullable(),
-  passport_override_b: z.string().optional().nullable(),
-  passport_override_c: z.string().optional().nullable(),
-  passport_override_d: z.string().optional().nullable(),
-  pest_notes: z.string().optional(),
-  disease_notes: z.string().optional(),
+const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const Schema = z.object({
+  plant_variety_id: z.string().uuid(),
+  size_id: z.string().uuid(),
+  location_id: z.string().uuid(),
+  phase: z.enum(["propagation","plug","potted"]),
+  supplier_id: z.string().uuid(),
+  containers: z.coerce.number().int().min(1),
+  supplier_batch_number: z.string().min(1).max(120),
+  incoming_date: DateOnly,
+  quality_rating: z.coerce.number().int().min(1).max(6).optional(),
+  pest_or_disease: z.boolean().optional(),
+  notes: z.string().max(1000).optional(),
+  passport_override: z.object({
+    operator_reg_no: z.string().optional(),
+    origin_country: z.string().optional(),
+    traceability_code: z.string().optional(),
+  }).optional(),
 });
-type CheckinFormInput = z.infer<typeof CheckinFormSchema>;
 
-type CheckinFormProps = {
-  onSubmitSuccess?: (batch: { batchId: string; batchNumber: string }) => void;
-  onCancel: () => void;
-};
+type Variety = { id: string; name: string; category?: string | null };
+type Size = { id: string; name: string; cell_multiple?: number | null; container_type?: string | null };
+type Location = { id: string; name: string; covered?: boolean | null };
+type Supplier = { id: string; name: string; producer_code?: string | null; country_code?: string | null };
 
-export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
-  const { toast } = useToast();
-  const { orgId } = useActiveOrg();
-  const [formLoading, setFormLoading] = useState(false);
-  const [ppOverrideEnabled, setPpOverrideEnabled] = useState<boolean>(false);
-  const [pestObserved, setPestObserved] = useState<boolean>(false);
-  const [diseaseObserved, setDiseaseObserved] = useState<boolean>(false);
+export default function CheckInForm(props: { onCreated?: (batch: any) => void }) {
+  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const form = useForm<CheckInInput>({ resolver: zodResolver(Schema) });
+  const [loading, setLoading] = React.useState(false);
+  const [overrideOn, setOverrideOn] = React.useState(false);
 
-  const form = useForm<CheckinFormInput>({
-    resolver: zodResolver(CheckinFormSchema),
-    mode: "onChange",
-    defaultValues: {
-      plant_variety_id: "" as any,
-      size_id: "" as any,
-      location_id: "" as any,
-      supplier_id: null,
-      quantity: 0,
-      quality_rating: 0,
-      passport_override_a: "",
-      passport_override_b: "",
-      passport_override_c: "",
-      passport_override_d: "",
-      pest_notes: "",
-      disease_notes: "",
-    },
-  });
+  const [varieties, setVarieties] = React.useState<Variety[]>([]);
+  const [sizes, setSizes] = React.useState<Size[]>([]);
+  const [locations, setLocations] = React.useState<Location[]>([]);
+  const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
 
-  // 6-star rating control used by Quality field
-  function StarRating({
-    value = 0,
-    onChange,
-  }: {
-    value?: number;
-    onChange: (n: number) => void;
-  }) {
-    return (
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5, 6].map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            aria-label={`Set ${n} stars`}
-            className={cn(
-              "p-1 rounded-md",
-              value >= n ? "opacity-100" : "opacity-40 hover:opacity-70"
-            )}
-          >
-            <Star
-              className="h-5 w-5"
-              fill={value >= n ? "currentColor" : "none"}
-              strokeWidth={1.5}
-            />
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => onChange(0)}
-          className="ml-2 text-xs underline"
-          aria-label="Clear rating"
-        >
-          Clear
-        </button>
-      </div>
-    );
-  }
-
-  async function onSubmit(values: CheckinFormInput) {
-    if (!orgId) {
-      toast({ variant: "destructive", title: "No Org Selected", description: "Select an organization first." });
-      return;
-    }
-    setFormLoading(true);
-    try {
-      const payload = { ...values, orgId };
-
-      const res = await fetch("/api/batches/checkin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || "Failed to check in batch.");
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [v, s, l, sup] = await Promise.all([
+          fetch("/api/lookups/varieties").then(r => r.json()),
+          fetch("/api/lookups/sizes").then(r => r.json()),
+          fetch("/api/lookups/locations").then(r => r.json()),
+          fetch("/api/lookups/suppliers").then(r => r.json()),
+        ]);
+        if (!cancelled) {
+          setVarieties(v.items ?? []);
+          setSizes(s.items ?? []);
+          setLocations(l.items ?? []);
+          setSuppliers(sup.items ?? []);
+        }
+      } catch (e) {
+        console.error("[CheckInForm] lookups failed", e);
+        toast({ title: "Failed to load lookups", description: String((e as any)?.message ?? e), variant: "destructive" });
       }
+    })();
+    return () => { cancelled = true; };
+  }, []); // once
 
-      const result = await res.json();
-      const newBatch = result.batch?.[0] ?? result.batch;
-      toast({ title: "Check-in Successful", description: `Batch #${newBatch.batch_number} created.` });
+  async function onSubmit(values: CheckInInput) {
+    setLoading(true);
+    try {
+      const { batch } = await ProductionAPI.checkIn(values);
+      toast({ title: "Batch checked in", description: `Batch ${batch.batch_number} created` });
       form.reset();
-      onSubmitSuccess?.(newBatch);
-    } catch (e: any) {
-      console.error("Check-in failed:", e);
-      toast({ variant: "destructive", title: "Check-in Failed", description: e.message });
+      props.onCreated?.(batch);
+    } catch (err) {
+      const e = err as HttpError;
+      console.error("[CheckInForm] submit error", e);
+      toast({
+        title: e.status === 401 ? "Please sign in" : "Failed to check in",
+        description: e.requestId ? `${e.message} (ref ${e.requestId})` : e.message,
+        variant: "destructive"
+      });
     } finally {
-      setFormLoading(false);
+      setLoading(false);
     }
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {/* Variety */}
-        <FormField
-          control={form.control}
-          name="plant_variety_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Variety</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/catalog/varieties"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search varieties"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <FormField name="plant_variety_id" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Variety</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger><SelectValue placeholder="Select variety" /></SelectTrigger>
+              <SelectContent>{varieties.map(v => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.name}{v.category ? ` — ${v.category}` : ""}
+                </SelectItem>
+              ))}</SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
 
-        {/* Size */}
-        <FormField
-          control={form.control}
-          name="size_id"
-          render={({ field }) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField name="size_id" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Size</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/catalog/sizes"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search sizes"
-                />
-              </FormControl>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                <SelectContent>{sizes.map(s => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
+                  </SelectItem>
+                ))}</SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          )} />
 
-        {/* Location */}
-        <FormField
-          control={form.control}
-          name="location_id"
-          render={({ field }) => (
+          <FormField name="phase" control={form.control} render={({ field }) => (
             <FormItem>
-              <FormLabel>Location</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/catalog/locations"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search locations"
-                />
-              </FormControl>
+              <FormLabel>Phase</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger><SelectValue placeholder="Select phase" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="propagation">Propagation</SelectItem>
+                  <SelectItem value="plug">Plug / Liner</SelectItem>
+                  <SelectItem value="potted">Potted</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          )} />
+        </div>
 
-        {/* Supplier */}
-        <FormField
-          control={form.control}
-          name="supplier_id"
-          render={({ field }) => (
+        <FormField name="location_id" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Location</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+              <SelectContent>{locations.map(l => (
+                <SelectItem key={l.id} value={l.id}>
+                  {l.name}{l.covered ? " (covered)" : ""}
+                </SelectItem>
+              ))}</SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField name="supplier_id" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Supplier</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+              <SelectContent>{suppliers.map(s => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}</SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField name="containers" control={form.control} render={({ field }) => (
             <FormItem>
-              <FormLabel>Supplier</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/catalog/suppliers"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search suppliers"
-                />
-              </FormControl>
+              <FormLabel>Containers</FormLabel>
+              <FormControl><Input type="number" min={1} step={1} {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Quantity */}
-        <FormField
-          control={form.control}
-          name="quantity"
-          render={({ field }) => (
+          )} />
+          <FormField name="incoming_date" control={form.control} render={({ field }) => (
             <FormItem>
-              <FormLabel>Quantity</FormLabel>
-              <FormControl>
-                <Input type="number" min={0} {...field} />
-              </FormControl>
+              <FormLabel>Incoming date</FormLabel>
+              <FormControl><Input type="date" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Quality */}
-        <FormField
-          control={form.control}
-          name="quality_rating"
-          render={({ field }) => (
+          )} />
+          <FormField name="quality_rating" control={form.control} render={({ field }) => (
             <FormItem>
-              <FormLabel>Quality Rating</FormLabel>
-              <FormControl>
-                <StarRating value={field.value ?? 0} onChange={field.onChange} />
-              </FormControl>
+              <FormLabel>Quality (1–6)</FormLabel>
+              <FormControl><Input type="number" min={1} max={6} step={1} {...field} /></FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          )} />
+        </div>
 
+        <FormField name="supplier_batch_number" control={form.control} render={({ field }) => (
+           <FormItem>
+             <FormLabel>Supplier Batch No.</FormLabel>
+             <FormControl><Input {...field} /></FormControl>
+             <FormMessage />
+           </FormItem>
+         )} />
+ 
         {/* Plant Passport Override */}
-        <div className="rounded-lg border p-3 space-y-3">
+        <div className="rounded-md border p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <FormLabel>Plant Passport Override</FormLabel>
-            <Switch checked={ppOverrideEnabled} onCheckedChange={setPpOverrideEnabled} />
-          </div>
-          {ppOverrideEnabled && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="passport_override_a"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override A</FormLabel>
-                    <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="font-medium">Plant Passport Override</div>
+            <div className="flex items-center gap-2 text-sm">
+              <span>Use override</span>
+              <input
+                type="checkbox"
+                checked={overrideOn}
+                onChange={(e) => setOverrideOn(e.target.checked)}
+                className="h-4 w-4"
               />
-              <FormField
-                control={form.control}
-                name="passport_override_b"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override B</FormLabel>
-                    <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="passport_override_c"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override C (Supplier Batch)</FormLabel>
-                    <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="passport_override_d"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Override D (Country)</FormLabel>
-                    <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Pests & Disease */}
-        <div className="rounded-lg border p-3 space-y-3">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Checkbox id="pestObserved" checked={pestObserved} onCheckedChange={(v) => setPestObserved(Boolean(v))} />
-              <label htmlFor="pestObserved" className="text-sm">Pests Observed</label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox id="diseaseObserved" checked={diseaseObserved} onCheckedChange={(v) => setDiseaseObserved(Boolean(v))} />
-              <label htmlFor="diseaseObserved" className="text-sm">Disease Observed</label>
             </div>
           </div>
+          <p className="text-sm text-muted-foreground">
+            Defaults to the selected supplier’s producer code and country.
+            Enable to override any of the fields below.
+          </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${overrideOn ? "" : "opacity-50 pointer-events-none"}`}>
             <FormField
+              name="passport_override.operator_reg_no"
               control={form.control}
-              name="pest_notes"
               render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Pest Notes (optional)</FormLabel>
-                  <FormControl><Textarea rows={3} {...field} value={field.value ?? ""} /></FormControl>
+                <FormItem>
+                  <FormLabel>Operator Reg No.</FormLabel>
+                  <FormControl><Input placeholder="e.g. IE2727" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
+              name="passport_override.origin_country"
               control={form.control}
-              name="disease_notes"
               render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Disease Notes (optional)</FormLabel>
-                  <FormControl><Textarea rows={3} {...field} value={field.value ?? ""} /></FormControl>
+                <FormItem>
+                  <FormLabel>Origin Country (ISO)</FormLabel>
+                  <FormControl><Input placeholder="IE, NL, GB..." {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              name="passport_override.traceability_code"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Traceability Code</FormLabel>
+                  <FormControl><Input placeholder="Overrides supplier batch no." {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -349,13 +265,31 @@ export function CheckinForm({ onSubmitSuccess, onCancel }: CheckinFormProps) {
           </div>
         </div>
 
-        <DialogFooter className="sticky bottom-0 z-10 -mx-6 px-6 supports-[backdrop-filter]:bg-background/60 backdrop-blur border-t -mb-6 pt-4 pb-4">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={formLoading}>Cancel</Button>
-          <Button type="submit" disabled={formLoading} aria-disabled={formLoading}>
-            {formLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save
+        <div className="flex items-center gap-2">
+          <FormField name="pest_or_disease" control={form.control} render={({ field }) => (
+            <FormItem className="flex items-center gap-2">
+              <FormControl>
+                <Checkbox checked={!!field.value} onCheckedChange={(v) => field.onChange(!!v)} />
+              </FormControl>
+              <FormLabel>Pest or disease present</FormLabel>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
+
+        <FormField name="notes" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Notes</FormLabel>
+            <FormControl><Textarea rows={3} {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <div className="flex justify-end gap-2">
+          <Button type="submit" disabled={loading}>
+            {loading ? "Saving…" : "Check in batch"}
           </Button>
-        </DialogFooter>
+        </div>
       </form>
     </Form>
   );

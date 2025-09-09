@@ -1,216 +1,216 @@
-// src/components/batches/TransplantForm.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { TransplantRequestSchema, TransplantRequest } from "@/lib/validators/transplant";
-import { Card } from "@/components/ui/card";
+import { z } from "zod";
+import { ProductionAPI } from "@/lib/production/client";
 import { Button } from "@/components/ui/button";
+import {
+  Form, FormField, FormItem, FormLabel, FormMessage, FormControl
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
-import { toast } from "sonner";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
 
-// You likely have generic Select components:
-import { Select, SelectTrigger, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectValue } from "@/components/ui/select";
-import { AsyncCombobox } from "@/components/ui/AsyncCombobox"; // Corrected import path
+const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const Schema = z.object({
+  parent_batch_id: z.string().uuid(),
+  size_id: z.string().uuid(),
+  // NOTE: keep the original field name you had to avoid upstream prop breakage
+  newLocationId: z.string().uuid(),
+  containers: z.coerce.number().int().min(1),
+  planted_at: DateOnly.optional(),
+  notes: z.string().max(1000).optional(),
+  archive_parent_if_empty: z.boolean().optional(),
+});
 
-type BatchSummary = {
-  id: string;
-  batch_number: string;
-  quantity: number;
-  plant_variety_id: string;
-  supplier_id: string | null;
-};
+type Size = { id: string; name: string; container_type?: string | null; cell_multiple?: number | null };
+type Location = { id: string; name: string; covered?: boolean | null };
 
-type SizeRow = { id: string; name: string; container_type: "pot" | "tray"; cell_multiple: number };
-
-export function TransplantForm(props: {
-  parentBatch: BatchSummary;
-  onSuccess?: (childBatchId: string) => void;
-  onCancel?: () => void;
+export default function TransplantForm(props: {
+  parentBatchId: string;
+  defaultTargetLocationId?: string;
+  onCreated?: (child: { id: string; batch_number: string }) => void;
 }) {
-  const [sizes, setSizes] = useState<SizeRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [authIssue, setAuthIssue] = useState<string | null>(null);
-
-  const form = useForm<TransplantRequest>({
-    resolver: zodResolver(TransplantRequestSchema),
+  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const form = useForm<z.infer<typeof Schema>>({
+    resolver: zodResolver(Schema),
     defaultValues: {
-      parentBatchId: props.parentBatch.id,
-      newBatchNumber: "",
-      newSizeId: undefined as any,
-      newLocationId: undefined as any,
-      containers: 1,
-      dumpAndArchiveRemainder: false,
-      passportOverrideA: "",
-      passportOverrideB: "",
-      passportOverrideC: "",
-      passportOverrideD: "",
+      parent_batch_id: props.parentBatchId as any,
+      archive_parent_if_empty: true,
     },
-    mode: "onChange",
   });
 
-  const selectedSize = useMemo(() => sizes.find(s => s.id === form.watch("newSizeId")), [sizes, form.watch("newSizeId")]);
-  const sizeMultiple = selectedSize?.cell_multiple ?? 1;
-  const containers = Number(form.watch("containers") || 0);
-  const totalUnits = containers * sizeMultiple;
+  const [loading, setLoading] = React.useState(false);
+  const [sizes, setSizes] = React.useState<Size[]>([]);
+  const [locations, setLocations] = React.useState<Location[]>([]);
+  const [parent, setParent] = React.useState<{ id: string; batch_number: string; quantity: number } | null>(null);
 
-  useEffect(() => {
+  const selectedSize = sizes.find(s => s.id === form.watch("size_id")) || null;
+  const cellMultiple = selectedSize?.cell_multiple ?? 1;
+  const containers = Number(form.watch("containers") || 0);
+  const requiredUnits = containers * cellMultiple;
+  const availableUnits = parent?.quantity ?? 0;
+  const insufficient = requiredUnits > availableUnits;
+
+  React.useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const res = await fetchWithAuth("/api/lookups/sizes");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json?.error || "Sizes load failed");
-        setSizes(json.options as SizeRow[]);
-        setAuthIssue(null);
-      } catch (e: any) {
-        console.error("[TransplantForm] lookups failed:", e);
-        setAuthIssue(e?.message ?? "Failed to load lookups");
+        const [sumRes, sizesRes, locsRes] = await Promise.all([
+          fetch(`/api/production/batches/${props.parentBatchId}/summary`),
+          fetch("/api/lookups/sizes"),
+          fetch("/api/lookups/locations"),
+        ]);
+        const [sum, s, l] = await Promise.all([sumRes.json(), sizesRes.json(), locsRes.json()]);
+        if (cancelled) return;
+
+        if (sum?.batch) {
+          setParent({ id: sum.batch.id, batch_number: sum.batch.batch_number, quantity: sum.batch.quantity });
+          form.setValue("parent_batch_id", sum.batch.id as any);
+        } else {
+          toast({ title: "Parent not found", variant: "destructive" });
+        }
+
+        setSizes(s.items ?? []);
+        setLocations(l.items ?? []);
+        if (props.defaultTargetLocationId) form.setValue("newLocationId", props.defaultTargetLocationId as any);
+      } catch (e) {
+        console.error("[TransplantForm] load failed", e);
+        toast({ title: "Failed to load transplant data", description: String((e as any)?.message ?? e), variant: "destructive" });
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [props.parentBatchId]); // eslint-disable-line
 
-  async function onSubmit(values: TransplantRequest) {
+  async function onSubmit(values: z.infer<typeof Schema>) {
+    setLoading(true);
     try {
-      if (!selectedSize) {
-        toast.error("Please choose a size.");
-        return;
-      }
-      setLoading(true);
-      const res = await fetchWithAuth("/api/production/transplants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+      const payload = {
+        parent_batch_id: values.parent_batch_id,
+        size_id: values.size_id,
+        location_id: values.newLocationId, // map old field name → API contract
+        containers: values.containers,
+        planted_at: values.planted_at,
+        notes: values.notes,
+        archive_parent_if_empty: values.archive_parent_if_empty ?? true,
+      };
+      const { child_batch } = await ProductionAPI.transplant(payload as any);
+      toast({ title: "Transplant created", description: `Child batch ${child_batch.batch_number} created` });
+      form.reset({
+        parent_batch_id: props.parentBatchId as any,
+        archive_parent_if_empty: true,
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Transplant failed");
-      toast.success(`Created batch ${json.childBatchNumber}`);
-      props.onSuccess?.(json.childBatchId);
-    } catch (e: any) {
-      toast.error(e.message);
+      props.onCreated?.(child_batch);
+    } catch (err: any) {
+      console.error("[TransplantForm] submit error", err);
+      toast({ title: "Failed to transplant", description: String(err?.message ?? err), variant: "destructive" });
     } finally {
       setLoading(false);
     }
   }
 
-  const parentRemaining = Math.max(0, props.parentBatch.quantity - totalUnits);
-
   return (
-    <Card className="p-4 space-y-4">
-      {authIssue ? (
-        <div className="text-sm text-red-600">{authIssue}</div>
-      ) : null}
-      <div className="text-sm text-muted-foreground">
-        Parent: <span className="font-semibold">{props.parentBatch.batch_number}</span> · Available units:{" "}
-        <span className="font-semibold">{props.parentBatch.quantity}</span>
-      </div>
+    <div className="space-y-4">
+      <Card className="p-3 text-sm">
+        <div className="flex flex-wrap gap-4">
+          <div><strong>Parent:</strong> {parent?.batch_number ?? "—"}</div>
+          <div><strong>Available units:</strong> {availableUnits}</div>
+          <div><strong>Required:</strong> {Number.isFinite(requiredUnits) ? requiredUnits : "—"}</div>
+        </div>
+      </Card>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <input type="hidden" {...form.register("parentBatchId")} value={props.parentBatch.id} />
+          <input type="hidden" {...form.register("parent_batch_id")} />
 
-          <FormField
-            control={form.control}
-            name="newBatchNumber"
-            render={({ field }) => (
+          <FormField name="size_id" control={form.control} render={({ field }) => (
+            <FormItem>
+              <FormLabel>Target size</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                <SelectContent>
+                  {sizes.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <FormField name="newLocationId" control={form.control} render={({ field }) => (
+            <FormItem>
+              <FormLabel>Target location</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectContent>
+                  {locations.map(l => (
+                    <SelectItem key={l.id} value={l.id}>{l.name}{l.covered ? " (covered)" : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField name="containers" control={form.control} render={({ field }) => (
               <FormItem>
-                <FormLabel>New Batch Number (optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="Auto if blank" {...field} />
-                </FormControl>
+                <FormLabel>Containers</FormLabel>
+                <FormControl><Input type="number" min={1} step={1} {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
+            )} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="newSizeId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Size</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Sizes</SelectLabel>
-                        {sizes.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name} — {s.cell_multiple} per container</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <AsyncCombobox
-              name="newLocationId"
-              control={form.control}
-              resource="locations"
-              placeholder="Search location"
-              fetcher={fetchWithAuth}
-            />
-          </div>
-
-          <FormField
-            control={form.control}
-            name="containers"
-            render={({ field }) => (
+            <FormField name="planted_at" control={form.control} render={({ field }) => (
               <FormItem>
-                <FormLabel>Containers (full trays/pots only)</FormLabel>
-                <FormControl>
-                  <Input type="number" min={1} step={1} {...field} onChange={e => field.onChange(Number(e.target.value))} />
-                </FormControl>
+                <FormLabel>Transplant date</FormLabel>
+                <FormControl><Input type="date" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
+            )} />
 
-          <div className="text-sm">
-            Size multiple: <strong>{sizeMultiple}</strong> · Total units to create: <strong>{totalUnits}</strong>
-          </div>
-
-          <FormField
-            control={form.control}
-            name="dumpAndArchiveRemainder"
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-2">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={v => field.onChange(Boolean(v))} />
-                </FormControl>
-                <Label className="cursor-pointer">Dump remainder ({parentRemaining} units) and archive parent</Label>
+            <FormField name="archive_parent_if_empty" control={form.control} render={({ field }) => (
+              <FormItem>
+                <FormLabel>Archive parent if empty</FormLabel>
+                <Select value={(field.value ? "yes" : "no")} onValueChange={(v) => field.onChange(v === "yes")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
               </FormItem>
-            )}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField control={form.control} name="passportOverrideA" render={({ field }) => (
-              <FormItem><FormLabel>Passport A (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
-            <FormField control={form.control} name="passportOverrideB" render={({ field }) => (
-              <FormItem><FormLabel>Passport B (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
-            <FormField control={form.control} name="passportOverrideC" render={({ field }) => (
-              <FormItem><FormLabel>Passport C (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
-            <FormField control={form.control} name="passportOverrideD" render={({ field }) => (
-              <FormItem><FormLabel>Passport D (optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
+            )} />
           </div>
 
-          <div className="flex gap-3 justify-end">
-            <Button type="button" variant="secondary" onClick={props.onCancel} disabled={loading}>Cancel</Button>
-            <Button type="submit" disabled={loading || totalUnits <= 0}>Transplant</Button>
+          <FormField name="notes" control={form.control} render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes</FormLabel>
+              <FormControl><Textarea rows={3} {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <div className="flex items-center justify-between">
+            <div className={`text-sm ${insufficient ? "text-red-600" : "text-muted-foreground"}`}>
+              {selectedSize
+                ? `Required = containers × ${cellMultiple} = ${Number.isFinite(requiredUnits) ? requiredUnits : "—"}`
+                : "Select a size to see required units"}
+            </div>
+            <Button type="submit" disabled={loading || insufficient || !selectedSize || !parent}>
+              {insufficient ? "Not enough stock" : (loading ? "Transplanting…" : "Create transplant")}
+            </Button>
           </div>
         </form>
       </Form>
-    </Card>
+    </div>
   );
 }

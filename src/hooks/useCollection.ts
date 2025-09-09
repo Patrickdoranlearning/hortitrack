@@ -15,79 +15,48 @@ export function useCollection<T extends { id?: string }>(collectionName: string,
   const supabase = supabaseClient();
 
   const fetchData = useCallback(async () => {
-     // Short-circuit golden tables to in-memory context (no HTTP, no RLS)
-    if (GOLDEN.has(collectionName) && ref.data) {
-      try {
-        if (collectionName === "nursery_locations") {
-          setData(ref.data.locations as unknown as T[]);
-          setLoading(false);
-          return;
-        }
-        if (collectionName === "plant_sizes") {
-          setData(ref.data.sizes as unknown as T[]);
-          setLoading(false);
-          return;
-        }
-        if (collectionName === "plant_varieties") {
-          setData(ref.data.varieties as unknown as T[]);
-          setLoading(false);
-          return;
-        }
-        if (collectionName === "suppliers") {
-          setData(ref.data.suppliers as unknown as T[]);
-          setLoading(false);
-          return;
-        }
-      } catch (e) {
-        console.error(`useCollection(${collectionName}) context error:`, e);
-      }
-    }
+    const lookupMap: Record<string, string> = {
+    plant_varieties: "/api/lookups/varieties",
+    plant_sizes: "/api/lookups/sizes",
+    nursery_locations: "/api/lookups/locations",
+    suppliers: "/api/lookups/suppliers",
+    };
+    const url = lookupMap[collectionName] ?? `/api/collections/${collectionName}`;
+
     setLoading(true);
     setError(null);
     try {
-      const { data: supabaseData, error: supabaseError } = await supabase
-        .from(collectionName)
-        .select('*')
-        .order('createdAt', { ascending: false });
-
-      if (supabaseError) {
-        throw supabaseError;
+      const res = await fetch(url);
+      const text = await res.text();
+      let json: any = {};
+      try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
+  
+      if (res.status === 401) {
+        // Not signed in: don't spam console; show gentle UI error
+        setError("Sign in required");
+        setData([]);
+        return;
       }
-      
-      // Ensure data has an 'id' property if it's missing, though Supabase usually provides it.
-      const itemsWithIds = (supabaseData as T[]).map(item => ({
-        ...item,
-        id: item.id || (item as any)._id, // Fallback if 'id' is not directly present, e.g., if it was '_id' in Firestore
-      }));
-
-      setData(itemsWithIds);
-    } catch (err: any) {
-      console.error(`Failed to fetch collection ${collectionName}:`, err);
-      setError(err.message || 'An unknown error occurred');
+      if (!res.ok) {
+        const message = json?.error || res.statusText || `HTTP ${res.status}`;
+        console.error(`useCollection(${collectionName}) fetch error:`, { message, url, status: res.status });
+        setError(message);
+        setData([]);
+        return;
+      }
+      setData((json.items as T[]) ?? []);
+    } catch (e: any) {
+      const message = e?.message || String(e);
+      console.error(`useCollection(${collectionName}) fetch error:`, { message, url });
+      setError(message || "An unknown error occurred");
+      setData([]);
     } finally {
       setLoading(false);
     }
-  }, [collectionName, supabase, ref.data]);
+  }, [collectionName]);
 
   useEffect(() => {
     fetchData();
-
-    // Supabase real-time subscriptions can be added here if needed
-    // For simplicity, we're just doing a one-time fetch on mount/refresh.
-    // If you need real-time updates, you would implement the subscribe method:
-    // const channel = supabase.channel(`${collectionName}_changes`);
-    // channel.on(
-    //   'postgres_changes',
-    //   { event: '*', schema: 'public', table: collectionName },
-    //   (payload) => {
-    //     console.log('Change received!', payload);
-    //     fetchData(); // Re-fetch on change, or implement more granular updates
-    //   }
-    // ).subscribe();
-
-    // return () => {
-    //   channel.unsubscribe();
-    // };
   }, [fetchData]);
 
   const forceRefresh = useCallback(() => {

@@ -1,131 +1,178 @@
+"use client";
 
-'use client';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '@/components/ui/button';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { useActiveOrg } from '@/lib/org/context';
-import AsyncCombobox from "@/components/ui/AsyncCombobox";
-import React from 'react';
-import { fetchWithAuth } from '@/lib/fetchWithAuth';
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { ProductionAPI, PropagationInput } from "@/lib/production/client";
+import { HttpError } from "@/lib/http/fetchJson";
 
+// Ensure these imports match your UI kit (shadcn)
+import { Button } from "@/components/ui/button";
+import {
+  Form, FormField, FormItem, FormLabel, FormMessage, FormControl
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+
+const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
-  plant_variety_id: z.string().min(1),
-  size_id: z.string().min(1),
-  location_id: z.string().min(1),
-  containers: z.coerce.number().int().min(0),
-  planted_at: z.string().min(1),
+  plant_variety_id: z.string().uuid(),
+  size_id: z.string().uuid(),
+  location_id: z.string().uuid(),
+  containers: z.coerce.number().int().min(1),
+  planted_at: DateOnly.optional(),
+  notes: z.string().max(1000).optional(),
 });
 
-export default function PropagationForm({ orgId }: { orgId?: string }) {
-  const { orgId: activeOrgId } = useActiveOrg();
-  const form = useForm<z.infer<typeof Schema>>({
-    resolver: zodResolver(Schema),
-    defaultValues: { 
-      plant_variety_id: '', 
-      size_id: '', 
-      location_id: '', 
-      containers: 0, 
-      planted_at: new Date().toISOString().slice(0,10) 
-    },
-  });
+type Variety = { id: string; name: string; category?: string | null };
+type Size = { id: string; name: string; cell_multiple?: number | null };
+type Location = { id: string; name: string; covered?: boolean | null };
 
-  const onSubmit = async (values: z.infer<typeof Schema>) => {
+export default function PropagationForm(props: {
+  defaultLocationId?: string;
+  onCreated?: (batch: any) => void;
+}) {
+  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const form = useForm<PropagationInput>({ resolver: zodResolver(Schema) });
+
+  const [loading, setLoading] = React.useState(false);
+  const [varieties, setVarieties] = React.useState<Variety[]>([]);
+  const [sizes, setSizes] = React.useState<Size[]>([]);
+  const [locations, setLocations] = React.useState<Location[]>([]);
+
+  // Load lookups
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [v, s, l] = await Promise.all([
+          fetch("/api/lookups/varieties").then(r => r.json()),
+          fetch("/api/lookups/sizes").then(r => r.json()),
+          fetch("/api/lookups/locations").then(r => r.json()),
+        ]);
+        if (!cancelled) {
+          setVarieties(v.items ?? []);
+          setSizes(s.items ?? []);
+          setLocations(l.items ?? []);
+          if (props.defaultLocationId) form.setValue("location_id", props.defaultLocationId as any);
+        }
+      } catch (e) {
+        console.error("[PropagationForm] lookups failed", e);
+        toast({ title: "Failed to load lookups", description: String((e as any)?.message ?? e), variant: "destructive" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [props.defaultLocationId]); // eslint-disable-line
+
+  async function onSubmit(values: PropagationInput) {
+    setLoading(true);
     try {
-      await fetchWithAuth('/api/batches/propagation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
+      const { batch, requestId } = await ProductionAPI.propagate(values);
+      toast({ title: "Propagation created", description: `Batch ${batch.batch_number} created` });
+      form.reset();
+      props.onCreated?.(batch);
+    } catch (err) {
+      const e = err as HttpError;
+      console.error("[PropagationForm] submit error", e);
+      toast({
+        title: e.status === 401 ? "Please sign in" : "Failed to create batch",
+        description: e.requestId ? `${e.message} (ref ${e.requestId})` : e.message,
+        variant: "destructive"
       });
-      // TODO: Add success toast
-    } catch (error) {
-      // TODO: Add error toast
-      console.error(error);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="plant_variety_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Variety</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/catalog/varieties"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search variety"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="size_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Size</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/catalog/sizes"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Select tray size"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="location_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Location</FormLabel>
-              <FormControl>
-                <AsyncCombobox
-                  endpoint="/api/catalog/locations"
-                  value={field.value ?? null}
-                  onChange={(v) => field.onChange(v)}
-                  placeholder="Search location"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField control={form.control} name="containers" render={({ field }) => (
+        <FormField name="plant_variety_id" control={form.control} render={({ field }) => (
           <FormItem>
-            <FormLabel>Trays</FormLabel>
+            <FormLabel>Variety</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger><SelectValue placeholder="Select variety" /></SelectTrigger>
+              <SelectContent>
+                {varieties.map(v => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.name}{v.category ? ` — ${v.category}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField name="size_id" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Size</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+              <SelectContent>
+                {sizes.map(s => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField name="location_id" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Location</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+              <SelectContent>
+                {locations.map(l => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}{l.covered ? " (covered)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField name="containers" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Containers</FormLabel>
             <FormControl>
-              <Input type="number" {...field} />
+              <Input type="number" min={1} step={1} {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
         )} />
-        <FormField control={form.control} name="planted_at" render={({ field }) => (
+
+        <FormField name="planted_at" control={form.control} render={({ field }) => (
           <FormItem>
-            <FormLabel>Planted Date</FormLabel>
+            <FormLabel>Planted date</FormLabel>
             <FormControl>
               <Input type="date" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
         )} />
-        <div className="pt-2">
-          <Button type="submit">Create Propagation Batch</Button>
+
+        <FormField name="notes" control={form.control} render={({ field }) => (
+          <FormItem>
+            <FormLabel>Notes</FormLabel>
+            <FormControl><Textarea rows={3} {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <div className="flex justify-end gap-2">
+          <Button type="submit" disabled={loading}>
+            {loading ? "Saving…" : "Create propagation"}
+          </Button>
         </div>
       </form>
     </Form>

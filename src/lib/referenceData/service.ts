@@ -1,4 +1,3 @@
-
 // src/lib/referenceData/service.ts
 export type ReferenceData = {
   varieties: Array<{
@@ -7,7 +6,7 @@ export type ReferenceData = {
     family: string | null;
     genus: string | null;
     species: string | null;
-    category: string | null; // mapped from "Category" on the server
+    category: string | null;
   }>;
   sizes: Array<{ id: string; name: string; container_type: string; cell_multiple: number }>;
   locations: Array<{ id: string; name: string; nursery_site: string }>;
@@ -36,13 +35,14 @@ function stringifyErrors(errs: any[]): string[] {
 
 export async function fetchReferenceData(): Promise<ReferenceData> {
   const res = await fetch("/api/reference-data", { method: "GET", cache: "no-store" });
-
+  
   if (!res.ok && res.status !== 207) {
-    let payload: any = null;
-    try { payload = await res.json(); } catch { /* fall back */ }
-    const msg = payload?.errors ? JSON.stringify(payload.errors) : await res.text().catch(() => "");
-    console.error("[refdata] HTTP error", res.status, msg);
-    return { varieties: [], sizes: [], locations: [], suppliers: [], errors: [`HTTP ${res.status}: ${msg || "no body"}`] };
+    const text = await res.text().catch(() => "");
+    const payload = text ? JSON.parse(text) : {};
+    const msg = payload?.error || text;
+    console.warn("[refdata] HTTP", res.status, msg);
+    // Allow 401 to pass through as a soft error (varieties/sizes may still be present)
+    return { varieties: payload?.varieties ?? [], sizes: payload?.sizes ?? [], locations: payload?.locations ?? [], suppliers: payload?.suppliers ?? [], errors: payload?.errors ?? [`HTTP ${res.status}: ${msg || "no body"}`] };
   }
 
   const json = await res.json().catch((e) => {
@@ -57,9 +57,16 @@ export async function fetchReferenceData(): Promise<ReferenceData> {
   const errors = Array.isArray(json.errors) ? stringifyErrors(json.errors) : [];
 
   if (errors.length) {
-    // Log clear, actionable error strings (no `{...}`)
-    for (const line of errors) console.error("[refdata] fetch error:", line);
+    for (const line of errors) {
+      const msg = typeof line === "string" ? line : JSON.stringify(line);
+      if (msg.includes("Unauthenticated")) {
+        console.info("[refdata] info:", msg);
+      } else {
+        console.warn("[refdata] warning:", msg);
+      }
+    }
   }
+
 
   return {
     varieties: json.varieties ?? [],

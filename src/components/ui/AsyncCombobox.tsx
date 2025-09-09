@@ -1,114 +1,82 @@
 "use client";
 
 import * as React from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Button } from "@/components/ui/button";
-import { ChevronsUpDown } from "lucide-react";
+import { Controller, type Control } from "react-hook-form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export type Option = { value: string; label: string; hint?: string; meta?: Record<string, any> };
+type Item = Record<string, any>;
 
-type Props = {
-  endpoint: string;              // e.g. "/api/options/varieties"
-  value: string | null;          // stores 'value' (id) in the form
-  onChange: (value: string | null) => void;
+export default function AsyncCombobox<TFormValues>({
+  name,
+  control,
+  resource,               // "varieties" | "sizes" | "locations" | "suppliers"
+  valueField = "id",
+  labelField = "name",
+  placeholder = "Select…",
+  onLoaded,
+}: {
+  name: string;
+  control: Control<TFormValues>;
+  resource: "varieties" | "sizes" | "locations" | "suppliers";
+  valueField?: string;
+  labelField?: string;
   placeholder?: string;
-  disabled?: boolean;
-  debounceMs?: number;
-};
-
-const AsyncCombobox = React.forwardRef<HTMLButtonElement, Props>(function AsyncCombobox(
-  { endpoint, value, onChange, placeholder = "Search…", disabled, debounceMs = 250 }: Props,
-  ref
-) {
-  const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+  onLoaded?: (items: Item[]) => void;
+}) {
+  const [items, setItems] = React.useState<Item[]>([]);
   const [error, setError] = React.useState<string | null>(null);
-  const [options, setOptions] = React.useState<Option[]>([]);
 
-  const debounced = useDebounce(query, debounceMs);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/lookups/${resource}`);
+        const j = await r.json().catch(() => ({}));
+        if (cancelled) return;
 
-  const fetcher = React.useCallback(async (q: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const url = new URL(endpoint, window.location.origin);
-      if (q) url.searchParams.set("q", q);
-      const res = await fetch(url.toString(), { credentials: "include" });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error || `Request failed with ${res.status}`);
-      const opts: Option[] = payload.options ?? [];
-      setOptions(opts);
-    } catch (e: any) {
-      console.error("[AsyncCombobox] fetch error:", e);
-      setOptions([]);
-      setError(e?.message ?? "Failed to load.");
-    } finally {
-      setLoading(false);
-    }
-  }, [endpoint]);
+        if (r.status === 401) {
+          setError("Sign in required to load this list.");
+          setItems([]);
+          return;
+        }
+        if (!r.ok) {
+          setError(j?.error || r.statusText || "Failed to load");
+          setItems([]);
+          return;
+        }
+        setItems(j?.items ?? []);
+        onLoaded?.(j?.items ?? []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message ?? String(e));
+          setItems([]);
+        }
+        console.error(`[AsyncCombobox:${resource}] load error`, e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [resource]);
 
-  React.useEffect(() => { fetcher(""); }, [fetcher]);
-  React.useEffect(() => { fetcher(debounced); }, [debounced, fetcher]);
-
-  const selected = options.find(o => o.value === value) || null;
+  if (error) {
+    return <div className="text-sm text-red-600">Failed to load {resource}: {error}</div>;
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          ref={ref}
-          type="button"
-          variant="outline"
-          role="combobox"
-          className="justify-between w-full"
-          disabled={disabled}
-        >
-          <span className="truncate">{selected?.label ?? placeholder}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-[--radix-popover-trigger-width] min-w-56">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder={placeholder} value={query} onValueChange={setQuery} />
-          <CommandList>
-            {loading && <CommandEmpty>Searching…</CommandEmpty>}
-            {!loading && error && <CommandEmpty>{error}</CommandEmpty>}
-            {!loading && !error && options.length === 0 && <CommandEmpty>No results.</CommandEmpty>}
-            {!loading && !error && options.length > 0 && (
-              <CommandGroup>
-                {options.map(opt => (
-                  <CommandItem
-                    key={opt.value}
-                    value={opt.label}
-                    onSelect={() => {
-                      onChange(opt.value);
-                      setOpen(false);
-                    }}
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-sm">{opt.label}</span>
-                      {opt.hint && <span className="text-xs text-muted-foreground">{opt.hint}</span>}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Controller
+      control={control}
+      name={name as any}
+      render={({ field }) => (
+        <Select value={field.value} onValueChange={field.onChange}>
+          <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
+          <SelectContent>
+            {items.map((it) => (
+              <SelectItem key={String(it[valueField])} value={String(it[valueField])}>
+                {String(it[labelField] ?? it[valueField])}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    />
   );
-});
-
-export default AsyncCombobox;
-
-function useDebounce<T>(value: T, delay: number) {
-  const [v, setV] = React.useState(value);
-  React.useEffect(() => {
-    const id = setTimeout(() => setV(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return v;
 }
