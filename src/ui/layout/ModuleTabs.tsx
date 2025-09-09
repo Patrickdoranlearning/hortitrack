@@ -64,10 +64,14 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
           return (
              <NavigationMenuItem key={item.key}>
                 <NavigationMenuTrigger className={cn(isModuleActive && "bg-accent/50 font-semibold text-primary")}>
-                    <Link href={item.href} className="mr-2">{item.label}</Link>
+                    {item.label}
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
+                    <ListItem
+                        item={{ label: `${item.label} Home`, href: item.href, description: `Go to the main ${item.label} dashboard.` }}
+                        active={pathname === item.href}
+                      />
                     {item.items.map((subItem) => (
                       <ListItem
                         key={subItem.label}
