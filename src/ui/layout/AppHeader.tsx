@@ -4,18 +4,18 @@
 import * as React from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { ModuleTabs, type ModuleTabItem } from "./ModuleTabs"
+import { ModuleTabs } from "./ModuleTabs"
 import { ProfileMenu } from "./ProfileMenu"
 import { Logo } from "@/components/logo"
+import { APP_NAV } from "@/config/nav";
 
 type AppHeaderProps = {
   companyName: string
   moduleKey: string
-  moduleTabs: ModuleTabItem[]
   className?: string
 }
 
-export function AppHeader({ companyName, moduleKey, moduleTabs, className }: AppHeaderProps) {
+export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps) {
   return (
     <header className={cn(
       "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60",
@@ -38,7 +38,7 @@ export function AppHeader({ companyName, moduleKey, moduleTabs, className }: App
       {/* Bottom bar: Module Tabs */}
       <div className="border-t bg-background/50">
         <div className="mx-auto max-w-7xl px-4">
-             <ModuleTabs items={moduleTabs} ariaLabel={`${moduleKey} module navigation`} />
+             <ModuleTabs items={APP_NAV} ariaLabel="Main application navigation" />
         </div>
       </div>
 

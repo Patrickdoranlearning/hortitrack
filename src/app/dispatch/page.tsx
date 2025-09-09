@@ -8,16 +8,10 @@ import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Truck, Calendar, ListChecks } from 'lucide-react';
 
-const TABS = [
-    { label: "Dispatch Dashboard", href: "/dispatch", exact: true },
-    { label: "Packing", href: "/dispatch/packing" },
-    { label: "Deliveries", href: "/dispatch/deliveries" },
-];
-
 export default function DispatchPage() {
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch" moduleTabs={TABS}>
+    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
       <div className="space-y-6">
         <ModulePageHeader 
             title="Dispatch Dashboard"

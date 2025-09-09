@@ -86,14 +86,6 @@ interface HomePageViewProps {
   };
 }
 
-const TABS = [
-    { label: "Dashboard", href: "/production", exact: true },
-    { label: "Batches", href: "/" },
-    { label: "Planning", href: "/production/planning"},
-    { label: "Plant Health", href: "/actions" },
-    { label: "Dispatch", href: "/dispatch" },
-];
-
 export default function HomePageView({
   initialBatches,
   plantFamilies,
@@ -269,7 +261,7 @@ export default function HomePageView({
   }
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
+    <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader 
             title="Nursery Stock"

@@ -13,13 +13,6 @@ import type { NurseryLocation } from '@/lib/types';
 import FlagBatchDialog from '@/components/flag-batch-dialog';
 import { Batch } from '@/lib/types';
 
-
-const TABS = [
-    { label: "Plant Health Dashboard", href: "/actions", exact: true },
-    { label: "IPM", href: "/actions/ipm" },
-    { label: "Flagged Batches", href: "/actions/flagged" },
-];
-
 export default function ActionsPage() {
   const [isActionLogOpen, setIsActionLogOpen] = React.useState(false);
   const [isFlagBatchOpen, setIsFlagBatchOpen] = React.useState(false);
@@ -30,7 +23,7 @@ export default function ActionsPage() {
 
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth" moduleTabs={TABS}>
+    <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth">
       <div className="space-y-6">
         <ModulePageHeader 
             title="Plant Health Dashboard"

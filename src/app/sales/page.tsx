@@ -8,25 +8,9 @@ import { SalesOrdersPanel } from '@/components/sales/SalesOrdersPanel';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
-const TABS = [
-    { label: "Production", href: "/production" },
-    { 
-        label: "Sales", 
-        href: "/sales", 
-        items: [
-            { label: "Sales Dashboard", href: "/sales"},
-            { label: "Orders", href: "/sales/orders"},
-            { label: "Customers", href: "/sales/customers"},
-            { label: "Products", href: "/sales/products"},
-        ]
-    },
-    { label: "Plant Health", href: "/actions" },
-    { label: "Dispatch", href: "/dispatch" },
-];
-
 export default function SalesLandingPage() {
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales" moduleTabs={TABS}>
+    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
         <div className="space-y-6">
             <ModulePageHeader 
                     title="Sales"

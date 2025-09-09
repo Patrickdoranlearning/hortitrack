@@ -10,22 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { DialogForm } from "@/ui/templates/DialogForm"
 
-const TABS = [
-  { 
-    label: "Production", 
-    href: "/production", 
-    items: [
-      { label: "Dashboard", href: "/production"},
-      { label: "Batches", href: "/batches"},
-      { label: "Planning", href: "/production/planning"},
-    ]
-  },
-  { label: "Plant Health", href: "/actions" },
-  { label: "Sales", href: "/sales" },
-  { label: "Dispatch", href: "/dispatch" },
-];
-
-
 const newBatchSchema = z.object({
   variety: z.string().min(1, "Required"),
   family: z.string().min(1, "Required"),
@@ -35,7 +19,7 @@ const newBatchSchema = z.object({
 
 export default function ProductionHome() {
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
+    <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-2xl">Production</h1>
         <DialogForm

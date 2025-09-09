@@ -12,41 +12,55 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu"
+import { NavItem } from "@/config/nav"
 
-export type ModuleTabItem = {
-  label: string;
-  href: string;
-  exact?: boolean;
-  items?: { label: string; href: string }[];
-};
 
-export function ModuleTabs({ items, ariaLabel }: { items: ModuleTabItem[]; ariaLabel?: string }) {
+export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?: string }) {
   const pathname = usePathname()
 
   return (
-    <nav aria-label={ariaLabel} className="overflow-x-auto">
-      <ul className="-mb-px flex h-10 items-center gap-4 text-sm">
+    <NavigationMenu aria-label={ariaLabel}>
+      <NavigationMenuList>
         {items.map((item) => {
-          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+          const active = item.key === 'production' ? pathname === '/' : pathname.startsWith(item.href)
           
-          if (item.items && item.items.length > 0) {
+          if (!item.items || item.items.length === 0) {
             return (
-              <li key={item.href}>
-                <DropdownMenu>
+              <NavigationMenuItem key={item.key}>
+                <Link href={item.href} legacyBehavior passHref>
+                  <NavigationMenuLink active={active} className={navigationMenuTriggerStyle()}>
+                    {item.label}
+                  </NavigationMenuLink>
+                </Link>
+              </NavigationMenuItem>
+            )
+          }
+
+          return (
+             <NavigationMenuItem key={item.key}>
+               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Link
+                      href={item.href}
                       className={cn(
-                        "inline-flex items-center border-b-2 px-1 pt-1 font-medium transition",
-                        active
-                          ? "border-primary text-primary"
-                          : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                        navigationMenuTriggerStyle(),
+                        "flex items-center gap-1",
+                        active ? "font-semibold text-primary" : ""
                       )}
+                      onMouseOver={(e) => (e.target as HTMLElement).click()}
                     >
                       {item.label}
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    </button>
+                      <ChevronDown className="h-4 w-4 transition-transform duration-200 group-hover:rotate-180" />
+                    </Link>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent>
+                  <DropdownMenuContent align="start">
                     {item.items.map(subItem => (
                        <DropdownMenuItem key={subItem.href} asChild>
                         <Link href={subItem.href}>{subItem.label}</Link>
@@ -54,27 +68,10 @@ export function ModuleTabs({ items, ariaLabel }: { items: ModuleTabItem[]; ariaL
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </li>
-            )
-          }
-
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={cn(
-                  "inline-flex items-center border-b-2 px-1 pt-1 font-medium transition",
-                  active
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                )}
-              >
-                {item.label}
-              </Link>
-            </li>
+            </NavigationMenuItem>
           )
         })}
-      </ul>
-    </nav>
+      </NavigationMenuList>
+    </NavigationMenu>
   )
 }

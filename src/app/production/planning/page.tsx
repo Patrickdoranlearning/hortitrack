@@ -7,24 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 
-const TABS = [
-    { 
-      label: "Production", 
-      href: "/production", 
-      items: [
-        { label: "Dashboard", href: "/production"},
-        { label: "Batches", href: "/batches"},
-        { label: "Planning", href: "/production/planning"},
-      ]
-    },
-    { label: "Plant Health", href: "/actions" },
-    { label: "Sales", href: "/sales" },
-    { label: "Dispatch", href: "/dispatch" },
-  ];
-
 export default function ProductionPlanningPage() {
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
+    <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Production Planning</h1>
         <Button><Plus className="mr-2 h-4 w-4" /> New Plan</Button>

@@ -111,13 +111,6 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     // setIsFormOpen(true);
   };
   
-  const TABS = [
-    { label: "Production", href: "/", exact: true },
-    { label: "Batches", href: "/batches" },
-    { label: "Plant Health", href: "/actions" },
-    { label: "Dispatch", href: "/dispatch" },
-];
-
   if (isDataLoading && !batches.length) {
      return (
         <div className="flex min-h-screen w-full flex-col p-6 items-center justify-center">
@@ -127,7 +120,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   }
 
   return (
-     <PageFrame companyName="Doran Nurseries" moduleKey="production" moduleTabs={TABS}>
+     <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader 
             title="All Batches"
