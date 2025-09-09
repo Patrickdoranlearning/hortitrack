@@ -49,6 +49,7 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
             ? pathname === '/' || pathname.startsWith('/production') || pathname.startsWith('/batches') 
             : pathname.startsWith(item.href);
 
+          // If there are no sub-items, render a simple link.
           if (!item.items || item.items.length === 0) {
             return (
               <NavigationMenuItem key={item.key}>
@@ -60,11 +61,14 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
               </NavigationMenuItem>
             );
           }
-
+          
+          // If there are sub-items, render the trigger and content.
           return (
              <NavigationMenuItem key={item.key}>
                 <NavigationMenuTrigger className={cn(isModuleActive && "bg-accent/50 font-semibold text-primary")}>
-                    {item.label}
+                    <Link href={item.href} className="flex items-center" onFocus={(e) => e.preventDefault()}>
+                        {item.label}
+                    </Link>
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
