@@ -1,7 +1,8 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import type { PhotoFile } from "@/components/actions/PhotoPicker";
 
 const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -15,7 +16,23 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
-export { app, db, auth };
+export async function uploadActionPhotos(batchId: string, files: File[]): Promise<PhotoFile[]> {
+  const results: PhotoFile[] = [];
+  for (const file of files) {
+    const path = `action-photos/${batchId}/${Date.now()}-${file.name}`;
+    const r = ref(storage, path);
+    const task = uploadBytesResumable(r, file, { contentType: file.type });
+    await new Promise((res, rej) => {
+      task.on("state_changed", undefined, rej, res);
+    });
+    const url = await getDownloadURL(r);
+    results.push({ url, path, mime: file.type, size: file.size });
+  }
+  return results;
+}
+
+
+export { app, auth, storage };

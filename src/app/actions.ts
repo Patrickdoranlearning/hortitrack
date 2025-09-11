@@ -1,24 +1,89 @@
 
 'use server';
 
-import { productionProtocol } from '@/ai/flows/production-protocol';
+import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
-import { db } from '@/lib/firebase-admin';
+import { createSupabaseServerWithCookies, type CookieBridge } from '@/server/db/supabaseServerApp';
+import { cookies } from 'next/headers';
+import { z } from 'zod';
+import { declassify } from '@/server/utils/declassify';
+import { snakeToCamel } from '@/lib/utils';
+
+async function getSupabaseForApp() {
+  const store = await cookies();
+  const cookieBridge: CookieBridge = {
+    get: (n) => store.get(n)?.value,
+    set: (n, v, o) => store.set(n, v, o),
+    remove: (n, o) => store.set(n, "", { ...o, maxAge: 0 }),
+  };
+  return createSupabaseServerWithCookies(cookieBridge);
+}
+
+function transformVBatchSearchData(data: any): Batch {
+    const camelCaseData = snakeToCamel(data);
+    return {
+        ...camelCaseData,
+        batchNumber: camelCaseData.batchNumber,
+        plantVariety: camelCaseData.varietyName ?? '',
+        plantFamily: camelCaseData.varietyFamily ?? null,
+        size: camelCaseData.sizeName ?? '',
+        location: camelCaseData.locationName ?? null,
+        supplier: camelCaseData.supplierName ?? null,
+        initialQuantity: camelCaseData.initialQuantity ?? camelCaseData.quantity ?? 0,
+        plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
+        plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
+        category: camelCaseData.category ?? '',
+        createdAt: camelCaseData.createdAt,
+        updatedAt: camelCaseData.updatedAt,
+        logHistory: [], 
+    };
+}
+
+async function getBatchById(batchId: string): Promise<Batch | null> {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase
+        .from("v_batch_search") 
+        .select("*") 
+        .eq("id", batchId)
+        .maybeSingle();
+    
+    if (error) {
+        console.error('[getBatchById] Supabase error from v_batch_search:', error);
+        return null;
+    }
+    return data ? transformVBatchSearchData(data) : null;
+}
 
 export async function getBatchesAction() {
     try {
-        const snapshot = await db.collection('batches').get();
-        const batches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Batch[];
-        return { success: true, data: batches };
+        const supabase = await getSupabaseForApp();
+        const { data: batches, error } = await supabase
+            .from("v_batch_search") 
+            .select("*") 
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error('[getBatchesAction] Supabase error from v_batch_search:', error);
+            throw error;
+        }
+        
+        const transformedBatches = (batches || []).map(transformVBatchSearchData);
+        
+        return { success: true, data: declassify(transformedBatches) as Batch[] };
     } catch (error: any) {
-        console.error('Error getting batches:', error);
+        console.error('[getBatchesAction] Error in action:', error);
         return { success: false, error: 'Failed to fetch batches: ' + error.message };
     }
 }
 
-export async function getProductionProtocolAction(batch: Batch) {
+export async function getProductionProtocolAction(batchId: string) {
   try {
+    const { productionProtocol } = await import('@/ai/flows/production-protocol');
+    const batch = await getBatchById(batchId);
+    if (!batch) {
+        return { success: false, error: 'Batch not found.' };
+    }
     const protocol = await productionProtocol(batch);
     return { success: true, data: protocol };
   } catch (error) {
@@ -30,8 +95,37 @@ export async function getProductionProtocolAction(batch: Batch) {
   }
 }
 
-export async function batchChatAction(batch: Batch, query: string) {
+export async function getCareRecommendationsAction(batchId: string) {
   try {
+    const batch = await getBatchById(batchId);
+    if (!batch) {
+        return { success: false, error: 'Batch not found.' };
+    }
+    const input: CareRecommendationsInput = {
+      batchInfo: {
+        plantFamily: batch.plantFamily,
+        plantVariety: batch.plantVariety,
+        plantingDate: batch.plantedAt ?? batch.plantingDate ?? new Date().toISOString(),
+      },
+      logHistory: (batch.logHistory || []).map((log: any) => log.note || log.type || log.action || 'Log entry'),
+    };
+    const recommendations = await careRecommendations(input);
+    return { success: true, data: recommendations };
+  } catch (error: any) {
+    console.error('Error getting care recommendations:', error);
+    return {
+      success: false,
+      error: 'Failed to generate AI care recommendations.',
+    };
+  }
+}
+
+export async function batchChatAction(batchId: string, query: string) {
+  try {
+    const batch = await getBatchById(batchId);
+    if (!batch) {
+        return { success: false, error: 'Batch not found.' };
+    }
     const input: BatchChatInput = { batch, query };
     const result = await batchChat(input);
     return { success: true, data: result };
@@ -41,202 +135,86 @@ export async function batchChatAction(batch: Batch, query: string) {
   }
 }
 
-
-export async function addBatchAction(
-  newBatchData: Omit<Batch, 'id' | 'logHistory'>
-) {
-  try {
-    const batchesCollection = db.collection('batches');
-    const newDocRef = batchesCollection.doc();
-    const newBatch: Batch = {
-      ...newBatchData,
-      id: newDocRef.id,
-      logHistory: [{ date: new Date().toISOString(), action: 'Batch created.' }],
-    };
-    await newDocRef.set(newBatch);
-    return { success: true, data: newBatch };
-  } catch (error: any) {
-    console.error('Error adding batch:', error);
-    return { success: false, error: 'Failed to add batch: ' + error.message };
-  }
+export async function addLocationAction(locationData: Omit<NurseryLocation, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('locations').insert([locationData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
 }
 
-export async function updateBatchAction(batchToUpdate: Batch) {
-  try {
-    const updatedBatchData = { ...batchToUpdate };
-
-    if (updatedBatchData.quantity <= 0 && updatedBatchData.status !== 'Archived') {
-      updatedBatchData.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
-      updatedBatchData.status = 'Archived';
-    }
-    
-    if (updatedBatchData.status === 'Archived') {
-        updatedBatchData.quantity = 0;
-    }
-
-
-    const batchesCollection = db.collection('batches');
-    const batchDoc = batchesCollection.doc(updatedBatchData.id);
-    await batchDoc.set(updatedBatchData, { merge: true });
-    return { success: true, data: updatedBatchData };
-  } catch (error: any) {
-    console.error('Error updating batch:', error);
-    return { success: false, error: 'Failed to update batch: ' + error.message };
-  }
+export async function updateLocationAction(locationData: NurseryLocation) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('locations').update(locationData).eq('id', locationData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
 }
 
-async function getBatchById(batchId: string): Promise<Batch | null> {
-    const docRef = db.collection('batches').doc(batchId);
-    const docSnap = await docRef.get();
-
-    if (docSnap.exists) {
-        return { ...docSnap.data(), id: docSnap.id } as Batch;
-    }
-    return null;
+export async function deleteLocationAction(locationId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('locations').delete().eq('id', locationId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
 }
 
-
-export async function logAction(batchId: string, action: string, quantityChange: number | null = null, newLocation: string | null = null) {
-  try {
-    const batch = await getBatchById(batchId);
-    if (!batch) {
-      return { success: false, error: 'Batch not found.' };
-    }
-    
-    const updatedBatch = { ...batch };
-
-    updatedBatch.logHistory = [...updatedBatch.logHistory, { date: new Date().toISOString(), action }];
-
-    if (quantityChange !== null) {
-      updatedBatch.quantity += quantityChange;
-    }
-    
-    if (newLocation !== null) {
-        updatedBatch.location = newLocation;
-    }
-
-    const result = await updateBatchAction(updatedBatch);
-    if (result.success) {
-      return { success: true, data: result.data };
-    } else {
-      return { success: false, error: result.error };
-    }
-  } catch (error: any) {
-    console.error('Error logging action:', error);
-    return { success: false, error: 'Failed to log action: ' + error.message };
-  }
+export async function addSizeAction(sizeData: Omit<PlantSize, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('sizes').insert([sizeData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
 }
 
-export async function archiveBatchAction(batchId: string, loss: number) {
-  try {
-    const batch = await getBatchById(batchId);
-    if (!batch) {
-      return { success: false, error: 'Batch not found.' };
-    }
-    
-    const updatedBatch = { ...batch };
-    
-    updatedBatch.status = 'Archived';
-    const action = `Archived with loss of ${loss} units. Final quantity: ${batch.quantity - loss}.`;
-    updatedBatch.logHistory.push({ date: new Date().toISOString(), action });
-    updatedBatch.quantity = 0;
-
-    const result = await updateBatchAction(updatedBatch);
-    if (result.success) {
-        return { success: true, data: result.data };
-    } else {
-        return { success: false, error: result.error };
-    }
-  } catch (error: any) {
-    console.error('Error archiving batch:', error);
-    return { success: false, error: 'Failed to archive batch: ' + error.message };
-  }
+export async function updateSizeAction(sizeData: PlantSize) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('sizes').update(sizeData).eq('id', sizeData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
 }
 
-export async function transplantBatchAction(
-  sourceBatchId: string,
-  newBatchData: Omit<Batch, 'id' | 'logHistory' | 'transplantedFrom' | 'batchNumber'>,
-  transplantQuantity: number,
-  logRemainingAsLoss: boolean
-) {
-  try {
-    return await db.runTransaction(async (transaction) => {
-        const sourceBatchRef = db.collection('batches').doc(sourceBatchId);
-        const sourceBatchDoc = await transaction.get(sourceBatchRef);
+export async function deleteSizeAction(sizeId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('sizes').delete().eq('id', sizeId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
 
-        if (!sourceBatchDoc.exists) {
-            throw new Error('Source batch not found.');
-        }
-        const sourceBatch = { ...sourceBatchDoc.data(), id: sourceBatchDoc.id } as Batch;
+export async function addSupplierAction(supplierData: Omit<Supplier, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('suppliers').insert([supplierData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
 
-        if (sourceBatch.quantity < transplantQuantity) {
-            throw new Error('Insufficient quantity in source batch.');
-        }
+export async function updateSupplierAction(supplierData: Supplier) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('suppliers').update(supplierData).eq('id', supplierData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
 
-        const allBatchesSnapshot = await transaction.get(db.collection('batches'));
-        const maxBatchNum = allBatchesSnapshot.docs.reduce((max, doc) => {
-            const b = doc.data() as Batch;
-            const numPart = parseInt(b.batchNumber.split('-')[1] || '0', 10);
-            return numPart > max ? numPart : max;
-        }, 0);
-        const nextBatchNumStr = (maxBatchNum + 1).toString().padStart(6, '0');
+export async function deleteSupplierAction(supplierId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
 
-        const batchNumberPrefix = {
-            'Propagation': '1', 'Plugs/Liners': '2', 'Potted': '3',
-            'Ready for Sale': '4', 'Looking Good': '6', 'Archived': '5'
-        };
-        const prefixedBatchNumber = `${batchNumberPrefix[newBatchData.status]}-${nextBatchNumStr}`;
+export async function addVarietyAction(varietyData: Omit<Variety, 'id'>) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('varieties').insert([varietyData]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
 
-        const newDocRef = db.collection('batches').doc();
-        const newBatch: Batch = {
-            ...(newBatchData as any),
-            id: newDocRef.id,
-            batchNumber: prefixedBatchNumber,
-            initialQuantity: transplantQuantity,
-            quantity: transplantQuantity,
-            transplantedFrom: sourceBatch.batchNumber,
-            logHistory: [
-                {
-                date: new Date().toISOString(),
-                action: `Created from transplant of ${transplantQuantity} units from batch ${sourceBatch.batchNumber}.`,
-                },
-            ],
-        };
+export async function updateVarietyAction(varietyData: Variety) {
+    const supabase = await getSupabaseForApp();
+    const { data, error } = await supabase.from('varieties').update(varietyData).eq('id', varietyData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data?.[0] };
+}
 
-        const updatedSourceBatch = { ...sourceBatch };
-        updatedSourceBatch.logHistory.push({
-            date: new Date().toISOString(),
-            action: `Transplanted ${transplantQuantity} units to new batch ${newBatch.batchNumber}.`,
-        });
-
-        if (logRemainingAsLoss) {
-            const remaining = sourceBatch.quantity - transplantQuantity;
-            if (remaining > 0) {
-            updatedSourceBatch.logHistory.push({
-                    date: new Date().toISOString(),
-                    action: `Archived with loss of ${remaining} units.`
-                });
-            }
-            updatedSourceBatch.status = 'Archived';
-            updatedSourceBatch.quantity = 0;
-        } else {
-            updatedSourceBatch.quantity -= transplantQuantity;
-        }
-        
-        transaction.set(newDocRef, newBatch);
-        
-        if (updatedSourceBatch.quantity <= 0 && updatedSourceBatch.status !== 'Archived') {
-            updatedSourceBatch.logHistory.push({ date: new Date().toISOString(), action: `Batch quantity reached zero and was automatically archived.` });
-            updatedSourceBatch.status = 'Archived';
-            updatedSourceBatch.quantity = 0;
-        }
-        transaction.set(sourceBatchRef, updatedSourceBatch);
-        
-        return { success: true, data: { sourceBatch: updatedSourceBatch, newBatch } };
-    });
-
-  } catch (error: any) {
-    console.error('Error transplanting batch:', error);
-    return { success: false, error: error.message || 'Failed to transplant batch.' };
-  }
+export async function deleteVarietyAction(varietyId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('varieties').delete().eq('id', varietyId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
 }

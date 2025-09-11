@@ -44,12 +44,30 @@ Transform the app into a multi-user platform with distinct roles and capabilitie
 *   **User Roles:**
     *   **Nursery Operative:** Focused on batch management, logging actions, and completing assigned tasks within the Production Module.
     *   **Sales Person:** Can view inventory, check what's ready for sale, and potentially create quotes or orders in the Sales Module.
-    *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly in the Sales Module.
+        *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly in the Sales Module. **They will use the same UI as Sales Persons for creating orders.**
 *   **Implementation:**
     *   Use **Firebase Authentication** to manage user accounts, logins, and security.
     *   Build different UI views and dashboards tailored to each user role.
+    *   **Note:** Sales Persons and Customers will share the same UI for order creation to reduce program size.
 
-## 3. Task Management System (Production Module)
+## 3. Product & Alias Management (Sales Module)
+
+A flexible system to manage how inventory is presented and sold to customers, separating internal stock from saleable products.
+
+### Sub-Features:
+
+*   **Product Catalogue:**
+    *   Create a customer-facing "Product" (e.g., "1.5L Mixed Colour Heather"). This is the item the customer sees and buys.
+    *   Products can have their own descriptions, sales photos, and prices.
+*   **Stock Linking:**
+    *   Link one or more production `Batches` to a single `Product`.
+    *   The system will automatically calculate the total available quantity for a product by summing the stock of all linked batches.
+    *   This allows selling multiple different batches (e.g., *Erica 'Kramer's Red'* and *Erica 'White Perfection'*) under a single product listing.
+*   **Implementation:**
+    *   Create a new "Products" data table in Firestore.
+    *   Build an interface in the Sales Module to create/edit products and link/unlink batches to them.
+
+## 4. Task Management System (Production Module)
 
 An active, operational tool to assign and track nursery tasks.
 
@@ -69,7 +87,7 @@ An active, operational tool to assign and track nursery tasks.
     *   Add a "Create Tasks" button to the AI Care Recommendations feature. The AI's suggestions (e.g., "Watering needed") can be converted directly into assignable tasks.
     *   AI could help prioritize tasks based on external data like weather forecasts.
 
-## 4. Label Printing (Production/Dispatch Module)
+## 5. Label Printing (Production/Dispatch Module)
 
 Bridge the gap between digital data and physical inventory by printing labels directly from the application.
 

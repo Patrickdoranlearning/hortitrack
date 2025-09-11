@@ -5,11 +5,6 @@ import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
-import {
   Users,
   ShoppingCart,
   Archive,
@@ -18,8 +13,8 @@ import {
   Search,
   TrendingDown,
   PieChart as PieIcon,
+  Package,
 } from 'lucide-react';
-import * as Recharts from 'recharts';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
@@ -33,6 +28,25 @@ import { Input } from '@/components/ui/input';
 import type { Batch } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
+import dynamic from 'next/dynamic';
+import { calculateLosses, type LossEvent } from '@/lib/metrics/losses';
+
+const FamilyDistributionChart = dynamic(
+  () => import('@/components/charts/FamilyDistributionChart'),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+);
+
+const SizeDistributionChart = dynamic(
+  () => import('@/components/charts/SizeDistributionChart'),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+);
+
+const LossesChart = dynamic(
+  () => import('@/components/charts/LossesChart'),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+);
+
 
 export default function DashboardOverviewPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -64,37 +78,30 @@ export default function DashboardOverviewPage() {
     return () => unsubscribe();
   }, []);
 
+  // Helper: keep only truthy string values (avoid undefined/null → invalid keys)
+  const toStringOptions = (values: Array<string | null | undefined>) =>
+    Array.from(
+      new Set(
+        values
+          .filter((v): v is string => typeof v === "string")
+          .map((v) => v.trim())
+          .filter((v) => v.length > 0)
+      )
+    );
+
   const statuses = useMemo(
-    () => ['all', ...Array.from(new Set(batches.map((b) => b.status)))],
+    () => ["all", ...toStringOptions(batches.map((b) => b.status))],
     [batches]
   );
   const sizes = useMemo(
-    () => ['all', ...Array.from(new Set(batches.map((b) => b.size)))],
+    () => ["all", ...toStringOptions(batches.map((b) => b.size))],
     [batches]
   );
   const locations = useMemo(
-    () => ['all', ...Array.from(new Set(batches.map((b) => b.location)))],
+    () => ["all", ...toStringOptions(batches.map((b) => b.location))],
     [batches]
   );
-
-  const calculateLosses = (batch: Batch) => {
-    const lossLogRegex =
-      /Logged (\d+) units as loss|Adjusted quantity by -(\d+)|Archived with loss of (\d+)/;
-    const lostQuantity = batch.logHistory.reduce((sum, log) => {
-      const match = log.action.match(lossLogRegex);
-      if (match) {
-        return (
-          sum +
-          (parseInt(match[1], 10) ||
-            parseInt(match[2], 10) ||
-            parseInt(match[3], 10))
-        );
-      }
-      return sum;
-    }, 0);
-    return lostQuantity;
-  };
-
+  
   const filteredBatches = useMemo(() => {
     return batches
       .filter((batch) =>
@@ -163,38 +170,38 @@ export default function DashboardOverviewPage() {
   }, [filteredBatches]);
 
   const lossData = useMemo(() => {
-    const lossByFamily = filteredBatches.reduce(
-      (acc, batch) => {
-        const loss = calculateLosses(batch);
-        if (loss > 0) {
-          acc[batch.plantFamily] = (acc[batch.plantFamily] || 0) + loss;
-        }
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-    return Object.entries(lossByFamily).map(([name, value]) => ({
-      name,
-      value,
-    }));
+    const lossEvents: LossEvent[] = filteredBatches.flatMap(batch => {
+        return (batch.logHistory ?? []).map(log => {
+            if ((log.type === 'LOSS' && typeof log.qty === 'number') || (log.type === 'ADJUST' && typeof log.qty === 'number' && log.qty < 0)) {
+                return {
+                    family: batch.plantFamily,
+                    quantity: Math.abs(log.qty!),
+                    date: new Date(log.date)
+                };
+            }
+            return null;
+        }).filter((e): e is LossEvent => e !== null);
+    });
+    return calculateLosses(lossEvents);
   }, [filteredBatches]);
 
-  const chartConfig = {
-    value: {
-      label: 'Plants',
-    },
-    primary: {
-      color: 'hsl(var(--primary))',
-    },
-    destructive: {
-      color: 'hsl(var(--destructive))',
-    },
-  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-2xl">Loading Dashboard...</div>
+      <div className="flex min-h-screen w-full flex-col p-6">
+          <div className="flex items-center justify-between space-y-2">
+            <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mt-6">
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
       </div>
     );
   }
@@ -202,7 +209,7 @@ export default function DashboardOverviewPage() {
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
-        <h1 className="text-4xl font-headline tracking-tight">Dashboard</h1>
+        <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
         <div className="flex items-center space-x-2">
           <Button asChild variant="outline">
             <Link href="/">
@@ -237,11 +244,14 @@ export default function DashboardOverviewPage() {
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              {statuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status === 'all' ? 'All Statuses' : status}
-                </SelectItem>
-              ))}
+              {statuses.map((status) => {
+                const key = status; // always a non-empty string now
+                return (
+                  <SelectItem key={key} value={status}>
+                    {status === "all" ? "All Statuses" : status}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           <Select
@@ -252,11 +262,14 @@ export default function DashboardOverviewPage() {
               <SelectValue placeholder="Filter by size" />
             </SelectTrigger>
             <SelectContent>
-              {sizes.map((size) => (
-                <SelectItem key={size} value={size}>
-                  {size === 'all' ? 'All Sizes' : size}
-                </SelectItem>
-              ))}
+              {sizes.map((size) => {
+                const key = size;
+                return (
+                  <SelectItem key={key} value={size}>
+                    {size === "all" ? "All Sizes" : size}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           <Select
@@ -269,11 +282,14 @@ export default function DashboardOverviewPage() {
               <SelectValue placeholder="Filter by location" />
             </SelectTrigger>
             <SelectContent>
-              {locations.map((location) => (
-                <SelectItem key={location} value={location}>
-                  {location === 'all' ? 'All Locations' : location}
-                </SelectItem>
-              ))}
+              {locations.map((location) => {
+                const key = location;
+                return (
+                  <SelectItem key={key} value={location}>
+                    {location === "all" ? "All Locations" : location}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </CardContent>
@@ -300,7 +316,7 @@ export default function DashboardOverviewPage() {
             <CardTitle className="text-sm font-medium">
               Active Batches
             </CardTitle>
-            <PlusSquare className="h-4 w-4 text-muted-foreground" />
+            <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeBatchesCount}</div>
@@ -352,97 +368,43 @@ export default function DashboardOverviewPage() {
         </Card>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieIcon />
               Plant Family Distribution
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={chartConfig}
-              className="min-h-[300px] w-full"
-            >
-              <Recharts.BarChart accessibilityLayer data={plantFamilyData}>
-                <Recharts.XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <Recharts.YAxis />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Recharts.Bar
-                  dataKey="value"
-                  fill="var(--color-primary)"
-                  radius={8}
-                />
-              </Recharts.BarChart>
-            </ChartContainer>
+          <CardContent className="min-w-0">
+            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+              <FamilyDistributionChart data={plantFamilyData} />
+            </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieIcon />
               Plant Size Distribution
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={chartConfig}
-              className="min-h-[300px] w-full"
-            >
-              <Recharts.BarChart accessibilityLayer data={plantSizeData}>
-                <Recharts.XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <Recharts.YAxis />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Recharts.Bar
-                  dataKey="value"
-                  fill="var(--color-primary)"
-                  radius={8}
-                />
-              </Recharts.BarChart>
-            </ChartContainer>
+          <CardContent className="min-w-0">
+             <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+              <SizeDistributionChart data={plantSizeData} />
+            </div>
           </CardContent>
         </Card>
-        <Card className="col-span-1 md:col-span-2">
+        <Card className="col-span-1 md:col-span-2 min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingDown />
               Losses by Plant Family
             </CardTitle>
           </CardHeader>
-          <CardContent className="pl-2">
-            <ChartContainer
-              config={chartConfig}
-              className="min-h-[300px] w-full"
-            >
-              <Recharts.BarChart accessibilityLayer data={lossData}>
-                <Recharts.XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
-                <Recharts.YAxis />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent hideLabel />}
-                />
-                <Recharts.Bar
-                  dataKey="value"
-                  fill="var(--color-destructive)"
-                  radius={8}
-                />
-              </Recharts.BarChart>
-            </ChartContainer>
+          <CardContent className="min-w-0 pl-2">
+            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+              <LossesChart data={lossData.lossByFamily.map(d => ({name: d.label, value: d.value}))} />
+            </div>
           </CardContent>
         </Card>
       </div>
