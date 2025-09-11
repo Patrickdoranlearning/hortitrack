@@ -10,10 +10,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { BatchSchema, ProductionProtocolOutputSchema } from '@/lib/types';
+import { BatchSchema } from '@/lib/types';
+import { ProductionProtocolOutputSchema, type ProductionProtocolOutput } from '@/lib/protocol-types';
 
-// Define the type from the schema for easy use
-export type ProductionProtocolOutput = z.infer<typeof ProductionProtocolOutputSchema>;
 
 // Define the Genkit prompt
 const productionProtocolPrompt = ai.definePrompt({

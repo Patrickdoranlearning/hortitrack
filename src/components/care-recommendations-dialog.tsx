@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,7 +10,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { getCareRecommendationsAction } from '@/app/actions';
-import type { Batch } from '@/lib/types';
 import type { CareRecommendationsOutput } from '@/ai/flows/care-recommendations';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -19,13 +19,13 @@ import { useToast } from '@/hooks/use-toast';
 interface CareRecommendationsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  batch: Batch | null;
+  batchId: string | null | undefined;
 }
 
 export function CareRecommendationsDialog({
   open,
   onOpenChange,
-  batch,
+  batchId,
 }: CareRecommendationsDialogProps) {
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] =
@@ -34,13 +34,13 @@ export function CareRecommendationsDialog({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open && batch) {
+    if (open && batchId) {
       setLoading(true);
       setError(null);
       setRecommendations(null);
 
       const fetchRecommendations = async () => {
-        const result = await getCareRecommendationsAction(batch);
+        const result = await getCareRecommendationsAction(batchId);
         if (result.success) {
           setRecommendations(result.data);
         } else {
@@ -56,7 +56,7 @@ export function CareRecommendationsDialog({
 
       fetchRecommendations();
     }
-  }, [open, batch, toast]);
+  }, [open, batchId, toast]);
 
   const handleOpenChange = (isOpen: boolean) => {
     onOpenChange(isOpen);
@@ -74,7 +74,7 @@ export function CareRecommendationsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-headline text-2xl">
             <Sparkles className="text-primary" />
-            AI Care for {batch?.plantFamily} - {batch?.plantVariety}
+            AI Care Recommendations
           </DialogTitle>
           <DialogDescription>
             AI-powered recommendations based on batch info and local conditions.
@@ -115,7 +115,7 @@ function RecommendationsList({ recommendations }: { recommendations: string[] })
     return (
         <ul className="space-y-3">
             {recommendations.map((rec, index) => (
-                <li key={index} className="flex items-start gap-3">
+                <li key={`${rec}-${index}`} className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
                     <span>{rec}</span>
                 </li>

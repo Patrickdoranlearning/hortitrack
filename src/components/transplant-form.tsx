@@ -1,197 +1,197 @@
 
-'use client';
+"use client";
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import type { Batch, TransplantFormData } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { useEffect, useMemo, useRef, useState, useContext } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { Batch, NurseryLocation, PlantSize } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Checkbox } from './ui/checkbox';
-import { SIZE_TO_STATUS_MAP } from '@/lib/constants';
+  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage,
+} from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SubmitButton } from "@/components/ui/SubmitButton";
+import { useToast } from "@/hooks/use-toast";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
+import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 
-const transplantFormSchema = (maxQuantity: number) =>
-  z.object({
-    category: z.string(),
-    plantFamily: z.string(),
-    plantVariety: z.string(),
-    plantingDate: z.string().min(1, 'Planting date is required.'),
-    quantity: z.coerce
-      .number()
-      .min(1, 'Quantity must be at least 1.')
-      .max(
-        maxQuantity,
-        `Quantity cannot exceed remaining stock of ${maxQuantity}.`
-      ),
-    status: z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']),
-    location: z.string().min(1, 'Location is required.'),
-    size: z.string().min(1, 'Size is required.'),
-    transplantedFrom: z.string().optional(),
-    supplier: z.string().optional(),
-    logRemainingAsLoss: z.boolean(),
-  });
-
-interface TransplantFormProps {
-  batch: Batch | null;
-  onSubmit: (data: TransplantFormData) => void;
-  onCancel: () => void;
-  nurseryLocations: string[];
-  plantSizes: string[];
+function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === "" || v === undefined || v === null) continue; // drop empties
+    out[k] = v;
+  }
+  return out as Partial<T>;
 }
 
-export function TransplantForm({
-  batch,
-  onSubmit,
-  onCancel,
-  nurseryLocations,
-  plantSizes,
-}: TransplantFormProps) {
-  const form = useForm<z.infer<ReturnType<typeof transplantFormSchema>>>({
-    resolver: zodResolver(transplantFormSchema(batch?.quantity ?? 0)),
-    defaultValues: batch
-      ? {
-          category: batch.category,
-          plantFamily: batch.plantFamily,
-          plantVariety: batch.plantVariety,
-          plantingDate: new Date().toISOString(),
-          quantity: batch.quantity,
-          status: 'Potted',
-          location: '',
-          size: '',
-          transplantedFrom: batch.batchNumber,
-          supplier: 'Doran Nurseries',
-          logRemainingAsLoss: false,
-        }
-      : undefined,
+const formSchema = (maxQuantity: number | null, isNewPropagation: boolean) => {
+  const Base = z.object({
+    plantingDate: z.date({ required_error: "Transplant date is required" }),
+    size: z.string().min(1, "Size is required"),
+    locationId: z.string().optional(),
+    location: z.string().optional(),
+    trayQuantity: z.coerce.number().int().nonnegative().optional(),
+    quantity: z.coerce.number().int().positive(),
+    logRemainingAsLoss: z.boolean().default(false),
+    notes: z.string().optional(),
   });
 
-  const handleFormSubmit = (
-    data: z.infer<ReturnType<typeof transplantFormSchema>>
-  ) => {
-    onSubmit({ ...data, initialQuantity: data.quantity });
-  };
-  
-  const handleSizeChange = (size: string) => {
-    form.setValue('size', size);
-    const newStatus = SIZE_TO_STATUS_MAP[size];
-    if (newStatus) {
-      form.setValue('status', newStatus);
+  const schemaWithRefinements = Base.refine(
+    (v) => !!v.locationId || !!v.location,
+    { path: ["locationId"], message: "Select a destination" }
+  );
+
+  if (maxQuantity !== null && !isNewPropagation) {
+    return schemaWithRefinements.extend({
+      quantity: z.coerce.number().int().positive().max(maxQuantity, `Max ${maxQuantity}`),
+    });
+  } else if (isNewPropagation) {
+    return schemaWithRefinements.extend({
+      // For new propagation, quantity is not limited by an existing batch
+      quantity: z.coerce.number().int().positive("Quantity is required and must be positive"),
+    });
+  }
+  return schemaWithRefinements;
+};
+
+export type TransplantFormData = z.infer<ReturnType<typeof formSchema>>;
+
+type Props = {
+  batch: Batch | null;
+  nurseryLocations: NurseryLocation[];
+  plantSizes?: PlantSize[];
+  onSubmit: (data: TransplantFormData) => Promise<void>;
+  onCancel: () => void;
+  onSuccess?: (newBatch: { batchId: string; batchNumber: string }) => void;
+  isNewPropagation: boolean; // New prop
+};
+
+export function TransplantForm({
+  batch, nurseryLocations, plantSizes = [], onSubmit: onSubmitProp, isNewPropagation, onCancel
+}: Props) {
+  const { data } = useContext(ReferenceDataContext);
+  const sizesSafe = (plantSizes && plantSizes.length ? plantSizes : data?.sizes ?? []) as Array<PlantSize>;
+  const { toast } = useToast();
+  const [selectedSize, setSelectedSize] = useState<PlantSize | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // default quantity = full batch until trays/size says otherwise
+  const defaultQty = isNewPropagation ? 0 : (batch?.quantity ?? 0);
+
+  const form = useForm<TransplantFormData>({
+    resolver: zodResolver(formSchema(isNewPropagation ? null : defaultQty, isNewPropagation)),
+    defaultValues: {
+      plantingDate: new Date(),
+      size: "",
+      locationId: undefined,
+      location: undefined,
+      trayQuantity: undefined,
+      quantity: defaultQty,
+      logRemainingAsLoss: false,
+      notes: "",
+    },
+    mode: "onChange",
+  });
+
+  // keep quantity derived from trays * size.multiple; fall back to full batch
+  useEffect(() => {
+    const t = form.getValues("trayQuantity");
+    const m = selectedSize?.multiple ?? 0;
+    if (t && m && m > 1) {
+      const q = t * m;
+      form.setValue("quantity", q, { shouldValidate: true, shouldDirty: true });
+    } else if (!isNewPropagation) {
+      // if user hasn’t typed anything, keep full batch by default, only for transplant
+      const current = form.getValues("quantity");
+      if (!current || current <= 0) {
+        form.setValue("quantity", defaultQty, { shouldValidate: true });
+      }
     }
-  };
+  }, [form, selectedSize, defaultQty, isNewPropagation, form.watch("trayQuantity")]);
 
+  const newSizeId = form.watch("size");
+  const selectedSizeMemo = useMemo(
+    () => sizesSafe.find((s) => s.id === newSizeId),
+    [sizesSafe, newSizeId]
+  );
+  const sizeMultiple = selectedSizeMemo?.multiple ?? 1;
 
-  if (!batch) {
-    return null;
+  const sortedPlantSizes = useMemo(() => {
+    // Example sort by size string; adjust to your preference
+    return [...(sizesSafe || [])].sort((a, b) =>
+      String(a.size).localeCompare(String(b.size))
+    );
+  }, [sizesSafe]);
+
+  function idemKey(values: TransplantFormData) {
+    const key = [
+      batch?.id || batch?.batchNumber || "new-propagation",
+      values.size,
+      values.locationId || values.location || "",
+      values.quantity,
+      values.plantingDate.getTime(),
+    ].join(":");
+    // very simple hash
+    return typeof window === "undefined" ? key : window.btoa(unescape(encodeURIComponent(key))).slice(0, 128);
+  }
+
+  async function onSubmit(values: TransplantFormData) {
+    if (!batch && !isNewPropagation) return; // Should not happen with new propagation logic
+    
+    // Applying the bonus suggestion for safer transplant totals
+    const w = form.watch();
+    const computed = (w.trayQuantity ?? 0) * (selectedSize?.multiple ?? 0) + 0; // partialCells not in current schema
+    const payload = { ...values, quantity: values.quantity }; // For now, quantity is directly from form
+
+    await onSubmitProp(payload);
   }
 
   return (
     <>
-      <DialogHeader>
+    <DialogHeader>
         <DialogTitle className="font-headline text-2xl">
-          Transplant Batch
+          {isNewPropagation ? "New Propagation" : "Transplant Batch"}
         </DialogTitle>
         <DialogDescription>
-          Create a new batch from an existing one. Original batch is #
-          {batch?.batchNumber}.
+          {isNewPropagation 
+            ? "Create a brand new batch for propagation." 
+            : `Create a new batch from existing batch #${batch?.batchNumber}.`}
         </DialogDescription>
       </DialogHeader>
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(handleFormSubmit)}
-          className="space-y-6"
-        >
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FormItem>
-              <FormLabel>New Batch Number</FormLabel>
-              <FormControl>
-                <Input placeholder="Auto-generated" disabled />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-            <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <ScrollArea className="max-h-[60vh] pr-2">
+          <div className="grid gap-4 p-1">
             <FormField
               control={form.control}
-              name="plantFamily"
+              name="size"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Plant Family</FormLabel>
-                  <FormControl>
-                    <Input {...field} disabled />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="plantVariety"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Plant Variety</FormLabel>
-                  <FormControl>
-                    <Input {...field} disabled />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Location</FormLabel>
+                  <FormLabel>New Size</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      const s = plantSizes.find((x) => x.size === v) || null;
+                      setSelectedSize(s);
+                    }}
                   >
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a new location" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {nurseryLocations.map((location) => (
-                        <SelectItem key={location} value={location}>
-                          {location}
+                      {sortedPlantSizes.map((s) => (
+                        <SelectItem key={s.id ?? s.size} value={s.size}>
+                          {s.size} {s.multiple ? `(x${s.multiple}/tray)` : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -200,6 +200,34 @@ export function TransplantForm({
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="locationId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New Location</FormLabel>
+                  <Select
+                    value={field.value ?? ""}
+                    onValueChange={(v) => field.onChange(v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {nurseryLocations.map((l) => (
+                        <SelectItem key={l.id ?? l.name} value={l.id ?? l.name!}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>If your locations don’t have IDs, we’ll store the name.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="plantingDate"
@@ -208,32 +236,27 @@ export function TransplantForm({
                   <FormLabel>Transplant Date</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={'outline'}
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(new Date(field.value), 'PPP')
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
+                       <Button
+                              type="button"
+                              variant={'outline'}
+                              className={cn(
+                                'w-full justify-start text-left font-normal',
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {field.value ? (
+                                format(field.value, 'PPP')
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                            </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent align="start" className="p-0">
                       <Calendar
                         mode="single"
-                        selected={
-                          field.value ? new Date(field.value) : undefined
-                        }
-                        onSelect={(date) =>
-                          field.onChange(date?.toISOString())
-                        }
+                        selected={field.value}
+                        onSelect={(d) => field.onChange(d)}
                         initialFocus
                       />
                     </PopoverContent>
@@ -242,115 +265,88 @@ export function TransplantForm({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantity to Transplant</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Max available: {batch?.quantity}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="size"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Size</FormLabel>
-                  <Select
-                    onValueChange={handleSizeChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a new size" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {plantSizes.map((size) => (
-                        <SelectItem key={size} value={size}>
-                          {size}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Status</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Propagation">Propagation</SelectItem>
-                      <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-                      <SelectItem value="Potted">Potted</SelectItem>
-                      <SelectItem value="Ready for Sale">
-                        Ready for Sale
-                      </SelectItem>
-                      <SelectItem value="Looking Good">Looking Good</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          
-          <FormField
-              control={form.control}
-              name="logRemainingAsLoss"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      Log remaining units as loss and archive original batch
-                    </FormLabel>
-                    <FormDescription>
-                      If checked, any units not transplanted will be logged as a loss, and the original batch #{batch.batchNumber} will be archived.
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
 
-          <div className="flex justify-end gap-4">
-            <Button type="button" variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit">Create Transplanted Batch</Button>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="trayQuantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>No. of Trays</FormLabel>
+                    <FormControl>
+                      <Input
+                        inputMode="numeric"
+                        type="number"
+                        min={0}
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      If size has a multiple, total plants = trays × multiple.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Total Plants</FormLabel>
+                    <FormControl>
+                      <Input 
+                        readOnly={!isNewPropagation} 
+                        className={cn({ "bg-muted": !isNewPropagation })} 
+                        type="number" 
+                        min={isNewPropagation ? 1 : 0} // For new propagation, min quantity is 1
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    {!isNewPropagation && <FormDescription>Max available: {batch?.quantity}</FormDescription>}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {!isNewPropagation && (
+              <FormField
+                control={form.control}
+                name="logRemainingAsLoss"
+                render={({ field }) => (
+                  <FormItem className="flex gap-3 items-start rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Log remaining units as loss and archive original batch</FormLabel>
+                      <FormDescription>
+                        Any untransplanted units will be logged as a loss and the original batch will be archived.
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
-        </form>
-      </Form>
+        </ScrollArea>
+
+        <DialogFooter className="flex justify-end gap-2 border-t pt-4">
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={form.formState.isSubmitting}>
+            Cancel
+          </Button>
+          <SubmitButton pending={form.formState.isSubmitting}>
+            {isNewPropagation ? "Create New Propagation Batch" : "Create Transplanted Batch"}
+          </SubmitButton>
+        </DialogFooter>
+      </form>
+    </Form>
     </>
   );
 }

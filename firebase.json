@@ -1,13 +1,11 @@
 {
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
-  },
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "hosting": {
+    "source": ".",
+    "frameworksBackend": {
+      "region": "us-central1"
+    }
   }
 }

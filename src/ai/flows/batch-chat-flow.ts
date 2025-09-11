@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -24,36 +23,39 @@ const BatchChatOutputSchema = z.object({
 export type BatchChatOutput = z.infer<typeof BatchChatOutputSchema>;
 
 // Define the Genkit prompt
-const batchChatPrompt = ai.definePrompt({
-  name: 'batchChatPrompt',
-  input: { schema: BatchChatInputSchema },
-  output: { schema: BatchChatOutputSchema },
-  prompt: `You are an expert horticulturalist and data analyst for a nursery. Your task is to answer questions about a specific plant batch based on the JSON data provided. Be concise and helpful.
+const batchChatPrompt = ai.definePrompt(
+  {
+    name: 'batchChatPrompt',
+    input: { schema: BatchChatInputSchema },
+    output: { schema: BatchChatOutputSchema },
+    prompt: `You are an expert horticulturalist and data analyst for a nursery. Your task is to answer questions about a specific plant batch based on the JSON data provided. Be concise and helpful.
 
-  Use the data to answer the user's question. Perform calculations if necessary (e.g., calculating days since planting).
+    Use the data to answer the user's question. Perform calculations if necessary (e.g., calculating days since planting).
 
-  Batch Data:
-  {{{JSONstringify batch}}}
+    Batch Data:
+    {{{JSONstringify batch}}}
 
-  User's Question:
-  "{{{query}}}"
+    User's Question:
+    "{{{query}}}"
 
-  Your Answer:
-  `,
-  // Helper to stringify JSON in the prompt
-  templateFormat: 'handlebars',
-  model: 'googleai/gemini-2.0-flash-preview',
-  context: [
-    {
-      role: 'system',
-      content:
-        'Handlebars helper to stringify JSON objects. Use as `{{{JSONstringify anObject}}}`.',
+    Your Answer:
+    `,
+    model: 'googleai/gemini-2.0-flash-preview',
+    context: [
+      {
+        role: 'system',
+        content:
+          'Handlebars helper to stringify JSON objects. Use as `{{{JSONstringify anObject}}}`.',
+      },
+    ],
+    config: {
+      templateFormat: 'handlebars',
+      helpers: {
+        JSONstringify: (value: any) => JSON.stringify(value, null, 2),
+      },
     },
-  ],
-  helpers: {
-    JSONstringify: (value: any) => JSON.stringify(value, null, 2),
-  },
-});
+  }
+);
 
 
 // Define the Genkit flow
