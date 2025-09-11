@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Controller, type Control } from "react-hook-form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 
 type Item = Record<string, any>;
 
@@ -25,6 +25,7 @@ export default function AsyncCombobox<TFormValues>({
 }) {
   const [items, setItems] = React.useState<Item[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -52,6 +53,8 @@ export default function AsyncCombobox<TFormValues>({
           setItems([]);
         }
         console.error(`[AsyncCombobox:${resource}] load error`, e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -66,16 +69,16 @@ export default function AsyncCombobox<TFormValues>({
       control={control}
       name={name as any}
       render={({ field }) => (
-        <Select value={field.value} onValueChange={field.onChange}>
-          <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
-          <SelectContent>
-            {items.map((it) => (
-              <SelectItem key={String(it[valueField])} value={String(it[valueField])}>
-                {String(it[labelField] ?? it[valueField])}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Combobox
+          options={items.map((it) => ({
+            value: String(it[valueField]),
+            label: String(it[labelField] ?? it[valueField]),
+          }))}
+          value={field.value}
+          onChange={field.onChange}
+          placeholder={loading ? `Loading ${resource}...` : placeholder}
+          disabled={loading}
+        />
       )}
     />
   );
