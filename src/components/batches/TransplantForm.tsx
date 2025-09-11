@@ -10,6 +10,7 @@ import {
   Form, FormField, FormItem, FormLabel, FormMessage, FormControl
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -130,16 +131,17 @@ export default function TransplantForm(props: {
           <FormField name="size_id" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Target size</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                <SelectContent>
-                  {sizes.map(s => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <Combobox
+                  options={sizes.map(s => ({
+                    value: s.id,
+                    label: `${s.name}${s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}`,
+                  }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select size"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -147,14 +149,17 @@ export default function TransplantForm(props: {
           <FormField name="newLocationId" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Target location</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-                <SelectContent>
-                  {locations.map(l => (
-                    <SelectItem key={l.id} value={l.id}>{l.name}{l.covered ? " (covered)" : ""}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <Combobox
+                  options={locations.map(l => ({
+                    value: l.id,
+                    label: `${l.name}${l.covered ? " (covered)" : ""}`,
+                  }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select location"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )} />
