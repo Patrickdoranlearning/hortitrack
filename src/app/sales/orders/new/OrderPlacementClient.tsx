@@ -1,6 +1,7 @@
 
 'use client';
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -73,21 +74,60 @@ const ProductCard = ({ product }: ProductCardProps) => {
   };
 
 const OrderSummaryFooter = () => {
-    const { totalCost, totalItems } = useOrderStore();
+    const router = useRouter();
+    const { items, totalCost, totalItems, clearOrder } = useOrderStore();
     const cost = totalCost();
-    const items = totalItems();
-  
+    const count = totalItems();
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleSubmit = async () => {
+      if (!items.length || submitting) return;
+      setSubmitting(true);
+      try {
+        // TODO: replace hardcoded customer and store IDs with real values
+        const payload = {
+          customerId: 'demo-customer',
+          storeId: 'main-store',
+          lines: items.map(i => ({
+            plantVariety: i.plantVariety,
+            size: i.size || 'unknown',
+            qty: i.orderQuantity,
+            unitPrice: i.retailPrice,
+          })),
+        };
+        const res = await fetch('/api/sales/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error || 'Failed to create order');
+        clearOrder();
+        router.push(`/sales/orders/${json.id}`);
+      } catch (err) {
+        console.error(err);
+        alert('Failed to create order');
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
     return (
       <div className="fixed bottom-0 left-0 right-0 bg-green-800 text-white p-4 flex justify-between items-center shadow-lg">
         <div className="text-lg">
-          You have {items} items
+          You have {count} items
         </div>
         <div className="flex items-center gap-6">
           <div className="text-2xl font-bold">
             Order Total €{cost.toFixed(2)}
           </div>
-          <Button variant="secondary" className="bg-white text-green-800 hover:bg-gray-200">
-            PROCEED WITH ORDER
+          <Button
+            variant="secondary"
+            className="bg-white text-green-800 hover:bg-gray-200"
+            disabled={submitting}
+            onClick={handleSubmit}
+          >
+            {submitting ? 'Saving…' : 'PROCEED WITH ORDER'}
           </Button>
         </div>
       </div>
@@ -115,9 +155,9 @@ export function OrderPlacementClient({ products, categories }: { products: Salea
     }, {} as Record<string, SaleableProduct[]>);
   }, [filteredProducts]);
 
-  return (
-    <div className="min-h-screen bg-gray-100 pb-24">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+    return (
+      <div className="min-h-screen bg-gray-100 pb-24">
+        <header className="bg-white shadow-sm sticky top-16 z-30">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Create Order - Doran Nurseries</h1>
