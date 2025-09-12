@@ -20,7 +20,7 @@ const Schema = z.object({
 });
 
 export default function DumpForm({ batchId, available, onDone }: { batchId: string; available: number; onDone?: (newQty: number)=>void }) {
-  const { toast } = useToast?.() ?? { toast: (x:any)=>alert(x?.title||x?.description||"OK") };
+  const { add: toast } = useToast();
   const form = useForm<z.infer<typeof Schema>>({ resolver: zodResolver(Schema), defaultValues: { archive_if_empty: true } });
   const [loading, setLoading] = React.useState(false);
   const units = Number(form.watch("units") || 0);

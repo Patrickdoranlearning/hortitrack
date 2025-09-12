@@ -14,6 +14,7 @@ import {
   Form, FormField, FormItem, FormLabel, FormMessage, FormControl
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,7 +46,7 @@ type Location = { id: string; name: string; covered?: boolean | null };
 type Supplier = { id: string; name: string; producer_code?: string | null; country_code?: string | null };
 
 export default function CheckInForm(props: { onCreated?: (batch: any) => void }) {
-  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const { add: toast } = useToast();
   const form = useForm<CheckInInput>({ resolver: zodResolver(Schema) });
   const { orgId } = useActiveOrg();
 
@@ -93,14 +94,18 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
         <FormField name="plant_variety_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Variety</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
-              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading varieties..." : "Select variety"} /></SelectTrigger>
-              <SelectContent>{varieties.map(v => (
-                <SelectItem key={v.id} value={v.id}>
-                  {v.name}{v.category ? ` — ${v.category}` : ""}
-                </SelectItem>
-              ))}</SelectContent>
-            </Select>
+            <FormControl>
+              <Combobox
+                options={varieties.map(v => ({
+                  value: v.id,
+                  label: `${v.name}${v.category ? ` — ${v.category}` : ""}`,
+                }))}
+                value={field.value}
+                onChange={field.onChange}
+                disabled={isLookupsLoading}
+                placeholder={isLookupsLoading ? "Loading varieties..." : "Select variety"}
+              />
+            </FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -109,14 +114,18 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
           <FormField name="size_id" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Size</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
-                <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading sizes..." : "Select size"} /></SelectTrigger>
-                <SelectContent>{sizes.map(s => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
-                  </SelectItem>
-                ))}</SelectContent>
-              </Select>
+              <FormControl>
+                <Combobox
+                  options={sizes.map(s => ({
+                    value: s.id,
+                    label: `${s.name}${s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}`,
+                  }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isLookupsLoading}
+                  placeholder={isLookupsLoading ? "Loading sizes..." : "Select size"}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -140,14 +149,18 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
         <FormField name="location_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Location</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
-              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading locations..." : "Select location"} /></SelectTrigger>
-              <SelectContent>{locations.map(l => (
-                <SelectItem key={l.id} value={l.id}>
-                  {l.name}{l.covered ? " (covered)" : ""}
-                </SelectItem>
-              ))}</SelectContent>
-            </Select>
+            <FormControl>
+              <Combobox
+                options={locations.map(l => ({
+                  value: l.id,
+                  label: `${l.name}${l.covered ? " (covered)" : ""}`,
+                }))}
+                value={field.value}
+                onChange={field.onChange}
+                disabled={isLookupsLoading}
+                placeholder={isLookupsLoading ? "Loading locations..." : "Select location"}
+              />
+            </FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -155,14 +168,15 @@ export default function CheckInForm(props: { onCreated?: (batch: any) => void })
         <FormField name="supplier_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>Supplier</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value} disabled={isLookupsLoading}>
-              <SelectTrigger><SelectValue placeholder={isLookupsLoading ? "Loading suppliers..." : "Select supplier"} /></SelectTrigger>
-              <SelectContent>{suppliers.map(s => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}</SelectContent>
-            </Select>
+            <FormControl>
+              <Combobox
+                options={suppliers.map(s => ({ value: s.id, label: s.name }))}
+                value={field.value}
+                onChange={field.onChange}
+                disabled={isLookupsLoading}
+                placeholder={isLookupsLoading ? "Loading suppliers..." : "Select supplier"}
+              />
+            </FormControl>
             <FormMessage />
           </FormItem>
         )} />

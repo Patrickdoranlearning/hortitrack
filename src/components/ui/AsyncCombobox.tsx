@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Controller, type Control } from "react-hook-form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 
 type Item = Record<string, any>;
 
@@ -14,6 +14,7 @@ export default function AsyncCombobox<TFormValues>({
   labelField = "name",
   placeholder = "Select…",
   onLoaded,
+  orgId,
 }: {
   name: string;
   control: Control<TFormValues>;
@@ -22,15 +23,26 @@ export default function AsyncCombobox<TFormValues>({
   labelField?: string;
   placeholder?: string;
   onLoaded?: (items: Item[]) => void;
+  orgId?: string | null;
 }) {
   const [items, setItems] = React.useState<Item[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    const needsOrg = resource === "locations" || resource === "suppliers";
+    if (needsOrg && !orgId) {
+      setItems([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`/api/lookups/${resource}`);
+        setLoading(true);
+        const url = orgId ? `/api/lookups/${resource}?org=${orgId}` : `/api/lookups/${resource}`;
+        const r = await fetch(url);
         const j = await r.json().catch(() => ({}));
         if (cancelled) return;
 
@@ -52,10 +64,12 @@ export default function AsyncCombobox<TFormValues>({
           setItems([]);
         }
         console.error(`[AsyncCombobox:${resource}] load error`, e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [resource]);
+  }, [resource, orgId]);
 
   if (error) {
     return <div className="text-sm text-red-600">Failed to load {resource}: {error}</div>;
@@ -66,16 +80,16 @@ export default function AsyncCombobox<TFormValues>({
       control={control}
       name={name as any}
       render={({ field }) => (
-        <Select value={field.value} onValueChange={field.onChange}>
-          <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
-          <SelectContent>
-            {items.map((it) => (
-              <SelectItem key={String(it[valueField])} value={String(it[valueField])}>
-                {String(it[labelField] ?? it[valueField])}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Combobox
+          options={items.map((it) => ({
+            value: String(it[valueField]),
+            label: String(it[labelField] ?? it[valueField]),
+          }))}
+          value={field.value}
+          onChange={field.onChange}
+          placeholder={loading ? `Loading ${resource}...` : placeholder}
+          disabled={loading}
+        />
       )}
     />
   );
