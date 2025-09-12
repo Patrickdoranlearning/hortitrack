@@ -21,9 +21,9 @@ function parseGS1(text: string): Record<string, string> {
   // Normalize AIM prefix like "]d2" or "]Q3"
   const t = text.replace(/^\]([A-Za-z][0-9])/, "");
 
-  // Plain (FNC1) patterns: (^|GS)AI(value..until GS or end)
+  // Plain (FNC1) patterns: AI(value..until GS or end)
   const gs = (ai: string, valRe: string) =>
-    firstMatch(t, new RegExp(`(?:^|${GS})${ai}(${valRe})`));
+    firstMatch(t, new RegExp(`${ai}(${valRe})`));
 
   // Parentheses patterns: (AI)value(next "(" or end)
   const paren = (ai: string) =>
@@ -50,34 +50,66 @@ function parseGS1(text: string): Record<string, string> {
 }
 
 export function parseScanCode(raw: string): Parsed | null {
-  console.log("parseScanCode received raw:", JSON.stringify(raw)); // ADDED LOG
   if (!raw) return null;
+  if (raw.length > 512) return null;
 
   // Keep GS, drop other control chars; trim
   let text = raw.replace(/[\u0000-\u001F\u007F]/g, (c) => (c === GS ? GS : "")).trim();
   if (!text) return null;
 
-  // 1) GS1 try
-  const ai = parseGS1(text);
-  const gs1Batch = ai["10"] || ai["21"] || ai["240"] || ai["91"];
-  if (gs1Batch) return { by: "batchNumber", value: gs1Batch.trim() };
+  const lower = text.toLowerCase();
 
-  // 2) If any token looks like a 20+ char doc id, use it
+  // Legacy prefixes
+  const legacy = lower.replace(new RegExp(GS, 'g'), '').match(/^batch:(\d{3,})$/);
+  if (legacy) return { by: 'batchNumber', value: legacy[1] };
+  const ht = lower.match(/^ht:batch:([a-z0-9-_]+)$/i);
+  if (ht) return { by: 'batchNumber', value: ht[1] };
+
+  // Plain numbers or #numbers
+  const hashNum = text.match(/^#?(\d{3,})$/);
+  if (hashNum) return { by: 'batchNumber', value: hashNum[1] };
+
+  // URLs
+  try {
+    const u = new URL(text);
+    const pathMatch = u.pathname.match(/\/batches\/([^/]+)/);
+    if (pathMatch) {
+      const v = pathMatch[1];
+      if (/^\d{3,}$/.test(v)) return { by: 'batchNumber', value: v };
+      return { by: 'id', value: v };
+    }
+    const qpBN = u.searchParams.get('batchNumber');
+    if (qpBN) return { by: 'batchNumber', value: qpBN };
+    const qpId = u.searchParams.get('id');
+    if (qpId) return { by: 'id', value: qpId };
+  } catch {}
+
+  // JSON
+  try {
+    const obj = JSON.parse(text);
+    if (typeof obj?.batchNumber === 'string') return { by: 'batchNumber', value: obj.batchNumber };
+    if (typeof obj?.id === 'string') return { by: 'id', value: obj.id };
+  } catch {}
+
+  // GS1 try
+  const ai = parseGS1(text);
+  const gs1Batch = ai['10'] || ai['21'] || ai['240'] || ai['91'];
+  if (gs1Batch) return { by: 'batchNumber', value: gs1Batch.trim() };
+
+  // Token search for id or batch number
   const tokens = text.split(GS).filter(Boolean);
   for (const part of tokens) {
     const p = part.trim();
-    if (/^[A-Za-z0-9_-]{20,}$/.test(p)) return { by: "id", value: p };
+    if (/^[A-Za-z0-9_-]{20,}$/.test(p)) return { by: 'id', value: p };
   }
-
-  // 3) Numeric batch numbers (>=4 digits)
   for (const part of tokens) {
     const p = part.trim();
-    if (/^\d{4,}$/.test(p)) return { by: "batchNumber", value: p };
+    if (/^\d{4,}$/.test(p)) return { by: 'batchNumber', value: p };
   }
 
-  // 4) Whole string fallback
-  if (/^[A-Za-z0-9_-]{20,}$/.test(text)) return { by: "id", value: text };
-  if (/^\d{4,}$/.test(text)) return { by: "batchNumber", value: text };
+  // Whole string fallback
+  if (/^[A-Za-z0-9_-]{20,}$/.test(text)) return { by: 'id', value: text };
+  if (/^\d{4,}$/.test(text)) return { by: 'batchNumber', value: text };
 
   return null;
 }
