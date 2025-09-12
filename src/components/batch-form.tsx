@@ -19,13 +19,19 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import type {
-  Batch, BatchStatus, PlantSize as PlantSizeType,
+  Batch,
+  BatchStatus,
+  PlantSize as PlantSizeType,
+  Variety,
+  NurseryLocation,
+  Supplier,
 } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { cn } from '@/lib/utils';
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { ComboBoxEntity } from './horti/ComboBoxEntity';
 import { useActiveOrg } from '@/server/org/context';
+import { useCollection } from '@/hooks/useCollection';
 
 const PassportFields = {
   passportType: z.enum(["received", "issued"]).optional(),
@@ -110,10 +116,14 @@ export function BatchForm({
   const isEdit = !!batch?.id;
   const activeOrgId = useActiveOrg();
 
-  const { data, loading } = React.useContext(ReferenceDataContext);
+  const ref = React.useContext(ReferenceDataContext);
+  const { data: varieties } = useCollection<Variety>('varieties', ref.data?.varieties ?? []);
+  const { data: sizes } = useCollection<PlantSizeType>('sizes', ref.data?.sizes ?? []);
+  const { data: locations } = useCollection<NurseryLocation>('locations', ref.data?.locations ?? []);
+  const { data: suppliers } = useCollection<Supplier>('suppliers', ref.data?.suppliers ?? []);
+  const loading = ref.loading;
 
-
-  const doranNurseries = useMemo(() => (data?.suppliers ?? []).find(s => s.name === 'Doran Nurseries'), [data?.suppliers]);
+  const doranNurseries = useMemo(() => (suppliers ?? []).find(s => s.name === 'Doran Nurseries'), [suppliers]);
 
   const onSuccess = React.useMemo(() => {
     if (onSubmitSuccess) return onSubmitSuccess;
@@ -228,11 +238,6 @@ export function BatchForm({
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading options…</p>;
   }
-
-  const varieties = data?.varieties ?? [];
-  const sizes = data?.sizes ?? [];
-  const locations = data?.locations ?? [];
-  const suppliers = data?.suppliers ?? [];
 
   const varietyOptions = varieties.map(v => ({ value: v.name, label: v.name }));
 

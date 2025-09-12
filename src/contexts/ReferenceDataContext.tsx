@@ -5,12 +5,17 @@
 import React from "react";
 import { fetchReferenceData, type ReferenceData } from "@/lib/referenceData/service";
 
-type Ctx = { data: Omit<ReferenceData, "errors"> | null; loading: boolean; reload: () => void; error?: string };
+type Ctx = {
+  data: Omit<ReferenceData, "errors"> | null;
+  loading: boolean;
+  reload: () => Promise<void>;
+  error?: string;
+};
 
 export const ReferenceDataContext = React.createContext<Ctx>({
   data: null,
   loading: true,
-  reload: () => {},
+  reload: async () => {},
 });
 
 export function ReferenceDataProvider({ children }: { children: React.ReactNode }) {
@@ -35,5 +40,9 @@ export function ReferenceDataProvider({ children }: { children: React.ReactNode 
     void load();
   }, [load]);
 
-  return <ReferenceDataContext.Provider value={{ data, loading, reload: load, error }}>{children}</ReferenceDataContext.Provider>;
+  return (
+    <ReferenceDataContext.Provider value={{ data, loading, reload: load, error }}>
+      {children}
+    </ReferenceDataContext.Provider>
+  );
 }
