@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { NewDraftBatchDialog, DraftBatch } from "./new-draft-batch-dialog"
 
+import { UploadBatchesCsvButton } from "./upload-batches-csv-button"
+
+
 export default function ProductionPlanningPage() {
   const [batches, setBatches] = React.useState<DraftBatch[]>([])
 
@@ -13,7 +16,12 @@ export default function ProductionPlanningPage() {
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Production Planning</h1>
-        <NewDraftBatchDialog onCreate={(b) => setBatches((prev) => [...prev, b])} />
+
+        <div className="flex items-center gap-2">
+          <UploadBatchesCsvButton onUpload={(bs) => setBatches((prev) => [...prev, ...bs])} />
+          <NewDraftBatchDialog onCreate={(b) => setBatches((prev) => [...prev, b])} />
+        </div>
+
       </div>
 
       <Card>
