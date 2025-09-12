@@ -26,12 +26,8 @@ export function mapError(e: unknown): { status: number; body: ErrorBody } {
   }
   
   // Generic error
-  const msg =
-    (e as any)?.message ||
-    (typeof e === "string" ? e : "Internal Server Error");
-
   return {
     status: 500,
-    body: { error: msg },
+    body: { error: 'Internal Error' },
   };
 }
