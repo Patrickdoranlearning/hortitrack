@@ -37,7 +37,7 @@ export default function PropagationForm(props: {
   defaultLocationId?: string;
   onCreated?: (batch: any) => void;
 }) {
-  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const { add: toast } = useToast();
   const form = useForm<PropagationInput>({ resolver: zodResolver(Schema) });
   const { orgId } = useActiveOrg();
 

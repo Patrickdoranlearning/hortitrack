@@ -46,7 +46,7 @@ type Location = { id: string; name: string; covered?: boolean | null };
 type Supplier = { id: string; name: string; producer_code?: string | null; country_code?: string | null };
 
 export default function CheckInForm(props: { onCreated?: (batch: any) => void }) {
-  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const { add: toast } = useToast();
   const form = useForm<CheckInInput>({ resolver: zodResolver(Schema) });
   const { orgId } = useActiveOrg();
 

@@ -84,7 +84,7 @@ export async function GET(_: Request, ctx: { params: { resource: string } }) {
         break;
       }
     }
-    return cache(NextResponse.json({ data }));
+    return cache(NextResponse.json({ data, items: data }));
   } catch (e: any) {
     console.error("[lookups] error:", e);
     return NextResponse.json(
