@@ -14,6 +14,7 @@ export default function AsyncCombobox<TFormValues>({
   labelField = "name",
   placeholder = "Select…",
   onLoaded,
+  orgId,
 }: {
   name: string;
   control: Control<TFormValues>;
@@ -22,16 +23,26 @@ export default function AsyncCombobox<TFormValues>({
   labelField?: string;
   placeholder?: string;
   onLoaded?: (items: Item[]) => void;
+  orgId?: string | null;
 }) {
   const [items, setItems] = React.useState<Item[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    const needsOrg = resource === "locations" || resource === "suppliers";
+    if (needsOrg && !orgId) {
+      setItems([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`/api/lookups/${resource}`);
+        setLoading(true);
+        const url = orgId ? `/api/lookups/${resource}?org=${orgId}` : `/api/lookups/${resource}`;
+        const r = await fetch(url);
         const j = await r.json().catch(() => ({}));
         if (cancelled) return;
 
@@ -58,7 +69,7 @@ export default function AsyncCombobox<TFormValues>({
       }
     })();
     return () => { cancelled = true; };
-  }, [resource]);
+  }, [resource, orgId]);
 
   if (error) {
     return <div className="text-sm text-red-600">Failed to load {resource}: {error}</div>;

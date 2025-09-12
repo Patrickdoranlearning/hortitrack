@@ -53,7 +53,9 @@ export function useLookup(resource: LookupResource, orgId?: string | null) {
   }, [resource, orgId]);
 
   // SWR fetch (deduped, background)
-  const { data, error, isLoading, mutate } = useSWR(key(resource, orgId), fetcher, {
+const requireOrg = resource === "locations" || resource === "suppliers";
+const swrKey = requireOrg && !orgId ? null : key(resource, orgId);
+const { data, error, isLoading, mutate } = useSWR(swrKey, fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 5 * 60 * 1000,
   });
