@@ -2,6 +2,7 @@
 "use client";
 import * as React from "react";
 import { OrderPlacementClient } from "./OrderPlacementClient";
+import { PageFrame } from "@/ui/templates/PageFrame";
 
 type Props = {
     customers?: any[];
@@ -43,5 +44,9 @@ export default function NewSalesOrderPage({ customers = [], onOrderCreated }: Pr
   if (loading) return <div className="p-4">Loading products…</div>;
   if (error)   return <div className="p-4 text-red-600">{error}</div>;
 
-  return <OrderPlacementClient products={products} categories={categories} />;
+  return (
+    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+      <OrderPlacementClient products={products} categories={categories} />
+    </PageFrame>
+  );
 }

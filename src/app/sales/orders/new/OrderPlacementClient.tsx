@@ -155,9 +155,9 @@ export function OrderPlacementClient({ products, categories }: { products: Salea
     }, {} as Record<string, SaleableProduct[]>);
   }, [filteredProducts]);
 
-  return (
-    <div className="min-h-screen bg-gray-100 pb-24">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+    return (
+      <div className="min-h-screen bg-gray-100 pb-24">
+        <header className="bg-white shadow-sm sticky top-16 z-30">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Create Order - Doran Nurseries</h1>
