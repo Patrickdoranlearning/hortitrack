@@ -19,12 +19,17 @@ const Schema = z.object({
 type Location = { id: string; name: string };
 
 export default function MoveForm({ batchId, onDone }: { batchId: string; onDone?: () => void }) {
-  const { toast } = useToast?.() ?? { toast: (x:any)=>alert(x?.title||x?.description||"OK") };
+  const { add: toast } = useToast();
   const form = useForm<z.infer<typeof Schema>>({ resolver: zodResolver(Schema) });
   const [locations, setLocations] = React.useState<Location[]>([]);
   const [loading, setLoading] = React.useState(false);
 
-  React.useEffect(() => { fetch("/api/lookups/locations").then(r=>r.json()).then(j=>setLocations(j.items||[])); }, []);
+  React.useEffect(() => {
+    fetch("/api/lookups/locations")
+      .then(r => r.json())
+      .then(j => setLocations(j.data || []))
+      .catch(() => setLocations([]));
+  }, []);
 
   async function onSubmit(values: z.infer<typeof Schema>) {
     setLoading(true);

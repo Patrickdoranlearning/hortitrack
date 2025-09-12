@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AsyncCombobox from "@/components/ui/AsyncCombobox";
+import { useActiveOrg } from "@/lib/org/context";
 
 const Schema = z.object({
   status: z.enum(["Growing","Ready","Sold","Archived"]).optional(),
@@ -31,6 +32,7 @@ export default function EditBatchForm({
   });
 
   const [saving, setSaving] = React.useState(false);
+  const { orgId } = useActiveOrg();
 
   async function onSubmit(values: z.infer<typeof Schema>) {
     if (!batch?.id) return;
@@ -59,6 +61,7 @@ export default function EditBatchForm({
                 name={field.name}
                 control={form.control}
                 resource="locations"
+                orgId={orgId}
                 placeholder="Select location"
               />
             </FormControl>

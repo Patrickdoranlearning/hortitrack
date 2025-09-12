@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { useToast } from "@/hooks/use-toast";
 import type { Batch, NurseryLocation } from "@/lib/types";
-import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader"; // Corrected import path to use BatchPhotoUploader
+import BatchPhotoUploader from "@/components/batches/BatchPhotoUploader";
 import { fetchJson } from "@/lib/http";
 
 function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {

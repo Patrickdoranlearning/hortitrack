@@ -11,13 +11,19 @@ function cache(resp: NextResponse) {
   return resp;
 }
 
-async function getOrgId(supabase: ReturnType<typeof getSupabaseForRequest>) {
-  // Prefer explicit header, else use the user's profile.active_org_id
+async function getOrgId(req: Request, supabase: ReturnType<typeof getSupabaseForRequest>) {
+  // Prefer explicit query param or header before consulting the user's profile
+  const url = new URL(req.url);
+  const byParam = url.searchParams.get("org");
+  if (byParam) return byParam;
+
   const hdr = (await import("next/headers")).headers();
   const byHeader = hdr.get("x-org-id");
   if (byHeader) return byHeader;
+
   const { data: user } = await supabase.auth.getUser();
   if (!user?.user) return null;
+
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("active_org_id")
@@ -27,7 +33,7 @@ async function getOrgId(supabase: ReturnType<typeof getSupabaseForRequest>) {
   return profile?.active_org_id ?? null;
 }
 
-export async function GET(_: Request, ctx: { params: { resource: string } }) {
+export async function GET(req: Request, ctx: { params: { resource: string } }) {
   const parse = Resource.safeParse(ctx.params.resource);
   if (!parse.success) {
     return NextResponse.json({ error: "Invalid resource" }, { status: 400 });
@@ -58,7 +64,7 @@ export async function GET(_: Request, ctx: { params: { resource: string } }) {
         break;
       }
       case "locations": {
-        const orgId = await getOrgId(supabase);
+        const orgId = await getOrgId(req, supabase);
         if (!orgId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
         const { data: rows, error } = await supabase
           .from("lookup_locations")
@@ -71,7 +77,7 @@ export async function GET(_: Request, ctx: { params: { resource: string } }) {
         break;
       }
       case "suppliers": {
-        const orgId = await getOrgId(supabase);
+        const orgId = await getOrgId(req, supabase);
         if (!orgId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
         const { data: rows, error } = await supabase
           .from("lookup_suppliers")
@@ -84,7 +90,7 @@ export async function GET(_: Request, ctx: { params: { resource: string } }) {
         break;
       }
     }
-    return cache(NextResponse.json({ data }));
+    return cache(NextResponse.json({ data, items: data }));
   } catch (e: any) {
     console.error("[lookups] error:", e);
     return NextResponse.json(

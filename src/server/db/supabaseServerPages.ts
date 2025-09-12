@@ -4,9 +4,7 @@ import type { Database } from "@/types/supabase";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { GetServerSidePropsContext } from "next";
 import { serialize } from "cookie";
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
 type Ctx =
   | { req: NextApiRequest; res: NextApiResponse }
@@ -24,7 +22,7 @@ type Ctx =
 export function getSupabaseServerPages(ctx: Ctx) {
   const req = "req" in ctx ? ctx.req : (ctx as GetServerSidePropsContext).req;
   const res = "res" in ctx ? ctx.res : (ctx as GetServerSidePropsContext).res!;
-  return createServerClient<Database>(url, key, {
+  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       get(name: string) {
         // @ts-ignore - next types differ slightly between runtimes

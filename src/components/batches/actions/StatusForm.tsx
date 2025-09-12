@@ -17,7 +17,7 @@ const Schema = z.object({
 });
 
 export default function StatusForm({ batchId, current, onDone }: { batchId: string; current: string; onDone?: () => void }) {
-  const { toast } = useToast?.() ?? { toast: (x:any)=>alert(x?.title||x?.description||"OK") };
+  const { add: toast } = useToast();
   const form = useForm<z.infer<typeof Schema>>({ resolver: zodResolver(Schema), defaultValues: { status: (["Growing","Ready","Archived","Sold"].includes(current) ? current as any : "Growing") } });
   const [loading, setLoading] = React.useState(false);
 
