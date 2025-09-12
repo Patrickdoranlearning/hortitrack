@@ -5,9 +5,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
 // Minimal cookie bridge interface to avoid next/headers dependency here.
 export type CookieBridge = {
@@ -24,5 +22,7 @@ export type CookieBridge = {
 export function createSupabaseServerWithCookies(
   cookieBridge: CookieBridge
 ): SupabaseClient<Database> {
-  return createServerClient<Database>(url, key, { cookies: cookieBridge });
+  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: cookieBridge,
+  });
 }

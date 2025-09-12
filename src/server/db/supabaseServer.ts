@@ -2,14 +2,15 @@
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { type Database } from "@/types/supabase"; // your generated types if available
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
 export function getSupabaseForRequest(req?: Request) {
   const cookieStore = cookies();
   // @ts-expect-error next/headers in route handlers
-  const h = headers();
+  const _h = headers();
   const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
     {
       cookies: {
         get(name: string) {
@@ -29,16 +30,16 @@ export function getSupabaseForRequest(req?: Request) {
 
 // Re-added this function from a previous version as it seems to be used elsewhere.
 export function getSupabaseServerClient() {
-    const cookieStore = cookies();
-    return createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value
-                },
-            },
-        }
-    )
+  const cookieStore = cookies();
+  return createServerClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
 }

@@ -10,6 +10,7 @@ import {
   Form, FormField, FormItem, FormLabel, FormMessage, FormControl
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -35,7 +36,7 @@ export default function TransplantForm(props: {
   defaultTargetLocationId?: string;
   onCreated?: (child: { id: string; batch_number: string }) => void;
 }) {
-  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const { add: toast } = useToast();
   const form = useForm<z.infer<typeof Schema>>({
     resolver: zodResolver(Schema),
     defaultValues: {
@@ -65,6 +66,9 @@ export default function TransplantForm(props: {
           fetch("/api/lookups/sizes"),
           fetch("/api/lookups/locations"),
         ]);
+        if (!sumRes.ok) throw new Error(`Summary load failed: ${sumRes.status}`);
+        if (!sizesRes.ok) throw new Error(`Sizes load failed: ${sizesRes.status}`);
+        if (!locsRes.ok) throw new Error(`Locations load failed: ${locsRes.status}`);
         const [sum, s, l] = await Promise.all([sumRes.json(), sizesRes.json(), locsRes.json()]);
         if (cancelled) return;
 
@@ -75,8 +79,8 @@ export default function TransplantForm(props: {
           toast({ title: "Parent not found", variant: "destructive" });
         }
 
-        setSizes(s.items ?? []);
-        setLocations(l.items ?? []);
+        setSizes(s.data ?? []);
+        setLocations(l.data ?? []);
         if (props.defaultTargetLocationId) form.setValue("newLocationId", props.defaultTargetLocationId as any);
       } catch (e) {
         console.error("[TransplantForm] load failed", e);
@@ -130,16 +134,17 @@ export default function TransplantForm(props: {
           <FormField name="size_id" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Target size</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                <SelectContent>
-                  {sizes.map(s => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <Combobox
+                  options={sizes.map(s => ({
+                    value: s.id,
+                    label: `${s.name}${s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}`,
+                  }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select size"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -147,14 +152,17 @@ export default function TransplantForm(props: {
           <FormField name="newLocationId" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Target location</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-                <SelectContent>
-                  {locations.map(l => (
-                    <SelectItem key={l.id} value={l.id}>{l.name}{l.covered ? " (covered)" : ""}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <Combobox
+                  options={locations.map(l => ({
+                    value: l.id,
+                    label: `${l.name}${l.covered ? " (covered)" : ""}`,
+                  }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select location"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )} />
