@@ -26,15 +26,26 @@ export function parseScanCode(input: string): ParsedScan | null {
     return { by: 'batchNumber', value: hash[1], raw };
   }
 
+  // Allow hashes before ids like '#abc-123'
+  const hashId = raw.match(/^#([a-z0-9-_]{3,})$/i);
+  if (hashId) {
+    return { by: 'id', value: hashId[1], raw };
+  }
+
   // UUID-ish id
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)) {
     return { by: 'id', value: raw, raw };
   }
 
-  // Plain text fallback: if it contains any digits, try batchNumber
+  // Generic id: letters plus at least one digit or separator
+  if (/^[a-z0-9-_]+$/i.test(raw) && /[a-z]/i.test(raw) && /[0-9-_]/.test(raw)) {
+    return { by: 'id', value: raw, raw };
+  }
+
+  // Plain numeric fallback
   const plainDigits = digitsOnly(raw);
   if (plainDigits.length >= 3) {
-    return { by: 'batchNumber', value: raw, raw };
+    return { by: 'batchNumber', value: plainDigits, raw };
   }
 
   return null;
@@ -44,6 +55,7 @@ export function parseScanCode(input: string): ParsedScan | null {
 export function candidateBatchNumbers(value: string): string[] {
   const v = value.trim();
   const d = digitsOnly(v);
-  const uniq = new Set<string>([v, d]);
+  const dNoZero = d.replace(/^0+/, '');
+  const uniq = new Set<string>([v, d, dNoZero]);
   return [...uniq].filter(Boolean);
 }

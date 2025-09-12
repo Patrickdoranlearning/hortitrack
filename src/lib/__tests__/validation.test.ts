@@ -1,4 +1,3 @@
-ts
 import { z } from "zod";
 import { mapError } from "@/lib/validation"; // or "../validation" if colocated
 import { ZodError } from "zod";

@@ -29,8 +29,9 @@ export function queryMatchesBatch(query: string, batch: Batch): boolean {
   }
   if (parsed?.by === 'batchNumber') {
     const bn = String(batch.batchNumber ?? '').trim().toLowerCase();
-    const cands = candidateBatchNumbers(parsed.value).map((s) => s.toLowerCase());
-    return cands.some((c) => bn === c);
+    const qCands = candidateBatchNumbers(parsed.value).map((s) => s.toLowerCase());
+    const bnCands = candidateBatchNumbers(bn).map((s) => s.toLowerCase());
+    return qCands.some((c) => bnCands.includes(c));
   }
 
   // Fallback fuzzy text
