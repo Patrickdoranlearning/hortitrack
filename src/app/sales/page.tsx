@@ -24,11 +24,8 @@ export default function SalesLandingPage() {
           }
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SalesOrdersPanel />
-          </div>
-          <div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -45,7 +42,6 @@ export default function SalesLandingPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
         </div>
       </div>
     </PageFrame>
