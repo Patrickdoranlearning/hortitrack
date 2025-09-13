@@ -3,40 +3,37 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { ActionDialog } from '@/components/actions/ActionDialog';
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import { Plus, ListChecks, Flag, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, ListChecks, Flag, AlertTriangle, CheckCircle, Shield } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useCollection } from '@/hooks/useCollection';
 import type { NurseryLocation } from '@/lib/types';
 import FlagBatchDialog from '@/components/flag-batch-dialog';
 import { Batch } from '@/lib/types';
+import Link from 'next/link';
 
 export default function ActionsPage() {
-  const [isActionLogOpen, setIsActionLogOpen] = React.useState(false);
   const [isFlagBatchOpen, setIsFlagBatchOpen] = React.useState(false);
-  const { data: locations, loading: locationsLoading } = useCollection<NurseryLocation>('locations');
-  
-  // Placeholder for a selected batch for the flag dialog
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
-
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth">
       <div className="space-y-6">
         <ModulePageHeader 
-            title="Plant Health Dashboard"
+            title="IPM Dashboard"
             description="Assign and track plant health tasks, log activities, and flag batches needing attention."
             actionsSlot={
               <>
+                <Button variant="outline" asChild>
+                    <Link href="/ipm/programs">
+                        <Shield />
+                        Manage IPM Programs
+                    </Link>
+                </Button>
                 <Button onClick={() => setIsFlagBatchOpen(true)}>
                     <Flag />
                     Flag a Batch
-                </Button>
-                <Button onClick={() => setIsActionLogOpen(true)}>
-                    <Plus />
-                    Log New Action
                 </Button>
               </>
             }
@@ -47,16 +44,16 @@ export default function ActionsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <AlertTriangle className="text-destructive" />
-                        Tasks To Do
+                        IPM Tasks To Do
                     </CardTitle>
                     <CardDescription>
-                        Tasks assigned by batch or location that need to be completed.
+                        Tasks generated from active IPM programs that need to be completed.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="text-center text-muted-foreground py-12">
                         <p>Task list coming soon.</p>
-                        <p className="text-xs">This will show assigned tasks like 'Spray batch X for aphids' or 'Check Tunnel Y for mildew'.</p>
+                        <p className="text-xs">This will show assigned tasks like 'Spray batch X for aphids'.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -64,7 +61,7 @@ export default function ActionsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <CheckCircle className="text-primary" />
-                        Recently Completed Tasks
+                        Recently Completed IPM Actions
                     </CardTitle>
                     <CardDescription>
                         A live feed of all plant health actions logged across the nursery.
@@ -79,13 +76,6 @@ export default function ActionsPage() {
 
         </div>
       </div>
-
-       <ActionDialog
-        open={isActionLogOpen}
-        onOpenChange={setIsActionLogOpen}
-        defaultBatchIds={[]} // No default batch on this page
-        locations={locations || []}
-      />
       
       {/* A placeholder batch is needed for the dialog to open. 
           In a real implementation, you'd select a batch first. */}

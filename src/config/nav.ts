@@ -33,8 +33,8 @@ export const APP_NAV: NavItem[] = [
     href: "/actions",
     icon: ShieldCheck,
     items: [
-        { label: "Health Dashboard", href: "/actions", description: "Tasks and recent activities."},
-        { label: "IPM Log", href: "/actions/ipm", description: "Log and view pest management."},
+        { label: "IPM Dashboard", href: "/actions", description: "Tasks and recent activities."},
+        { label: "IPM Programs", href: "/ipm/programs", description: "Design and manage IPM programs."},
         { label: "Flagged Batches", href: "/actions/flagged", description: "Batches needing attention."},
     ]
   },
