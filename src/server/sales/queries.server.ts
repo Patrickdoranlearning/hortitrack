@@ -1,8 +1,5 @@
-
-// src/server/sales/queries.server.ts
 import "server-only";
-import { adminDb } from "@/server/db/admin";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import type { Supplier, Batch } from "@/lib/types";
 
@@ -10,144 +7,188 @@ export const OrderSchema = z.object({
   id: z.string(),
   customerName: z.string().min(1).default(""),
   customerId: z.string().optional(),
-  status: z.enum(["draft", "open", "fulfilled", "cancelled", "confirmed", "picking", "ready", "dispatched", "delivered", "void"]),
-  createdAt: z.any().transform(v => v?.toDate ? v.toDate().toISOString() : v), // Handle Timestamps
+  status: z.enum(["draft", "confirmed", "processing", "ready_for_dispatch", "dispatched", "delivered", "cancelled"]),
+  createdAt: z.string(),
 });
 export type Order = z.infer<typeof OrderSchema>;
 
 export const NewOrderSchema = z.object({
-  customerName: z.string().min(1),
-  total: z.number().nonnegative().default(0),
-  status: z.enum(["draft", "open", "fulfilled", "cancelled"]).default("draft"),
+  customerId: z.string().min(1),
+  status: z.enum(["draft", "confirmed"]).default("draft"),
 });
 export type NewOrder = z.infer<typeof NewOrderSchema>;
 
 export async function listOrders(limit = 100, status?: string): Promise<Order[]> {
-  let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = adminDb
-    .collection("sales_orders")
-    .orderBy("createdAt", "desc")
+  const supabase = await createClient();
+  let query = supabase
+    .from("orders")
+    .select("*, customers(name)")
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (status) {
-    query = query.where("status", "==", status);
+    query = query.eq("status", status);
   }
 
-  const snap = await query.get();
-  
-  const customerIds = snap.docs
-    .map(d => (d.data() as any).customerId)
-    .filter((id): id is string => !!id && typeof id === 'string');
-
-  let customers: Record<string, string> = {};
-  if (customerIds.length > 0) {
-    // Firestore 'in' query is limited to 30 items per query
-    const chunks = [];
-    for (let i = 0; i < customerIds.length; i += 30) {
-      chunks.push(customerIds.slice(i, i + 30));
-    }
-    for (const chunk of chunks) {
-      const customerSnap = await adminDb.collection("customers").where(adminDb.firestore.FieldPath.documentId(), 'in', chunk).get();
-      customerSnap.docs.forEach(doc => {
-          customers[doc.id] = (doc.data() as any).name || doc.id;
-      });
-    }
+  const { data, error } = await query;
+  if (error) {
+    console.error("Error listing orders:", error);
+    return [];
   }
 
-
-  return snap.docs
-    .map((d) => {
-      const raw = { id: d.id, ...d.data() };
-      const customerName = customers[raw.customerId] || raw.customerId || "Unknown";
-      const parsed = OrderSchema.safeParse({ ...raw, customerName });
-      if (!parsed.success) {
-        console.warn("[sales:listOrders] invalid doc", d.id, parsed.error.flatten());
-        return null;
-      }
-      return parsed.data;
-    })
-    .filter(Boolean) as Order[];
+  return data.map((d: any) => ({
+    id: d.id,
+    customerName: d.customers?.name || "Unknown",
+    customerId: d.customer_id,
+    status: d.status,
+    createdAt: d.created_at,
+  }));
 }
 
 export async function createOrder(input: NewOrder): Promise<string> {
-  const now = new Date().toISOString();
-  const ref = await adminDb.collection("orders").add({
-    customerName: input.customerName,
-    total: input.total,
-    status: input.status,
-    createdAt: now,
-  });
-  return ref.id;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // Get active org
+  let activeOrgId: string | null = null;
+  const { data: profile } = await supabase.from('profiles').select('active_org_id').eq('id', user.id).single();
+  if (profile?.active_org_id) {
+    activeOrgId = profile.active_org_id;
+  } else {
+    const { data: membership } = await supabase.from('org_memberships').select('org_id').eq('user_id', user.id).limit(1).single();
+    if (membership) activeOrgId = membership.org_id;
+  }
+  if (!activeOrgId) throw new Error("No active organization found");
+
+  const { data, error } = await supabase
+    .from("orders")
+    .insert({
+      org_id: activeOrgId,
+      customer_id: input.customerId,
+      order_number: `ORD-${Date.now()}`, // Simple generation for now
+      status: input.status,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
+}
+export async function getOrderById(orderId: string): Promise<Order & { lines: any[] } | null> {
+  const supabase = await createClient();
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .select("*, customers(name)")
+    .eq("id", orderId)
+    .single();
+
+  if (orderErr || !order) return null;
+
+  const { data: lines } = await supabase
+    .from("order_items")
+    .select("*, skus(plant_varieties(name), plant_sizes(name))")
+    .eq("order_id", orderId);
+
+  const mappedLines = (lines || []).map((l: any) => ({
+    id: l.id,
+    plantVariety: l.skus?.plant_varieties?.name ?? "Unknown",
+    size: l.skus?.plant_sizes?.name ?? "Unknown",
+    qty: l.quantity,
+    unitPrice: l.unit_price_ex_vat,
+  }));
+
+  return {
+    ...OrderSchema.parse({
+      id: order.id,
+      customerId: order.customer_id,
+      status: order.status,
+      createdAt: order.created_at,
+      customerName: order.customers?.name ?? "Unknown"
+    }),
+    lines: mappedLines
+  };
 }
 
 
 export async function getCustomers(): Promise<Supplier[]> {
-    const snap = await adminDb.collection("suppliers").orderBy("name").get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Supplier);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customers")
+    .select("*")
+    .order("name");
+
+  if (error) {
+    console.error("Error fetching customers:", error);
+    return [];
+  }
+  return data as any[]; // Map to Supplier/Customer type if needed
 }
 
 export interface SaleableProduct {
-    id: string;
-    plantVariety: string;
-    size: string;
-    category?: string;
-    totalQuantity: number;
-    barcode?: string;
-    cost?: number;
-    status?: string;
-    imageUrl?: string;
-    availableBatches: Batch[];
+  id: string;
+  plantVariety: string;
+  size: string;
+  category?: string;
+  totalQuantity: number;
+  barcode?: string;
+  cost?: number;
+  status?: string;
+  imageUrl?: string;
+  availableBatches: Batch[];
 }
 
+import { getSaleableBatches } from "@/server/sales/inventory";
+
 export async function getSaleableProducts(): Promise<SaleableProduct[]> {
-    if (process.env.USE_SUPABASE_READS === "1") {
-        const sb = getSupabaseForRequest();
-        // Use v_sku_available + join lookup data we need for UI
-        const { data, error } = await sb
-        .from("v_sku_available")
-        .select("sku_code, description, available_qty")
-        .order("sku_code");
-        if (error) throw new Error(`[supabase] v_sku_available: ${error.message}`);
-        return (data ?? []).map(r => ({
-            id: r.sku_code,
-            plantVariety: r.description ?? r.sku_code,
-            size: '',
-            totalQuantity: Number(r.available_qty ?? 0),
-            availableBatches: [],
-            status: Number(r.available_qty ?? 0) > 0 ? "Available" : "Out",
-        }));
+  // Fetch available batches from shared service
+  const batches = await getSaleableBatches();
+
+  const productsMap = new Map<string, SaleableProduct>();
+
+  batches.forEach((b) => {
+    // Map InventoryBatch to Batch type if needed
+    const batch: Batch = {
+      id: b.id,
+      orgId: "", // Not needed for display here
+      batchNumber: b.batchNumber || "",
+      plantVariety: b.plantVariety || "",
+      size: b.size || "",
+      category: b.category,
+      quantity: b.quantity || 0,
+      growerPhotoUrl: b.growerPhotoUrl,
+      salesPhotoUrl: b.salesPhotoUrl,
+      status: b.status as any,
+      plantVarietyId: "", // Missing from InventoryBatch, maybe add?
+      sizeId: "",
+      locationId: "",
+      phase: "finished", // Default
+      // ... map other fields
+    } as Batch;
+
+    const productKey = `${batch.plantVariety}-${batch.size}`;
+
+    if (productsMap.has(productKey)) {
+      const existingProduct = productsMap.get(productKey)!;
+      existingProduct.totalQuantity += batch.quantity!;
+      existingProduct.availableBatches.push(batch);
+    } else {
+      productsMap.set(productKey, {
+        id: productKey,
+        plantVariety: batch.plantVariety!,
+        size: batch.size!,
+        category: batch.category,
+        totalQuantity: batch.quantity!,
+        barcode: `BARCODE-${batch.plantVariety?.replace(/\s+/g, '')}`,
+        cost: 1.53,
+        status: 'Bud & flower',
+        imageUrl: batch.growerPhotoUrl || batch.salesPhotoUrl || `https://placehold.co/100x100.png`,
+        availableBatches: [batch],
+      });
     }
+  });
 
-    const saleableStatuses = ["Ready for Sale", "Looking Good"];
-    const snapshot = await adminDb.collection('batches')
-        .where('status', 'in', saleableStatuses)
-        .where('quantity', '>', 0)
-        .get();
-
-    const productsMap = new Map<string, SaleableProduct>();
-
-    snapshot.docs.forEach(doc => {
-        const batch = { id: doc.id, ...doc.data() } as Batch;
-        const productKey = `${batch.plantVariety}-${batch.size}`;
-
-        if (productsMap.has(productKey)) {
-            const existingProduct = productsMap.get(productKey)!;
-            existingProduct.totalQuantity += batch.quantity;
-            existingProduct.availableBatches.push(batch);
-        } else {
-            productsMap.set(productKey, {
-                id: productKey,
-                plantVariety: batch.plantVariety,
-                size: batch.size,
-                category: batch.category,
-                totalQuantity: batch.quantity,
-                barcode: `BARCODE-${batch.plantVariety.replace(/\s+/g, '')}`, // Example barcode
-                cost: 1.53, // Example cost
-                status: 'Bud & flower', // Example status
-                imageUrl: batch.growerPhotoUrl || batch.salesPhotoUrl || `https://placehold.co/100x100.png`,
-                availableBatches: [batch],
-            });
-        }
-    });
-
-    return Array.from(productsMap.values());
+  return Array.from(productsMap.values());
 }

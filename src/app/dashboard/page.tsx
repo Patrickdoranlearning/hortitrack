@@ -26,31 +26,49 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import type { Batch } from '@/lib/types';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 import { calculateLosses, type LossEvent } from '@/lib/metrics/losses';
+import { useCollection } from '@/hooks/use-collection';
 
-const FamilyDistributionChart = dynamic(
+const FamilyDistributionChart = nextDynamic(
   () => import('@/components/charts/FamilyDistributionChart'),
   { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
 );
 
-const SizeDistributionChart = dynamic(
+const SizeDistributionChart = nextDynamic(
   () => import('@/components/charts/SizeDistributionChart'),
   { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
 );
 
-const LossesChart = dynamic(
+const LossesChart = nextDynamic(
   () => import('@/components/charts/LossesChart'),
   { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
 );
 
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardOverviewPage() {
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: rawBatches, loading: isLoading } = useCollection<any>('batches');
+
+  const batches = useMemo(() => {
+    const list = Array.isArray(rawBatches) ? rawBatches : [];
+    return list.map((d: any) => ({
+      id: d.id,
+      batchNumber: d.batch_number,
+      plantVariety: d.plant_variety,
+      plantFamily: d.plant_family,
+      category: d.category,
+      plantingDate: d.planting_date,
+      quantity: d.quantity,
+      size: d.size,
+      location: d.location_id,
+      status: d.status,
+      logHistory: d.log_history,
+    } as Batch));
+  }, [rawBatches]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     status: 'all',
@@ -58,29 +76,10 @@ export default function DashboardOverviewPage() {
     location: 'all',
   });
 
-  useEffect(() => {
-    const q = query(collection(db, 'batches'), orderBy('batchNumber'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const batchesData = snapshot.docs.map(
-          (doc) => ({ ...doc.data(), id: doc.id }) as Batch
-        );
-        setBatches(batchesData);
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error('Failed to subscribe to batch updates:', error);
-        setIsLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
-
   // Helper: keep only truthy string values (avoid undefined/null → invalid keys)
-  const toStringOptions = (values: Array<string | null | undefined>) =>
-    Array.from(
+  const toStringOptions = (values: Array<string | null | undefined>) => {
+    if (!Array.isArray(values)) return [];
+    return Array.from(
       new Set(
         values
           .filter((v): v is string => typeof v === "string")
@@ -88,6 +87,7 @@ export default function DashboardOverviewPage() {
           .filter((v) => v.length > 0)
       )
     );
+  };
 
   const statuses = useMemo(
     () => ["all", ...toStringOptions(batches.map((b) => b.status))],
@@ -101,7 +101,7 @@ export default function DashboardOverviewPage() {
     () => ["all", ...toStringOptions(batches.map((b) => b.location))],
     [batches]
   );
-  
+
   const filteredBatches = useMemo(() => {
     return batches
       .filter((batch) =>
@@ -171,16 +171,16 @@ export default function DashboardOverviewPage() {
 
   const lossData = useMemo(() => {
     const lossEvents: LossEvent[] = filteredBatches.flatMap(batch => {
-        return (batch.logHistory ?? []).map(log => {
-            if ((log.type === 'LOSS' && typeof log.qty === 'number') || (log.type === 'ADJUST' && typeof log.qty === 'number' && log.qty < 0)) {
-                return {
-                    family: batch.plantFamily,
-                    quantity: Math.abs(log.qty!),
-                    date: new Date(log.date)
-                };
-            }
-            return null;
-        }).filter((e): e is LossEvent => e !== null);
+      return (batch.logHistory ?? []).map(log => {
+        if ((log.type === 'LOSS' && typeof log.qty === 'number') || (log.type === 'ADJUST' && typeof log.qty === 'number' && log.qty < 0)) {
+          return {
+            family: batch.plantFamily,
+            quantity: Math.abs(log.qty!),
+            date: new Date(log.date)
+          };
+        }
+        return null;
+      }).filter((e): e is LossEvent => e !== null);
     });
     return calculateLosses(lossEvents);
   }, [filteredBatches]);
@@ -189,19 +189,19 @@ export default function DashboardOverviewPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen w-full flex-col p-6">
-          <div className="flex items-center justify-between space-y-2">
-            <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-28 w-full" />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mt-6">
-            <Skeleton className="h-80 w-full" />
-            <Skeleton className="h-80 w-full" />
-          </div>
+        <div className="flex items-center justify-between space-y-2">
+          <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mt-6">
+          <Skeleton className="h-80 w-full" />
+          <Skeleton className="h-80 w-full" />
+        </div>
       </div>
     );
   }
@@ -389,7 +389,7 @@ export default function DashboardOverviewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="min-w-0">
-             <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
               <SizeDistributionChart data={plantSizeData} />
             </div>
           </CardContent>
@@ -403,7 +403,7 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent className="min-w-0 pl-2">
             <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <LossesChart data={lossData.lossByFamily.map(d => ({name: d.label, value: d.value}))} />
+              <LossesChart data={lossData.lossByFamily.map(d => ({ name: d.label, value: d.value }))} />
             </div>
           </CardContent>
         </Card>

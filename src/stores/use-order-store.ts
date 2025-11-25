@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import type { SaleableProduct } from '@/server/sales/queries';
+import type { SaleableProduct } from '@/server/sales/queries.server';
 
 interface OrderItem extends SaleableProduct {
   orderQuantity: number;

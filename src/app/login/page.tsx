@@ -2,46 +2,35 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
-import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
+import { login } from './actions';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const { toast } = useToast();
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (formData: FormData) => {
     setLoading(true);
     setError(null);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({ title: 'Sign In Successful', description: "Welcome back!" });
-      router.replace('/');
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
+    
+    const res = await login(formData);
+    if (res?.error) {
+        setError(res.error);
+        setLoading(false);
     }
+    // If success, server action redirects
   };
 
   return (
@@ -61,21 +50,20 @@ export default function LoginPage() {
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Sign-in Failed</AlertTitle>
                   <AlertDescription>
-                    {error.includes('auth/invalid-credential') ? 'Incorrect email or password. Please try again.' : 'An unexpected error occurred. Please try again later.'}
+                    {error}
                   </AlertDescription>
                 </Alert>
               )}
-            <form onSubmit={handleSignIn}>
+            <form action={handleSubmit}>
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
                         <Input
                         id="email"
+                        name="email"
                         type="email"
                         placeholder="manager@dorannurseries.com"
                         required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
                         disabled={loading}
                         />
                     </div>
@@ -83,10 +71,9 @@ export default function LoginPage() {
                         <Label htmlFor="password">Password</Label>
                         <Input
                         id="password"
+                        name="password"
                         type="password"
                         required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
                         disabled={loading}
                         />
                     </div>

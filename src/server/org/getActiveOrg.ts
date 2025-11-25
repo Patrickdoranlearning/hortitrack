@@ -1,19 +1,8 @@
 import "server-only";
-import { createSupabaseServerWithCookies, type CookieBridge } from "@/server/db/supabaseServerApp";
-import { cookies } from "next/headers";
-
-function getSupabaseForApp() {
-  const store = cookies();
-  const cookieBridge: CookieBridge = {
-    get: (n) => store.get(n)?.value,
-    set: (n, v, o) => store.set(n, v, o),
-    remove: (n, o) => store.set(n, "", { ...o, maxAge: 0 }),
-  };
-  return createSupabaseServerWithCookies(cookieBridge);
-}
+import { getSupabaseServerApp } from "@/server/db/supabase";
 
 export async function resolveActiveOrgId(): Promise<string | null> {
-  const supabase = getSupabaseForApp();
+  const supabase = getSupabaseServerApp();
 
   const { data: u } = await supabase.auth.getUser();
   const uid = u?.user?.id ?? null;

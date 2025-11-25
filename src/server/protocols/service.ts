@@ -1,15 +1,9 @@
-import { adminDb } from "@/server/db/admin";
+import { createClient } from "@/lib/supabase/server";
 import { isValidDocId } from "@/server/util/ids";
 import { buildBatchRoute } from "@/server/batches/route";
+import { getBatchById } from "@/server/batches/service";
 
-export async function getBatchById(id: string) {
-  if (!isValidDocId(id)) {
-    throw new Error("Invalid batch id");
-  }
-  const snap = await adminDb.collection("batches").doc(id).get();
-  if (!snap.exists) return null;
-  return { id: snap.id, ...snap.data() } as any;
-}
+// Removed local getBatchById
 
 export async function createProtocolFromBatch(batchId: string, opts?: { name?: string; publish?: boolean }) {
   const batch = await getBatchById(batchId);
@@ -24,18 +18,18 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
     name,
     version: 1,
     status: opts?.publish ? "published" : "draft",
-    createdAt: new Date(),
-    createdFromBatchId: String(batchId),
+    created_at: new Date().toISOString(),
+    created_from_batch_id: String(batchId),
 
-    plantFamily: batch.plantFamily ?? null,
-    plantVariety: batch.plantVariety ?? batch.variety ?? null,
+    plant_family: batch.plantFamily ?? null,
+    plant_variety: batch.plantVariety ?? batch.variety ?? null,
     season: inferSeason(batch.plantingDate || batch.sowDate),
 
-    potSize: batch.size ?? batch.potSize ?? null,
-    media: batch.media ?? batch.substrate ?? null,
-    containerType: batch.containerType ?? null,
-    supplierName: batch.supplier?.name ?? batch.supplierName ?? batch.vendorName ?? null,
-    supplierId: batch.supplier?.id ?? batch.supplierId ?? batch.vendorId ?? null,
+    pot_size: batch.potSize ?? null,
+    media: batch.media ?? null,
+    container_type: batch.containerType ?? null,
+    supplier_name: batch.supplierName ?? null,
+    supplier_id: batch.supplierId ?? null,
 
     targets: {
       tempC: {
@@ -52,7 +46,7 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
     // Placeholder steps; extend later by mining your action log
     steps: normalizeSteps(batch.steps || batch.carePlan || []),
 
-    sourceSnapshot: {
+    source_snapshot: {
       batchNumber: batch.batchNumber ?? null,
       sowDate: batch.sowDate ?? null,
       plantingDate: batch.plantingDate ?? null,
@@ -71,8 +65,11 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
     (protocol as any).route = { ancestry: [], edges: [], nodes: {}, timeline: [], summary: { hops: 0 } };
   }
 
-  const ref = await adminDb.collection("protocols").add(protocol);
-  return { id: ref.id, ...protocol };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("protocols").insert(protocol).select().single();
+
+  if (error) throw error;
+  return data;
 }
 
 function inferSeason(dateStr?: string | null) {

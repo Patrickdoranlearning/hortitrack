@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowLeft, Plus, Trash2, Edit } from 'lucide-react';
@@ -12,78 +12,39 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { VarietyForm } from '@/components/variety-form';
 import { useToast } from '@/hooks/use-toast';
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/use-auth';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, writeBatch, doc } from 'firebase/firestore';
 import { addVarietyAction, updateVarietyAction, deleteVarietyAction } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VARIETIES as INITIAL_VARIETIES } from '@/lib/varieties';
 import { VarietiesCsvButtons } from '@/components/varieties/VarietiesCsvButtons';
+import { useCollection } from '@/hooks/use-collection';
 
 
 export default function VarietiesPage() {
-  const { user } = useAuth();
-  const [varieties, setVarieties] = useState<Variety[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVariety, setEditingVariety] = useState<Variety | null>(null);
   const { toast } = useToast();
 
-  const subscribeToVarieties = useCallback(() => {
-    if (!user) return;
-    setIsLoading(true);
-    const q = query(collection(db, 'varieties'), orderBy('name'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (snapshot.empty) {
-          console.log("Varieties collection is empty, seeding initial data...");
-          const batch = writeBatch(db);
-          INITIAL_VARIETIES.forEach(variety => {
-            const docRef = doc(collection(db, "varieties"));
-            batch.set(docRef, variety);
-          });
-          batch.commit().then(() => console.log("Initial varieties seeded successfully."));
-        } else {
-          const varietiesData = snapshot.docs.map(
-            (doc) => ({ ...doc.data(), id: doc.id }) as Variety
-          );
-          setVarieties(varietiesData);
-        }
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error('Failed to subscribe to variety updates:', error);
-        toast({ variant: 'destructive', title: 'Error loading varieties', description: error.message });
-        setIsLoading(false);
-      }
-    );
-    return unsubscribe;
-  }, [user, toast]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToVarieties();
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [subscribeToVarieties]);
-
+  const { data: varietiesData, loading: varietiesLoading } = useCollection<Variety>('varieties', INITIAL_VARIETIES);
+  const varieties = varietiesData || [];
+  const isLoading = authLoading || varietiesLoading;
 
   const handleAddVariety = () => {
     setEditingVariety(null);
     setIsFormOpen(true);
   };
-  
+
   const handleEditVariety = (variety: Variety) => {
     setEditingVariety(variety);
     setIsFormOpen(true);
@@ -95,12 +56,12 @@ export default function VarietiesPage() {
 
     const result = await deleteVarietyAction(varietyId);
     if (result.success) {
-        toast({ title: 'Variety Deleted', description: `Successfully deleted "${varietyToDelete.name}".` });
+      toast({ title: 'Variety Deleted', description: `Successfully deleted "${varietyToDelete.name}".` });
     } else {
-        toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
+      toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
     }
   };
-  
+
   const handleFormSubmit = async (varietyData: Omit<Variety, 'id'> | Variety) => {
     const isEditing = 'id' in varietyData;
 
@@ -109,129 +70,129 @@ export default function VarietiesPage() {
       : await addVarietyAction(varietyData);
 
     if (result.success) {
-      toast({ 
-        title: isEditing ? 'Variety Updated' : 'Variety Added', 
-        description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".` 
+      toast({
+        title: isEditing ? 'Variety Updated' : 'Variety Added',
+        description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`
       });
       setIsFormOpen(false);
       setEditingVariety(null);
     } else {
-      toast({ 
-        variant: 'destructive', 
-        title: isEditing ? 'Update Failed' : 'Add Failed', 
-        description: result.error 
+      toast({
+        variant: 'destructive',
+        title: isEditing ? 'Update Failed' : 'Add Failed',
+        description: result.error
       });
     }
   };
 
   return (
     <>
-    <div className="container mx-auto max-w-7xl p-4 sm:p-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="container mx-auto max-w-7xl p-4 sm:p-6">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
             <h1 className="font-headline text-4xl">Plant Varieties</h1>
             <p className="text-muted-foreground">The master list of all plant varieties and their attributes.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-                <Link href="/settings">
-                    <ArrowLeft />
-                    Back to Data Management
-                </Link>
+              <Link href="/settings">
+                <ArrowLeft />
+                Back to Data Management
+              </Link>
             </Button>
             <VarietiesCsvButtons />
             <Button onClick={handleAddVariety}>
-                <Plus />
-                Add New Variety
+              <Plus />
+              Add New Variety
             </Button>
+          </div>
         </div>
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Varieties Golden Table</CardTitle>
-          <CardDescription>This is the master list of varieties used for auto-completing new batch forms.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-             <div className="space-y-2">
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Varieties Golden Table</CardTitle>
+            <CardDescription>This is the master list of varieties used for auto-completing new batch forms.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Variety Name</TableHead>
-                  <TableHead>Common Name</TableHead>
-                  <TableHead>Family</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Grouping</TableHead>
-                  <TableHead>Flowering Period</TableHead>
-                  <TableHead>Flower Colour</TableHead>
-                  <TableHead>Evergreen</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {varieties.map((variety) => (
-                  <TableRow key={variety.id}>
-                    <TableCell className="font-medium">{variety.name}</TableCell>
-                    <TableCell>{variety.commonName}</TableCell>
-                    <TableCell>{variety.family}</TableCell>
-                    <TableCell>{variety.category}</TableCell>
-                    <TableCell>{variety.grouping}</TableCell>
-                    <TableCell>{variety.floweringPeriod}</TableCell>
-                    <TableCell>{variety.flowerColour}</TableCell>
-                    <TableCell>{variety.evergreen}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Variety Name</TableHead>
+                    <TableHead>Common Name</TableHead>
+                    <TableHead>Family</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Grouping</TableHead>
+                    <TableHead>Flowering Period</TableHead>
+                    <TableHead>Flower Colour</TableHead>
+                    <TableHead>Evergreen</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {varieties.map((variety) => (
+                    <TableRow key={variety.id}>
+                      <TableCell className="font-medium">{variety.name}</TableCell>
+                      <TableCell>{variety.commonName}</TableCell>
+                      <TableCell>{variety.family}</TableCell>
+                      <TableCell>{variety.category}</TableCell>
+                      <TableCell>{variety.grouping}</TableCell>
+                      <TableCell>{variety.floweringPeriod}</TableCell>
+                      <TableCell>{variety.flowerColour}</TableCell>
+                      <TableCell>{variety.evergreen}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
                           <Button type="button" size="icon" variant="outline" onClick={() => handleEditVariety(variety)}><Edit /></Button>
                           <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                  <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                      This will permanently delete the "{variety.name}" variety. This action cannot be undone.
-                                  </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteVariety(variety.id!)}>
-                                      Yes, delete it
-                                  </AlertDialogAction>
-                                  </AlertDialogFooter>
-                              </AlertDialogContent>
+                            <AlertDialogTrigger asChild>
+                              <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete the "{variety.name}" variety. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteVariety(variety.id!)}>
+                                  Yes, delete it
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
                           </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-2xl">
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-                <DialogTitle>{editingVariety ? "Edit Variety" : "Add Variety"}</DialogTitle>
-                <DialogDescription>Family/category is used to prefill batch info.</DialogDescription>
+              <DialogTitle>{editingVariety ? "Edit Variety" : "Add Variety"}</DialogTitle>
+              <DialogDescription>Family/category is used to prefill batch info.</DialogDescription>
             </DialogHeader>
             <VarietyForm
-                variety={editingVariety}
-                onSubmit={handleFormSubmit}
-                onCancel={() => {
-                    setIsFormOpen(false);
-                    setEditingVariety(null);
-                }}
+              variety={editingVariety}
+              onSubmit={handleFormSubmit}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setEditingVariety(null);
+              }}
             />
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </>
   );
 }

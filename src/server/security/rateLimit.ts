@@ -1,57 +1,56 @@
-import { adminDb } from "@/server/db/admin";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { createClient } from "@/lib/supabase/server";
 
-type Result = { allowed: boolean; remaining: number; resetMs: number };
+export interface Result {
+  allowed: boolean;
+  remaining: number;
+  resetMs: number;
+}
 
 export async function checkRateLimit(opts: { key: string; windowMs: number; max: number }): Promise<Result> {
   const { key, windowMs, max } = opts;
   const now = Date.now();
-  const windowStart = new Date(now - (now % windowMs)); // align to window
-  const resetAt = +windowStart + windowMs;
+  const resetAt = now + windowMs;
 
-  const ref = adminDb.collection("rateLimits").doc(key);
-  return adminDb.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
+  const supabase = await createClient();
 
-    if (!snap.exists) {
-      tx.set(ref, {
-        count: 1,
-        windowStart: Timestamp.fromDate(new Date(+windowStart)),
-        expireAt: Timestamp.fromMillis(resetAt + 5 * 60_000), // TTL buffer
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      return { allowed: true, remaining: Math.max(0, max - 1), resetMs: Math.max(0, resetAt - now) };
-    }
+  // 1. Clean up expired (optional, or run periodically)
+  // await supabase.from('rate_limits').delete().lt('expire_at', now);
 
-    const data = snap.data() || {};
-    const start: Timestamp = data.windowStart;
-    const count: number = data.count ?? 0;
+  // 2. Get current usage
+  const { data: current } = await supabase
+    .from('rate_limits')
+    .select('*')
+    .eq('key', key)
+    .single();
 
-    // New window?
-    if (!start || start.toMillis() !== +windowStart) {
-      tx.set(
-        ref,
-        {
-          count: 1,
-          windowStart: Timestamp.fromMillis(+windowStart),
-          expireAt: Timestamp.fromMillis(resetAt + 5 * 60_000),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-      return { allowed: true, remaining: Math.max(0, max - 1), resetMs: Math.max(0, resetAt - now) };
-    }
+  let points = current?.points || 0;
+  let expireAt = current?.expire_at || resetAt;
 
-    const next = (count || 0) + 1;
-    const allowed = next <= max;
-    tx.set(
-      ref,
-      { count: next, updatedAt: FieldValue.serverTimestamp(), expireAt: Timestamp.fromMillis(resetAt + 5 * 60_000) },
-      { merge: true }
-    );
+  if (current && current.expire_at < now) {
+    // Expired, reset
+    points = 0;
+    expireAt = resetAt;
+  }
 
-    return { allowed, remaining: Math.max(0, max - next), resetMs: Math.max(0, resetAt - now) };
-  });
+  // 3. Increment
+  points++;
+
+  // 4. Update/Insert
+  const { error } = await supabase
+    .from('rate_limits')
+    .upsert({ key, points, expire_at: expireAt });
+
+  if (error) {
+    console.error("Rate limit error:", error);
+    // Fail open if DB error
+    return { allowed: true, remaining: 1, resetMs: 0 };
+  }
+
+  const allowed = points <= max;
+  const remaining = Math.max(0, max - points);
+  const resetMs = Math.max(0, expireAt - now);
+
+  return { allowed, remaining, resetMs };
 }
 
 // Prefer user id; otherwise first XFF IP.

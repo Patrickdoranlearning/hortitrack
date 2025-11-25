@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { createClient } from '@/lib/supabase/client';
 import type { Batch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { PrinterIcon, ArrowLeft } from 'lucide-react';
@@ -27,11 +26,30 @@ export default function PrintBatchPage() {
 
     const fetchBatch = async () => {
       try {
-        const docRef = doc(db, 'batches', batchId);
-        const docSnap = await getDoc(docRef);
+        const supabase = createClient();
+        const { data, error } = await supabase.from('batches').select('*').eq('id', batchId).single();
 
-        if (docSnap.exists()) {
-          setBatch({ id: docSnap.id, ...docSnap.data() } as Batch);
+        if (error) throw error;
+
+        if (data) {
+          // Map snake_case to camelCase
+          const b: Batch = {
+            id: data.id,
+            batchNumber: data.batch_number,
+            plantVariety: data.plant_variety,
+            plantFamily: data.plant_family,
+            category: data.category,
+            plantingDate: data.planting_date,
+            quantity: data.quantity,
+            size: data.size,
+            location: data.location_id, // or name
+            status: data.status,
+            supplier: data.supplier_name,
+            growerPhotoUrl: data.grower_photo_url,
+            salesPhotoUrl: data.sales_photo_url,
+            // ... other fields
+          } as Batch;
+          setBatch(b);
         } else {
           setError('Batch not found.');
         }

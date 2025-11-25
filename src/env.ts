@@ -7,10 +7,10 @@ import { z } from "zod";
  * Do NOT import this from client components.
  */
 const Schema = z.object({
-  // Firebase Admin
-  FIREBASE_PROJECT_ID: z.string().min(1, "Missing FIREBASE_PROJECT_ID"),
-  FIREBASE_CLIENT_EMAIL: z.string().email("Invalid FIREBASE_CLIENT_EMAIL"),
-  FIREBASE_PRIVATE_KEY: z.string().min(10, "Missing FIREBASE_PRIVATE_KEY"),
+  // Firebase Admin (Legacy - Optional)
+  FIREBASE_PROJECT_ID: z.string().optional(),
+  FIREBASE_CLIENT_EMAIL: z.string().email("Invalid FIREBASE_CLIENT_EMAIL").optional(),
+  FIREBASE_PRIVATE_KEY: z.string().optional(),
 
   // Optional buckets
   FIREBASE_STORAGE_BUCKET: z.string().optional(),

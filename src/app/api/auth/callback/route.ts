@@ -1,6 +1,5 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { createSupabaseServerWithCookies, type CookieBridge } from '@/server/db/supabaseServerApp';
+import { getSupabaseServerApp } from '@/server/db/supabase';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -8,13 +7,7 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
-    const cookieStore = cookies();
-    const cookieBridge: CookieBridge = {
-      get: (name) => cookieStore.get(name)?.value,
-      set: (name, value, options) => cookieStore.set(name, value, options),
-      remove: (name, options) => cookieStore.set(name, "", { ...options, maxAge: 0 }),
-    };
-    const supabase = createSupabaseServerWithCookies(cookieBridge);
+    const supabase = getSupabaseServerApp();
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`)

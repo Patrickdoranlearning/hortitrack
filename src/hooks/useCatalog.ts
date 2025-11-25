@@ -1,6 +1,8 @@
 'use client';
 import useSWR from 'swr';
-import { supabase } from '@/lib/supabaseClient';
+import { supabaseClient } from '@/lib/supabase/client';
+
+const supabase = supabaseClient();
 
 type Row = { id: string; name: string };
 type SizeRow = Row & { container_type?: string | null; cell_multiple?: number | null };

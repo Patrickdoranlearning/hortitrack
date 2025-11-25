@@ -5,7 +5,8 @@ This document outlines the planned features and ideas for the HortiTrack applica
 ## Core Modules
 
 *   **Production Module (Current Focus):** Core functionality for tracking plant batches from propagation to sale-ready status. Includes batch creation, logging, AI recommendations, and protocol generation.
-*   **Sales Module:** To be developed. Will handle customer-facing inventory, ordering, and salesperson tools.
+*   **Sales Module:** Internal module for sales staff to handle customer-facing inventory, ordering, and salesperson tools.
+*   **B2B Portal:** External portal for wholesale customers to view stock and place orders.
 *   **Dispatch Module:** To be developed. Will manage preparing and shipping customer orders.
 *   **IPM (Integrated Pest Management) / Plant Health Module:** To be developed. Will track pest and disease issues, treatments, and perform advanced health analysis.
 
@@ -21,7 +22,7 @@ A system to attach photos to batches, enhancing visual tracking and sales capabi
 
 *   **Dual Photo Types:**
     *   **Grower Photos:** For internal use. A visual log to track the batch's progress, health, and size over its lifecycle. Helps standardize production techniques.
-    *   **Sales Photos:** "Glamour shots" of market-ready batches to be used by the sales team and shown to customers in a future portal.
+    *   **Sales Photos:** "Glamour shots" of market-ready batches to be used by the sales team and shown to customers in the B2B portal.
 *   **Implementation:**
     *   Add a "Take Photo" option after scanning a batch or from the batch details screen.
     *   Use the device's camera.
@@ -35,7 +36,7 @@ A system to attach photos to batches, enhancing visual tracking and sales capabi
     *   The AI will analyze and report on changes in size, biomass, and foliage density, providing quantifiable growth data.
     *   Requires consistent photo-taking, potentially using a reference object for scale.
 
-## 2. User Roles, Authentication & Ordering (Sales Module)
+## 2. User Roles, Authentication & Ordering (Sales Module & B2B Portal)
 
 Transform the app into a multi-user platform with distinct roles and capabilities.
 
@@ -43,12 +44,12 @@ Transform the app into a multi-user platform with distinct roles and capabilitie
 
 *   **User Roles:**
     *   **Nursery Operative:** Focused on batch management, logging actions, and completing assigned tasks within the Production Module.
-    *   **Sales Person:** Can view inventory, check what's ready for sale, and potentially create quotes or orders in the Sales Module.
-        *   **Customer:** A B2B portal for wholesale customers to log in, view available stock, see pricing, and place orders directly in the Sales Module. **They will use the same UI as Sales Persons for creating orders.**
+    *   **Sales Person:** Can view inventory, check what's ready for sale, and create quotes or orders in the internal **Sales Module**.
+    *   **Customer:** A B2B portal user who can log in, view available stock, see pricing, and place orders directly in the **B2B Portal**.
 *   **Implementation:**
     *   Use **Firebase Authentication** to manage user accounts, logins, and security.
-    *   Build different UI views and dashboards tailored to each user role.
-    *   **Note:** Sales Persons and Customers will share the same UI for order creation to reduce program size.
+    *   **Sales Module (Internal):** `src/app/sales` - For Sales Persons.
+    *   **B2B Portal (External):** `src/app/b2b` - For Customers. Distinct UI optimized for external users.
 
 ## 3. Product & Alias Management (Sales Module)
 
