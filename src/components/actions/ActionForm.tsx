@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { useToast } from "@/hooks/use-toast";
 import type { Batch, NurseryLocation } from "@/lib/types";
-import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader"; // Corrected import path to use BatchPhotoUploader
+import BatchPhotoUploader from "@/components/batches/BatchPhotoUploader";
 import { fetchJson } from "@/lib/http";
 
 function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
@@ -66,9 +66,9 @@ export function ActionForm({
   onCancel?: () => void;
 }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"MOVE"|"DUMP"|"CHECKIN">("MOVE");
-  const [uploaded, setUploaded] = useState<{url:string;path?:string}[]>([]);
-  const abortRef = useRef<AbortController|null>(null);
+  const [tab, setTab] = useState<"MOVE" | "DUMP" | "CHECKIN">("MOVE");
+  const [uploaded, setUploaded] = useState<{ url: string; path?: string }[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
   const max = Number(batch.quantity ?? 0);
 
   // ---- MOVE
@@ -112,11 +112,11 @@ export function ActionForm({
   useEffect(() => {
     // push uploaded photos to whichever tab is active
     if (uploaded.length === 0) return;
-    if (tab === "MOVE") moveForm.setValue("photos", [...(moveForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
-    if (tab === "DUMP") dumpForm.setValue("photos", [...(dumpForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
-    if (tab === "CHECKIN") checkForm.setValue("photos", [...(checkForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
+    if (tab === "MOVE") moveForm.setValue("photos", [...(moveForm.getValues("photos") || []), ...uploaded], { shouldDirty: true });
+    if (tab === "DUMP") dumpForm.setValue("photos", [...(dumpForm.getValues("photos") || []), ...uploaded], { shouldDirty: true });
+    if (tab === "CHECKIN") checkForm.setValue("photos", [...(checkForm.getValues("photos") || []), ...uploaded], { shouldDirty: true });
     setUploaded([]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploaded, tab]);
 
   function idemKey(payload: Record<string, any>) {
@@ -125,7 +125,7 @@ export function ActionForm({
       ...payload,
       at: new Date(payload.at).getTime(),
     });
-    return typeof window === "undefined" ? base : btoa(unescape(encodeURIComponent(base))).slice(0,128);
+    return typeof window === "undefined" ? base : btoa(unescape(encodeURIComponent(base))).slice(0, 128);
   }
 
   async function submit(payload: Record<string, any>) {
@@ -175,7 +175,7 @@ export function ActionForm({
       await submit(payload);
       toast({ title: "Move logged", description: `Destination set.` });
       onSuccess?.();
-    } catch (e:any) {
+    } catch (e: any) {
       const msg = String(e.message || e);
       if (/destination/i.test(msg)) moveForm.setError("toLocationId", { message: msg });
       toast({ variant: "destructive", title: "Move failed", description: msg });
@@ -191,7 +191,7 @@ export function ActionForm({
       await submit(payload);
       toast({ title: "Dump logged", description: `Quantity adjusted.` });
       onSuccess?.();
-    } catch (e:any) {
+    } catch (e: any) {
       const msg = String(e.message || e);
       if (/exceeds/i.test(msg)) dumpForm.setError("quantity", { message: msg });
       if (/reason/i.test(msg)) dumpForm.setError("reason", { message: msg });
@@ -204,8 +204,8 @@ export function ActionForm({
       await submit(payload);
       toast({ title: "Check-in saved" });
       onSuccess?.();
-    } catch (e:any) {
-      toast({ variant: "destructive", title: "Check-in failed", description: String(e.message||e) });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Check-in failed", description: String(e.message || e) });
     }
   }
 
@@ -239,7 +239,7 @@ export function ActionForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={moveForm.control} name="quantity" render={({ field }) => (
               <FormItem>
                 <FormLabel>Quantity (blank = whole batch)</FormLabel>
@@ -251,7 +251,7 @@ export function ActionForm({
                 <div className="text-xs text-muted-foreground">Available: {max}</div>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={moveForm.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Notes</FormLabel>
@@ -259,7 +259,7 @@ export function ActionForm({
                   <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
                 </FormControl>
               </FormItem>
-            )}/>
+            )} />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
               <SubmitButton pending={moveForm.formState.isSubmitting}>Apply Move</SubmitButton>
@@ -279,7 +279,7 @@ export function ActionForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={dumpForm.control} name="quantity" render={({ field }) => (
               <FormItem>
                 <FormLabel>Quantity (blank = whole batch)</FormLabel>
@@ -291,7 +291,7 @@ export function ActionForm({
                 <div className="text-xs text-muted-foreground">Available: {max}</div>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={dumpForm.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Notes</FormLabel>
@@ -299,7 +299,7 @@ export function ActionForm({
                   <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
                 </FormControl>
               </FormItem>
-            )}/>
+            )} />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
               <SubmitButton pending={dumpForm.formState.isSubmitting}>Log Dump</SubmitButton>
@@ -319,7 +319,7 @@ export function ActionForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
               <SubmitButton pending={checkForm.formState.isSubmitting}>Save Check-in</SubmitButton>

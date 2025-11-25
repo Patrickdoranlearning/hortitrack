@@ -1,55 +1,53 @@
 
 export const runtime = "nodejs";
 import { NextResponse } from "next/server";
-import { adminDb } from "@/server/db/admin";
 import { z } from "zod";
-import { BatchSchema, BatchStatus } from "@/lib/types";
-import { declassify } from "@/server/utils/declassify";
+import { ProductionStatus } from "@/lib/types";
 import { toMessage } from "@/lib/errors";
+import { getBatchById, getBatchLogs, getBatchPhotos } from "@/server/batches/service";
+import { createClient } from "@/lib/supabase/server"; // Keep this for PATCH/DELETE
 
 type Params = { params: { batchId: string } };
 
 export async function GET(_req: Request, { params }: Params) {
   try {
-    const ref = adminDb.collection("batches").doc(params.batchId);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      return NextResponse.json({ ok:false, error: { code:"NOT_FOUND", message:"Not found" } }, { status: 404 });
+    const batch = await getBatchById(params.batchId);
+
+    if (!batch) {
+      return NextResponse.json({ ok: false, error: { code: "NOT_FOUND", message: "Not found" } }, { status: 404 });
     }
-    const batch = { id: snap.id, ...declassify(snap.data()) } as any;
 
     // Photos (split by type)
-    const photosSnap = await ref.collection("photos").orderBy("createdAt", "desc").limit(60).get();
-    const photos = photosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const photosSplit = { grower: photos.filter(p => p.type === "GROWER"), sales: photos.filter(p => p.type === "SALES") };
+    const photos = await getBatchPhotos(params.batchId);
+    const photosSplit = {
+      grower: (photos || []).filter((p: any) => p.type === "GROWER"),
+      sales: (photos || []).filter((p: any) => p.type === "SALES")
+    };
 
-    // Logs (legacy inline logHistory)
-    const logs = Array.isArray(batch.logHistory) ? batch.logHistory.slice(-50) : [];
+    // Logs
+    const logs = await getBatchLogs(params.batchId);
 
-    // Ancestry: follow `transplantedFrom` or `ancestryFromId` up to 3
+    // Ancestry (simplified for now, or reuse buildBatchRoute logic if needed)
+    // For now, let's just return empty ancestry or basic parent info
     const ancestry: any[] = [];
-    let prevId = batch.transplantedFrom || batch.ancestryFromId || null;
-    for (let hops = 0; prevId && hops < 3; hops++) {
-      const prevSnap = await adminDb.collection('batches').where('batchNumber', '==', prevId).limit(1).get();
-      if (prevSnap.empty) break;
-
-      const prevDoc = prevSnap.docs[0];
-      const d = prevDoc.data() || {};
-      ancestry.push({
-        id: prevDoc.id,
-        batchNumber: d.batchNumber ?? prevDoc.id,
-        plantVariety: d.plantVariety ?? d.variety ?? "",
-        plantFamily: d.plantFamily ?? "",
-        size: d.size ?? "",
-        supplier: d.supplier ?? d.supplierName ?? null,
-        producedWeek: d.plantingDateWeek ?? d.producedWeek ?? null,
-      });
-      prevId = d.transplantedFrom || d.ancestryFromId || null;
+    if (batch.parentBatchId) {
+      const parent = await getBatchById(batch.parentBatchId);
+      if (parent) {
+        ancestry.push({
+          id: parent.id,
+          batchNumber: parent.batchNumber,
+          plantVariety: parent.plantVariety,
+          plantFamily: parent.plantFamily,
+          size: parent.size,
+          supplier: parent.supplierName,
+          producedWeek: parent.producedAt // approximate
+        });
+      }
     }
 
-    return NextResponse.json({ ok:true, data: { batch, logs, photos: photosSplit, ancestry } }, { status: 200 });
+    return NextResponse.json({ ok: true, data: { batch, logs, photos: photosSplit, ancestry } }, { status: 200 });
   } catch (e: any) {
-    return NextResponse.json({ ok:false, error: { code:"SERVER_ERROR", message: toMessage(e) } }, { status: 500 });
+    return NextResponse.json({ ok: false, error: { code: "SERVER_ERROR", message: toMessage(e) } }, { status: 500 });
   }
 }
 
@@ -60,24 +58,69 @@ const PatchBody = z.object({
   plantVariety: z.string().min(1).optional(),
   plantingDate: z.string().optional(), // ISO
   quantity: z.number().int().nonnegative().optional(),
-  status: BatchStatus.optional(),
+  status: ProductionStatus.optional(),
   location: z.string().optional(),
   size: z.string().optional(),
   supplier: z.string().optional(),
   growerPhotoUrl: z.string().optional(),
   salesPhotoUrl: z.string().optional(),
-  // logHistory is appended server-side when we auto-archive; disallow blind replacement from clients
 }).strict();
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
     const updates = PatchBody.parse(await req.json());
-    const ref = adminDb.collection("batches").doc(params.batchId);
-    const snap = await ref.get();
-    if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    const stored = declassify(snap.data());
-    const initialQty: number = stored.initialQuantity ?? 0;
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+    // Get active org
+    let activeOrgId: string | null = null;
+    const { data: profile } = await supabase.from('profiles').select('active_org_id').eq('id', user.id).single();
+    if (profile?.active_org_id) {
+      activeOrgId = profile.active_org_id;
+    } else {
+      const { data: membership } = await supabase.from('org_memberships').select('org_id').eq('user_id', user.id).limit(1).single();
+      if (membership) activeOrgId = membership.org_id;
+    }
+
+    if (!activeOrgId) return NextResponse.json({ error: "No active organization found" }, { status: 400 });
+
+    const { data: stored, error: fetchError } = await supabase.from("batches").select("*").eq("id", params.batchId).single();
+
+    if (fetchError || !stored) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Resolve IDs if fields are present
+    let varietyId = undefined;
+    let sizeId = undefined;
+    let locationId = undefined;
+    let supplierId = undefined;
+
+    if (updates.plantVariety) {
+      const { data: v } = await supabase.from('plant_varieties').select('id').eq('name', updates.plantVariety).single();
+      if (!v) return NextResponse.json({ error: `Variety '${updates.plantVariety}' not found` }, { status: 400 });
+      varietyId = v.id;
+    }
+
+    if (updates.size) {
+      const { data: s } = await supabase.from('plant_sizes').select('id').eq('name', updates.size).single();
+      if (!s) return NextResponse.json({ error: `Size '${updates.size}' not found` }, { status: 400 });
+      sizeId = s.id;
+    }
+
+    if (updates.location) {
+      const { data: l } = await supabase.from('nursery_locations').select('id').eq('name', updates.location).eq('org_id', activeOrgId).single();
+      if (!l) return NextResponse.json({ error: `Location '${updates.location}' not found` }, { status: 400 });
+      locationId = l.id;
+    }
+
+    if (updates.supplier) {
+      const { data: s } = await supabase.from('suppliers').select('id').eq('name', updates.supplier).eq('org_id', activeOrgId).single();
+      if (!s) return NextResponse.json({ error: `Supplier '${updates.supplier}' not found` }, { status: 400 });
+      supplierId = s.id;
+    }
+
+    const initialQty: number = stored.initial_quantity ?? 0;
     const nextQty: number = (typeof updates.quantity === "number") ? updates.quantity : stored.quantity ?? 0;
     const nextStatus: typeof stored.status = updates.status ?? stored.status;
 
@@ -87,27 +130,45 @@ export async function PATCH(req: Request, { params }: Params) {
 
     const shouldArchive = nextQty <= 0 || nextStatus === "Archived";
     const serverUpdate: Record<string, any> = {
-      ...updates,
+      // category: updates.category, // Removed from schema
+      // plant_family: updates.plantFamily, // Removed from schema
+      plant_variety_id: varietyId,
+      planting_date: updates.plantingDate,
+      location_id: locationId,
+      size_id: sizeId,
+      supplier_id: supplierId,
+      grower_photo_url: updates.growerPhotoUrl,
+      sales_photo_url: updates.salesPhotoUrl,
       quantity: shouldArchive ? 0 : nextQty,
       status: shouldArchive ? "Archived" : nextStatus,
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
+
+    // Remove undefined keys
+    Object.keys(serverUpdate).forEach(key => serverUpdate[key] === undefined && delete serverUpdate[key]);
+
+    const { data: updatedBatch, error: updateError } = await supabase
+      .from("batches")
+      .update(serverUpdate)
+      .eq("id", params.batchId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
 
     // Append auto-archive log if transitioning to Archived now
     const becameArchived = shouldArchive && stored.status !== "Archived";
     if (becameArchived) {
-      const logEntry = {
-        id: `log_${Date.now()}`,
-        date: new Date().toISOString(),
+      await supabase.from("logs").insert({
+        org_id: activeOrgId, // Added org_id
+        batch_id: params.batchId,
         type: "ARCHIVE",
         note: "Batch quantity reached zero and was automatically archived.",
-      };
-      serverUpdate.logHistory = [...(stored.logHistory ?? []), logEntry];
+        date: new Date().toISOString(),
+      });
     }
 
-    await ref.set(serverUpdate, { merge: true });
-    const finalSnap = await ref.get();
-    return NextResponse.json({ id: finalSnap.id, ...declassify(finalSnap.data()) });
+    return NextResponse.json({ id: updatedBatch.id, ...updatedBatch }); // Should map back to camelCase if needed
   } catch (e: any) {
     if (e?.name === "ZodError") {
       return NextResponse.json({ error: toMessage(e.errors), issues: e.errors }, { status: 400 });
@@ -118,9 +179,13 @@ export async function PATCH(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   try {
-    // Soft-delete? Archive instead of delete (preferred)
-    const ref = adminDb.collection("batches").doc(params.batchId);
-    await ref.set({ status: "Archived", updatedAt: new Date().toISOString() }, { merge: true });
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("batches")
+      .update({ status: "Archived", updated_at: new Date().toISOString() })
+      .eq("id", params.batchId);
+
+    if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: toMessage(e) }, { status: 500 });

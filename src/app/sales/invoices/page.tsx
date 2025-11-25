@@ -1,9 +1,20 @@
-import { adminDb } from "@/server/db/admin";
+import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+export const dynamic = "force-dynamic";
+
 export default async function InvoicesPage() {
-  const snap = await adminDb.collection("invoices").orderBy("invoiceDate", "desc").limit(50).get();
-  const invoices = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  const { data: invoicesData, error } = await supabaseAdmin
+    .from("invoices")
+    .select("*")
+    .order("invoice_date", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Error fetching invoices:", error);
+  }
+
+  const invoices = invoicesData || [];
 
   return (
     <Card>
@@ -23,9 +34,9 @@ export default async function InvoicesPage() {
             {invoices.map((i: any) => (
               <tr key={i.id} className="border-b">
                 <td className="py-2 font-medium">{i.number ?? i.id}</td>
-                <td className="py-2">{i.customerId}</td>
-                <td className="py-2">{i.invoiceDate?.toDate ? i.invoiceDate.toDate().toLocaleDateString() : ""}</td>
-                <td className="py-2">{i.totalsIncVat != null ? `€${Number(i.totalsIncVat).toFixed(2)}` : "-"}</td>
+                <td className="py-2">{i.customer_id}</td>
+                <td className="py-2">{i.invoice_date ? new Date(i.invoice_date).toLocaleDateString() : ""}</td>
+                <td className="py-2">{i.totals_inc_vat != null ? `€${Number(i.totals_inc_vat).toFixed(2)}` : "-"}</td>
                 <td className="py-2 capitalize">{i.status ?? "draft"}</td>
               </tr>
             ))}

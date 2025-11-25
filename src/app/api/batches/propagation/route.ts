@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { firebaseAdminAuth } from '@/server/auth/firebaseAdmin';
 import { supabaseAdmin } from '@/server/db/supabaseAdmin';
 import { getOrgForUserByEmail } from '@/server/orgs/getOrgForUser';
 import { PropagationInput } from '@/lib/schemas/production';
@@ -13,9 +12,11 @@ export async function POST(req: NextRequest) {
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const decoded = await firebaseAdminAuth.verifyIdToken(token);
-    const email = decoded.email;
-    if (!email) return NextResponse.json({ error: 'Missing email on token' }, { status: 401 });
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user || !user.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const email = user.email;
 
     // 2) Org
     const orgId = await getOrgForUserByEmail(email);
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
         quantity: units,           // current
         initial_quantity: units,   // snapshot
         unit: 'plants',
-        planted_at: (input.planted_at as Date).toISOString().slice(0,10),
+        planted_at: (input.planted_at as Date).toISOString().slice(0, 10),
         supplier_id: input.supplier_id ?? null,
         supplier_batch_number: '', // per schema default
       })
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
         org_id: orgId,
         batch_id: batch.id,
         type: 'PROPAGATION',
-        by_user_id: null, // we’re on Firebase; optional: store decoded.uid in a separate column if you add it
+        by_user_id: user.id,
         payload: { containers: input.containers, cell_multiple: multiple, units },
       });
     if (evtErr) console.error('[propagation] event insert failed:', evtErr.message);

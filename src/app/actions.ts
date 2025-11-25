@@ -4,20 +4,13 @@
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
-import { createSupabaseServerWithCookies, type CookieBridge } from '@/server/db/supabaseServerApp';
-import { cookies } from 'next/headers';
+import { getSupabaseServerApp } from '@/server/db/supabase';
 import { z } from 'zod';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
 
-async function getSupabaseForApp() {
-  const store = await cookies();
-  const cookieBridge: CookieBridge = {
-    get: (n) => store.get(n)?.value,
-    set: (n, v, o) => store.set(n, v, o),
-    remove: (n, o) => store.set(n, "", { ...o, maxAge: 0 }),
-  };
-  return createSupabaseServerWithCookies(cookieBridge);
+function getSupabaseForApp() {
+  return getSupabaseServerApp();
 }
 
 function transformVBatchSearchData(data: any): Batch {

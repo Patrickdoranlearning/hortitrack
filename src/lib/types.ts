@@ -1,256 +1,244 @@
 import { z } from "zod";
 
-// --- Dictionaries ---
-export const SupplierSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1, 'Supplier name is required'),
-  address: z.string().optional(),
-  country: z.string().optional(),
-  countryCode: z.string().optional(),
+// --- Enums (matching DB types) ---
+export const ProductionPhase = z.enum(['propagation', 'growing', 'finished']);
+export const ProductionStatus = z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']);
+export const CreditStatus = z.enum(['draft', 'issued', 'paid', 'void']);
+export const DeliveryStatus = z.enum(['unscheduled', 'scheduled', 'departed', 'delivered', 'cancelled']);
+export const InvoiceStatus = z.enum(['draft', 'issued', 'paid', 'void', 'overdue']);
+export const SubstitutionStatus = z.enum(['requested', 'approved', 'rejected', 'applied']);
+export const OrderStatus = z.enum(['draft', 'confirmed', 'processing', 'ready_for_dispatch', 'dispatched', 'delivered', 'cancelled']);
+export const OrgRole = z.enum(['owner', 'admin', 'grower', 'sales', 'viewer']);
+export const FeedbackSeverity = z.enum(['info', 'warning', 'critical']);
+export const ResolutionStatus = z.enum(['open', 'in_progress', 'resolved', 'wont_fix']);
+export const SizeContainerType = z.enum(['pot', 'tray', 'bareroot']);
+export const VehicleType = z.enum(['van', 'truck', 'trailer']);
+
+// --- Organizations ---
+export const OrganizationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  countryCode: z.string().default('IE'),
   producerCode: z.string().optional(),
-  operatorRegNo: z.string().optional(),
-  contact: z.string().optional(),
-  active: z.boolean().default(true).optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
-export type Supplier = z.infer<typeof SupplierSchema>;
+export type Organization = z.infer<typeof OrganizationSchema>;
 
-export const PlantSizeSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1, "Size name is required"), // Renamed 'size' to 'name' for consistency with searches and view
-  type: z.enum(["Pot", "Tray", "Bareroot"]), // Renamed 'type' to 'containerType' for consistency
-  containerType: z.enum(["Pot", "Tray", "Bareroot"]).optional(), // Added for consistency with searchSizes
-  area: z.number().optional(),
-  shelfQuantity: z.number().optional(),
-  multiple: z.number().optional(),
+// --- Sites ---
+export const SiteSchema = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  name: z.string(),
 });
-export type PlantSize = z.infer<typeof PlantSizeSchema>;
+export type Site = z.infer<typeof SiteSchema>;
 
+// --- Locations ---
 export const NurseryLocationSchema = z.object({
   id: z.string().optional(),
+  orgId: z.string(),
+  siteId: z.string().optional(),
   name: z.string().min(1, "Location name is required"),
-  nursery: z.string().optional(),
-  type: z.string().optional(),
+  nurserySite: z.string(), // Kept for compatibility/display
+  covered: z.boolean().default(false),
   area: z.number().optional(),
-  isCovered: z.boolean().optional(),
   capacity: z.number().int().nonnegative().optional(),
 });
 export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
 
+// --- Plant Sizes ---
+export const PlantSizeSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Size name is required"),
+  containerType: SizeContainerType.default('pot'),
+  cellMultiple: z.number().int().min(1).default(1),
+  cellDiameterMm: z.number().optional(),
+  cellVolumeL: z.number().optional(),
+});
+export type PlantSize = z.infer<typeof PlantSizeSchema>;
+
+// --- Plant Varieties ---
 export const VarietySchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
-  family: z.string().min(1),
-  category: z.string().default("Perennial").optional(), // Made optional based on previous observation
-  grouping: z.string().optional(),
-  commonName: z.string().optional(),
-  rating: z.string().optional(),
-  salesPeriod: z.string().optional(),
-  floweringPeriod: z.string().optional(),
-  flowerColour: z.string().optional(),
-  evergreen: z.string().optional(),
+  family: z.string().optional(),
+  genus: z.string().optional(),
+  species: z.string().optional(),
+  category: z.string().optional(),
+  colour: z.string().optional(),
+  rating: z.number().min(1).max(6).optional(),
 });
 export type Variety = z.infer<typeof VarietySchema>;
 
-// --- Plant Passport ---
-export const PlantPassportSchema = z.object({
-    id: z.string(),
-    type: z.enum(["received", "issued"]),
-    botanicalName: z.string(),           // A
-    operatorRegNo: z.string(),           // B e.g. IE-xxxxxxx
-    traceabilityCode: z.string(),        // C (lot/trace code)
-    originCountry: z.string(),           // D (ISO alpha-2)
-    protectedZone: z.object({ codes: z.array(z.string()) }).optional(), // when PZ applies
-    issuerName: z.string().optional(),
-    issueDate: z.date().optional(),
-    rawLabelText: z.string().optional(),
-    rawBarcodeText: z.string().optional(),
-    images: z.array(z.object({ url: z.string(), name: z.string().optional() })).optional(),
-    createdAt: z.date(),
-    createdBy: z.string(),
-});
-export type PlantPassport = z.infer<typeof PlantPassportSchema>;
-
-
-// --- Logs ---
-export const LogEntrySchema = z.object({
+// --- Suppliers ---
+export const SupplierSchema = z.object({
   id: z.string().optional(),
-  date: z.string().or(z.date()).transform((d) => (d instanceof Date ? d.toISOString() : d)),
-  type: z.string().min(1),
-  at: z.string().or(z.date()).optional().transform((d) => (d instanceof Date ? d.toISOString() : d)),
-  note: z.string().optional(),
-  qty: z.number().optional(),
-  reason: z.string().optional(),
-  newLocation: z.string().optional(),
-  newLocationId: z.string().optional(),
-  fromBatch: z.string().optional(),
-  toBatch: z.string().optional(),
-  action: z.string().optional(),
+  orgId: z.string(),
+  name: z.string().min(1, 'Supplier name is required'),
+  producerCode: z.string().optional(),
+  countryCode: z.string().default('IE'),
+  phone: z.string().optional(),
+  email: z.string().email().optional(),
+  address: z.string().optional(),
+  eircode: z.string().optional(),
 });
-export type LogEntry = z.infer<typeof LogEntrySchema>;
+export type Supplier = z.infer<typeof SupplierSchema>;
+
+// --- Price Lists ---
+export const PriceListSchema = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  name: z.string(),
+  currency: z.string().default('EUR'),
+  isDefault: z.boolean().default(false),
+  validFrom: z.string().optional(),
+  validTo: z.string().optional(),
+});
+export type PriceList = z.infer<typeof PriceListSchema>;
+
+// --- Customers ---
+export const CustomerSchema = z.object({
+  id: z.string().optional(),
+  orgId: z.string(),
+  code: z.string().optional(),
+  name: z.string().min(1),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  vatNumber: z.string().optional(),
+  notes: z.string().optional(),
+  defaultPriceListId: z.string().optional(),
+});
+export type Customer = z.infer<typeof CustomerSchema>;
+
+export const CustomerAddressSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  label: z.string(),
+  line1: z.string(),
+  line2: z.string().optional(),
+  city: z.string().optional(),
+  county: z.string().optional(),
+  eircode: z.string().optional(),
+  countryCode: z.string().default('IE'),
+  isDefaultShipping: z.boolean().default(false),
+  isDefaultBilling: z.boolean().default(false),
+});
+export type CustomerAddress = z.infer<typeof CustomerAddressSchema>;
 
 // --- Batches ---
-export const BatchStatus = z.enum([
-  "Propagation",
-  "Plugs/Liners",
-  "Potted",
-  "Ready for Sale",
-  "Looking Good",
-  "Archived",
-]);
-export type BatchStatus = z.infer<typeof BatchStatus>;
-
 export const BatchSchema = z.object({
   id: z.string().optional(),
+  orgId: z.string(),
   batchNumber: z.string(),
-  category: z.string().optional(), // Made optional as it's not directly from view yet
-  plantFamily: z.string().nullable().optional(), // Now nullable as per view/mapping
-  plantVariety: z.string().optional(), // Now optional as per view/mapping
-  plantedAt: z.string().nullable().optional(), // Renamed from plantingDate to plantedAt for consistency
-  plantingDate: z.string().nullable().optional(), // Kept for compatibility if still used
-  initialQuantity: z.number().int().nonnegative().optional(), // Made optional and non-negative
-  quantity: z.number().int().nonnegative().optional(),
-  status: BatchStatus,
-  phase: z.string().nullable().optional(), // Made nullable and optional for consistency with view
-  location: z.string().nullable().optional(), // Now nullable as per view/mapping
-  locationId: z.string().optional(), // Assuming ID is still part of the underlying data
-  size: z.string().optional(), // Now optional as per view/mapping
-  sizeId: z.string().optional(), // Assuming ID is still part of the underlying data
-  supplier: z.string().nullable().optional(), // Now nullable as per view/mapping
-  supplierId: z.string().optional(), // Assuming ID is still part of the underlying data
-  supplierRef: z.string().optional(),
-  deliveryRef: z.string().optional(),
-  notes: z.string().optional(),
-  logHistory: z.array(LogEntrySchema).default([]).optional(), // Made optional
+  phase: ProductionPhase.default('propagation'),
+  supplierId: z.string().optional(),
+  plantVarietyId: z.string(),
+  sizeId: z.string(),
+  locationId: z.string(),
+  status: ProductionStatus.default('Propagation'),
+  quantity: z.number().int().nonnegative().default(0),
+  initialQuantity: z.number().int().nonnegative().optional(),
+  quantityProduced: z.number().int().optional(),
+  unit: z.string().default('plants'),
+  plantedAt: z.string().optional(), // date
+  readyAt: z.string().optional(), // date
+  dispatchedAt: z.string().optional(), // date
+  archivedAt: z.string().optional(), // timestamp
+  qrCode: z.string().optional(),
+  qrImageUrl: z.string().optional(),
+  passportOverrideA: z.string().optional(),
+  passportOverrideB: z.string().optional(),
+  passportOverrideC: z.string().optional(),
+  passportOverrideD: z.string().optional(),
+  logHistory: z.array(z.any()).default([]), // Keeping as any for now to avoid circular dep issues or complex migration
+  supplierBatchNumber: z.string().default(''),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
-  transplantedFrom: z.string().optional(),
-  growerPhotoUrl: z.string().url().optional(),
-  salesPhotoUrl: z.string().url().optional(),
-  isTopPerformer: z.boolean().optional(),
-  
-  // New fields for check-in and passport
-  sourceType: z.enum(["Propagation", "Purchase"]).default("Propagation").optional(),
-  
-  qcStatus: z.enum(["Pending", "Accepted", "Rejected", "Quarantined"]).default("Pending").optional(),
-  qcNotes: z.string().optional(),
 
-  // Flag object for issue tracking
-  flag: z.object({
-    active: z.boolean().default(false),
-    reason: z.string().optional(),
-    remedy: z.string().optional(),
-    severity: z.enum(["low", "medium", "high"]).optional(),
-    flaggedAt: z.string().optional(),
-    flaggedBy: z.string().optional(),
-  }).optional(),
-  
-  // --- Plant Passport stored on Batch ---
-  passportType: z.enum(["received", "issued"]).optional(),
-  passportBotanical: z.string().optional(),   // A
-  passportOperator: z.string().optional(),   // B (operator reg no)
-  passportTraceCode: z.string().optional(),  // C
-  passportOrigin: z.string().optional(),     // D (ISO alpha-2)
-  passportPZ: z.any().optional(),            // { codes: string[] }
-  passportRawText: z.string().optional(),
-  passportRawBarcode: z.string().optional(),
-  passportImages: z.any().optional(),        // StoredFile[]
-  passportIssueDate: z.any().optional(),
-  passportIssuerName: z.string().optional(),
-  currentPassportId: z.string().optional().nullable(), // Added for linking to batch_passports table
+  // Expanded fields for UI convenience (joined data)
+  plantVariety: z.any().optional(), // Joined Variety object
+  size: z.any().optional(), // Joined Size object
+  location: z.any().optional(), // Joined Location object
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
-// --- Production Protocol (AI output) ---
-export const ProductionProtocolStepSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  type: z.string().optional(),
-  day: z.number().int().nonnegative().optional(),
-  at: z.string().optional(),
-  durationDays: z.number().int().nonnegative().optional(),
-  params: z.record(z.any()).optional(),
-});
-
-export const ProductionTargetsSchema = z.object({
-  tempC: z
-    .object({
-      day: z.number().nullable().optional(),
-      night: z.number().nullable().optional(),
-    })
-    .optional(),
-  humidityPct: z.number().nullable().optional(),
-  lightHours: z.number().nullable().optional(),
-  ec: z.number().nullable().optional(),
-  ph: z.number().nullable().optional(),
-  spacing: z.union([z.number(), z.string()]).nullable().optional(),
-});
-
-const ProductionProtocolRouteNodeSchema = z.object({
+// --- Batch Logs ---
+export const BatchLogSchema = z.object({
   id: z.string(),
-  batchNumber: z.union([z.string(), z.number()]).nullable().optional(),
-  plantVariety: z.string().nullable().optional(),
-  sowDate: z.string().nullable().optional(),
-  plantingDate: z.string().nullable().optional(),
-  producedAt: z.string().nullable().optional(),
-  potSize: z.union([z.number(), z.string()]).nullable().optional(),
-  supplierName: z.string().nullable().optional(),
-  supplierId: z.string().nullable().optional(),
+  orgId: z.string(),
+  batchId: z.string(),
+  type: z.string(),
+  note: z.string().optional(),
+  qtyChange: z.number().int().optional(),
+  actorId: z.string().optional(),
+  occurredAt: z.string(),
+  createdAt: z.string(),
 });
+export type BatchLog = z.infer<typeof BatchLogSchema>;
 
-export const ProductionProtocolRouteSchema = z.object({
-  ancestry: z
-    .array(
-      z.object({
-        level: z.number().int(),
-        node: ProductionProtocolRouteNodeSchema,
-        via: z
-          .object({
-            action: z.string().optional(),
-            at: z.string().nullable().optional(),
-            week: z.string().nullable().optional(),
-            notes: z.string().nullable().optional(),
-          })
-          .nullable()
-          .optional(),
-      })
-    )
-    .optional()
-    .default([]),
-  timeline: z
-    .array(
-      z.object({
-        at: z.string().nullable().optional(),
-        week: z.string().nullable().optional(),
-        action: z.string(),
-        batchId: z.string(),
-        note: z.string().nullable().optional(),
-      })
-    )
-    .optional()
-    .default([]),
-  summary: z
-    .object({
-      transplantWeek: z.string().nullable().optional(),
-      previousProducedWeek: z.string().nullable().optional(),
-      originBatchId: z.string().nullable().optional(),
-      hops: z.number().int().nullable().optional(),
-    })
-    .optional(),
+// --- SKUs ---
+export const SkuSchema = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  code: z.string(),
+  plantVarietyId: z.string(),
+  sizeId: z.string(),
+  description: z.string().optional(),
+  barcode: z.string().optional(),
+  defaultVatRate: z.number().default(13.5),
 });
+export type Sku = z.infer<typeof SkuSchema>;
 
-export const ProductionProtocolOutputSchema = z.object({
-  id: z.string().optional(),
-  protocolTitle: z.string().optional(),
-  summary: z.string().optional(),
-  timeline: z.array(z.object({
-    day: z.number(),
-    action: z.string(),
-    details: z.string(),
-    date: z.string().optional(),
-  })).optional(),
-  recommendations: z.array(z.string()).optional(),
-  targets: ProductionTargetsSchema.optional(),
-  steps: z.array(ProductionProtocolStepSchema).default([]),
-  route: ProductionProtocolRouteSchema.optional(),
+// --- Orders ---
+export const OrderSchema = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  orderNumber: z.string(),
+  customerId: z.string(),
+  shipToAddressId: z.string().optional(),
+  status: OrderStatus.default('draft'),
+  paymentStatus: z.string().optional(),
+  requestedDeliveryDate: z.string().optional(),
+  notes: z.string().optional(),
+  subtotalExVat: z.number().default(0),
+  vatAmount: z.number().default(0),
+  totalIncVat: z.number().default(0),
+  trolleysEstimated: z.number().int().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+
+  // UI Helpers
+  customerName: z.string().optional(),
 });
-export type ProductionProtocolOutput = z.infer<typeof ProductionProtocolOutputSchema>;
+export type Order = z.infer<typeof OrderSchema>;
+
+export const OrderItemSchema = z.object({
+  id: z.string(),
+  orderId: z.string(),
+  skuId: z.string(),
+  description: z.string().optional(),
+  quantity: z.number().int().nonnegative(),
+  unitPriceExVat: z.number().nonnegative(),
+  vatRate: z.number().nonnegative(),
+  discountPct: z.number().min(0).max(100).default(0),
+  lineTotalExVat: z.number().default(0),
+  lineVatAmount: z.number().default(0),
+});
+export type OrderItem = z.infer<typeof OrderItemSchema>;
+
+// --- Profiles ---
+export const ProfileSchema = z.object({
+  id: z.string(),
+  displayName: z.string().optional(),
+  email: z.string().optional(),
+  activeOrgId: z.string().optional(),
+});
+export type Profile = z.infer<typeof ProfileSchema>;
+
+// --- Org Memberships ---
+export const OrgMembershipSchema = z.object({
+  orgId: z.string(),
+  userId: z.string(),
+  role: OrgRole.default('viewer'),
+});
+export type OrgMembership = z.infer<typeof OrgMembershipSchema>;

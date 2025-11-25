@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { firebaseAdminAuth } from '@/server/auth/firebaseAdmin';
 import { supabaseAdmin } from '@/server/db/supabaseAdmin';
 import { getOrgForUserByEmail } from '@/server/orgs/getOrgForUser';
 
@@ -13,9 +12,11 @@ export async function GET(req: NextRequest, { params }: { params: { table: Table
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const decoded = await firebaseAdminAuth.verifyIdToken(token);
-    const email = decoded.email;
-    if (!email) return NextResponse.json({ error: 'Missing email on token' }, { status: 401 });
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user || !user.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const email = user.email;
 
     // org-scoped only where needed
     let orgId: string | null = null;

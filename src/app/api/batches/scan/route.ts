@@ -1,13 +1,13 @@
 
 export const runtime = "nodejs";
 
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/server/db/admin";
-import { declassify } from "@/server/utils/declassify";
 import { parseScanCode, candidateBatchNumbers } from '@/lib/scan/parse';
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 import { getUserFromRequest } from "@/server/security/auth";
 import { z } from 'zod';
+import { getBatchById, BatchNode } from "@/server/batches/service";
 
 const Body = z.object({ code: z.string().min(1) });
 
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const key = requestKey(req as any, user.uid);
+    const key = requestKey(req as any, user.id); // user.id for Supabase User
     const rl = await checkRateLimit({ key: `scan:${key}`, windowMs: 60_000, max: 30 });
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests", resetMs: rl.resetMs }, { status: 429 });
@@ -33,30 +33,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unsupported code format' }, { status: 422 });
     }
 
-    let batch = null;
+    const supabase = await createClient();
+    let batch: BatchNode | null = null;
+
     if (parsed.by === 'id') {
-      const doc = await adminDb.collection('batches').doc(parsed.value).get();
-      if (doc.exists) {
-        batch = { id: doc.id, ...doc.data() };
-      }
+      batch = await getBatchById(parsed.value);
     } else { // parsed.by === 'batchNumber'
       const candidates = candidateBatchNumbers(parsed.value);
       for (const cand of candidates) {
         // Try to find by string batchNumber
-        let snapshot = await adminDb.collection('batches').where('batchNumber', '==', cand).limit(1).get();
-        if (!snapshot.empty) {
-          batch = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+        let { data } = await supabase.from('batches').select("id").eq("batch_number", cand).limit(1).single();
+        if (data) {
+          batch = await getBatchById(data.id);
           break;
         }
 
         // If batchNumber is stored as a number, try that too
         const numCand = Number(cand);
         if (!isNaN(numCand)) {
-            snapshot = await adminDb.collection('batches').where('batchNumber', '==', numCand).limit(1).get();
-            if (!snapshot.empty) {
-                batch = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                break;
-            }
+          let { data: dataNum } = await supabase.from('batches').select("id").eq("batch_number", numCand).limit(1).single();
+          if (dataNum) {
+            batch = await getBatchById(dataNum.id);
+            break;
+          }
         }
       }
     }
@@ -76,7 +75,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const clean = declassify({ id: (batch as any).id, ...(batch as any) });
+    // Map to clean structure (already camelCase from service)
+    const clean = batch;
+
     const summary = {
       id: clean.id,
       batchNumber: clean.batchNumber,

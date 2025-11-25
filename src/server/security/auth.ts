@@ -1,14 +1,26 @@
 import type { NextRequest } from "next/server";
-import { adminAuth } from "@/server/db/admin";
-import type { DecodedIdToken } from "firebase-admin/auth";
+import { createClient } from "@/lib/supabase/server";
+import type { User } from "@supabase/supabase-js";
 
-export async function getUserFromRequest(req: NextRequest): Promise<DecodedIdToken | null> {
+export async function getUserFromRequest(req: NextRequest): Promise<User | null> {
   try {
     const h = req.headers.get("authorization") || "";
     const m = /^bearer\s+(.+)$/i.exec(h);
     const token = m?.[1]?.trim();
-    if (!token) return null;
-    return await adminAuth.verifyIdToken(token);
+
+    const supabase = await createClient();
+
+    if (token) {
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (error || !user) return null;
+      return user;
+    }
+
+    // Fallback to cookie session if no bearer token
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    return user;
+
   } catch {
     return null;
   }

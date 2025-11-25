@@ -37,7 +37,7 @@ export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
 
   try {
     // Call the Supabase RPC function to atomically increment the counter
-    const { data: newSeq, error } = await supabase.rpc('increment_org_counter', {
+    const { data: newSeq, error } = await supabase.rpc('increment_counter', {
       p_org_id: orgId,
       p_key: counterKey,
     });

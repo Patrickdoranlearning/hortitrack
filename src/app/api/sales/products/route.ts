@@ -1,21 +1,10 @@
 // src/app/api/sales/products/route.ts
 import { NextResponse } from "next/server";
-import { createSupabaseServerWithCookies, type CookieBridge } from "@/server/db/supabaseServerApp";
-import { cookies } from "next/headers";
-
-function getSupabaseForApp() {
-  const store = cookies();
-  const cookieBridge: CookieBridge = {
-    get: (n) => store.get(n)?.value,
-    set: (n, v, o) => store.set(n, v, o),
-    remove: (n, o) => store.set(n, "", { ...o, maxAge: 0 }),
-  };
-  return createSupabaseServerWithCookies(cookieBridge);
-}
+import { getSupabaseServerApp } from "@/server/db/supabase";
 
 export async function GET() {
   try {
-    const supabase = getSupabaseForApp();
+    const supabase = getSupabaseServerApp();
     const { data, error } = await supabase
       .from("v_sku_available")
       .select("sku_code, description, available_qty")

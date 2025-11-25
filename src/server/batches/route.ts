@@ -1,4 +1,4 @@
-import { adminDb } from "@/server/db/admin";
+import { createClient } from "@/lib/supabase/server";
 
 type AnyDate = Date | string | number | null | undefined;
 const toDate = (v: AnyDate) => (v ? new Date(v as any) : null);
@@ -18,17 +18,7 @@ const weekLabel = (d: AnyDate) => {
   return `${year}-W${String(week).padStart(2, "0")}`;
 };
 
-export type BatchNode = {
-  id: string;
-  batchNumber?: string | number | null;
-  plantVariety?: string | null;
-  sowDate?: string | null;
-  plantingDate?: string | null;
-  producedAt?: string | null;
-  potSize?: string | number | null;
-  supplierName?: string | null;
-  supplierId?: string | null;
-};
+// BatchNode imported from service
 
 export type BatchEdge = {
   from: string;
@@ -52,39 +42,17 @@ export type BatchRoute = {
   };
 };
 
-async function readBatch(id: string): Promise<BatchNode | null> {
-  const snap = await adminDb.collection("batches").doc(id).get();
-  if (!snap.exists) return null;
-  const d = snap.data() || {};
-  const supplierName =
-    d.supplier?.name ?? d.supplierName ?? d.vendorName ?? null;
-  const supplierId =
-    d.supplier?.id ?? d.supplierId ?? d.vendorId ?? null;
-  return {
-    id: snap.id,
-    batchNumber: d.batchNumber ?? null,
-    plantVariety: d.plantVariety ?? d.variety ?? null,
-    sowDate: d.sowDate ?? null,
-    plantingDate: d.plantingDate ?? null,
-    producedAt: d.producedAt ?? d.harvestDate ?? null,
-    potSize: d.size ?? d.potSize ?? null,
-    supplierName,
-    supplierId,
-  };
-}
+import { getBatchById, getBatchLogs, BatchNode } from "@/server/batches/service";
 
-async function readLogs(id: string) {
-  return adminDb
-    .collection("batches").doc(id).collection("logs")
-    .orderBy("at", "asc").limit(1000).get()
-    .catch(() => ({ empty: true, docs: [] } as any));
-}
+// ... (keep types BatchEdge, BatchRoute)
 
-function findParentCandidate(batchDoc: any, logs: FirebaseFirestore.QuerySnapshot) {
-  const explicit = batchDoc?.parentBatchId || batchDoc?.sourceBatchId || batchDoc?.previousBatchId || null;
+// Removed local readBatch and readLogs
+
+function findParentCandidate(batch: BatchNode, logs: any) {
+  const explicit = batch.parentBatchId;
   let fromLog: string | null = null;
   for (const doc of logs.docs) {
-    const ev = doc.data() as any;
+    const ev = doc.data();
     if (ev?.kind === "action" && ["transplant", "split", "propagate", "move"].includes(ev.action)) {
       fromLog = ev?.fromBatchId || ev?.sourceBatchId || null;
       if (fromLog) break;
@@ -115,13 +83,27 @@ export async function buildBatchRoute(batchId: string, maxDepth = 3): Promise<Ba
 
   while (currentId && level <= maxDepth) {
     if (!isValidId(currentId)) break;
-    const batchSnap = await adminDb.collection("batches").doc(currentId).get();
-    if (!batchSnap.exists) break;
-    const batchDoc = batchSnap.data() || {};
-    const node = await readBatch(currentId);
-    if (node) nodes[currentId] = node;
 
-    const logs = await readLogs(currentId);
+    // Use shared service
+    const node = await getBatchById(currentId);
+    if (!node) break;
+    nodes[currentId] = node;
+
+    const rawLogs = await getBatchLogs(currentId, 1000);
+    // Map logs to legacy structure expected by loop
+    const logs = {
+      docs: rawLogs.map(l => ({
+        data: () => ({
+          kind: "action",
+          action: l.action,
+          at: l.date,
+          notes: l.note,
+          fromBatchId: l.from_batch_id,
+          sourceBatchId: l.source_batch_id,
+          payload: l.payload
+        })
+      }))
+    };
 
     if (node?.sowDate) timeline.push({ at: node.sowDate, week: weekLabel(node.sowDate), action: "sow", batchId: currentId });
     if (node?.plantingDate) timeline.push({ at: node.plantingDate, week: weekLabel(node.plantingDate), action: "plant", batchId: currentId });
@@ -136,16 +118,16 @@ export async function buildBatchRoute(batchId: string, maxDepth = 3): Promise<Ba
       }
     }
 
-    const parentId = findParentCandidate(batchDoc, logs);
+    const parentId = findParentCandidate(node, logs);
     const viaEdge: BatchEdge | null = parentId
       ? {
-          from: parentId,
-          to: currentId,
-          action: "transplant",
-          at: batchDoc?.transplantedAt || (logs.docs.find((d) => (d.data() as any)?.action === "transplant")?.data() as any)?.at || null,
-          week: weekLabel(batchDoc?.transplantedAt || (logs.docs.find((d) => (d.data() as any)?.action === "transplant")?.data() as any)?.at || null),
-          notes: null,
-        }
+        from: parentId,
+        to: currentId,
+        action: "transplant",
+        at: batchDoc?.transplantedAt || (logs.docs.find((d) => (d.data() as any)?.action === "transplant")?.data() as any)?.at || null,
+        week: weekLabel(batchDoc?.transplantedAt || (logs.docs.find((d) => (d.data() as any)?.action === "transplant")?.data() as any)?.at || null),
+        notes: null,
+      }
       : null;
 
     ancestry.push({ level, node: node!, via: viaEdge });

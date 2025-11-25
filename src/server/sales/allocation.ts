@@ -1,27 +1,7 @@
 // src/server/sales/allocation.ts
 import "server-only";
-import { adminDb } from "@/server/db/admin";
 import type { Allocation } from "@/lib/sales/types";
-
-// Minimal FEFO+grade policy using what we have in batches:
-// - status in ["Ready for Sale", "Looking Good"]
-// - qcStatus not "Rejected" / "Quarantined"
-// - Prefer older plantingDate, then older createdAt
-// - Prefer higher grade lexicographically (A > B > C) if present
-type BatchDoc = {
-  id: string;
-  batchNumber?: string;
-  plantVariety?: string;
-  size?: string;
-  status?: string;
-  qcStatus?: string;
-  quantity?: number;
-  grade?: string;
-  location?: string;
-  plantingDate?: string;
-  createdAt?: any;
-  hidden?: boolean;
-};
+import { getSaleableBatches, InventoryBatch } from "@/server/sales/inventory";
 
 function toTs(d: any): number {
   try {
@@ -32,6 +12,8 @@ function toTs(d: any): number {
   } catch { return 0; }
 }
 
+// ...
+
 export async function allocateForProductLine(params: {
   plantVariety: string;
   size: string;
@@ -39,22 +21,15 @@ export async function allocateForProductLine(params: {
 }): Promise<Allocation[]> {
   const { plantVariety, size, qty } = params;
 
-  // 1) Query by variety + size (index-friendly); filter in memory for status/flags.
-  const snap = await adminDb
-    .collection("batches")
-    .where("plantVariety", "==", plantVariety)
-    .where("size", "==", size)
-    .get();
+  // 1) Get all saleable batches and filter by variety/size
+  const allSaleable = await getSaleableBatches();
 
-  const candidates: BatchDoc[] = [];
-  snap.forEach((d) => candidates.push({ id: d.id, ...(d.data() as any) }));
-
-  const saleable = candidates
+  const saleable = allSaleable
     .filter((b) =>
-      (b.status === "Ready for Sale" || b.status === "Looking Good") &&
+      b.plantVariety === plantVariety &&
+      b.size === size &&
       (b.qcStatus !== "Rejected" && b.qcStatus !== "Quarantined") &&
-      !b.hidden &&
-      (typeof b.quantity === "number" && b.quantity > 0)
+      !b.hidden
     )
     .sort((a, b) => {
       // Prefer older plantingDate (FEFO-like), then createdAt; then grade; then batchNumber

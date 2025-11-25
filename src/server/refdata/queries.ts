@@ -1,4 +1,4 @@
-import { getSupabaseServerApp } from "@/server/db/supabaseServerApp";
+import { getSupabaseServerApp } from "@/server/db/supabase";
 import { snakeToCamel } from "@/lib/utils";
 
 // Global search (no org filter)
