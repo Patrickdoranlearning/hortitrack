@@ -1,0 +1,492 @@
+HortiTrack
+Horticulture ERP Build Document
+
+
+
+
+
+Completed By: Patrick Doran
+
+
+Contents
+Overview	3
+1	Modules	3
+1.1	Production Module (Rollout 1)	3
+1.2	Sales Module (Rollout 1)	4
+1.3	Webshop (Rollout 1)	4
+1.4	Data management (Rollout 1)	5
+1.5	Production Planning (Rollout 2)	5
+1.6	Dispatch Module (Rollout 2)	5
+1.7	Plant Health Module (Rollout 3)	5
+2	App infrastructure	5
+3	Global UI	6
+3.1	Headers strips	6
+3.2	Mobile & Desktop	6
+3.3	7
+Production Module	7
+1	Fundamentals / Goals	7
+2	Core Concepts:	7
+2.1	Batch Numbers:	7
+2.2	Plant Passport:	8
+2.3	Ancestry:	8
+3	Cards & Features	9
+3.1	Plant Passport mini- Card — Batchdetaildialogue/SummaryTab	9
+3.2	Placement	9
+3.2.1	Passport Fields (always visible)	9
+3.2.2	UI Layout & Design	9
+3.2.3	Interactions	10
+3.3	Data handling	10
+3.4	Ancestry Tab — BatchDetailDialogue/Ancestry (Hortitrack)	10
+3.5	New Batch Feature — Developer-Oriented Spec	12
+3.5.1	New Batch Button	12
+4	Forms	13
+4.1	Propagation Form	13
+4.1.1	Description	13
+4.1.2	Fields	13
+4.2	Check-in Form	13
+4.2.1	Description	13
+4.2.2	Fields	13
+4.3	Transplant Form:	15
+4.3.1	Fields	15
+5	Templates	16
+5.1	Module Page Template (to be completed)	16
+5.2	Pill UI: (to be completed)	16
+
+Overview
+1	Modules
+1.1	Production Module (Rollout 1)
+o	Tracks plants from seed/cutting/purchase to sale
+o	Scan / Search  / Filter Batches
+o	Traceability:
+	Batch numbers
+	Tracks plants ancestry
+	Plant Passports
+o	Pages:
+	Production/ (Home)
+	Production/Dashboard
+	Production/Data
+	Production/Data/
+	Production/Settings
+	
+	
+o	Dialogue Box:
+	Batch Detail Dialogue Box
+o	Forms:
+	Propagation Form
+	Check-In Form
+	Transplant Form
+	Batch Edit Form
+o	Cards:
+	Batch Cards
+	Ancestry Cards
+1.2	Sales Module (Rollout 1)
+o	Allows nursery users manage orders
+o	Scan / Search / Track / Invoice Orders
+o	Pages:
+	Sales/(Home)
+	Sales/Invoice
+	Sales/Credit Note
+	Sales/Pick Order
+	Sales/Dashboard
+o	Dialogue Box:
+	Order Detail Dialogue Box
+	Pick Order Dialogue Box
+o	Forms:
+	Edit Order Form
+	Invoice Form
+	Pick Order Substitute Form
+	QC Form
+o	Cards:
+	Order Card
+	Pick Order Card
+1.3	Webshop (Rollout 1)
+o	Nursery staff
+	Can create orders for customers
+•	Create an order then assign it to a customer’s Account
+o	Customers
+	Can create orders for themselves
+	Can check order status
+	Auto generate order confirmation
+o	
+o	Products can be ordered by product or individual batches
+o	Pages:
+	Webshop/(Home)
+	Webshop/Create Order
+	Webshop/Cart
+	Webshop/Order Confirmation
+	Webshop/Invoices
+o	Dialogue Box:
+	Your Order Detail Dialogue Box
+o	Forms:
+	Edit Order Form
+o	Cards:
+	Order Product card
+•	Drop down Batches under that product
+	Recent Orders Cards
+1.4	Data management (Rollout 1)
+1.5	Production Planning (Rollout 2)
+o	Builds recipes
+	Application will fine tune the recipes
+•	Using AI to optimise growing windows and conditions
+1.6	Dispatch/Logistics Module (Rollout 2)
+1.7	Plant Health Module (Rollout 3)
+o	Track Plant Health
+	Take photos of batches
+•	Analyse Photos so that we can determine rate of growth
+	Log and flag Issues
+	Assign tasks to employees
+2	App infrastructure
+•	Hosting on Firebase
+•	Photos stored on Firebase/Supabase
+•	Database on Supabase
+•	User Authentication on Firebase
+3	Global UI
+The Application will have a global UI Template which will give users a familiar feeling as they navigate through the app.
+3.1	Headers strips
+There will be 2 header strips
+o	Top strip: 
+	Left: Hortitrack log with name of company
+	Right: Profile photo - User menu
+o	Bottom Strip: Navigation strip
+	Modules Names  - will direct you to any of the modules you have access to.
+	Hover on Module name and it will drop down specific pages of that module
+	Clicking on the Module name will bring you to the Module Home
+	Navigation strip will become menu a button in the top strip when the user is on a smaller screen
+•	The button will slide out a side tab with the module names listed
+o	When you tab on the module name it drops down the specific pages of that module.
+3.2	Mobile & Desktop
+Application will be built for both Mobile and Desktop
+o	Optimised for mobile as most traffic will come from mobile users
+	Pages of Particular importance for mobile optimization
+•	Production
+•	Plant Health
+•	Webshop
+o	Management modules
+	Pages that will generally be accessed by desktop
+•	Production Planning
+•	Dispatch
+•	Sales
+3.3	Pills
+Pills will be used throughout the app to show status/phase/other information on Cards/Dialogue boxes. Pills can be display only or they can allow users to quickly change the information of certain fields. 
+Pills are coloured based on the status or phase they are representing. 
+3.3.1	Standard Pills (Display Only)
+•	These pills give the users a quick and easy way to interoperate the data. 
+•	Is the batch looking good/ is it growing?
+3.3.2	Editable Pills
+•	These will be a form of dropdown pill
+•	Pressing on the down arrow will allow you to quickly change the status of a batch for example. 
+3.4	Buttons
+Buttons will take one of the following forms:
+3.4.1	Standard Button
+•	These are green rectangular buttons with rounded edges
+•	They will give the user a quick route to perform a task like filling in a form.
+3.4.2	Dropdown buttons
+•	These are green rectangular buttons with a dropdown arrow on the right to indicate that the button has more than one option
+•	Create Batch has two options for example
+3.4.3	Icon Button
+•	Small buttons that are used on cards to give users quick options
+•	These will be green with a white icon
+
+
+3.5	Combo Boxes
+•	Combo Boxes will be populated in two ways
+o	Simple / Static Data:
+	These combo boxes will be built into the application
+	The will be data the is universal across the application
+	You can add to static data combo boxes by using the add option button which will be visible at the bottom of the combo box list
+•	This will bring you to a page with all of the options for that combo box and it will allow you to add new options. 
+o	Dynamic Data:
+	This will be data that is stored in the database
+•	Eg. Customer Names, Variety Names
+	These will generally have more options that static data fields
+	If the combo box does not have the data that you require it will bring you to the correct form that will allow you to add the data to the database which in turn will update the combo box. 
+•	Combo boxes will be scrollable dropdown menus that have a search function.
+•	The user will be able to search for an option then click on their choice. 
+Production Module
+1	Fundamentals / Goals
+•	Production Home with Scanner, Search, Batch Card Matrix Layout, and AI Chat.
+•	Batch Cards with quick actions.
+•	Batch Summary Dialog with tabs: Summary, Log History, Photos, Ancestry, Quality.
+•	Create Batches via Propagation and Check in forms.
+•	Transplant form
+•	Batch Quality Form
+•	Full end-to-end traceability: batches tracked from propagation/check-in through every action until dispatch.
+•	Event sourcing: every action is an append-only BatchEvent.
+•	Growth intelligence: capture performance data, generate QualityScores, and enable batch performance comparisons.
+•	Optional edge-camera integration: computer vision summaries processed locally and uploaded.
+•	Manages plant batches end-to-end (create, view, edit, transplant, archive).
+•	Fast batch lookup & scanning (camera + WASM fallback)
+•	QR/Data Matrix generation and Zebra label printing.
+•	Batch detail Dialogue
+o	 History log, ancestry, photos, flagging, AI chat & care suggestions, and production protocol (JSON/PDF) generation.
+•	Varieties (import/export CSV where implemented).
+•	Dashboard with live metrics & charts (family/size distribution, losses).
+2	Core Concepts:
+2.1	Batch Numbers:
+•	Batch Numbers Autogenerate
+•	Example: <Phase>-<YYWW>-<seq5> 1-2525-00001
+•	Phase: Propagation 1, Plug/liner 2, potted 3
+•	YY Year
+•	WW week
+•	Auto increment will increase by 1 for each new batch it will have 5 digits 
+2.2	Plant Passport:
+•	Passport fields:
+o	A) Family (from Variety)
+o	B) Producer Code (from Supplier) Defaults to IE2727 Doran Nurseries Producer Code
+o	C) Supplier Batch No. (Batch Number)
+o	D) Country Code (from Supplier) Defaults to IE
+2.3	Ancestry:
+•	Horizontal mini-Batch-cards: Current → predecessor (−1) → (−2) …; click opens that batch
+•	When the user clicks on mini-batch-card it should navigate the user to the batch summary of that batch. 
+•	Mini Batch cards must display
+o	Batch number
+o	Variety
+o	Family
+o	Size
+o	Supplier
+o	Production Week
+ 
+3	Cards & Features
+3.1	Plant Passport mini- Card — Batchdetaildialogue/SummaryTab
+Plant Passport Card for the Summary tab inside the Batch Detail Dialogue so it feels consistent with the rest of Hortitrack and surfaces all four passport fields cleanly.
+3.2	Placement
+•	Appears in the Summary tab of the Batch Detail Dialogue.
+•	Displayed below the key batch details (Batch #, Variety, Size, Status).
+•	Compact but distinct card with EU plant passport styling cues.
+3.2.1	Passport Fields
+•	A) Family → pulled from Variety (DB: batch.family).
+•	B) Producer Code → from Supplier.
+o	Defaults to IE2727 Doran Nurseries Producer Code if supplier has no custom code.
+•	C) Supplier Batch No. → the Batch Number.
+•	D) Country Code → from Supplier.
+o	Defaults to IE (Ireland).
+3.2.2	UI Layout & Design
+Card container
+•	shadcn/ui Card with rounded corners (rounded-2xl), soft shadow, pale neutral background (bg-[#E5E8E3]).
+•	Header: “Plant Passport” with a small leaf icon (lucid-react leaf).
+Inside the card (2-column grid):
+•	Labels: muted grey, small text.
+•	Values: bold, darker text (Playfair font).
+•	Subtle divider lines between rows.
+3.2.3	Interactions
+•	Read-only: Fields are informational, not editable here.
+3.3	Data handling
+•	Defaults applied automatically:
+o	If Supplier has no Producer Code → show IE2727 Doran Nurseries Producer Code.
+o	If Supplier has no Country Code → fallback to IE.
+•	Supplier Batch No. always equals the Batch Number in Hortitrack.
+
+3.4	Ancestry Tab — BatchDetailDialogue/Ancestry (Hortitrack)
+Tabs present: Summary · Log History · Photos · Ancestry
+Objective: Give users a fast, visual way to see and traverse a batch’s lineage (current → predecessor −1 → −2 …), with compact cards and one click navigation to any ancestor.
+ 
+3.4.1.1	Product goals
+•	Clarity: Show a linear chain from the current batch back to its predecessors (−1, −2, …).
+•	Speed: One click on a mini batch card opens the Batch Detail Dialogue for that batch.
+•	Signal: Each card shows Batch #, Variety, Family, Size, Supplier, Production Week.
+•	Robustness: Handle no ancestry, long chains, partial data, archived ancestors.
+ 
+3.4.1.2	Non code interaction spec (what happens when users click an ancestor)
+1.	User action: Clicks a mini batch card in the Ancestry scroller.
+2.	Immediate feedback:
+o	The clicked card gets a subtle pressed state for 150–200ms (scale 0.98) and shows a loading spinner at top right.
+o	Cursor switches to progress on desktop.
+3.	Dialogue continuity:
+o	The same Batch Detail Dialogue remains open (no page navigation).
+o	Title updates to the new batch number & variety.
+o	The dialogue size and position remain unchanged, preserving user context.
+4.	Tab behavior (configurable):
+o	Default: land on Summary tab of the newly opened batch.
+o	Optional setting: stay on Ancestry tab when navigating through ancestors.
+5.	Focus & a11y:
+o	Keyboard focus moves to the dialogue header of the new batch (announce via ARIA live region: “Opened batch 1250001 — Veronica spicata”).
+6.	History/back:
+o	A lightweight Back control appears in the dialogue header after the first navigation, enabling step back to the previously viewed batch.
+o	Back preserves the tab the user was on before the click.
+7.	Analytics: Log ui.ancestry.card_click with { fromBatchId, toBatchId, cardIndex }.
+ 
+3.4.1.3	UI layout & states (recap)
+•	Horizontal scroller: Current → Parent −1 → Parent −2 → … with chevrons between cards.
+•	Mini card content:
+o	Batch # (prominent) • Size
+o	Variety (truncated)
+o	Family • Supplier • Production Week
+•	Badges: status (Active/Archived/Dispatched).
+•	Current batch visually accented; current card is non clickable.
+States: Loading (skeletons), Empty, Error with retry.
+ 
+3.4.1.4	Rules & edge cases for navigation
+•	Ancestor unavailable (permissions or archived in cold storage): show a locked/disabled card with tooltip “You don’t have permission to open this batch.”
+•	Circular data guard: if clicking would re open the same batch, ignore and show a gentle toast “Already viewing this batch.”
+•	Missing metadata: if Supplier or Production Week is missing, do not block navigation; simply omit those fields.
+•	Multi parent lineages (future): if more than one parent exists, clicking the branch selector changes which linear chain populates the scroller. Clicking a card still opens that exact batch.
+ 
+3.4.1.5	Copy & micro interactions
+•	Tooltip on cards: Open batch {batchNumber}.
+•	Toast on load failure: “Couldn’t open that batch. Please try again.”
+•	Header subtitle pattern after navigation: {Variety} · {Size} · {Production Week}.
+3.4.1.6	Acceptance criteria (non code)
+•	Clicking any ancestor mini card opens the Batch Detail Dialogue for that ancestor without closing the dialogue container.
+•	The dialogue header updates to the target batch’s identity immediately after navigation.
+•	The user can Back to the previously opened batch within the same dialogue.
+•	Keyboard and screen reader users receive appropriate focus management and announcements.
+•	Disabled/locked ancestors cannot be opened and communicate why.
+3.4.1.7	QA scenarios the engineer should test
+1.	Batch with no ancestry → only current card shown; click disabled.
+2.	Chain of 1–3 ancestors → smooth navigation through all, Back works.
+3.	Long chain (20+ nodes) → horizontal scrolling responsive; performance acceptable.
+4.	Archived ancestor → opens fine but card is visually muted beforehand.
+5.	Permission restricted ancestor → disabled card + tooltip; cannot be opened.
+6.	Keyboard navigation → Tab to cards, Enter/Space opens; focus moves to header; Shift+Tab returns to tabs.
+7.	Error state (simulate failure) → toast + retry leaves user on current batch.
+3.5	New Batch Feature — Developer-Oriented Spec
+3.5.1	New Batch Button
+•	Keep current location on Home page, no visual change.
+•	On click → open modal with two options: Propagation Batch and Check-in Batch.
+•	Options presented as large selectable cards with icons and descriptions.
+•	Selection loads the respective form in a dialogue.
+ 
+ 
+4	Forms
+4.1	Propagation Form
+4.1.1	Description
+Propagation form will be used to populate the batches table. This form will be used to create new batches of plants that have been produced by propagation means. They will all have propagation phase and growing status. 
+4.1.2	Fields
+•	Auto-generate Batch Number in pattern 1-YYYY-#####.
+•	Phase is always “Propagation” and locked.
+•	Variety field should be searchable with autosuggest.
+o	Selecting variety auto-populates Family and category.
+o	Provide “+ Add New Variety” option if not found.
+o	Data from plant_varieties Table
+•	Location field is searchable and autosuggest-enabled.
+o	Data from nursery_locations Table
+•	Size field only shows Propagation trays.
+o	Each tray has an associated size multiple (units per tray).
+o	Data from plant_Size Table
+•	Quantity field accepts number of trays.
+•	Total Quantity auto-calculates = Quantity × size multiple.
+o	Support optional “Partial trays” toggle → allows Full trays + Partial cells.
+•	Supplier field defaults to “Doran Nurseries”.
+•	Planting Date uses date picker.
+•	On save:
+o	Auto-populate a plant passport (Family, Producer Code IE2727, our Batch Number, Country IE).
+4.2	Check-in Form
+4.2.1	Description
+The check-in form will be used to populate the batches table. This form will be used when new plants have come in from suppliers. It should populate the batches table. We should allocated a doran nurseries batch number to the batch and the supplier. The 
+4.2.2	Fields
+•	Variety field works the same as in Propagation form.
+•	Location field defaults to T21 Holding, searchable.
+•	Size field shows all sizes.
+o	Order: Pots → Plug trays → Propagation trays.
+o	Each size includes size multiple.
+•	Phase field allows Propagation, Plug/Linear, or Potted.
+•	Quantity field accepts number of containers (pots or trays).
+•	Total Quantity auto-calculates = Quantity × size multiple.
+o	Pots default to 1 unit per container.
+o	Add optional manual override for Total Quantity (restricted by permission).
+•	Supplier field is a searchable dropdown.
+•	Supplier_batch_number
+o	This field allows us to upload the supplier batch number
+•	Incoming Date is a date picker.
+•	Photos field allows up to 3 uploads.
+•	Passport fields are captured from supplier:
+o	Family (auto from Variety, editable).
+o	Producer Code (auto from Supplier, editable).
+o	Supplier Batch Number (user input, stored as Batch −1 reference).
+o	Country Code (auto from Supplier, editable).
+•	Quality inspection includes pest/disease checkbox and star rating (1–6).
+•	On save:
+o	Create a CHECKIN event with supplier passport details, photos, and quality data.
+o	Mark current batch passport as “Supplier Source.”
+ 
+4.2.2.1	Quantity Handling
+•	Each Size has a size_multiple stored in system.
+•	Quantity = number of containers.
+•	Total Quantity = Quantity × size_multiple.
+•	For partial trays: allow input of Full trays only
+•	For pots: multiple = 1, so Quantity = Total Quantity.
+•	For check-in with override permission: allow editing of Total Quantity directly, store quantity_overridden = true.
+•	Always snapshot size_multiple_at_start on batch creation to avoid future catalog drift.
+•	Store both containers_start and units_start in batch record.
+•	Initialize units_current = units_start.
+•	Adjustments after creation handled by COUNT, LOSS, SPLIT, MERGE, or UPPOT events.
+ 
+4.2.2.2	Plant Passport Lifecycle
+•	Propagation batches always get internal passport on creation.
+o	Family from Variety, Producer Code = IE2727, Supplier Batch No. = our Batch Number, Country = IE.
+•	Check-in batches start with supplier passport as current passport.
+o	Supplier passport remains valid until either a Transplant/Up-pot/Potting event occurs or 12 weeks have elapsed since check-in.
+•	On transplant or time threshold:
+o	Archive supplier passport into historical_passports.
+o	Generate new internal passport (IE2727 / IE / our Batch Number).
+o	Update batch passport_source = Internal.
+o	Create audit log event noting passport switch (with actor + timestamp).
+ 
+4.2.2.3	Summary Tab — Passport Card
+•	Always display Plant Passport card in Summary tab of Batch Detail Dialogue.
+•	Show Family, Producer Code, Supplier Batch No., Country Code.
+•	Add a Source badge → “Supplier” or “Internal”.
+•	If Supplier source → display note “Supplier passport applies until transplant.”
+•	If Internal source → provide link to “View historical supplier passport” (opens in Log History).
+4.3	Transplant Form:
+The Transplant form will take an existing batch, and create an New batch from that batch. Transplanting is the act of taking a small cell and putting it into a bigger cell. This could be a propagation cell to a plug cell, a plug cell to a pot cell, or a propagation cell into a pot cell. Generally when plants are transplanted they change phase. 
+We can transplant an entire batch or part of a batch. When transplanting we should have an option to mark rest of batch as dumped which logs the difference between (Available stock – transplanted stock) and the batch should be archived. 
+4.3.1	Fields
+•	Batch number – New batch number for the transplanted batch
+•	Batch number -1 
+o	Automatically carried over when using button on batch card. 
+o	Scanner option when press the transplant form button on the production home page
+o	There can be multiple cells from different batches put into the same pot at times. This makes it slightly confusing. 
+o	This information is used to populate the ancestry cards
+•	Size – (New size) combo box with Size options (this populates the Phase field)
+•	Location – (new location) Combo box with location options
+•	Phase – (Linked to the size)
+•	Status – Defaults to growing
+•	Plant Passport overwrite option
+4.3.1.1	Quantity Handling
+•	Each Size has a size_multiple stored in system.
+•	Quantity = number of containers.
+•	Total Quantity = Quantity × size_multiple.
+•	Allow input of Full trays only
+•	For pots: multiple = 1, so total Quantity produced = Input Quantity * 1 
+•	For trays: example 273 Tray, multiple = 273, so total quantity produced = input quantity * 273
+Phase & Status will be displayed as pills.
+
+Sales Module
+1	Core Functionality
+The sales module will help the nursery track orders, plants, and customer transactions. The sales module needs to be imagined through a number of lens’. Nursery Management, Nursery Pickers, Nursery Sales & Customers
+•	The Sales Module will be the home of sales orders. We will be able to do the following
+o	Create Orders
+o	View Orders
+o	Pick Orders
+•	Customers will be able to place orders through the Webshop
+•	Traceability is a key element for this module.
+o	We must be able to assign batches to customers’ orders.
+o	This module will log the batches that are dispatched to each customer
+•	Nursery Pickers will be able to view orders assigned to them. 
+o	They will get a pick list
+o	From the pick list they go to batches and pick these batches for orders. They will confirm the batch when it was fit for sale
+o	They will substitute if that batch is not saleable. 
+	When they substitute this will be flagged on the invoice
+•	Invoicing, Credit notes & Delivery dockets
+o	Orders can be converted to invoices, delivery notes
+o	If a customer has an issue with an order we can use a credit note page to credit items from a particular order. 
+•	Data management
+o	We will be able to create products and allocated batches to those products. 
+
+2	
+
+
+Webshop Module
+1	Core Functionality
+The Webshop will be the sales hub of the nursery it will allow customers to place orders and give customers access to their invoices. 
+•	Order Page:
+o	The order page will allow customers to place orders on our site. 
+o	They can place orders for products
+	If they want to select batches they can do so by clicking on the select batch button on the which will be on the product card
+	This will then drop down all of the batches that are under that product card
+o	They can filter products/ batches by name / size/ family
+•	Products:
+o	Products will be created to reduce the total number of products that we have
+o	Products can have alias’ which certain customers can order under
+o	Product pricing will be stored by customer
