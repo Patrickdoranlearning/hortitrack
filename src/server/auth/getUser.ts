@@ -6,7 +6,7 @@ import { UUID } from "crypto";
 export type ServerUser = { uid: string; email?: string; orgId?: string };
 
 export async function getUserIdAndOrgId(): Promise<{ userId: string | null; orgId: string | null }> {
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 

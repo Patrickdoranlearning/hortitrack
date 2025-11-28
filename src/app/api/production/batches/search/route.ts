@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const sb = getSupabaseForRequest();
+  const sb = await getSupabaseForRequest();
 
   // base select with exact count for pagination
   let query = sb.from("v_batch_search")

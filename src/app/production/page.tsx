@@ -1,31 +1,66 @@
 
-"use client"
+"use client";
 
-import * as React from "react"
-import { z } from "zod"
-import { PageFrame } from "@/ui/templates/PageFrame"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { DialogForm } from "@/ui/templates/DialogForm"
-import { createPropagationBatchAction } from "@/app/actions/production"
-import { useToast } from "@/hooks/use-toast"
+import * as React from "react";
+import { PageFrame } from "@/ui/templates/PageFrame";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { DialogForm } from "@/ui/templates/DialogForm";
+import { createPropagationBatchAction } from "@/app/actions/production";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
+import { propagationFormSchema } from "@/app/production/forms/propagation-schema";
 
-// Match the backend PropagationFormSchema requirements
-const newBatchSchema = z.object({
-  variety: z.string().min(1, "Required"),
-  family: z.string().optional(),
-  sizeId: z.string().min(1, "Required"), // Treat as Size Name for now if IDs not available
-  sizeMultiple: z.coerce.number().int().positive("Must be > 0"),
-  fullTrays: z.coerce.number().int().min(0),
-  partialCells: z.coerce.number().int().min(0).default(0),
-  locationId: z.string().min(1, "Required"),
-  plantingDate: z.string().min(1, "Required"), // Date picker would be better
-})
+type VarOption = { id: string; name: string; family?: string | null };
+type SizeOption = {
+  id: string;
+  name: string;
+  cellMultiple: number;
+  containerType?: string | null;
+};
+type LocationOption = {
+  id: string;
+  name: string;
+  nurserySite?: string | null;
+};
 
 export default function ProductionHome() {
-  const { toast } = useToast()
+  const { toast } = useToast();
+  const { data: refData, loading: refLoading } = React.useContext(ReferenceDataContext);
+
+  const varietyOptions = React.useMemo<VarOption[]>(() => {
+    return (refData?.varieties ?? []).map((v: any) => ({
+      id: v.id,
+      name: v.name,
+      family: v.family ?? v.family_name ?? null,
+    }));
+  }, [refData?.varieties]);
+
+  const sizeOptions = React.useMemo<SizeOption[]>(() => {
+    return (refData?.sizes ?? []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      containerType: s.containerType ?? s.container_type ?? null,
+      cellMultiple: Number(s.cellMultiple ?? s.cell_multiple ?? s.multiple ?? 1) || 1,
+    }));
+  }, [refData?.sizes]);
+
+  const locationOptions = React.useMemo<LocationOption[]>(() => {
+    return (refData?.locations ?? []).map((l: any) => ({
+      id: l.id ?? l.value ?? "",
+      name: l.name ?? "",
+      nurserySite: l.nurserySite ?? l.nursery_site ?? null,
+    }));
+  }, [refData?.locations]);
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
@@ -34,7 +69,7 @@ export default function ProductionHome() {
         <DialogForm
           title="New Propagation Batch"
           description="Start a new batch from propagation (seed/cuttings)."
-          schema={newBatchSchema}
+          schema={propagationFormSchema}
           defaultValues={{
             variety: "",
             family: "",
@@ -45,7 +80,11 @@ export default function ProductionHome() {
             locationId: "",
             plantingDate: new Date().toISOString().split('T')[0]
           }}
-          trigger={<Button variant="accent">New Batch</Button>}
+          trigger={
+            <Button variant="accent" disabled={refLoading}>
+              New Batch
+            </Button>
+          }
           onSubmit={async (values) => {
             const res = await createPropagationBatchAction({
               ...values,
@@ -64,7 +103,25 @@ export default function ProductionHome() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="col-span-2">
                 <Label htmlFor="variety">Variety</Label>
-                <Input id="variety" {...form.register("variety")} placeholder="e.g. Lavandula angustifolia" />
+                <Select
+                  value={form.watch("variety")}
+                  onValueChange={(value) => {
+                    form.setValue("variety", value, { shouldValidate: true });
+                    const selected = varietyOptions.find((v) => v.name === value);
+                    form.setValue("family", selected?.family ?? "", { shouldDirty: true });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={refLoading ? "Loading varieties..." : "Select a variety"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {varietyOptions.map((v) => (
+                      <SelectItem key={v.id} value={v.name}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FieldError msg={form.formState.errors.variety?.message} />
               </div>
               
@@ -82,7 +139,28 @@ export default function ProductionHome() {
 
               <div>
                 <Label htmlFor="sizeId">Size / Container</Label>
-                <Input id="sizeId" {...form.register("sizeId")} placeholder="e.g. 54-cell" />
+                <Select
+                  value={form.watch("sizeId")}
+                  onValueChange={(value) => {
+                    form.setValue("sizeId", value, { shouldValidate: true });
+                    const selected = sizeOptions.find((s) => s.id === value);
+                    if (selected) {
+                      form.setValue("sizeMultiple", selected.cellMultiple, { shouldDirty: true });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={refLoading ? "Loading sizes..." : "Select a size"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sizeOptions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                        {s.containerType ? ` · ${s.containerType}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FieldError msg={form.formState.errors.sizeId?.message} />
               </div>
 
@@ -106,7 +184,22 @@ export default function ProductionHome() {
 
               <div className="col-span-2">
                 <Label htmlFor="locationId">Location</Label>
-                <Input id="locationId" {...form.register("locationId")} placeholder="e.g. Greenhouse 1" />
+                <Select
+                  value={form.watch("locationId")}
+                  onValueChange={(value) => form.setValue("locationId", value, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={refLoading ? "Loading locations..." : "Select a location"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locationOptions.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.nurserySite ? `${loc.nurserySite} · ` : ""}
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FieldError msg={form.formState.errors.locationId?.message} />
               </div>
             </div>

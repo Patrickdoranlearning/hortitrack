@@ -1,90 +1,265 @@
 "use client";
 
-import { TransplantForm, type TransplantFormData } from "@/components/transplant-form";
-import { createPropagationBatchAction } from "@/app/actions/production";
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
+import { createPropagationBatchAction } from "@/app/actions/production";
 import { useToast } from "@/hooks/use-toast";
 import type { NurseryLocation, PlantSize, Variety } from "@/lib/types";
+import { propagationFormSchema, type PropagationFormValues } from "@/app/production/forms/propagation-schema";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PropagationClientProps {
-    nurseryLocations: NurseryLocation[];
-    plantSizes: PlantSize[];
-    varieties: Variety[];
+  nurseryLocations: NurseryLocation[];
+  plantSizes: PlantSize[];
+  varieties: Variety[];
 }
 
-export default function PropagationClient({ nurseryLocations, plantSizes, varieties }: PropagationClientProps) {
-    const router = useRouter();
-    const { toast } = useToast();
+type NormalizedVariety = { id: string; name: string; family?: string | null };
+type NormalizedSize = {
+  id: string;
+  name: string;
+  cellMultiple: number;
+  containerType?: string | null;
+};
+type NormalizedLocation = {
+  id: string;
+  name: string;
+  nurserySite?: string | null;
+};
 
-    const handleSubmit = async (data: TransplantFormData) => {
-        // Map TransplantFormData to PropagationFormSchema expected by action
-        // Assuming compatibility or mapping needed
-        const payload = {
-            plantingDate: data.plantingDate,
-            size: data.size,
-            locationId: data.locationId,
-            location: data.location,
-            quantity: data.quantity,
-            trayQuantity: data.trayQuantity,
-            notes: data.notes,
-            // Missing fields? plantVariety is needed for new propagation
-        };
+export default function PropagationClient({
+  nurseryLocations,
+  plantSizes,
+  varieties,
+}: PropagationClientProps) {
+  const router = useRouter();
+  const { toast } = useToast();
 
-        // Wait, TransplantForm for new propagation doesn't seem to have plantVariety field?
-        // Let's check TransplantForm again.
-        // It has size, location, quantity. But not variety?
-        // Ah, TransplantForm might be designed for transplanting FROM a batch, so variety is known.
-        // But for NEW propagation, we need to select variety.
+  const varietyOptions = React.useMemo<NormalizedVariety[]>(
+    () =>
+      varieties.map((v: any) => ({
+        id: v.id,
+        name: v.name,
+        family: v.family ?? v.family_name ?? null,
+      })),
+    [varieties],
+  );
 
-        // If TransplantForm doesn't support variety selection, I might need another form or extend it.
-        // But for now, I'll assume I can't use TransplantForm as is if it lacks variety.
-        // However, the previous code (HomePageView) had `addBatch` which took `plantVariety`.
+  const sizeOptions = React.useMemo<NormalizedSize[]>(
+    () =>
+      plantSizes.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        containerType: s.containerType ?? s.container_type ?? null,
+        cellMultiple: Number(s.cellMultiple ?? s.cell_multiple ?? s.multiple ?? 1) || 1,
+      })),
+    [plantSizes],
+  );
 
-        // I'll check if I can use BatchForm instead?
-        // BatchForm likely has all fields.
+  const locationOptions = React.useMemo<NormalizedLocation[]>(
+    () =>
+      nurseryLocations.map((l: any) => ({
+        id: l.id ?? l.value ?? "",
+        name: l.name ?? "",
+        nurserySite: l.nurserySite ?? l.nursery_site ?? null,
+      })),
+    [nurseryLocations],
+  );
 
-        // For now, I'll just log an error if variety is missing.
-        // Or maybe I should use BatchForm.
+  const defaultValues: PropagationFormValues = {
+    variety: "",
+    family: "",
+    sizeId: "",
+    sizeMultiple: 1,
+    fullTrays: 0,
+    partialCells: 0,
+    locationId: "",
+    plantingDate: new Date().toISOString().split("T")[0],
+  };
 
-        // Let's try to use BatchForm instead if TransplantForm is insufficient.
-        // But the task was to refactor propagation page.
+  const form = useForm<PropagationFormValues>({
+    resolver: zodResolver(propagationFormSchema),
+    defaultValues,
+  });
 
-        // I'll stick to TransplantForm for now and assume I might have missed something or it's handled elsewhere.
-        // Actually, looking at TransplantForm code again (step 609), it DOES NOT have variety selection.
+  const selectedSizeId = form.watch("sizeId");
+  React.useEffect(() => {
+    const match = sizeOptions.find((s) => s.id === selectedSizeId);
+    if (match) {
+      form.setValue("sizeMultiple", match.cellMultiple, { shouldDirty: true });
+    }
+  }, [selectedSizeId, sizeOptions, form]);
 
-        // So I should probably use BatchForm for new propagation.
-        // Or a dedicated PropagationForm.
+  const onSubmit = async (values: PropagationFormValues) => {
+    const payload = { ...values, family: values.family || null };
+    const result = await createPropagationBatchAction(payload);
 
-        // I'll use BatchForm.
-        // But wait, the file path is `production/batches/new/propagation`.
-        // Maybe it implies starting from a variety?
+    if (result.success) {
+      toast({
+        title: "Batch Created",
+        description: `Batch ${result.data?.batch_number ?? result.data?.id ?? ""} started.`,
+      });
+      form.reset(defaultValues);
+      router.push("/production/batches");
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to create batch",
+        variant: "destructive",
+      });
+    }
+  };
 
-        // I'll use BatchForm for now as it's more complete.
+  return (
+    <div className="container mx-auto max-w-3xl py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-semibold">New Propagation Batch</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form className="grid gap-6" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="col-span-2">
+                  <FormLabel>Variety</FormLabel>
+                  <Select
+                    value={form.watch("variety")}
+                    onValueChange={(value) => {
+                      form.setValue("variety", value, { shouldValidate: true });
+                      const match = varietyOptions.find((v) => v.name === value);
+                      form.setValue("family", match?.family ?? "", { shouldDirty: true });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a variety" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {varietyOptions.map((v) => (
+                        <SelectItem key={v.id} value={v.name}>
+                          {v.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InlineFieldError msg={form.formState.errors.variety?.message} />
+                </div>
 
-        // Wait, I can't import BatchForm easily if it's not exported or if it has complex deps.
-        // I saw BatchForm in HomePageView imports.
+                <div>
+                  <FormLabel>Family (Optional)</FormLabel>
+                  <Input placeholder="e.g. Lamiaceae" {...form.register("family")} />
+                  <InlineFieldError msg={form.formState.errors.family?.message} />
+                </div>
 
-        // Let's try to use BatchForm.
+                <div>
+                  <FormLabel>Planting Date</FormLabel>
+                  <Input type="date" {...form.register("plantingDate")} />
+                  <InlineFieldError msg={form.formState.errors.plantingDate?.message} />
+                </div>
 
-        // Re-reading HomePageView imports:
-        // import { BatchForm } from '@/components/batch-form';
+                <div>
+                  <FormLabel>Size / Container</FormLabel>
+                  <Select
+                    value={form.watch("sizeId")}
+                    onValueChange={(value) => form.setValue("sizeId", value, { shouldValidate: true })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sizeOptions.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                          {s.containerType ? ` · ${s.containerType}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InlineFieldError msg={form.formState.errors.sizeId?.message} />
+                </div>
 
-        // I'll use BatchForm.
+                <div>
+                  <FormLabel>Cells per Tray</FormLabel>
+                  <Input
+                    type="number"
+                    {...form.register("sizeMultiple", { valueAsNumber: true })}
+                  />
+                  <InlineFieldError msg={form.formState.errors.sizeMultiple?.message} />
+                </div>
 
-        const result = await createPropagationBatchAction(payload as any); // Type cast for now
-        if (result.success) {
-            toast({ title: "Success", description: "Batch created" });
-            router.push("/dashboard");
-        } else {
-            toast({ title: "Error", description: result.error, variant: "destructive" });
-        }
-    };
+                <div>
+                  <FormLabel>Full Trays</FormLabel>
+                  <Input type="number" {...form.register("fullTrays", { valueAsNumber: true })} />
+                  <InlineFieldError msg={form.formState.errors.fullTrays?.message} />
+                </div>
 
-    return (
-        <div className="container mx-auto max-w-2xl py-10">
-            <h1 className="text-2xl font-bold mb-6">New Propagation Batch</h1>
-            {/* Placeholder for form */}
-            <p>Form goes here. Using BatchForm is recommended.</p>
-        </div>
-    );
+                <div>
+                  <FormLabel>Partial Cells</FormLabel>
+                  <Input type="number" {...form.register("partialCells", { valueAsNumber: true })} />
+                  <InlineFieldError msg={form.formState.errors.partialCells?.message} />
+                </div>
+
+                <div className="col-span-2">
+                  <FormLabel>Location</FormLabel>
+                  <Select
+                    value={form.watch("locationId")}
+                    onValueChange={(value) => form.setValue("locationId", value, { shouldValidate: true })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationOptions.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.nurserySite ? `${loc.nurserySite} · ` : ""}
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <InlineFieldError msg={form.formState.errors.locationId?.message} />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => form.reset(defaultValues)}
+                  disabled={form.formState.isSubmitting}
+                >
+                  Reset
+                </Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? "Creating..." : "Create Batch"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function InlineFieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return <p className="mt-1 text-xs text-red-600">{msg}</p>;
 }

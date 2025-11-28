@@ -4,7 +4,7 @@ import { getSupabaseServerApp } from "@/server/db/supabase";
 
 export async function GET() {
   try {
-    const supabase = getSupabaseServerApp();
+    const supabase = await getSupabaseServerApp();
     const { data, error } = await supabase
       .from("v_sku_available")
       .select("sku_code, description, available_qty")

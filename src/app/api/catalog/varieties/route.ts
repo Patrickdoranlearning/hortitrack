@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   if (!parse.success) return NextResponse.json({ error: parse.error.format() }, { status: 400 });
 
   const { q, limit } = parse.data;
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
 
   let query = supabase.from("plant_varieties").select("id,name,family").order("name", { ascending: true }).limit(limit);
   if (q && q.length > 0) query = query.ilike("name", `%${q}%`);

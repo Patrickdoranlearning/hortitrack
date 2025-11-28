@@ -30,8 +30,8 @@ export function createSupabaseServerWithCookies(
   });
 }
 
-export function getSupabaseServerApp(): SupabaseClient<Database> {
-  const store = cookies();
+export async function getSupabaseServerApp(): Promise<SupabaseClient<Database>> {
+  const store = await cookies();
   const bridge: CookieBridge = {
     get: (name) => store.get(name)?.value,
     set: (name, value, options) => store.set(name, value, options),

@@ -2,7 +2,7 @@ import "server-only";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 
 export async function resolveActiveOrgId(): Promise<string | null> {
-  const supabase = getSupabaseServerApp();
+  const supabase = await getSupabaseServerApp();
 
   const { data: u } = await supabase.auth.getUser();
   const uid = u?.user?.id ?? null;
