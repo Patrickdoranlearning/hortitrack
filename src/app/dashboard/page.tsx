@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users,
@@ -51,6 +51,43 @@ export const dynamic = "force-dynamic";
 
 export default function DashboardOverviewPage() {
   const { data: rawBatches, loading: isLoading } = useCollection<any>('batches');
+  const { data: sizeRows } = useCollection<any>('plant_sizes');
+  const { data: locationRows } = useCollection<any>('nursery_locations');
+
+  const sizeLabelById = useMemo(() => {
+    const entries: Record<string, string> = {};
+    const list = Array.isArray(sizeRows) ? sizeRows : [];
+    for (const row of list) {
+      if (!row || typeof row !== "object") continue;
+      const id = row.id;
+      const label = typeof row.name === "string" ? row.name.trim() : "";
+      if (typeof id === "string" && label.length) {
+        entries[id] = label;
+      }
+    }
+    return entries;
+  }, [sizeRows]);
+
+  const locationLabelById = useMemo(() => {
+    const entries: Record<string, string> = {};
+    const list = Array.isArray(locationRows) ? locationRows : [];
+    for (const row of list) {
+      if (!row || typeof row !== "object") continue;
+      const id = row.id;
+      const parts: string[] = [];
+      if (typeof row.nursery_site === "string" && row.nursery_site.trim().length) {
+        parts.push(row.nursery_site.trim());
+      }
+      if (typeof row.name === "string" && row.name.trim().length) {
+        parts.push(row.name.trim());
+      }
+      const label = parts.join(" · ") || (typeof row.name === "string" ? row.name.trim() : "");
+      if (typeof id === "string" && label.length) {
+        entries[id] = label;
+      }
+    }
+    return entries;
+  }, [locationRows]);
 
   const batches = useMemo(() => {
     const list = Array.isArray(rawBatches) ? rawBatches : [];
@@ -62,12 +99,14 @@ export default function DashboardOverviewPage() {
       category: d.category,
       plantingDate: d.planting_date,
       quantity: d.quantity,
-      size: d.size,
-      location: d.location_id,
+      sizeId: d.size_id,
+      size: sizeLabelById[d.size_id as string] ?? d.size_name ?? 'Unknown size',
+      locationId: d.location_id,
+      location: locationLabelById[d.location_id as string] ?? d.location_name ?? 'Unknown location',
       status: d.status,
       logHistory: d.log_history,
     } as Batch));
-  }, [rawBatches]);
+  }, [rawBatches, sizeLabelById, locationLabelById]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({

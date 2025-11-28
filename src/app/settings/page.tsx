@@ -10,13 +10,13 @@ export default function SettingsPage() {
 
   return (
     <div className="container mx-auto max-w-4xl p-4 sm:p-6">
-       <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex justify-between items-center">
         <h1 className="font-headline text-4xl">Manage Data</h1>
         <Button asChild variant="outline">
-            <Link href="/">
-                <ArrowLeft />
-                Back to Nursery Stock
-            </Link>
+          <Link href="/">
+            <ArrowLeft />
+            Back to Nursery Stock
+          </Link>
         </Button>
       </div>
       <p className="mb-6 text-muted-foreground">
@@ -29,10 +29,10 @@ export default function SettingsPage() {
             <CardDescription>View, search, and manage all historical and active batch records in a table.</CardDescription>
           </CardHeader>
           <CardContent>
-             <Button asChild>
-                <Link href="/batches">
-                    Manage Batches
-                </Link>
+            <Button asChild>
+              <Link href="/production/batches">
+                Manage Batches
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -43,10 +43,10 @@ export default function SettingsPage() {
             <CardDescription>View and manage the master list of all plant varieties, including their family and category.</CardDescription>
           </CardHeader>
           <CardContent>
-             <Button asChild>
-                <Link href="/varieties">
-                    Manage Varieties
-                </Link>
+            <Button asChild>
+              <Link href="/varieties">
+                Manage Varieties
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -58,9 +58,9 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-                <Link href="/locations">
-                    Manage Locations
-                </Link>
+              <Link href="/locations">
+                Manage Locations
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -72,9 +72,9 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-                <Link href="/sizes">
-                    Manage Sizes
-                </Link>
+              <Link href="/sizes">
+                Manage Sizes
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -86,9 +86,9 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-                <Link href="/suppliers">
-                    Manage Suppliers
-                </Link>
+              <Link href="/suppliers">
+                Manage Suppliers
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -100,9 +100,9 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-                <Link href="/sales/orders">
-                    Manage Orders
-                </Link>
+              <Link href="/sales/orders">
+                Manage Orders
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -114,9 +114,9 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-                <Link href="/sales/customers">
-                    Manage Customers
-                </Link>
+              <Link href="/sales/customers">
+                Manage Customers
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -128,9 +128,9 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-                <Link href="/sales/products">
-                    Manage Products
-                </Link>
+              <Link href="/sales/products">
+                Manage Products
+              </Link>
             </Button>
           </CardContent>
         </Card>

@@ -48,7 +48,7 @@ type LocationFormValues = z.infer<typeof locationFormSchema>;
 
 export default function LocationsPage() {
   const { user } = useAuth();
-  const { data: rawLocations, loading: isLoading } = useCollection<NurseryLocation>('locations');
+  const { data: rawLocations, loading: isLoading } = useCollection<NurseryLocation>('nursery_locations');
   const locations = rawLocations || [];
 
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);

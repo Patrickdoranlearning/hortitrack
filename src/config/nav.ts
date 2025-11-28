@@ -23,7 +23,7 @@ export const APP_NAV: NavItem[] = [
     icon: Sprout,
     items: [
       { label: "Dashboard", href: "/", description: "High-level production overview." },
-      { label: "All Batches", href: "/batches", description: "View and manage all batches." },
+      { label: "All Batches", href: "/production/batches", description: "View and manage all batches." },
       { label: "Planning", href: "/production/planning", description: "Plan future production cycles." },
     ]
   },
