@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { isValidDocId } from "@/server/util/ids";
+import { isValidDocId } from "@/server/utils/ids";
 import { buildBatchRoute } from "@/server/batches/route";
 import { getBatchById } from "@/server/batches/service";
 

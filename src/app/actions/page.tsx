@@ -16,7 +16,7 @@ import { Batch } from '@/lib/types';
 export default function ActionsPage() {
   const [isActionLogOpen, setIsActionLogOpen] = React.useState(false);
   const [isFlagBatchOpen, setIsFlagBatchOpen] = React.useState(false);
-  const { data: locations, loading: locationsLoading } = useCollection<NurseryLocation>('locations');
+  const { data: locations, loading: locationsLoading } = useCollection<NurseryLocation>('nursery_locations');
   
   // Placeholder for a selected batch for the flag dialog
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);

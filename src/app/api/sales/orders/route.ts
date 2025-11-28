@@ -70,8 +70,16 @@ export async function POST(req: Request) {
     for (const line of input.lines) {
       // Find SKU by Variety + Size
       // We need to resolve Variety ID and Size ID first
-      const { data: variety } = await supabase.from('plant_varieties').select('id').eq('name', line.plantVariety).single();
-      const { data: size } = await supabase.from('plant_sizes').select('id').eq('name', line.size).single();
+      const { data: variety } = await supabase
+        .from('plant_varieties')
+        .select('id')
+        .eq('name', line.plantVariety)
+        .maybeSingle();
+      const { data: size } = await supabase
+        .from('plant_sizes')
+        .select('id')
+        .eq('name', line.size)
+        .maybeSingle();
 
       if (!variety || !size) {
         return fail(400, "invalid_product", `Product not found: ${line.plantVariety} ${line.size}`);
@@ -83,7 +91,7 @@ export async function POST(req: Request) {
         .eq('plant_variety_id', variety.id)
         .eq('size_id', size.id)
         .eq('org_id', activeOrgId)
-        .single();
+        .maybeSingle();
 
       if (!sku) {
         return fail(400, "no_sku", `SKU not found for: ${line.plantVariety} ${line.size}`);
@@ -126,7 +134,7 @@ export async function POST(req: Request) {
 
     // Insert Lines
     const { error: linesErr } = await supabase
-      .from("order_items")
+      .from("sales_order_lines")
       .insert(linesToInsert.map(l => ({ ...l, order_id: orderId })));
 
     if (linesErr) throw new Error(`Lines create failed: ${linesErr.message}`);

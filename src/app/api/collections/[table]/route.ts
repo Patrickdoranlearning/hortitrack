@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/server/db/supabaseAdmin';
-import { getOrgForUserByEmail } from '@/server/orgs/getOrgForUser';
+import { getOrgForUserByEmail } from '@/server/org/getOrgForUser';
 
 type Table = 'nursery_locations' | 'suppliers' | 'plant_varieties' | 'plant_sizes';
 

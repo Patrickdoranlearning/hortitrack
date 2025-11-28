@@ -28,18 +28,63 @@ export async function POST(_: NextRequest, { params }: { params: { orderId: stri
 
     if (linesErr || !lines || lines.length === 0) return fail(400, "no_lines", "Order has no lines.");
 
+    // Look up human-readable variety and size names for labels
+    const varietyIds = Array.from(
+      new Set(
+        lines
+          .map((l: any) => l.plant_variety_id)
+          .filter((id: unknown): id is string => typeof id === "string")
+      )
+    );
+    const sizeIds = Array.from(
+      new Set(
+        lines
+          .map((l: any) => l.size_id)
+          .filter((id: unknown): id is string => typeof id === "string")
+      )
+    );
+
+    const [{ data: varieties }, { data: sizes }] = await Promise.all([
+      varietyIds.length
+        ? supabaseAdmin
+            .from("plant_varieties")
+            .select("id, name")
+            .in("id", varietyIds)
+        : { data: [] as any[] },
+      sizeIds.length
+        ? supabaseAdmin
+            .from("plant_sizes")
+            .select("id, name")
+            .in("id", sizeIds)
+        : { data: [] as any[] },
+    ]);
+
+    const varietyNameById = Object.fromEntries(
+      (varieties || []).map((v: any) => [v.id, v.name] as const)
+    );
+    const sizeNameById = Object.fromEntries(
+      (sizes || []).map((s: any) => [s.id, s.name] as const)
+    );
+
     // MVP label rule: 1 label per plant (per unit)
     const zpls: string[] = [];
     lines.forEach((line) => {
       const qty = Number(line?.allocations?.reduce((a: number, b: any) => a + (b.qty || 0), 0)) || Number(line.qty) || 0;
       if (qty <= 0) return;
 
-      // Encoded barcode preference (MVP: internal SKU pattern: "PLU-" + variety + "-" + size)
-      const barcode = `PLU:${String(line.plant_variety_id)}|${String(line.size_id)}`.slice(0, 40);
+      const varietyName =
+        varietyNameById[String(line.plant_variety_id)] ??
+        String(line.plant_variety_name ?? "Unknown variety");
+      const sizeName =
+        sizeNameById[String(line.size_id)] ??
+        String(line.size_name ?? "Unknown size");
+
+      // Encoded barcode preference (MVP: internal SKU pattern based on variety + size)
+      const barcode = `PLU:${varietyName}|${sizeName}`.slice(0, 40);
 
       const zpl = buildSaleLabelZpl({
-        productTitle: String(line.plant_variety_id),
-        size: String(line.size_id),
+        productTitle: varietyName,
+        size: sizeName,
         priceText: line.unit_price != null ? `€${Number(line.unit_price).toFixed(2)}` : "€0.00",
         barcode,
         symbology: "code128",

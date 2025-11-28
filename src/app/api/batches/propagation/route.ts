@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/server/db/supabaseAdmin';
-import { getOrgForUserByEmail } from '@/server/orgs/getOrgForUser';
+import { getOrgForUserByEmail } from '@/server/org/getOrgForUser';
 import { PropagationInput } from '@/lib/schemas/production';
 import { generateBatchNumber } from '@/lib/batchNumbers';
 

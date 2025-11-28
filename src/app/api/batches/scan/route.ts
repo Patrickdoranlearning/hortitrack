@@ -42,7 +42,12 @@ export async function POST(req: NextRequest) {
       const candidates = candidateBatchNumbers(parsed.value);
       for (const cand of candidates) {
         // Try to find by string batchNumber
-        let { data } = await supabase.from('batches').select("id").eq("batch_number", cand).limit(1).single();
+        let { data } = await supabase
+          .from('batches')
+          .select("id")
+          .eq("batch_number", cand)
+          .limit(1)
+          .maybeSingle();
         if (data) {
           batch = await getBatchById(data.id);
           break;
@@ -51,7 +56,12 @@ export async function POST(req: NextRequest) {
         // If batchNumber is stored as a number, try that too
         const numCand = Number(cand);
         if (!isNaN(numCand)) {
-          let { data: dataNum } = await supabase.from('batches').select("id").eq("batch_number", numCand).limit(1).single();
+          let { data: dataNum } = await supabase
+            .from('batches')
+            .select("id")
+            .eq("batch_number", numCand)
+            .limit(1)
+            .maybeSingle();
           if (dataNum) {
             batch = await getBatchById(dataNum.id);
             break;
