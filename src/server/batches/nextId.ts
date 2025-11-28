@@ -21,7 +21,7 @@ function isoWeek(date: Date) {
 }
 
 export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
   const { orgId } = await getUserIdAndOrgId(); // Get orgId from current user's session
 
   if (!orgId) {

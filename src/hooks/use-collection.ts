@@ -1,57 +1,88 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, SupabaseClient } from "@/lib/supabase/client";
 
-export function useCollection<T = any>(table: string, initialData?: T[]) {
-    const [data, setData] = useState<T[]>(initialData || []);
-    const [loading, setLoading] = useState(!initialData);
-    const [error, setError] = useState<Error | null>(null);
+const orgScopedCollections = new Set(["nursery_locations", "suppliers"]);
 
-    const supabase = createClient();
+export function useCollection<T = any>(collectionName: string, initialData?: T[]) {
+  const [data, setData] = useState<T[]>(initialData || []);
+  const [loading, setLoading] = useState(!initialData);
+  const [error, setError] = useState<Error | null>(null);
 
-    useEffect(() => {
-        let mounted = true;
-        setLoading(true);
+  const supabase = createClient();
 
-        const fetchData = async () => {
-            try {
-                const { data: result, error } = await supabase.from(table).select("*");
-                if (error) throw error;
-                if (mounted) {
-                    // Map snake_case to camelCase if needed? 
-                    // For now, assuming the types match or we accept snake_case in components.
-                    // Ideally we should map. Let's assume the components might expect camelCase if they were using Firebase + custom mapping.
-                    // But Supabase returns what's in DB.
-                    // Let's return raw data for now and see if we need mapping.
-                    // Actually, looking at previous files, mapping was done manually.
-                    // Let's just return the data.
-                    setData(result as unknown as T[]);
-                    setError(null);
-                }
-            } catch (err: any) {
-                if (mounted) setError(err);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
 
-        fetchData();
-
-        // Realtime subscription could be added here
-        // const channel = supabase.channel(table).on(...)
-
-        return () => {
-            mounted = false;
-        };
-    }, [table]);
-
-    const forceRefresh = async () => {
-        const { data: result, error } = await supabase.from(table).select("*");
-        if (!error && result) {
+    const fetchData = async () => {
+      try {
+        if (orgScopedCollections.has(collectionName)) {
+          const url =
+            collectionName === "suppliers"
+              ? "/api/lookups/suppliers"
+              : "/api/lookups/locations";
+          const token = await getSessionToken(supabase);
+          const res = await fetch(url, {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const json = await res.json();
+          if (mounted) {
+            setData((json.items ?? json.data ?? []) as T[]);
+            setError(null);
+          }
+        } else {
+          const { data: result, error } = await supabase.from(collectionName).select("*");
+          if (error) throw error;
+          if (mounted) {
             setData(result as unknown as T[]);
+            setError(null);
+          }
         }
+      } catch (err: any) {
+        if (mounted) setError(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
 
-    return { data, loading, error, forceRefresh };
+    fetchData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [collectionName, supabase]);
+
+  const forceRefresh = async () => {
+    try {
+      if (orgScopedCollections.has(collectionName)) {
+        const url =
+          collectionName === "suppliers"
+            ? "/api/lookups/suppliers"
+            : "/api/lookups/locations";
+        const token = await getSessionToken(supabase);
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const json = await res.json();
+        setData((json.items ?? json.data ?? []) as T[]);
+      } else {
+        const { data: result, error } = await supabase.from(collectionName).select("*");
+        if (error) throw error;
+        setData(result as unknown as T[]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    }
+  };
+
+  return { data, loading, error, forceRefresh };
+}
+
+async function getSessionToken(supabase: SupabaseClient) {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token;
 }

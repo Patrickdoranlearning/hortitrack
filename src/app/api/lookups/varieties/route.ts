@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/server/db/supabaseServer";
 
 export async function GET() {
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("plant_varieties_compat")
     .select("id, name, family, genus, species, category")

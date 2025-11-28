@@ -13,7 +13,7 @@ export type FlagEvent = {
 };
 
 export async function getFlags(batchId: string) {
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
   
   // Fetch generic flag events
   const { data, error } = await supabase
@@ -54,7 +54,7 @@ export async function setFlag(batchId: string, key: FlagKey, value: any, opts?: 
   reason?: string | null;
   notes?: string | null;
 }) {
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
 
   // We need org_id to insert into batch_events. 
   // Fetch it from the batch.

@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export default async function Page({ params }: { params: { batchId: string } }) {
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
   const { data: batch, error } = await supabase
     .from("batches")
     .select("*, plant_varieties(name, category), plant_sizes(name), nursery_locations(name)")

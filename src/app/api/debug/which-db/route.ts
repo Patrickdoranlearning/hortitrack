@@ -4,7 +4,7 @@ import { getSupabaseServerApp } from "@/server/db/supabase";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = getSupabaseServerApp();
+  const supabase = await getSupabaseServerApp();
 
   try {
     // This RPC call might need adjustment based on your actual Supabase functions

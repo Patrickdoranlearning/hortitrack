@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const supabase = getSupabaseServerClient();
+    const supabase = await getSupabaseServerClient();
     
     // Simple query to check connection
     const { data, error } = await supabase.from("organizations").select("count").limit(1).single();

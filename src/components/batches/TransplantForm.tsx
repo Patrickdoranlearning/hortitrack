@@ -35,7 +35,12 @@ export default function TransplantForm(props: {
   defaultTargetLocationId?: string;
   onCreated?: (child: { id: string; batch_number: string }) => void;
 }) {
-  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  const toastImpl = useToast?.();
+  const toast =
+    toastImpl?.toast ??
+    ((v: any) => {
+      alert(v?.title || v?.description || "OK");
+    });
   const form = useForm<z.infer<typeof Schema>>({
     resolver: zodResolver(Schema),
     defaultValues: {

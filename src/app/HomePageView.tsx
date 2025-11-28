@@ -61,7 +61,7 @@ import { queryMatchesBatch } from '@/lib/search';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckinForm } from '@/components/batches/CheckInForm';
+import CheckInForm from '@/components/batches/CheckInForm';
 import { useCollection } from '@/hooks/useCollection'; 
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
@@ -255,10 +255,8 @@ export default function HomePageView({
     );
   }
 
-  if (!user) {
-    router.replace('/login');
-    return null;
-  }
+  // `useEffect` above handles redirect when user is missing; render nothing while it runs.
+  if (!user) return null;
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
@@ -520,7 +518,7 @@ export default function HomePageView({
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <PropagationForm orgId={orgId ?? undefined} />
+            <PropagationForm />
           </div>
         </DialogContent>
       </Dialog>
@@ -539,9 +537,10 @@ export default function HomePageView({
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <CheckinForm 
+            <CheckInForm 
               onSubmitSuccess={(batch) => {
-                toast({ title: "Check-in Successful", description: `Batch #${batch.batchNumber} created.` });
+                const batchNumber = batch?.batch_number ?? batch?.batchNumber ?? "";
+                toast({ title: "Check-in Successful", description: batchNumber ? `Batch #${batchNumber} created.` : "Batch created." });
                 setIsCheckinFormOpen(false); 
                 forceRefresh(); 
               }}

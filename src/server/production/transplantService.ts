@@ -5,12 +5,8 @@ import { inferPhase } from "@/lib/production/phase";
 import { getSupabaseForRequest } from "@/server/db/supabaseServer";
 import { getActiveOrgId } from "@/server/auth/org";
 
-const uuid = z.string().uuid();
-
-type Supabase = ReturnType<typeof getSupabaseForRequest>;
-
 export async function performTransplant(inputRaw: TransplantRequest) {
-  const sb = getSupabaseForRequest();
+  const sb = await getSupabaseForRequest();
   const orgId = await getActiveOrgId(sb);
   const input = TransplantRequestSchema.parse(inputRaw);
 
