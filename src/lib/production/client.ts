@@ -74,6 +74,12 @@ export const ProductionAPI = {
       body: JSON.stringify(payload),
     });
   },
+  updateBatch(batchId: string, payload: Record<string, unknown>) {
+    return fetchJson<ApiResponse<{ ok: true }>>(`/api/batches/${batchId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
   dump(batchId: string, payload: { units: number; reason: string; archive_if_empty?: boolean; notes?: string }) {
     return fetchJson<ApiResponse<{ ok: true; new_quantity: number }>>(`/api/production/batches/${batchId}/dump`, {
       method: "POST",

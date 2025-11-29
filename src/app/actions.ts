@@ -4,13 +4,13 @@
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch } from '@/lib/types';
-import { getSupabaseServerApp } from '@/server/db/supabase';
+import { getSupabaseServerApp, getSupabaseServerClient } from '@/server/db/supabase';
 import { z } from 'zod';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
 
 async function getSupabaseForApp() {
-  return getSupabaseServerApp();
+  return getSupabaseServerClient();
 }
 
 function transformVBatchSearchData(data: any): Batch {

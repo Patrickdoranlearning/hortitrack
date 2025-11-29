@@ -43,6 +43,7 @@ const SafeAncestryCard = _ensure(AncestryCard, "AncestryCard");
 type BatchCardProps = {
   batch: Batch;
   onOpen?: (batch: Batch) => void;
+  onLogAction?: (batch: Batch) => void;
   actionsSlot?: React.ReactNode;
   className?: string;
 };
@@ -50,6 +51,7 @@ type BatchCardProps = {
 export function BatchCard({
   batch,
   onOpen,
+  onLogAction,
   actionsSlot,
   className,
 }: BatchCardProps) {
@@ -106,8 +108,17 @@ export function BatchCard({
           </div>
         </div>
         {/* Place actions here; they must stop propagation */}
-        <div onClick={(e) => e.stopPropagation()} className="relative z-10 flex items-center gap-2">
+        <div onClick={(e) => e.stopPropagation()} className="relative z-10 flex flex-wrap items-center gap-2">
           {actionsSlot}
+          {onLogAction && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onLogAction(batch)}
+            >
+              Log Action
+            </Button>
+          )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button variant="default">Transplant</Button>

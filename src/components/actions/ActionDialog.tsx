@@ -10,14 +10,13 @@ import { fetchJson } from "@/lib/http";
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  defaultBatchIds: string[];
+  batch: Batch | null;
   locations: NurseryLocation[];
 };
 
-export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations = [] }: Props) {
+export function ActionDialog({ open, onOpenChange, batch, locations = [] }: Props) {
   const [localLocations, setLocalLocations] = React.useState(locations);
   const [loading, setLoading] = React.useState(!locations.length);
-  const selectedBatch = { id: defaultBatchIds[0] } as Batch; // Simplified for the new form
 
   React.useEffect(() => {
     if (!open || locations.length) {
@@ -47,15 +46,21 @@ export function ActionDialog({ open, onOpenChange, defaultBatchIds, locations = 
         <DialogHeader>
           <DialogTitle>Record Action</DialogTitle>
           <DialogDescription>
-            Apply an action to batch #{selectedBatch.batchNumber || selectedBatch.id}. Your changes will be logged.
+            {batch
+              ? `Apply an action to batch #${batch.batchNumber ?? batch.id}.`
+              : "Select a batch to log an action."}
           </DialogDescription>
         </DialogHeader>
         
         {loading ? (
           <p>Loading locations...</p>
+        ) : !batch ? (
+          <p className="text-sm text-muted-foreground">
+            Select a batch to log an action.
+          </p>
         ) : (
           <ActionForm 
-            batch={selectedBatch} 
+            batch={batch} 
             locations={localLocations}
             onCancel={() => onOpenChange(false)}
             onSuccess={() => onOpenChange(false)}

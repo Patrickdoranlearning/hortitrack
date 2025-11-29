@@ -38,7 +38,6 @@ import {
   Plus,
   QrCode,
   Search,
-  Settings,
   Sparkles,
   Users,
   Printer,
@@ -133,6 +132,14 @@ export default function HomePageView({
     category: 'all',
     status: 'Active',
   });
+  const clearBatchQuery = React.useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!params.has("batch")) return;
+    params.delete("batch");
+    const qs = params.toString();
+    router.replace(qs ? `/?${qs}` : "/");
+  }, [router, searchParams]);
+
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const filteredBatches = React.useMemo(() => {
@@ -182,6 +189,16 @@ export default function HomePageView({
     setSelectedBatch(batch);
     setIsDetailDialogOpen(true);
   };
+
+  const handleDetailOpenChange = React.useCallback(
+    (open: boolean) => {
+      setIsDetailDialogOpen(open);
+      if (!open) {
+        clearBatchQuery();
+      }
+    },
+    [clearBatchQuery]
+  );
 
   const handleLogAction = (batch: Batch) => {
     setSelectedBatch(batch);
@@ -555,6 +572,7 @@ export default function HomePageView({
                   key={batch.id}
                   batch={batch}
                   onOpen={handleOpenDetail}
+                  onLogAction={handleLogAction}
                   actionsSlot={
                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <TooltipProvider>
@@ -589,7 +607,7 @@ export default function HomePageView({
       {selectedBatch && (
         <BatchDetailDialog
           open={isDetailDialogOpen}
-          onOpenChange={setIsDetailDialogOpen}
+          onOpenChange={handleDetailOpenChange}
           batch={selectedBatch}
           onEdit={handleEditBatch}
           onTransplant={handleTransplantOpen}
@@ -638,7 +656,7 @@ export default function HomePageView({
       <ActionDialog
         open={isLogActionOpen}
         onOpenChange={setIsLogActionOpen}
-        defaultBatchIds={selectedBatch ? [selectedBatch.id!] : []}
+        batch={selectedBatch}
         locations={nurseryLocations || []}
       />
       
