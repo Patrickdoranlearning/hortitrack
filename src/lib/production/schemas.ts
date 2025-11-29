@@ -37,3 +37,14 @@ export const CheckInInputSchema = z.object({
   passport_override: PassportOverrideSchema.optional(),
 });
 export type CheckInInput = z.infer<typeof CheckInInputSchema>;
+
+export const TransplantInputSchema = z.object({
+  parent_batch_id: z.string().uuid(),
+  size_id: z.string().uuid(),
+  location_id: z.string().uuid(),
+  containers: z.number().int().min(1),
+  planted_at: DateOnly.optional(),
+  notes: z.string().max(1000).optional(),
+  archive_parent_if_empty: z.boolean().optional(),
+});
+export type TransplantInput = z.infer<typeof TransplantInputSchema>;

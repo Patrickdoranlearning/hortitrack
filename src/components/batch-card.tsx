@@ -11,7 +11,7 @@ import { Progress } from './ui/progress';
 import { cn } from "@/lib/utils";
 import type { Batch } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import TransplantForm from "@/components/batches/TransplantForm";
 import EditBatchForm from "@/components/batches/EditBatchForm";
 import EventsCard from "@/components/batches/EventsCard";
@@ -112,12 +112,13 @@ export function BatchCard({
             <DialogTrigger asChild>
               <Button variant="default">Transplant</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl" aria-describedby="transplant-desc">
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Transplant from {batch.batchNumber}</DialogTitle>
-                <p id="transplant-desc" className="text-sm text-muted-foreground">
-                  Create a new batch from this parent. Full trays/pots only.
-                </p>
+                <DialogDescription>
+                  {batch.plantVariety ? `${batch.plantVariety}` : "Create a new batch from this parent."}
+                  {typeof batch.quantity === "number" ? ` • ${batch.quantity.toLocaleString()} units remaining` : ""}
+                </DialogDescription>
               </DialogHeader>
               <SafeTransplantForm
                 parentBatchId={parentSummary.id}

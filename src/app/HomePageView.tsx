@@ -120,7 +120,6 @@ export default function HomePageView({
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] = React.useState(false);
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
-  const [isScanOpen, setIsScanOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
   const [isCheckinFormOpen, setIsCheckinFormOpen] = React.useState(false);
@@ -204,16 +203,139 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
 
+  const [isScanOpen, setIsScanOpen] = React.useState(false);
+
+  const normalizeBatchFromScan = React.useCallback(
+    (node: any): Batch => {
+      const normalized = {
+        id: node.id,
+        orgId: node.orgId ?? node.org_id ?? orgId ?? "",
+        batchNumber: String(node.batchNumber ?? node.batch_number ?? ""),
+        phase: (node.phase ?? "propagation") as Batch["phase"],
+        supplierId: node.supplierId ?? node.supplier_id ?? undefined,
+        plantVarietyId:
+          node.plantVarietyId ??
+          node.plant_variety_id ??
+          node.plantVariety ??
+          "",
+        sizeId: node.sizeId ?? node.size_id ?? "",
+        locationId: node.locationId ?? node.location_id ?? "",
+        status: (node.status ?? "Propagation") as Batch["status"],
+        quantity: node.quantity ?? 0,
+        initialQuantity: node.initialQuantity ?? node.quantity ?? 0,
+        quantityProduced: node.quantityProduced ?? undefined,
+        unit: node.unit ?? "plants",
+        plantedAt: node.plantingDate ?? node.plantedAt ?? null,
+        readyAt: node.producedAt ?? node.readyAt ?? null,
+        dispatchedAt: node.dispatchedAt ?? null,
+        archivedAt: node.archivedAt ?? null,
+        qrCode: node.qrCode ?? undefined,
+        qrImageUrl: node.qrImageUrl ?? undefined,
+        passportOverrideA: undefined,
+        passportOverrideB: undefined,
+        passportOverrideC: undefined,
+        passportOverrideD: undefined,
+        logHistory: node.logHistory ?? [],
+        supplierBatchNumber: node.supplierBatchNumber ?? "",
+        createdAt: node.createdAt ?? null,
+        updatedAt: node.updatedAt ?? null,
+        plantVariety: node.plantVariety ?? node.variety ?? "",
+        plantFamily: node.plantFamily ?? "",
+        size: node.size ?? node.potSize ?? "",
+        location: node.location ?? "",
+      } as Batch;
+      return normalized;
+    },
+    [orgId]
+  );
+
   const handleAiCareClick = async () => {
     if (!batches || batches.length === 0) return;
     const batchForRecs = batches[0];
     setSelectedBatch(batchForRecs);
     setIsRecommendationsOpen(true);
   };
-  
-  const handleScanDetected = (text: string) => {
-    window.location.href = `/?batch=${encodeURIComponent(text)}`;
-  };
+
+  const handleScanDetected = React.useCallback(
+    async (text: string) => {
+      if (!text) return;
+      try {
+        const res = await fetch("/api/batches/scan", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code: text }),
+        });
+
+        if (res.ok) {
+          const { batch } = await res.json();
+          const normalized = normalizeBatchFromScan(batch);
+          setSelectedBatch(normalized);
+          setIsDetailDialogOpen(true);
+          setIsScanOpen(false);
+          router.replace(
+            `/?batch=${encodeURIComponent(
+              normalized.id ?? normalized.batchNumber
+            )}`
+          );
+          setBatches((prev) => {
+            if (!prev) return [normalized];
+            const exists = prev.some((b) => b.id === normalized.id);
+            if (exists) {
+              return prev.map((b) =>
+                b.id === normalized.id ? { ...b, ...normalized } : b
+              );
+            }
+            return [normalized, ...prev];
+          });
+          toast({
+            title: "Batch found",
+            description: `#${normalized.batchNumber} • ${
+              normalized.plantVariety ?? ""
+            }`,
+          });
+        } else if (res.status === 404) {
+          toast({
+            variant: "destructive",
+            title: "Not found",
+            description: "No batch matched the scanned code.",
+          });
+        } else if (res.status === 422) {
+          toast({
+            variant: "destructive",
+            title: "Unsupported code",
+            description: "This code format is not recognized.",
+          });
+        } else if (res.status === 429) {
+          toast({
+            variant: "destructive",
+            title: "Slow down",
+            description: "Too many scans in a short period. Please wait a moment.",
+          });
+        } else if (res.status === 401) {
+          toast({
+            variant: "destructive",
+            title: "Unauthorized",
+            description: "Session expired. Please sign in again.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Scan failed",
+            description: `Server responded with ${res.status}.`,
+          });
+        }
+      } catch (err: any) {
+        toast({
+          variant: "destructive",
+          title: "Scan failed",
+          description: err?.message || "Could not look up that batch.",
+        });
+      }
+    },
+    [normalizeBatchFromScan, router, toast]
+  );
   
   const handleEditBatch = React.useCallback((batch: Batch) => {
     setEditingBatch(batch);

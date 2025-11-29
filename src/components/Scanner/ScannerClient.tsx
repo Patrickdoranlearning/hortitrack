@@ -17,16 +17,15 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   const rafRef = useRef<number | null>(null);
   const vfcRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const preferredResolution = { w: 1920, h: 1080 };
+  const overlayScale = Math.max(0.55, Math.min(1, roiScale));
+  const useFullFrame = false;
   
   const [camState, setCamState] = useState<CamState>("idle");
   const [engine, setEngine] = useState<Engine>("none");
   const [torch, setTorch] = useState(false);
-  const [zoom, setZoom] = useState<number | null>(null);
-  const [zoomCaps, setZoomCaps] = useState<{ min: number; max: number; step: number } | null>(null);
-  const [useFullFrame, setUseFullFrame] = useState(false);
   const [lastErr, setLastErr] = useState<string | null>(null);
   const [lastMs, setLastMs] = useState<number | null>(null);
-  const [workerStatus, setWorkerStatus] = useState<"loading" | "ready" | "error">("loading");
   const workerBusyRef = useRef<boolean>(false);
   const lastDecodeStartRef = useRef<number>(0);
   const [decodedText, setDecodedText] = useState<string | null>(null); // New state for decoded text
@@ -35,23 +34,19 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   const lastRef = useRef<{ text: string; t: number; confirmed: boolean }>({ text: "", t: 0, confirmed: false });
 
   // devices & resolution
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
-  const [resolution, setResolution] = useState<{ w: number; h: number }>({ w: 1920, h: 1080 });
   useEffect(() => {
-    // enumerate after permission; called in startCamera too
     (async () => {
-      if (!navigator.mediaDevices?.enumerateDevices) return;
+      if (!navigator.mediaDevices?.enumerateDevices || deviceId) return;
       try {
         const list = await navigator.mediaDevices.enumerateDevices();
         const vids = list.filter((d) => d.kind === "videoinput");
-        setDevices(vids);
-        // prefer back camera by label if not chosen
-        if (!deviceId) {
-          const back = vids.find((d) => /back|rear|environment/i.test(d.label));
-          setDeviceId(back?.deviceId || vids[0]?.deviceId);
-        }
-      } catch {}
+        if (!vids.length) return;
+        const back = vids.find((d) => /back|rear|environment/i.test(d.label));
+        setDeviceId(back?.deviceId || vids[0].deviceId);
+      } catch {
+        // ignore
+      }
     })();
   }, [deviceId]);
 
@@ -82,8 +77,8 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
 
     try {
       const video: MediaTrackConstraints = deviceId
-        ? { deviceId: { exact: deviceId }, width: { ideal: resolution.w }, height: { ideal: resolution.h } }
-        : { facingMode: { ideal: "environment" }, width: { ideal: resolution.w }, height: { ideal: resolution.h } };
+        ? { deviceId: { exact: deviceId }, width: { ideal: preferredResolution.w }, height: { ideal: preferredResolution.h } }
+        : { facingMode: { ideal: "environment" }, width: { ideal: preferredResolution.w }, height: { ideal: preferredResolution.h } };
       const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
       streamRef.current = stream;
     } catch (e: any) {
@@ -132,10 +127,6 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
     const caps: any = vTrack.getCapabilities?.() || {};
     vTrack.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] } as any).catch(() => {});
     if (caps.torch) vTrack.applyConstraints({ advanced: [{ torch }] } as any).catch(() => {});
-    if (caps.zoom) {
-      setZoomCaps({ min: caps.zoom.min ?? 1, max: caps.zoom.max ?? 5, step: caps.zoom.step ?? 0.1 });
-      setZoom(caps.zoom.min ?? 1);
-    }
 
     setCamState("streaming");
 
@@ -210,10 +201,9 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
     } catch {
       workerRef.current = new Worker(new URL("../../workers/decoder.worker.ts", import.meta.url), { type: "module" });
     }
-    setWorkerStatus("loading");
     workerRef.current.onmessage = (ev: MessageEvent) => {
       const { ok, result, error, type } = ev.data || {};
-      if (type === "READY" || type === "PONG") { setWorkerStatus("ready"); return; }
+      if (type === "READY" || type === "PONG") { return; }
       if (ok && result?.text) {
         workerBusyRef.current = false;
         setLastMs(result.ms ?? null);
@@ -301,115 +291,92 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
     startCamera();
   }, []); // Empty dependency array means this runs once on mount
 
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
-          onClick={() => startCamera()}
-          disabled={camState === "requesting" || camState === "streaming"}
-        >
-          {camState === "streaming" ? "Scanning…" : "Start scanning"}
-        </button>
-        <button
-          type="button"
-          className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
-          onClick={() => stopAll()}
-          disabled={camState !== "streaming"}
-        >
-          Stop
-        </button>
-        <label className="ml-3 inline-flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={useFullFrame} onChange={(e) => setUseFullFrame(e.target.checked)} />
-          Full-frame mode
-        </label>
-      </div>
+  const statusText =
+    camState === "permission_denied"
+      ? "Camera permission denied. Tap refresh after allowing access."
+      : camState === "no_frames"
+      ? "Waiting for video frames…"
+      : decodedText
+      ? `Last scan: ${
+          decodedText.length > 42 ? `${decodedText.slice(0, 42)}…` : decodedText
+        }`
+      : "Point the QR or Data Matrix label inside the frame.";
 
-      <div className="relative">
-        <video ref={videoRef} className="w-full rounded-xl bg-black/50" playsInline muted />
-        {!useFullFrame && (
-          <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="rounded-xl border-2 border-white/70" style={{ width: "80%", height: "80%" }} />
+  return (
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-black/70">
+        <video
+          ref={videoRef}
+          className="aspect-video w-full object-cover"
+          playsInline
+          muted
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+        >
+          <div
+            className="rounded-2xl border-2 border-white/70 shadow-[0_0_40px_rgba(0,0,0,0.7)]"
+            style={{
+              width: `${overlayScale * 100}%`,
+              height: `${overlayScale * 100}%`,
+            }}
+          />
+        </div>
+        {camState !== "streaming" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-sm text-white">
+            <p className="text-center opacity-90">
+              {camState === "permission_denied"
+                ? "Allow camera access to scan."
+                : camState === "requesting"
+                ? "Opening camera…"
+                : "Preparing camera…"}
+            </p>
+            <button
+              type="button"
+              onClick={() => startCamera()}
+              className="rounded-full bg-white/90 px-4 py-1 text-xs font-semibold text-black"
+            >
+              Refresh camera
+            </button>
           </div>
         )}
       </div>
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Debug/status bar */}
-      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>Camera: {camState}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-col">
+          <span>{statusText}</span>
+          {lastMs != null && camState === "streaming" && (
+            <span className="text-[11px] text-muted-foreground/80">
+              {engine.toUpperCase()} decode in {lastMs}ms
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1">
-            Engine
-            <select
-              className="rounded border px-1 py-0.5"
-              value={engine}
-              onChange={(e) => {
-                const val = e.target.value as Engine;
-                setEngine(val);
-                if (val === "native") runNativeLoop(); else runWasmLoop();
-              }}>
-              <option value="wasm">WASM</option>
-              <option value="native">Native</option>
-            </select>
-          </label>
-          {engine === "wasm" && <span>Worker: {workerStatus}</span>}
+          <button
+            type="button"
+            onClick={onToggleTorch}
+            disabled={camState !== "streaming"}
+            className="rounded-full border border-border px-3 py-1 text-[11px] font-medium hover:bg-white/5 disabled:opacity-50"
+          >
+            {torch ? "Torch on" : "Torch off"}
+          </button>
+          <button
+            type="button"
+            onClick={() => startCamera()}
+            className="rounded-full border border-border px-3 py-1 text-[11px] font-medium hover:bg-white/5"
+          >
+            Refresh
+          </button>
         </div>
       </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {devices.length > 1 && (
-          <label className="flex items-center gap-1 text-xs">
-            Camera
-            <select
-              className="rounded border px-1 py-0.5"
-              value={deviceId}
-              onChange={(e) => { setDeviceId(e.target.value); startCamera(); }}>
-              {devices.map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0, 6)}`}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="flex items-center gap-1 text-xs">
-          Resolution
-          <select
-            className="rounded border px-1 py-0.5"
-            value={`${resolution.w}x${resolution.h}`}
-            onChange={(e) => {
-              const [w, h] = e.target.value.split("x").map(Number);
-              setResolution({ w, h });
-              startCamera();
-            }}>
-            <option value="1280x720">1280×720</option>
-            <option value="1920x1080">1920×1080</option>
-            <option value="2560x1440">2560×1440</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        {decodedText && <span>Decoded: {decodedText}</span>} {/* Display decoded text here */}
-        {lastMs != null && <span>Last decode: {lastMs}ms</span>}
-        {lastErr && <span className="text-red-700">Err: {lastErr}</span>}
-        {zoomCaps && (
-          <label className="ml-auto inline-flex items-center gap-2">
-            Zoom
-            <input
-              type="range"
-              min={zoomCaps.min}
-              max={zoomCaps.max}
-              step={zoomCaps.step}
-              value={zoom ?? zoomCaps.min}
-              onChange={(e) => onZoomChange(parseFloat(e.target.value))}
-            />
-          </label>
-        )}
-        <button type="button" onClick={onToggleTorch} className="rounded-md border px-2 py-0.5">
-          {torch ? "Torch: On" : "Torch: Off"}
-        </button>
-      </div>
+      {lastErr && (
+        <p className="text-xs text-red-600">
+          {lastErr}
+          {camState === "permission_denied" && " • Check browser camera settings."}
+        </p>
+      )}
     </div>
   );
 }
