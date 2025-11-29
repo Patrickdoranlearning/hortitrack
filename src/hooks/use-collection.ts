@@ -6,18 +6,18 @@ import { createClient, SupabaseClient } from "@/lib/supabase/client";
 const orgScopedCollections = new Set(["nursery_locations", "suppliers"]);
 
 export function useCollection<T = any>(collectionName: string, initialData?: T[]) {
-  const [data, setData] = useState<T[]>(initialData || []);
-  const [loading, setLoading] = useState(!initialData);
-  const [error, setError] = useState<Error | null>(null);
+    const [data, setData] = useState<T[]>(initialData || []);
+    const [loading, setLoading] = useState(!initialData);
+    const [error, setError] = useState<Error | null>(null);
 
-  const supabase = createClient();
+    const supabase = createClient();
 
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
+    useEffect(() => {
+        let mounted = true;
+        setLoading(true);
 
-    const fetchData = async () => {
-      try {
+        const fetchData = async () => {
+            try {
         if (orgScopedCollections.has(collectionName)) {
           const url =
             collectionName === "suppliers"
@@ -35,27 +35,27 @@ export function useCollection<T = any>(collectionName: string, initialData?: T[]
           }
         } else {
           const { data: result, error } = await supabase.from(collectionName).select("*");
-          if (error) throw error;
-          if (mounted) {
-            setData(result as unknown as T[]);
-            setError(null);
+                if (error) throw error;
+                if (mounted) {
+                    setData(result as unknown as T[]);
+                    setError(null);
           }
-        }
-      } catch (err: any) {
+                }
+            } catch (err: any) {
         if (mounted) setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
 
-    fetchData();
+        fetchData();
 
-    return () => {
-      mounted = false;
-    };
+        return () => {
+            mounted = false;
+        };
   }, [collectionName, supabase]);
 
-  const forceRefresh = async () => {
+    const forceRefresh = async () => {
     try {
       if (orgScopedCollections.has(collectionName)) {
         const url =
@@ -72,14 +72,14 @@ export function useCollection<T = any>(collectionName: string, initialData?: T[]
       } else {
         const { data: result, error } = await supabase.from(collectionName).select("*");
         if (error) throw error;
-        setData(result as unknown as T[]);
+            setData(result as unknown as T[]);
       }
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
-    }
-  };
+        }
+    };
 
-  return { data, loading, error, forceRefresh };
+    return { data, loading, error, forceRefresh };
 }
 
 async function getSessionToken(supabase: SupabaseClient) {

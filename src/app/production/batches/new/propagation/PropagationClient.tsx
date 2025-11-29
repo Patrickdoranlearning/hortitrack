@@ -27,9 +27,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PropagationClientProps {
-  nurseryLocations: NurseryLocation[];
-  plantSizes: PlantSize[];
-  varieties: Variety[];
+    nurseryLocations: NurseryLocation[];
+    plantSizes: PlantSize[];
+    varieties: Variety[];
 }
 
 type NormalizedVariety = { id: string; name: string; family?: string | null };
@@ -50,8 +50,8 @@ export default function PropagationClient({
   plantSizes,
   varieties,
 }: PropagationClientProps) {
-  const router = useRouter();
-  const { toast } = useToast();
+    const router = useRouter();
+    const { toast } = useToast();
 
   const varietyOptions = React.useMemo<NormalizedVariety[]>(
     () =>
@@ -112,23 +112,23 @@ export default function PropagationClient({
     const payload = { ...values, family: values.family || null };
     const result = await createPropagationBatchAction(payload);
 
-    if (result.success) {
+        if (result.success) {
       toast({
         title: "Batch Created",
         description: `Batch ${result.data?.batch_number ?? result.data?.id ?? ""} started.`,
       });
       form.reset(defaultValues);
       router.push("/production/batches");
-    } else {
+        } else {
       toast({
         title: "Error",
         description: result.error || "Failed to create batch",
         variant: "destructive",
       });
-    }
-  };
+        }
+    };
 
-  return (
+    return (
     <div className="container mx-auto max-w-3xl py-10">
       <Card>
         <CardHeader>
@@ -255,8 +255,8 @@ export default function PropagationClient({
           </Form>
         </CardContent>
       </Card>
-    </div>
-  );
+        </div>
+    );
 }
 
 function InlineFieldError({ msg }: { msg?: string }) {
