@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowLeft, Plus, Trash2, Edit } from 'lucide-react';
@@ -38,7 +38,43 @@ export default function VarietiesPage() {
 
   const { data: varietiesData, loading: varietiesLoading } = useCollection<Variety>('varieties', INITIAL_VARIETIES);
   const varieties = varietiesData || [];
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Variety; direction: 'asc' | 'desc' }>({
+    key: 'name',
+    direction: 'asc',
+  });
   const isLoading = authLoading || varietiesLoading;
+
+  const sortedVarieties = useMemo(() => {
+    return [...varieties].sort((a, b) => {
+      const { key, direction } = sortConfig;
+      const left = (a?.[key] ?? '') as string | number | boolean;
+      const right = (b?.[key] ?? '') as string | number | boolean;
+
+      if (typeof left === 'number' && typeof right === 'number') {
+        return direction === 'asc' ? left - right : right - left;
+      }
+      if (typeof left === 'boolean' && typeof right === 'boolean') {
+        return direction === 'asc'
+          ? Number(left) - Number(right)
+          : Number(right) - Number(left);
+      }
+
+      const leftStr = String(left).toLowerCase();
+      const rightStr = String(right).toLowerCase();
+      if (leftStr < rightStr) return direction === 'asc' ? -1 : 1;
+      if (leftStr > rightStr) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [varieties, sortConfig]);
+
+  const handleSort = (key: keyof Variety) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
 
   const handleAddVariety = () => {
     setEditingVariety(null);
@@ -85,6 +121,21 @@ export default function VarietiesPage() {
     }
   };
 
+  const renderSortLabel = (label: string, key: keyof Variety, minWidth?: string) => {
+    const isActive = sortConfig.key === key;
+    const indicator = isActive ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '';
+    return (
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-left text-xs font-semibold uppercase tracking-wide"
+        onClick={() => handleSort(key)}
+      >
+        {label}
+        <span className="text-muted-foreground">{indicator}</span>
+      </button>
+    );
+  };
+
   return (
     <>
       <div className="container mx-auto max-w-7xl p-4 sm:p-6">
@@ -113,37 +164,41 @@ export default function VarietiesPage() {
             <CardTitle>Varieties Golden Table</CardTitle>
             <CardDescription>This is the master list of varieties used for auto-completing new batch forms.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {isLoading ? (
               <div className="space-y-2">
                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
             ) : (
-              <Table>
+              <Table className="min-w-[1100px] text-sm whitespace-nowrap">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Variety Name</TableHead>
-                    <TableHead>Common Name</TableHead>
-                    <TableHead>Family</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Grouping</TableHead>
-                    <TableHead>Flowering Period</TableHead>
-                    <TableHead>Flower Colour</TableHead>
-                    <TableHead>Evergreen</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[180px]">{renderSortLabel('Variety Name', 'name')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[160px]">{renderSortLabel('Common Name', 'commonName')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[140px]">{renderSortLabel('Family', 'family')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[140px]">{renderSortLabel('Category', 'category')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[140px]">{renderSortLabel('Grouping', 'grouping')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[160px]">{renderSortLabel('Flowering Period', 'floweringPeriod')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[160px]">{renderSortLabel('Flower Colour', 'flowerColour')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[120px]">{renderSortLabel('Evergreen', 'evergreen')}</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {varieties.map((variety) => (
-                    <TableRow key={variety.id}>
-                      <TableCell className="font-medium">{variety.name}</TableCell>
-                      <TableCell>{variety.commonName}</TableCell>
-                      <TableCell>{variety.family}</TableCell>
-                      <TableCell>{variety.category}</TableCell>
-                      <TableCell>{variety.grouping}</TableCell>
-                      <TableCell>{variety.floweringPeriod}</TableCell>
-                      <TableCell>{variety.flowerColour}</TableCell>
-                      <TableCell>{variety.evergreen}</TableCell>
+                  {sortedVarieties.map((variety, index) => {
+                    const rowKey =
+                      variety.id ??
+                      (variety.name ? `variety-${variety.name}-${index}` : `variety-${index}`);
+                    return (
+                    <TableRow key={rowKey}>
+                      <TableCell className="px-4 py-2 font-medium">{variety.name}</TableCell>
+                      <TableCell className="px-4 py-2">{variety.commonName}</TableCell>
+                      <TableCell className="px-4 py-2">{variety.family}</TableCell>
+                      <TableCell className="px-4 py-2">{variety.category}</TableCell>
+                      <TableCell className="px-4 py-2">{variety.grouping}</TableCell>
+                      <TableCell className="px-4 py-2">{variety.floweringPeriod}</TableCell>
+                      <TableCell className="px-4 py-2">{variety.flowerColour}</TableCell>
+                      <TableCell className="px-4 py-2">{variety.evergreen ? 'Yes' : 'No'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button type="button" size="icon" variant="outline" onClick={() => handleEditVariety(variety)}><Edit /></Button>
@@ -169,7 +224,8 @@ export default function VarietiesPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             )}
