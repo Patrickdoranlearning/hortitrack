@@ -188,6 +188,11 @@ export default function HomePageView({
     setIsLogActionOpen(true);
   };
   
+  const handleTransplantOpen = React.useCallback((batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsTransplantOpen(true);
+  }, []);
+  
   const handlePrintClick = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsPreviewOpen(true);
@@ -205,7 +210,7 @@ export default function HomePageView({
 
   const [isScanOpen, setIsScanOpen] = React.useState(false);
 
-  const normalizeBatchFromScan = React.useCallback(
+  const normalizeBatchNode = React.useCallback(
     (node: any): Batch => {
       const normalized = {
         id: node.id,
@@ -249,6 +254,18 @@ export default function HomePageView({
     [orgId]
   );
 
+  const fetchBatchNode = React.useCallback(
+    async (batchId: string) => {
+      const res = await fetch(`/api/batches/${batchId}`);
+      const json = await res.json();
+      if (!res.ok)
+        throw new Error(json.error?.message ?? "Failed to load batch");
+      const node = json.data?.batch ?? json.batch ?? json;
+      return normalizeBatchNode(node);
+    },
+    [normalizeBatchNode]
+  );
+
   const handleAiCareClick = async () => {
     if (!batches || batches.length === 0) return;
     const batchForRecs = batches[0];
@@ -270,7 +287,7 @@ export default function HomePageView({
 
         if (res.ok) {
           const { batch } = await res.json();
-          const normalized = normalizeBatchFromScan(batch);
+          const normalized = normalizeBatchNode(batch);
           setSelectedBatch(normalized);
           setIsDetailDialogOpen(true);
           setIsScanOpen(false);
@@ -328,7 +345,41 @@ export default function HomePageView({
         });
       }
     },
-    [normalizeBatchFromScan, router, toast]
+    [normalizeBatchNode, router, toast]
+  );
+
+  const handleAncestrySelect = React.useCallback(
+    async (batchId: string) => {
+      if (!batchId) return;
+      try {
+        let existing = batches?.find((b) => b.id === batchId);
+        if (!existing) {
+          existing = await fetchBatchNode(batchId);
+          setBatches((prev) => {
+            if (!prev) return [existing as Batch];
+            const idx = prev.findIndex((b) => b.id === batchId);
+            if (idx === -1) return [existing as Batch, ...prev];
+            const copy = [...prev];
+            copy[idx] = existing as Batch;
+            return copy;
+          });
+        }
+        if (existing) {
+          setSelectedBatch(existing);
+          setIsDetailDialogOpen(true);
+          router.replace(
+            `/?batch=${encodeURIComponent(existing.id ?? existing.batchNumber)}`
+          );
+        }
+      } catch (err: any) {
+        toast({
+          variant: "destructive",
+          title: "Unable to open batch",
+          description: err?.message ?? "Could not load that batch.",
+        });
+      }
+    },
+    [batches, fetchBatchNode, router, toast]
   );
   
   const handleEditBatch = React.useCallback((batch: Batch) => {
@@ -540,11 +591,12 @@ export default function HomePageView({
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           batch={selectedBatch}
-          onEdit={() => handleEditBatch(selectedBatch)}
-          onTransplant={() => {}}
+          onEdit={handleEditBatch}
+          onTransplant={handleTransplantOpen}
           onLogAction={handleLogAction}
           onGenerateProtocol={handleGenerateProtocol}
           onCareRecommendations={handleRecommendations}
+          onSelectRelatedBatch={handleAncestrySelect}
         />
       )}
 

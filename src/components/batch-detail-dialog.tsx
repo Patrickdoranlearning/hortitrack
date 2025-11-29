@@ -36,6 +36,7 @@ interface BatchDetailDialogProps {
   onLogAction: (batch: Batch) => void;
   onGenerateProtocol: (batch: Batch) => void;
   onCareRecommendations: (batch: Batch) => void;
+  onSelectRelatedBatch?: (batchId: string) => void;
 }
 
 export function BatchDetailDialog({
@@ -47,6 +48,7 @@ export function BatchDetailDialog({
   onLogAction,
   onGenerateProtocol,
   onCareRecommendations,
+  onSelectRelatedBatch,
 }: BatchDetailDialogProps) {
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
@@ -165,7 +167,10 @@ export function BatchDetailDialog({
                   </div>
                 </TabsContent>
                 <TabsContent value="ancestry">
-                    <AncestryStrip currentId={batch.id!} />
+                    <AncestryStrip
+                      currentId={batch.id!}
+                      onSelectBatch={(id) => onSelectRelatedBatch?.(id)}
+                    />
                 </TabsContent>
               </Tabs>
             </div>
