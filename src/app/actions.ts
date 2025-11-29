@@ -3,7 +3,7 @@
 
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
-import type { Batch } from '@/lib/types';
+import type { Batch, PlantSize } from '@/lib/types';
 import { getSupabaseServerApp, getSupabaseServerClient } from '@/server/db/supabase';
 import { z } from 'zod';
 import { declassify } from '@/server/utils/declassify';
@@ -46,6 +46,57 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
         return null;
     }
     return data ? transformVBatchSearchData(data) : null;
+}
+
+const plantSizeColumnMap = {
+  camel: [
+    'id',
+    'name',
+    'containerType',
+    'cellMultiple',
+    'shelfQuantity',
+    'area',
+    'cellVolumeL',
+    'cellDiameterMm',
+    'cellWidthMm',
+    'cellLengthMm',
+    'cellShape',
+  ] as const,
+  snake: [
+    'id',
+    'name',
+    'container_type',
+    'cell_multiple',
+    'shelf_quantity',
+    'area',
+    'cell_volume_l',
+    'cell_diameter_mm',
+    'cell_width_mm',
+    'cell_length_mm',
+    'cell_shape',
+  ] as const,
+};
+
+function mapPlantSizeToDb(size: Partial<PlantSize>) {
+  const payload: Record<string, any> = {};
+  plantSizeColumnMap.camel.forEach((camelKey, index) => {
+    const dbKey = plantSizeColumnMap.snake[index];
+    const value = (size as any)[camelKey];
+    if (value !== undefined && value !== null) {
+      payload[dbKey] = value;
+    }
+  });
+  return payload;
+}
+
+function normalizePlantSizeRow(row?: any): PlantSize | undefined {
+  if (!row) return undefined;
+  const normalized: Record<string, any> = {};
+  plantSizeColumnMap.camel.forEach((camelKey, index) => {
+    const dbKey = plantSizeColumnMap.snake[index];
+    normalized[camelKey] = row[dbKey];
+  });
+  return normalized as PlantSize;
 }
 
 export async function getBatchesAction() {
@@ -151,16 +202,22 @@ export async function deleteLocationAction(locationId: string) {
 
 export async function addSizeAction(sizeData: Omit<PlantSize, 'id'>) {
     const supabase = await getSupabaseForApp();
-    const { data, error } = await supabase.from('plant_sizes').insert([sizeData]).select();
+    const payload = mapPlantSizeToDb(sizeData);
+    const { data, error } = await supabase.from('plant_sizes').insert([payload]).select();
     if (error) return { success: false, error: error.message };
-    return { success: true, data: data?.[0] };
+    return { success: true, data: normalizePlantSizeRow(data?.[0]) };
 }
 
 export async function updateSizeAction(sizeData: PlantSize) {
     const supabase = await getSupabaseForApp();
-    const { data, error } = await supabase.from('plant_sizes').update(sizeData).eq('id', sizeData.id).select();
+    const payload = mapPlantSizeToDb(sizeData);
+    const { data, error } = await supabase
+      .from('plant_sizes')
+      .update(payload)
+      .eq('id', sizeData.id)
+      .select();
     if (error) return { success: false, error: error.message };
-    return { success: true, data: data?.[0] };
+    return { success: true, data: normalizePlantSizeRow(data?.[0]) };
 }
 
 export async function deleteSizeAction(sizeId: string) {

@@ -1,16 +1,16 @@
-
 'use client';
 
-import { useState, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Upload } from 'lucide-react';
-import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { INITIAL_PLANT_SIZES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import type { PlantSize } from '@/lib/types';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,24 +21,134 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import { SizeForm } from '@/components/size-form';
 import { useAuth } from '@/hooks/use-auth';
-import { addSizeAction, updateSizeAction, deleteSizeAction } from '../actions';
+import { addSizeAction, deleteSizeAction, updateSizeAction } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection } from '@/hooks/use-collection';
+import { PageFrame } from '@/ui/templates/PageFrame';
+import { DataPageShell } from '@/components/data-management/DataPageShell';
+import { DataToolbar } from '@/components/data-management/DataToolbar';
+import { Input } from '@/components/ui/input';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Trash2, Edit } from 'lucide-react';
 
+const quickSizeSchema = z.object({
+  name: z.string().min(1, 'Size name is required'),
+  containerType: z.enum(['pot', 'tray', 'bareroot']),
+  cellMultiple: z.coerce.number().int().min(1).default(1),
+  shelfQuantity: z.coerce.number().int().min(0).default(0),
+  area: z.coerce.number().min(0).optional(),
+  cellVolumeL: z.coerce.number().min(0).optional(),
+  cellWidthMm: z.coerce.number().min(0).optional(),
+  cellLengthMm: z.coerce.number().min(0).optional(),
+  cellShape: z.enum(['round', 'square']).optional(),
+});
+
+type QuickSizeFormValues = z.infer<typeof quickSizeSchema>;
+
+const defaultQuickValues: QuickSizeFormValues = {
+  name: '',
+  containerType: 'pot',
+  cellMultiple: 1,
+  shelfQuantity: 0,
+  area: undefined,
+  cellVolumeL: undefined,
+  cellWidthMm: undefined,
+  cellLengthMm: undefined,
+  cellShape: undefined,
+};
+
+type SortableSizeKey =
+  | 'name'
+  | 'containerType'
+  | 'cellMultiple'
+  | 'shelfQuantity'
+  | 'area'
+  | 'cellVolumeL'
+  | 'cellWidthMm'
+  | 'cellLengthMm'
+  | 'cellShape';
 
 export default function SizesPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSize, setEditingSize] = useState<PlantSize | null>(null);
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const nameFieldRef = useRef<HTMLInputElement | null>(null);
+  const [filterText, setFilterText] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: SortableSizeKey; direction: 'asc' | 'desc' }>({
+    key: 'name',
+    direction: 'asc',
+  });
 
-  const { data: sizesData, loading: sizesLoading } = useCollection<PlantSize>('sizes', INITIAL_PLANT_SIZES);
-  const sizes = sizesData || [];
+  const { data: sizesData, loading: sizesLoading } = useCollection<any>('plant_sizes', INITIAL_PLANT_SIZES);
+  const sizes = useMemo<PlantSize[]>(() => {
+    return (sizesData || []).map(normalizeSizeRow);
+  }, [sizesData]);
   const isLoading = authLoading || sizesLoading;
+
+  const quickForm = useForm<QuickSizeFormValues>({
+    resolver: zodResolver(quickSizeSchema),
+    defaultValues: defaultQuickValues,
+  });
+
+  const filteredSizes = useMemo(() => {
+    if (!filterText) return sizes;
+    const query = filterText.toLowerCase();
+    return sizes.filter(
+      (size) =>
+        size.name?.toLowerCase().includes(query) ||
+        size.containerType?.toLowerCase().includes(query)
+    );
+  }, [sizes, filterText]);
+
+  const sortedSizes = useMemo(() => {
+    return [...filteredSizes].sort((a, b) => {
+      const { key, direction } = sortConfig;
+      const left = a?.[key];
+      const right = b?.[key];
+
+      if (left === undefined || left === null) return direction === 'asc' ? 1 : -1;
+      if (right === undefined || right === null) return direction === 'asc' ? -1 : 1;
+
+      if (typeof left === 'number' && typeof right === 'number') {
+        return direction === 'asc' ? left - right : right - left;
+      }
+
+      const leftStr = String(left).toLowerCase();
+      const rightStr = String(right).toLowerCase();
+      if (leftStr < rightStr) return direction === 'asc' ? -1 : 1;
+      if (leftStr > rightStr) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredSizes, sortConfig]);
+
+  const handleSort = (key: SortableSizeKey) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const renderHeaderButton = (label: string, key: SortableSizeKey) => {
+    const isActive = sortConfig.key === key;
+    const indicator = isActive ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '';
+    return (
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-left text-xs font-semibold uppercase tracking-wide"
+        onClick={() => handleSort(key)}
+      >
+        {label}
+        <span className="text-muted-foreground">{indicator}</span>
+      </button>
+    );
+  };
 
   const handleAddSize = () => {
     setEditingSize(null);
@@ -51,194 +161,504 @@ export default function SizesPage() {
   };
 
   const handleDeleteSize = async (sizeId: string) => {
-    const sizeToDelete = sizes.find(s => s.id === sizeId);
-    if (sizeToDelete) {
-      const result = await deleteSizeAction(sizeId);
-      if (result.success) {
-        toast({ title: 'Size Deleted', description: `Successfully deleted "${sizeToDelete.name}".` });
-      } else {
-        toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
-      }
+    const sizeToDelete = sizes.find((s) => s.id === sizeId);
+    if (!sizeToDelete) return;
+    const result = await deleteSizeAction(sizeId);
+    if (result.success) {
+      toast({ title: 'Size deleted', description: `Removed "${sizeToDelete.name}".` });
+    } else {
+      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
     }
   };
 
   const handleFormSubmit = async (data: Omit<PlantSize, 'id'> | PlantSize) => {
     const isEditing = 'id' in data;
-
     const result = isEditing
       ? await updateSizeAction(data as PlantSize)
       : await addSizeAction(data as Omit<PlantSize, 'id'>);
 
     if (result.success) {
       toast({
-        title: isEditing ? 'Size Updated' : 'Size Added',
-        description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`
+        title: isEditing ? 'Size updated' : 'Size added',
+        description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`,
       });
       setIsFormOpen(false);
       setEditingSize(null);
     } else {
       toast({
         variant: 'destructive',
-        title: isEditing ? 'Update Failed' : 'Add Failed',
-        description: result.error
+        title: isEditing ? 'Update failed' : 'Add failed',
+        description: result.error,
       });
     }
   };
 
-  const handleDownloadData = () => {
-    const headers: (keyof Omit<PlantSize, 'id'>)[] = ['name', 'containerType', 'area', 'shelfQuantity', 'multiple'];
-    const csvRows = sizes.map(s =>
-      headers.map(header => `"${s[header] || ''}"`).join(',')
+  const handleQuickAdd = quickForm.handleSubmit(async (values) => {
+    const normalizedName = values.name.trim().toLowerCase();
+    if (
+      sizes.some(
+        (size) => size.name && size.name.trim().toLowerCase() === normalizedName
+      )
+    ) {
+      toast({
+        variant: 'destructive',
+        title: 'Duplicate size',
+        description: `"${values.name}" already exists. Edit the existing row instead.`,
+      });
+      return;
+    }
+
+    const payload: Omit<PlantSize, 'id'> = {
+      name: values.name.trim(),
+      containerType: values.containerType,
+      cellMultiple: values.cellMultiple ?? 1,
+      shelfQuantity: values.shelfQuantity ?? 0,
+      area: values.area,
+      cellVolumeL: values.cellVolumeL,
+      cellWidthMm: values.cellWidthMm,
+      cellLengthMm: values.cellLengthMm,
+      cellShape: values.cellShape,
+    };
+
+    const result = await addSizeAction(payload);
+    if (result.success) {
+      toast({ title: 'Size added', description: `"${values.name}" is now available.` });
+      quickForm.reset(defaultQuickValues);
+      nameFieldRef.current?.focus();
+    } else {
+      toast({ variant: 'destructive', title: 'Add failed', description: result.error });
+    }
+  });
+
+  const handleDownloadTemplate = async () => {
+    const headers = [
+      'name',
+      'containerType',
+      'cellMultiple',
+      'shelfQuantity',
+      'area',
+      'cellVolumeL',
+      'cellWidthMm',
+      'cellLengthMm',
+      'cellShape',
+    ];
+    const sampleRow = [
+      'P9',
+      'pot',
+      '1',
+      '80',
+      '0.01',
+      '',
+      '',
+      '',
+      'round',
+    ].join(',');
+    downloadCsv(headers, [sampleRow], 'plant_sizes_template.csv');
+  };
+
+  const handleDownloadData = async () => {
+    const headers = [
+      'name',
+      'containerType',
+      'cellMultiple',
+      'shelfQuantity',
+      'area',
+      'cellVolumeL',
+      'cellWidthMm',
+      'cellLengthMm',
+      'cellShape',
+    ];
+    const rows = sortedSizes.map((size) =>
+      headers.map((header) => `"${(size as any)[header] ?? ''}"`).join(',')
+    );
+    downloadCsv(headers, rows, 'plant_sizes.csv');
+  };
+
+  const handleUploadCsv = async (file: File) => {
+    const text = await file.text();
+    const rows = text.split('\n').filter((row) => row.trim() !== '');
+    const headerLine = rows.shift();
+    if (!headerLine) throw new Error('The CSV file is empty.');
+
+    const headers = headerLine.split(',').map((h) => h.trim().replace(/"/g, ''));
+    const required = ['name', 'containerType'];
+    if (!required.every((h) => headers.includes(h))) {
+      throw new Error(`CSV headers are missing or incorrect. Required: ${required.join(', ')}`);
+    }
+
+    const existingNames = new Set(
+      sizes
+        .map((size) => size.name?.trim().toLowerCase())
+        .filter((name): name is string => Boolean(name))
     );
 
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(',') + '\n'
-      + csvRows.join('\n');
+    let created = 0;
+    const duplicates: string[] = [];
+    const failures: string[] = [];
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "plant_sizes.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
-      try {
-        const rows = text.split('\n').filter(row => row.trim() !== '');
-        const headerLine = rows.shift()?.trim() || '';
-        const headers = headerLine.split(',').map(h => h.trim().replace(/"/g, '') as keyof PlantSize);
-
-        const requiredHeaders: (keyof PlantSize)[] = ['name', 'containerType', 'area', 'shelfQuantity'];
-        if (!requiredHeaders.every(h => headers.includes(h))) {
-          throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
-        }
-
-        for (const row of rows) {
-          const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)!.map(v => v.replace(/"/g, '').trim());
-          const sizeData: any = {};
-          headers.forEach((header, i) => {
-            sizeData[header] = values[i] || '';
-          });
-
-          await addSizeAction(sizeData);
-        }
-
-        toast({ title: 'Import Successful', description: `${rows.length} sizes have been imported.` });
-      } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
-      } finally {
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+    for (const row of rows) {
+      if (!row.trim()) continue;
+      const values =
+        row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)?.map((v) => v.replace(/"/g, '').trim()) ?? [];
+      const record: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        record[header] = values[index] ?? '';
+      });
+      const normalizedName = record.name?.trim().toLowerCase();
+      if (!record.name || !normalizedName) {
+        failures.push('(missing name)');
+        continue;
       }
-    };
-    reader.readAsText(file);
+
+      if (existingNames.has(normalizedName)) {
+        duplicates.push(record.name);
+        continue;
+      }
+
+      const payload: Omit<PlantSize, 'id'> = {
+        name: record.name.trim(),
+        containerType: (record.containerType || 'pot').toLowerCase() as PlantSize['containerType'],
+        cellMultiple: record.cellMultiple ? Number(record.cellMultiple) : 1,
+        shelfQuantity: record.shelfQuantity ? Number(record.shelfQuantity) : 0,
+        area: record.area ? Number(record.area) : undefined,
+        cellVolumeL: record.cellVolumeL ? Number(record.cellVolumeL) : undefined,
+        cellWidthMm: record.cellWidthMm ? Number(record.cellWidthMm) : undefined,
+        cellLengthMm: record.cellLengthMm ? Number(record.cellLengthMm) : undefined,
+        cellShape: record.cellShape ? (record.cellShape.toLowerCase() as 'round' | 'square') : undefined,
+      };
+
+      const result = await addSizeAction(payload);
+      if (result.success) {
+        created += 1;
+        existingNames.add(normalizedName);
+      } else {
+        failures.push(record.name);
+      }
+    }
+
+    let description = `${created} new size${created === 1 ? '' : 's'} added.`;
+    if (duplicates.length) {
+      description += ` Skipped ${duplicates.length} duplicate${duplicates.length === 1 ? '' : 's'} (${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? ', …' : ''}).`;
+    }
+    if (failures.length) {
+      description += ` Failed to import ${failures.length} row${failures.length === 1 ? '' : 's'}.`;
+    }
+
+    toast({
+      title: 'Import complete',
+      description,
+      variant: failures.length ? 'destructive' : 'default',
+    });
   };
 
-  const customSizeSort = (a: PlantSize, b: PlantSize) => {
-    const typeOrder: Record<string, number> = { 'Pot': 1, 'Tray': 2, 'Bareroot': 3 };
-
-    const typeA = typeOrder[a.containerType || ''] || 99;
-    const typeB = typeOrder[b.containerType || ''] || 99;
-
-    if (typeA !== typeB) {
-      return typeA - typeB;
-    }
-
-    const nameA = a.name ?? "";
-    const nameB = b.name ?? "";
-
-    const sizeA = Number.parseFloat(nameA);
-    const sizeB = Number.parseFloat(nameB);
-    const hasNumericSizes = !Number.isNaN(sizeA) && !Number.isNaN(sizeB);
-
-    if (a.containerType === 'Pot' && hasNumericSizes) {
-      return sizeA - sizeB;
-    }
-
-    if (a.containerType === 'Tray' && hasNumericSizes) {
-      return sizeB - sizeA;
-    }
-
-    // Fallback to lexical ordering for non-numeric names or other container types.
-    return nameA.localeCompare(nameB);
-  };
+  const focusQuickRow = () => nameFieldRef.current?.focus();
 
   return (
-    <>
-      <div className="container mx-auto max-w-6xl p-4 sm:p-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="font-headline text-4xl">Plant Sizes</h1>
-            <p className="text-muted-foreground">The master list of all standard plant/container sizes.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href="/settings">
-                <ArrowLeft />
-                Back to Data Management
-              </Link>
-            </Button>
-            <Button variant="outline" onClick={handleDownloadData}><Download /> Download Data</Button>
-            <Button onClick={() => fileInputRef.current?.click()}><Upload /> Upload CSV</Button>
-            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
-            <Button onClick={handleAddSize}>
-              <Plus />
-              Add New Size
-            </Button>
-          </div>
-        </div>
-
+    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+      <DataPageShell
+        title="Plant Sizes"
+        description="Standardise tray, pot, and bareroot data for propagation, transplanting, and sales."
+        toolbar={
+          <DataToolbar
+            onDownloadTemplate={handleDownloadTemplate}
+            onDownloadData={handleDownloadData}
+            onUploadCsv={handleUploadCsv}
+            onAddRow={focusQuickRow}
+            filters={
+              <Input
+                className="w-full max-w-xs"
+                placeholder="Filter by size or type…"
+                value={filterText}
+                onChange={(event) => setFilterText(event.target.value)}
+              />
+            }
+            extraActions={
+              <Button size="sm" onClick={handleAddSize}>
+                <Plus className="mr-2 h-4 w-4" />
+                Manage form
+              </Button>
+            }
+          />
+        }
+      >
         <Card>
           <CardHeader>
-            <CardTitle>Manage Sizes</CardTitle>
-            <CardDescription>Add, edit, or remove sizes from the list used in batch forms.</CardDescription>
+            <CardTitle>Golden table</CardTitle>
+            <CardDescription>Use the quick row for single entries or the pencil icon to edit existing sizes.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {isLoading ? (
               <div className="space-y-2">
-                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                {[...Array(5)].map((_, index) => (
+                  <Skeleton key={index} className="h-12 w-full" />
+                ))}
               </div>
             ) : (
-              <Table>
+              <Table className="min-w-[1100px] text-sm whitespace-nowrap">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Area (m²)</TableHead>
-                    <TableHead>Shelf Quantity</TableHead>
-                    <TableHead>Multiple</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[160px]">{renderHeaderButton('Size / Label', 'name')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[120px]">{renderHeaderButton('Type', 'containerType')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[110px]">{renderHeaderButton('Cells', 'cellMultiple')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Shelf qty', 'shelfQuantity')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Area (m²)', 'area')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Volume (L)', 'cellVolumeL')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[170px]">{renderHeaderButton('Dimensions (mm)', 'cellWidthMm')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[120px]">{renderHeaderButton('Shape', 'cellShape')}</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sizes.sort(customSizeSort).map((size) => (
+                  <Form {...quickForm}>
+                    <TableRow className="bg-muted/70">
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Size / Label</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Add new size…"
+                                  {...field}
+                                  ref={(node) => {
+                                    nameFieldRef.current = node;
+                                    field.ref(node);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="containerType"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Type</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="pot">Pot</SelectItem>
+                                  <SelectItem value="tray">Tray</SelectItem>
+                                  <SelectItem value="bareroot">Bareroot</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="cellMultiple"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Cells</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  placeholder="e.g., 54"
+                                  value={field.value ?? ''}
+                                  onChange={(event) =>
+                                    field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="shelfQuantity"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Shelf qty</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="e.g., 80"
+                                  value={field.value ?? ''}
+                                  onChange={(event) =>
+                                    field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="area"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Area</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={field.value ?? ''}
+                                  onChange={(event) =>
+                                    field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="cellVolumeL"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Volume</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Optional"
+                                  value={field.value ?? ''}
+                                  onChange={(event) =>
+                                    field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="grid grid-cols-2 gap-2">
+                          <FormField
+                            control={quickForm.control}
+                            name="cellWidthMm"
+                            render={({ field }) => (
+                              <FormItem className="space-y-1">
+                                <FormLabel className="sr-only">Width</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    placeholder="W"
+                                    value={field.value ?? ''}
+                                    onChange={(event) =>
+                                      field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage className="text-xs" />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={quickForm.control}
+                            name="cellLengthMm"
+                            render={({ field }) => (
+                              <FormItem className="space-y-1">
+                                <FormLabel className="sr-only">Length</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    placeholder="L"
+                                    value={field.value ?? ''}
+                                    onChange={(event) =>
+                                      field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage className="text-xs" />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="cellShape"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Shape</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Shape" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="round">Round</SelectItem>
+                                  <SelectItem value="square">Square</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" onClick={handleQuickAdd}>
+                          Add
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </Form>
+
+                  {sortedSizes.map((size) => (
                     <TableRow key={size.id}>
-                      <TableCell className="font-medium">{size.name}</TableCell>
-                      <TableCell>{size.containerType}</TableCell>
-                      <TableCell>{size.area}</TableCell>
-                      <TableCell>{size.shelfQuantity}</TableCell>
-                      <TableCell>{size.multiple}</TableCell>
+                      <TableCell className="px-4 py-2 font-medium">{size.name}</TableCell>
+                      <TableCell className="px-4 py-2">{formatType(size.containerType)}</TableCell>
+                      <TableCell className="px-4 py-2">{size.cellMultiple ?? 1}</TableCell>
+                      <TableCell className="px-4 py-2">{size.shelfQuantity ?? 0}</TableCell>
+                      <TableCell className="px-4 py-2">{size.area ?? '—'}</TableCell>
+                      <TableCell className="px-4 py-2">{size.cellVolumeL ?? '—'}</TableCell>
+                      <TableCell className="px-4 py-2">
+                        {size.cellWidthMm && size.cellLengthMm
+                          ? `${size.cellWidthMm} × ${size.cellLengthMm}`
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="px-4 py-2">{size.cellShape ? capitalize(size.cellShape) : '—'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <Button type="button" size="icon" variant="outline" onClick={() => handleEditSize(size)}><Edit /></Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={() => handleEditSize(size)}
+                          >
+                            <Edit />
+                          </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
+                              <Button type="button" size="icon" variant="destructive">
+                                <Trash2 />
+                              </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogTitle>Delete size?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This will permanently delete the "{size.name}" size. This action cannot be undone.
+                                  This removes "{size.name}" from future forms.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -258,21 +678,60 @@ export default function SizesPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingSize ? "Edit Size" : "Add Size"}</DialogTitle>
-            <DialogDescription>Define container/tray sizes and multiples.</DialogDescription>
-          </DialogHeader>
-          <SizeForm
-            size={editingSize}
-            onSubmit={handleFormSubmit}
-            onCancel={() => setIsFormOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-    </>
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingSize ? 'Edit size' : 'Add size'}</DialogTitle>
+              <DialogDescription>Define tray, plug, or pot metadata.</DialogDescription>
+            </DialogHeader>
+            <SizeForm
+              size={editingSize}
+              onSubmit={handleFormSubmit}
+              onCancel={() => setIsFormOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      </DataPageShell>
+    </PageFrame>
   );
 }
+
+function downloadCsv(headers: string[], rows: string[], filename: string) {
+  const csvContent = `data:text/csv;charset=utf-8,${headers.join(',')}\n${rows.join('\n')}`;
+  const encoded = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encoded);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function formatType(type?: PlantSize['containerType']) {
+  if (!type) return '—';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function capitalize(value?: string | null) {
+  if (!value) return '';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function normalizeSizeRow(row: any): PlantSize {
+  if (!row) return row;
+  return {
+    id: row.id,
+    name: row.name,
+    containerType: row.containerType ?? row.container_type ?? 'pot',
+    cellMultiple: row.cellMultiple ?? row.cell_multiple ?? 1,
+    shelfQuantity: row.shelfQuantity ?? row.shelf_quantity ?? 0,
+    area: row.area,
+    cellVolumeL: row.cellVolumeL ?? row.cell_volume_l,
+    cellDiameterMm: row.cellDiameterMm ?? row.cell_diameter_mm,
+    cellWidthMm: row.cellWidthMm ?? row.cell_width_mm,
+    cellLengthMm: row.cellLengthMm ?? row.cell_length_mm,
+    cellShape: row.cellShape ?? row.cell_shape,
+  };
+}
+

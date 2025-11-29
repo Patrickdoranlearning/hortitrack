@@ -41,6 +41,7 @@ export const NurseryLocationSchema = z.object({
   name: z.string().min(1, "Location name is required"),
   nurserySite: z.string(), // Kept for compatibility/display
   covered: z.boolean().default(false),
+  type: z.string().optional(),
   area: z.number().optional(),
   capacity: z.number().int().nonnegative().optional(),
 });
@@ -52,8 +53,13 @@ export const PlantSizeSchema = z.object({
   name: z.string().min(1, "Size name is required"),
   containerType: SizeContainerType.default('pot'),
   cellMultiple: z.number().int().min(1).default(1),
+  shelfQuantity: z.number().int().nonnegative().optional(),
+  area: z.number().nonnegative().optional(),
   cellDiameterMm: z.number().optional(),
   cellVolumeL: z.number().optional(),
+  cellWidthMm: z.number().optional(),
+  cellLengthMm: z.number().optional(),
+  cellShape: z.enum(['round', 'square']).optional(),
 });
 export type PlantSize = z.infer<typeof PlantSizeSchema>;
 
@@ -66,6 +72,12 @@ export const VarietySchema = z.object({
   species: z.string().optional(),
   category: z.string().optional(),
   colour: z.string().optional(),
+  commonName: z.string().optional(),
+  grouping: z.string().optional(),
+  floweringPeriod: z.string().optional(),
+  flowerColour: z.string().optional(),
+  evergreen: z.boolean().optional(),
+  plantBreedersRights: z.boolean().optional(),
   rating: z.number().min(1).max(6).optional(),
 });
 export type Variety = z.infer<typeof VarietySchema>;
@@ -81,6 +93,7 @@ export const SupplierSchema = z.object({
   email: z.string().email().optional(),
   address: z.string().optional(),
   eircode: z.string().optional(),
+  supplierType: z.string().optional(),
 });
 export type Supplier = z.infer<typeof SupplierSchema>;
 
@@ -107,6 +120,9 @@ export const CustomerSchema = z.object({
   vatNumber: z.string().optional(),
   notes: z.string().optional(),
   defaultPriceListId: z.string().optional(),
+  store: z.string().optional(),
+  accountsEmail: z.string().email().optional(),
+  pricingTier: z.string().optional(),
 });
 export type Customer = z.infer<typeof CustomerSchema>;
 
@@ -242,3 +258,15 @@ export const OrgMembershipSchema = z.object({
   role: OrgRole.default('viewer'),
 });
 export type OrgMembership = z.infer<typeof OrgMembershipSchema>;
+
+// --- Hauliers ---
+export const HaulierSchema = z.object({
+  id: z.string().optional(),
+  orgId: z.string(),
+  name: z.string().min(1),
+  phone: z.string().optional(),
+  email: z.string().email().optional(),
+  notes: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+export type Haulier = z.infer<typeof HaulierSchema>;

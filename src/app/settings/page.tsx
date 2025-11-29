@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Ruler, MapPin, Truck, PackageSearch, ShoppingCart, Users, Receipt } from 'lucide-react';
+import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt } from 'lucide-react';
 import Link from 'next/link';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
@@ -16,7 +16,7 @@ export default function DataManagementPage() {
           <div>
             <h1 className="font-headline text-4xl">Data Management</h1>
             <p className="text-muted-foreground">
-              Manage your "golden tables"—the standardized datasets that power every production workflow.
+              Download a template, upload CSVs, or add quick rows to keep your golden data sets in sync across the nursery.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -27,24 +27,11 @@ export default function DataManagementPage() {
           </Button>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><PackageSearch /> Batch Data</CardTitle>
-              <CardDescription>View, search, and manage all historical and active batch records in a table.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/production/batches">
-                  Manage Batches
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Database /> Plant Varieties</CardTitle>
-              <CardDescription>View and manage the master list of all plant varieties, including their family and category.</CardDescription>
+              <CardDescription>Maintain families, categories, and compliance data. Supports CSV import/export.</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
@@ -58,7 +45,7 @@ export default function DataManagementPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><MapPin /> Nursery Locations</CardTitle>
-              <CardDescription>Add or remove nursery locations, and define their area and type.</CardDescription>
+              <CardDescription>Capture tunnels, glasshouses, areas, and coverage so forms stay accurate.</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
@@ -72,7 +59,7 @@ export default function DataManagementPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Ruler /> Plant Sizes</CardTitle>
-              <CardDescription>Maintain the list of standard container and plug sizes for your stock.</CardDescription>
+              <CardDescription>Track trays, pots, and plug dimensions with quick inline edits.</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
@@ -86,7 +73,7 @@ export default function DataManagementPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Truck /> Suppliers</CardTitle>
-              <CardDescription>Maintain the list of plant and material suppliers for your nursery.</CardDescription>
+              <CardDescription>Classify plant, haulage, hardware, and admin suppliers with one source of truth.</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
@@ -99,22 +86,8 @@ export default function DataManagementPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><ShoppingCart /> Sales Orders</CardTitle>
-              <CardDescription>View all customer sales orders.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/sales/orders">
-                  Manage Orders
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle className="flex items-center gap-2"><Users /> Customers</CardTitle>
-              <CardDescription>Manage customer accounts and stores.</CardDescription>
+              <CardDescription>Upload store lists, finance contacts, and pricing tiers in bulk.</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
@@ -128,12 +101,26 @@ export default function DataManagementPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Receipt /> Products</CardTitle>
-              <CardDescription>Manage the sales product catalog.</CardDescription>
+              <CardDescription>Coming soon: manage SKUs, aliases, and price lists in one place.</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
                 <Link href="/sales/products">
                   Manage Products
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Truck /> Hauliers</CardTitle>
+              <CardDescription>Manage approved logistics partners for dispatch drop-downs.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/hauliers">
+                  Manage Hauliers
                 </Link>
               </Button>
             </CardContent>
