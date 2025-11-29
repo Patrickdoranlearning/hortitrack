@@ -289,12 +289,6 @@ export default function HomePageView({
             }
             return [normalized, ...prev];
           });
-          toast({
-            title: "Batch found",
-            description: `#${normalized.batchNumber} • ${
-              normalized.plantVariety ?? ""
-            }`,
-          });
         } else if (res.status === 404) {
           toast({
             variant: "destructive",
