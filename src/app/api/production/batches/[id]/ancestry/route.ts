@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { getBatchById } from "@/server/batches/service";
 
 export async function GET(
   _req: NextRequest,
@@ -8,31 +9,40 @@ export async function GET(
   try {
     const { supabase, orgId } = await getUserAndOrg();
 
-    const parentQ = supabase
-      .from("batch_ancestry")
-      .select("parent_batch_id, proportion, parent:parent_batch_id (id, batch_number)")
-      .eq("org_id", orgId)
-      .eq("child_batch_id", params.id);
-
-    const childQ = supabase
-      .from("batch_ancestry")
-      .select("child_batch_id, proportion, child:child_batch_id (id, batch_number)")
-      .eq("org_id", orgId)
-      .eq("parent_batch_id", params.id);
-
     const [{ data: parents, error: pErr }, { data: children, error: cErr }] =
-      await Promise.all([parentQ, childQ]);
+      await Promise.all([
+        supabase
+          .from("batch_ancestry")
+          .select("parent_batch_id, proportion")
+          .eq("org_id", orgId)
+          .eq("child_batch_id", params.id),
+        supabase
+          .from("batch_ancestry")
+          .select("child_batch_id, proportion")
+          .eq("org_id", orgId)
+          .eq("parent_batch_id", params.id),
+      ]);
 
     if (pErr) throw pErr;
     if (cErr) throw cErr;
 
+    const parentIds = (parents ?? [])
+      .map((r) => r.parent_batch_id)
+      .filter(Boolean);
+    const childIds = (children ?? [])
+      .map((r) => r.child_batch_id)
+      .filter(Boolean);
+
+    const [current, parentNodes, childNodes] = await Promise.all([
+      getBatchById(params.id),
+      Promise.all(parentIds.map((id) => getBatchById(id))),
+      Promise.all(childIds.map((id) => getBatchById(id))),
+    ]);
+
     return NextResponse.json({
-      parents: (parents ?? []).map(r => ({
-        id: r.parent?.id, batch_number: r.parent?.batch_number, proportion: r.proportion,
-      })),
-      children: (children ?? []).map(r => ({
-        id: r.child?.id, batch_number: r.child?.batch_number, proportion: r.proportion,
-      })),
+      current,
+      parents: parentNodes.filter(Boolean),
+      children: childNodes.filter(Boolean),
     });
   } catch (e: any) {
     const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
