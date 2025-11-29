@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { SupplierSchema as FormSchema, type Supplier } from '@/lib/types';
 import { useEffect } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const SupplierFormSchema = FormSchema.omit({ id: true });
 type SupplierFormValues = Omit<Supplier, 'id'>;
@@ -31,23 +32,33 @@ export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps
 
   const form = useForm<SupplierFormValues>({
     resolver: zodResolver(SupplierFormSchema),
-    defaultValues: supplier ? { ...supplier } : {
-        name: '',
-        address: '',
-        country: '',
-        countryCode: '',
-        producerCode: '',
-    },
+    defaultValues: supplier
+      ? { ...supplier }
+      : {
+          name: '',
+          address: '',
+          countryCode: 'IE',
+          producerCode: '',
+          phone: '',
+          email: '',
+          eircode: '',
+          supplierType: '',
+        },
   });
 
   useEffect(() => {
-    form.reset(supplier || {
+    form.reset(
+      supplier || {
         name: '',
         address: '',
-        country: '',
-        countryCode: '',
+        countryCode: 'IE',
         producerCode: '',
-    });
+        phone: '',
+        email: '',
+        eircode: '',
+        supplierType: '',
+      }
+    );
   }, [supplier, form]);
 
   const handleFormSubmit = (data: SupplierFormValues) => {
@@ -83,24 +94,67 @@ export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps
                       <FormMessage />
                   </FormItem>
               )} />
-              <FormField control={form.control} name="country" render={({ field }) => (
-                  <FormItem>
-                      <FormLabel>Country</FormLabel>
-                      <FormControl><Input placeholder="e.g., 'Ireland'" {...field} /></FormControl>
-                      <FormMessage />
-                  </FormItem>
-              )} />
               <FormField control={form.control} name="countryCode" render={({ field }) => (
                   <FormItem>
-                      <FormLabel>Country Code (D)</FormLabel>
-                      <FormControl><Input placeholder="e.g., 'IE'" {...field} /></FormControl>
+                      <FormLabel>Country code</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., IE"
+                          value={field.value ?? ''}
+                          maxLength={2}
+                          onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                        />
+                      </FormControl>
                       <FormMessage />
                   </FormItem>
               )} />
               <FormField control={form.control} name="producerCode" render={({ field }) => (
                   <FormItem>
-                      <FormLabel>Producer Code (B)</FormLabel>
+                      <FormLabel>Producer code</FormLabel>
                       <FormControl><Input placeholder="e.g., '12345'" {...field} /></FormControl>
+                      <FormMessage />
+                  </FormItem>
+              )} />
+              <FormField control={form.control} name="supplierType" render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Supplier type</FormLabel>
+                      <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Unspecified</SelectItem>
+                          <SelectItem value="plant">Plant supplier</SelectItem>
+                          <SelectItem value="general">General supplier</SelectItem>
+                          <SelectItem value="hardware">Hardware supplier</SelectItem>
+                          <SelectItem value="haulier">Haulier</SelectItem>
+                          <SelectItem value="administrative">Administrative supplier</SelectItem>
+                          <SelectItem value="stationary">Stationary supplier</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                  </FormItem>
+              )} />
+              <FormField control={form.control} name="phone" render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl><Input placeholder="+353..." {...field} /></FormControl>
+                      <FormMessage />
+                  </FormItem>
+              )} />
+              <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl><Input type="email" placeholder="supplier@example.com" {...field} /></FormControl>
+                      <FormMessage />
+                  </FormItem>
+              )} />
+              <FormField control={form.control} name="eircode" render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Eircode</FormLabel>
+                      <FormControl><Input placeholder="Optional" {...field} /></FormControl>
                       <FormMessage />
                   </FormItem>
               )} />

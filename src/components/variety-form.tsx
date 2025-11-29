@@ -18,6 +18,7 @@ import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/co
 import { type Variety, VarietySchema } from '@/lib/types';
 import { ScrollArea } from './ui/scroll-area';
 import { useEffect } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type VarietyFormValues = z.infer<typeof VarietySchema>;
 
@@ -34,30 +35,34 @@ export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
     resolver: zodResolver(VarietySchema),
     defaultValues: variety || {
         name: '',
-        family: '',
-        category: '',
-        grouping: '',
         commonName: '',
-        rating: '',
-        salesPeriod: '',
+        family: '',
+        genus: '',
+        species: '',
+        category: '',
+        colour: '',
         floweringPeriod: '',
         flowerColour: '',
-        evergreen: '',
+        evergreen: undefined,
+        plantBreedersRights: undefined,
+        rating: undefined,
     },
   });
 
   useEffect(() => {
     form.reset(variety || {
         name: '',
-        family: '',
-        category: '',
-        grouping: '',
         commonName: '',
-        rating: '',
-        salesPeriod: '',
+        family: '',
+        genus: '',
+        species: '',
+        category: '',
+        colour: '',
         floweringPeriod: '',
         flowerColour: '',
-        evergreen: '',
+        evergreen: undefined,
+        plantBreedersRights: undefined,
+        rating: undefined,
     });
   }, [variety, form]);
 
@@ -81,70 +86,185 @@ export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
                   <FormField control={form.control} name="name" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Variety Name</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Munstead'" {...field} /></FormControl>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'Munstead'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
                   <FormField control={form.control} name="commonName" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Common Name</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'English Lavender'" {...field} /></FormControl>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'English Lavender'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
                   <FormField control={form.control} name="family" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Plant Family</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Lavender'" {...field} /></FormControl>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'Lamiaceae'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                  <FormField control={form.control} name="genus" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Genus</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'Lavandula'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                  <FormField control={form.control} name="species" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Species</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'angustifolia'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
                   <FormField control={form.control} name="category" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Category</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Perennial'" {...field} /></FormControl>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'Perennial'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
-                  <FormField control={form.control} name="grouping" render={({ field }) => (
+                  <FormField control={form.control} name="colour" render={({ field }) => (
                       <FormItem>
-                          <FormLabel>Grouping</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Herb'" {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="evergreen" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Evergreen</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Yes' or 'No'" {...field} /></FormControl>
+                          <FormLabel>Foliage Colour</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'Grey-green'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
                   <FormField control={form.control} name="flowerColour" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Flower Colour</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Purple'" {...field} /></FormControl>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'Purple'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
                   <FormField control={form.control} name="floweringPeriod" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Flowering Period</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Summer'" {...field} /></FormControl>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 'Summer'"
+                              value={field.value ?? ''}
+                              onChange={(event) => field.onChange(event.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
-                  <FormField control={form.control} name="salesPeriod" render={({ field }) => (
+                  <FormField control={form.control} name="evergreen" render={({ field }) => (
                       <FormItem>
-                          <FormLabel>Sales Period</FormLabel>
-                          <FormControl><Input placeholder="e.g., 'Spring-Summer'" {...field} /></FormControl>
+                          <FormLabel>Evergreen</FormLabel>
+                          <Select
+                              value={field.value === undefined ? "unknown" : field.value ? "yes" : "no"}
+                              onValueChange={(value) =>
+                                field.onChange(
+                                  value === "unknown" ? undefined : value === "yes"
+                                )
+                              }
+                          >
+                              <FormControl>
+                                  <SelectTrigger>
+                                      <SelectValue placeholder="Evergreen?" />
+                                  </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                  <SelectItem value="unknown">Unspecified</SelectItem>
+                                  <SelectItem value="yes">Yes</SelectItem>
+                                  <SelectItem value="no">No</SelectItem>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                  <FormField control={form.control} name="plantBreedersRights" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Plant Breeders Rights</FormLabel>
+                          <Select
+                              value={field.value === undefined ? "unknown" : field.value ? "yes" : "no"}
+                              onValueChange={(value) =>
+                                field.onChange(
+                                  value === "unknown" ? undefined : value === "yes"
+                                )
+                              }
+                          >
+                              <FormControl>
+                                  <SelectTrigger>
+                                      <SelectValue placeholder="PBR?" />
+                                  </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                  <SelectItem value="unknown">Unspecified</SelectItem>
+                                  <SelectItem value="yes">Yes</SelectItem>
+                                  <SelectItem value="no">No</SelectItem>
+                              </SelectContent>
+                          </Select>
                           <FormMessage />
                       </FormItem>
                   )} />
                    <FormField control={form.control} name="rating" render={({ field }) => (
                       <FormItem>
                           <FormLabel>Rating</FormLabel>
-                          <FormControl><Input placeholder="e.g., '5'" {...field} /></FormControl>
+                          <FormControl>
+                              <Input
+                                  type="number"
+                                  min={1}
+                                  max={6}
+                                  placeholder="1-6"
+                                  value={field.value ?? ""}
+                                  onChange={(event) =>
+                                      field.onChange(event.target.value === "" ? undefined : Number(event.target.value))
+                                  }
+                              />
+                          </FormControl>
                           <FormMessage />
                       </FormItem>
                   )} />
