@@ -47,9 +47,9 @@ const Schema = z.object({
   notes: z.string().max(1000).optional(),
   passport_override: z
     .object({
-      operator_reg_no: z.string().optional(),
-      origin_country: z.string().optional(),
-      traceability_code: z.string().optional(),
+    operator_reg_no: z.string().optional(),
+    origin_country: z.string().optional(),
+    traceability_code: z.string().optional(),
     })
     .optional(),
 });
@@ -93,7 +93,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
 
   const [submitting, setSubmitting] = React.useState(false);
   const [overrideOn, setOverrideOn] = React.useState(false);
-
+  
   const varieties = React.useMemo(() => referenceData?.varieties ?? [], [referenceData]);
   const sizes = React.useMemo(() => referenceData?.sizes ?? [], [referenceData]);
   const locations = React.useMemo(() => referenceData?.locations ?? [], [referenceData]);
@@ -240,22 +240,22 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 control={form.control}
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
-                    <FormLabel>Variety</FormLabel>
+            <FormLabel>Variety</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a variety" />
                       </SelectTrigger>
                       <SelectContent>
                         {varieties.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
+                <SelectItem key={v.id} value={v.id}>
                             {v.name}
                             {v.family ? ` · ${v.family}` : ""}
-                          </SelectItem>
+                </SelectItem>
                         ))}
                       </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+            </Select>
+            <FormMessage />
+          </FormItem>
                 )}
               />
 
@@ -263,7 +263,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="size_id"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
+            <FormItem>
                     <FormLabel>Size / Container</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
@@ -271,15 +271,15 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                       </SelectTrigger>
                       <SelectContent>
                         {sizes.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
+                  <SelectItem key={s.id} value={s.id}>
                             {s.name}
                             {s.container_type ? ` · ${s.container_type}` : ""}
-                          </SelectItem>
+                  </SelectItem>
                         ))}
                       </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+              </Select>
+              <FormMessage />
+            </FormItem>
                 )}
               />
 
@@ -287,20 +287,20 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="phase"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
+            <FormItem>
                     <FormLabel>Ready phase</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Where will these land?" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="propagation">Propagation</SelectItem>
+                <SelectContent>
+                  <SelectItem value="propagation">Propagation</SelectItem>
                         <SelectItem value="plug">Plug / liner</SelectItem>
-                        <SelectItem value="potted">Potted</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+                  <SelectItem value="potted">Potted</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
                 )}
               />
 
@@ -319,12 +319,12 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                           <SelectItem key={s.id} value={s.id}>
                             {s.name}
                             {s.producer_code ? ` · ${s.producer_code}` : ""}
-                          </SelectItem>
+                </SelectItem>
                         ))}
                       </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+            </Select>
+            <FormMessage />
+          </FormItem>
                 )}
               />
             </div>
@@ -339,7 +339,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="location_id"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
+          <FormItem>
                     <FormLabel>Nursery location</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
@@ -350,12 +350,12 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                           <SelectItem key={loc.id} value={loc.id}>
                             {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
                             {loc.name}
-                          </SelectItem>
+                </SelectItem>
                         ))}
                       </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+            </Select>
+            <FormMessage />
+          </FormItem>
                 )}
               />
 
@@ -363,11 +363,11 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="incoming_date"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Incoming date</FormLabel>
+            <FormItem>
+              <FormLabel>Incoming date</FormLabel>
                     <Input type="date" {...field} />
-                    <FormMessage />
-                  </FormItem>
+              <FormMessage />
+            </FormItem>
                 )}
               />
 
@@ -375,13 +375,13 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="containers"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
+            <FormItem>
                     <FormLabel>Containers</FormLabel>
                     <FormControl>
                       <Input type="number" min={1} step={1} {...field} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <FormMessage />
+            </FormItem>
                 )}
               />
 
@@ -389,13 +389,13 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="supplier_batch_number"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
+           <FormItem>
                     <FormLabel>Supplier batch / traceability</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="e.g. PO-2024-09-18" />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
+             <FormMessage />
+           </FormItem>
                 )}
               />
             </div>
@@ -443,7 +443,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                       <span className="text-sm text-muted-foreground">
                         Flag if scouts or QC noted anything.
                       </span>
-                    </div>
+          </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -453,9 +453,9 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">Plant passport override</p>
-                    <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
                       Defaults to supplier registration and origin; toggle to override.
-                    </p>
+          </p>
                   </div>
                   <Checkbox checked={overrideOn} onCheckedChange={(v) => setOverrideOn(Boolean(v))} />
                 </div>
@@ -464,11 +464,11 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                     overrideOn ? "" : "opacity-60"
                   }`}
                 >
-                  <FormField
-                    name="passport_override.operator_reg_no"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
+            <FormField
+              name="passport_override.operator_reg_no"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
                         <FormLabel>Operator reg. no.</FormLabel>
                     <Input
                       {...field}
@@ -477,15 +477,15 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                       disabled={!overrideOn}
                       placeholder={selectedSupplier?.producer_code ?? "IE2727"}
                     />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="passport_override.origin_country"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              name="passport_override.origin_country"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
                         <FormLabel>Origin country (ISO)</FormLabel>
                         <Input
                           {...field}
@@ -494,15 +494,15 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                           disabled={!overrideOn}
                           placeholder={selectedSupplier?.country_code ?? "IE"}
                         />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="passport_override.traceability_code"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              name="passport_override.traceability_code"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
                         <FormLabel>Traceability code</FormLabel>
                         <Input
                           {...field}
@@ -511,12 +511,12 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                           disabled={!overrideOn}
                           placeholder="Overrides supplier batch no."
                         />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
               <FormField
                 name="notes"
@@ -529,8 +529,8 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                       placeholder="QC observations, storage instructions, etc."
                       {...field}
                     />
-                    <FormMessage />
-                  </FormItem>
+              <FormMessage />
+            </FormItem>
                 )}
               />
             </div>
@@ -560,7 +560,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                   </Badge>
                 ))}
               </div>
-            </div>
+        </div>
             <dl className="space-y-3 text-sm">
               <SummaryRow label="Variety" value={selectedVariety?.name ?? "—"} />
               <SummaryRow label="Supplier" value={selectedSupplier?.name ?? "—"} />

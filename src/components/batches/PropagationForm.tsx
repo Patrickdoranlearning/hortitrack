@@ -68,7 +68,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
   });
 
   const [submitting, setSubmitting] = React.useState(false);
-
+  
   const varieties = React.useMemo(() => referenceData?.varieties ?? [], [referenceData]);
   const sizes = React.useMemo(() => referenceData?.sizes ?? [], [referenceData]);
   const locations = React.useMemo(() => referenceData?.locations ?? [], [referenceData]);
@@ -175,22 +175,22 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 control={form.control}
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
-                    <FormLabel>Variety</FormLabel>
+            <FormLabel>Variety</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Search or pick a variety" />
                       </SelectTrigger>
-                      <SelectContent>
+              <SelectContent>
                         {varieties.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
+                  <SelectItem key={v.id} value={v.id}>
                             {v.name}
                             {v.family ? ` · ${v.family}` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
                 )}
               />
 
@@ -225,23 +225,23 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 name="size_id"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
+          <FormItem>
                     <FormLabel>Size / Container</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a size" />
                       </SelectTrigger>
-                      <SelectContent>
+              <SelectContent>
                         {sizes.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
+                  <SelectItem key={s.id} value={s.id}>
                             {s.name}
                             {s.container_type ? ` · ${s.container_type}` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
                 )}
               />
 
@@ -282,23 +282,23 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 name="location_id"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
+          <FormItem>
                     <FormLabel>Nursery location</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a bench or tunnel" />
                       </SelectTrigger>
-                      <SelectContent>
+              <SelectContent>
                         {locations.map((loc) => (
                           <SelectItem key={loc.id} value={loc.id}>
                             {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
                             {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
                 )}
               />
 
@@ -306,15 +306,15 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 name="notes"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
+          <FormItem>
+            <FormLabel>Notes</FormLabel>
                     <Textarea
                       rows={3}
                       placeholder="e.g. Use bottom heat for first 48 hours."
                       {...field}
                     />
-                    <FormMessage />
-                  </FormItem>
+            <FormMessage />
+          </FormItem>
                 )}
               />
             </div>
@@ -331,7 +331,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
             </Button>
             <Button type="submit" disabled={submitting}>
               {submitting ? "Creating…" : "Create propagation"}
-            </Button>
+          </Button>
           </div>
         </div>
 

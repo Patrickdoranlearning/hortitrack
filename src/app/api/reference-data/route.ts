@@ -48,16 +48,16 @@ export async function GET(_req: NextRequest) {
       const { supabase: supScoped, orgId } = await getUserAndOrg();
       const [{ data: locs, error: lErr }, { data: sups, error: sErr }] = await Promise.all([
         supScoped
-          .from("nursery_locations")
-          .select("id, name, covered, area, nursery_site")
-          .eq("org_id", orgId)
-          .order("name"),
+            .from("nursery_locations")
+            .select("id, name, covered, area, nursery_site")
+            .eq("org_id", orgId)
+            .order("name"),
         supScoped
-          .from("suppliers")
-          .select("id, name, producer_code, country_code")
-          .eq("org_id", orgId)
-          .order("name"),
-      ]);
+            .from("suppliers")
+            .select("id, name, producer_code, country_code")
+            .eq("org_id", orgId)
+            .order("name"),
+        ]);
 
       if (lErr) results.errors.push(`locations: ${lErr.message}`); else results.locations = locs ?? [];
       if (sErr) results.errors.push(`suppliers: ${sErr.message}`); else results.suppliers = sups ?? [];
@@ -98,7 +98,7 @@ export async function GET(_req: NextRequest) {
         results.errors.push(
           "Using default organization data because no active org is associated with this user."
         );
-      } else {
+  } else {
         results.errors.push("No organizations available to provide fallback location data.");
       }
     } catch (fallbackErr: any) {
