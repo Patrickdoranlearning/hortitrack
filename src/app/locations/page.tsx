@@ -1,362 +1,560 @@
-
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Edit, Check, X, Sun, Wind, Download, Upload } from 'lucide-react';
-import Link from 'next/link';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import type { NurseryLocation } from '@/lib/types';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { useMemo, useState } from 'react';
 import * as z from 'zod';
+import { useForm, type UseFormReturn } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Plus, Trash2, Edit } from 'lucide-react';
+import { DataPageShell } from '@/components/data-management/DataPageShell';
+import { DataToolbar } from '@/components/data-management/DataToolbar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/hooks/use-auth';
-import { addLocationAction, updateLocationAction, deleteLocationAction } from '../actions';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { INITIAL_LOCATIONS } from '@/lib/locations';
+import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
+import type { NurseryLocation } from '@/lib/types';
+import { addLocationAction, deleteLocationAction, updateLocationAction } from '../actions';
+import { LocationForm } from '@/components/location-form';
+import { PageFrame } from '@/ui/templates/PageFrame';
 
-
-const locationFormSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1, 'Location name is required.'),
-  area: z.coerce.number().min(0, 'Area must be a positive number.'),
-  isCovered: z.boolean(),
-  nursery: z.string().min(1, 'Nursery is required.'),
-  type: z.string().min(1, 'Location type is required.'),
+const quickLocationSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  nurserySite: z.string().min(1, 'Nursery site is required'),
+  type: z.string().min(1, 'Type is required'),
+  covered: z.boolean().optional(),
+  area: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    const num = Number(val);
+    return Number.isFinite(num) ? num : undefined;
+  }, z.number().nonnegative().optional()),
+  siteId: z.string().optional(),
 });
-type LocationFormValues = z.infer<typeof locationFormSchema>;
 
+type QuickLocationFormValues = z.infer<typeof quickLocationSchema>;
+
+type SortableLocationKey = 'name' | 'nurserySite' | 'type' | 'area' | 'covered' | 'siteId';
+
+const defaultQuickValues: QuickLocationFormValues = {
+  name: '',
+  nurserySite: '',
+  type: '',
+  covered: false,
+  area: undefined,
+  siteId: undefined,
+};
 
 export default function LocationsPage() {
-  const { user } = useAuth();
-  const { data: rawLocations, loading: isLoading } = useCollection<NurseryLocation>('nursery_locations');
-  const locations = rawLocations || [];
-
-  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const form = useForm<LocationFormValues>({
-    resolver: zodResolver(locationFormSchema),
-    defaultValues: {
-      id: '',
-      name: '',
-      area: 0,
-      isCovered: false,
-      nursery: 'Main',
-      type: '',
-    }
+  const [filterText, setFilterText] = useState('');
+  const [editingLocation, setEditingLocation] = useState<NurseryLocation | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: SortableLocationKey; direction: 'asc' | 'desc' }>({
+    key: 'name',
+    direction: 'asc',
   });
 
-  // Removed manual subscription logic as useCollection handles it
+  const { data: rawLocations, loading } = useCollection<any>('nursery_locations');
+  const locations = useMemo<NurseryLocation[]>(() => (rawLocations || []).map(normalizeLocation).filter(Boolean) as NurseryLocation[], [rawLocations]);
 
-  const handleAddNew = () => {
-    form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Main', type: '' });
-    setEditingLocationId('new');
-  };
+  const quickForm = useForm<QuickLocationFormValues>({
+    resolver: zodResolver(quickLocationSchema),
+    defaultValues: defaultQuickValues,
+  });
 
-  const handleEdit = (location: NurseryLocation) => {
-    setEditingLocationId(location.id);
-    form.reset(location);
-  };
+  const filteredLocations = useMemo(() => {
+    if (!filterText) return locations;
+    const q = filterText.toLowerCase();
+    return locations.filter((location) =>
+      [location.name, location.nurserySite, location.type, location.siteId]
+        .filter(Boolean)
+        .some((field) => field!.toLowerCase().includes(q))
+    );
+  }, [locations, filterText]);
 
-  const handleCancelEdit = () => {
-    setEditingLocationId(null);
-    form.reset({ id: '', name: '', area: 0, isCovered: false, nursery: 'Main', type: '' });
-  }
-
-  const handleDelete = async (locationId: string) => {
-    const locationToDelete = locations.find(loc => loc.id === locationId);
-    if (locationToDelete) {
-      const result = await deleteLocationAction(locationId);
-      if (result.success) {
-        toast({ title: 'Location Deleted', description: `Successfully deleted "${locationToDelete.name}".` });
-      } else {
-        toast({ variant: 'destructive', title: 'Delete Failed', description: result.error });
+  const sortedLocations = useMemo(() => {
+    return [...filteredLocations].sort((a, b) => {
+      const { key, direction } = sortConfig;
+      const left = (a as any)[key];
+      const right = (b as any)[key];
+      if (left === right) return 0;
+      if (left === undefined || left === null) return direction === 'asc' ? -1 : 1;
+      if (right === undefined || right === null) return direction === 'asc' ? 1 : -1;
+      if (typeof left === 'number' && typeof right === 'number') {
+        return direction === 'asc' ? left - right : right - left;
       }
-    }
+      return direction === 'asc'
+        ? String(left).localeCompare(String(right))
+        : String(right).localeCompare(String(left));
+    });
+  }, [filteredLocations, sortConfig]);
+
+  const handleSort = (key: SortableLocationKey) => {
+    setSortConfig((prev) =>
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' }
+    );
   };
 
-  const onSubmit = async (data: LocationFormValues) => {
-    const isNew = editingLocationId === 'new';
-
-    if (locations.some(loc => loc.name.toLowerCase() === data.name.toLowerCase() && (isNew || loc.id !== data.id))) {
-      toast({ variant: 'destructive', title: 'Duplicate Name', description: 'A location with this name already exists.' });
+  const handleQuickAdd = quickForm.handleSubmit(async (values) => {
+    const duplicate = locations.find((loc) => loc.name.toLowerCase() === values.name.trim().toLowerCase());
+    if (duplicate) {
+      toast({ variant: 'destructive', title: 'Duplicate name', description: 'A location with that name already exists.' });
       return;
     }
 
-    const { id, ...locationData } = data;
-    const result = isNew
-      ? await addLocationAction(locationData as Omit<NurseryLocation, 'id'>)
-      : await updateLocationAction({ ...locationData, id: editingLocationId! });
+    const payload: Omit<NurseryLocation, 'id'> = {
+      name: values.name.trim(),
+      nurserySite: values.nurserySite.trim(),
+      type: values.type.trim(),
+      covered: values.covered ?? false,
+      area: values.area,
+      siteId: values.siteId?.trim() || undefined,
+    } as any;
 
+    const result = await addLocationAction(payload);
     if (result.success) {
-      toast({
-        title: isNew ? 'Location Added' : 'Location Updated',
-        description: `Successfully ${isNew ? 'added' : 'updated'} "${result.data?.name}".`
-      });
-      setEditingLocationId(null);
-      form.reset();
+      toast({ title: 'Location added', description: `"${values.name}" is now available.` });
+      quickForm.reset(defaultQuickValues);
     } else {
-      toast({
-        variant: 'destructive',
-        title: isNew ? 'Add Failed' : 'Update Failed',
-        description: result.error
-      });
+      toast({ variant: 'destructive', title: 'Add failed', description: result.error });
     }
+  });
+
+  const handleDownloadTemplate = () => {
+    const headers = ['name', 'nurserySite', 'type', 'covered', 'area', 'siteId'];
+    const sample = ['Tunnel 12', 'Main', 'Tunnel', 'true', '450', 'main-t12'];
+    downloadCsv(headers, [sample], 'nursery_locations_template.csv');
   };
 
   const handleDownloadData = () => {
-    const headers = ['name', 'nursery', 'type', 'area', 'isCovered'];
-    const csvRows = locations.map(loc =>
-      [loc.name, loc.nursery, loc.type, loc.area, loc.isCovered].join(',')
-    );
-
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(',') + '\n'
-      + csvRows.join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "locations_data.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const headers = ['name', 'nurserySite', 'type', 'covered', 'area', 'siteId'];
+    const rows = sortedLocations.map((loc) => [
+      loc.name ?? '',
+      loc.nurserySite ?? '',
+      loc.type ?? '',
+      String(Boolean(loc.covered)),
+      loc.area ?? '',
+      loc.siteId ?? '',
+    ]);
+    downloadCsv(headers, rows, 'nursery_locations.csv');
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleUploadCsv = async (file: File) => {
+    const text = await file.text();
+    const rows = text.split('\n').filter((row) => row.trim() !== '');
+    const headerLine = rows.shift();
+    if (!headerLine) throw new Error('The CSV file is empty.');
+    const headers = headerLine.split(',').map((h) => h.trim());
+    const required = ['name', 'nurserySite', 'type'];
+    if (!required.every((h) => headers.includes(h))) {
+      throw new Error(`CSV headers are missing or incorrect. Required: ${required.join(', ')}`);
+    }
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
-      try {
-        const rows = text.split('\n').filter(row => row.trim() !== '');
-        const headers = rows.shift()?.trim().split(',').map(h => h.trim()) || [];
+    let created = 0;
+    const failures: string[] = [];
 
-        const requiredHeaders = ['name', 'nursery', 'type', 'area', 'isCovered'];
-        if (!requiredHeaders.every(h => headers.includes(h))) {
-          throw new Error('CSV headers are missing or incorrect. Required: ' + requiredHeaders.join(', '));
-        }
+    for (const row of rows) {
+      if (!row.trim()) continue;
+      const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)?.map((v) => v.replace(/"/g, '').trim()) ?? [];
+      const record: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        record[header] = values[index] ?? '';
+      });
 
-        for (const row of rows) {
-          const values = row.trim().split(',');
-          const locationData: any = {};
-          headers.forEach((header, i) => {
-            locationData[header] = values[i]?.trim();
-          });
-
-          const dataToSave: Omit<NurseryLocation, 'id'> = {
-            name: locationData.name || '',
-            nursery: locationData.nursery || 'Main',
-            type: locationData.type || 'Tunnel',
-            area: parseInt(locationData.area, 10) || 0,
-            isCovered: locationData.isCovered?.toLowerCase() === 'true',
-          };
-          await addLocationAction(dataToSave);
-        }
-        toast({ title: 'Import Successful', description: `${rows.length} locations have been processed.` });
-      } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
-      } finally {
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+      const name = record.name?.trim();
+      if (!name) {
+        failures.push('(missing name)');
+        continue;
       }
-    };
-    reader.readAsText(file);
+
+      const payload: Omit<NurseryLocation, 'id'> = {
+        name,
+        nurserySite: record.nurserySite?.trim() || 'Main',
+        type: record.type?.trim() || 'Tunnel',
+        covered: ['true', '1', 'yes'].includes(record.covered?.toLowerCase()),
+        area: record.area ? Number(record.area) : undefined,
+        siteId: record.siteId?.trim() || undefined,
+      } as any;
+
+      const result = await addLocationAction(payload);
+      if (result.success) {
+        created += 1;
+      } else {
+        failures.push(name);
+      }
+    }
+
+    toast({
+      title: 'Import complete',
+      description: `${created} location${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
+      variant: failures.length ? 'destructive' : 'default',
+    });
   };
 
-  const renderEditRow = (id: 'new' | string) => {
+  const handleDelete = async (id: string, name: string) => {
+    const result = await deleteLocationAction(id);
+    if (result.success) {
+      toast({ title: 'Location deleted', description: `"${name}" removed.` });
+    } else {
+      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+    }
+  };
+
+  const renderSortHeader = (label: string, key: SortableLocationKey) => {
+    const active = sortConfig.key === key;
+    const indicator = active ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '';
     return (
-      <TableRow key={id} className="bg-muted/50">
-        <Form {...form}>
-          <TableCell>
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormControl><Input {...field} placeholder="New Location Name" /></FormControl></FormItem>
-            )} />
-          </TableCell>
-          <TableCell>
-            <FormField control={form.control} name="nursery" render={({ field }) => (
-              <FormItem>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Select nursery" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem key="main" value="Main">Main</SelectItem>
-                    <SelectItem key="alberts" value="Alberts">Alberts</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormItem>
-            )} />
-          </TableCell>
-          <TableCell>
-            <FormField control={form.control} name="type" render={({ field }) => (
-              <FormItem>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem key="glasshouse" value="Glasshouse">Glasshouse</SelectItem>
-                    <SelectItem key="tunnel" value="Tunnel">Tunnel</SelectItem>
-                    <SelectItem key="section" value="Section">Section</SelectItem>
-                    <SelectItem key="prophouse" value="Prophouse">Prophouse</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormItem>
-            )} />
-          </TableCell>
-          <TableCell>
-            <FormField control={form.control} name="area" render={({ field }) => (
-              <FormItem><FormControl><Input type="number" {...field} placeholder="Area in m²" onChange={e => field.onChange(parseInt(e.target.value, 10))} /></FormControl></FormItem>
-            )} />
-          </TableCell>
-          <TableCell>
-            <FormField control={form.control} name="isCovered" render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center gap-2">
-                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                  <Label>Covered</Label>
-                </div>
-              </FormItem>
-            )} />
-          </TableCell>
-          <TableCell className="text-right">
-            <div className="flex gap-2 justify-end">
-              <Button size="icon" onClick={form.handleSubmit(onSubmit)}><Check /></Button>
-              <Button size="icon" variant="ghost" onClick={handleCancelEdit}><X /></Button>
-            </div>
-          </TableCell>
-        </Form>
-      </TableRow>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-left text-xs font-semibold uppercase tracking-wide"
+        onClick={() => handleSort(key)}
+      >
+        {label}
+        <span className="text-muted-foreground">{indicator}</span>
+      </button>
     );
-  }
+  };
+
+  const filters = (
+    <Input
+      className="w-full max-w-xs"
+      placeholder="Filter by name, site, type…"
+      value={filterText}
+      onChange={(event) => setFilterText(event.target.value)}
+    />
+  );
 
   return (
-    <div className="container mx-auto max-w-5xl p-4 sm:p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="mb-1 font-headline text-4xl">Nursery Locations</h1>
-          <p className="text-muted-foreground">The master list of all nursery locations, their size, and type.</p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/settings">
-            <ArrowLeft />
-            Back to Data Management
-          </Link>
-        </Button>
-      </div>
+    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+      <DataPageShell
+        title="Nursery Locations"
+        description="Keep tunnels, glasshouses, and sections aligned across propagation forms."
+        toolbar={
+          <DataToolbar
+            onDownloadTemplate={handleDownloadTemplate}
+            onDownloadData={handleDownloadData}
+            onUploadCsv={handleUploadCsv}
+            onAddRow={() => {
+              const nameField = document.getElementById('quick-location-name');
+              nameField?.focus();
+            }}
+            filters={filters}
+            extraActions={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setEditingLocation(null);
+                  setIsFormOpen(true);
+                }}
+              >
+                Open form
+              </Button>
+            }
+          />
+        }
+      >
+        <CardWithTable
+          locations={sortedLocations}
+          loading={loading}
+          quickForm={quickForm}
+          handleQuickAdd={handleQuickAdd}
+          renderSortHeader={renderSortHeader}
+          setEditingLocation={setEditingLocation}
+          setIsFormOpen={setIsFormOpen}
+          handleDelete={handleDelete}
+        />
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Manage Locations</CardTitle>
-              <CardDescription>Add, edit, or remove locations from the master list.</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleDownloadData}><Download /> Download Data</Button>
-              <Button onClick={() => fileInputRef.current?.click()}><Upload /> Upload CSV</Button>
-              <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
-            </div>
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-w-2xl">
+            <LocationForm
+              location={editingLocation}
+              onSubmit={async (values) => {
+                const result = await (values as any).id
+                  ? updateLocationAction(values as NurseryLocation)
+                  : addLocationAction(values as Omit<NurseryLocation, 'id'>);
+                if (result.success) {
+                  toast({
+                    title: (values as any).id ? 'Location updated' : 'Location added',
+                    description: `"${result.data?.name ?? values.name}" saved successfully.`,
+                  });
+                  setIsFormOpen(false);
+                  setEditingLocation(null);
+                } else {
+                  toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                }
+              }}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setEditingLocation(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      </DataPageShell>
+    </PageFrame>
+  );
+}
+
+function CardWithTable({
+  locations,
+  loading,
+  quickForm,
+  handleQuickAdd,
+  renderSortHeader,
+  setEditingLocation,
+  setIsFormOpen,
+  handleDelete,
+}: {
+  locations: NurseryLocation[];
+  loading: boolean;
+  quickForm: UseFormReturn<QuickLocationFormValues>;
+  handleQuickAdd: () => void;
+  renderSortHeader: (label: string, key: SortableLocationKey) => React.ReactNode;
+  setEditingLocation: (loc: NurseryLocation | null) => void;
+  setIsFormOpen: (open: boolean) => void;
+  handleDelete: (id: string, name: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border bg-card">
+      <div className="border-b px-4 py-2">
+        <h2 className="text-lg font-semibold">Locations</h2>
+        <p className="text-sm text-muted-foreground">Inline add, edit, and remove nursery locations.</p>
+      </div>
+      <div className="overflow-x-auto px-4 py-3">
+        {loading ? (
+          <div className="space-y-2">
+            {[...Array(6)].map((_, index) => (
+              <Skeleton key={index} className="h-12 w-full" />
+            ))}
           </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[30%]">Name</TableHead>
-                  <TableHead>Nursery</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Area (m²)</TableHead>
-                  <TableHead>Covered</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+        ) : (
+          <Table className="min-w-[1000px] text-sm">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="px-4 py-2 w-[220px]">{renderSortHeader('Name', 'name')}</TableHead>
+                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Nursery site', 'nurserySite')}</TableHead>
+                <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Type', 'type')}</TableHead>
+                <TableHead className="px-4 py-2 w-[140px]">{renderSortHeader('Covered', 'covered')}</TableHead>
+                <TableHead className="px-4 py-2 w-[140px]">{renderSortHeader('Area (m²)', 'area')}</TableHead>
+                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Site ID', 'siteId')}</TableHead>
+                <TableHead className="text-right px-4 py-2">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <Form {...quickForm}>
+                <TableRow className="bg-muted/60">
+                  <TableCell className="px-4 py-2">
+                    <FormField
+                      control={quickForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="sr-only">Name</FormLabel>
+                          <FormControl>
+                            <Input id="quick-location-name" placeholder="Add new location…" {...field} />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                  </TableCell>
+                  <TableCell className="px-4 py-2">
+                    <FormField
+                      control={quickForm.control}
+                      name="nurserySite"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="sr-only">Nursery site</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Main / Alberts…" {...field} />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                  </TableCell>
+                  <TableCell className="px-4 py-2">
+                    <FormField
+                      control={quickForm.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="sr-only">Type</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Tunnel, Glasshouse…" {...field} />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                  </TableCell>
+                  <TableCell className="px-4 py-2">
+                    <FormField
+                      control={quickForm.control}
+                      name="covered"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="sr-only">Covered</FormLabel>
+                          <Select
+                            value={field.value ? 'covered' : 'uncovered'}
+                            onValueChange={(value) => field.onChange(value === 'covered')}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Covered?" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="covered">Covered</SelectItem>
+                              <SelectItem value="uncovered">Uncovered</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                  </TableCell>
+                  <TableCell className="px-4 py-2">
+                    <FormField
+                      control={quickForm.control}
+                      name="area"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="sr-only">Area</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="m²"
+                              value={field.value ?? ''}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                field.onChange(value === '' ? undefined : Number(value));
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                  </TableCell>
+                  <TableCell className="px-4 py-2">
+                    <FormField
+                      control={quickForm.control}
+                      name="siteId"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="sr-only">Site ID</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Optional" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value || undefined)} />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-right">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-full sm:w-auto gap-2"
+                      onClick={handleQuickAdd}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Save row
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {locations.sort((a, b) => (a?.name || '').localeCompare(b?.name || '')).map(location => {
-                  if (editingLocationId === location.id) {
-                    return renderEditRow(location.id);
-                  }
-                  return (
-                    <TableRow key={location.id}>
-                      <TableCell className="font-medium">{location.name}</TableCell>
-                      <TableCell>{location.nursery || 'N/A'}</TableCell>
-                      <TableCell>{location.type || 'N/A'}</TableCell>
-                      <TableCell>{location.area.toLocaleString()} m²</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {location.isCovered ? <Sun className="text-amber-500" /> : <Wind className="text-blue-400" />}
-                          <span>{location.isCovered ? 'Covered' : 'Uncovered'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button type="button" size="icon" variant="outline" onClick={() => handleEdit(location)}><Edit /></Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button type="button" size="icon" variant="destructive"><Trash2 /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete the "{location.name}" location. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(location.id)}>
-                                  Yes, delete it
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-                {editingLocationId === 'new' && renderEditRow('new')}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleAddNew} disabled={!!editingLocationId}>
-            <Plus />
-            Add New Location
-          </Button>
-        </CardFooter>
-      </Card>
+              </Form>
+
+              {locations.map((location) => (
+                <TableRow key={location.id}>
+                  <TableCell className="px-4 py-2 font-medium">{location.name}</TableCell>
+                  <TableCell className="px-4 py-2">{location.nurserySite || '—'}</TableCell>
+                  <TableCell className="px-4 py-2">{location.type || '—'}</TableCell>
+                  <TableCell className="px-4 py-2">{location.covered ? 'Covered' : 'Uncovered'}</TableCell>
+                  <TableCell className="px-4 py-2">{location.area ? `${location.area.toLocaleString()} m²` : '—'}</TableCell>
+                  <TableCell className="px-4 py-2">{location.siteId || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => {
+                          setEditingLocation(location);
+                          setIsFormOpen(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button type="button" size="sm" variant="destructive" className="gap-2">
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete "{location.name}"?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This cannot be undone and existing batches will lose this reference.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(location.id!, location.name)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
     </div>
   );
+}
+
+function normalizeLocation(row: any): NurseryLocation | undefined {
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    name: row.name,
+    nurserySite: row.nursery_site ?? row.nurserySite ?? 'Main',
+    type: row.type ?? undefined,
+    covered: row.covered ?? false,
+    area: typeof row.area === 'number' ? row.area : row.area ? Number(row.area) : undefined,
+    siteId: row.site_id ?? row.siteId ?? undefined,
+    orgId: row.org_id ?? row.orgId ?? '',
+    createdAt: row.created_at ?? row.createdAt,
+    updatedAt: row.updated_at ?? row.updatedAt,
+  } as NurseryLocation;
+}
+
+function downloadCsv(headers: string[], rows: (string | number | undefined)[][], filename: string) {
+  const csv = [headers.join(','), ...rows.map((row) => row.map((value) => (value ?? '').toString()).join(','))].join('\n');
+  const uri = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+  const link = document.createElement('a');
+  link.href = uri;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }

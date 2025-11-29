@@ -39,11 +39,12 @@ export const NurseryLocationSchema = z.object({
   orgId: z.string(),
   siteId: z.string().optional(),
   name: z.string().min(1, "Location name is required"),
-  nurserySite: z.string(), // Kept for compatibility/display
+  nurserySite: z.string().optional(),
   covered: z.boolean().default(false),
   type: z.string().optional(),
-  area: z.number().optional(),
-  capacity: z.number().int().nonnegative().optional(),
+  area: z.number().nonnegative().nullable().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 export type NurseryLocation = z.infer<typeof NurseryLocationSchema>;
 
@@ -73,7 +74,6 @@ export const VarietySchema = z.object({
   category: z.string().optional(),
   colour: z.string().optional(),
   commonName: z.string().optional(),
-  grouping: z.string().optional(),
   floweringPeriod: z.string().optional(),
   flowerColour: z.string().optional(),
   evergreen: z.boolean().optional(),

@@ -14,65 +14,59 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
-import type { Customer } from '@/lib/types';
-import { addCustomerAction, deleteCustomerAction, updateCustomerAction } from '@/app/actions';
+import type { Haulier } from '@/lib/types';
+import { addHaulierAction, deleteHaulierAction, updateHaulierAction } from '@/app/actions';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { CustomerForm } from '@/components/customer-form';
+import { HaulierForm } from '@/components/haulier-form';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
-const quickCustomerSchema = z.object({
+const quickHaulierSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  code: z.string().optional(),
-  store: z.string().optional(),
+  phone: z.string().optional(),
   email: z.string().email().optional(),
-  accountsEmail: z.string().email().optional(),
-  pricingTier: z.string().optional(),
 });
 
-type QuickCustomerValues = z.infer<typeof quickCustomerSchema>;
+type QuickHaulierValues = z.infer<typeof quickHaulierSchema>;
 
-type SortableCustomerKey = 'name' | 'code' | 'store' | 'pricingTier';
+type SortableHaulierKey = 'name' | 'phone' | 'email';
 
-const defaultQuickValues: QuickCustomerValues = {
+const defaultQuickValues: QuickHaulierValues = {
   name: '',
-  code: '',
-  store: '',
+  phone: '',
   email: '',
-  accountsEmail: '',
-  pricingTier: '',
 };
 
-export default function CustomersPage() {
+export default function HauliersPage() {
   const { toast } = useToast();
   const [filterText, setFilterText] = useState('');
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editingHaulier, setEditingHaulier] = useState<Haulier | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [sortConfig, setSortConfig] = useState<{ key: SortableCustomerKey; direction: 'asc' | 'desc' }>({
+  const [sortConfig, setSortConfig] = useState<{ key: SortableHaulierKey; direction: 'asc' | 'desc' }>({
     key: 'name',
     direction: 'asc',
   });
 
-  const { data: rawCustomers, loading } = useCollection<any>('customers');
-  const customers = useMemo<Customer[]>(() => (rawCustomers || []).map(normalizeCustomer).filter(Boolean) as Customer[], [rawCustomers]);
+  const { data: rawHauliers, loading } = useCollection<any>('hauliers');
+  const hauliers = useMemo<Haulier[]>(() => (rawHauliers || []).map(normalizeHaulier).filter(Boolean) as Haulier[], [rawHauliers]);
 
-  const quickForm = useForm<QuickCustomerValues>({
-    resolver: zodResolver(quickCustomerSchema),
+  const quickForm = useForm<QuickHaulierValues>({
+    resolver: zodResolver(quickHaulierSchema),
     defaultValues: defaultQuickValues,
   });
 
-  const filteredCustomers = useMemo(() => {
-    if (!filterText) return customers;
+  const filteredHauliers = useMemo(() => {
+    if (!filterText) return hauliers;
     const q = filterText.toLowerCase();
-    return customers.filter((customer) =>
-      [customer.name, customer.code, customer.store, customer.pricingTier]
+    return hauliers.filter((haulier) =>
+      [haulier.name, haulier.phone, haulier.email]
         .filter(Boolean)
         .some((field) => field!.toLowerCase().includes(q))
     );
-  }, [customers, filterText]);
+  }, [hauliers, filterText]);
 
-  const sortedCustomers = useMemo(() => {
-    return [...filteredCustomers].sort((a, b) => {
+  const sortedHauliers = useMemo(() => {
+    return [...filteredHauliers].sort((a, b) => {
       const { key, direction } = sortConfig;
       const left = (a as any)[key] ?? '';
       const right = (b as any)[key] ?? '';
@@ -80,9 +74,9 @@ export default function CustomersPage() {
         ? String(left).localeCompare(String(right))
         : String(right).localeCompare(String(left));
     });
-  }, [filteredCustomers, sortConfig]);
+  }, [filteredHauliers, sortConfig]);
 
-  const handleSort = (key: SortableCustomerKey) => {
+  const handleSort = (key: SortableHaulierKey) => {
     setSortConfig((prev) =>
       prev.key === key
         ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
@@ -91,28 +85,23 @@ export default function CustomersPage() {
   };
 
   const handleQuickAdd = quickForm.handleSubmit(async (values) => {
-    const duplicate = customers.find((customer) => customer.name.toLowerCase() === values.name.trim().toLowerCase());
+    const duplicate = hauliers.find((haulier) => haulier.name.toLowerCase() === values.name.trim().toLowerCase());
     if (duplicate) {
-      toast({ variant: 'destructive', title: 'Duplicate name', description: 'That customer already exists.' });
+      toast({ variant: 'destructive', title: 'Duplicate name', description: 'That haulier already exists.' });
       return;
     }
 
-    const payload: Omit<Customer, 'id'> = {
+    const payload: Omit<Haulier, 'id'> = {
       name: values.name.trim(),
-      code: values.code?.trim() || undefined,
-      store: values.store?.trim() || undefined,
+      phone: values.phone?.trim() || undefined,
       email: values.email?.trim() || undefined,
-      accountsEmail: values.accountsEmail?.trim() || undefined,
-      pricingTier: values.pricingTier?.trim() || undefined,
-      phone: undefined,
-      vatNumber: undefined,
       notes: undefined,
-      defaultPriceListId: undefined,
+      isActive: true,
     } as any;
 
-    const result = await addCustomerAction(payload);
+    const result = await addHaulierAction(payload);
     if (result.success) {
-      toast({ title: 'Customer added', description: `"${values.name}" is now available.` });
+      toast({ title: 'Haulier added', description: `"${values.name}" is now available.` });
       quickForm.reset(defaultQuickValues);
     } else {
       toast({ variant: 'destructive', title: 'Add failed', description: result.error });
@@ -120,24 +109,21 @@ export default function CustomersPage() {
   });
 
   const handleDownloadTemplate = () => {
-    const headers = ['name', 'code', 'store', 'email', 'accountsEmail', 'pricingTier'];
-    const sample = ['Garden Centre HQ', 'GC-001', 'Garden Centre', 'orders@garden.ie', 'accounts@garden.ie', 'A'];
-    downloadCsv(headers, [sample], 'customers_template.csv');
+    const headers = ['name', 'phone', 'email'];
+    const sample = ['Logistics Ltd', '+3531234567', 'dispatch@logistics.ie'];
+    downloadCsv(headers, [sample], 'hauliers_template.csv');
   };
 
   const handleDownloadData = () => {
-    const headers = ['name', 'code', 'store', 'email', 'accountsEmail', 'pricingTier', 'phone', 'vatNumber'];
-    const rows = sortedCustomers.map((customer) => [
-      customer.name ?? '',
-      customer.code ?? '',
-      customer.store ?? '',
-      customer.email ?? '',
-      customer.accountsEmail ?? '',
-      customer.pricingTier ?? '',
-      customer.phone ?? '',
-      customer.vatNumber ?? '',
+    const headers = ['name', 'phone', 'email', 'notes', 'isActive'];
+    const rows = sortedHauliers.map((haulier) => [
+      haulier.name,
+      haulier.phone ?? '',
+      haulier.email ?? '',
+      haulier.notes ?? '',
+      String(haulier.isActive ?? true),
     ]);
-    downloadCsv(headers, rows, 'customers.csv');
+    downloadCsv(headers, rows, 'hauliers.csv');
   };
 
   const handleUploadCsv = async (file: File) => {
@@ -146,9 +132,7 @@ export default function CustomersPage() {
     const headerLine = rows.shift();
     if (!headerLine) throw new Error('The CSV file is empty.');
     const headers = headerLine.split(',').map((h) => h.trim());
-    if (!headers.includes('name')) {
-      throw new Error('CSV must include a "name" column.');
-    }
+    if (!headers.includes('name')) throw new Error('CSV must include a "name" column.');
 
     let created = 0;
     const failures: string[] = [];
@@ -167,20 +151,15 @@ export default function CustomersPage() {
         continue;
       }
 
-      const payload: Omit<Customer, 'id'> = {
+      const payload: Omit<Haulier, 'id'> = {
         name,
-        code: record.code || undefined,
-        store: record.store || undefined,
-        email: record.email || undefined,
-        accountsEmail: record.accountsEmail || undefined,
-        pricingTier: record.pricingTier || undefined,
         phone: record.phone || undefined,
-        vatNumber: record.vatNumber || undefined,
+        email: record.email || undefined,
         notes: record.notes || undefined,
-        defaultPriceListId: record.defaultPriceListId || undefined,
+        isActive: record.isActive ? ['true', '1', 'yes'].includes(record.isActive.toLowerCase()) : true,
       } as any;
 
-      const result = await addCustomerAction(payload);
+      const result = await addHaulierAction(payload);
       if (result.success) {
         created += 1;
       } else {
@@ -190,21 +169,21 @@ export default function CustomersPage() {
 
     toast({
       title: 'Import complete',
-      description: `${created} customer${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
+      description: `${created} haulier${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
       variant: failures.length ? 'destructive' : 'default',
     });
   };
 
   const handleDelete = async (id: string, name: string) => {
-    const result = await deleteCustomerAction(id);
+    const result = await deleteHaulierAction(id);
     if (result.success) {
-      toast({ title: 'Customer deleted', description: `"${name}" removed.` });
+      toast({ title: 'Haulier deleted', description: `"${name}" removed.` });
     } else {
       toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
     }
   };
 
-  const renderSortHeader = (label: string, key: SortableCustomerKey) => {
+  const renderSortHeader = (label: string, key: SortableHaulierKey) => {
     const active = sortConfig.key === key;
     const indicator = active ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '';
     return (
@@ -222,7 +201,7 @@ export default function CustomersPage() {
   const filters = (
     <Input
       className="w-full max-w-xs"
-      placeholder="Filter by name, code, store…"
+      placeholder="Filter by name, contact…"
       value={filterText}
       onChange={(event) => setFilterText(event.target.value)}
     />
@@ -231,56 +210,56 @@ export default function CustomersPage() {
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <DataPageShell
-        title="Customers"
-        description="Manage buyer details, finance contacts, and pricing tiers."
+        title="Hauliers"
+        description="Maintain approved logistics partners for dispatch screens."
         toolbar={
           <DataToolbar
             onDownloadTemplate={handleDownloadTemplate}
             onDownloadData={handleDownloadData}
             onUploadCsv={handleUploadCsv}
-            onAddRow={() => document.getElementById('quick-customer-name')?.focus()}
+            onAddRow={() => document.getElementById('quick-haulier-name')?.focus()}
             filters={filters}
             extraActions={
-              <Button size="sm" variant="secondary" onClick={() => { setEditingCustomer(null); setIsFormOpen(true); }}>
+              <Button size="sm" variant="secondary" onClick={() => { setEditingHaulier(null); setIsFormOpen(true); }}>
                 Open form
               </Button>
             }
           />
         }
       >
-        <CustomersTable
-          customers={sortedCustomers}
+        <HauliersTable
+          hauliers={sortedHauliers}
           loading={loading}
           quickForm={quickForm}
           handleQuickAdd={handleQuickAdd}
           renderSortHeader={renderSortHeader}
-          setEditingCustomer={setEditingCustomer}
+          setEditingHaulier={setEditingHaulier}
           setIsFormOpen={setIsFormOpen}
           handleDelete={handleDelete}
         />
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="max-w-3xl">
-            <CustomerForm
-              customer={editingCustomer}
+          <DialogContent className="max-w-2xl">
+            <HaulierForm
+              haulier={editingHaulier}
               onSubmit={async (values) => {
                 const result = await ('id' in values && values.id
-                  ? updateCustomerAction(values as Customer)
-                  : addCustomerAction(values as Omit<Customer, 'id'>));
+                  ? updateHaulierAction(values as Haulier)
+                  : addHaulierAction(values as Omit<Haulier, 'id'>));
                 if (result.success) {
                   toast({
-                    title: editingCustomer ? 'Customer updated' : 'Customer added',
+                    title: editingHaulier ? 'Haulier updated' : 'Haulier added',
                     description: `"${result.data?.name ?? values.name}" saved successfully.`,
                   });
                   setIsFormOpen(false);
-                  setEditingCustomer(null);
+                  setEditingHaulier(null);
                 } else {
                   toast({ variant: 'destructive', title: 'Save failed', description: result.error });
                 }
               }}
               onCancel={() => {
                 setIsFormOpen(false);
-                setEditingCustomer(null);
+                setEditingHaulier(null);
               }}
             />
           </DialogContent>
@@ -290,48 +269,46 @@ export default function CustomersPage() {
   );
 }
 
-function CustomersTable({
-  customers,
+function HauliersTable({
+  hauliers,
   loading,
   quickForm,
   handleQuickAdd,
   renderSortHeader,
-  setEditingCustomer,
+  setEditingHaulier,
   setIsFormOpen,
   handleDelete,
 }: {
-  customers: Customer[];
+  hauliers: Haulier[];
   loading: boolean;
-  quickForm: UseFormReturn<QuickCustomerValues>;
+  quickForm: UseFormReturn<QuickHaulierValues>;
   handleQuickAdd: () => void;
-  renderSortHeader: (label: string, key: SortableCustomerKey) => React.ReactNode;
-  setEditingCustomer: (customer: Customer | null) => void;
+  renderSortHeader: (label: string, key: SortableHaulierKey) => React.ReactNode;
+  setEditingHaulier: (haulier: Haulier | null) => void;
   setIsFormOpen: (open: boolean) => void;
   handleDelete: (id: string, name: string) => void;
 }) {
   return (
     <div className="rounded-lg border bg-card">
       <div className="border-b px-4 py-2">
-        <h2 className="text-lg font-semibold">Customers</h2>
-        <p className="text-sm text-muted-foreground">Inline quick add with dialog editing.</p>
+        <h2 className="text-lg font-semibold">Hauliers</h2>
+        <p className="text-sm text-muted-foreground">Track approved carriers and their contact info.</p>
       </div>
       <div className="overflow-x-auto px-4 py-3">
         {loading ? (
           <div className="space-y-2">
-            {[...Array(6)].map((_, index) => (
+            {[...Array(5)].map((_, index) => (
               <Skeleton key={index} className="h-12 w-full" />
             ))}
           </div>
         ) : (
-          <Table className="min-w-[1100px] text-sm">
+          <Table className="min-w-[900px] text-sm">
             <TableHeader>
               <TableRow>
-                <TableHead className="px-4 py-2 w-[220px]">{renderSortHeader('Name', 'name')}</TableHead>
-                <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Code', 'code')}</TableHead>
-                <TableHead className="px-4 py-2 w-[220px]">{renderSortHeader('Store', 'store')}</TableHead>
-                <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Pricing', 'pricingTier')}</TableHead>
-                <TableHead className="px-4 py-2">Sales email</TableHead>
-                <TableHead className="px-4 py-2">Accounts email</TableHead>
+                <TableHead className="px-4 py-2 w-[260px]">{renderSortHeader('Name', 'name')}</TableHead>
+                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Phone', 'phone')}</TableHead>
+                <TableHead className="px-4 py-2 w-[240px]">{renderSortHeader('Email', 'email')}</TableHead>
+                <TableHead className="px-4 py-2 w-[140px]">Status</TableHead>
                 <TableHead className="px-4 py-2 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -346,7 +323,7 @@ function CustomersTable({
                         <FormItem className="space-y-1">
                           <FormLabel className="sr-only">Name</FormLabel>
                           <FormControl>
-                            <Input id="quick-customer-name" placeholder="Customer name" {...field} />
+                            <Input id="quick-haulier-name" placeholder="Haulier name" {...field} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -356,42 +333,12 @@ function CustomersTable({
                   <TableCell className="px-4 py-2">
                     <FormField
                       control={quickForm.control}
-                      name="code"
+                      name="phone"
                       render={({ field }) => (
                         <FormItem className="space-y-1">
-                          <FormLabel className="sr-only">Code</FormLabel>
+                          <FormLabel className="sr-only">Phone</FormLabel>
                           <FormControl>
-                            <Input placeholder="Optional" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value)} />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                  </TableCell>
-                  <TableCell className="px-4 py-2">
-                    <FormField
-                      control={quickForm.control}
-                      name="store"
-                      render={({ field }) => (
-                        <FormItem className="space-y-1">
-                          <FormLabel className="sr-only">Store</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Store / chain" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value)} />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                  </TableCell>
-                  <TableCell className="px-4 py-2">
-                    <FormField
-                      control={quickForm.control}
-                      name="pricingTier"
-                      render={({ field }) => (
-                        <FormItem className="space-y-1">
-                          <FormLabel className="sr-only">Pricing tier</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Optional" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value)} />
+                            <Input placeholder="Phone" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value)} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
@@ -404,30 +351,16 @@ function CustomersTable({
                       name="email"
                       render={({ field }) => (
                         <FormItem className="space-y-1">
-                          <FormLabel className="sr-only">Sales email</FormLabel>
+                          <FormLabel className="sr-only">Email</FormLabel>
                           <FormControl>
-                            <Input placeholder="orders@example.com" type="email" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value)} />
+                            <Input placeholder="Email" type="email" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value)} />
                           </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
-                    <FormField
-                      control={quickForm.control}
-                      name="accountsEmail"
-                      render={({ field }) => (
-                        <FormItem className="space-y-1">
-                          <FormLabel className="sr-only">Accounts email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="accounts@example.com" type="email" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value)} />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                  </TableCell>
+                  <TableCell className="px-4 py-2">Active</TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <Button
                       type="button"
@@ -442,14 +375,12 @@ function CustomersTable({
                 </TableRow>
               </Form>
 
-              {customers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell className="px-4 py-2 font-medium">{customer.name}</TableCell>
-                  <TableCell className="px-4 py-2">{customer.code || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{customer.store || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{customer.pricingTier || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{customer.email || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{customer.accountsEmail || '—'}</TableCell>
+              {hauliers.map((haulier) => (
+                <TableRow key={haulier.id}>
+                  <TableCell className="px-4 py-2 font-medium">{haulier.name}</TableCell>
+                  <TableCell className="px-4 py-2">{haulier.phone || '—'}</TableCell>
+                  <TableCell className="px-4 py-2">{haulier.email || '—'}</TableCell>
+                  <TableCell className="px-4 py-2">{haulier.isActive ? 'Active' : 'Inactive'}</TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-2">
                       <Button
@@ -458,7 +389,7 @@ function CustomersTable({
                         variant="outline"
                         className="gap-2"
                         onClick={() => {
-                          setEditingCustomer(customer);
+                          setEditingHaulier(haulier);
                           setIsFormOpen(true);
                         }}
                       >
@@ -474,14 +405,14 @@ function CustomersTable({
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete "{customer.name}"?</AlertDialogTitle>
+                            <AlertDialogTitle>Delete "{haulier.name}"?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This customer will be removed from drop-downs immediately.
+                              This carrier will be removed from selection lists.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(customer.id!, customer.name)}>
+                            <AlertDialogAction onClick={() => handleDelete(haulier.id!, haulier.name)}>
                               Delete
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -499,25 +430,20 @@ function CustomersTable({
   );
 }
 
-function normalizeCustomer(row: any): Customer | undefined {
+function normalizeHaulier(row: any): Haulier | undefined {
   if (!row) return undefined;
   return {
     id: row.id,
     orgId: row.org_id ?? row.orgId ?? '',
-    code: row.code ?? undefined,
     name: row.name,
-    email: row.email ?? undefined,
     phone: row.phone ?? undefined,
-    vatNumber: row.vat_number ?? row.vatNumber ?? undefined,
+    email: row.email ?? undefined,
     notes: row.notes ?? undefined,
-    defaultPriceListId: row.default_price_list_id ?? row.defaultPriceListId ?? undefined,
-    store: row.store ?? undefined,
-    accountsEmail: row.accounts_email ?? row.accountsEmail ?? undefined,
-    pricingTier: row.pricing_tier ?? row.pricingTier ?? undefined,
-  } as Customer;
+    isActive: row.is_active ?? row.isActive ?? true,
+  } as Haulier;
 }
 
-function downloadCsv(headers: string[], rows: (string | number | undefined)[][], filename: string) {
+function downloadCsv(headers: string[], rows: (string | number | boolean | undefined)[][], filename: string) {
   const csv = [headers.join(','), ...rows.map((row) => row.map((value) => (value ?? '').toString()).join(','))].join('\n');
   const uri = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
   const link = document.createElement('a');
