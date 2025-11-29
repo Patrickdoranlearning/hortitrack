@@ -7,10 +7,11 @@ import { usePathname } from "next/navigation"
 import { Menu } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { NavItem } from "@/config/nav"
 import { Logo } from "@/components/logo"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?: string }) {
   const pathname = usePathname()
@@ -24,6 +25,9 @@ export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?:
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="p-0 flex flex-col">
+        <VisuallyHidden>
+          <SheetTitle>Main navigation</SheetTitle>
+        </VisuallyHidden>
         <div className="flex items-center gap-4 px-6 py-3 border-b shrink-0">
           <Logo />
         </div>

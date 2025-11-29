@@ -20,7 +20,7 @@ const items: Item[] = [
   { href: "/sales/deliveries", label: "Deliveries", icon: Truck },
   { href: "/sales/invoices", label: "Invoices", icon: FileText },
   { href: "/sales/credits", label: "Credit Notes", icon: Receipt },
-  { href: "/sales/settings", label: "Settings", icon: Settings },
+  { href: "/sales/settings", label: "Data Management", icon: Settings },
 ];
 
 export function SalesSidebar() {

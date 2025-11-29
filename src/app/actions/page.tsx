@@ -83,7 +83,7 @@ export default function ActionsPage() {
        <ActionDialog
         open={isActionLogOpen}
         onOpenChange={setIsActionLogOpen}
-        defaultBatchIds={[]} // No default batch on this page
+        batch={selectedBatch}
         locations={locations || []}
       />
       

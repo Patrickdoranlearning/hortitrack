@@ -66,7 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <DropdownMenuItem asChild>
                 <Link href="/settings">
                   <Settings />
-                  Settings
+                  Data Management
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

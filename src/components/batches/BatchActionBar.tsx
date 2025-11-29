@@ -154,7 +154,7 @@ export function BatchActionBar({
        <ActionDialog
         open={actionOpen}
         onOpenChange={setActionOpen}
-        defaultBatchIds={[batch.id]}
+       batch={batch}
         locations={locations}
       />
     </TooltipProvider>

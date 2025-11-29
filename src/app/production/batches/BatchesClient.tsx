@@ -203,11 +203,11 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
               [...Array(9)].map((_, i) => <Skeleton key={i} className="h-40 w-full" />)
           ) : (
               filteredBatches.map((batch) => (
-                  <BatchCard
-                    key={batch.id}
-                    batch={batch}
-                    onOpen={handleViewDetails}
-                  />
+                <BatchCard
+                  key={batch.id}
+                  batch={batch}
+                  onOpen={handleViewDetails}
+                />
               ))
           )}
           </div>

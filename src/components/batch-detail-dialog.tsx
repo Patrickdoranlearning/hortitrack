@@ -150,8 +150,8 @@ export function BatchDetailDialog({
                     <p className="text-sm text-muted-foreground mb-1">Stock Distribution</p>
                     <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity ?? 0} />
                   </div>
-                  {batch.sourceType === "Purchase" && batch.id && (
-                     <PlantPassportCard batchId={batch.id} />
+                  {batch.id && (
+                    <PlantPassportCard batchId={batch.id} />
                   )}
                 </TabsContent>
                 <TabsContent value="history">

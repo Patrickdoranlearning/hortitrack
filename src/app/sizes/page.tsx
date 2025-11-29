@@ -153,18 +153,23 @@ export default function SizesPage() {
       return typeA - typeB;
     }
 
-    const sizeA = parseFloat(a.name);
-    const sizeB = parseFloat(b.name);
+    const nameA = a.name ?? "";
+    const nameB = b.name ?? "";
 
-    if (a.containerType === 'Pot') {
+    const sizeA = Number.parseFloat(nameA);
+    const sizeB = Number.parseFloat(nameB);
+    const hasNumericSizes = !Number.isNaN(sizeA) && !Number.isNaN(sizeB);
+
+    if (a.containerType === 'Pot' && hasNumericSizes) {
       return sizeA - sizeB;
     }
 
-    if (a.containerType === 'Tray') {
+    if (a.containerType === 'Tray' && hasNumericSizes) {
       return sizeB - sizeA;
     }
 
-    return a.name.localeCompare(b.name);
+    // Fallback to lexical ordering for non-numeric names or other container types.
+    return nameA.localeCompare(nameB);
   };
 
   return (

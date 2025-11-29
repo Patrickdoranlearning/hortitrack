@@ -198,7 +198,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 <FormLabel>Family (auto)</FormLabel>
                 <Input value={selectedVariety?.family ?? ""} readOnly />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Edit varieties in Settings → Varieties.
+                  Edit varieties in Data Management → Varieties.
                 </p>
               </div>
 
