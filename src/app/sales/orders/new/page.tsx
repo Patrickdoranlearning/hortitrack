@@ -1,47 +1,30 @@
 
-"use client";
-import * as React from "react";
-import { OrderPlacementClient } from "./OrderPlacementClient";
+import { createClient } from '@/lib/supabase/server';
+import { PageFrame } from '@/ui/templates/PageFrame';
+import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import CreateOrderForm from '@/components/sales/CreateOrderForm';
 
-type Props = {
-    customers?: any[];
-    onOrderCreated?: () => void;
-};
+export default async function CreateOrderPage() {
+  const supabase = await createClient();
 
-export default function NewSalesOrderPage({ customers = [], onOrderCreated }: Props) {
-  const [products, setProducts] = React.useState<any[]>([]);
-  const [categories, setCategories] = React.useState<string[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  // Fetch customers for the dropdown
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('id, name')
+    .order('name');
 
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [pRes] = await Promise.all([
-          fetch("/api/sales/products", { cache: "no-store" }),
-          // customers endpoint already exists if you want to use it in the UI later:
-          // fetch("/api/sales/customers", { cache: "no-store" }),
-        ]);
-        const pJson = await pRes.json();
-        if (!alive) return;
-        if (!pRes.ok || !pJson.ok) throw new Error(pJson.error || "Failed to load products");
-        const prods = pJson.products as any[];
-        setProducts(prods);
-        const cats = Array.from(new Set(prods.map(p => p.category || "General")));
-        setCategories(["all", ...cats]);
-        setLoading(false);
-      } catch (e: any) {
-        if (!alive) return;
-        setError(e.message ?? "Failed to load");
-        setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  return (
+    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+      <div className="space-y-6 max-w-4xl mx-auto">
+        <ModulePageHeader
+          title="Create New Order"
+          description="Enter order details for a customer"
+        />
 
-  if (loading) return <div className="p-4">Loading products…</div>;
-  if (error)   return <div className="p-4 text-red-600">{error}</div>;
-
-  return <OrderPlacementClient products={products} categories={categories} />;
+        <div className="bg-card rounded-lg border p-6 shadow-sm">
+          <CreateOrderForm customers={customers || []} />
+        </div>
+      </div>
+    </PageFrame>
+  );
 }

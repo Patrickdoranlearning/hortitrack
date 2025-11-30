@@ -114,8 +114,55 @@ export interface Database {
       }>;
       orders: TableDefinition<{
         id: string;
-        customer_id: string | null;
-        status: string | null;
+        org_id: string;
+        order_number: string;
+        customer_id: string;
+        ship_to_address_id: string | null;
+        status: string;
+        payment_status: string | null;
+        requested_delivery_date: string | null;
+        notes: string | null;
+        subtotal_ex_vat: number;
+        vat_amount: number;
+        total_inc_vat: number;
+        trolleys_estimated: number | null;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      order_items: TableDefinition<{
+        id: string;
+        order_id: string;
+        batch_id: string | null;
+        quantity: number;
+        unit_price: number;
+        total_price: number;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      invoices: TableDefinition<{
+        id: string;
+        org_id: string;
+        customer_id: string;
+        invoice_number: string;
+        status: string;
+        issue_date: string;
+        due_date: string | null;
+        subtotal_ex_vat: number;
+        vat_amount: number;
+        total_inc_vat: number;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      credit_notes: TableDefinition<{
+        id: string;
+        org_id: string;
+        customer_id: string;
+        credit_number: string;
+        status: string;
+        issue_date: string;
+        subtotal_ex_vat: number;
+        vat_amount: number;
+        total_inc_vat: number;
         created_at: string | null;
         updated_at: string | null;
       }>;
@@ -123,6 +170,35 @@ export interface Database {
         id: string;
         name: string;
         created_at: string | null;
+      }>;
+      pick_orders: TableDefinition<{
+        id: string;
+        order_item_id: string;
+        picker_id: string | null;
+        status: string;
+        picked_qty: number | null;
+        notes: string | null;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      dispatch_events: TableDefinition<{
+        id: string;
+        order_id: string;
+        batch_id: string | null;
+        dispatched_at: string | null;
+        carrier: string | null;
+        tracking_number: string | null;
+        created_at: string | null;
+      }>;
+      sales_qc: TableDefinition<{
+        id: string;
+        pick_order_id: string;
+        batch_id: string | null;
+        issue_type: string | null;
+        notes: string | null;
+        resolved: boolean | null;
+        created_at: string | null;
+        updated_at: string | null;
       }>;
     };
     Views: {

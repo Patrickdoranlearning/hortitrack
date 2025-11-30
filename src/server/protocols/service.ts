@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient } from "@/lib/supabase/server";
 import { isValidDocId } from "@/server/utils/ids";
 import { buildBatchRoute } from "@/server/batches/route";
@@ -22,29 +23,29 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
     created_from_batch_id: String(batchId),
 
     plant_family: batch.plantFamily ?? null,
-    plant_variety: batch.plantVariety ?? batch.variety ?? null,
+    plant_variety: batch.plantVariety ?? (batch as any).variety ?? null,
     season: inferSeason(batch.plantingDate || batch.sowDate),
 
     pot_size: batch.potSize ?? null,
-    media: batch.media ?? null,
-    container_type: batch.containerType ?? null,
+    media: (batch as any).media ?? null,
+    container_type: (batch as any).containerType ?? null,
     supplier_name: batch.supplierName ?? null,
     supplier_id: batch.supplierId ?? null,
 
     targets: {
       tempC: {
-        day: batch.targetTempDayC ?? null,
-        night: batch.targetTempNightC ?? null,
+        day: (batch as any).targetTempDayC ?? null,
+        night: (batch as any).targetTempNightC ?? null,
       },
-      humidityPct: batch.targetHumidityPct ?? null,
-      lightHours: batch.targetLightHours ?? null,
-      ec: batch.targetEC ?? null,
-      ph: batch.targetPH ?? null,
-      spacing: batch.spacing ?? null,
+      humidityPct: (batch as any).targetHumidityPct ?? null,
+      lightHours: (batch as any).targetLightHours ?? null,
+      ec: (batch as any).targetEC ?? null,
+      ph: (batch as any).targetPH ?? null,
+      spacing: (batch as any).spacing ?? null,
     },
 
     // Placeholder steps; extend later by mining your action log
-    steps: normalizeSteps(batch.steps || batch.carePlan || []),
+    steps: normalizeSteps((batch as any).steps || (batch as any).carePlan || []),
 
     source_snapshot: {
       batchNumber: batch.batchNumber ?? null,
