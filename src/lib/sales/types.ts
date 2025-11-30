@@ -89,3 +89,11 @@ export interface Order {
   totalAmount: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; // Example statuses
 }
+
+import { Database } from '@/types/supabase';
+
+export type SalesOrder = Database['public']['Tables']['orders']['Row'];
+export type SalesOrderItem = Database['public']['Tables']['order_items']['Row'];
+export type PickOrder = Database['public']['Tables']['pick_orders']['Row'];
+export type Invoice = Database['public']['Tables']['invoices']['Row'];
+export type CreditNote = Database['public']['Tables']['credit_notes']['Row'];
