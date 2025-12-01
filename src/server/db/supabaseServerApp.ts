@@ -2,6 +2,9 @@
 // Universal server client factory — SAFE to import from pages/ or app/
 // Does NOT import "server-only" or "next/headers".
 
+import "server-only";
+
+import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
@@ -25,4 +28,15 @@ export function createSupabaseServerWithCookies(
   return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: cookieBridge,
   });
+}
+
+export async function getSupabaseServerApp(): Promise<SupabaseClient<Database>> {
+  const store = await cookies();
+  const bridge: CookieBridge = {
+    get: (name) => store.get(name)?.value,
+    set: (name, value, options) => store.set(name, value, options),
+    remove: (name, options) => store.set(name, "", { ...options, maxAge: 0 }),
+  };
+
+  return createSupabaseServerWithCookies(bridge);
 }

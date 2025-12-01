@@ -19,7 +19,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import type {
-  Batch, BatchStatus, PlantSize as PlantSizeType,
+  Batch, ProductionStatus, PlantSize as PlantSizeType,
 } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { cn } from '@/lib/utils';
@@ -59,21 +59,21 @@ const BatchFormSchema = z.object({
   salesPhotoUrl: z.string().optional(),
   ...PassportFields,
 }).superRefine((data, ctx) => {
-    if (data.sourceType === "Purchase") {
-      if (!data.passportBotanical) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Botanical Name is required for purchases.", path: ["passportBotanical"] });
-      }
-      if (!data.passportOperator) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Operator is required for purchases.", path: ["passportOperator"] });
-      }
-      if (!data.passportTraceCode) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Traceability Code is required for purchases.", path: ["passportTraceCode"] });
-      }
-      if (!data.passportOrigin) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Country of Origin is required for purchases.", path: ["passportOrigin"] });
-      }
+  if (data.sourceType === "Purchase") {
+    if (!data.passportBotanical) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Botanical Name is required for purchases.", path: ["passportBotanical"] });
     }
-  });
+    if (!data.passportOperator) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Operator is required for purchases.", path: ["passportOperator"] });
+    }
+    if (!data.passportTraceCode) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Traceability Code is required for purchases.", path: ["passportTraceCode"] });
+    }
+    if (!data.passportOrigin) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Country of Origin is required for purchases.", path: ["passportOrigin"] });
+    }
+  }
+});
 
 type BatchFormValues = z.infer<typeof BatchFormSchema>;
 
@@ -124,7 +124,7 @@ export function BatchForm({
         }
       };
     }
-    return () => {};
+    return () => { };
   }, [onSubmitSuccess, onCreated]);
 
   const form = useForm<BatchFormValues>({
@@ -138,7 +138,7 @@ export function BatchForm({
       size: batch?.size ?? '',
       trayQuantity: null,
       quantity: batch?.quantity ?? 0,
-      status: (batch?.status as BatchStatus) ?? 'Potted',
+      status: (batch?.status as ProductionStatus) ?? 'Potted',
       plantingDate: parseToDate(batch?.plantingDate),
       supplier: batch?.supplier ?? (doranNurseries?.name || ''),
       location: batch?.location ?? '',
@@ -188,7 +188,7 @@ export function BatchForm({
       initialQuantity: isEdit ? (batch?.initialQuantity ?? values.quantity) : values.quantity,
       plantingDate: values.plantingDate.toISOString(),
     };
-    
+
     if (values.sourceType === "Purchase") {
       payload.passportType = "received";
     }
@@ -513,7 +513,7 @@ export function BatchForm({
                   </FormControl>
                   <SelectContent>
                     {supplierOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                     {field.value && !supplierOptions.some(o => o.value === field.value) && (
+                    {field.value && !supplierOptions.some(o => o.value === field.value) && (
                       <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
                     )}
                   </SelectContent>
@@ -523,7 +523,7 @@ export function BatchForm({
             )}
           />
         </div>
-        
+
         {sourceType === "Purchase" && (
           <div className="space-y-4 pt-4 border-t">
             <h3 className="font-medium text-lg">Plant Passport Details</h3>
@@ -535,7 +535,7 @@ export function BatchForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>A - Botanical Name</FormLabel>
-                    <Input {...field} value={field.value ?? ''} placeholder="e.g., Lavandula angustifolia"/>
+                    <Input {...field} value={field.value ?? ''} placeholder="e.g., Lavandula angustifolia" />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -546,7 +546,7 @@ export function BatchForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>B - Operator Reg. No.</FormLabel>
-                    <Input {...field} value={field.value ?? ''} placeholder="e.g., IE-12345"/>
+                    <Input {...field} value={field.value ?? ''} placeholder="e.g., IE-12345" />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -557,7 +557,7 @@ export function BatchForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>C - Traceability Code</FormLabel>
-                    <Input {...field} value={field.value ?? ''} placeholder="e.g., Lot-54321"/>
+                    <Input {...field} value={field.value ?? ''} placeholder="e.g., Lot-54321" />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -569,7 +569,7 @@ export function BatchForm({
                   <FormItem>
                     <FormLabel>D - Country of Origin</FormLabel>
                     <FormControl>
-                        <Input {...field} value={field.value ?? ''} placeholder="ISO2 code, e.g., NL"/>
+                      <Input {...field} value={field.value ?? ''} placeholder="ISO2 code, e.g., NL" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -580,7 +580,7 @@ export function BatchForm({
         )}
 
         {form.formState.errors.root?.serverError && (
-            <p className="text-sm font-medium text-destructive">{form.formState.errors.root.serverError.message}</p>
+          <p className="text-sm font-medium text-destructive">{form.formState.errors.root.serverError.message}</p>
         )}
 
         <DialogFooter className="sticky bottom-0 z-10 -mx-6 px-6 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t -mb-6 pt-4 pb-4">

@@ -1,7 +1,7 @@
 
 // src/app/api/batches/[batchId]/passport/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/server/db/admin";
+import { createClient } from "@/lib/supabase/server";
 
 type ComputedPassport = {
   batchId: string;
@@ -11,16 +11,6 @@ type ComputedPassport = {
   dCountryCode: string | null;
   warnings: string[];
 };
-
-async function getBatchDoc(batchId: string) {
-  const snap = await adminDb.collection("batches").doc(batchId).get();
-  return snap.exists ? { id: snap.id, ...snap.data() } as any : null;
-}
-
-async function getSupplierDoc(supplierId: string) {
-  const snap = await adminDb.collection("suppliers").doc(supplierId).get();
-  return snap.exists ? { id: snap.id, ...snap.data() } as any : null;
-}
 
 function pick<T extends object, K extends keyof T>(obj: T | null | undefined, keys: readonly K[]): Partial<T> {
   const out: Partial<T> = {};
@@ -36,13 +26,35 @@ export async function GET(_req: NextRequest, { params }: { params: { batchId: st
       return NextResponse.json({ error: "Batch ID is required." }, { status: 400 });
     }
 
-    const batch = await getBatchDoc(batchId);
+    const supabase = await createClient();
+    const { data: batch, error: batchErr } = await supabase
+      .from("batches")
+      .select(
+        `
+        id,
+        batch_number,
+        plant_varieties(name, family),
+        supplier_id,
+        suppliers (producer_code, country_code)
+      `
+      )
+      .eq("id", batchId)
+      .maybeSingle();
+
+    if (batchErr) {
+      console.error("[passport] batch fetch failed", batchErr);
+      return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+
     if (!batch) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     const aFamily =
-      (batch.family ?? batch.plantFamily ?? batch.varietyFamily ?? null) as string | null;
+      (batch.plant_varieties?.family ??
+        batch.family ??
+        batch.plantFamily ??
+        null) as string | null;
 
     const cBatchNumber =
       (batch.batch_number ?? batch.batchNumber ?? batchId) as string;
@@ -51,24 +63,11 @@ export async function GET(_req: NextRequest, { params }: { params: { batchId: st
     let dCountryCode: string | null = null;
     const warnings: string[] = [];
 
-    // embedded supplier support
-    const embeddedSupplier = batch.supplier ?? batch.supplierData ?? null;
+    const embeddedSupplier = batch.suppliers ?? null;
     if (embeddedSupplier) {
-      const picked = pick(embeddedSupplier, ["producerCode", "countryCode"]);
-      bProducerCode = (picked as any).producerCode ?? null;
-      dCountryCode = (picked as any).countryCode ?? null;
-    }
-
-    // referenced supplier support
-    const supplierId: string | null =
-      (batch.supplier_id ?? batch.supplierId ?? null) as string | null;
-
-    if ((!bProducerCode || !dCountryCode) && supplierId) {
-      const supplier = await getSupplierDoc(supplierId);
-      if (supplier) {
-        bProducerCode = (supplier.producerCode ?? bProducerCode) ?? null;
-        dCountryCode = (supplier.countryCode ?? dCountryCode) ?? null;
-      }
+      const picked = pick(embeddedSupplier, ["producer_code", "country_code"]);
+      bProducerCode = (picked as any).producer_code ?? null;
+      dCountryCode = (picked as any).country_code ?? null;
     }
 
     if (!bProducerCode) warnings.push("Supplier producer code (B) missing; using default.");

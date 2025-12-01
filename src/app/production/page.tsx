@@ -1,60 +1,206 @@
 
-"use client"
+"use client";
 
-import * as React from "react"
-import { z } from "zod"
-import { PageFrame } from "@/ui/templates/PageFrame"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { DialogForm } from "@/ui/templates/DialogForm"
+import * as React from "react";
+import { PageFrame } from "@/ui/templates/PageFrame";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { DialogForm } from "@/ui/templates/DialogForm";
+import { createPropagationBatchAction } from "@/app/actions/production";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
+import { propagationFormSchema } from "@/app/production/forms/propagation-schema";
 
-const newBatchSchema = z.object({
-  variety: z.string().min(1, "Required"),
-  family: z.string().min(1, "Required"),
-  size: z.string().min(1, "Required"),
-  initialQty: z.coerce.number().int().positive("Must be > 0"),
-})
+type VarOption = { id: string; name: string; family?: string | null };
+type SizeOption = {
+  id: string;
+  name: string;
+  cellMultiple: number;
+  containerType?: string | null;
+};
+type LocationOption = {
+  id: string;
+  name: string;
+  nurserySite?: string | null;
+};
 
 export default function ProductionHome() {
+  const { toast } = useToast();
+  const { data: refData, loading: refLoading } = React.useContext(ReferenceDataContext);
+
+  const varietyOptions = React.useMemo<VarOption[]>(() => {
+    return (refData?.varieties ?? []).map((v: any) => ({
+      id: v.id,
+      name: v.name,
+      family: v.family ?? v.family_name ?? null,
+    }));
+  }, [refData?.varieties]);
+
+  const sizeOptions = React.useMemo<SizeOption[]>(() => {
+    return (refData?.sizes ?? []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      containerType: s.containerType ?? s.container_type ?? null,
+      cellMultiple: Number(s.cellMultiple ?? s.cell_multiple ?? s.multiple ?? 1) || 1,
+    }));
+  }, [refData?.sizes]);
+
+  const locationOptions = React.useMemo<LocationOption[]>(() => {
+    return (refData?.locations ?? []).map((l: any) => ({
+      id: l.id ?? l.value ?? "",
+      name: l.name ?? "",
+      nurserySite: l.nurserySite ?? l.nursery_site ?? null,
+    }));
+  }, [refData?.locations]);
+
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-2xl">Production</h1>
         <DialogForm
-          title="New Batch"
-          description="Create a new batch for production."
-          schema={newBatchSchema}
-          defaultValues={{ variety: "", family: "", size: "", initialQty: 0 }}
-          trigger={<Button variant="accent">New Batch</Button>}
+          title="New Propagation Batch"
+          description="Start a new batch from propagation (seed/cuttings)."
+          schema={propagationFormSchema}
+          defaultValues={{
+            variety: "",
+            family: "",
+            sizeId: "",
+            sizeMultiple: 1,
+            fullTrays: 0,
+            partialCells: 0,
+            locationId: "",
+            plantingDate: new Date().toISOString().split('T')[0]
+          }}
+          trigger={
+            <Button variant="accent" disabled={refLoading}>
+              New Batch
+            </Button>
+          }
           onSubmit={async (values) => {
-            // TODO: call server action or API
-            // await createBatch(values)
-            console.log("Create batch", values)
+            const res = await createPropagationBatchAction({
+              ...values,
+              family: values.family || null,
+              // If specific fields are missing/optional in schema but required by action, handle here
+            })
+            
+            if (res.success) {
+                toast({ title: "Batch Created", description: `Batch ${res.data?.batch_number} started.` })
+            } else {
+                toast({ title: "Error", description: res.error || "Failed to create batch", variant: "destructive" })
+            }
           }}
         >
           {({ form }) => (
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
+              <div className="col-span-2">
                 <Label htmlFor="variety">Variety</Label>
-                <Input id="variety" {...form.register("variety")} />
+                <Select
+                  value={form.watch("variety")}
+                  onValueChange={(value) => {
+                    form.setValue("variety", value, { shouldValidate: true });
+                    const selected = varietyOptions.find((v) => v.name === value);
+                    form.setValue("family", selected?.family ?? "", { shouldDirty: true });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={refLoading ? "Loading varieties..." : "Select a variety"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {varietyOptions.map((v) => (
+                      <SelectItem key={v.id} value={v.name}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FieldError msg={form.formState.errors.variety?.message} />
               </div>
+              
               <div>
-                <Label htmlFor="family">Family</Label>
-                <Input id="family" {...form.register("family")} />
+                <Label htmlFor="family">Family (Optional)</Label>
+                <Input id="family" {...form.register("family")} placeholder="e.g. Lamiaceae" />
                 <FieldError msg={form.formState.errors.family?.message} />
               </div>
+
               <div>
-                <Label htmlFor="size">Pot Size</Label>
-                <Input id="size" {...form.register("size")} />
-                <FieldError msg={form.formState.errors.size?.message} />
+                 <Label htmlFor="plantingDate">Planting Date</Label>
+                 <Input id="plantingDate" type="date" {...form.register("plantingDate")} />
+                 <FieldError msg={form.formState.errors.plantingDate?.message} />
               </div>
+
               <div>
-                <Label htmlFor="initialQty">Initial Quantity</Label>
-                <Input id="initialQty" type="number" {...form.register("initialQty", { valueAsNumber: true })} />
-                <FieldError msg={form.formState.errors.initialQty?.message} />
+                <Label htmlFor="sizeId">Size / Container</Label>
+                <Select
+                  value={form.watch("sizeId")}
+                  onValueChange={(value) => {
+                    form.setValue("sizeId", value, { shouldValidate: true });
+                    const selected = sizeOptions.find((s) => s.id === value);
+                    if (selected) {
+                      form.setValue("sizeMultiple", selected.cellMultiple, { shouldDirty: true });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={refLoading ? "Loading sizes..." : "Select a size"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sizeOptions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                        {s.containerType ? ` · ${s.containerType}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError msg={form.formState.errors.sizeId?.message} />
+              </div>
+
+               <div>
+                <Label htmlFor="sizeMultiple">Cells per Tray</Label>
+                <Input id="sizeMultiple" type="number" {...form.register("sizeMultiple", { valueAsNumber: true })} />
+                <FieldError msg={form.formState.errors.sizeMultiple?.message} />
+              </div>
+
+              <div>
+                <Label htmlFor="fullTrays">Full Trays</Label>
+                <Input id="fullTrays" type="number" {...form.register("fullTrays", { valueAsNumber: true })} />
+                <FieldError msg={form.formState.errors.fullTrays?.message} />
+              </div>
+              
+              <div>
+                <Label htmlFor="partialCells">Partial Cells</Label>
+                <Input id="partialCells" type="number" {...form.register("partialCells", { valueAsNumber: true })} />
+                <FieldError msg={form.formState.errors.partialCells?.message} />
+              </div>
+
+              <div className="col-span-2">
+                <Label htmlFor="locationId">Location</Label>
+                <Select
+                  value={form.watch("locationId")}
+                  onValueChange={(value) => form.setValue("locationId", value, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={refLoading ? "Loading locations..." : "Select a location"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locationOptions.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.nurserySite ? `${loc.nurserySite} · ` : ""}
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError msg={form.formState.errors.locationId?.message} />
               </div>
             </div>
           )}
@@ -64,15 +210,15 @@ export default function ProductionHome() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Batches in Propagation</CardTitle></CardHeader>
-          <CardContent className="text-3xl font-semibold">124</CardContent>
+          <CardContent className="text-3xl font-semibold">--</CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Ready for Sale</CardTitle></CardHeader>
-          <CardContent className="text-3xl font-semibold">8,940</CardContent>
+          <CardContent className="text-3xl font-semibold">--</CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Loss (last 7 days)</CardTitle></CardHeader>
-          <CardContent className="text-3xl font-semibold">2.1%</CardContent>
+          <CardContent className="text-3xl font-semibold">--</CardContent>
         </Card>
       </div>
     </PageFrame>

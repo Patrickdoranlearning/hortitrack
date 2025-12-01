@@ -38,7 +38,6 @@ import {
   Plus,
   QrCode,
   Search,
-  Settings,
   Sparkles,
   Users,
   Printer,
@@ -61,15 +60,17 @@ import { queryMatchesBatch } from '@/lib/search';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckinForm } from '@/components/batches/CheckInForm';
+import CheckInForm from '@/components/batches/CheckInForm';
 import { useCollection } from '@/hooks/useCollection'; 
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
 import EditBatchForm from '@/components/batches/EditBatchForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
+const BulkPropagationUpload = dynamic(() => import('@/components/batches/BulkPropagationUpload'), { ssr: false });
 const VarietyForm = dynamic(() => import('@/components/varieties/VarietyForm'), { ssr: false });
 
 interface HomePageViewProps {
@@ -120,7 +121,6 @@ export default function HomePageView({
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] = React.useState(false);
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
-  const [isScanOpen, setIsScanOpen] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
   const [isCheckinFormOpen, setIsCheckinFormOpen] = React.useState(false);
@@ -133,8 +133,34 @@ export default function HomePageView({
     plantFamily: 'all',
     category: 'all',
     status: 'Active',
+    variety: 'all',
+    location: 'all',
   });
+  const clearBatchQuery = React.useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!params.has("batch")) return;
+    params.delete("batch");
+    const qs = params.toString();
+    router.replace(qs ? `/?${qs}` : "/");
+  }, [router, searchParams]);
+
   const [searchQuery, setSearchQuery] = React.useState('');
+
+  const varietyOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    (batches || []).forEach((batch) => {
+      if (batch.plantVariety) set.add(batch.plantVariety);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [batches]);
+
+  const locationOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    (batches || []).forEach((batch) => {
+      if (batch.location) set.add(batch.location);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [batches]);
 
   const filteredBatches = React.useMemo(() => {
     const dataToFilter = batches || [];
@@ -147,6 +173,12 @@ export default function HomePageView({
       .filter((batch) =>
         filters.category === 'all' || batch.category === filters.category
       )
+      .filter((batch) => (
+        filters.variety === 'all' || (batch.plantVariety ?? '') === filters.variety
+      ))
+      .filter((batch) => (
+        filters.location === 'all' || (batch.location ?? '') === filters.location
+      ))
       .filter((batch) => {
         if (filters.status === 'all') return true;
         if (filters.status === 'Active') return batch.status !== 'Archived';
@@ -184,10 +216,25 @@ export default function HomePageView({
     setIsDetailDialogOpen(true);
   };
 
+  const handleDetailOpenChange = React.useCallback(
+    (open: boolean) => {
+      setIsDetailDialogOpen(open);
+      if (!open) {
+        clearBatchQuery();
+      }
+    },
+    [clearBatchQuery]
+  );
+
   const handleLogAction = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsLogActionOpen(true);
   };
+  
+  const handleTransplantOpen = React.useCallback((batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsTransplantOpen(true);
+  }, []);
   
   const handlePrintClick = (batch: Batch) => {
     setSelectedBatch(batch);
@@ -204,16 +251,179 @@ export default function HomePageView({
     setIsRecommendationsOpen(true);
   };
 
+  const [isScanOpen, setIsScanOpen] = React.useState(false);
+
+  const normalizeBatchNode = React.useCallback(
+    (node: any): Batch => {
+      const normalized = {
+        id: node.id,
+        orgId: node.orgId ?? node.org_id ?? orgId ?? "",
+        batchNumber: String(node.batchNumber ?? node.batch_number ?? ""),
+        phase: (node.phase ?? "propagation") as Batch["phase"],
+        supplierId: node.supplierId ?? node.supplier_id ?? undefined,
+        plantVarietyId:
+          node.plantVarietyId ??
+          node.plant_variety_id ??
+          node.plantVariety ??
+          "",
+        sizeId: node.sizeId ?? node.size_id ?? "",
+        locationId: node.locationId ?? node.location_id ?? "",
+        status: (node.status ?? "Propagation") as Batch["status"],
+        quantity: node.quantity ?? 0,
+        initialQuantity: node.initialQuantity ?? node.quantity ?? 0,
+        quantityProduced: node.quantityProduced ?? undefined,
+        unit: node.unit ?? "plants",
+        plantedAt: node.plantingDate ?? node.plantedAt ?? null,
+        readyAt: node.producedAt ?? node.readyAt ?? null,
+        dispatchedAt: node.dispatchedAt ?? null,
+        archivedAt: node.archivedAt ?? null,
+        qrCode: node.qrCode ?? undefined,
+        qrImageUrl: node.qrImageUrl ?? undefined,
+        passportOverrideA: undefined,
+        passportOverrideB: undefined,
+        passportOverrideC: undefined,
+        passportOverrideD: undefined,
+        logHistory: node.logHistory ?? [],
+        supplierBatchNumber: node.supplierBatchNumber ?? "",
+        createdAt: node.createdAt ?? null,
+        updatedAt: node.updatedAt ?? null,
+        plantVariety: node.plantVariety ?? node.variety ?? "",
+        plantFamily: node.plantFamily ?? "",
+        size: node.size ?? node.potSize ?? "",
+        location: node.location ?? "",
+      } as Batch;
+      return normalized;
+    },
+    [orgId]
+  );
+
+  const fetchBatchNode = React.useCallback(
+    async (batchId: string) => {
+      const res = await fetch(`/api/batches/${batchId}`);
+      const json = await res.json();
+      if (!res.ok)
+        throw new Error(json.error?.message ?? "Failed to load batch");
+      const node = json.data?.batch ?? json.batch ?? json;
+      return normalizeBatchNode(node);
+    },
+    [normalizeBatchNode]
+  );
+
   const handleAiCareClick = async () => {
     if (!batches || batches.length === 0) return;
     const batchForRecs = batches[0];
     setSelectedBatch(batchForRecs);
     setIsRecommendationsOpen(true);
   };
-  
-  const handleScanDetected = (text: string) => {
-    window.location.href = `/?batch=${encodeURIComponent(text)}`;
-  };
+
+  const handleScanDetected = React.useCallback(
+    async (text: string) => {
+      if (!text) return;
+      try {
+        const res = await fetch("/api/batches/scan", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code: text }),
+        });
+
+        if (res.ok) {
+          const { batch } = await res.json();
+          const normalized = normalizeBatchNode(batch);
+          setSelectedBatch(normalized);
+          setIsDetailDialogOpen(true);
+          setIsScanOpen(false);
+          router.replace(
+            `/?batch=${encodeURIComponent(
+              normalized.id ?? normalized.batchNumber
+            )}`
+          );
+          setBatches((prev) => {
+            if (!prev) return [normalized];
+            const exists = prev.some((b) => b.id === normalized.id);
+            if (exists) {
+              return prev.map((b) =>
+                b.id === normalized.id ? { ...b, ...normalized } : b
+              );
+            }
+            return [normalized, ...prev];
+          });
+        } else if (res.status === 404) {
+          toast({
+            variant: "destructive",
+            title: "Not found",
+            description: "No batch matched the scanned code.",
+          });
+        } else if (res.status === 422) {
+          toast({
+            variant: "destructive",
+            title: "Unsupported code",
+            description: "This code format is not recognized.",
+          });
+        } else if (res.status === 429) {
+          toast({
+            variant: "destructive",
+            title: "Slow down",
+            description: "Too many scans in a short period. Please wait a moment.",
+          });
+        } else if (res.status === 401) {
+          toast({
+            variant: "destructive",
+            title: "Unauthorized",
+            description: "Session expired. Please sign in again.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Scan failed",
+            description: `Server responded with ${res.status}.`,
+          });
+        }
+      } catch (err: any) {
+        toast({
+          variant: "destructive",
+          title: "Scan failed",
+          description: err?.message || "Could not look up that batch.",
+        });
+      }
+    },
+    [normalizeBatchNode, router, toast]
+  );
+
+  const handleAncestrySelect = React.useCallback(
+    async (batchId: string) => {
+      if (!batchId) return;
+      try {
+        let existing = batches?.find((b) => b.id === batchId);
+        if (!existing) {
+          existing = await fetchBatchNode(batchId);
+          setBatches((prev) => {
+            if (!prev) return [existing as Batch];
+            const idx = prev.findIndex((b) => b.id === batchId);
+            if (idx === -1) return [existing as Batch, ...prev];
+            const copy = [...prev];
+            copy[idx] = existing as Batch;
+            return copy;
+          });
+        }
+        if (existing) {
+          setSelectedBatch(existing);
+          setIsDetailDialogOpen(true);
+          router.replace(
+            `/?batch=${encodeURIComponent(existing.id ?? existing.batchNumber)}`
+          );
+        }
+      } catch (err: any) {
+        toast({
+          variant: "destructive",
+          title: "Unable to open batch",
+          description: err?.message ?? "Could not load that batch.",
+        });
+      }
+    },
+    [batches, fetchBatchNode, router, toast]
+  );
   
   const handleEditBatch = React.useCallback((batch: Batch) => {
     setEditingBatch(batch);
@@ -255,10 +465,8 @@ export default function HomePageView({
     );
   }
 
-  if (!user) {
-    router.replace('/login');
-    return null;
-  }
+  // `useEffect` above handles redirect when user is missing; render nothing while it runs.
+  if (!user) return null;
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
@@ -315,11 +523,16 @@ export default function HomePageView({
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <Link href="/production/batches/new/bulk-transplant">
+                        <Button variant="outline" disabled={isReadonly} className="w-full sm:w-auto">
+                            <TransplantIcon className="mr-2 h-4 w-4" /> Bulk Transplant
+                        </Button>
+                    </Link>
                 </>
             }
         />
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Select
             value={filters.status}
             onValueChange={(value) =>
@@ -378,6 +591,44 @@ export default function HomePageView({
               ))}
             </SelectContent>
           </Select>
+
+          <Select
+            value={filters.variety}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, variety: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by variety" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Varieties</SelectItem>
+              {varietyOptions.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.location}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, location: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locationOptions.map((loc) => (
+                <SelectItem key={loc} value={loc}>
+                  {loc}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
@@ -390,6 +641,7 @@ export default function HomePageView({
                   key={batch.id}
                   batch={batch}
                   onOpen={handleOpenDetail}
+                  onLogAction={handleLogAction}
                   actionsSlot={
                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <TooltipProvider>
@@ -424,13 +676,14 @@ export default function HomePageView({
       {selectedBatch && (
         <BatchDetailDialog
           open={isDetailDialogOpen}
-          onOpenChange={setIsDetailDialogOpen}
+          onOpenChange={handleDetailOpenChange}
           batch={selectedBatch}
-          onEdit={() => handleEditBatch(selectedBatch)}
-          onTransplant={() => {}}
+          onEdit={handleEditBatch}
+          onTransplant={handleTransplantOpen}
           onLogAction={handleLogAction}
           onGenerateProtocol={handleGenerateProtocol}
           onCareRecommendations={handleRecommendations}
+          onSelectRelatedBatch={handleAncestrySelect}
         />
       )}
 
@@ -472,7 +725,7 @@ export default function HomePageView({
       <ActionDialog
         open={isLogActionOpen}
         onOpenChange={setIsLogActionOpen}
-        defaultBatchIds={selectedBatch ? [selectedBatch.id!] : []}
+        batch={selectedBatch}
         locations={nurseryLocations || []}
       />
       
@@ -516,12 +769,35 @@ export default function HomePageView({
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="font-headline text-3xl">Start Propagation</DialogTitle>
             <DialogDescription id="new-propagation-desc">
-              Pick variety, tray size, quantity and starting location for propagation.
+              Pick variety, tray size, quantity and starting location for propagation or import from CSV.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <PropagationForm orgId={orgId ?? undefined} />
-          </div>
+          <Tabs defaultValue="form" className="min-h-0 flex flex-col">
+            <TabsList className="mx-6 mb-4 w-fit">
+              <TabsTrigger value="form">Single entry</TabsTrigger>
+              <TabsTrigger value="bulk">Bulk CSV upload</TabsTrigger>
+            </TabsList>
+            <TabsContent
+              value="form"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-6"
+            >
+              <PropagationForm
+                onSubmitSuccess={() => {
+                  forceRefresh();
+                }}
+              />
+            </TabsContent>
+            <TabsContent
+              value="bulk"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-6"
+            >
+              <BulkPropagationUpload
+                onComplete={() => {
+                  forceRefresh();
+                }}
+              />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -539,9 +815,10 @@ export default function HomePageView({
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <CheckinForm 
+            <CheckInForm 
               onSubmitSuccess={(batch) => {
-                toast({ title: "Check-in Successful", description: `Batch #${batch.batchNumber} created.` });
+                const batchNumber = batch?.batch_number ?? batch?.batchNumber ?? "";
+                toast({ title: "Check-in Successful", description: batchNumber ? `Batch #${batchNumber} created.` : "Batch created." });
                 setIsCheckinFormOpen(false); 
                 forceRefresh(); 
               }}

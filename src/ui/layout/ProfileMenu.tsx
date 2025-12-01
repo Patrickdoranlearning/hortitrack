@@ -22,7 +22,7 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
         <DropdownMenuLabel>Profile</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/settings">Data Management</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/account">Account</Link></DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

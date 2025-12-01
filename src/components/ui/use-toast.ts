@@ -31,7 +31,14 @@ export const useToastStore = create<ToastState>((set, get) => ({
 }));
 
 export function useToast() {
-  return useToastStore();
+  const store = useToastStore();
+  return React.useMemo(
+    () => ({
+      ...store,
+      toast: store.add,
+    }),
+    [store]
+  );
 }
 
 export function toast(t: Omit<ToastItem, "id">) {

@@ -5,6 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Recursively transforms keys of an object (or array of objects) from snake_case to camelCase.
+ * Useful when consuming Supabase/Postgres data (snake_case) in the frontend (camelCase).
+ */
 export function snakeToCamel<T>(obj: T): any {
   if (Array.isArray(obj)) {
     return obj.map(v => snakeToCamel(v));
