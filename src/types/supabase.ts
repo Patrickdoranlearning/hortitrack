@@ -92,6 +92,29 @@ export interface Database {
         country_code: string | null;
         created_at: string | null;
       }>;
+      price_lists: TableDefinition<{
+        id: string;
+        org_id: string;
+        name: string;
+        currency: string;
+        is_default: boolean | null;
+        valid_from: string | null;
+        valid_to: string | null;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      skus: TableDefinition<{
+        id: string;
+        org_id: string;
+        code: string;
+        plant_variety_id: string;
+        size_id: string;
+        description: string | null;
+        barcode: string | null;
+        default_vat_rate: number;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
       profiles: TableDefinition<{
         id: string;
         active_org_id: string | null;
@@ -111,6 +134,18 @@ export interface Database {
         id: string;
         name: string;
         created_at: string | null;
+      }>;
+      products: TableDefinition<{
+        id: string;
+        org_id: string;
+        sku_id: string;
+        name: string;
+        description: string | null;
+        default_status: string | null;
+        hero_image_url: string | null;
+        is_active: boolean | null;
+        created_at: string | null;
+        updated_at: string | null;
       }>;
       orders: TableDefinition<{
         id: string;
@@ -132,12 +167,48 @@ export interface Database {
       order_items: TableDefinition<{
         id: string;
         order_id: string;
-        batch_id: string | null;
+        product_id: string | null;
+        sku_id: string;
+        description: string | null;
         quantity: number;
-        unit_price: number;
-        total_price: number;
+        unit_price_ex_vat: number;
+        vat_rate: number;
+        discount_pct: number | null;
+        line_total_ex_vat: number;
+        line_vat_amount: number;
         created_at: string | null;
         updated_at: string | null;
+      }>;
+      product_batches: TableDefinition<{
+        id: string;
+        org_id: string;
+        product_id: string;
+        batch_id: string;
+        available_quantity_override: number | null;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      product_prices: TableDefinition<{
+        id: string;
+        org_id: string;
+        product_id: string;
+        price_list_id: string;
+        unit_price_ex_vat: number;
+        currency: string;
+        valid_from: string | null;
+        valid_to: string | null;
+        min_qty: number;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      price_list_customers: TableDefinition<{
+        id: string;
+        org_id: string;
+        price_list_id: string;
+        customer_id: string;
+        valid_from: string | null;
+        valid_to: string | null;
+        created_at: string | null;
       }>;
       invoices: TableDefinition<{
         id: string;
@@ -168,8 +239,39 @@ export interface Database {
       }>;
       customers: TableDefinition<{
         id: string;
+        org_id: string;
         name: string;
+        email: string | null;
+        phone: string | null;
+        vat_number: string | null;
+        notes: string | null;
+        default_price_list_id: string | null;
         created_at: string | null;
+      }>;
+      order_events: TableDefinition<{
+        id: string;
+        org_id: string;
+        order_id: string;
+        event_type: string;
+        description: string | null;
+        metadata: Json | null;
+        created_by: string | null;
+        created_at: string | null;
+      }>;
+      order_exceptions: TableDefinition<{
+        id: string;
+        org_id: string;
+        order_id: string;
+        order_item_id: string | null;
+        exception_type: string;
+        status: string;
+        notes: string | null;
+        raised_by: string | null;
+        resolved_by: string | null;
+        resolved_notes: string | null;
+        created_at: string | null;
+        resolved_at: string | null;
+        metadata: Json | null;
       }>;
       pick_orders: TableDefinition<{
         id: string;

@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { TransplantInputSchema } from "@/lib/production/schemas";
 import { getUserAndOrg } from "@/server/auth/org";
 import { nextBatchNumber } from "@/server/numbering/batches";
+import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 
 type Phase = "propagation" | "plug" | "potted";
 const PhaseMapToNumber: Record<Phase, 1|2|3> = { propagation: 1, plug: 2, potted: 3 };
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     const input = TransplantInputSchema.parse(await req.json());
     const { supabase, orgId, user } = await getUserAndOrg();
+    const internalSupplierId = await ensureInternalSupplierId(supabase, orgId);
 
     // 1) Load parent batch (org-scoped)
     const { data: parent, error: pErr } = await supabase
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
         size_id: input.size_id,
         location_id: input.location_id,
         status: "Growing",
+        supplier_id: internalSupplierId,
         quantity: childUnits,
         initial_quantity: childUnits,
         unit: "plants",

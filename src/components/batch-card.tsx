@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import type { Batch } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ClipboardList } from "lucide-react";
 import TransplantForm from "@/components/batches/TransplantForm";
 import EditBatchForm from "@/components/batches/EditBatchForm";
 import EventsCard from "@/components/batches/EventsCard";
@@ -20,6 +22,7 @@ import AncestryCard from "@/components/batches/AncestryCard";
 import MoveForm from "@/components/batches/actions/MoveForm";
 import StatusForm from "@/components/batches/actions/StatusForm";
 import DumpForm from "@/components/batches/actions/DumpForm";
+import { TransplantIcon } from "@/components/icons";
 
 // --- runtime guard: logs undefined imports without crashing ---
 const _ensure = (x: any, name: string) => {
@@ -89,6 +92,17 @@ export function BatchCard({
   };
 
   const phase = batch.phase;
+  const locationLabel =
+    typeof batch.location === "string"
+      ? batch.location
+      : (batch as any)?.location?.name ??
+        (batch as any)?.locationName ??
+        "Unassigned";
+  const supplierLabel =
+    (batch as any)?.supplier ??
+    (batch as any)?.supplierName ??
+    (batch as any)?.supplier_name ??
+    "Unassigned";
 
   return (
     <div
@@ -97,69 +111,114 @@ export function BatchCard({
         "hover:shadow-md transition-shadow",
         className
       )}
+
     >
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="font-serif text-xl leading-tight">{batch.batchNumber}</div>
-          {batch.plantVariety && <div className="text-sm line-clamp-1">{batch.plantVariety}</div>}
+      <div className="flex-1 space-y-3">
+        {/* Action bar */}
+        <TooltipProvider>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 flex flex-wrap items-center justify-end gap-1.5 sm:gap-2"
+          >
+            {actionsSlot}
+            {onLogAction && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="sm:px-3"
+                    onClick={() => onLogAction(batch)}
+                  >
+                    <ClipboardList className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Log Action</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="sm:hidden">
+                  <p>Log Action</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button variant="default" size="sm" className="sm:px-3" aria-label="Transplant">
+                  <TransplantIcon />
+                  <span className="hidden sm:inline ml-2">Transplant</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Transplant from {batch.batchNumber}</DialogTitle>
+                  <DialogDescription>
+                    {batch.plantVariety ? `${batch.plantVariety}` : "Create a new batch from this parent."}
+                    {typeof batch.quantity === "number" ? ` • ${batch.quantity.toLocaleString()} units remaining` : ""}
+                  </DialogDescription>
+                </DialogHeader>
+                <SafeTransplantForm
+                  parentBatchId={parentSummary.id}
+                  onCreated={() => {
+                    setOpen(false); /* trigger refresh */
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </TooltipProvider>
+
+        {/* Core batch info */}
+        <div className="space-y-1">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-serif text-xl leading-tight">
+                {batch.plantVariety || batch.batchNumber}
+              </div>
+              {batch.plantFamily && (
+                <div className="text-sm text-muted-foreground line-clamp-1">
+                  {batch.plantFamily}
+                </div>
+              )}
+            </div>
+            <div className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
+              {batch.batchNumber}
+            </div>
+          </div>
           <div className="text-xs text-muted-foreground">
-            {[batch.plantFamily, batch.size].filter(Boolean).join(" • ") || " "}
+            {[batch.size, batch.phase?.toString()?.replace(/_/g, " ")].filter(Boolean).join(" • ") || " "}
           </div>
         </div>
-        {/* Place actions here; they must stop propagation */}
-        <div onClick={(e) => e.stopPropagation()} className="relative z-10 flex flex-wrap items-center gap-2">
-          {actionsSlot}
-          {onLogAction && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onLogAction(batch)}
-            >
-              Log Action
-            </Button>
-          )}
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button variant="default">Transplant</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Transplant from {batch.batchNumber}</DialogTitle>
-                <DialogDescription>
-                  {batch.plantVariety ? `${batch.plantVariety}` : "Create a new batch from this parent."}
-                  {typeof batch.quantity === "number" ? ` • ${batch.quantity.toLocaleString()} units remaining` : ""}
-                </DialogDescription>
-              </DialogHeader>
-              <SafeTransplantForm
-                parentBatchId={parentSummary.id}
-                onCreated={() => { setOpen(false); /* trigger refresh */ }}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
 
-      <div className="mt-2 flex-grow">
-        <div className="flex justify-between text-xs font-semibold">
+        {/* Location & supplier */}
+        <div className="rounded-xl bg-muted/40 p-3 text-xs sm:text-sm grid gap-2">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-muted-foreground uppercase tracking-wide text-[10px] sm:text-xs">Location</span>
+            <span className="font-medium text-right">{locationLabel}</span>
+          </div>
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-muted-foreground uppercase tracking-wide text-[10px] sm:text-xs">Supplier</span>
+            <span className="font-medium text-right">{supplierLabel}</span>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between text-xs font-semibold">
             <span>Stock</span>
             <span>
               {(batch.quantity ?? 0).toLocaleString()} / {(batch.initialQuantity ?? 0).toLocaleString()}
             </span>
           </div>
-        <Progress value={stockPercentage} className="mt-1" />
-      </div>
+          <Progress value={stockPercentage} className="mt-1" />
+        </div>
 
-
-      <div className="flex flex-wrap gap-1 mt-3">
-        {phase && (
+        <div className="flex flex-wrap gap-1">
+          {phase && (
             <Badge variant="secondary" className="capitalize">{phase}</Badge>
-        )}
-        {batch.status && (
-          <Badge variant={getStatusVariant(batch.status)}>
-            {batch.status}
-          </Badge>
-        )}
+          )}
+          {batch.status && (
+            <Badge variant={getStatusVariant(batch.status)}>
+              {batch.status}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Full-card overlay button to capture click & focus accessibly */}

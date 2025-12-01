@@ -12,18 +12,29 @@ export const SalesOrderStatus = z.enum([
 ]);
 export type SalesOrderStatus = z.infer<typeof SalesOrderStatus>;
 
-export const CreateOrderLineSchema = z.object({
-  // Product identity (MVP: variety + size == product)
-  plantVariety: z.string().min(1),
-  size: z.string().min(1),
-  qty: z.number().int().positive(),
-  allowSubstitute: z.boolean().optional().default(false),
-  unitPrice: z.number().nonnegative().optional(), // optional override
-});
+export const CreateOrderLineSchema = z
+  .object({
+    productId: z.string().uuid().optional(),
+    // Product identity fallback (variety + size)
+    plantVariety: z.string().min(1).optional(),
+    size: z.string().min(1).optional(),
+    description: z.string().optional(),
+    qty: z.number().int().positive(),
+    allowSubstitute: z.boolean().optional().default(false),
+    unitPrice: z.number().nonnegative().optional(), // optional override
+    vatRate: z.number().min(0).max(100).optional(),
+  })
+  .refine(
+    (val) => Boolean(val.productId) || (Boolean(val.plantVariety) && Boolean(val.size)),
+    {
+      message: "Provide a productId or both plant variety and size",
+      path: ["productId"],
+    }
+  );
 
 export const CreateOrderSchema = z.object({
   customerId: z.string().min(1),
-  storeId: z.string().min(1),
+  storeId: z.string().min(1).optional(),
   deliveryDate: z.string().optional(), // ISO
   shipMethod: z.enum(["van", "haulier"]).optional(),
   notesCustomer: z.string().optional(),
