@@ -523,6 +523,11 @@ export default function HomePageView({
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <Link href="/production/batches/new/bulk-transplant">
+                        <Button variant="outline" disabled={isReadonly} className="w-full sm:w-auto">
+                            <TransplantIcon className="mr-2 h-4 w-4" /> Bulk Transplant
+                        </Button>
+                    </Link>
                 </>
             }
         />
