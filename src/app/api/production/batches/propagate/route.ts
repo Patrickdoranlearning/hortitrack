@@ -5,6 +5,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerClient } from "@/server/db/supabaseServer";
 import { PropagationInputSchema } from "@/lib/production/schemas";
 import { nextBatchNumber } from "@/server/numbering/batches";
+import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
     const input = PropagationInputSchema.parse(body);
 
     const { supabase, orgId, user } = await getUserAndOrg();
+    const internalSupplierId = await ensureInternalSupplierId(supabase, orgId);
 
     // Fetch size.multiple to compute plant units from container count
     const { data: size, error: sizeErr } = await supabase
@@ -40,6 +42,7 @@ export async function POST(req: NextRequest) {
         initial_quantity: units,
         unit: "plants",
         planted_at: input.planted_at ?? null,
+        supplier_id: internalSupplierId,
         supplier_batch_number: "",          // internal propagation
       })
       .select("*")

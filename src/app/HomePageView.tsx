@@ -67,8 +67,10 @@ import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
 import EditBatchForm from '@/components/batches/EditBatchForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
+const BulkPropagationUpload = dynamic(() => import('@/components/batches/BulkPropagationUpload'), { ssr: false });
 const VarietyForm = dynamic(() => import('@/components/varieties/VarietyForm'), { ssr: false });
 
 interface HomePageViewProps {
@@ -131,6 +133,8 @@ export default function HomePageView({
     plantFamily: 'all',
     category: 'all',
     status: 'Active',
+    variety: 'all',
+    location: 'all',
   });
   const clearBatchQuery = React.useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -141,6 +145,22 @@ export default function HomePageView({
   }, [router, searchParams]);
 
   const [searchQuery, setSearchQuery] = React.useState('');
+
+  const varietyOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    (batches || []).forEach((batch) => {
+      if (batch.plantVariety) set.add(batch.plantVariety);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [batches]);
+
+  const locationOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    (batches || []).forEach((batch) => {
+      if (batch.location) set.add(batch.location);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [batches]);
 
   const filteredBatches = React.useMemo(() => {
     const dataToFilter = batches || [];
@@ -153,6 +173,12 @@ export default function HomePageView({
       .filter((batch) =>
         filters.category === 'all' || batch.category === filters.category
       )
+      .filter((batch) => (
+        filters.variety === 'all' || (batch.plantVariety ?? '') === filters.variety
+      ))
+      .filter((batch) => (
+        filters.location === 'all' || (batch.location ?? '') === filters.location
+      ))
       .filter((batch) => {
         if (filters.status === 'all') return true;
         if (filters.status === 'Active') return batch.status !== 'Archived';
@@ -497,11 +523,16 @@ export default function HomePageView({
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <Link href="/production/batches/new/bulk-transplant">
+                        <Button variant="outline" disabled={isReadonly} className="w-full sm:w-auto">
+                            <TransplantIcon className="mr-2 h-4 w-4" /> Bulk Transplant
+                        </Button>
+                    </Link>
                 </>
             }
         />
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Select
             value={filters.status}
             onValueChange={(value) =>
@@ -556,6 +587,44 @@ export default function HomePageView({
               {(plantFamilies || []).map((p) => (
                 <SelectItem key={p} value={p}>
                   {p}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.variety}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, variety: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by variety" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Varieties</SelectItem>
+              {varietyOptions.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.location}
+            onValueChange={(value) =>
+              setFilters((f) => ({ ...f, location: value }))
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locationOptions.map((loc) => (
+                <SelectItem key={loc} value={loc}>
+                  {loc}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -700,12 +769,35 @@ export default function HomePageView({
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="font-headline text-3xl">Start Propagation</DialogTitle>
             <DialogDescription id="new-propagation-desc">
-              Pick variety, tray size, quantity and starting location for propagation.
+              Pick variety, tray size, quantity and starting location for propagation or import from CSV.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <PropagationForm />
-          </div>
+          <Tabs defaultValue="form" className="min-h-0 flex flex-col">
+            <TabsList className="mx-6 mb-4 w-fit">
+              <TabsTrigger value="form">Single entry</TabsTrigger>
+              <TabsTrigger value="bulk">Bulk CSV upload</TabsTrigger>
+            </TabsList>
+            <TabsContent
+              value="form"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-6"
+            >
+              <PropagationForm
+                onSubmitSuccess={() => {
+                  forceRefresh();
+                }}
+              />
+            </TabsContent>
+            <TabsContent
+              value="bulk"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-6"
+            >
+              <BulkPropagationUpload
+                onComplete={() => {
+                  forceRefresh();
+                }}
+              />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

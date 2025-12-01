@@ -173,7 +173,11 @@ export default function CreateOrderForm({ customers }: CreateOrderFormProps) {
                                                         type="number"
                                                         step="0.01"
                                                         {...field}
-                                                        onChange={e => field.onChange(parseFloat(e.target.value))}
+                                                        value={field.value ?? ''}
+                                                        onChange={e => {
+                                                            const value = e.target.value;
+                                                            field.onChange(value === '' ? undefined : parseFloat(value));
+                                                        }}
                                                     />
                                                 </FormControl>
                                                 <FormMessage />

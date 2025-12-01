@@ -27,7 +27,7 @@ export async function GET(req: Request) {
 
   // base select with exact count for pagination
   let query = sb.from("v_batch_search")
-    .select("id, org_id, batch_number, status, phase, quantity, ready_at, variety_name, family, size_name, location_name, supplier_name",
+    .select("id, org_id, batch_number, status, phase, quantity, ready_at, variety_name, size_name, location_name, supplier_name",
       { count: "exact" })
     .order("ready_at", { ascending: true, nullsFirst: false })
     .range(from, to);
@@ -39,7 +39,6 @@ export async function GET(req: Request) {
     query = query.or([
       `batch_number.ilike.${like}`,
       `variety_name.ilike.${like}`,
-      `family.ilike.${like}`,
       `size_name.ilike.${like}`,
       `location_name.ilike.${like}`,
       `supplier_name.ilike.${like}`,
