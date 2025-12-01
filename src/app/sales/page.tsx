@@ -4,10 +4,10 @@ import Link from 'next/link';
 import * as React from 'react';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { PageFrame } from '@/ui/templates/PageFrame';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import SalesMetrics, { DashboardMetrics } from '@/components/sales/SalesMetrics';
 import { createClient } from '@/lib/supabase/server';
 import { startOfWeek, endOfWeek, addWeeks, formatISO } from 'date-fns';
+import { ClipboardList, ShoppingBag, FileText } from 'lucide-react';
 
 export default async function SalesLandingPage() {
     const supabase = await createClient();
@@ -63,48 +63,28 @@ export default async function SalesLandingPage() {
                     }
                 />
 
-                <SalesMetrics metrics={metrics} />
-
-                <div className="space-y-4">
-                    <h2 className="text-xl font-semibold tracking-tight">Quick Actions</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex flex-wrap items-center gap-3">
+                    <Button asChild variant="secondary" size="sm" className="gap-2">
                         <Link href="/sales/orders">
-                            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                                <CardHeader>
-                                    <CardTitle>Orders</CardTitle>
-                                    <CardDescription>Manage customer orders</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-2xl font-bold">View All</p>
-                                </CardContent>
-                            </Card>
+                            <ShoppingBag className="h-4 w-4" />
+                            Orders
                         </Link>
-
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="gap-2">
                         <Link href="/sales/picking">
-                            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                                <CardHeader>
-                                    <CardTitle>Picking</CardTitle>
-                                    <CardDescription>View pick lists and status</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-2xl font-bold">View Picks</p>
-                                </CardContent>
-                            </Card>
+                            <ClipboardList className="h-4 w-4" />
+                            Picking
                         </Link>
-
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="gap-2">
                         <Link href="/sales/invoices">
-                            <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                                <CardHeader>
-                                    <CardTitle>Invoices</CardTitle>
-                                    <CardDescription>Manage invoices and credits</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-2xl font-bold">View Invoices</p>
-                                </CardContent>
-                            </Card>
+                            <FileText className="h-4 w-4" />
+                            Invoices
                         </Link>
-                    </div>
+                    </Button>
                 </div>
+
+                <SalesMetrics metrics={metrics} />
             </div>
         </PageFrame>
     );

@@ -1,8 +1,9 @@
 
 "use client";
 import * as React from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus } from "lucide-react";
 import { PropagationStartDialog } from "@/components/dialogs/PropagationStartDialog";
 import { BatchCheckInDialog } from "@/components/dialogs/BatchCheckInDialog";
@@ -22,6 +23,10 @@ export function NewBatchButton({ className }: { className?: string }) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => setMode("prop")}>Propagation</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setMode("checkin")}>Check-In</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/production/batches/new/bulk-transplant">Bulk Transplant</Link>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <PropagationStartDialog open={mode === "prop"} onOpenChange={(o) => !o && setMode(null)} />
