@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OrderStatusBadge from "@/components/sales/OrderStatusBadge";
 import { PrintLabelsButton } from "@/components/sales/PrintLabelsButton";
 import { UpdateStatusButton } from "@/components/sales/UpdateStatusButton";
-import { getOrderById } from "@/server/sales/queries";
+import { getOrderById } from "@/server/sales/queries.server";
 
 export const runtime = "nodejs";
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export default async function OrderDetailPage({ params }: { params: { orderId: s
           <div>
             <div className="text-sm text-muted-foreground">Created</div>
             <div className="font-medium">
-              {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString() : ""}
+              {order.createdAt ? new Date(order.createdAt).toLocaleString() : ""}
             </div>
           </div>
           <div className="md:col-span-3 flex gap-2">
@@ -52,7 +52,6 @@ export default async function OrderDetailPage({ params }: { params: { orderId: s
                 <th className="py-2">Size</th>
                 <th className="py-2">Qty</th>
                 <th className="py-2">Unit Price</th>
-                <th className="py-2">Allocations</th>
               </tr>
             </thead>
             <tbody>
@@ -62,22 +61,10 @@ export default async function OrderDetailPage({ params }: { params: { orderId: s
                   <td className="py-2">{l.size}</td>
                   <td className="py-2">{l.qty}</td>
                   <td className="py-2">{l.unitPrice != null ? `€${Number(l.unitPrice).toFixed(2)}` : "-"}</td>
-                  <td className="py-2">
-                    {Array.isArray(l.allocations) && l.allocations.length > 0 ? (
-                      <ul className="list-disc ml-5">
-                        {l.allocations.map((a: any, i: number) => (
-                          <li key={i}>
-                            Batch {a.batchNumber ?? a.batchId} — {a.qty} pcs
-                            {a.grade ? ` — Grade ${a.grade}` : ""}{a.location ? ` — ${a.location}` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : <span className="text-muted-foreground">Auto allocation pending</span>}
-                  </td>
                 </tr>
               ))}
               {order.lines.length === 0 && (
-                <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No lines.</td></tr>
+                <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">No lines.</td></tr>
               )}
             </tbody>
           </table>

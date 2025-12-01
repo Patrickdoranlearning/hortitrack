@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     if (!parse.success) return NextResponse.json({ error: parse.error.format() }, { status: 400 });
 
     const { q, limit } = parse.data;
-    const supabase = getSupabaseForRequest();
+    const supabase = await getSupabaseForRequest();
     
     // Fetch the active organization ID for the current user
     const orgId = await getActiveOrgId(supabase);

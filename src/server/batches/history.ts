@@ -2,7 +2,7 @@
 'use server';
 
 import { adminDb } from "@/server/db/admin";
-import { isValidDocId } from "@/server/util/ids";
+import { isValidDocId } from "@/server/utils/ids";
 
 export type HistoryLog = {
   id: string;
@@ -78,10 +78,10 @@ async function readBatch(id: string) {
 
 
 async function readChildren(batchNumber: string) {
-    if (!batchNumber) return [];
-    const q = adminDb.collection("batches").where("transplantedFrom", "==", batchNumber);
-    const qs = await q.limit(20).get().catch(() => ({ empty: true, docs: [] } as any));
-    return qs.docs.map((doc: any) => ({ id: doc.id, ...(doc.data() || {}) }));
+  if (!batchNumber) return [];
+  const q = adminDb.collection("batches").where("transplantedFrom", "==", batchNumber);
+  const qs = await q.limit(20).get().catch(() => ({ empty: true, docs: [] } as any));
+  return qs.docs.map((doc: any) => ({ id: doc.id, ...(doc.data() || {}) }));
 }
 
 async function readLogs(id: string) {
@@ -99,18 +99,18 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
 
   const nodes: HistoryNode[] = [];
   const edges: HistoryEdge[] = [];
-  
+
   nodes.push({ id: `batch:${b.id}`, kind: "batch", batchId: b.id, label: `Batch ${b.batchNumber ?? b.id}`, meta: { variety: b.variety } });
 
   if (b.parentBatchId) {
     const parentSnap = await adminDb.collection('batches').where('batchNumber', '==', b.parentBatchId).limit(1).get();
     if (!parentSnap.empty) {
-        const parent = await readBatch(parentSnap.docs[0].id);
-        if (parent) {
-             const pNodeId = `batch:${parent.id}`;
-             nodes.push({ id: pNodeId, kind: "batch", batchId: parent.id, label: `Batch ${parent.batchNumber ?? parent.id}`, meta: { variety: parent.variety } });
-             edges.push({ id: `e:${pNodeId}->batch:${b.id}`, from: pNodeId, to: `batch:${b.id}`, kind: "flow", label: "transplant" });
-        }
+      const parent = await readBatch(parentSnap.docs[0].id);
+      if (parent) {
+        const pNodeId = `batch:${parent.id}`;
+        nodes.push({ id: pNodeId, kind: "batch", batchId: parent.id, label: `Batch ${parent.batchNumber ?? parent.id}`, meta: { variety: parent.variety } });
+        edges.push({ id: `e:${pNodeId}->batch:${b.id}`, from: pNodeId, to: `batch:${b.id}`, kind: "flow", label: "transplant" });
+      }
     }
   }
 
@@ -145,9 +145,9 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
       }
       currentStage = { name: l.note || l.type || action, start: at };
     }
-    
+
     if (l.newLocation && MOVE_ACTIONS.has(action)) {
-        // This logic is simplified; a full location history would need its own spans
+      // This logic is simplified; a full location history would need its own spans
     }
   }
   if (currentStage) {
@@ -177,7 +177,7 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
     details: l.details || null,
     userId: l.userId || l.uid || null,
     userName: l.userName || l.user || null,
-    media: l.photoUrl ? [{url: l.photoUrl, name: 'photo'}] : [],
+    media: l.photoUrl ? [{ url: l.photoUrl, name: 'photo' }] : [],
   }));
   logs.sort((a, b) => +new Date(a.at) - +new Date(b.at));
 

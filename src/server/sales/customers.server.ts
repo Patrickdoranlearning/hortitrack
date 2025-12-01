@@ -1,8 +1,6 @@
 // src/server/sales/customers.server.ts
 import "server-only";
-import { adminDb } from "@/server/db/admin";
 import { z } from "zod";
-import { mapFirebaseAdminError } from "@/server/errors";
 
 export const Customer = z.object({
   id: z.string(),
@@ -13,18 +11,28 @@ export const Customer = z.object({
 });
 export type Customer = z.infer<typeof Customer>;
 
+import { createClient } from "@/lib/supabase/server";
+
 export async function listCustomers(limit = 100): Promise<Customer[]> {
   try {
-    const snap = await adminDb
-      .collection("customers")
-      .orderBy("createdAt", "desc")
-      .limit(limit)
-      .get();
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
-    return snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .map((raw) => Customer.parse(raw));
-  } catch (e) {
-    throw mapFirebaseAdminError(e);
+    if (error) throw error;
+
+    return data.map((d: any) => Customer.parse({
+      id: d.id,
+      name: d.name,
+      email: d.email,
+      phone: d.phone,
+      createdAt: d.created_at,
+    }));
+  } catch (e: any) {
+    console.error("Error listing customers:", e);
+    return [];
   }
 }

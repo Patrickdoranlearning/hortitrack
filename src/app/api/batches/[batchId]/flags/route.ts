@@ -18,6 +18,8 @@ export async function GET(req: NextRequest, { params }: { params: { batchId: str
   }
 }
 
+import { getUserIdAndOrgId } from "@/server/auth/getUser";
+
 // PATCH /api/batches/:id/flags  { key, value, reason?, notes? }
 export async function PATCH(req: NextRequest, { params }: { params: { batchId: string } }) {
   const id = params.batchId;
@@ -31,8 +33,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { batchId: s
   if (!key) return NextResponse.json({ error: "key is required" }, { status: 422 });
 
   try {
-    // TODO: plug your auth to pass actor info (if available)
+    const { userId, orgId } = await getUserIdAndOrgId();
+    
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    // TODO: Validate org access if necessary (e.g. check if batch belongs to org)
+
     await setFlag(id, key, value, {
+      actor: { id: userId }, // Pass Supabase User ID
       reason: typeof body?.reason === "string" ? body.reason.slice(0, 200) : null,
       notes: typeof body?.notes === "string" ? body.notes.slice(0, 500) : null,
     });

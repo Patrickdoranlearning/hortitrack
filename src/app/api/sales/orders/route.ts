@@ -1,59 +1,37 @@
 // src/app/api/sales/orders/route.ts
 import { NextResponse } from "next/server";
-import { listOrders, createOrder, NewOrderSchema } from "@/server/sales/queries.server";
-import { z } from "zod";
-import { ok, fail } from "@/server/utils/envelope";
-import { allocateForProductLine } from "@/server/sales/allocation";
-import { adminDb } from "@/server/db/admin";
-import { getUser } from "@/server/auth/getUser";
-import { nanoid } from "nanoid";
-import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
-import { requireRoles } from "@/server/auth/roles";
 import { CreateOrderSchema } from "@/lib/sales/types";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
+import { ok, fail } from "@/server/utils/envelope";
 
 export async function GET(req: Request) {
   try {
-    const authz = await requireRoles(["sales:read"]);
-    if (!authz.ok) return fail(authz.reason === "unauthenticated" ? 401 : 403, authz.reason, "Not allowed.");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return fail(401, "unauthenticated", "You must be signed in.");
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const limit = Math.min(Number(searchParams.get("limit") || 50), 200);
 
-    if (process.env.USE_SUPABASE_READS === "1") {
-      const sb = getSupabaseForRequest();
-      // Base select
-      let q = sb.from("orders")
-        .select("id, customer_id, status, created_at", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      if (status && status !== "all") q = q.eq("status", status);
-      const { data, error } = await q;
-      if (error) return fail(400, "query_failed", error.message);
+    // Base select
+    let q = supabase.from("orders")
+      .select("id, customer_id, status, created_at, customers(name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (status && status !== "all") q = q.eq("status", status);
+    const { data, error } = await q;
+    if (error) return fail(400, "query_failed", error.message);
 
-      const orders = (data ?? []).map(o => ({
-        id: o.id,
-        customerName: o.customer_id ?? "Unknown",
-        customerId: o.customer_id ?? null,
-        status: o.status ?? "draft",
-        createdAt: o.created_at,
-      }));
+    const orders = (data ?? []).map((o: any) => ({
+      id: o.id,
+      customerName: o.customers?.name ?? "Unknown",
+      customerId: o.customer_id ?? null,
+      status: o.status ?? "draft",
+      createdAt: o.created_at,
+    }));
 
-      // Enrich customer names (best-effort)
-      const ids = [...new Set(orders.map(o => o.customerId).filter(Boolean))] as string[];
-      if (ids.length) {
-        const { data: cust, error: cErr } = await sb.from("customers").select("id,name").in("id", ids);
-        if (!cErr && cust) {
-          const map = new Map(cust.map(c => [c.id, c.name]));
-          orders.forEach(o => { if (o.customerId && map.has(o.customerId)) o.customerName = map.get(o.customerId)!; });
-        }
-      }
-      return NextResponse.json({ ok: true, orders });
-    } else {
-      const orders = await listOrders(limit, status || undefined);
-      return NextResponse.json({ ok: true, orders });
-    }
+    return NextResponse.json({ ok: true, orders });
   } catch (err) {
     console.error("[api:sales/orders][GET]", err);
     return NextResponse.json({ ok: false, error: String((err as any)?.message ?? err) }, { status: 500 });
@@ -62,15 +40,21 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const user = await getUser();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return fail(401, "unauthenticated", "You must be signed in.");
 
-    const rlKey = requestKey(req as any, user.uid);
-    const { allowed } = await checkRateLimit({ key: `sales:create-order:${rlKey}`, windowMs: 10000, max: 10});
-    if (!allowed) {
-        return fail(429, "rate_limited", "Too many requests.");
+    // Get active org
+    let activeOrgId: string | null = null;
+    const { data: profile } = await supabase.from('profiles').select('active_org_id').eq('id', user.id).single();
+    if (profile?.active_org_id) {
+      activeOrgId = profile.active_org_id;
+    } else {
+      const { data: membership } = await supabase.from('org_memberships').select('org_id').eq('user_id', user.id).limit(1).single();
+      if (membership) activeOrgId = membership.org_id;
     }
-    
+    if (!activeOrgId) return fail(400, "no_org", "No active organization found.");
+
     const json = await req.json();
     const parsed = CreateOrderSchema.safeParse(json);
     if (!parsed.success) {
@@ -81,62 +65,81 @@ export async function POST(req: Request) {
     }
     const input = parsed.data;
 
-    // Allocate each line
-    const allocatedLines: any[] = [];
+    // Resolve SKUs and check availability
+    const linesToInsert: any[] = [];
     for (const line of input.lines) {
-      const allocations = await allocateForProductLine({
-        plantVariety: line.plantVariety,
-        size: line.size,
-        qty: line.qty,
-      });
-      allocatedLines.push({
-        plantVariety: line.plantVariety,
-        size: line.size,
-        qty: line.qty,
-        unitPrice: line.unitPrice,
-        allocations,
+      // Find SKU by Variety + Size
+      // We need to resolve Variety ID and Size ID first
+      const { data: variety } = await supabase
+        .from('plant_varieties')
+        .select('id')
+        .eq('name', line.plantVariety)
+        .maybeSingle();
+      const { data: size } = await supabase
+        .from('plant_sizes')
+        .select('id')
+        .eq('name', line.size)
+        .maybeSingle();
+
+      if (!variety || !size) {
+        return fail(400, "invalid_product", `Product not found: ${line.plantVariety} ${line.size}`);
+      }
+
+      const { data: sku } = await supabase
+        .from('skus')
+        .select('id')
+        .eq('plant_variety_id', variety.id)
+        .eq('size_id', size.id)
+        .eq('org_id', activeOrgId)
+        .maybeSingle();
+
+      if (!sku) {
+        return fail(400, "no_sku", `SKU not found for: ${line.plantVariety} ${line.size}`);
+      }
+
+      // Optional: Check availability using allocateForProductLine (just for validation)
+      // const allocations = await allocateForProductLine({ ... });
+      // if (allocations.reduce((sum, a) => sum + a.qty, 0) < line.qty) ...
+
+      linesToInsert.push({
+        sku_id: sku.id,
+        quantity: line.qty,
+        unit_price_ex_vat: line.unitPrice ?? 0, // Should fetch from price list or SKU default
+        vat_rate: 13.5, // Default
+        description: `${line.plantVariety} - ${line.size}`,
       });
     }
 
-    // Persist: orders + subcollection lines
-    const now = new Date();
-    const orderRef = adminDb.collection("sales_orders").doc();
-    const orderId = orderRef.id;
+    // Create Order
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .insert({
+        org_id: activeOrgId,
+        customer_id: input.customerId,
+        // store_id: input.storeId, // Not in new schema?
+        order_number: `ORD-${Date.now()}`,
+        status: "confirmed", // MVP
+        requested_delivery_date: input.deliveryDate ?? null,
+        // ship_method: input.shipMethod ?? null, // Not in new schema?
+        notes: input.notesCustomer ?? input.notesInternal ?? null,
+        subtotal_ex_vat: 0, // Calculate?
+        vat_amount: 0,
+        total_inc_vat: 0,
+      })
+      .select("id")
+      .single();
 
-    const status = "confirmed"; // MVP: confirm on create (UI can support draft later)
+    if (orderErr) throw new Error(`Order create failed: ${orderErr.message}`);
+    const orderId = order.id;
 
-    await orderRef.set({
-      customerId: input.customerId,
-      storeId: input.storeId,
-      status,
-      deliveryDate: input.deliveryDate ?? null,
-      shipMethod: input.shipMethod ?? null,
-      notesCustomer: input.notesCustomer ?? null,
-      notesInternal: input.notesInternal ?? null,
-      totalsExVat: 0, vat: 0, totalsIncVat: 0,
-      createdAt: now, updatedAt: now,
-      createdBy: user.uid,
-    });
+    // Insert Lines
+    const { error: linesErr } = await supabase
+      .from("sales_order_lines")
+      .insert(linesToInsert.map(l => ({ ...l, order_id: orderId })));
 
-    const linesCol = orderRef.collection("lines");
-    const batchOps: Promise<any>[] = [];
-    for (const l of allocatedLines) {
-      const lineId = nanoid(8);
-      batchOps.push(
-        linesCol.doc(lineId).set({
-          plantVariety: l.plantVariety,
-          size: l.size,
-          qty: l.qty,
-          unitPrice: l.unitPrice ?? null,
-          allocations: l.allocations,
-          createdAt: now,
-        })
-      );
-    }
-    await Promise.all(batchOps);
-    
-    const id = orderId;
-    return NextResponse.json({ ok: true, id }, { status: 201 });
+    if (linesErr) throw new Error(`Lines create failed: ${linesErr.message}`);
+
+    return NextResponse.json({ ok: true, id: orderId }, { status: 201 });
   } catch (err) {
     console.error("[api:sales/orders][POST]", err);
     return NextResponse.json({ ok: false, error: "Failed to create order" }, { status: 500 });

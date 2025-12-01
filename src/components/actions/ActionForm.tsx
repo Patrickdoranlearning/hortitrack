@@ -15,8 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { useToast } from "@/hooks/use-toast";
 import type { Batch, NurseryLocation } from "@/lib/types";
-import { BatchPhotoUploader } from "@/components/batches/BatchPhotoUploader"; // Corrected import path to use BatchPhotoUploader
+import BatchPhotoUploader from "@/components/batches/BatchPhotoUploader";
 import { fetchJson } from "@/lib/http";
+import { Card } from "@/components/ui/card";
 
 function compactPayload<T extends Record<string, any>>(obj: T): Partial<T> {
   const out: Record<string, any> = {};
@@ -46,9 +47,35 @@ const dumpSchema = (max: number) => z.object({
   photos: z.array(z.object({ url: z.string().url(), path: z.string().optional() })).default([]),
 });
 
+const CLEAR_STATUS_VALUE = "__none";
+
+const growerStatusOptions = [
+  { label: "Propagation", value: "Propagation" },
+  { label: "Growing", value: "Growing" },
+  { label: "Looking Good", value: "Looking Good" },
+  { label: "Ready for Sale", value: "Ready for Sale" },
+  { label: "Potted", value: "Potted" },
+  { label: "Archived", value: "Archived" },
+];
+
 const checkinSchema = z.object({
-  type: z.enum(["CHECKIN", "NOTE"]),
+  type: z.literal("CHECKIN"),
   at: z.date(),
+  status: z
+    .enum(
+      growerStatusOptions
+        .filter((opt) => opt.value)
+        .map((opt) => opt.value as string) as [
+        "Propagation",
+        "Growing",
+        "Looking Good",
+        "Ready for Sale",
+        "Potted",
+        "Archived"
+      ]
+    )
+    .optional(),
+  flags: z.array(z.string()).default([]),
   notes: z.string().min(1, "Add a note"),
   photos: z.array(z.object({ url: z.string().url(), path: z.string().optional() })).default([]),
 });
@@ -66,9 +93,9 @@ export function ActionForm({
   onCancel?: () => void;
 }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"MOVE"|"DUMP"|"CHECKIN">("MOVE");
-  const [uploaded, setUploaded] = useState<{url:string;path?:string}[]>([]);
-  const abortRef = useRef<AbortController|null>(null);
+  const [tab, setTab] = useState<"MOVE" | "DUMP" | "CHECKIN">("MOVE");
+  const [uploaded, setUploaded] = useState<{ url: string; path?: string }[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
   const max = Number(batch.quantity ?? 0);
 
   // ---- MOVE
@@ -104,6 +131,8 @@ export function ActionForm({
     defaultValues: {
       type: "CHECKIN",
       at: new Date(),
+    status: undefined,
+    flags: [],
       notes: "",
       photos: [],
     },
@@ -112,11 +141,11 @@ export function ActionForm({
   useEffect(() => {
     // push uploaded photos to whichever tab is active
     if (uploaded.length === 0) return;
-    if (tab === "MOVE") moveForm.setValue("photos", [...(moveForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
-    if (tab === "DUMP") dumpForm.setValue("photos", [...(dumpForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
-    if (tab === "CHECKIN") checkForm.setValue("photos", [...(checkForm.getValues("photos")||[]), ...uploaded], { shouldDirty: true });
+    if (tab === "MOVE") moveForm.setValue("photos", [...(moveForm.getValues("photos") || []), ...uploaded], { shouldDirty: true });
+    if (tab === "DUMP") dumpForm.setValue("photos", [...(dumpForm.getValues("photos") || []), ...uploaded], { shouldDirty: true });
+    if (tab === "CHECKIN") checkForm.setValue("photos", [...(checkForm.getValues("photos") || []), ...uploaded], { shouldDirty: true });
     setUploaded([]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploaded, tab]);
 
   function idemKey(payload: Record<string, any>) {
@@ -125,7 +154,7 @@ export function ActionForm({
       ...payload,
       at: new Date(payload.at).getTime(),
     });
-    return typeof window === "undefined" ? base : btoa(unescape(encodeURIComponent(base))).slice(0,128);
+    return typeof window === "undefined" ? base : btoa(unescape(encodeURIComponent(base))).slice(0, 128);
   }
 
   async function submit(payload: Record<string, any>) {
@@ -175,7 +204,7 @@ export function ActionForm({
       await submit(payload);
       toast({ title: "Move logged", description: `Destination set.` });
       onSuccess?.();
-    } catch (e:any) {
+    } catch (e: any) {
       const msg = String(e.message || e);
       if (/destination/i.test(msg)) moveForm.setError("toLocationId", { message: msg });
       toast({ variant: "destructive", title: "Move failed", description: msg });
@@ -191,39 +220,73 @@ export function ActionForm({
       await submit(payload);
       toast({ title: "Dump logged", description: `Quantity adjusted.` });
       onSuccess?.();
-    } catch (e:any) {
+    } catch (e: any) {
       const msg = String(e.message || e);
       if (/exceeds/i.test(msg)) dumpForm.setError("quantity", { message: msg });
       if (/reason/i.test(msg)) dumpForm.setError("reason", { message: msg });
       toast({ variant: "destructive", title: "Dump failed", description: msg });
     }
   }
+  const photoRequiredStatuses = ["Ready for Sale", "Looking Good"];
+
   async function onSubmitCheck(values: CheckForm) {
     try {
-      const payload = { ...values, at: values.at.toISOString() };
+      if (
+        values.status &&
+        photoRequiredStatuses.includes(values.status) &&
+        (!values.photos || values.photos.length === 0)
+      ) {
+        checkForm.setError("status", {
+          message: "Add at least one photo when marking as saleable or looking good.",
+        });
+        toast({
+          variant: "destructive",
+          title: "Photo required",
+          description:
+            "Please take a sales photo when setting status to Looking Good or Ready for Sale.",
+        });
+        return;
+      }
+
+      const payload = {
+        ...values,
+        at: values.at.toISOString(),
+        status: values.status,
+        flags: values.flags ?? [],
+      };
       await submit(payload);
       toast({ title: "Check-in saved" });
       onSuccess?.();
-    } catch (e:any) {
-      toast({ variant: "destructive", title: "Check-in failed", description: String(e.message||e) });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Check-in failed", description: String(e.message || e) });
     }
   }
 
   const locs = useMemo(() => locations ?? [], [locations]);
 
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
-      <TabsList className="grid grid-cols-3">
-        <TabsTrigger value="MOVE">Move</TabsTrigger>
-        <TabsTrigger value="DUMP">Dumped</TabsTrigger>
-        <TabsTrigger value="CHECKIN">Check-in</TabsTrigger>
-      </TabsList>
+    <div className="grid max-h-[75vh] grid-rows-[auto_minmax(0,1fr)] gap-4">
+      <Card className="rounded-lg border bg-muted/10 p-4 text-sm text-muted-foreground">
+        Log moves, dumps, or check-ins for batch #{batch.batchNumber ?? batch.id}. Everything is captured in the history.
+      </Card>
 
-      <BatchPhotoUploader batchId={String(batch.id ?? batch.batchNumber)} onUploaded={setUploaded} />
+      <div className="overflow-y-auto pr-1">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
+          <TabsList className="grid grid-cols-3">
+            <TabsTrigger value="MOVE">Move</TabsTrigger>
+            <TabsTrigger value="DUMP">Dumped</TabsTrigger>
+            <TabsTrigger value="CHECKIN">Check-in</TabsTrigger>
+          </TabsList>
 
-      <TabsContent value="MOVE">
-        <Form {...moveForm}>
-          <form onSubmit={moveForm.handleSubmit(onSubmitMove)} noValidate className="space-y-4">
+          <BatchPhotoUploader batchId={String(batch.id ?? batch.batchNumber)} onUploaded={setUploaded} />
+
+          <TabsContent value="MOVE">
+            <SectionCard
+              title="Move batch"
+              description="Update the destination and optionally note partial moves."
+            >
+              <Form {...moveForm}>
+                <form onSubmit={moveForm.handleSubmit(onSubmitMove)} noValidate className="space-y-4">
             <FormField control={moveForm.control} name="toLocationId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Destination</FormLabel>
@@ -239,7 +302,7 @@ export function ActionForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={moveForm.control} name="quantity" render={({ field }) => (
               <FormItem>
                 <FormLabel>Quantity (blank = whole batch)</FormLabel>
@@ -251,7 +314,7 @@ export function ActionForm({
                 <div className="text-xs text-muted-foreground">Available: {max}</div>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={moveForm.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Notes</FormLabel>
@@ -259,18 +322,23 @@ export function ActionForm({
                   <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
                 </FormControl>
               </FormItem>
-            )}/>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-              <SubmitButton pending={moveForm.formState.isSubmitting}>Apply Move</SubmitButton>
-            </div>
-          </form>
-        </Form>
-      </TabsContent>
+            )} />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+                    <SubmitButton pending={moveForm.formState.isSubmitting}>Apply Move</SubmitButton>
+                  </div>
+                </form>
+              </Form>
+            </SectionCard>
+          </TabsContent>
 
-      <TabsContent value="DUMP">
-        <Form {...dumpForm}>
-          <form onSubmit={dumpForm.handleSubmit(onSubmitDump)} noValidate className="space-y-4">
+          <TabsContent value="DUMP">
+            <SectionCard
+              title="Log dumped stock"
+              description="Record losses or write-offs with a reason and amount."
+            >
+              <Form {...dumpForm}>
+                <form onSubmit={dumpForm.handleSubmit(onSubmitDump)} noValidate className="space-y-4">
             <FormField control={dumpForm.control} name="reason" render={({ field }) => (
               <FormItem>
                 <FormLabel>Reason</FormLabel>
@@ -279,7 +347,7 @@ export function ActionForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={dumpForm.control} name="quantity" render={({ field }) => (
               <FormItem>
                 <FormLabel>Quantity (blank = whole batch)</FormLabel>
@@ -291,7 +359,7 @@ export function ActionForm({
                 <div className="text-xs text-muted-foreground">Available: {max}</div>
                 <FormMessage />
               </FormItem>
-            )}/>
+            )} />
             <FormField control={dumpForm.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Notes</FormLabel>
@@ -299,34 +367,158 @@ export function ActionForm({
                   <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
                 </FormControl>
               </FormItem>
-            )}/>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-              <SubmitButton pending={dumpForm.formState.isSubmitting}>Log Dump</SubmitButton>
-            </div>
-          </form>
-        </Form>
-      </TabsContent>
+            )} />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+                    <SubmitButton pending={dumpForm.formState.isSubmitting}>Log Dump</SubmitButton>
+                  </div>
+                </form>
+              </Form>
+            </SectionCard>
+          </TabsContent>
 
-      <TabsContent value="CHECKIN">
-        <Form {...checkForm}>
-          <form onSubmit={checkForm.handleSubmit(onSubmitCheck)} noValidate className="space-y-4">
-            <FormField control={checkForm.control} name="notes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notes</FormLabel>
-                <FormControl>
-                  <Textarea value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} name={field.name} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}/>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-              <SubmitButton pending={checkForm.formState.isSubmitting}>Save Check-in</SubmitButton>
-            </div>
-          </form>
-        </Form>
-      </TabsContent>
-    </Tabs>
+          <TabsContent value="CHECKIN">
+            <SectionCard
+              title="Grower notes"
+              description="Capture observations, flag follow-ups, and keep the batch record fresh."
+            >
+              <Form {...checkForm}>
+                <form
+                  onSubmit={checkForm.handleSubmit(onSubmitCheck)}
+                  noValidate
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={checkForm.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status update</FormLabel>
+                    <Select
+                      value={field.value ?? CLEAR_STATUS_VALUE}
+                      onValueChange={(val) =>
+                        field.onChange(
+                          val === CLEAR_STATUS_VALUE ? undefined : val
+                        )
+                      }
+                    >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Leave unchanged" />
+                          </SelectTrigger>
+                          <SelectContent>
+                        <SelectItem value={CLEAR_STATUS_VALUE}>No change</SelectItem>
+                            {growerStatusOptions.map((opt) => (
+                              <SelectItem key={opt.label} value={opt.value}>
+                                {opt.label || "No change"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          A photo is required when marking as “Ready for Sale” or “Looking Good.”
+                        </p>
+                      <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={checkForm.control}
+                    name="flags"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Flags</FormLabel>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: "Needs spacing", value: "spacing" },
+                            { label: "Needs feeding", value: "feeding" },
+                            { label: "Scout issue", value: "issue" },
+                            { label: "Sales photo", value: "sales_photo" },
+                          ].map((flag) => {
+                            const active = field.value?.includes(flag.value);
+                            return (
+                              <Button
+                                key={flag.value}
+                                type="button"
+                                variant={active ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => {
+                                  const current = field.value ?? [];
+                                  const next = active
+                                    ? current.filter((v) => v !== flag.value)
+                                    : [...current, flag.value];
+                                  field.onChange(next);
+                                }}
+                              >
+                                {flag.label}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={checkForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            placeholder="Example: Needs spacing next week..."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <p className="text-xs text-muted-foreground">
+                    Logged at {checkForm.watch("at")?.toLocaleString()}
+                  </p>
+
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={onCancel}>
+                      Cancel
+                    </Button>
+                    <SubmitButton pending={checkForm.formState.isSubmitting}>
+                      Save notes
+                    </SubmitButton>
+                  </div>
+                </form>
+              </Form>
+            </SectionCard>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="space-y-4 p-4">
+      <div>
+        <h3 className="text-lg font-semibold">{title}</h3>
+        {description && (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </Card>
   );
 }

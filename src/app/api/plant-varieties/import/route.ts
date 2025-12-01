@@ -78,7 +78,6 @@ export async function POST(req: NextRequest) {
           nameLower: normName(name),
           family: (r.family ?? "").toString().trim() || "",
           category: (r.category ?? "").toString().trim() || "",
-          grouping: (r.grouping ?? "").toString().trim() || undefined,
           commonName: (r.commonName ?? "").toString().trim() || undefined,
           rating: (r.rating ?? "").toString().trim() || undefined,
           salesPeriod: (r.salesPeriod ?? "").toString().trim() || undefined,

@@ -1,5 +1,6 @@
 // app/api/lookups/[resource]/route.ts
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { getSupabaseForRequest } from "@/server/db/supabaseServer";
 
@@ -11,9 +12,9 @@ function cache(resp: NextResponse) {
   return resp;
 }
 
-async function getOrgId(supabase: ReturnType<typeof getSupabaseForRequest>) {
+async function getOrgId(supabase: Awaited<ReturnType<typeof getSupabaseForRequest>>) {
   // Prefer explicit header, else use the user's profile.active_org_id
-  const hdr = (await import("next/headers")).headers();
+  const hdr = await headers();
   const byHeader = hdr.get("x-org-id");
   if (byHeader) return byHeader;
   const { data: user } = await supabase.auth.getUser();
@@ -34,7 +35,7 @@ export async function GET(_: Request, ctx: { params: { resource: string } }) {
   }
 
   const resource = parse.data;
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
   try {
     let data: any[] = [];
     switch (resource) {

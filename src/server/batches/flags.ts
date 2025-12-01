@@ -1,5 +1,4 @@
-import { adminDb } from "@/server/db/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { getSupabaseForRequest } from "@/server/db/supabaseServer";
 
 export type FlagKey = "isTopPerformer" | "quarantined" | "priority"; // extend as needed
 
@@ -8,28 +7,44 @@ export type FlagEvent = {
   key: FlagKey;
   value: boolean | string | number;
   actor?: { id?: string; email?: string } | null;
-  at: FirebaseFirestore.Timestamp | Date;
+  at: string; // ISO string from DB
   reason?: string | null;
   notes?: string | null;
 };
 
 export async function getFlags(batchId: string) {
-  // Aggregate from logs (latest wins)
-  const snap = await adminDb
-    .collection("batches").doc(batchId)
-    .collection("logs")
-    .where("kind", "==", "flag")
-    .orderBy("at", "asc")
-    .limit(500)
-    .get();
+  const supabase = await getSupabaseForRequest();
+  
+  // Fetch generic flag events
+  const { data, error } = await supabase
+    .from("batch_events")
+    .select("*")
+    .eq("batch_id", batchId)
+    .eq("type", "FLAG_CHANGE")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching flags:", error);
+    throw new Error("Failed to fetch flags");
+  }
 
   const flags: Record<string, any> = {};
   const history: FlagEvent[] = [];
-  for (const d of snap.docs) {
-    const ev = d.data() as any;
-    if (!ev?.key) continue;
-    flags[ev.key] = ev.value;
-    history.push({ ...ev, at: ev.at });
+
+  for (const ev of data ?? []) {
+    const payload = typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload;
+    if (payload?.key) {
+      flags[payload.key] = payload.value;
+      history.push({
+        kind: "flag",
+        key: payload.key as FlagKey,
+        value: payload.value,
+        actor: payload.actor,
+        at: ev.created_at ?? new Date().toISOString(),
+        reason: payload.reason,
+        notes: payload.notes,
+      });
+    }
   }
   return { flags, history };
 }
@@ -39,23 +54,39 @@ export async function setFlag(batchId: string, key: FlagKey, value: any, opts?: 
   reason?: string | null;
   notes?: string | null;
 }) {
-  const batchRef = adminDb.collection("batches").doc(batchId);
-  const logsRef = batchRef.collection("logs");
+  const supabase = await getSupabaseForRequest();
 
-  await adminDb.runTransaction(async (tx) => {
-    // 1) append a log event
-    const evRef = logsRef.doc();
-    tx.set(evRef, {
-      kind: "flag",
-      key,
-      value,
-      actor: opts?.actor || null,
-      reason: opts?.reason || null,
-      notes: opts?.notes || null,
-      at: FieldValue.serverTimestamp(),
-    });
+  // We need org_id to insert into batch_events. 
+  // Fetch it from the batch.
+  const { data: batch, error: batchError } = await supabase
+    .from("batches")
+    .select("org_id")
+    .eq("id", batchId)
+    .single();
+    
+  if (batchError || !batch) {
+    throw new Error("Batch not found or access denied");
+  }
 
-    // 2) materialize on batch doc (denormalized, keeps legacy reads working)
-    tx.set(batchRef, { [key]: value, flags: { [key]: value } }, { merge: true });
+  const payload = {
+    key,
+    value,
+    reason: opts?.reason,
+    notes: opts?.notes,
+    actor: opts?.actor,
+  };
+
+  const { error } = await supabase.from("batch_events").insert({
+    org_id: batch.org_id,
+    batch_id: batchId,
+    type: "FLAG_CHANGE",
+    by_user_id: opts?.actor?.id ?? null,
+    payload: JSON.stringify(payload),
+    created_at: new Date().toISOString(),
   });
+
+  if (error) {
+    console.error("Error setting flag:", error);
+    throw error;
+  }
 }

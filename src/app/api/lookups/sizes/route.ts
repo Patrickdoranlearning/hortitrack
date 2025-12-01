@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/server/db/supabaseServer";
 
 export async function GET() {
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("plant_sizes")
     .select("id, name, container_type, cell_multiple")

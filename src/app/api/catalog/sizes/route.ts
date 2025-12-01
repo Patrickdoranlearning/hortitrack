@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   if (!parse.success) return NextResponse.json([]);
 
   const { q, limit } = parse.data;
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
 
   let query = supabase
     .from("plant_sizes")

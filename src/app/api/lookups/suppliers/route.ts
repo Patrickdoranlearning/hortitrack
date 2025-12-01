@@ -6,7 +6,7 @@ export async function GET() {
     const { supabase, orgId } = await getUserAndOrg();
     const { data, error } = await supabase
       .from("suppliers")
-      .select("id, name, producer_code, country_code")
+      .select("id, name, producer_code, country_code, phone, email, address, eircode, supplier_type, updated_at")
       .eq("org_id", orgId)
       .order("name");
 

@@ -4,10 +4,10 @@ import { createServerClient } from "@supabase/ssr";
 import { type Database } from "@/types/supabase"; // your generated types if available
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
-export function getSupabaseForRequest(req?: Request) {
-  const cookieStore = cookies();
+export async function getSupabaseForRequest(req?: Request) {
+  const cookieStore = await cookies();
   // @ts-expect-error next/headers in route handlers
-  const _h = headers();
+  const _h = await headers();
   const supabase = createServerClient<Database>(
     SUPABASE_URL,
     SUPABASE_ANON_KEY,
@@ -29,8 +29,8 @@ export function getSupabaseForRequest(req?: Request) {
 }
 
 // Re-added this function from a previous version as it seems to be used elsewhere.
-export function getSupabaseServerClient() {
-  const cookieStore = cookies();
+export async function getSupabaseServerClient() {
+  const cookieStore = await cookies();
   return createServerClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY,

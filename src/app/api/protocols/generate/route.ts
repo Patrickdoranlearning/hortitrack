@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createProtocolFromBatch } from "@/server/protocols/service";
 import { renderProtocolPdf } from "@/server/protocols/pdf";
-import { isValidDocId } from "@/server/util/ids";
+import { isValidDocId } from "@/server/utils/ids";
 
 export const runtime = "nodejs";
 

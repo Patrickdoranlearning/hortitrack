@@ -114,7 +114,7 @@ function normalizeFlat(p: z.infer<typeof FlatSchema>): Normalized {
 }
 
 export async function POST(req: Request) {
-  const supabase = getSupabaseForRequest();
+  const supabase = await getSupabaseForRequest();
 
   let body: any = {};
   try {

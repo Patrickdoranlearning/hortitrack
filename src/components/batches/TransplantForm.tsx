@@ -1,216 +1,603 @@
+
 "use client";
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ProductionAPI } from "@/lib/production/client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ProductionAPI, type TransplantInput } from "@/lib/production/client";
+import { HttpError, fetchJson } from "@/lib/http/fetchJson";
+import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
+
 import { Button } from "@/components/ui/button";
 import {
-  Form, FormField, FormItem, FormLabel, FormMessage, FormControl
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
   parent_batch_id: z.string().uuid(),
   size_id: z.string().uuid(),
-  // NOTE: keep the original field name you had to avoid upstream prop breakage
-  newLocationId: z.string().uuid(),
+  location_id: z.string().uuid(),
   containers: z.coerce.number().int().min(1),
   planted_at: DateOnly.optional(),
   notes: z.string().max(1000).optional(),
   archive_parent_if_empty: z.boolean().optional(),
 });
 
-type Size = { id: string; name: string; container_type?: string | null; cell_multiple?: number | null };
-type Location = { id: string; name: string; covered?: boolean | null };
+type ParentSnapshot = {
+  id: string;
+  batch_number: string;
+  quantity: number | null;
+  phase?: string | null;
+  status?: string | null;
+  planted_at?: string | null;
+  location_id?: string | null;
+  location_name?: string | null;
+  location_site?: string | null;
+  size_id?: string | null;
+  size_name?: string | null;
+  size_cell_multiple?: number | null;
+  size_container_type?: string | null;
+  variety_name?: string | null;
+  variety_family?: string | null;
+};
 
-export default function TransplantForm(props: {
+type ParentState =
+  | { loading: true; data: null; error?: string }
+  | { loading: false; data: ParentSnapshot | null; error?: string };
+
+type Props = {
   parentBatchId: string;
   defaultTargetLocationId?: string;
   onCreated?: (child: { id: string; batch_number: string }) => void;
-}) {
-  const { toast } = useToast?.() ?? { toast: (v: any) => alert(v?.title || v?.description || "OK") };
+  onCancel?: () => void;
+};
+
+export default function TransplantForm({
+  parentBatchId,
+  defaultTargetLocationId,
+  onCreated,
+  onCancel,
+}: Props) {
+  const { data: referenceData, loading: refLoading, error: refError, reload } =
+    React.useContext(ReferenceDataContext);
+  const toastImpl = (useToast?.() as any) || null;
+  const toast =
+    toastImpl?.toast ??
+    ((v: any) => {
+      alert(v?.title || v?.description || "OK");
+    });
+
+  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   const form = useForm<z.infer<typeof Schema>>({
     resolver: zodResolver(Schema),
     defaultValues: {
-      parent_batch_id: props.parentBatchId as any,
+      parent_batch_id: parentBatchId,
+      containers: undefined,
+      planted_at: today,
       archive_parent_if_empty: true,
     },
   });
 
-  const [loading, setLoading] = React.useState(false);
-  const [sizes, setSizes] = React.useState<Size[]>([]);
-  const [locations, setLocations] = React.useState<Location[]>([]);
-  const [parent, setParent] = React.useState<{ id: string; batch_number: string; quantity: number } | null>(null);
+  const [parentState, setParentState] = React.useState<ParentState>({
+    loading: true,
+    data: null,
+  });
+  const [submitting, setSubmitting] = React.useState(false);
+  const [writeOffRemainder, setWriteOffRemainder] =
+    React.useState<boolean>(false);
 
-  const selectedSize = sizes.find(s => s.id === form.watch("size_id")) || null;
-  const cellMultiple = selectedSize?.cell_multiple ?? 1;
-  const containers = Number(form.watch("containers") || 0);
-  const requiredUnits = containers * cellMultiple;
-  const availableUnits = parent?.quantity ?? 0;
-  const insufficient = requiredUnits > availableUnits;
+  const sizes = React.useMemo(() => referenceData?.sizes ?? [], [referenceData]);
+  const locations = React.useMemo(
+    () => referenceData?.locations ?? [],
+    [referenceData]
+  );
+
+  const loadParent = React.useCallback(async () => {
+    setParentState((prev) => ({ ...prev, loading: true, error: undefined }) as ParentState);
+    try {
+      const res = await fetchJson<{ batch: ParentSnapshot }>(
+        `/api/production/batches/${parentBatchId}/summary`
+      );
+      setParentState({ loading: false, data: res.batch });
+    } catch (err) {
+      const e = err as HttpError;
+      setParentState({
+        loading: false,
+        data: null,
+        error: e.message,
+      });
+    }
+  }, [parentBatchId]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [sumRes, sizesRes, locsRes] = await Promise.all([
-          fetch(`/api/production/batches/${props.parentBatchId}/summary`),
-          fetch("/api/lookups/sizes"),
-          fetch("/api/lookups/locations"),
-        ]);
-        const [sum, s, l] = await Promise.all([sumRes.json(), sizesRes.json(), locsRes.json()]);
-        if (cancelled) return;
+    void loadParent();
+  }, [loadParent]);
 
-        if (sum?.batch) {
-          setParent({ id: sum.batch.id, batch_number: sum.batch.batch_number, quantity: sum.batch.quantity });
-          form.setValue("parent_batch_id", sum.batch.id as any);
-        } else {
-          toast({ title: "Parent not found", variant: "destructive" });
-        }
+  React.useEffect(() => {
+    const parent = parentState.data;
+    if (!parent) return;
 
-        setSizes(s.items ?? []);
-        setLocations(l.items ?? []);
-        if (props.defaultTargetLocationId) form.setValue("newLocationId", props.defaultTargetLocationId as any);
-      } catch (e) {
-        console.error("[TransplantForm] load failed", e);
-        toast({ title: "Failed to load transplant data", description: String((e as any)?.message ?? e), variant: "destructive" });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [props.parentBatchId]); // eslint-disable-line
+    const currentParentId = form.getValues("parent_batch_id");
+    if (parent.id && currentParentId !== parent.id) {
+      form.setValue("parent_batch_id", parent.id);
+    }
+
+    if (!form.getValues("size_id") && parent.size_id) {
+      form.setValue("size_id", parent.size_id);
+    }
+  }, [parentState.data, form]);
+
+  React.useEffect(() => {
+    const parent = parentState.data;
+    const currentLocation = form.getValues("location_id");
+    const fallback =
+      defaultTargetLocationId ??
+      parent?.location_id ??
+      (locations.length ? locations[0].id : undefined);
+    if (!currentLocation && fallback) {
+      form.setValue("location_id", fallback);
+    }
+  }, [
+    defaultTargetLocationId,
+    parentState.data,
+    locations,
+    form,
+  ]);
+
+  const watchSize = form.watch("size_id");
+  const watchLocation = form.watch("location_id");
+  const watchContainersRaw = form.watch("containers");
+  const hasContainers =
+    watchContainersRaw !== undefined &&
+    watchContainersRaw !== null &&
+    !Number.isNaN(Number(watchContainersRaw));
+  const watchContainers = hasContainers ? Number(watchContainersRaw) : 0;
+  const watchDate = form.watch("planted_at");
+
+  const selectedSize = React.useMemo(
+    () => sizes.find((s) => s.id === watchSize),
+    [sizes, watchSize]
+  );
+  const sizeMultiple = selectedSize
+    ? Math.max(1, selectedSize.cell_multiple ?? 1)
+    : 1;
+  const requiredUnits = hasContainers ? watchContainers * sizeMultiple : 0;
+  const parentAvailable = parentState.data?.quantity ?? 0;
+  const insufficient = hasContainers && requiredUnits > parentAvailable;
+  const remainderUnits = React.useMemo(() => {
+    if (!hasContainers || !parentAvailable || parentAvailable <= 0) return 0;
+    const remainder = parentAvailable - requiredUnits;
+    return remainder > 0 ? remainder : 0;
+  }, [hasContainers, parentAvailable, requiredUnits]);
+
+  const readiness = [
+    { label: "Size", ok: Boolean(watchSize) },
+    { label: "Location", ok: Boolean(watchLocation) },
+    { label: "Containers", ok: hasContainers && requiredUnits > 0 },
+  ];
 
   async function onSubmit(values: z.infer<typeof Schema>) {
-    setLoading(true);
+    const remainderToWriteOff =
+      writeOffRemainder && remainderUnits > 0 ? remainderUnits : 0;
+    setSubmitting(true);
     try {
-      const payload = {
-        parent_batch_id: values.parent_batch_id,
-        size_id: values.size_id,
-        location_id: values.newLocationId, // map old field name → API contract
+      const payload: TransplantInput = {
+        parent_batch_id: values.parent_batch_id as any,
+        size_id: values.size_id as any,
+        location_id: values.location_id as any,
         containers: values.containers,
         planted_at: values.planted_at,
         notes: values.notes,
         archive_parent_if_empty: values.archive_parent_if_empty ?? true,
       };
-      const { child_batch } = await ProductionAPI.transplant(payload as any);
-      toast({ title: "Transplant created", description: `Child batch ${child_batch.batch_number} created` });
-      form.reset({
-        parent_batch_id: props.parentBatchId as any,
-        archive_parent_if_empty: true,
+      const { child_batch } = await ProductionAPI.transplant(payload);
+
+      if (remainderToWriteOff > 0) {
+        await ProductionAPI.dump(values.parent_batch_id, {
+          units: remainderToWriteOff,
+          reason: "Write-off after transplant",
+          archive_if_empty: true,
+        });
+      }
+
+      toast({
+        title: "Transplant created",
+        description:
+          remainderToWriteOff > 0
+            ? `Batch ${child_batch.batch_number} created. ${remainderToWriteOff.toLocaleString()} remaining units written off.`
+            : `Batch ${child_batch.batch_number} created.`,
       });
-      props.onCreated?.(child_batch);
-    } catch (err: any) {
+      form.reset({
+        parent_batch_id: parentBatchId,
+        size_id: values.size_id,
+        location_id: values.location_id,
+        containers: undefined,
+        planted_at: today,
+        archive_parent_if_empty: true,
+        notes: "",
+      });
+      setWriteOffRemainder(false);
+      onCreated?.(child_batch);
+      void loadParent();
+    } catch (err) {
+      const e = err as HttpError;
       console.error("[TransplantForm] submit error", err);
-      toast({ title: "Failed to transplant", description: String(err?.message ?? err), variant: "destructive" });
+      toast({
+        title: e.status === 401 ? "Please sign in" : "Failed to transplant",
+        description: e.requestId
+          ? `${e.message} (ref ${e.requestId})`
+          : e.message,
+        variant: "destructive",
+      });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
+  if ((refLoading && !referenceData) || (parentState.loading && !parentState.data)) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-muted-foreground">
+        Loading transplant data…
+      </div>
+    );
+  }
+
+  if (parentState.error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Parent batch unavailable</AlertTitle>
+        <AlertDescription className="flex items-center justify-between gap-3">
+          <span>{parentState.error}</span>
+          <Button size="sm" variant="outline" onClick={() => void loadParent()}>
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!referenceData) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Reference data unavailable</AlertTitle>
+        <AlertDescription className="flex items-center justify-between gap-3">
+          <span>{refError ?? "Sizes or locations failed to load."}</span>
+          <Button size="sm" variant="outline" onClick={reload}>
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  const parent = parentState.data;
+
   return (
-    <div className="space-y-4">
-      <Card className="p-3 text-sm">
-        <div className="flex flex-wrap gap-4">
-          <div><strong>Parent:</strong> {parent?.batch_number ?? "—"}</div>
-          <div><strong>Available units:</strong> {availableUnits}</div>
-          <div><strong>Required:</strong> {Number.isFinite(requiredUnits) ? requiredUnits : "—"}</div>
-        </div>
-      </Card>
-
+    <div className="max-h-[75vh] overflow-y-auto pr-2">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <input type="hidden" {...form.register("parent_batch_id")} />
+        <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]"
+        noValidate
+      >
+        <div className="space-y-6">
+          <SectionCard
+            title="Destination setup"
+            description={
+              parent
+                ? `${parent.variety_name ?? "Variety unknown"} • ${parentAvailable?.toLocaleString() ?? "—"} units on hand`
+                : "Pick the size, location, and date for the new child batch."
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                name="size_id"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Target size / container</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value ?? ""}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sizes.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                            {s.container_type ? ` · ${s.container_type}` : ""}
+                            {s.cell_multiple ? ` · ${s.cell_multiple}/tray` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <FormField name="size_id" control={form.control} render={({ field }) => (
-            <FormItem>
-              <FormLabel>Target size</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                <SelectContent>
-                  {sizes.map(s => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}{s.cell_multiple ? ` (${s.cell_multiple}/tray)` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )} />
+              <FormField
+                name="location_id"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Nursery location</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value ?? ""}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a bench or tunnel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <FormField name="newLocationId" control={form.control} render={({ field }) => (
-            <FormItem>
-              <FormLabel>Target location</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-                <SelectContent>
-                  {locations.map(l => (
-                    <SelectItem key={l.id} value={l.id}>{l.name}{l.covered ? " (covered)" : ""}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )} />
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <FormField name="containers" control={form.control} render={({ field }) => (
-              <FormItem>
-                <FormLabel>Containers</FormLabel>
-                <FormControl><Input type="number" min={1} step={1} {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <FormField name="planted_at" control={form.control} render={({ field }) => (
-              <FormItem>
-                <FormLabel>Transplant date</FormLabel>
-                <FormControl><Input type="date" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <FormField name="archive_parent_if_empty" control={form.control} render={({ field }) => (
-              <FormItem>
-                <FormLabel>Archive parent if empty</FormLabel>
-                <Select value={(field.value ? "yes" : "no")} onValueChange={(v) => field.onChange(v === "yes")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="yes">Yes</SelectItem>
-                    <SelectItem value="no">No</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-          </div>
-
-          <FormField name="notes" control={form.control} render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes</FormLabel>
-              <FormControl><Textarea rows={3} {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )} />
-
-          <div className="flex items-center justify-between">
-            <div className={`text-sm ${insufficient ? "text-red-600" : "text-muted-foreground"}`}>
-              {selectedSize
-                ? `Required = containers × ${cellMultiple} = ${Number.isFinite(requiredUnits) ? requiredUnits : "—"}`
-                : "Select a size to see required units"}
+              <FormField
+                name="planted_at"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transplant date</FormLabel>
+                    <Input type="date" {...field} />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-            <Button type="submit" disabled={loading || insufficient || !selectedSize || !parent}>
-              {insufficient ? "Not enough stock" : (loading ? "Transplanting…" : "Create transplant")}
+          </SectionCard>
+
+          <SectionCard
+            title="Quantities & notes"
+            description="Tell us how many containers you’re splitting out and any context."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                name="containers"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Containers (trays / pots)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          field.onChange(next ? Number(next) : undefined);
+                        }}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedSize
+                        ? `${watchContainers ? requiredUnits.toLocaleString() : "—"} computed units`
+                        : "Select a size to calculate units moved"}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="md:col-span-2 rounded border p-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={writeOffRemainder}
+                    onCheckedChange={(v) => setWriteOffRemainder(Boolean(v))}
+                    disabled={!hasContainers || remainderUnits <= 0 || submitting}
+                  />
+                  <div className="space-y-1">
+                    <FormLabel className="text-sm">
+                      Write off remaining units after transplant
+                    </FormLabel>
+                    <p className="text-sm text-muted-foreground">
+                      {hasContainers
+                        ? remainderUnits > 0
+                          ? `Automatically log ${remainderUnits.toLocaleString()} units as loss once this child batch is created.`
+                          : "No remainder to write off with the current quantity."
+                        : "Enter containers to see how many units would remain."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <FormField
+                name="notes"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Notes</FormLabel>
+                    <Textarea
+                      rows={3}
+                      placeholder="Optional context for the log and child batch."
+                      {...field}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </SectionCard>
+
+          <div className="flex flex-wrap justify-end gap-2">
+            {onCancel && (
+              <Button type="button" variant="ghost" onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+            <Button type="submit" disabled={submitting || insufficient}>
+              {insufficient
+                ? "Insufficient stock"
+                : submitting
+                ? "Transplanting…"
+                : "Create transplant"}
             </Button>
           </div>
-        </form>
-      </Form>
+        </div>
+
+        <aside className="space-y-4">
+          <Card className="space-y-4 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Parent batch
+                </p>
+                <p className="text-xl font-semibold">
+                  {parent?.batch_number ?? "—"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {parent?.variety_name
+                    ? `${parent.variety_name}${
+                        parent.variety_family ? ` · ${parent.variety_family}` : ""
+                      }`
+                    : "—"}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void loadParent()}
+                disabled={parentState.loading}
+              >
+                Refresh
+              </Button>
+            </div>
+            <dl className="space-y-3 text-sm">
+              <SummaryRow
+                label="Available units"
+                value={
+                  parentAvailable !== null
+                    ? parentAvailable.toLocaleString()
+                    : "—"
+                }
+              />
+              <SummaryRow
+                label="Required"
+                value={
+                  selectedSize
+                    ? `${requiredUnits.toLocaleString()}`
+                    : "Select a size"
+                }
+              />
+              <SummaryRow
+                label="Location"
+                value={
+                  parent?.location_name
+                    ? `${parent.location_site ? `${parent.location_site} · ` : ""}${
+                        parent.location_name
+                      }`
+                    : "—"
+                }
+              />
+              <SummaryRow
+                label="Phase"
+                value={parent?.phase ? parent.phase : "—"}
+              />
+              <SummaryRow label="Status" value={parent?.status ?? "—"} />
+              <SummaryRow
+                label="Last planted"
+                value={parent?.planted_at ?? "—"}
+              />
+              <SummaryRow
+                label="Child date"
+                value={watchDate || today}
+              />
+            </dl>
+            {insufficient && (
+              <Alert variant="destructive">
+                <AlertTitle>Not enough units</AlertTitle>
+                <AlertDescription className="text-sm">
+                  Reduce the container count or pick a different size. Parent
+                  only has {parentAvailable?.toLocaleString() ?? 0} units.
+                </AlertDescription>
+              </Alert>
+            )}
+          </Card>
+
+          <Card className="space-y-3 p-4">
+            <p className="text-sm font-medium text-muted-foreground">
+              Completion
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {readiness.map((item) => (
+                <Badge key={item.label} variant={item.ok ? "default" : "secondary"}>
+                  {item.label}
+                  {!item.ok && <span className="ml-1 text-xs">(pending)</span>}
+                </Badge>
+              ))}
+            </div>
+          </Card>
+        </aside>
+      </form>
+    </Form>
+  </div>
+  );
+}
+
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="space-y-4 p-4">
+      <div>
+        <h3 className="text-lg font-semibold">{title}</h3>
+        {description && (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-border/50 pb-1 text-sm last:border-b-0 last:pb-0">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right font-medium text-foreground">{value}</dd>
     </div>
   );
 }
