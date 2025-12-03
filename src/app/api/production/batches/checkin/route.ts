@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getUserAndOrg } from "@/server/auth/org";
-import { CheckInInputSchema } from "@/lib/production/schemas";
+import { CheckInInputSchema } from "@/lib/domain/batch";
 import { nextBatchNumber } from "@/server/numbering/batches";
 
 const PhaseMap = { propagation: 1, plug: 2, potted: 3 } as const;
@@ -81,12 +81,23 @@ export async function POST(req: NextRequest) {
       throw new Error("Supplier not found");
     }
     
+    // Get org defaults for passport (dynamic, not hardcoded!)
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("producer_code, country_code")
+      .eq("id", orgId)
+      .single();
+    
     const operator_reg_no =
       input.passport_override?.operator_reg_no ??
-      supplier.producer_code ?? "IE2727";
+      supplier.producer_code ?? 
+      org?.producer_code ?? 
+      "UNKNOWN";
     const origin_country =
       input.passport_override?.origin_country ??
-      supplier.country_code ?? "IE";
+      supplier.country_code ?? 
+      org?.country_code ?? 
+      "IE";
     const traceability_code =
       input.passport_override?.traceability_code ??
       input.supplier_batch_number;

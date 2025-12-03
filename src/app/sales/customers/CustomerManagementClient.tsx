@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Settings2, Mail, Phone, Building2, CreditCard } from "lucide-react";
+import { Plus, Trash2, Settings2, Mail, Phone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { CustomerManagementPayload, CustomerSummary } from "./types";
+import { DataPageShell } from "@/components/data-management/DataPageShell";
+import { DataToolbar } from "@/components/data-management/DataToolbar";
 import {
   upsertCustomerAction,
   deleteCustomerAction,
@@ -60,17 +62,23 @@ export default function CustomerManagementClient({ customers, priceLists }: Prop
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
   const [filterText, setFilterText] = useState("");
+  const priceListNameMap = useMemo(
+    () => new Map(priceLists.map((pl) => [pl.name.toLowerCase(), pl.id])),
+    [priceLists]
+  );
 
-  const filteredCustomers = customers.filter((c) => {
-    if (!filterText) return true;
+  const filteredCustomers = useMemo(() => {
+    if (!filterText) return customers;
     const q = filterText.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.code?.toLowerCase().includes(q) ||
-      c.email?.toLowerCase().includes(q) ||
-      c.store?.toLowerCase().includes(q)
-    );
-  });
+    return customers.filter((c) => {
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.code?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.store?.toLowerCase().includes(q)
+      );
+    });
+  }, [customers, filterText]);
 
   const handleCreate = () => {
     setSheetMode("create");
@@ -84,33 +92,177 @@ export default function CustomerManagementClient({ customers, priceLists }: Prop
     setSheetOpen(true);
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "name",
+      "code",
+      "email",
+      "phone",
+      "store",
+      "accountsEmail",
+      "pricingTier",
+      "defaultPriceList",
+      "vatNumber",
+      "notes",
+    ];
+    const sample = [
+      "Garden Centre HQ",
+      "GC-001",
+      "orders@gardencentrehq.ie",
+      "+3531234567",
+      "Woodie's",
+      "accounts@gardencentrehq.ie",
+      "Tier A",
+      priceLists[0]?.name ?? "Wholesale 2025",
+      "IE1234567X",
+      "Prefers deliveries on Mondays",
+    ];
+    downloadCsv(headers, [sample], "customers_template.csv");
+  };
+
+  const handleDownloadData = () => {
+    const headers = [
+      "name",
+      "code",
+      "email",
+      "phone",
+      "store",
+      "accountsEmail",
+      "pricingTier",
+      "defaultPriceList",
+      "vatNumber",
+      "notes",
+    ];
+    const rows = filteredCustomers.map((customer) => [
+      customer.name ?? "",
+      customer.code ?? "",
+      customer.email ?? "",
+      customer.phone ?? "",
+      customer.store ?? "",
+      customer.accountsEmail ?? "",
+      customer.pricingTier ?? "",
+      customer.defaultPriceListName ?? "",
+      customer.vatNumber ?? "",
+      customer.notes ?? "",
+    ]);
+    downloadCsv(headers, rows, "customers.csv");
+  };
+
+  const handleUploadCsv = async (file: File) => {
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter((line) => line.trim().length);
+    if (!lines.length) {
+      throw new Error("The CSV file is empty.");
+    }
+
+    const headerLine = lines.shift()!;
+    const headers = parseCsvRow(headerLine).map((header) => header.toLowerCase());
+    if (!headers.includes("name")) {
+      throw new Error('CSV must include a "name" column.');
+    }
+
+    let created = 0;
+    const failures: string[] = [];
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const values = parseCsvRow(line);
+      const record: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        record[header] = values[index] ?? "";
+      });
+
+      const name = record["name"]?.trim();
+      if (!name) {
+        failures.push("(missing name)");
+        continue;
+      }
+
+      const priceListValue =
+        record["defaultpricelistid"] || record["defaultpricelist"] || "";
+      let defaultPriceListId: string | undefined;
+      if (priceListValue) {
+        const byId = priceLists.find((pl) => pl.id === priceListValue);
+        if (byId) {
+          defaultPriceListId = byId.id;
+        } else {
+          const byName = priceListNameMap.get(priceListValue.toLowerCase());
+          if (byName) {
+            defaultPriceListId = byName;
+          }
+        }
+      }
+
+      const result = await upsertCustomerAction({
+        name,
+        code: record["code"] || null,
+        email: record["email"] || null,
+        phone: record["phone"] || null,
+        vatNumber: record["vatnumber"] || null,
+        notes: record["notes"] || null,
+        store: record["store"] || null,
+        accountsEmail: record["accountsemail"] || null,
+        pricingTier: record["pricingtier"] || null,
+        defaultPriceListId: defaultPriceListId ?? null,
+      });
+
+      if (result.success) {
+        created += 1;
+      } else {
+        failures.push(name);
+      }
+    }
+
+    toast({
+      title: "Import complete",
+      description: `${created} customer${created === 1 ? "" : "s"} imported${
+        failures.length ? `, ${failures.length} failed.` : "."
+      }`,
+      variant: failures.length ? "destructive" : "default",
+    });
+    router.refresh();
+  };
+
+  const filters = (
+    <Input
+      className="w-full max-w-sm"
+      placeholder="Filter by name, code, email…"
+      value={filterText}
+      onChange={(e) => setFilterText(e.target.value)}
+    />
+  );
+
   return (
-    <div className="space-y-6">
+    <DataPageShell
+      title="Customers"
+      description="Manage buyer details, pricing assignments, and contact information."
+      heroActions={
+        <Button onClick={handleCreate}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add customer
+        </Button>
+      }
+      toolbar={
+        <DataToolbar
+          onDownloadTemplate={handleDownloadTemplate}
+          onDownloadData={handleDownloadData}
+          onUploadCsv={handleUploadCsv}
+          filters={filters}
+        />
+      }
+      backHref="/sales"
+    >
       <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Customers</CardTitle>
-            <CardDescription>
-              Manage buyer details, pricing assignments, and contact information.
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Input
-              className="w-64"
-              placeholder="Filter by name, code, email..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-            />
-            <Button onClick={handleCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add customer
-            </Button>
-          </div>
+        <CardHeader>
+          <CardTitle>Customer directory</CardTitle>
+          <CardDescription>
+            Connected directly to Supabase customers, price lists, and assignments.
+          </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {filteredCustomers.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              <p>No customers found. Click "Add customer" to get started.</p>
+              <p>No customers found. Use the import tools or click “Add customer”.</p>
             </div>
           ) : (
             <Table>
@@ -133,16 +285,22 @@ export default function CustomerManagementClient({ customers, priceLists }: Prop
                     <TableCell>
                       <div className="flex flex-col gap-1 text-sm">
                         {customer.email && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
+                          <a
+                            className="flex items-center gap-1 text-muted-foreground hover:underline"
+                            href={`mailto:${customer.email}`}
+                          >
                             <Mail className="h-3 w-3" />
                             {customer.email}
-                          </span>
+                          </a>
                         )}
                         {customer.phone && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
+                          <a
+                            className="flex items-center gap-1 text-muted-foreground hover:underline"
+                            href={`tel:${customer.phone}`}
+                          >
                             <Phone className="h-3 w-3" />
                             {customer.phone}
-                          </span>
+                          </a>
                         )}
                         {!customer.email && !customer.phone && "—"}
                       </div>
@@ -192,7 +350,7 @@ export default function CustomerManagementClient({ customers, priceLists }: Prop
           router.refresh();
         }}
       />
-    </div>
+    </DataPageShell>
   );
 }
 
@@ -218,14 +376,6 @@ function CustomerSheet({
   const [pending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<"details" | "pricing">("details");
 
-  const [form, setForm] = useState(() => getInitialForm(customer));
-
-  // Reset form when customer changes
-  useState(() => {
-    setForm(getInitialForm(customer));
-    setActiveTab("details");
-  });
-
   function getInitialForm(c: CustomerSummary | null) {
     return {
       name: c?.name ?? "",
@@ -240,6 +390,16 @@ function CustomerSheet({
       pricingTier: c?.pricingTier ?? "",
     };
   }
+
+  const [form, setForm] = useState(() => getInitialForm(customer));
+
+  // Reset form whenever the sheet opens for a different customer
+  useEffect(() => {
+    if (open) {
+      setForm(getInitialForm(customer));
+      setActiveTab("details");
+    }
+  }, [customer, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -580,6 +740,36 @@ function CustomerPricingSection({ customer, priceLists, onUpdated }: CustomerPri
         )}
       </div>
     </div>
+  );
+}
+
+function downloadCsv(headers: string[], rows: string[][], filename: string) {
+  const csv = [headers, ...rows].map((cols) =>
+    cols
+      .map((value) => {
+        const cell = value ?? "";
+        const needsQuotes = /[",\n]/.test(cell);
+        const escaped = cell.replace(/"/g, '""');
+        return needsQuotes ? `"${escaped}"` : escaped;
+      })
+      .join(",")
+  );
+  const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function parseCsvRow(row: string): string[] {
+  return (
+    row
+      .match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)
+      ?.map((value) => value.replace(/^"|"$/g, "").replace(/""/g, '"').trim()) ?? []
   );
 }
 

@@ -1,7 +1,7 @@
 // src/components/BatchLabelPreview.tsx
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescriptionHidden } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import LabelPreview from "./LabelPreview";
 import { useToast } from "@/hooks/use-toast";
@@ -65,6 +65,7 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
       <DialogContent className="sm:max-w-fit">
         <DialogHeader>
           <DialogTitle>Print Label • Batch #{batch.batchNumber}</DialogTitle>
+          <DialogDescriptionHidden>Preview and print label for batch</DialogDescriptionHidden>
         </DialogHeader>
 
         <div className="mx-auto my-4 scale-125">

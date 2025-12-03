@@ -92,8 +92,8 @@ export function TransplantForm({
     defaultValues: {
       plantingDate: new Date(),
       size: "",
-      locationId: undefined,
-      location: undefined,
+      locationId: "",  // Use empty string for controlled Select
+      location: "",    // Use empty string for controlled Select
       trayQuantity: undefined,
       quantity: defaultQty,
       logRemainingAsLoss: false,

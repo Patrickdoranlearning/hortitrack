@@ -4,8 +4,8 @@
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch, Customer, Haulier, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
-import { getSupabaseServerApp, getSupabaseServerClient } from '@/server/db/supabase';
-import { z } from 'zod';
+import { getSupabaseServerClient } from '@/server/db/supabase';
+import type { Database } from '@/types/supabase';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
 import { getUserAndOrg } from '@/server/auth/org';
@@ -14,7 +14,10 @@ async function getSupabaseForApp() {
   return getSupabaseServerClient();
 }
 
-function transformVBatchSearchData(data: any): Batch {
+// Use typed view row instead of `any`
+type VBatchSearchRow = Database['public']['Views']['v_batch_search']['Row'];
+
+function transformVBatchSearchData(data: VBatchSearchRow): Batch {
     const camelCaseData = snakeToCamel(data);
     return {
         ...camelCaseData,
@@ -27,7 +30,7 @@ function transformVBatchSearchData(data: any): Batch {
         initialQuantity: camelCaseData.initialQuantity ?? camelCaseData.quantity ?? 0,
         plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
         plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
-        category: camelCaseData.category ?? '',
+        category: camelCaseData.varietyCategory ?? '',
         createdAt: camelCaseData.createdAt,
         updatedAt: camelCaseData.updatedAt,
         logHistory: [], 
@@ -46,7 +49,7 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
         console.error('[getBatchById] Supabase error from v_batch_search:', error);
         return null;
     }
-    return data ? transformVBatchSearchData(data) : null;
+    return data ? transformVBatchSearchData(data as VBatchSearchRow) : null;
 }
 
 const plantSizeColumnMap = {
@@ -296,25 +299,76 @@ function normalizeHaulierRow(row?: any): Haulier | undefined {
   return normalized as Haulier;
 }
 
-export async function getBatchesAction() {
+/**
+ * Server-side batch filtering options
+ */
+export type GetBatchesOptions = {
+  query?: string;           // Search term for batch number or variety
+  status?: string;          // Filter by status
+  plantFamily?: string;     // Filter by plant family
+  category?: string;        // Filter by category
+  limit?: number;           // Pagination limit
+  offset?: number;          // Pagination offset
+};
+
+export async function getBatchesAction(options: GetBatchesOptions = {}) {
     try {
         const supabase = await getSupabaseForApp();
-        const { data: batches, error } = await supabase
+        
+        // Build query with server-side filtering
+        let query = supabase
             .from("v_batch_search") 
-            .select("*") 
-            .order("created_at", { ascending: false });
+            .select("*", { count: 'exact' });
+
+        // Apply text search filter
+        if (options.query && options.query.trim()) {
+            const searchTerm = `%${options.query.trim()}%`;
+            query = query.or(`batch_number.ilike.${searchTerm},variety_name.ilike.${searchTerm}`);
+        }
+
+        // Apply status filter
+        if (options.status && options.status !== 'all') {
+            query = query.eq('status', options.status);
+        }
+
+        // Apply plant family filter
+        if (options.plantFamily && options.plantFamily !== 'all') {
+            query = query.eq('variety_family', options.plantFamily);
+        }
+
+        // Apply category filter
+        if (options.category && options.category !== 'all') {
+            query = query.eq('variety_category', options.category);
+        }
+
+        // Apply pagination (with sensible defaults)
+        const limit = options.limit ?? 100;
+        const offset = options.offset ?? 0;
+        query = query.range(offset, offset + limit - 1);
+
+        // Order by created_at descending
+        query = query.order("created_at", { ascending: false });
+
+        const { data: batches, error, count } = await query;
 
         if (error) {
             console.error('[getBatchesAction] Supabase error from v_batch_search:', error);
             throw error;
         }
         
-        const transformedBatches = (batches || []).map(transformVBatchSearchData);
+        const transformedBatches = (batches || []).map((b) => 
+            transformVBatchSearchData(b as VBatchSearchRow)
+        );
         
-        return { success: true, data: declassify(transformedBatches) as Batch[] };
-    } catch (error: any) {
+        return { 
+            success: true, 
+            data: declassify(transformedBatches) as Batch[],
+            total: count ?? 0,
+        };
+    } catch (error: unknown) {
         console.error('[getBatchesAction] Error in action:', error);
-        return { success: false, error: 'Failed to fetch batches: ' + error.message };
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return { success: false, error: 'Failed to fetch batches: ' + message };
     }
 }
 

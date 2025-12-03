@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
-import { ProductionAPI, type TransplantInput, type UUID } from "@/lib/production/client";
+import { transplantBatchAction } from "@/app/actions/transplant";
+import type { TransplantInput } from "@/lib/domain/batch";
 import { fetchJson, HttpError } from "@/lib/http/fetchJson";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -276,23 +277,26 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
       updateRow(row.id, { status: "uploading", message: undefined });
       try {
         const payload: TransplantInput = {
-          parent_batch_id: row.parentBatchId as UUID,
-          size_id: row.sizeId as UUID,
-          location_id: row.locationId as UUID,
+          parent_batch_id: row.parentBatchId as string,
+          size_id: row.sizeId as string,
+          location_id: row.locationId as string,
           containers: row.containers,
           planted_at: row.plantedAt || undefined,
           notes: row.notes || undefined,
           archive_parent_if_empty: row.archiveParentIfEmpty,
         };
-        await ProductionAPI.transplant(payload);
+
+        const result = await transplantBatchAction(payload);
+        
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+
         created += 1;
         updateRow(row.id, { status: "success", message: "Created" });
       } catch (err: any) {
         failed += 1;
-        const description =
-          err?.message ??
-          err?.response?.data?.error ??
-          "Failed to create transplant";
+        const description = err?.message ?? "Failed to create transplant";
         updateRow(row.id, {
           status: "error",
           message: description,

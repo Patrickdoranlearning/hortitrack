@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { MultiTransplantInputSchema } from "@/lib/production/schemas";
+import { MultiTransplantInputSchema } from "@/lib/domain/batch";
 import { getUserAndOrg } from "@/server/auth/org";
 import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 import { nextBatchNumber } from "@/server/numbering/batches";
@@ -156,13 +156,20 @@ export async function POST(req: NextRequest) {
     });
     await supabase.from("batch_events").insert(events);
 
+    // Get org defaults for passport (dynamic, not hardcoded!)
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("producer_code, country_code")
+      .eq("id", orgId)
+      .single();
+
     await supabase.from("batch_passports").insert({
       batch_id: child.id,
       org_id: orgId,
       passport_type: "internal",
-      operator_reg_no: "IE2727",
+      operator_reg_no: org?.producer_code ?? "UNKNOWN",
       traceability_code: child.batch_number,
-      origin_country: "IE",
+      origin_country: org?.country_code ?? "IE",
       created_by_user_id: user.id,
     });
 

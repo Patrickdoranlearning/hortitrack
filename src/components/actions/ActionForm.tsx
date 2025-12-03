@@ -87,7 +87,7 @@ const checkinSchema = z.object({
 
 type MoveForm = z.infer<ReturnType<typeof moveSchema>>;
 type DumpForm = z.infer<ReturnType<typeof dumpSchema>>;
-type CheckForm = z.infer<ReturnType<typeof checkinSchema>>;
+type CheckForm = z.infer<typeof checkinSchema>;
 
 export function ActionForm({
   batch,
@@ -143,8 +143,8 @@ export function ActionForm({
     defaultValues: {
       type: "CHECKIN",
       at: new Date(),
-    status: undefined,
-    flags: [],
+      status: undefined,  // Optional enum field
+      flags: [],
       notes: "",
       photos: [],
     },
@@ -326,7 +326,11 @@ export function ActionForm({
         </p>
       </Card>
       {mode === "CHECKIN" && (
-        <BatchPhotoUploader batchId={String(batch.id ?? batch.batchNumber)} onUploaded={setUploaded} />
+        <BatchPhotoUploader 
+          batchId={String(batch.id ?? batch.batchNumber)} 
+          type="GROWER"
+          onUploaded={(p) => setUploaded(prev => [...prev, { url: p.url, path: p.id }])} 
+        />
       )}
 
       {mode === "MOVE" && (
@@ -556,7 +560,7 @@ export function ActionForm({
                                 onClick={() => {
                                   const current = field.value ?? [];
                                   const next = active
-                                    ? current.filter((v) => v !== flag.value)
+                                    ? current.filter((v: string) => v !== flag.value)
                                     : [...current, flag.value];
                                   field.onChange(next);
                                 }}

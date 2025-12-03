@@ -1,9 +1,10 @@
 import { getUserAndOrg } from "@/server/auth/org";
 import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
 import CustomerManagementClient from "./CustomerManagementClient";
 import { fetchCustomerManagementData, mapCustomers } from "./customer-data";
 import type { CustomerManagementPayload } from "./types";
+
+export const dynamic = "force-dynamic";
 
 export default async function CustomersPage() {
   const { orgId, supabase } = await getUserAndOrg();
@@ -21,10 +22,6 @@ export default async function CustomersPage() {
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="sales">
-      <ModulePageHeader
-        title="Customers"
-        description="Manage buyer details, pricing assignments, and contact information."
-      />
       <CustomerManagementClient {...payload} />
     </PageFrame>
   );
