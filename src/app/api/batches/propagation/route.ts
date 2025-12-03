@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     if (batchErr) throw new Error(`batch insert failed: ${batchErr.message}`);
 
     // 7) Internal Plant Passport on creation (A-D fields per spec)
-    // A Family comes from variety; B Producer Code IE2727; C Supplier Batch No = our Batch Number; D Country IE
+    // A Family comes from variety; B Producer Code from org; C Supplier Batch No = our Batch Number; D Country from org
     const { data: variety, error: varErr } = await supabaseAdmin
       .from('plant_varieties')
       .select('family, name')
@@ -87,17 +87,24 @@ export async function POST(req: NextRequest) {
       .single();
     if (varErr) console.warn('[propagation] variety lookup failed for passport:', varErr.message);
 
+    // Get org details for passport (dynamic, not hardcoded!)
+    const { data: org } = await supabaseAdmin
+      .from('organizations')
+      .select('producer_code, country_code, name')
+      .eq('id', orgId)
+      .single();
+
     const { error: passErr } = await supabaseAdmin
       .from('batch_passports')
       .insert({
         org_id: orgId,
         batch_id: batch.id,
         passport_type: 'internal',
-        botanical_name: variety?.name ?? null,       // optional
-        operator_reg_no: 'IE2727',
-        traceability_code: batch.batch_number,       // supplier batch no = our batch number
-        origin_country: 'IE',
-        issuer_name: 'Doran Nurseries',
+        botanical_name: variety?.name ?? null,
+        operator_reg_no: org?.producer_code ?? 'UNKNOWN',
+        traceability_code: batch.batch_number,
+        origin_country: org?.country_code ?? 'IE',
+        issuer_name: org?.name ?? 'Unknown Nursery',
       });
     if (passErr) console.error('[propagation] passport insert failed:', passErr.message);
 

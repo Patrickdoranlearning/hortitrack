@@ -475,7 +475,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                       value={field.value ?? ""}
                       onChange={field.onChange}
                       disabled={!overrideOn}
-                      placeholder={selectedSupplier?.producer_code ?? "IE2727"}
+                      placeholder={selectedSupplier?.producer_code ?? "Enter producer code"}
                     />
                   <FormMessage />
                 </FormItem>

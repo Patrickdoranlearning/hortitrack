@@ -3,6 +3,7 @@
 
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react"
 
@@ -136,6 +137,22 @@ const DialogDescription = React.forwardRef<
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 
+/**
+ * Use this when a dialog doesn't need a visible description but needs one
+ * for accessibility. Add it as a child of DialogContent to silence the warning.
+ */
+const DialogDescriptionHidden = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(({ children, ...props }, ref) => (
+  <VisuallyHidden asChild>
+    <DialogPrimitive.Description ref={ref} {...props}>
+      {children}
+    </DialogPrimitive.Description>
+  </VisuallyHidden>
+))
+DialogDescriptionHidden.displayName = "DialogDescriptionHidden"
+
 export {
   Dialog,
   DialogPortal,
@@ -147,4 +164,5 @@ export {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogDescriptionHidden,
 }

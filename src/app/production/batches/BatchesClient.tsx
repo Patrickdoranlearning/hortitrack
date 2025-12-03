@@ -19,9 +19,12 @@ import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import Link from 'next/link';
 import { TransplantIcon } from '@/components/icons';
 import { FeatureGate } from '@/components/FeatureGate';
@@ -241,60 +244,48 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         />
         
         <div className="flex items-center gap-4">
-          <Select
-            value={filters.status}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, status: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {statuses.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Filter className="mr-2 h-4 w-4" />
+                Filter
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="start">
+              <DropdownMenuLabel>Status</DropdownMenuLabel>
+              <DropdownMenuRadioGroup 
+                value={filters.status} 
+                onValueChange={(value) => setFilters((f) => ({ ...f, status: value }))}
+              >
+                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                {statuses.filter(s => s !== 'all').map(status => (
+                    <DropdownMenuRadioItem key={status} value={status}>{status}</DropdownMenuRadioItem>
                 ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.category}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, category: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {(categories || []).map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.plantFamily}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, plantFamily: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by family" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Families</SelectItem>
-                {(plantFamilies || []).map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Category</DropdownMenuLabel>
+              <DropdownMenuRadioGroup 
+                value={filters.category} 
+                onValueChange={(value) => setFilters((f) => ({ ...f, category: value }))}
+              >
+                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                {(categories || []).filter(c => c !== 'all').map((c) => (
+                  <DropdownMenuRadioItem key={c} value={c}>{c}</DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Family</DropdownMenuLabel>
+              <DropdownMenuRadioGroup 
+                value={filters.plantFamily} 
+                onValueChange={(value) => setFilters((f) => ({ ...f, plantFamily: value }))}
+              >
+                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                {(plantFamilies || []).filter(p => p !== 'all').map((p) => (
+                  <DropdownMenuRadioItem key={p} value={p}>{p}</DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
