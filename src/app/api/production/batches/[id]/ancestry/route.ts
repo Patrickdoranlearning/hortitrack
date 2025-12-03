@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
-import { getBatchById } from "@/server/batches/service";
+import { getBatchById, type BatchNode } from "@/server/batches/service";
+
+type NodeWithProportion = BatchNode & { proportion?: number | null };
 
 export async function GET(
   _req: NextRequest,
@@ -33,11 +35,19 @@ export async function GET(
       .map((r) => r.child_batch_id)
       .filter(Boolean);
 
-    const [current, parentNodes, childNodes] = await Promise.all([
-      getBatchById(params.id),
-      Promise.all(parentIds.map((id) => getBatchById(id))),
-      Promise.all(childIds.map((id) => getBatchById(id))),
-    ]);
+    const current = await getBatchById(params.id);
+    const parentNodes = (await Promise.all(
+      (parents ?? []).map(async (record) => {
+        const node = await getBatchById(record.parent_batch_id);
+        return node ? { ...node, proportion: record.proportion } : null;
+      })
+    )) as Array<NodeWithProportion | null>;
+    const childNodes = (await Promise.all(
+      (children ?? []).map(async (record) => {
+        const node = await getBatchById(record.child_batch_id);
+        return node ? { ...node, proportion: record.proportion } : null;
+      })
+    )) as Array<NodeWithProportion | null>;
 
     return NextResponse.json({
       current,

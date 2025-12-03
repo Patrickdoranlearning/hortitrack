@@ -43,58 +43,10 @@ import {
   upsertPriceListCustomerAction,
   upsertProductAction,
   upsertProductPriceAction,
+  upsertProductAliasAction,
+  deleteProductAliasAction,
 } from "./actions";
-
-export type ProductManagementPayload = {
-  products: ProductSummary[];
-  skus: Array<{ id: string; code: string; label: string }>;
-  batches: Array<{ id: string; label: string; status: string; quantity: number }>;
-  priceLists: Array<{ id: string; name: string; currency: string; isDefault: boolean }>;
-  customers: Array<{ id: string; name: string; defaultPriceListId: string | null }>;
-  priceListCustomers: Array<{
-    id: string;
-    priceListId: string;
-    customerId: string;
-    priceListName: string;
-    customerName: string;
-    validFrom: string | null;
-    validTo: string | null;
-  }>;
-};
-
-type ProductSummary = {
-  id: string;
-  name: string;
-  skuId: string;
-  description: string | null;
-  defaultStatus: string | null;
-  heroImageUrl: string | null;
-  isActive: boolean;
-  sku: { id: string; code: string; label: string } | null;
-  batches: Array<{
-    id: string;
-    batchId: string;
-    availableQuantityOverride: number | null;
-    batch: {
-      id: string;
-      batchNumber: string;
-      quantity: number;
-      status: string;
-      varietyName: string | null;
-      sizeName: string | null;
-    } | null;
-  }>;
-  prices: Array<{
-    id: string;
-    priceListId: string;
-    priceListName: string;
-    unitPriceExVat: number;
-    currency: string;
-    minQty: number;
-    validFrom: string | null;
-    validTo: string | null;
-  }>;
-};
+import type { ProductManagementPayload, ProductSummary, ProductSkuOption } from "./types";
 
 export default function ProductManagementClient(props: ProductManagementPayload) {
   const { toast } = useToast();
@@ -107,15 +59,11 @@ export default function ProductManagementClient(props: ProductManagementPayload)
     sheetMode === "edit" && selectedProductId ? props.products.find((prod) => prod.id === selectedProductId) ?? null : null;
 
   const handleCreateProduct = () => {
-    setSheetMode("create");
-    setSelectedProductId(null);
-    setSheetOpen(true);
+    router.push("/sales/products/new");
   };
 
   const handleManageProduct = (productId: string) => {
-    setSheetMode("edit");
-    setSelectedProductId(productId);
-    setSheetOpen(true);
+    router.push(`/sales/products/${productId}`);
   };
 
   const handleProductSaved = (productId: string | null) => {
@@ -196,6 +144,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
         skus={props.skus}
         batches={props.batches}
         priceLists={props.priceLists}
+        customers={props.customers}
         onProductSaved={handleProductSaved}
       />
     </div>
@@ -210,10 +159,11 @@ type ComposerProps = {
   skus: ProductManagementPayload["skus"];
   batches: ProductManagementPayload["batches"];
   priceLists: ProductManagementPayload["priceLists"];
+  customers: ProductManagementPayload["customers"];
   onProductSaved: (productId: string | null) => void;
 };
 
-function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches, priceLists, onProductSaved }: ComposerProps) {
+function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches, priceLists, customers, onProductSaved }: ComposerProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
@@ -247,13 +197,16 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
           <SheetTitle>{mode === "edit" ? `Manage ${product?.name ?? "product"}` : "Create product"}</SheetTitle>
         </SheetHeader>
         <Tabs value={activeTab} onValueChange={(next) => setActiveTab(next as typeof activeTab)}>
-          <TabsList className="grid grid-cols-3">
+          <TabsList className="grid grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="inventory" disabled={!currentProductId}>
               Inventory
             </TabsTrigger>
             <TabsTrigger value="pricing" disabled={!currentProductId}>
               Pricing
+            </TabsTrigger>
+            <TabsTrigger value="aliases" disabled={!currentProductId}>
+              Aliases
             </TabsTrigger>
           </TabsList>
           <TabsContent value="details">
@@ -316,6 +269,18 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
               <EmptyTabState label="Save product details first to add pricing." />
             )}
           </TabsContent>
+          <TabsContent value="aliases">
+            {currentProductId ? (
+              <ProductAliasesSection
+                productId={currentProductId}
+                aliases={product?.aliases ?? []}
+                customers={customers}
+                priceLists={priceLists}
+              />
+            ) : (
+              <EmptyTabState label="Save product details first to manage aliases." />
+            )}
+          </TabsContent>
         </Tabs>
       </SheetContent>
     </Sheet>
@@ -335,9 +300,20 @@ type ProductDetailsSectionProps = {
   skus: ProductManagementPayload["skus"];
   mode: "create" | "edit";
   onSaved: (productId: string | null) => void;
+  onCreateSku?: () => void;
+  forcedSkuId?: string | null;
+  onForcedSkuApplied?: () => void;
 };
 
-function ProductDetailsSection({ product, skus, mode, onSaved }: ProductDetailsSectionProps) {
+export function ProductDetailsSection({
+  product,
+  skus,
+  mode,
+  onSaved,
+  onCreateSku,
+  forcedSkuId,
+  onForcedSkuApplied,
+}: ProductDetailsSectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -359,7 +335,20 @@ function ProductDetailsSection({ product, skus, mode, onSaved }: ProductDetailsS
       defaultStatus: product?.defaultStatus ?? "",
       isActive: product?.isActive ?? true,
     });
-  }, [product?.id, skus]);
+  }, [product?.id]);
+
+  useEffect(() => {
+    if (!formState.skuId && skus.length > 0) {
+      setFormState((prev) => ({ ...prev, skuId: skus[0].id }));
+    }
+  }, [skus, formState.skuId]);
+
+  useEffect(() => {
+    if (forcedSkuId) {
+      setFormState((prev) => ({ ...prev, skuId: forcedSkuId }));
+      onForcedSkuApplied?.();
+    }
+  }, [forcedSkuId, onForcedSkuApplied]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -404,21 +393,28 @@ function ProductDetailsSection({ product, skus, mode, onSaved }: ProductDetailsS
         </div>
         <div className="space-y-2">
           <Label>SKU</Label>
-          <Select
-            value={formState.skuId}
-            onValueChange={(value) => setFormState((prev) => ({ ...prev, skuId: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select SKU" />
-            </SelectTrigger>
-            <SelectContent>
-              {skus.map((sku) => (
-                <SelectItem key={sku.id} value={sku.id}>
-                  {sku.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              value={formState.skuId}
+              onValueChange={(value) => setFormState((prev) => ({ ...prev, skuId: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select SKU" />
+              </SelectTrigger>
+              <SelectContent>
+                {skus.map((sku) => (
+                  <SelectItem key={sku.id} value={sku.id}>
+                    {sku.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {onCreateSku && (
+              <Button type="button" variant="outline" onClick={onCreateSku}>
+                New SKU
+              </Button>
+            )}
+          </div>
         </div>
       </div>
       <div className="space-y-2">
@@ -471,7 +467,7 @@ type ProductInventorySectionProps = {
   availableBatches: ProductManagementPayload["batches"];
 };
 
-function ProductInventorySection({ productId, linkedBatches, availableBatches }: ProductInventorySectionProps) {
+export function ProductInventorySection({ productId, linkedBatches, availableBatches }: ProductInventorySectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [selectedBatchId, setSelectedBatchId] = useState<string>(availableBatches[0]?.id ?? "");
@@ -601,7 +597,7 @@ type ProductPricingSectionProps = {
   prices: ProductSummary["prices"];
 };
 
-function ProductPricingSection({ productId, priceLists, prices }: ProductPricingSectionProps) {
+export function ProductPricingSection({ productId, priceLists, prices }: ProductPricingSectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -743,7 +739,7 @@ type AssignmentsCardProps = {
   assignments: ProductManagementPayload["priceListCustomers"];
 };
 
-function PriceListAssignmentsCard({ priceLists, customers, assignments }: AssignmentsCardProps) {
+export function PriceListAssignmentsCard({ priceLists, customers, assignments }: AssignmentsCardProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [assignmentForm, setAssignmentForm] = useState(() => ({
@@ -933,14 +929,14 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
           <div className="space-y-1.5">
             <Label>Default price list</Label>
             <Select
-              value={defaultForm.priceListId ?? ""}
-              onValueChange={(value) => setDefaultForm((prev) => ({ ...prev, priceListId: value }))}
+              value={defaultForm.priceListId || "none"}
+              onValueChange={(value) => setDefaultForm((prev) => ({ ...prev, priceListId: value === "none" ? "" : value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select price list" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {priceLists.map((priceList) => (
                   <SelectItem key={priceList.id} value={priceList.id}>
                     {priceList.name}
@@ -1002,5 +998,208 @@ function formatDateRange(from?: string | null, to?: string | null) {
   const format = (value: string | null | undefined) =>
     value ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—";
   return `From ${format(from)} · To ${format(to)}`;
+}
+
+type ProductAliasesSectionProps = {
+  productId: string;
+  aliases: ProductSummary["aliases"];
+  customers: ProductManagementPayload["customers"];
+  priceLists: ProductManagementPayload["priceLists"];
+};
+
+export function ProductAliasesSection({ productId, aliases, customers, priceLists }: ProductAliasesSectionProps) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [form, setForm] = useState({
+    aliasName: "",
+    customerId: "",
+    customerSkuCode: "",
+    customerBarcode: "",
+    unitPriceExVat: "",
+    priceListId: "",
+    notes: "",
+  });
+  const [pending, startTransition] = useTransition();
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.aliasName.trim()) {
+      toast({ variant: "destructive", title: "Alias name required" });
+      return;
+    }
+    startTransition(async () => {
+      const result = await upsertProductAliasAction({
+        productId,
+        aliasName: form.aliasName.trim(),
+        customerId: form.customerId || null,
+        customerSkuCode: form.customerSkuCode || null,
+        customerBarcode: form.customerBarcode || null,
+        unitPriceExVat: form.unitPriceExVat ? Number(form.unitPriceExVat) : null,
+        priceListId: form.priceListId || null,
+        notes: form.notes || null,
+      });
+      if (!result.success) {
+        toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to save alias." });
+        return;
+      }
+      toast({ title: "Alias saved" });
+      setForm({
+        aliasName: "",
+        customerId: "",
+        customerSkuCode: "",
+        customerBarcode: "",
+        unitPriceExVat: "",
+        priceListId: "",
+        notes: "",
+      });
+      router.refresh();
+    });
+  };
+
+  const handleDelete = (aliasId: string) => {
+    startTransition(async () => {
+      const result = await deleteProductAliasAction(aliasId);
+      if (!result.success) {
+        toast({ variant: "destructive", title: "Delete failed", description: result.error ?? "Unable to delete alias." });
+        return;
+      }
+      toast({ title: "Alias removed" });
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <form className="space-y-4 rounded-lg border p-4" onSubmit={handleSubmit}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Alias name</Label>
+            <Input
+              placeholder="Customer sees this name"
+              value={form.aliasName}
+              onChange={(event) => setForm((prev) => ({ ...prev, aliasName: event.target.value }))}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Assign to customer (optional)</Label>
+            <Select
+              value={form.customerId || "__none__"}
+              onValueChange={(value) => setForm((prev) => ({ ...prev, customerId: value === "__none__" ? "" : value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All customers" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                <SelectItem value="__none__">All customers</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Customer SKU</Label>
+            <Input
+              placeholder="e.g., ACME-001"
+              value={form.customerSkuCode}
+              onChange={(event) => setForm((prev) => ({ ...prev, customerSkuCode: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Customer barcode</Label>
+            <Input
+              placeholder="Optional barcode"
+              value={form.customerBarcode}
+              onChange={(event) => setForm((prev) => ({ ...prev, customerBarcode: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Unit price (ex VAT)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Use price list if blank"
+              value={form.unitPriceExVat}
+              onChange={(event) => setForm((prev) => ({ ...prev, unitPriceExVat: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Price list (optional)</Label>
+            <Select
+              value={form.priceListId || "__none__"}
+              onValueChange={(value) => setForm((prev) => ({ ...prev, priceListId: value === "__none__" ? "" : value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {priceLists.map((pl) => (
+                  <SelectItem key={pl.id} value={pl.id}>
+                    {pl.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Notes</Label>
+          <Textarea
+            rows={2}
+            value={form.notes}
+            onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+          />
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={pending}>
+            {pending ? "Saving…" : "Add alias"}
+          </Button>
+        </div>
+      </form>
+
+      <div className="space-y-4">
+        <h4 className="font-semibold">Existing aliases</h4>
+        {aliases.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No aliases defined yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {aliases.map((alias) => (
+              <div key={alias.id} className="rounded-lg border p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium">{alias.aliasName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {alias.customerSkuCode || "No customer SKU"} • {alias.customerName ?? "All customers"}
+                    </p>
+                    {alias.unitPriceExVat !== null && (
+                      <p className="text-sm text-muted-foreground">Price: €{alias.unitPriceExVat.toFixed(2)}</p>
+                    )}
+                    {alias.priceListName && (
+                      <p className="text-xs text-muted-foreground">Price list: {alias.priceListName}</p>
+                    )}
+                    {alias.notes && <p className="text-xs text-muted-foreground mt-2">{alias.notes}</p>}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => handleDelete(alias.id)}
+                    disabled={pending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 

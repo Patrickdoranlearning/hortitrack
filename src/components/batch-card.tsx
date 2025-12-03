@@ -13,7 +13,6 @@ import type { Batch } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ClipboardList } from "lucide-react";
 import TransplantForm from "@/components/batches/TransplantForm";
 import EditBatchForm from "@/components/batches/EditBatchForm";
 import EventsCard from "@/components/batches/EventsCard";
@@ -23,6 +22,8 @@ import MoveForm from "@/components/batches/actions/MoveForm";
 import StatusForm from "@/components/batches/actions/StatusForm";
 import DumpForm from "@/components/batches/actions/DumpForm";
 import { TransplantIcon } from "@/components/icons";
+import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
+import type { ActionMode } from "@/components/actions/types";
 
 // --- runtime guard: logs undefined imports without crashing ---
 const _ensure = (x: any, name: string) => {
@@ -46,7 +47,7 @@ const SafeAncestryCard = _ensure(AncestryCard, "AncestryCard");
 type BatchCardProps = {
   batch: Batch;
   onOpen?: (batch: Batch) => void;
-  onLogAction?: (batch: Batch) => void;
+  onLogAction?: (batch: Batch, mode: ActionMode) => void;
   actionsSlot?: React.ReactNode;
   className?: string;
 };
@@ -122,22 +123,14 @@ export function BatchCard({
           >
             {actionsSlot}
             {onLogAction && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="sm:px-3"
-                    onClick={() => onLogAction(batch)}
-                  >
-                    <ClipboardList className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Log Action</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="sm:hidden">
-                  <p>Log Action</p>
-                </TooltipContent>
-              </Tooltip>
+              <ActionMenuButton
+                batch={batch}
+                onSelect={(mode) => onLogAction(batch, mode)}
+                variant="secondary"
+                size="sm"
+                className="sm:px-3"
+                hideLabelOnMobile
+              />
             )}
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>

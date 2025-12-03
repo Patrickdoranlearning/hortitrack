@@ -107,8 +107,10 @@ export interface Database {
         id: string;
         org_id: string;
         code: string;
-        plant_variety_id: string;
-        size_id: string;
+        display_name: string;
+        sku_type: string | null;
+        plant_variety_id: string | null;
+        size_id: string | null;
         description: string | null;
         barcode: string | null;
         default_vat_rate: number;
@@ -209,6 +211,21 @@ export interface Database {
         valid_from: string | null;
         valid_to: string | null;
         created_at: string | null;
+      }>;
+      product_aliases: TableDefinition<{
+        id: string;
+        org_id: string;
+        product_id: string;
+        customer_id: string | null;
+        alias_name: string;
+        customer_sku_code: string | null;
+        customer_barcode: string | null;
+        unit_price_ex_vat: number | null;
+        price_list_id: string | null;
+        is_active: boolean | null;
+        notes: string | null;
+        created_at: string | null;
+        updated_at: string | null;
       }>;
       invoices: TableDefinition<{
         id: string;
