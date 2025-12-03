@@ -43,12 +43,14 @@ import {
   Printer,
   MoreHorizontal,
   ShoppingCart,
+  ClipboardList,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 import dynamic from 'next/dynamic';
 import { ActionDialog } from '../components/actions/ActionDialog';
+import type { ActionMode } from "@/components/actions/types";
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
@@ -59,6 +61,7 @@ import { FeatureGate } from '@/components/FeatureGate';
 import { queryMatchesBatch } from '@/lib/search';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
+import { TransplantMenuButton } from "@/components/horti/TransplantMenuButton";
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import CheckInForm from '@/components/batches/CheckInForm';
 import { useCollection } from '@/hooks/useCollection'; 
@@ -117,6 +120,7 @@ export default function HomePageView({
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = React.useState(false);
   const [isLogActionOpen, setIsLogActionOpen] = React.useState(false);
+  const [logActionMode, setLogActionMode] = React.useState<ActionMode>("MOVE");
   const [isTransplantOpen, setIsTransplantOpen] = React.useState(false);
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] = React.useState(false);
@@ -226,8 +230,9 @@ export default function HomePageView({
     [clearBatchQuery]
   );
 
-  const handleLogAction = (batch: Batch) => {
+  const handleLogAction = (batch: Batch, mode: ActionMode) => {
     setSelectedBatch(batch);
+    setLogActionMode(mode);
     setIsLogActionOpen(true);
   };
   
@@ -424,6 +429,20 @@ export default function HomePageView({
     },
     [batches, fetchBatchNode, router, toast]
   );
+
+  const refreshSelectedBatch = React.useCallback(async () => {
+    if (!selectedBatch?.id) return;
+    try {
+      const updated = await fetchBatchNode(selectedBatch.id);
+      setBatches((prev) => {
+        if (!prev) return [updated];
+        return prev.map((b) => (b.id === updated.id ? updated : b));
+      });
+      setSelectedBatch(updated);
+    } catch (err) {
+      console.error("Failed to refresh batch:", err);
+    }
+  }, [selectedBatch?.id, fetchBatchNode]);
   
   const handleEditBatch = React.useCallback((batch: Batch) => {
     setEditingBatch(batch);
@@ -504,6 +523,11 @@ export default function HomePageView({
                         <Sparkles /> AI Care
                     </Button>
                     </FeatureGate>
+                    <Button variant="outline" className="w-full sm:w-auto" asChild>
+                      <Link href="/actions">
+                        <ClipboardList className="mr-2 h-4 w-4" /> Log Actions
+                      </Link>
+                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button disabled={isReadonly} className="w-full sm:w-auto">
@@ -523,11 +547,7 @@ export default function HomePageView({
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Link href="/production/batches/new/bulk-transplant">
-                        <Button variant="outline" disabled={isReadonly} className="w-full sm:w-auto">
-                            <TransplantIcon className="mr-2 h-4 w-4" /> Bulk Transplant
-                        </Button>
-                    </Link>
+                    <TransplantMenuButton className="w-full sm:w-auto" />
                 </>
             }
         />
@@ -727,6 +747,8 @@ export default function HomePageView({
         onOpenChange={setIsLogActionOpen}
         batch={selectedBatch}
         locations={nurseryLocations || []}
+        mode={logActionMode}
+        onSuccess={refreshSelectedBatch}
       />
       
       <ProductionProtocolDialog

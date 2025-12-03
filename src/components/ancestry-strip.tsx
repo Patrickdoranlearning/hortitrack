@@ -14,6 +14,7 @@ type Mini = {
   status?: string | null;
   quantity?: number | null;
   initialQuantity?: number | null;
+  proportion?: number | null;
 };
 
 type ResponseShape = {
@@ -44,8 +45,15 @@ function MiniBatchCard({
       <div className="text-xs uppercase tracking-wide text-muted-foreground">
         {highlight ? "Current batch" : "Batch"}
       </div>
-      <div className="font-semibold text-base">
-        #{data.batchNumber ?? "—"}
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-semibold text-base">
+          #{data.batchNumber ?? "—"}
+        </div>
+        {typeof data.proportion === "number" && !Number.isNaN(data.proportion) && (
+          <span className="text-xs text-muted-foreground">
+            {(data.proportion * 100).toFixed(0)}%
+          </span>
+        )}
       </div>
       <div className="text-sm line-clamp-1">{data.plantVariety ?? "—"}</div>
       <div className="mt-1 text-xs text-muted-foreground">
@@ -134,14 +142,27 @@ export default function AncestryStrip({
     );
   }
 
-  return (
-    <div className="flex items-center gap-3 overflow-x-auto p-2">
-      {data.parents.map((parent) => (
-        <React.Fragment key={parent.id}>
-          <MiniBatchCard data={parent} onSelect={onSelectBatch} />
-          <span className="text-muted-foreground text-lg">→</span>
+  const renderVerticalColumn = (items: Mini[], connector: string) => (
+    <div className="flex flex-col items-stretch gap-2">
+      {items.map((item, idx) => (
+        <React.Fragment key={item.id}>
+          <MiniBatchCard data={item} onSelect={onSelectBatch} />
+          {idx < items.length - 1 && (
+            <span className="text-center text-muted-foreground text-lg">{connector}</span>
+          )}
         </React.Fragment>
       ))}
+    </div>
+  );
+
+  return (
+    <div className="flex items-start gap-4 overflow-x-auto p-2">
+      {data.parents.length > 0 && (
+        <>
+          {renderVerticalColumn(data.parents, "+")}
+          {data.current && <span className="text-muted-foreground text-2xl self-center">→</span>}
+        </>
+      )}
       {data.current && (
         <MiniBatchCard
           data={data.current}
@@ -150,16 +171,11 @@ export default function AncestryStrip({
         />
       )}
       {data.children.length > 0 && data.current && (
-        <span className="text-muted-foreground text-lg">→</span>
+        <>
+          <span className="text-muted-foreground text-2xl self-center">→</span>
+          {renderVerticalColumn(data.children, "↓")}
+        </>
       )}
-      {data.children.map((child, idx) => (
-        <React.Fragment key={child.id}>
-          <MiniBatchCard data={child} onSelect={onSelectBatch} />
-          {idx < data.children.length - 1 && (
-            <span className="text-muted-foreground text-lg">→</span>
-          )}
-        </React.Fragment>
-      ))}
     </div>
   );
 }

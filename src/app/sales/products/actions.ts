@@ -43,6 +43,19 @@ const priceListCustomerSchema = z.object({
   validTo: z.string().optional().nullable(),
 });
 
+const productAliasSchema = z.object({
+  id: z.string().uuid().optional(),
+  productId: z.string().uuid(),
+  customerId: z.string().uuid().nullable().optional(),
+  aliasName: z.string().min(1, 'Alias name is required'),
+  customerSkuCode: z.string().max(120).optional().nullable(),
+  customerBarcode: z.string().max(255).optional().nullable(),
+  unitPriceExVat: z.number().nonnegative().optional().nullable(),
+  priceListId: z.string().uuid().nullable().optional(),
+  notes: z.string().max(500).optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
 function cleanString(value?: string | null) {
   if (value === undefined || value === null) return null;
   const trimmed = value.trim();
@@ -273,5 +286,123 @@ export async function setCustomerDefaultPriceListAction(customerId: string, pric
   }
   revalidatePath('/sales/products');
   return { success: true };
+}
+
+export async function upsertProductAliasAction(input: z.infer<typeof productAliasSchema>) {
+  const parsed = productAliasSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerClient();
+
+  const payload = {
+    org_id: orgId,
+    product_id: parsed.productId,
+    customer_id: parsed.customerId ?? null,
+    alias_name: parsed.aliasName.trim(),
+    customer_sku_code: cleanString(parsed.customerSkuCode),
+    customer_barcode: cleanString(parsed.customerBarcode),
+    unit_price_ex_vat: parsed.unitPriceExVat ?? null,
+    price_list_id: parsed.priceListId ?? null,
+    is_active: parsed.isActive ?? true,
+    notes: cleanString(parsed.notes),
+    updated_at: new Date().toISOString(),
+  };
+
+  let error;
+  if (parsed.id) {
+    ({ error } = await supabase.from('product_aliases').update(payload).eq('id', parsed.id));
+  } else {
+    ({ error } = await supabase.from('product_aliases').insert(payload));
+  }
+
+  if (error) {
+    console.error('[upsertProductAliasAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+export async function deleteProductAliasAction(aliasId: string) {
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase.from('product_aliases').delete().eq('id', aliasId);
+  if (error) {
+    console.error('[deleteProductAliasAction]', error);
+    return { success: false, error: error.message };
+  }
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+const createSkuSchema = z.object({
+  code: z.string().trim().min(1).max(64).optional(),
+  displayName: z.string().trim().min(1, 'Display name is required'),
+  description: z.string().trim().max(255).optional(),
+  barcode: z.string().trim().min(1).max(255),
+  vatRate: z.number().min(0).max(100).default(13.5),
+});
+
+export async function createSkuAction(input: z.infer<typeof createSkuSchema>) {
+  const parsed = createSkuSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerClient();
+
+  let skuCode = parsed.code?.trim() || '';
+  if (!skuCode) {
+    skuCode = await generateSkuCode(supabase);
+  }
+  if (parsed.code) {
+    const { data: existing } = await supabase
+      .from('skus')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('code', skuCode)
+      .maybeSingle();
+    if (existing) {
+      skuCode = `${skuCode}-${Date.now().toString(36).toUpperCase()}`;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('skus')
+    .insert({
+      org_id: orgId,
+      code: skuCode,
+      display_name: parsed.displayName,
+      description: parsed.description ?? null,
+      barcode: parsed.barcode,
+      default_vat_rate: parsed.vatRate ?? 13.5,
+      plant_variety_id: null,
+      size_id: null,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[createSkuAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true, data };
+}
+
+async function generateSkuCode(supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>) {
+  const { data, error } = await supabase.rpc('next_sku_code');
+  console.log('[generateSkuCode] rpc result', { data, error, typeofData: typeof data });
+  if (error) {
+    console.error('[generateSkuCode] rpc error, fallback to timestamp', error);
+    const fallback = Date.now().toString(36).toUpperCase();
+    return `SKU-${fallback}`;
+  }
+  // data comes back as number or bigint from the sequence
+  const seq = Number(data);
+  if (Number.isNaN(seq)) {
+    console.error('[generateSkuCode] invalid sequence value', data);
+    const fallback = Date.now().toString(36).toUpperCase();
+    return `SKU-${fallback}`;
+  }
+  const padded = String(seq).padStart(4, '0');
+  return `SKU-${padded}`;
 }
 

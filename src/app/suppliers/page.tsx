@@ -376,14 +376,14 @@ function SuppliersTable({
                       render={({ field }) => (
                         <FormItem className="space-y-1">
                           <FormLabel className="sr-only">Type</FormLabel>
-                          <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                          <Select value={field.value || 'unspecified'} onValueChange={(val) => field.onChange(val === 'unspecified' ? '' : val)}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Type" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Unspecified</SelectItem>
+                              <SelectItem value="unspecified">Unspecified</SelectItem>
                               {supplierTypes.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}

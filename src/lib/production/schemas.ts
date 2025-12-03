@@ -48,3 +48,26 @@ export const TransplantInputSchema = z.object({
   archive_parent_if_empty: z.boolean().optional(),
 });
 export type TransplantInput = z.infer<typeof TransplantInputSchema>;
+
+export const MultiTransplantInputSchema = z.object({
+  child: z.object({
+    plant_variety_id: z.string().uuid(),
+    size_id: z.string().uuid(),
+    location_id: z.string().uuid(),
+    packs: z.number().int().min(1),
+    units_per_pack: z.number().int().min(1),
+    planted_at: DateOnly.optional(),
+    notes: z.string().max(1000).optional(),
+  }),
+  parents: z
+    .array(
+      z.object({
+        parent_batch_id: z.string().uuid(),
+        units: z.number().int().min(1),
+        notes: z.string().max(500).optional(),
+        archive_parent_if_empty: z.boolean().optional(),
+      })
+    )
+    .min(1, "Add at least one source batch"),
+});
+export type MultiTransplantInput = z.infer<typeof MultiTransplantInputSchema>;

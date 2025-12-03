@@ -41,6 +41,24 @@ export type TransplantInput = {
   archive_parent_if_empty?: boolean;
 };
 
+export type MultiTransplantInput = {
+  child: {
+    plant_variety_id: UUID;
+    size_id: UUID;
+    location_id: UUID;
+    packs: number;
+    units_per_pack: number;
+    planted_at?: string;
+    notes?: string;
+  };
+  parents: Array<{
+    parent_batch_id: UUID;
+    units: number;
+    notes?: string;
+    archive_parent_if_empty?: boolean;
+  }>;
+};
+
 type ApiResponse<T> = { requestId?: string } & T;
 
 export const ProductionAPI = {
@@ -61,6 +79,12 @@ export const ProductionAPI = {
       "/api/production/batches/transplant",
       { method: "POST", body: JSON.stringify(input) }
     );
+  },
+  multiTransplant(input: MultiTransplantInput) {
+    return fetchJson<ApiResponse<{ child_batch: any }>>("/api/production/batches/multi-transplant", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   },
   move(batchId: string, payload: { location_id: string; notes?: string }) {
     return fetchJson<ApiResponse<{ ok: true }>>(`/api/production/batches/${batchId}/move`, {

@@ -11,8 +11,9 @@ import {
   QrCode,
   Sparkles,
   Printer,
+  ClipboardList,
 } from 'lucide-react';
-import type { Batch } from '@/lib/types';
+import type { Batch, NurseryLocation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,8 +27,10 @@ import { TransplantIcon } from '@/components/icons';
 import { FeatureGate } from '@/components/FeatureGate';
 import { BatchDetailDialog } from "@/components/batch-detail-dialog";
 import { NewBatchButton } from '@/components/horti/NewBatchButton';
+import { TransplantMenuButton } from "@/components/horti/TransplantMenuButton";
 import ScannerDialog from '@/components/scan-and-act-dialog';
 import { ActionDialog } from '@/components/actions/ActionDialog';
+import type { ActionMode } from "@/components/actions/types";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +43,7 @@ import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
+import { fetchJson } from '@/lib/http';
 
 
 export default function BatchesClient({ initialBatches }: { initialBatches: Batch[] }) {
@@ -61,17 +65,53 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [isScanOpen, setIsScanOpen] = useState(false);
   const [isLogActionOpen, setIsLogActionOpen] = useState(false);
+  const [logActionMode, setLogActionMode] = useState<ActionMode>("MOVE");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // UseSWR for fetching batches from Supabase, with initialData from SSR
-  const { data: batchesResult, error: batchesError, isLoading: isDataLoading } = useSWR(
+  const { data: batchesResult, error: batchesError, isLoading: isDataLoading, mutate: mutateBatches } = useSWR(
     'batches', 
     getBatchesAction, 
     { fallbackData: { success: true, data: initialBatches } }
   );
   const batches = batchesResult?.data || [];
+
+  const handleActionSuccess = React.useCallback(() => {
+    // Refresh the batches list after an action
+    mutateBatches();
+    // Also update the selected batch if it exists
+    if (selectedBatch?.id) {
+      const updated = batches.find((b) => b.id === selectedBatch.id);
+      if (updated) setSelectedBatch(updated);
+    }
+  }, [mutateBatches, selectedBatch?.id, batches]);
+
+  const { data: locationsData, error: locationsError } = useSWR(
+    "catalog/locations",
+    () => fetchJson<{ value: string; label: string }[]>("/api/catalog/locations")
+  );
+
+  const nurseryLocations = useMemo<NurseryLocation[]>(() => {
+    if (!locationsData) return [];
+    const orgId = batches[0]?.orgId ?? "";
+    return locationsData.map((loc) => ({
+      id: loc.value,
+      name: loc.label,
+      orgId,
+    }));
+  }, [locationsData, batches]);
   
   if (batchesError) console.error("Error fetching batches:", batchesError);
+  useEffect(() => {
+    if (locationsError) {
+      console.error("Error loading locations:", locationsError);
+      toast({
+        variant: "destructive",
+        title: "Locations unavailable",
+        description: "Could not load nursery locations. Please refresh and try again.",
+      });
+    }
+  }, [locationsError, toast]);
 
 
   // Open dialog if ?batch=<id> present
@@ -117,8 +157,9 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     console.log("Editing batch:", batch);
   };
 
-  const handleLogAction = (batch: Batch) => {
+  const handleLogAction = (batch: Batch, mode: ActionMode) => {
     setSelectedBatch(batch);
+    setLogActionMode(mode);
     setIsLogActionOpen(true);
   };
 
@@ -188,7 +229,13 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         <Sparkles className="mr-2 h-4 w-4" /> AI Care
                     </Button>
                     </FeatureGate>
+                    <Button variant="outline" className="w-full sm:w-auto" asChild>
+                      <Link href="/actions">
+                        <ClipboardList className="mr-2 h-4 w-4" /> Log Actions
+                      </Link>
+                    </Button>
                     <NewBatchButton />
+                    <TransplantMenuButton />
                 </>
             }
         />
@@ -308,7 +355,9 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         open={isLogActionOpen}
         onOpenChange={setIsLogActionOpen}
         batch={selectedBatch}
-        locations={[]}
+        locations={nurseryLocations}
+        mode={logActionMode}
+        onSuccess={handleActionSuccess}
       />
       {selectedBatch && <BatchLabelPreview
         open={isPreviewOpen}

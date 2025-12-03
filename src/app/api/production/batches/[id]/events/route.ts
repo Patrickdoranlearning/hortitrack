@@ -9,10 +9,10 @@ export async function GET(
     const { supabase, orgId } = await getUserAndOrg();
     const { data: rows, error } = await supabase
       .from("batch_events")
-      .select("id, type, created_at, by_user_id, payload")
+      .select("id, type, at, created_at, by_user_id, payload")
       .eq("org_id", orgId)
       .eq("batch_id", params.id)
-      .order("created_at", { ascending: false });
+      .order("at", { ascending: false });
 
     if (error) throw error;
     return NextResponse.json({ items: rows ?? [] });

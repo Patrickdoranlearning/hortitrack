@@ -12,11 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
   Pencil,
-  ClipboardList,
   Sprout,
   BarChart2,
   Trash2,
   Share2,
+  Loader2,
 } from "lucide-react";
 import type { Batch } from '@/lib/types';
 import { ProductionProtocolDialog } from "./production-protocol-dialog";
@@ -26,6 +26,28 @@ import { BatchChatDialog } from "./batch-chat-dialog";
 import { BatchDistributionBar } from "./batch-distribution-bar";
 import AncestryStrip from "./ancestry-strip";
 import { PlantPassportCard } from "./batches/PlantPassportCard";
+import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
+import type { ActionMode } from "@/components/actions/types";
+
+type BatchEvent = {
+  id: string;
+  type: string;
+  at: string;
+  created_at: string;
+  by_user_id: string | null;
+  payload: Record<string, any> | null;
+};
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  DUMP: "Stock Dumped",
+  MOVE: "Moved",
+  MOVE_IN: "Received from Split",
+  CHECKIN: "Check-in",
+  NOTE: "Note Added",
+  PROPAGATE: "Propagated",
+  TRANSPLANT: "Transplanted",
+  STATUS_CHANGE: "Status Changed",
+};
 
 interface BatchDetailDialogProps {
   open: boolean;
@@ -33,7 +55,7 @@ interface BatchDetailDialogProps {
   batch: Batch | null;
   onEdit: (batch: Batch) => void;
   onTransplant: (batch: Batch) => void;
-  onLogAction: (batch: Batch) => void;
+  onLogAction: (batch: Batch, mode: ActionMode) => void;
   onGenerateProtocol: (batch: Batch) => void;
   onCareRecommendations: (batch: Batch) => void;
   onSelectRelatedBatch?: (batchId: string) => void;
@@ -52,6 +74,49 @@ export function BatchDetailDialog({
 }: BatchDetailDialogProps) {
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
+  const [events, setEvents] = React.useState<BatchEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = React.useState(false);
+  const [eventsError, setEventsError] = React.useState<string | null>(null);
+
+  // Fetch events when dialog opens or batch changes
+  React.useEffect(() => {
+    if (!open || !batch?.id) {
+      setEvents([]);
+      return;
+    }
+
+    let cancelled = false;
+    setEventsLoading(true);
+    setEventsError(null);
+
+    fetch(`/api/production/batches/${batch.id}/events`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j?.error || res.statusText);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setEvents(data.items || []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setEventsError(err?.message || String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setEventsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, batch?.id]);
 
   const getStatusVariant = (status: Batch['status']): 'default' | 'secondary' | 'destructive' | 'outline' | 'accent' | 'info' => {
      switch (status) {
@@ -155,15 +220,54 @@ export function BatchDetailDialog({
                   )}
                 </TabsContent>
                 <TabsContent value="history">
-                  <div className="max-h-60 overflow-y-auto text-sm space-y-2 mt-4">
-                    {(batch.logHistory ?? []).slice().reverse().map((log, index) => (
-                      <div key={index} className="flex justify-between">
-                        <span>{log.note || `${log.type} action`}</span>
-                        <span className="text-muted-foreground">
-                          {new Date(log.date).toLocaleDateString()}
-                        </span>
+                  <div className="max-h-72 overflow-y-auto text-sm space-y-3 mt-4">
+                    {eventsLoading && (
+                      <div className="flex items-center justify-center py-8 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Loading events...
                       </div>
-                    ))}
+                    )}
+                    {eventsError && (
+                      <div className="text-sm text-red-600 py-4">{eventsError}</div>
+                    )}
+                    {!eventsLoading && !eventsError && events.length === 0 && (
+                      <div className="text-muted-foreground py-4">No events logged yet.</div>
+                    )}
+                    {!eventsLoading && events.map((event) => {
+                      const payload = typeof event.payload === "string" 
+                        ? JSON.parse(event.payload) 
+                        : event.payload;
+                      const typeLabel = EVENT_TYPE_LABELS[event.type] || event.type;
+                      
+                      return (
+                        <div key={event.id} className="rounded-lg border p-3 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{typeLabel}</span>
+                            <span className="text-muted-foreground text-xs">
+                              {new Date(event.at || event.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          {payload?.reason && (
+                            <div className="text-muted-foreground">Reason: {payload.reason}</div>
+                          )}
+                          {payload?.units_dumped && (
+                            <div className="text-muted-foreground">Units: {payload.units_dumped}</div>
+                          )}
+                          {payload?.units_moved && (
+                            <div className="text-muted-foreground">Units moved: {payload.units_moved}</div>
+                          )}
+                          {payload?.to_location_name && (
+                            <div className="text-muted-foreground">To: {payload.to_location_name}</div>
+                          )}
+                          {payload?.status && (
+                            <div className="text-muted-foreground">Status: {payload.status}</div>
+                          )}
+                          {payload?.notes && (
+                            <div className="text-muted-foreground">{payload.notes}</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </TabsContent>
                 <TabsContent value="ancestry">
@@ -179,7 +283,7 @@ export function BatchDetailDialog({
               <h4 className="font-semibold text-lg">Actions</h4>
               <Button onClick={() => onEdit(batch)} variant="outline"><Pencil /> Edit Batch</Button>
               <Button onClick={() => onTransplant(batch)} variant="outline" disabled={(batch.quantity ?? 0) === 0}><Sprout /> Transplant</Button>
-              <Button onClick={() => onLogAction(batch)} variant="outline"><ClipboardList /> Log Action</Button>
+              <ActionMenuButton batch={batch} onSelect={(mode) => onLogAction(batch, mode)} className="w-full" />
               <Button onClick={() => setIsChatOpen(true)} variant="outline"><Share2 /> Chat about Batch</Button>
               
               <div className="!mt-auto pt-4 border-t">
