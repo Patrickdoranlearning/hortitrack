@@ -54,7 +54,16 @@ export type BatchMapping = {
 export type ProductManagementPayload = {
   products: ProductSummary[];
   skus: ProductSkuOption[];
-  batches: Array<{ id: string; label: string; status: string; quantity: number }>;
+  batches: Array<{
+    id: string;
+    label: string;
+    status: string;
+    quantity: number;
+    varietyId?: string | null;
+    varietyName?: string | null;
+    sizeId?: string | null;
+    sizeName?: string | null;
+  }>;
   priceLists: Array<{ id: string; name: string; currency: string; isDefault: boolean }>;
   customers: Array<{ id: string; name: string; defaultPriceListId: string | null }>;
   priceListCustomers: Array<{

@@ -23,11 +23,11 @@ export async function getSaleableBatches(): Promise<InventoryBatch[]> {
     const supabase = await createClient();
 
     // Fetch available batches
-    // Criteria: Status is "Ready for Sale" or "Looking Good", Quantity > 0
+    // Criteria: Status is "Ready" or "Looking Good", Quantity > 0
     const { data, error } = await supabase
         .from("batches")
         .select("*, plant_varieties(name), plant_sizes(name), nursery_locations(name)")
-        .in("status", ["Ready for Sale", "Looking Good"])
+        .in("status", ["Ready", "Looking Good"])
         .gt("quantity", 0);
 
     if (error) {

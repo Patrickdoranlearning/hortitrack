@@ -17,28 +17,25 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import Link from "next/link";
-import MainNav from "@/components/nav/MainNav";
+import SubNav from "@/components/nav/SubNav";
+import CreateMenu from "@/components/nav/CreateMenu";
+import MobileNav from "@/components/nav/MobileNav";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      <div className="hidden border-r bg-muted/40 md:block">
-        <div className="flex h-full max-h-screen flex-col gap-2">
-          <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <Logo />
-            </Link>
-          </div>
-          <div className="flex-1">
-            <MainNav />
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen w-full">
       <div className="flex flex-col">
         <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
-          {/* Mobile Nav Header can go here if needed */}
+          <MobileNav />
+          <Link href="/" className="flex items-center gap-2 font-semibold">
+            <Logo />
+          </Link>
           <div className="w-full flex-1">
             {/* Search or other header content can go here */}
+          </div>
+          {/* Create button for mobile */}
+          <div className="md:hidden">
+            <CreateMenu />
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -77,6 +74,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
+        <div className="hidden md:flex items-center justify-between border-b bg-background">
+          <SubNav />
+          <div className="px-4 lg:px-6 py-2">
+            <CreateMenu />
+          </div>
+        </div>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
             {children}
         </main>

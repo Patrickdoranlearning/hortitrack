@@ -24,19 +24,10 @@ export const QuantitySnapshotSchema = z.object({
 });
 export type QuantitySnapshot = z.infer<typeof QuantitySnapshotSchema>;
 
-export const PhaseSchema = z.enum(["Propagation", "Plug/Linear", "Potted"]);
+export const PhaseSchema = z.string().min(1);
 export type Phase = z.infer<typeof PhaseSchema>;
 
-export const ProductionStatusSchema = z.enum([
-  "Propagation",
-  "Plugs/Liners",
-  "Potted",
-  "Ready for Sale",
-  "Looking Good",
-  "Archived",
-  "Incoming",
-  "Planned",
-]);
+export const ProductionStatusSchema = z.string().min(1);
 export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
 
 export const BatchSchema = z.object({

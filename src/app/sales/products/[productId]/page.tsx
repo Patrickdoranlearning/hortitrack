@@ -7,8 +7,8 @@ import { fetchProductManagementData, mapProducts } from "../product-data";
 
 type Params = { productId: string };
 
-export default async function ProductEditPage({ params }: { params: Params }) {
-  const { productId } = params;
+export default async function ProductEditPage({ params }: { params: Promise<Params> }) {
+  const { productId } = await params;
   const { orgId, supabase } = await getUserAndOrg();
   const data = await fetchProductManagementData(supabase, orgId);
   const products = mapProducts(data.productRows);
@@ -33,6 +33,10 @@ export default async function ProductEditPage({ params }: { params: Params }) {
       label: `#${row.batch_number} • ${row.plant_varieties?.name ?? "Variety"} • ${row.plant_sizes?.name ?? "Size"}`,
       status: row.status ?? "",
       quantity: row.quantity ?? 0,
+      varietyId: row.plant_variety_id,
+      varietyName: row.plant_varieties?.name ?? null,
+      sizeId: row.size_id,
+      sizeName: row.plant_sizes?.name ?? null,
     })),
     priceLists: data.priceLists.map((row) => ({
       id: row.id,

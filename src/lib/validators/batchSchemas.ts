@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { PRODUCTION_PHASE, PRODUCTION_STATUS } from "@/lib/enums";
 
 const uuid = z.string().uuid("Invalid id");
 
@@ -22,8 +21,8 @@ export const BatchCheckInSchema = z.object({
   size_id: uuid,
   location_id: uuid,
   supplier_id: uuid.optional().nullable(),
-  status: z.enum(PRODUCTION_STATUS),
-  phase: z.enum(PRODUCTION_PHASE),
+  status: z.string().min(1),
+  phase: z.string().min(1),
   check_in_date: z.coerce.date().default(new Date()),
   tray_qty: z.coerce.number().int().min(1),
   total_quantity: z.coerce.number().int().min(1).optional(),

@@ -10,16 +10,34 @@ import { useActiveOrg } from "@/server/org/context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PRODUCTION_PHASE, PRODUCTION_STATUS } from "@/lib/enums";
 import { toast } from "@/components/ui/use-toast";
+import { useAttributeOptions } from "@/hooks/useAttributeOptions";
 
 export function BatchCheckInDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void; }) {
   const orgId = useActiveOrg()!;
+  const { options: statusOptions, loading: statusLoading } = useAttributeOptions("production_status");
+  const { options: phaseOptions, loading: phaseLoading } = useAttributeOptions("production_phase");
   const form = useForm<BatchCheckInInput>({
     resolver: zodResolver(BatchCheckInSchema),
-    defaultValues: { check_in_date: new Date(), phase: "potting", status: "Growing", tray_qty: 1 },
+    defaultValues: { check_in_date: new Date(), phase: "", status: "", tray_qty: 1 },
     mode: "onChange",
   });
+
+  React.useEffect(() => {
+    if (!statusOptions.length) return;
+    const current = form.getValues("status");
+    if (!current) {
+      form.setValue("status", statusOptions[0].systemCode, { shouldValidate: true });
+    }
+  }, [statusOptions, form]);
+
+  React.useEffect(() => {
+    if (!phaseOptions.length) return;
+    const current = form.getValues("phase");
+    if (!current) {
+      form.setValue("phase", phaseOptions[0].systemCode, { shouldValidate: true });
+    }
+  }, [phaseOptions, form]);
 
   const trayQty = form.watch("tray_qty") ?? 0;
   const sizeObj = (form.getValues() as any)?.size;
@@ -64,19 +82,37 @@ export function BatchCheckInDialog({ open, onOpenChange }: { open: boolean; onOp
       </div>
       <div className="col-span-6">
         <Label>Status</Label>
-        <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v as any, { shouldValidate: true })}>
+        <Select
+          value={form.watch("status")}
+          onValueChange={(v) => form.setValue("status", v as any, { shouldValidate: true })}
+          disabled={statusLoading}
+        >
           <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
           <SelectContent>
-            {PRODUCTION_STATUS.filter(s => s !== "Archived").map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {statusOptions
+              .filter((s) => s.systemCode !== "Archived")
+              .map((s) => (
+                <SelectItem key={s.systemCode} value={s.systemCode}>
+                  {s.displayLabel}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
       <div className="col-span-6">
         <Label>Phase</Label>
-        <Select value={form.watch("phase")} onValueChange={(v) => form.setValue("phase", v as any, { shouldValidate: true })}>
+        <Select
+          value={form.watch("phase")}
+          onValueChange={(v) => form.setValue("phase", v as any, { shouldValidate: true })}
+          disabled={phaseLoading}
+        >
           <SelectTrigger><SelectValue placeholder="Select phase" /></SelectTrigger>
           <SelectContent>
-            {PRODUCTION_PHASE.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            {phaseOptions.map((p) => (
+              <SelectItem key={p.systemCode} value={p.systemCode}>
+                {p.displayLabel}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createCheckinBatch } from "@/server/batches/service";
-import { CheckinFormSchema } from "@/lib/types";
+import { CheckinFormSchema } from "@/types/batch";
 import { getUserIdAndOrgId } from "@/server/auth/getUser";
 
 export const runtime = "nodejs";

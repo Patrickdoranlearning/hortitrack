@@ -8,10 +8,11 @@ import { redirect } from 'next/navigation';
 async function getCustomers(orgId: string) {
   const supabase = await getSupabaseServerApp();
 
-  // Fetch all customers - RLS will filter by org
+  // Fetch only this org's customers
   const { data: customers, error } = await supabase
     .from('customers')
-    .select('id, name, org_id, is_active')
+    .select('id, name, org_id')
+    .eq('org_id', orgId)
     .order('name');
 
   if (error) {
@@ -19,10 +20,7 @@ async function getCustomers(orgId: string) {
     return [];
   }
 
-  // Filter in-memory by org and active status
-  const filtered = (customers || []).filter(
-    c => c.org_id === orgId && c.is_active !== false
-  );
+  const filtered = (customers || []).filter(c => c.org_id === orgId);
 
   return filtered.map(c => ({ id: c.id, name: c.name }));
 }

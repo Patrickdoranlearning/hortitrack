@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPropagationBatch } from "@/server/batches/service";
-import { PropagationFormSchema } from "@/lib/types";
+import { PropagationFormSchema } from "@/types/batch";
 import { getUserIdAndOrgId } from "@/server/auth/getUser";
 
 export const runtime = "nodejs";

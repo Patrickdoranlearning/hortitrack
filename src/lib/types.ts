@@ -8,17 +8,8 @@ export interface UserSession {
 }
 
 // --- Enums (matching DB types) ---
-export const ProductionPhase = z.enum(['propagation', 'growing', 'finished']);
-export const ProductionStatus = z.enum([
-  'Propagation',
-  'Plugs/Liners',
-  'Potted',
-  'Ready for Sale',
-  'Looking Good',
-  'Archived',
-  'Incoming',
-  'Planned',
-]);
+export const ProductionPhase = z.string();
+export const ProductionStatus = z.string();
 export const CreditStatus = z.enum(['draft', 'issued', 'paid', 'void']);
 export const DeliveryStatus = z.enum(['unscheduled', 'scheduled', 'departed', 'delivered', 'cancelled']);
 export const InvoiceStatus = z.enum(['draft', 'issued', 'paid', 'void', 'overdue']);

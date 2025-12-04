@@ -90,7 +90,7 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
     .select('id, batch_number, quantity, status, phase, planted_at, plant_variety_id, size_id, location_id')
     .eq('org_id', orgId)
     .in('id', batchIds)
-    .in('status', ['Ready for Sale', 'Looking Good'])
+    .in('status', ['Ready', 'Looking Good'])
     .gt('quantity', 0)
     .order('planted_at', { ascending: true });
 
@@ -173,7 +173,7 @@ export async function getVarietiesWithBatches(orgId: string) {
     .from('batches')
     .select('id, batch_number, quantity, status, phase, planted_at, plant_variety_id, size_id, location_id')
     .eq('org_id', orgId)
-    .in('status', ['Ready for Sale', 'Looking Good'])
+    .in('status', ['Ready', 'Looking Good'])
     .gt('quantity', 0)
     .order('planted_at', { ascending: true });
 

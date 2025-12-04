@@ -29,6 +29,10 @@ export default async function ProductsPage() {
       label: `#${row.batch_number} • ${row.plant_varieties?.name ?? "Variety"} • ${row.plant_sizes?.name ?? "Size"}`,
       status: row.status ?? "",
       quantity: row.quantity ?? 0,
+      varietyId: row.plant_variety_id,
+      varietyName: row.plant_varieties?.name ?? null,
+      sizeId: row.size_id,
+      sizeName: row.plant_sizes?.name ?? null,
     })),
     priceLists: data.priceLists.map((row) => ({
       id: row.id,

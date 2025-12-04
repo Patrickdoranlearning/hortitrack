@@ -1,70 +1,87 @@
 export const runtime = "nodejs";
-import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/server/db/admin";
+
+import { NextResponse } from "next/server";
+import { withApiGuard } from "@/server/http/guard";
+import { getSupabaseAdmin } from "@/server/db/supabase";
 
 function csvEscape(val: unknown): string {
-  // Convert to string, escape quotes, wrap in quotes if needed
-  const s = val === null || val === undefined ? "" : String(val);
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
+  if (val === null || val === undefined) return "";
+  const text = String(val);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const limit = Math.min(Number(searchParams.get("limit") || 5000), 20000);
-    
-    let q = adminDb.collection("varieties").orderBy("name").limit(limit);
+export const GET = withApiGuard({
+  method: "GET",
+  requireRole: "user",
+  async handler({ req }) {
+    try {
+      const { searchParams } = new URL(req.url);
+      const limit = Math.min(
+        Math.max(Number(searchParams.get("limit") ?? 5000), 1),
+        20000
+      );
 
-    const snap = await q.get();
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("plant_varieties")
+        .select("*")
+        .order("name", { ascending: true })
+        .limit(limit);
 
-    const header = [
-      "id",
-      "name",
-      "family",
-      "category",
-      "commonName",
-      "rating",
-      "salesPeriod",
-      "floweringPeriod",
-      "flowerColour",
-      "evergreen",
-      "updatedAt",
-      "createdAt",
-    ];
+      if (error) throw error;
 
-    const rows: string[] = [header.join(",")];
+      const header = [
+        "id",
+        "name",
+        "family",
+        "category",
+        "commonName",
+        "rating",
+        "floweringPeriod",
+        "flowerColour",
+        "evergreen",
+        "updatedAt",
+        "createdAt",
+      ];
 
-    for (const d of snap.docs) {
-      const v = d.data() as any;
-      rows.push([
-        csvEscape(d.id),
-        csvEscape(v.name ?? ""),
-        csvEscape(v.family ?? ""),
-        csvEscape(v.category ?? ""),
-        csvEscape(v.commonName ?? ""),
-        csvEscape(v.rating ?? ""),
-        csvEscape(v.salesPeriod ?? ""),
-        csvEscape(v.floweringPeriod ?? ""),
-        csvEscape(v.flowerColour ?? ""),
-        csvEscape(v.evergreen ?? ""),
-        csvEscape(v.updatedAt?.toDate ? v.updatedAt.toDate().toISOString() : v.updatedAt ?? ""),
-        csvEscape(v.createdAt?.toDate ? v.createdAt.toDate().toISOString() : v.createdAt ?? ""),
-      ].join(","));
+      const rows = (data ?? []).map((v) =>
+        [
+          csvEscape(v.id),
+          csvEscape(v.name),
+          csvEscape(v.family),
+          csvEscape(v.category),
+          csvEscape(v.common_name),
+          csvEscape(v.rating),
+          csvEscape(v.flowering_period),
+          csvEscape(v.flower_colour),
+          csvEscape(
+            typeof v.evergreen === "boolean" ? (v.evergreen ? "true" : "false") : ""
+          ),
+          csvEscape(v.updated_at),
+          csvEscape(v.created_at),
+        ].join(",")
+      );
+
+      const csv = [header.join(","), ...rows].join("\n");
+      const filename = `plant_varieties_${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[varieties/export] error", message);
+      return NextResponse.json(
+        { error: "Failed to export plant varieties", details: message },
+        { status: 500 }
+      );
     }
-
-    const csv = rows.join("\n");
-    const filename = `plant_varieties_${new Date().toISOString().slice(0,10)}.csv`;
-    return new NextResponse(csv, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "Cache-Control": "no-store",
-      },
-    });
-  } catch (e) {
-    console.error("[varieties/export] error", e);
-    return NextResponse.json({ error: "Failed to export plant varieties" }, { status: 500 });
-  }
-}
+  },
+});

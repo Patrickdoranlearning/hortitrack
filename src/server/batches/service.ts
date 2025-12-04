@@ -1,5 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { getUserAndOrg } from "@/server/auth/org";
+import { normalizeSystemCode } from "@/lib/attributeOptions";
 
 export type BatchNode = {
   id: string;
@@ -85,5 +87,90 @@ export async function getBatchPhotos(id: string, limit = 60) {
     .limit(limit);
 
   if (error) return [];
+  return data;
+}
+
+// -----------------------------------------------------------------------------
+// Temporary implementations to satisfy imports; replace with full logic as needed.
+// -----------------------------------------------------------------------------
+
+export type PropagationInput = any;
+export async function createPropagationBatch(params: { input: PropagationInput; userId: string }) {
+  const { supabase, orgId } = await getUserAndOrg();
+  const input = params.input as any;
+  const { data, error } = await supabase
+    .from("batches")
+    .insert({
+      org_id: orgId,
+      batch_number: input?.batchNumber ?? `PR-${Date.now()}`,
+      plant_variety_id: input?.varietyId ?? input?.plant_variety_id,
+      size_id: input?.sizeId ?? input?.size_id,
+      location_id: input?.locationId ?? input?.location_id,
+      phase: normalizeSystemCode(input?.phase ?? "propagation").toLowerCase(),
+      status: input?.status ?? "Growing",
+      quantity: input?.quantity ?? input?.units ?? 0,
+      initial_quantity: input?.quantity ?? input?.units ?? 0,
+      planted_at: input?.plantingDate ?? input?.planted_at ?? null,
+      supplier_id: input?.supplierId ?? input?.supplier_id ?? null,
+      supplier_batch_number: input?.supplierBatchNumber ?? "",
+      notes: input?.notes ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export type CheckinInput = any;
+export async function createCheckinBatch(params: { input: CheckinInput; userId: string }) {
+  const { supabase, orgId } = await getUserAndOrg();
+  const input = params.input as any;
+  const { data, error } = await supabase
+    .from("batches")
+    .insert({
+      org_id: orgId,
+      batch_number: input?.batchNumber ?? `IN-${Date.now()}`,
+      plant_variety_id: input?.varietyId ?? input?.plant_variety_id,
+      size_id: input?.sizeId ?? input?.size_id,
+      location_id: input?.locationId ?? input?.location_id,
+      phase: normalizeSystemCode(input?.phase ?? "propagation").toLowerCase(),
+      status: input?.status ?? "Incoming",
+      quantity: input?.totalUnits ?? input?.quantity ?? 0,
+      initial_quantity: input?.totalUnits ?? input?.quantity ?? 0,
+      incoming_date: input?.incomingDate ?? null,
+      supplier_id: input?.supplierId ?? input?.supplier_id ?? null,
+      supplier_batch_number: input?.supplierBatchNumber ?? input?.passportC ?? "",
+      notes: input?.note ?? input?.notes ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export type TransplantInput = {
+  plantingDate: string;
+  quantity: number;
+  sizeId: string;
+  locationId?: string | null;
+  locationName?: string | null;
+  logRemainingAsLoss?: boolean;
+  notes?: string | null;
+};
+
+export async function transplantBatch(batchId: string, input: TransplantInput, userId: string) {
+  const { supabase, orgId } = await getUserAndOrg();
+  const { data, error } = await supabase.rpc("perform_transplant", {
+    p_org_id: orgId,
+    p_parent_batch_id: batchId,
+    p_size_id: input.sizeId,
+    p_location_id: input.locationId ?? null,
+    p_containers: input.quantity,
+    p_user_id: userId,
+    p_planted_at: input.plantingDate ?? null,
+    p_notes: input.notes ?? null,
+    p_archive_parent_if_empty: input.logRemainingAsLoss ?? false,
+  });
+  if (error) throw error;
   return data;
 }

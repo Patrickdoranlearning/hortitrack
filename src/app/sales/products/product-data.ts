@@ -82,8 +82,8 @@ export type ProductManagementData = {
     status: string | null;
     plant_variety_id: string | null;
     size_id: string | null;
-    plant_varieties?: { name: string | null } | null;
-    plant_sizes?: { name: string | null } | null;
+    plant_varieties?: { id: string; name: string | null; family?: string | null } | null;
+    plant_sizes?: { id: string; name: string | null } | null;
   }>;
   priceLists: Array<{ id: string; name: string; currency: string; is_default: boolean | null }>;
   customers: Array<{ id: string; name: string; default_price_list_id: string | null }>;
@@ -196,15 +196,70 @@ export async function fetchProductManagementData(
         quantity,
         status,
         plant_variety_id,
-        size_id,
-        plant_varieties ( name ),
-        plant_sizes ( name )
+        size_id
       `
       )
       .eq("org_id", orgId)
-      .in("status", ["Ready for Sale", "Looking Good", "Finished"])
+      .in("status", ["Ready for Sale", "Looking Good"])
+      .gt("quantity", 0)
       .order("batch_number", { ascending: true })
-      .then((res) => res.data ?? []),
+      .then(async (res) => {
+        if (res.error) {
+          console.error("[fetchProductManagementData] batches query failed", {
+            message: res.error.message,
+            details: res.error.details,
+            hint: res.error.hint,
+            code: res.error.code,
+          });
+          return [];
+        }
+        const rows = res.data ?? [];
+        if (rows.length === 0) return [];
+
+        const varietyIds = Array.from(
+          new Set(rows.map((row) => row.plant_variety_id).filter(Boolean))
+        ) as string[];
+        const sizeIds = Array.from(
+          new Set(rows.map((row) => row.size_id).filter(Boolean))
+        ) as string[];
+
+        const [varietiesRes, sizesRes] = await Promise.all([
+          varietyIds.length
+            ? supabase
+                .from("plant_varieties")
+                .select("id, name")
+                .eq("org_id", orgId)
+                .in("id", varietyIds)
+            : { data: [], error: null },
+          sizeIds.length
+            ? supabase.from("plant_sizes").select("id, name").eq("org_id", orgId).in("id", sizeIds)
+            : { data: [], error: null },
+        ]);
+
+        if (varietiesRes.error) {
+          console.warn(
+            "[fetchProductManagementData] plant_varieties lookup failed",
+            varietiesRes.error
+          );
+        }
+        if (sizesRes.error) {
+          console.warn(
+            "[fetchProductManagementData] plant_sizes lookup failed",
+            sizesRes.error
+          );
+        }
+
+        const varietyMap = new Map(
+          (varietiesRes.data ?? []).map((row) => [row.id, row.name ?? null])
+        );
+        const sizeMap = new Map((sizesRes.data ?? []).map((row) => [row.id, row.name ?? null]));
+
+        return rows.map((row) => ({
+          ...row,
+          plant_varieties: { name: varietyMap.get(row.plant_variety_id ?? "") ?? null },
+          plant_sizes: { name: sizeMap.get(row.size_id ?? "") ?? null },
+        }));
+      }),
     supabase.from("price_lists").select("*").eq("org_id", orgId).order("name", { ascending: true }).then((res) => res.data ?? []),
     supabase
       .from("customers")
