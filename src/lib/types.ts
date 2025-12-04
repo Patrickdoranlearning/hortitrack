@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export interface UserSession {
+  uid: string;
+  email?: string;
+  role?: string | null;
+  orgId?: string | null;
+}
+
 // --- Enums (matching DB types) ---
 export const ProductionPhase = z.enum(['propagation', 'growing', 'finished']);
 export const ProductionStatus = z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']);

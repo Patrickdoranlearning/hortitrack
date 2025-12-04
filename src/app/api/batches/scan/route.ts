@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const key = requestKey(req as any, user.id); // user.id for Supabase User
+    const key = requestKey(req as any, user.uid);
     const rl = await checkRateLimit({ key: `scan:${key}`, windowMs: 60_000, max: 30 });
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests", resetMs: rl.resetMs }, { status: 429 });

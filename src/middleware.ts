@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isAllowedOrigin } from "@/lib/security/origin";
+import { jsonError } from "@/server/http/responses";
 
 // Matcher for paths to apply middleware to
 export const config = {
@@ -28,7 +29,7 @@ export async function middleware(req: NextRequest) {
         method: req.method,
       };
       console.warn("[middleware] blocked Bad Origin", details);
-      return NextResponse.json({ ok: false, error: "Bad Origin" }, { status: 403 });
+      return jsonError("Bad Origin", { status: 403, details });
     }
   }
 

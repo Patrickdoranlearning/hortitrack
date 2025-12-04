@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/server/db/supabase";
 
 export interface Result {
   allowed: boolean;
@@ -11,7 +11,7 @@ export async function checkRateLimit(opts: { key: string; windowMs: number; max:
   const now = Date.now();
   const resetAt = now + windowMs;
 
-  const supabase = await createClient();
+  const supabase = getSupabaseAdmin();
 
   // 1. Clean up expired (optional, or run periodically)
   // await supabase.from('rate_limits').delete().lt('expire_at', now);
@@ -21,7 +21,7 @@ export async function checkRateLimit(opts: { key: string; windowMs: number; max:
     .from('rate_limits')
     .select('*')
     .eq('key', key)
-    .single();
+    .maybeSingle();
 
   let points = current?.points || 0;
   let expireAt = current?.expire_at || resetAt;
