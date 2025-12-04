@@ -6,7 +6,6 @@
  */
 
 import { z } from "zod";
-import { PRODUCTION_STATUS } from "@/lib/enums";
 
 // ============================================================================
 // Shared Primitives
@@ -15,10 +14,10 @@ import { PRODUCTION_STATUS } from "@/lib/enums";
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format");
 const CountryCode = z.string().regex(/^[A-Z]{2}$/, "Use ISO 3166-1 alpha-2, e.g. IE, NL");
 
-export const PhaseSchema = z.enum(["propagation", "plug", "potted", "plug_linear"]);
+export const PhaseSchema = z.string().min(1, "Phase is required");
 export type Phase = z.infer<typeof PhaseSchema>;
 
-export const ProductionStatusSchema = z.enum(PRODUCTION_STATUS);
+export const ProductionStatusSchema = z.string().min(1, "Status is required");
 export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
 
 // ============================================================================

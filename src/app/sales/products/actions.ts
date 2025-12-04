@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { getUserAndOrg } from '@/server/auth/org';
 import { getSupabaseServerClient } from '@/server/db/supabase';
 
+const SALEABLE_BATCH_STATUSES = ['Ready for Sale', 'Looking Good'] as const;
+
 const productDetailsSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'Name is required'),
@@ -141,6 +143,99 @@ export async function removeProductBatchAction(productBatchId: string) {
   }
   revalidatePath('/sales/products');
   return { success: true };
+}
+
+export async function autoLinkProductBatchesAction(productId: string) {
+  if (!productId) {
+    return { success: false, error: 'Product is required.' };
+  }
+
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerClient();
+
+  const { data: product, error: productError } = await supabase
+    .from('products')
+    .select(
+      `
+      id,
+      sku_id,
+      skus (
+        id,
+        display_name,
+        plant_variety_id,
+        size_id
+      )
+    `
+    )
+    .eq('id', productId)
+    .eq('org_id', orgId)
+    .maybeSingle();
+
+  if (productError || !product) {
+    console.error('[autoLinkProductBatchesAction] product lookup failed', productError);
+    return { success: false, error: 'Unable to load product details.' };
+  }
+
+  const varietyId = product.skus?.plant_variety_id;
+  const sizeId = product.skus?.size_id;
+  if (!varietyId || !sizeId) {
+    return {
+      success: false,
+      error: 'The product SKU is missing a variety or size, so matching batches cannot be found.',
+    };
+  }
+
+  const { data: existingLinks, error: existingError } = await supabase
+    .from('product_batches')
+    .select('batch_id')
+    .eq('product_id', productId);
+
+  if (existingError) {
+    console.error('[autoLinkProductBatchesAction] existing links lookup failed', existingError);
+    return { success: false, error: 'Unable to inspect current batch links.' };
+  }
+
+  const existingIds = new Set(existingLinks?.map((entry) => entry.batch_id));
+
+  const { data: candidates, error: candidateError } = await supabase
+    .from('batches')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('plant_variety_id', varietyId)
+    .eq('size_id', sizeId)
+    .in('status', SALEABLE_BATCH_STATUSES)
+    .gt('quantity', 0);
+
+  if (candidateError) {
+    console.error('[autoLinkProductBatchesAction] batch lookup failed', candidateError);
+    return { success: false, error: 'Unable to load matching batches.' };
+  }
+
+  const batchIdsToLink =
+    candidates?.map((row) => row.id).filter((id) => id && !existingIds.has(id)) ?? [];
+
+  if (batchIdsToLink.length === 0) {
+    return {
+      success: true,
+      linked: 0,
+      message: 'No additional batches matched this product.',
+    };
+  }
+
+  const insertPayload = batchIdsToLink.map((batchId) => ({
+    org_id: orgId,
+    product_id: productId,
+    batch_id: batchId,
+  }));
+
+  const { error: insertError } = await supabase.from('product_batches').insert(insertPayload);
+  if (insertError) {
+    console.error('[autoLinkProductBatchesAction] insert failed', insertError);
+    return { success: false, error: insertError.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true, linked: batchIdsToLink.length };
 }
 
 export async function upsertProductPriceAction(input: z.infer<typeof productPriceSchema>) {

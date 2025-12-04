@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminDb } from "@/server/db/admin";
+import { getSupabaseAdmin } from "@/server/db/supabase";
 import { isValidDocId } from "@/server/utils/ids";
 
 export type HistoryLog = {
@@ -17,19 +17,22 @@ export type HistoryLog = {
 };
 
 type AnyDate = Date | string | number | null | undefined;
-const toDate = (v: AnyDate) => {
-  if (!v) return null;
-  // Handle Firestore Timestamps
-  if (typeof v === "object" && (v as any).toDate) {
-    return (v as any).toDate() as Date;
+
+const toDate = (value: AnyDate) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? date : null;
   }
-  const d = new Date(v as any);
-  return isFinite(d.getTime()) ? d : null;
+  return null;
 };
+
 const daysBetween = (a?: AnyDate, b?: AnyDate) => {
-  const d1 = toDate(a), d2 = toDate(b);
-  if (!d1 || !d2) return null;
-  return Math.max(0, Math.round((+d2 - +d1) / 86400000));
+  const start = toDate(a);
+  const end = toDate(b);
+  if (!start || !end) return null;
+  return Math.max(0, Math.round((+end - +start) / 86_400_000));
 };
 
 export type HistoryNode = {
@@ -42,7 +45,7 @@ export type HistoryNode = {
   start?: string | null;
   end?: string | null;
   durationDays?: number | null;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 };
 
 export type HistoryEdge = {
@@ -54,100 +57,199 @@ export type HistoryEdge = {
 };
 
 export type BatchHistory = {
-  batch: { id: string; batchNumber?: string | number | null; plantName?: string | null; variety?: string | null; quantity?: number | null; createdAt?: string | null; };
+  batch: {
+    id: string;
+    batchNumber?: string | number | null;
+    plantName?: string | null;
+    variety?: string | null;
+    quantity?: number | null;
+    createdAt?: string | null;
+  };
   graph: { nodes: HistoryNode[]; edges: HistoryEdge[] };
   logs: HistoryLog[];
 };
 
+type BatchRow = {
+  id: string;
+  batch_number: string | null;
+  plant_varieties?: { name: string | null };
+  quantity: number | null;
+  created_at: string | null;
+  parent_batch_id: string | null;
+};
 
-async function readBatch(id: string) {
-  const snap = await adminDb.collection("batches").doc(id).get();
-  if (!snap.exists) return null;
-  const d = snap.data() || {};
-  return {
-    id: snap.id,
-    batchNumber: d.batchNumber ?? null,
-    plantName: d.plantName ?? null,
-    variety: d.plantVariety ?? d.variety ?? null,
-    quantity: d.quantity ?? d.plants ?? null,
-    createdAt: toDate(d.createdAt)?.toISOString() ?? null,
-    parentBatchId: d.transplantedFrom ?? null, // Use transplantedFrom for lineage
-    composition: Array.isArray(d.composition) ? d.composition : [],
-  };
+async function readBatch(id: string): Promise<BatchRow | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("batches")
+    .select("id, batch_number, quantity, created_at, parent_batch_id, plant_varieties(name)")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as BatchRow) ?? null;
 }
 
-
-async function readChildren(batchNumber: string) {
-  if (!batchNumber) return [];
-  const q = adminDb.collection("batches").where("transplantedFrom", "==", batchNumber);
-  const qs = await q.limit(20).get().catch(() => ({ empty: true, docs: [] } as any));
-  return qs.docs.map((doc: any) => ({ id: doc.id, ...(doc.data() || {}) }));
+async function readChildren(id: string) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("batches")
+    .select("id, batch_number")
+    .eq("parent_batch_id", id)
+    .limit(20);
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
-async function readLogs(id: string) {
-  const logHistory = (await adminDb.collection("batches").doc(id).get()).data()?.logHistory || [];
-  return logHistory.map((l: any, i: number) => ({ id: l.id || `log-${i}`, ...l }));
+async function readEvents(batchId: string) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("batch_events")
+    .select("id, type, at, by_user_id, payload")
+    .eq("batch_id", batchId)
+    .order("at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
+function parsePayload(raw: unknown): Record<string, unknown> | null {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw as Record<string, unknown>;
+  try {
+    return JSON.parse(String(raw)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
 
 export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
   if (!isValidDocId(rootId)) {
     throw new Error("Invalid batch ID provided.");
   }
-  const b = await readBatch(rootId);
-  if (!b) throw new Error("Batch not found");
+
+  const batch = await readBatch(rootId);
+  if (!batch) throw new Error("Batch not found");
 
   const nodes: HistoryNode[] = [];
   const edges: HistoryEdge[] = [];
+  nodes.push({
+    id: `batch:${batch.id}`,
+    kind: "batch",
+    batchId: batch.id,
+    label: `Batch ${batch.batch_number ?? batch.id}`,
+    meta: { variety: batch.plant_varieties?.name ?? null },
+  });
 
-  nodes.push({ id: `batch:${b.id}`, kind: "batch", batchId: b.id, label: `Batch ${b.batchNumber ?? b.id}`, meta: { variety: b.variety } });
-
-  if (b.parentBatchId) {
-    const parentSnap = await adminDb.collection('batches').where('batchNumber', '==', b.parentBatchId).limit(1).get();
-    if (!parentSnap.empty) {
-      const parent = await readBatch(parentSnap.docs[0].id);
-      if (parent) {
-        const pNodeId = `batch:${parent.id}`;
-        nodes.push({ id: pNodeId, kind: "batch", batchId: parent.id, label: `Batch ${parent.batchNumber ?? parent.id}`, meta: { variety: parent.variety } });
-        edges.push({ id: `e:${pNodeId}->batch:${b.id}`, from: pNodeId, to: `batch:${b.id}`, kind: "flow", label: "transplant" });
-      }
+  if (batch.parent_batch_id) {
+    const parent = await readBatch(batch.parent_batch_id);
+    if (parent) {
+      const parentId = `batch:${parent.id}`;
+      nodes.push({
+        id: parentId,
+        kind: "batch",
+        batchId: parent.id,
+        label: `Batch ${parent.batch_number ?? parent.id}`,
+        meta: { variety: parent.plant_varieties?.name ?? null },
+      });
+      edges.push({
+        id: `e:${parentId}->batch:${batch.id}`,
+        from: parentId,
+        to: `batch:${batch.id}`,
+        kind: "flow",
+        label: "transplant",
+      });
     }
   }
 
-  const kids = await readChildren(b.batchNumber!);
-  if (kids.length > 0) {
-    const splitId = `split:${b.id}`;
-    nodes.push({ id: splitId, kind: "split", batchId: b.id, label: `Split (${kids.length})` });
-    edges.push({ id: `e:batch:${b.id}->${splitId}`, from: `batch:${b.id}`, to: splitId, kind: "split", label: "split" });
-    for (const c of kids) {
-      const cNodeId = `batch:${c.id}`;
-      nodes.push({ id: cNodeId, kind: "batch", batchId: c.id, label: `Batch ${c.batchNumber ?? c.id}` });
-      edges.push({ id: `e:${splitId}->${cNodeId}`, from: splitId, to: cNodeId, kind: "split", label: "→" });
+  const children = await readChildren(batch.id);
+  if (children.length) {
+    const splitId = `split:${batch.id}`;
+    nodes.push({
+      id: splitId,
+      kind: "split",
+      batchId: batch.id,
+      label: `Split (${children.length})`,
+    });
+    edges.push({
+      id: `e:batch:${batch.id}->${splitId}`,
+      from: `batch:${batch.id}`,
+      to: splitId,
+      kind: "split",
+      label: "split",
+    });
+    for (const child of children) {
+      const childId = `batch:${child.id}`;
+      nodes.push({
+        id: childId,
+        kind: "batch",
+        batchId: child.id,
+        label: `Batch ${child.batch_number ?? child.id}`,
+      });
+      edges.push({
+        id: `e:${splitId}->${childId}`,
+        from: splitId,
+        to: childId,
+        kind: "split",
+        label: "→",
+      });
     }
   }
 
-  const rawLogs = await readLogs(b.id);
+  const events = await readEvents(batch.id);
+  const logs: HistoryLog[] = events.map((evt) => {
+    const payload = parsePayload(evt.payload);
+    const photos = getArray(payload, "photos");
+    return {
+      id: evt.id,
+      batchId: batch.id,
+      at: toDate(evt.at)?.toISOString() ?? new Date().toISOString(),
+      type: (evt.type ?? "event").toLowerCase(),
+      title:
+        getString(payload, "notes") ??
+        getString(payload, "reason") ??
+        getString(payload, "stage") ??
+        evt.type ??
+        "event",
+      details:
+        getString(payload, "details") ??
+        getString(payload, "notes") ??
+        getString(payload, "reason") ??
+        null,
+      userId: evt.by_user_id ?? null,
+      userName: getString(payload, "by_user"),
+      media: photos
+        .map((photo) => normalizePhoto(photo))
+        .filter((photo): photo is { url: string; caption?: string } => !!photo?.url)
+        .map((photo) => ({
+          url: photo.url,
+          name: photo.caption ?? null,
+        })),
+    };
+  });
 
-  const STAGE_ACTIONS = new Set(["cuttings", "potting", "graded", "spaced", "ready", "rooted", "create"]);
-  const MOVE_ACTIONS = new Set(["move", "relocate"]);
+  const STAGE_ACTIONS = new Set([
+    "cuttings",
+    "potting",
+    "graded",
+    "spaced",
+    "ready",
+    "rooted",
+    "create",
+    "checkin",
+  ]);
+
   type StageSpan = { name: string; start?: AnyDate; end?: AnyDate };
   const stages: StageSpan[] = [];
   let currentStage: StageSpan | null = null;
 
-  for (const l of rawLogs) {
-    const at = toDate(l.at || l.date) ?? new Date();
-    const action = (l.type || l.action || "action").toString().toLowerCase();
-
-    if (STAGE_ACTIONS.has(action)) {
+  for (const log of logs) {
+    const at = toDate(log.at) ?? new Date();
+    if (STAGE_ACTIONS.has(log.type)) {
       if (currentStage) {
-        currentStage.end = currentStage.end || at || currentStage.start;
+        currentStage.end = currentStage.end || at;
         stages.push(currentStage);
       }
-      currentStage = { name: l.note || l.type || action, start: at };
-    }
-
-    if (l.newLocation && MOVE_ACTIONS.has(action)) {
-      // This logic is simplified; a full location history would need its own spans
+      currentStage = { name: log.title, start: at };
     }
   }
   if (currentStage) {
@@ -155,35 +257,85 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
     stages.push(currentStage);
   }
 
-  let prevStageNodeId: string | null = `batch:${b.id}`;
-  stages.forEach((s, i) => {
-    const id = `stage:${b.id}:${i}`;
-    const start = toDate(s.start)?.toISOString() ?? null;
-    const end = toDate(s.end)?.toISOString() ?? null;
-    const dur = daysBetween(s.start, s.end);
-    nodes.push({ id, kind: "stage", batchId: b.id, stageName: s.name, label: s.name, start, end, durationDays: dur });
+  let prevStageNodeId: string | null = `batch:${batch.id}`;
+  stages.forEach((stage, idx) => {
+    const nodeId = `stage:${batch.id}:${idx}`;
+    const start = toDate(stage.start)?.toISOString() ?? null;
+    const end = toDate(stage.end)?.toISOString() ?? null;
+    const duration = daysBetween(stage.start, stage.end);
+    nodes.push({
+      id: nodeId,
+      kind: "stage",
+      batchId: batch.id,
+      stageName: stage.name,
+      label: stage.name,
+      start,
+      end,
+      durationDays: duration,
+    });
     if (prevStageNodeId) {
-      edges.push({ id: `e:${prevStageNodeId}->${id}`, from: prevStageNodeId, to: id, kind: "flow", label: dur != null ? `${dur}d` : "" });
+      edges.push({
+        id: `e:${prevStageNodeId}->${nodeId}`,
+        from: prevStageNodeId,
+        to: nodeId,
+        kind: "flow",
+        label: duration != null ? `${duration}d` : "",
+      });
     }
-    prevStageNodeId = id;
+    prevStageNodeId = nodeId;
   });
 
-  const logs: HistoryLog[] = rawLogs.map((l: any) => ({
-    id: l.id,
-    batchId: b.id,
-    at: toDate(l.at || l.date)?.toISOString() ?? new Date().toISOString(),
-    type: (l.type || l.action || "action").toString().toLowerCase(),
-    title: l.note || l.type || l.action || "Action Log",
-    details: l.details || null,
-    userId: l.userId || l.uid || null,
-    userName: l.userName || l.user || null,
-    media: l.photoUrl ? [{ url: l.photoUrl, name: 'photo' }] : [],
-  }));
   logs.sort((a, b) => +new Date(a.at) - +new Date(b.at));
 
   return {
-    batch: { id: b.id, batchNumber: b.batchNumber, plantName: b.plantName, variety: b.variety, quantity: b.quantity, createdAt: b.createdAt },
+    batch: {
+      id: batch.id,
+      batchNumber: batch.batch_number,
+      plantName: batch.plant_varieties?.name ?? null,
+      variety: batch.plant_varieties?.name ?? null,
+      quantity: batch.quantity,
+      createdAt: batch.created_at,
+    },
     graph: { nodes, edges },
     logs,
   };
+}
+
+function getString(
+  payload: Record<string, unknown> | null,
+  key: string
+): string | null {
+  const value = payload?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+function getArray(
+  payload: Record<string, unknown> | null,
+  key: string
+): unknown[] {
+  const value = payload?.[key];
+  return Array.isArray(value) ? value : [];
+}
+
+type PhotoCandidate =
+  | string
+  | { url?: unknown; caption?: unknown }
+  | null
+  | undefined;
+
+function normalizePhoto(candidate: PhotoCandidate) {
+  if (typeof candidate === "string" && candidate.length) {
+    return { url: candidate, caption: undefined };
+  }
+  if (
+    candidate &&
+    typeof candidate === "object" &&
+    typeof (candidate as { url?: unknown }).url === "string"
+  ) {
+    const url = (candidate as { url: string }).url;
+    const captionValue = (candidate as { caption?: unknown }).caption;
+    const caption = typeof captionValue === "string" ? captionValue : undefined;
+    return { url, caption };
+  }
+  return null;
 }

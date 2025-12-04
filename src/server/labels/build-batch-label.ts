@@ -19,7 +19,7 @@ type LabelTemplate = {
   margin_mm: number;
   dpi: number;
   zpl_template?: string;
-  layout?: Record<string, any>;
+  layout?: Record<string, unknown>;
 };
 
 export function buildZpl(input: LabelInput, copies: number = 1): string {
@@ -111,20 +111,19 @@ export function buildZplWithTemplate(
   
   // If custom ZPL template exists, use it
   if (template.zpl_template) {
-    let zpl = template.zpl_template
-      .replace(/\{\{batchNumber\}\}/g, escapeZpl(String(batchNumber)))
-      .replace(/\{\{variety\}\}/g, escapeZpl(variety))
-      .replace(/\{\{family\}\}/g, escapeZpl(family))
-      .replace(/\{\{quantity\}\}/g, String(quantity))
-      .replace(/\{\{size\}\}/g, escapeZpl(size))
-      .replace(/\{\{location\}\}/g, escapeZpl(location || ""))
-      .replace(/\{\{payload\}\}/g, escapeZpl(dmPayload));
-    
-    // Add print quantity if multiple copies
+    const rendered = renderTemplate(template.zpl_template, {
+      batchNumber: escapeZpl(String(batchNumber)),
+      variety: escapeZpl(variety),
+      family: escapeZpl(family),
+      quantity: String(quantity),
+      size: escapeZpl(size),
+      location: escapeZpl(location ?? ""),
+      payload: escapeZpl(dmPayload),
+    });
     if (copies > 1) {
-      zpl = zpl.replace("^XA", `^XA\n^PQ${copies},0,1,Y`);
+      return injectPrintQuantity(rendered, copies);
     }
-    return zpl;
+    return rendered;
   }
 
   // Dynamic template based on dimensions
@@ -174,4 +173,31 @@ export function buildZplWithTemplate(
 
 function escapeZpl(s: string) {
   return s.replace(/[\^\\~]/g, (m) => "\\" + m);
+}
+
+const TOKEN_REGEX = /\{\{([a-zA-Z0-9_]+)\}\}/g;
+const ALLOWED_TOKENS = new Set([
+  "batchNumber",
+  "variety",
+  "family",
+  "quantity",
+  "size",
+  "location",
+  "payload",
+]);
+
+function renderTemplate(template: string, values: Record<string, string>) {
+  return template.replace(TOKEN_REGEX, (_match, token) => {
+    if (!ALLOWED_TOKENS.has(token)) {
+      return _match;
+    }
+    return values[token] ?? "";
+  });
+}
+
+function injectPrintQuantity(zpl: string, copies: number) {
+  if (/^(\^XA)/m.test(zpl)) {
+    return zpl.replace(/^(\^XA)/m, `$1\n^PQ${copies},0,1,Y`);
+  }
+  return `^XA\n^PQ${copies},0,1,Y\n${zpl}`;
 }

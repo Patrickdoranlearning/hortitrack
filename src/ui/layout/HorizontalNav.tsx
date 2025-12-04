@@ -2,10 +2,9 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { type NavItem } from "@/config/nav"
-import { ChevronDown } from "lucide-react"
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -22,24 +21,33 @@ type HorizontalNavProps = {
 
 export function HorizontalNav({ items, currentModuleKey }: HorizontalNavProps) {
   const pathname = usePathname()
+  const router = useRouter()
 
   return (
     <NavigationMenu className="hidden md:flex">
       <NavigationMenuList>
         {items.map((item) => {
-          const isActive = item.key === currentModuleKey || pathname === item.href
+          const isActive = item.key === currentModuleKey || pathname.startsWith(item.href)
           const Icon = item.icon
+          const navContentId = `nav-content-${item.key}`
 
           return (
             <NavigationMenuItem key={item.key}>
               {item.items && item.items.length > 0 ? (
                 <>
                   <NavigationMenuTrigger
+                    aria-expanded={isActive}
+                    aria-controls={navContentId}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      router.push(item.href)
+                    }}
                     className={cn(
+                      "group inline-flex w-max items-center justify-center rounded-md focus:outline-none disabled:pointer-events-none disabled:opacity-50",
                       "h-10 px-4 py-2 text-sm font-medium transition-colors",
                       "hover:bg-accent hover:text-accent-foreground",
                       "focus:bg-accent focus:text-accent-foreground",
-                      isActive && "bg-accent/50 text-accent-foreground"
+                      isActive && "bg-[#4CAF50] text-white"
                     )}
                   >
                     <div className="flex items-center gap-2">
@@ -47,27 +55,23 @@ export function HorizontalNav({ items, currentModuleKey }: HorizontalNavProps) {
                       <span>{item.label}</span>
                     </div>
                   </NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+                  <NavigationMenuContent
+                    id={navContentId}
+                    className="min-w-[220px]"
+                  >
+                    <ul className="flex flex-col py-1">
                       {item.items.map((subItem) => (
                         <li key={subItem.href}>
                           <NavigationMenuLink asChild>
                             <Link
                               href={subItem.href}
                               className={cn(
-                                "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors",
-                                "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                                pathname === subItem.href && "bg-accent/50"
+                                "flex w-full items-center gap-2 px-4 py-2 text-sm font-medium text-foreground transition-colors",
+                                "hover:bg-muted focus:bg-muted focus:outline-none",
+                                pathname === subItem.href && "bg-muted text-foreground"
                               )}
                             >
-                              <div className="text-sm font-medium leading-none">
-                                {subItem.label}
-                              </div>
-                              {subItem.description && (
-                                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                                  {subItem.description}
-                                </p>
-                              )}
+                              <span>{subItem.label}</span>
                             </Link>
                           </NavigationMenuLink>
                         </li>
@@ -83,7 +87,7 @@ export function HorizontalNav({ items, currentModuleKey }: HorizontalNavProps) {
                       "hover:bg-accent hover:text-accent-foreground",
                       "focus:bg-accent focus:text-accent-foreground focus:outline-none",
                       "disabled:pointer-events-none disabled:opacity-50",
-                      isActive && "bg-accent/50 text-accent-foreground"
+                      isActive && "bg-[#4CAF50] text-white"
                     )}
                   >
                     <div className="flex items-center gap-2">

@@ -26,6 +26,7 @@ export const APP_NAV: NavItem[] = [
       { label: "Locations", href: "/production/locations", description: "View what's growing in each location." },
       { label: "Planning", href: "/production/planning", description: "Plan future production cycles." },
       { label: "Recipes", href: "/production/recipes", description: "Production recipes and timelines." },
+      { label: "Saleable", href: "/production/saleable", description: "Release-ready batches and quick approvals." },
     ]
   },
   {

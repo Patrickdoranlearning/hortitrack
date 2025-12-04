@@ -339,26 +339,24 @@ export interface Database {
       v_batch_search: {
         Row: {
           id: string;
-          org_id: string;
-          batch_number: string;
+          org_id: string | null;
+          batch_number: string | null;
           status: string | null;
           phase: string | null;
           quantity: number | null;
           initial_quantity: number | null;
           ready_at: string | null;
+          updated_at: string | null;
           created_at: string | null;
-          planted_at: string | null;
-          variety_name: string | null;
-          variety_family: string | null;
-          variety_category: string | null;
-          size_name: string | null;
-          container_type: string | null;
+          location_id: string | null;
           location_name: string | null;
+          size_id: string | null;
+          size_name: string | null;
+          supplier_id: string | null;
           supplier_name: string | null;
           plant_variety_id: string | null;
-          size_id: string | null;
-          location_id: string | null;
-          supplier_id: string | null;
+          variety_name: string | null;
+          family: string | null;
         };
       };
       v_sku_available: {

@@ -10,7 +10,6 @@ async function getCustomers(orgId: string) {
     .from('customers')
     .select('id, name')
     .eq('org_id', orgId)
-    .eq('is_active', true)
     .order('name');
 
   if (error) {

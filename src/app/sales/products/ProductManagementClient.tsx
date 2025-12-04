@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Settings2, Trash2, Loader2, Tag, Link as LinkIcon } from "lucide-react";
+import { Plus, Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -35,6 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   addProductBatchAction,
+  autoLinkProductBatchesAction,
   deletePriceListCustomerAction,
   deleteProductAction,
   deleteProductPriceAction,
@@ -470,13 +471,58 @@ type ProductInventorySectionProps = {
 export function ProductInventorySection({ productId, linkedBatches, availableBatches }: ProductInventorySectionProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const [batchOptions, setBatchOptions] = useState(availableBatches);
   const [selectedBatchId, setSelectedBatchId] = useState<string>(availableBatches[0]?.id ?? "");
   const [overrideQty, setOverrideQty] = useState<string>("");
   const [pending, startTransition] = useTransition();
+  const [isRefreshingBatches, setIsRefreshingBatches] = useState(false);
 
   useEffect(() => {
-    setSelectedBatchId(availableBatches[0]?.id ?? "");
+    setBatchOptions(availableBatches);
+    setSelectedBatchId((current) => {
+      if (current && availableBatches.some((batch) => batch.id === current)) {
+        return current;
+      }
+      return availableBatches[0]?.id ?? "";
+    });
   }, [availableBatches]);
+
+  const refreshSelectableBatches = useCallback(async () => {
+    setIsRefreshingBatches(true);
+    try {
+      const response = await fetch("/api/sales/linkable-batches", { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as {
+        batches?: ProductManagementPayload["batches"];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to load batches.");
+      }
+      const fetched = payload?.batches ?? [];
+      setBatchOptions(fetched);
+      setSelectedBatchId((current) => {
+        if (current && fetched.some((batch) => batch.id === current)) {
+          return current;
+        }
+        return fetched[0]?.id ?? "";
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast({
+        variant: "destructive",
+        title: "Failed to load batches",
+        description: message,
+      });
+    } finally {
+      setIsRefreshingBatches(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (availableBatches.length === 0) {
+      void refreshSelectableBatches();
+    }
+  }, [availableBatches.length, refreshSelectableBatches]);
 
   const handleAdd = () => {
     if (!selectedBatchId) {
@@ -496,6 +542,7 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
       toast({ title: "Batch linked" });
       router.refresh();
       setOverrideQty("");
+      await refreshSelectableBatches();
     });
   };
 
@@ -508,26 +555,93 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
       }
       toast({ title: "Batch removed" });
       router.refresh();
+      await refreshSelectableBatches();
+    });
+  };
+
+  const handleAutoLink = () => {
+    startTransition(async () => {
+      const result = await autoLinkProductBatchesAction(productId);
+      if (!result.success) {
+        toast({
+          variant: "destructive",
+          title: "Auto-link failed",
+          description: result.error ?? "Unable to link matching batches.",
+        });
+        return;
+      }
+      const linkedCount = result.linked ?? 0;
+      toast({
+        title:
+          linkedCount > 0
+            ? `Linked ${linkedCount} batch${linkedCount === 1 ? "" : "es"}`
+            : "No matching batches found",
+        description:
+          linkedCount > 0
+            ? "Matched on SKU variety and size."
+            : result.message ?? "Update the SKU variety/size to enable matching.",
+      });
+      router.refresh();
+      await refreshSelectableBatches();
     });
   };
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border p-4">
+      <div className="rounded-lg border p-4 space-y-3">
         <div className="space-y-2">
-          <Label>Link a finished batch</Label>
-          <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Label>Link a finished batch</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleAutoLink}
+                disabled={pending || batchOptions.length === 0}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Auto-link matching
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshSelectableBatches()}
+                disabled={pending || isRefreshingBatches}
+              >
+                {isRefreshingBatches && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                Refresh list
+              </Button>
+            </div>
+          </div>
+          <Select
+            value={selectedBatchId}
+            onValueChange={setSelectedBatchId}
+            disabled={batchOptions.length === 0 || pending}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose batch" />
             </SelectTrigger>
             <SelectContent className="max-h-60">
-              {availableBatches.map((batch) => (
-                <SelectItem key={batch.id} value={batch.id}>
-                  {batch.label} ({batch.quantity} units)
+              {batchOptions.length === 0 ? (
+                <SelectItem value="__none__" disabled>
+                  No saleable batches found
                 </SelectItem>
-              ))}
+              ) : (
+                batchOptions.map((batch) => (
+                  <SelectItem key={batch.id} value={batch.id}>
+                    {batch.label} ({batch.quantity} units)
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
+          {batchOptions.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Mark batches as “Ready for Sale” or “Looking Good” and refresh to see them here.
+            </p>
+          )}
         </div>
         <div className="mt-3 space-y-2">
           <Label>Available quantity override (optional)</Label>
