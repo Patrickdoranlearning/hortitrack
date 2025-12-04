@@ -47,7 +47,9 @@ export function HorizontalNav({ items, currentModuleKey }: HorizontalNavProps) {
                       "h-10 px-4 py-2 text-sm font-medium transition-colors",
                       "hover:bg-accent hover:text-accent-foreground",
                       "focus:bg-accent focus:text-accent-foreground",
-                      isActive && "bg-[#4CAF50] text-white"
+                      isActive
+                        ? "!bg-[#4CAF50] !text-white shadow-sm"
+                        : "bg-background text-foreground"
                     )}
                   >
                     <div className="flex items-center gap-2">
@@ -87,7 +89,9 @@ export function HorizontalNav({ items, currentModuleKey }: HorizontalNavProps) {
                       "hover:bg-accent hover:text-accent-foreground",
                       "focus:bg-accent focus:text-accent-foreground focus:outline-none",
                       "disabled:pointer-events-none disabled:opacity-50",
-                      isActive && "bg-[#4CAF50] text-white"
+                      isActive
+                        ? "!bg-[#4CAF50] !text-white shadow-sm"
+                        : "bg-background text-foreground"
                     )}
                   >
                     <div className="flex items-center gap-2">
