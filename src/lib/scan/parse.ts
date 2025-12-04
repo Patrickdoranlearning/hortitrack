@@ -1,6 +1,7 @@
 export type ParsedScan
   = { by: "batchNumber"; value: string; raw: string }
-  | { by: "id"; value: string; raw: string };
+  | { by: "id"; value: string; raw: string }
+  | { by: "locationId"; value: string; raw: string };
 
 const digitsOnly = (s: string) => s.replace(/\D+/g, '');
 
@@ -10,6 +11,12 @@ export function parseScanCode(input: string): ParsedScan | null {
 
   // Normalize common prefixes
   const lower = raw.toLowerCase();
+
+  // ht:loc:<locationId> - Location codes
+  const htLoc = lower.match(/^ht:loc:([a-z0-9-_]+)$/i);
+  if (htLoc) {
+    return { by: 'locationId', value: htLoc[1], raw };
+  }
 
   // ht:batch:<code> (allow letters/digits/dashes/underscores)
   const ht = lower.match(/^ht:batch:([a-z0-9-_]+)$/i);

@@ -232,11 +232,6 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         <Sparkles className="mr-2 h-4 w-4" /> AI Care
                     </Button>
                     </FeatureGate>
-                    <Button variant="outline" className="w-full sm:w-auto" asChild>
-                      <Link href="/actions">
-                        <ClipboardList className="mr-2 h-4 w-4" /> Log Actions
-                      </Link>
-                    </Button>
                     <NewBatchButton />
                     <TransplantMenuButton />
                 </>

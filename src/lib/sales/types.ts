@@ -23,6 +23,10 @@ export const CreateOrderLineSchema = z
     allowSubstitute: z.boolean().optional().default(false),
     unitPrice: z.number().nonnegative().optional(), // optional override
     vatRate: z.number().min(0).max(100).optional(),
+    // Batch-specific ordering
+    specificBatchId: z.string().uuid().optional(), // Request specific batch
+    gradePreference: z.enum(['A', 'B', 'C']).optional(), // Grade preference
+    preferredBatchNumbers: z.array(z.string()).optional(), // List of preferred batch numbers
   })
   .refine(
     (val) => Boolean(val.productId) || (Boolean(val.plantVariety) && Boolean(val.size)),

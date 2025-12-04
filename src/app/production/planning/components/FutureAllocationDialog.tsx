@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -36,7 +37,8 @@ import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { useToast } from "@/hooks/use-toast";
 import type { ProtocolSummary, PlanningBatch } from "@/lib/planning/types";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, QrCode } from "lucide-react";
+import ScannerDialog from "@/components/scan-and-act-dialog";
 
 const OPTIONAL_VALUE = "__option__";
 
@@ -118,6 +120,7 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
   const { data: refData } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
   const [submitting, setSubmitting] = React.useState(false);
+  const [isScanOpen, setIsScanOpen] = React.useState(false);
 
   // Default to current week + 12 weeks ahead
   const now = new Date();
@@ -145,6 +148,33 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
   const sizes = refData?.sizes ?? [];
   const varieties = refData?.varieties ?? [];
   const locations = refData?.locations ?? [];
+
+  // Filter parents to only show those with available stock, and build combobox options
+  const parentBatchOptions = React.useMemo<ComboboxOption[]>(() => {
+    const options: ComboboxOption[] = [
+      { value: OPTIONAL_VALUE, label: "No parent (new batch)" },
+    ];
+    
+    for (const parent of parents) {
+      const available = parent.quantity - (parent.reservedQuantity ?? 0);
+      // Only include batches with available stock
+      if (available <= 0) continue;
+      
+      const hasReserved = (parent.reservedQuantity ?? 0) > 0;
+      const batchLabel = parent.batchNumber ?? parent.id.slice(0, 8);
+      const varietyLabel = parent.varietyName ?? "Variety";
+      const quantityLabel = hasReserved 
+        ? `${available.toLocaleString()} avail (${parent.reservedQuantity?.toLocaleString()} reserved)`
+        : `${parent.quantity.toLocaleString()} units`;
+      
+      options.push({
+        value: parent.id,
+        label: `${batchLabel} · ${varietyLabel} · ${quantityLabel}`,
+      });
+    }
+    
+    return options;
+  }, [parents]);
 
   // Watch fields for calculations
   const watchedParentBatchId = form.watch("parentBatchId");
@@ -186,6 +216,37 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
       form.setValue("plantVarietyId", "");
     }
   }
+
+  const handleScanDetected = React.useCallback((code: string) => {
+    if (!code) return;
+    
+    // Try to find a matching batch by batch number or ID
+    const matchedParent = parents.find(
+      (p) => p.batchNumber === code || p.id === code
+    );
+    
+    if (matchedParent) {
+      const available = matchedParent.quantity - (matchedParent.reservedQuantity ?? 0);
+      if (available > 0) {
+        handleParentChange(matchedParent.id);
+        toast({ title: "Batch found", description: `Selected ${matchedParent.batchNumber}` });
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "No stock available", 
+          description: `${matchedParent.batchNumber} has no available stock` 
+        });
+      }
+    } else {
+      toast({ 
+        variant: "destructive", 
+        title: "Batch not found", 
+        description: "No matching batch found for scanned code" 
+      });
+    }
+    
+    setIsScanOpen(false);
+  }, [parents, toast]);
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
@@ -253,45 +314,26 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Source batch (optional)</FormLabel>
-                      <Select
-                        value={field.value ?? OPTIONAL_VALUE}
-                        onValueChange={(val) => {
-                          handleParentChange(val);
-                        }}
-                      >
+                      <div className="flex gap-2">
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select parent batch" />
-                          </SelectTrigger>
+                          <Combobox
+                            options={parentBatchOptions}
+                            value={field.value || OPTIONAL_VALUE}
+                            onChange={(val) => handleParentChange(val)}
+                            placeholder="Search by batch # or variety..."
+                            emptyMessage="No batches with available stock"
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value={OPTIONAL_VALUE}>No parent (new batch)</SelectItem>
-                          {parents.map((parent) => {
-                            const available = parent.quantity - (parent.reservedQuantity ?? 0);
-                            const hasReserved = (parent.reservedQuantity ?? 0) > 0;
-                            return (
-                              <SelectItem 
-                                key={parent.id} 
-                                value={parent.id}
-                                disabled={available <= 0}
-                              >
-                                {parent.batchNumber ?? parent.id.slice(0, 8)} · {parent.varietyName ?? "Variety"} ·{" "}
-                                {hasReserved ? (
-                                  <span>
-                                    <span className="font-medium">{available.toLocaleString()}</span>
-                                    <span className="text-muted-foreground"> avail</span>
-                                    <span className="text-xs text-muted-foreground ml-1">
-                                      ({parent.reservedQuantity?.toLocaleString()} reserved)
-                                    </span>
-                                  </span>
-                                ) : (
-                                  <span>{parent.quantity.toLocaleString()} units</span>
-                                )}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setIsScanOpen(true)}
+                          title="Scan batch QR code"
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -615,6 +657,12 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
             </DialogFooter>
           </form>
         </Form>
+
+        <ScannerDialog
+          open={isScanOpen}
+          onOpenChange={setIsScanOpen}
+          onDetected={handleScanDetected}
+        />
       </DialogContent>
     </Dialog>
   );
