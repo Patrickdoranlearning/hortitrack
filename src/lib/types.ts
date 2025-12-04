@@ -9,7 +9,16 @@ export interface UserSession {
 
 // --- Enums (matching DB types) ---
 export const ProductionPhase = z.enum(['propagation', 'growing', 'finished']);
-export const ProductionStatus = z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']);
+export const ProductionStatus = z.enum([
+  'Propagation',
+  'Plugs/Liners',
+  'Potted',
+  'Ready for Sale',
+  'Looking Good',
+  'Archived',
+  'Incoming',
+  'Planned',
+]);
 export const CreditStatus = z.enum(['draft', 'issued', 'paid', 'void']);
 export const DeliveryStatus = z.enum(['unscheduled', 'scheduled', 'departed', 'delivered', 'cancelled']);
 export const InvoiceStatus = z.enum(['draft', 'issued', 'paid', 'void', 'overdue']);
@@ -160,6 +169,7 @@ export const BatchSchema = z.object({
   locationId: z.string(),
   status: ProductionStatus.default('Propagation'),
   quantity: z.number().int().nonnegative().default(0),
+  reservedQuantity: z.number().int().nonnegative().default(0),
   initialQuantity: z.number().int().nonnegative().optional(),
   quantityProduced: z.number().int().optional(),
   unit: z.string().default('plants'),
@@ -182,6 +192,7 @@ export const BatchSchema = z.object({
   plantVariety: z.any().optional(), // Joined Variety object
   size: z.any().optional(), // Joined Size object
   location: z.any().optional(), // Joined Location object
+  parentBatchId: z.string().nullable().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 

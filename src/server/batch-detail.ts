@@ -9,7 +9,21 @@ export const BatchDetailSchema = z.object({
   size: z.string().nullable().optional(),
   supplierName: z.string().nullable().optional(),
   productionWeek: z.string().nullable().optional(),
-  status: z.enum(["Active", "Archived", "Dispatched", "Growing", "Propagation", "Potted", "Ready for Sale", "Looking Good", "Plugs/Liners"]).default("Active"),
+  status: z
+    .enum([
+      "Active",
+      "Archived",
+      "Dispatched",
+      "Growing",
+      "Propagation",
+      "Potted",
+      "Ready for Sale",
+      "Looking Good",
+      "Plugs/Liners",
+      "Incoming",
+      "Planned",
+    ])
+    .default("Active"),
   ancestryNodes: z.array(z.any()).optional(), // Add ancestryNodes to the schema
 });
 

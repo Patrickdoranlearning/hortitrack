@@ -95,7 +95,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   );
 
   const nurseryLocations = useMemo<NurseryLocation[]>(() => {
-    if (!locationsData) return [];
+    if (!Array.isArray(locationsData) || !locationsData.length) return [];
     const orgId = batches[0]?.orgId ?? "";
     return locationsData.map((loc) => ({
       id: loc.value,

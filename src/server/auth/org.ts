@@ -1,45 +1,31 @@
 import { getSupabaseServerClient } from "@/server/db/supabaseServer";
 import { getSupabaseAdmin } from "@/server/db/supabase";
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 export async function getUserAndOrg() {
   const supabase = await getSupabaseServerClient();
   const admin = getSupabaseAdmin();
 
-  const { data: { user }, error: uerr } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: uerr,
+  } = await supabase.auth.getUser();
   if (uerr || !user) throw new Error("Unauthenticated");
 
-  const { data: profiles, error: perr } = await supabase
-    .from("profiles")
-    .select("active_org_id, display_name")
-    .eq("id", user.id)
-    .order("updated_at", { ascending: false })
-    .limit(1);
+  const orgId = await resolveActiveOrgId({ supabase, admin, user });
+  return { user, orgId, supabase };
+}
 
-  if (perr) throw new Error(`Profile lookup failed: ${perr.message}`);
+export async function getActiveOrgId(existingClient?: SupabaseClient) {
+  const supabase = existingClient ?? (await getSupabaseServerClient());
+  const admin = getSupabaseAdmin();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("Unauthenticated");
 
-  let activeOrgId = profiles?.[0]?.active_org_id as string | null | undefined;
-
-  if (!activeOrgId) {
-    const { data: memberships, error: membershipError } = await admin
-      .from("org_memberships")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true })
-      .limit(1);
-    if (membershipError) {
-      console.error("[getUserAndOrg] membership lookup failed", membershipError);
-    }
-    activeOrgId = memberships?.[0]?.org_id ?? null;
-  }
-
-  if (!activeOrgId) {
-    activeOrgId = await ensureOrgLink(user, admin);
-  }
-
-  if (!activeOrgId) throw new Error("No active org selected");
-
-  return { user, orgId: activeOrgId as string, supabase };
+  return resolveActiveOrgId({ supabase, admin, user });
 }
 
 async function ensureOrgLink(user: User, admin = getSupabaseAdmin()): Promise<string | null> {
@@ -119,4 +105,45 @@ async function ensureOrgLink(user: User, admin = getSupabaseAdmin()): Promise<st
     console.error("[getUserAndOrg] ensureOrgLink failed", err);
     return null;
   }
+}
+
+async function resolveActiveOrgId({
+  supabase,
+  admin,
+  user,
+}: {
+  supabase: SupabaseClient;
+  admin: SupabaseClient;
+  user: User;
+}): Promise<string> {
+  const { data: profiles, error: perr } = await supabase
+    .from("profiles")
+    .select("active_org_id")
+    .eq("id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  if (perr) throw new Error(`Profile lookup failed: ${perr.message}`);
+
+  let activeOrgId = profiles?.[0]?.active_org_id as string | null | undefined;
+
+  if (!activeOrgId) {
+    const { data: memberships, error: membershipError } = await admin
+      .from("org_memberships")
+      .select("org_id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    if (membershipError) {
+      console.error("[getUserAndOrg] membership lookup failed", membershipError);
+    }
+    activeOrgId = memberships?.[0]?.org_id ?? null;
+  }
+
+  if (!activeOrgId) {
+    activeOrgId = await ensureOrgLink(user, admin);
+  }
+
+  if (!activeOrgId) throw new Error("No active org selected");
+  return activeOrgId;
 }

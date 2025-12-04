@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { PRODUCTION_STATUS } from "@/lib/enums";
 
 // ============================================================================
 // Shared Primitives
@@ -17,7 +18,7 @@ const CountryCode = z.string().regex(/^[A-Z]{2}$/, "Use ISO 3166-1 alpha-2, e.g.
 export const PhaseSchema = z.enum(["propagation", "plug", "potted", "plug_linear"]);
 export type Phase = z.infer<typeof PhaseSchema>;
 
-export const ProductionStatusSchema = z.enum(["Growing", "Ready", "Available", "Looking Good", "Archived"]);
+export const ProductionStatusSchema = z.enum(PRODUCTION_STATUS);
 export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
 
 // ============================================================================
