@@ -28,6 +28,8 @@ export interface Database {
         location_id: string | null;
         supplier_id: string | null;
         status: string | null;
+        parent_batch_id: string | null;
+      protocol_id: string | null;
         planted_at: string | null;
         created_at: string | null;
         updated_at: string | null;
@@ -316,6 +318,19 @@ export interface Database {
         issue_type: string | null;
         notes: string | null;
         resolved: boolean | null;
+        created_at: string | null;
+        updated_at: string | null;
+      }>;
+      protocols: TableDefinition<{
+        id: string;
+        org_id: string;
+        name: string;
+        description: string | null;
+        target_variety_id: string | null;
+        target_size_id: string | null;
+        definition: Json | null;
+        route: Json | null;
+        is_active: boolean | null;
         created_at: string | null;
         updated_at: string | null;
       }>;

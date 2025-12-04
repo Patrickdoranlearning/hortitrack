@@ -61,6 +61,8 @@ const growerStatusOptions = [
   { label: "Ready for Sale", value: "Ready for Sale" },
   { label: "Potted", value: "Potted" },
   { label: "Archived", value: "Archived" },
+  { label: "Incoming", value: "Incoming" },
+  { label: "Planned", value: "Planned" },
 ];
 
 const checkinSchema = z.object({

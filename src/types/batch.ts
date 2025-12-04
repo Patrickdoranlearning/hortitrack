@@ -27,10 +27,23 @@ export type QuantitySnapshot = z.infer<typeof QuantitySnapshotSchema>;
 export const PhaseSchema = z.enum(["Propagation", "Plug/Linear", "Potted"]);
 export type Phase = z.infer<typeof PhaseSchema>;
 
+export const ProductionStatusSchema = z.enum([
+  "Propagation",
+  "Plugs/Liners",
+  "Potted",
+  "Ready for Sale",
+  "Looking Good",
+  "Archived",
+  "Incoming",
+  "Planned",
+]);
+export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
+
 export const BatchSchema = z.object({
   id: z.string(),
   batchNumber: z.string(),
   phase: PhaseSchema,
+  status: ProductionStatusSchema.optional(),
   varietyId: z.string().optional(),
   variety: z.string().optional(),
   family: z.string().nullable().optional(),
@@ -46,6 +59,7 @@ export const BatchSchema = z.object({
   createdAt: z.string(),
   createdBy: z.string().nullable().optional(),
   currentPassport: PlantPassportSchema,
+  parentBatchId: z.string().nullable().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 

@@ -6,6 +6,7 @@ export type BatchNode = {
   orgId: string;
   batchNumber?: string | number | null;
   plantVariety?: string | null;
+  plantVarietyId?: string | null;
   plantFamily?: string | null;
   sowDate?: string | null;
   plantingDate?: string | null;
@@ -21,6 +22,7 @@ export type BatchNode = {
   growerPhotoUrl?: string | null;
   salesPhotoUrl?: string | null;
   parentBatchId?: string | null;
+  sizeId?: string | null;
   // Add other fields as needed
 };
 
@@ -40,12 +42,14 @@ export async function getBatchById(id: string): Promise<BatchNode | null> {
     orgId: d.org_id,
     batchNumber: d.batch_number ?? null,
     plantVariety: d.plant_varieties?.name ?? null,
+    plantVarietyId: d.plant_variety_id ?? null,
     plantFamily: d.plant_varieties?.family ?? null,
     sowDate: d.sow_date ?? null,
     plantingDate: d.planting_date ?? d.planted_at ?? null,
     producedAt: d.produced_at ?? d.ready_at ?? null,
     potSize: d.plant_sizes?.name ?? null,
     size: d.plant_sizes?.name ?? null,
+    sizeId: d.size_id ?? null,
     supplierName: d.supplier_name ?? null, // Need to join suppliers if this is an ID now
     supplierId: d.supplier_id ?? null,
     location: d.nursery_locations?.name ?? null,

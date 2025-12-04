@@ -38,6 +38,7 @@ export const ProductionProtocolRouteSchema = z.object({
   nodes: z.array(ProductionProtocolRouteNodeSchema),
   edges: z.array(ProductionProtocolRouteEdgeSchema),
 });
+export type ProductionProtocolRoute = z.infer<typeof ProductionProtocolRouteSchema>;
 
 export const ProductionProtocolOutputSchema = z.object({
   protocolTitle: z.string().optional(),
