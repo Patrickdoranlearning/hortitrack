@@ -119,6 +119,12 @@ export async function createOrder(data: CreateOrderInput) {
             vatRate,
             lineTotalExVat,
             lineVatAmount,
+            // Store batch preferences for later allocation
+            batchPreferences: {
+                specificBatchId: line.specificBatchId,
+                gradePreference: line.gradePreference,
+                preferredBatchNumbers: line.preferredBatchNumbers,
+            },
         });
     }
 
@@ -150,18 +156,30 @@ export async function createOrder(data: CreateOrderInput) {
         return { error: 'Failed to create order' };
     }
 
-    const orderItemsPayload = resolvedLines.map(line => ({
-        order_id: order.id,
-        product_id: line.productId,
-        sku_id: line.skuId,
-        description: line.description,
-        quantity: line.quantity,
-        unit_price_ex_vat: line.unitPrice,
-        vat_rate: line.vatRate,
-        discount_pct: 0,
-        line_total_ex_vat: line.lineTotalExVat,
-        line_vat_amount: line.lineVatAmount,
-    }));
+    const orderItemsPayload = resolvedLines.map(line => {
+        // Create description that includes batch preferences if specified
+        let description = line.description;
+        if (line.batchPreferences?.specificBatchId) {
+            description += ` [Batch: ${line.batchPreferences.specificBatchId}]`;
+        } else if (line.batchPreferences?.gradePreference) {
+            description += ` [Grade: ${line.batchPreferences.gradePreference}]`;
+        } else if (line.batchPreferences?.preferredBatchNumbers?.length) {
+            description += ` [Preferred Batches: ${line.batchPreferences.preferredBatchNumbers.join(', ')}]`;
+        }
+
+        return {
+            order_id: order.id,
+            product_id: line.productId,
+            sku_id: line.skuId,
+            description,
+            quantity: line.quantity,
+            unit_price_ex_vat: line.unitPrice,
+            vat_rate: line.vatRate,
+            discount_pct: 0,
+            line_total_ex_vat: line.lineTotalExVat,
+            line_vat_amount: line.lineVatAmount,
+        };
+    });
 
     const { error: itemsError } = await supabase
         .from('order_items')

@@ -2,7 +2,7 @@
 // Client-safe parser for DataMatrix/QR payloads with GS1/AIM.
 // Mirrors server parse but has no server imports.
 
-export type Parsed = { by: "id" | "batchNumber"; value: string };
+export type Parsed = { by: "id" | "batchNumber" | "locationId"; value: string };
 
 const GS = String.fromCharCode(29); // FNC1 group separator
 
@@ -49,6 +49,14 @@ export function parseScanCode(raw: string): Parsed | null {
   // Keep GS (FNC1), drop other control chars
   let text = raw.replace(/[\u0000-\u001F\u007F]/g, (c) => (c === GS ? GS : "")).trim();
   if (!text) return null;
+
+  // Check for HortiTrack location code format: ht:loc:<id>
+  const htLoc = text.toLowerCase().match(/^ht:loc:([a-z0-9-_]+)$/i);
+  if (htLoc) return { by: "locationId", value: htLoc[1] };
+
+  // Check for HortiTrack batch code format: ht:batch:<code>
+  const htBatch = text.toLowerCase().match(/^ht:batch:([a-z0-9-_]+)$/i);
+  if (htBatch) return { by: "batchNumber", value: htBatch[1] };
 
   // GS1 candidates
   const ai = parseGS1(text);

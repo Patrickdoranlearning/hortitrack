@@ -34,6 +34,60 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient();
+
+    // Handle location codes - redirect to location page
+    if (parsed.by === 'locationId') {
+      // Check if location exists
+      const { data: location } = await supabase
+        .from('nursery_locations')
+        .select('id, name')
+        .eq('id', parsed.value)
+        .maybeSingle();
+
+      if (location) {
+        return NextResponse.json({
+          type: 'location',
+          location: { id: location.id, name: location.name },
+          redirectUrl: `/production/locations?location=${location.id}`,
+          summary: {
+            by: parsed.by,
+            value: parsed.value,
+            ms: Date.now() - started,
+          },
+        }, { status: 200 });
+      }
+
+      // Try by site_id
+      const { data: locationBySiteId } = await supabase
+        .from('nursery_locations')
+        .select('id, name')
+        .eq('site_id', parsed.value)
+        .maybeSingle();
+
+      if (locationBySiteId) {
+        return NextResponse.json({
+          type: 'location',
+          location: { id: locationBySiteId.id, name: locationBySiteId.name },
+          redirectUrl: `/production/locations?location=${locationBySiteId.id}`,
+          summary: {
+            by: parsed.by,
+            value: parsed.value,
+            ms: Date.now() - started,
+          },
+        }, { status: 200 });
+      }
+
+      return NextResponse.json({
+        error: 'Location not found',
+        summary: {
+          by: parsed.by,
+          value: parsed.value,
+          rawLen: code.length,
+          ms: Date.now() - started,
+        },
+      }, { status: 404 });
+    }
+
     let batch: BatchNode | null = null;
 
     if (parsed.by === 'id') {
@@ -97,7 +151,7 @@ export async function POST(req: NextRequest) {
       location: clean.location,
       status: clean.status,
     };
-    return NextResponse.json({ batch: clean, summary }, { status: 200 });
+    return NextResponse.json({ type: 'batch', batch: clean, summary }, { status: 200 });
   } catch (e: any) {
     console.error("POST /api/batches/scan error:", e);
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });

@@ -523,11 +523,6 @@ export default function HomePageView({
                         <Sparkles /> AI Care
                     </Button>
                     </FeatureGate>
-                    <Button variant="outline" className="w-full sm:w-auto" asChild>
-                      <Link href="/actions">
-                        <ClipboardList className="mr-2 h-4 w-4" /> Log Actions
-                      </Link>
-                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button disabled={isReadonly} className="w-full sm:w-auto">
