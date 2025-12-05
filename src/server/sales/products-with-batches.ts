@@ -18,6 +18,7 @@ export interface ProductAliasInfo {
   customerId: string | null;
   customerSkuCode: string | null;
   isActive: boolean;
+  unitPriceExVat: number | null;
 }
 
 export interface ProductWithBatches {
@@ -28,6 +29,7 @@ export interface ProductWithBatches {
   availableStock: number;
   batches: BatchInfo[];
   aliases: ProductAliasInfo[];
+  defaultPrice: number | null;
 }
 
 /**
@@ -89,12 +91,33 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
   // Fetch product aliases for customer filtering
   const { data: aliases, error: aliasError } = await supabase
     .from('product_aliases')
-    .select('id, product_id, alias_name, customer_id, customer_sku_code, is_active')
+    .select('id, product_id, alias_name, customer_id, customer_sku_code, is_active, unit_price_ex_vat')
     .eq('org_id', orgId)
     .in('product_id', productIds);
 
   if (aliasError) {
     console.error('Error fetching product aliases:', aliasError);
+  }
+
+  // Fetch default prices from product_prices for products (join with price_lists to get default list)
+  const defaultPriceMap = new Map<string, number>();
+  if (productIds.length > 0) {
+    const { data: priceItems, error: priceError } = await supabase
+      .from('product_prices')
+      .select('product_id, unit_price_ex_vat, price_list_id, price_lists!inner(is_default)')
+      .eq('org_id', orgId)
+      .in('product_id', productIds);
+
+    if (priceError) {
+      console.error('Error fetching price items:', priceError);
+    }
+
+    // Create a map of default prices by product
+    priceItems?.forEach((item: any) => {
+      if (item.price_lists?.is_default && item.unit_price_ex_vat != null) {
+        defaultPriceMap.set(item.product_id, Number(item.unit_price_ex_vat));
+      }
+    });
   }
 
   const aliasMap = new Map<string, ProductAliasInfo[]>();
@@ -106,6 +129,7 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
       customerId: alias.customer_id ?? null,
       customerSkuCode: alias.customer_sku_code ?? null,
       isActive: alias.is_active ?? true,
+      unitPriceExVat: alias.unit_price_ex_vat ?? null,
     });
     aliasMap.set(alias.product_id, list);
   });
@@ -178,17 +202,29 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
   // Transform products with their batches
   const productsWithBatches: ProductWithBatches[] = products.map(product => {
     const sku = skuMap.get(product.sku_id);
-    const batches = productBatchMap.get(product.id) || [];
-    const totalStock = batches.reduce((sum, b) => sum + b.quantity, 0);
+    const productBatches = productBatchMap.get(product.id) || [];
+    const totalStock = productBatches.reduce((sum, b) => sum + b.quantity, 0);
+
+    // Get product-level variety and size from SKU
+    const productVariety = varietyMap.get(sku?.plant_variety_id || '') || '';
+    const productSize = sizeMap.get(sku?.size_id || '') || '';
+
+    // Ensure each batch has variety and size, falling back to product-level values
+    const enrichedBatches = productBatches.map(batch => ({
+      ...batch,
+      plantVariety: batch.plantVariety || productVariety,
+      size: batch.size || productSize,
+    }));
 
     return {
       id: product.id,
       name: product.name || sku?.display_name || 'Unknown Product',
-      plantVariety: varietyMap.get(sku?.plant_variety_id || '') || '',
-      size: sizeMap.get(sku?.size_id || '') || '',
+      plantVariety: productVariety,
+      size: productSize,
       availableStock: totalStock,
-      batches: batches,
+      batches: enrichedBatches,
       aliases: aliasMap.get(product.id) || [],
+      defaultPrice: defaultPriceMap.get(product.id) ?? null,
     };
   });
 
