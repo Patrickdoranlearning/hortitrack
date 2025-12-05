@@ -78,13 +78,17 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       setReady(true);
       setLastSyncedAt(new Date());
     } catch (err) {
+      // Log error but don't break the UI if offline sync fails (expected when truly offline)
       const message = err instanceof Error ? err.message : String(err);
-      console.error("[offline-sync] failed", message);
-      setError(message || "Offline sync failed");
+      console.warn("[offline-sync] sync failed (you may be offline):", message);
+      // Only set visible error state if we haven't successfully synced yet
+      if (!ready) {
+        setError(message || "Offline sync failed");
+      }
     } finally {
       setSyncing(false);
     }
-  }, [orgId, supabase]);
+  }, [orgId, supabase, ready]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -103,7 +107,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
 
   const lookupByParsed = React.useCallback(
     async (parsed: Parsed) => {
-      if (!ready) return null;
+      // Allow lookup even if sync failed (best effort from existing IDB data)
       const db = await getOfflineDb();
       if (parsed.by === "id") {
         const doc = await db.batches.findOne(parsed.value).exec();
@@ -120,7 +124,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       }
       return null;
     },
-    [ready]
+    []
   );
 
   const lookupByCode = React.useCallback(
@@ -153,4 +157,3 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
 export function useOfflineBatches() {
   return React.useContext(OfflineContext);
 }
-

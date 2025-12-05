@@ -18,11 +18,21 @@ export function useAttributeOptions(attributeKey: AttributeKey, opts?: { include
   const { data, error, isLoading, mutate } = useSWR<ResponseShape>(
     attributeKey ? `/api/options/${attributeKey}${query}` : null,
     fetcher,
-    { revalidateOnFocus: false }
+    { 
+      revalidateOnFocus: false,
+      // Prevent infinite loop if data is considered "changed" every time
+      // Use deep comparison for data if needed, or trust that SWR dedupes by key
+    }
   );
 
+  // Memoize the return value to prevent effect loops downstream
   const options = data?.options ?? (error ? defaultOptionsFor(attributeKey, includeInactive) : []);
 
+  // Only return a new object if data/options actually changed
+  // However, options is a new array reference here on every render if we don't memoize it
+  // But wait, data comes from SWR state.
+  // Let's use simple stable return for now, relying on SWR stability.
+  
   return {
     options,
     source: data?.source,

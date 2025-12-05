@@ -57,7 +57,13 @@ export default function DropdownManagerPage() {
         localId: opt.id ?? `${opt.systemCode}-${opt.sortOrder}`,
       })
     );
-    setItems(next);
+    // Prevent update if nothing materially changed (rudimentary check to stop loops)
+    setItems(prev => {
+      if (prev.length === next.length && prev.every((p, i) => p.localId === next[i].localId && p.displayLabel === next[i].displayLabel)) {
+        return prev;
+      }
+      return next;
+    });
     setDirty(false);
   }, [remoteOptions, selectedKey]);
 
