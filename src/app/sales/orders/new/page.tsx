@@ -11,7 +11,7 @@ async function getCustomers(orgId: string) {
   // Fetch only this org's customers
   const { data: customers, error } = await supabase
     .from('customers')
-    .select('id, name, org_id')
+    .select('id, name, org_id, store')
     .eq('org_id', orgId)
     .order('name');
 
@@ -22,7 +22,7 @@ async function getCustomers(orgId: string) {
 
   const filtered = (customers || []).filter(c => c.org_id === orgId);
 
-  return filtered.map(c => ({ id: c.id, name: c.name }));
+  return filtered.map(c => ({ id: c.id, name: c.name, store: c.store }));
 }
 
 export default async function CreateOrderPage() {

@@ -40,6 +40,13 @@ export interface Product {
   size: string;
   availableStock: number;
   batches?: Batch[];
+  aliases?: Array<{
+    id: string;
+    aliasName: string | null;
+    customerId: string | null;
+    customerSkuCode?: string | null;
+    isActive?: boolean | null;
+  }>;
 }
 
 interface ProductBatchSelectorProps {
@@ -55,7 +62,11 @@ interface ProductBatchSelectorProps {
   onChange: (value: any) => void;
   mode: 'basic' | 'specific';
   onModeChange?: (mode: 'basic' | 'specific') => void;
+  customerId?: string;
+  className?: string;
 }
+
+const AUTO_ALLOCATE_VALUE = 'auto-allocate';
 
 export function ProductBatchSelector({
   products,
@@ -63,6 +74,8 @@ export function ProductBatchSelector({
   onChange,
   mode,
   onModeChange,
+  customerId,
+  className,
 }: ProductBatchSelectorProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showBatchDetails, setShowBatchDetails] = useState(false);
@@ -73,6 +86,19 @@ export function ProductBatchSelector({
       setSelectedProduct(product || null);
     }
   }, [value?.productId, products]);
+
+  const resolveLabel = (product: Product) => {
+    const alias = product.aliases?.find(
+      (a) => a.isActive !== false && (!!customerId ? a.customerId === customerId : !!a.aliasName)
+    );
+
+    if (alias?.aliasName) {
+      return alias.aliasName;
+    }
+
+    if (product.name) return product.name;
+    return `${product.plantVariety} - ${product.size}`;
+  };
 
   const handleProductChange = (productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -90,6 +116,13 @@ export function ProductBatchSelector({
   };
 
   const handleBatchSelection = (batchId: string) => {
+    if (batchId === AUTO_ALLOCATE_VALUE) {
+      onChange({
+        ...value,
+        specificBatchId: undefined,
+      });
+      return;
+    }
     const batch = selectedProduct?.batches?.find(b => b.id === batchId);
     if (batch) {
       onChange({
@@ -123,7 +156,7 @@ export function ProductBatchSelector({
   const totalStock = selectedProduct?.availableStock || 0;
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", className)}>
       <div className="flex items-center gap-4">
         <div className="flex-1">
           <Label>Product</Label>
@@ -137,7 +170,12 @@ export function ProductBatchSelector({
             <SelectContent>
               {products.map(product => (
                 <SelectItem key={product.id} value={product.id}>
-                  {product.plantVariety} - {product.size} ({product.availableStock} available)
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium">{resolveLabel(product)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {product.plantVariety} · {product.size} · {product.availableStock} available
+                    </span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -167,7 +205,7 @@ export function ProductBatchSelector({
       </div>
 
       {selectedProduct && mode === 'specific' && (
-        <div className="border rounded-lg p-4 bg-muted/30">
+        <div className="border rounded-lg p-4 bg-muted/30 w-full">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium">Batch Selection Options</h4>
             <Badge variant="secondary">{totalStock} plants available</Badge>
@@ -178,34 +216,27 @@ export function ProductBatchSelector({
             <div>
               <Label className="text-xs">Select Specific Batch</Label>
               <Select
-                value={value?.specificBatchId || ''}
+                value={value?.specificBatchId ?? AUTO_ALLOCATE_VALUE}
                 onValueChange={handleBatchSelection}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Auto-allocate (or choose specific batch)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Auto-allocate</SelectItem>
-                  {availableBatches.map(batch => (
-                    <SelectItem key={batch.id} value={batch.id}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{batch.batchNumber}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {batch.quantity} plants
-                        </Badge>
-                        {batch.grade && (
-                          <Badge variant="secondary" className="text-xs">
-                            Grade {batch.grade}
-                          </Badge>
-                        )}
-                        {batch.location && (
+                  <SelectItem value={AUTO_ALLOCATE_VALUE}>Auto-allocate</SelectItem>
+                  {availableBatches.map(batch => {
+                    const label = `${batch.plantVariety} - ${batch.size} - ${batch.batchNumber}`;
+                    return (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{label}</span>
                           <span className="text-xs text-muted-foreground">
-                            {batch.location}
+                            {batch.quantity} plants{batch.location ? ` · ${batch.location}` : ''}
                           </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

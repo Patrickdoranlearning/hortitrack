@@ -20,18 +20,16 @@ type AppHeaderProps = {
 export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps) {
   const [hoveredModule, setHoveredModule] = React.useState<string | null>(null)
   const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+  const [isDesktop, setIsDesktop] = React.useState(false)
+  const HOVER_HIDE_DELAY = 300
 
-  // Find the current module and its sub-items
-  const currentModule = APP_NAV.find(item => item.key === moduleKey)
-  const currentSubNavItems = currentModule?.items || []
-
-  // Find the hovered module's sub-items (for hover preview)
+  // Find the hovered module's sub-items (hover/focus driven only on desktop)
   const hoveredModuleData = hoveredModule ? APP_NAV.find(item => item.key === hoveredModule) : null
   const hoveredSubNavItems = hoveredModuleData?.items || []
 
-  // Determine which sub-items to show: hovered module takes priority, else current module
-  const displaySubNavItems = hoveredModule ? hoveredSubNavItems : currentSubNavItems
-  const showSubNav = displaySubNavItems.length > 0
+  // Show subnav only when hovering/focusing a module on desktop
+  const displaySubNavItems = hoveredSubNavItems
+  const showSubNav = isDesktop && hoveredModule !== null && hoveredSubNavItems.length > 0
 
   const handleModuleHover = React.useCallback((key: string | null) => {
     // Clear any pending timeout
@@ -47,7 +45,7 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
       // Delay hiding to allow moving to SubNav
       hoverTimeoutRef.current = setTimeout(() => {
         setHoveredModule(null)
-      }, 150)
+      }, HOVER_HIDE_DELAY)
     }
   }, [])
 
@@ -73,6 +71,15 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
     }
   }, [])
 
+  // Track viewport to toggle desktop-only subnav rendering
+  React.useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)")
+    const handleChange = () => setIsDesktop(media.matches)
+    handleChange()
+    media.addEventListener("change", handleChange)
+    return () => media.removeEventListener("change", handleChange)
+  }, [])
+
   return (
     <header className={cn(
       "sticky top-0 z-[999] w-full bg-background overflow-visible",
@@ -94,33 +101,34 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
         </div>
       </div>
 
-      {/* Row 2: Main navigation (modules) */}
-      <div className="border-b overflow-visible">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2 overflow-visible">
-          <span className="sr-only">App navigation</span>
-          {/* Mobile: full module picker */}
-          <div className="md:hidden">
-            <ModuleTabs items={APP_NAV} ariaLabel="Main application navigation" />
+      {/* Row 2: Main navigation (modules) + subnav - wrapped for hover continuity */}
+      <div 
+        className="relative"
+        onMouseLeave={handleSubNavMouseLeave}
+      >
+        <div className="border-b overflow-visible">
+          <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2 overflow-visible">
+            <span className="sr-only">App navigation</span>
+            {/* Mobile: full module picker */}
+            <div className="md:hidden">
+              <ModuleTabs items={APP_NAV} ariaLabel="Main application navigation" />
+            </div>
+            {/* Desktop: modules link bar */}
+            <HorizontalNav 
+              items={APP_NAV} 
+              currentModuleKey={moduleKey}
+              onModuleHover={handleModuleHover}
+            />
           </div>
-          {/* Desktop: modules link bar */}
-          <HorizontalNav 
-            items={APP_NAV} 
-            currentModuleKey={moduleKey}
-            onModuleHover={handleModuleHover}
-          />
         </div>
-      </div>
 
-      {/* Row 3: Sub navigation (pages) - shows on hover or for current module, desktop only */}
-      {showSubNav && (
-        <div 
-          className="hidden md:block"
-          onMouseEnter={handleSubNavMouseEnter}
-          onMouseLeave={handleSubNavMouseLeave}
-        >
-          <SubNav items={displaySubNavItems} />
-        </div>
-      )}
+        {/* Row 3: Sub navigation (pages) - shows on hover, desktop only */}
+        {showSubNav && (
+          <div onMouseEnter={handleSubNavMouseEnter}>
+            <SubNav items={displaySubNavItems} />
+          </div>
+        )}
+      </div>
     </header>
   )
 }

@@ -125,9 +125,21 @@ export async function POST(
       dbPhase = "potted";
     }
 
+    // Resolve status_id for the new dbStatus
+    let statusId = undefined;
+    const { data: sOpt } = await supabase
+      .from("attribute_options")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("attribute_key", "production_status")
+      .or(`system_code.eq.${dbStatus},display_label.eq.${dbStatus}`)
+      .single();
+    if (sOpt) statusId = sOpt.id;
+
     // Build update object
     const updateData: Record<string, any> = {
       status: dbStatus,
+      status_id: statusId,
       quantity: payload.quantity,
       initial_quantity: payload.quantity, // Reset initial quantity to actual
       location_id: payload.locationId,

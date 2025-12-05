@@ -25,12 +25,33 @@ export async function POST(req: NextRequest) {
 
     const { orgId, supabase, user } = await getUserAndOrg();
 
+    // Resolve status_id from attribute_options
+    const { data: statusOption } = await supabase
+      .from("attribute_options")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("attribute_key", "production_status")
+      .or(`system_code.eq.${status},display_label.eq.${status}`)
+      .single();
+
+    const updatePayload: any = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (statusOption) {
+      updatePayload.status_id = statusOption.id;
+    } else {
+       // Fallback or error? If status is validated against SALEABLE_STATUSES, it should exist as an option if seeded.
+       // But if not found, we proceed with just status text update to avoid breaking if options missing?
+       // However, migration made status_id not null, so this update might fail if status_id was null (but it's an update, so it keeps old value if not set).
+       // If we are Changing status, we SHOULD update status_id.
+       console.warn(`[bulk-status] Could not find status_id for status '${status}'`);
+    }
+
     const { error } = await supabase
       .from("batches")
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .in("id", payload.batchIds)
       .eq("org_id", orgId);
 
