@@ -12,6 +12,14 @@ export interface BatchInfo {
   plantingDate?: string;
 }
 
+export interface ProductAliasInfo {
+  id: string;
+  aliasName: string | null;
+  customerId: string | null;
+  customerSkuCode: string | null;
+  isActive: boolean;
+}
+
 export interface ProductWithBatches {
   id: string;
   name: string;
@@ -19,6 +27,7 @@ export interface ProductWithBatches {
   size: string;
   availableStock: number;
   batches: BatchInfo[];
+  aliases: ProductAliasInfo[];
 }
 
 /**
@@ -76,6 +85,30 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
   if (pbError) {
     console.error('Error fetching product batches:', pbError);
   }
+
+  // Fetch product aliases for customer filtering
+  const { data: aliases, error: aliasError } = await supabase
+    .from('product_aliases')
+    .select('id, product_id, alias_name, customer_id, customer_sku_code, is_active')
+    .eq('org_id', orgId)
+    .in('product_id', productIds);
+
+  if (aliasError) {
+    console.error('Error fetching product aliases:', aliasError);
+  }
+
+  const aliasMap = new Map<string, ProductAliasInfo[]>();
+  aliases?.forEach((alias) => {
+    const list = aliasMap.get(alias.product_id) || [];
+    list.push({
+      id: alias.id,
+      aliasName: alias.alias_name ?? null,
+      customerId: alias.customer_id ?? null,
+      customerSkuCode: alias.customer_sku_code ?? null,
+      isActive: alias.is_active ?? true,
+    });
+    aliasMap.set(alias.product_id, list);
+  });
 
   // Get all relevant batches (simplified query)
   const batchIds = productBatches?.map(pb => pb.batch_id) || [];
@@ -155,6 +188,7 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
       size: sizeMap.get(sku?.size_id || '') || '',
       availableStock: totalStock,
       batches: batches,
+      aliases: aliasMap.get(product.id) || [],
     };
   });
 

@@ -129,6 +129,21 @@ export async function PATCH(req: Request, { params }: Params) {
     }
 
     const shouldArchive = nextQty <= 0 || nextStatus === "Archived";
+    const finalStatus = shouldArchive ? "Archived" : nextStatus;
+
+    // Resolve status_id if status is changing or likely to be updated
+    let statusId = undefined;
+    if (finalStatus) {
+      const { data: sOpt } = await supabase
+        .from("attribute_options")
+        .select("id")
+        .eq("org_id", activeOrgId)
+        .eq("attribute_key", "production_status")
+        .or(`system_code.eq.${finalStatus},display_label.eq.${finalStatus}`)
+        .single();
+      if (sOpt) statusId = sOpt.id;
+    }
+
     const serverUpdate: Record<string, any> = {
       // category: updates.category, // Removed from schema
       // plant_family: updates.plantFamily, // Removed from schema
@@ -140,7 +155,8 @@ export async function PATCH(req: Request, { params }: Params) {
       grower_photo_url: updates.growerPhotoUrl,
       sales_photo_url: updates.salesPhotoUrl,
       quantity: shouldArchive ? 0 : nextQty,
-      status: shouldArchive ? "Archived" : nextStatus,
+      status: finalStatus,
+      status_id: statusId,
       updated_at: new Date().toISOString(),
     };
 
@@ -180,9 +196,39 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(_req: Request, { params }: Params) {
   try {
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+    // Get active org
+    let activeOrgId: string | null = null;
+    const { data: profile } = await supabase.from('profiles').select('active_org_id').eq('id', user.id).single();
+    if (profile?.active_org_id) {
+      activeOrgId = profile.active_org_id;
+    } else {
+      const { data: membership } = await supabase.from('org_memberships').select('org_id').eq('user_id', user.id).limit(1).single();
+      if (membership) activeOrgId = membership.org_id;
+    }
+
+    if (!activeOrgId) return NextResponse.json({ error: "No active organization found" }, { status: 400 });
+
+    // Resolve 'Archived' status_id
+    const { data: sOpt } = await supabase
+      .from("attribute_options")
+      .select("id")
+      .eq("org_id", activeOrgId)
+      .eq("attribute_key", "production_status")
+      .or(`system_code.eq.Archived,display_label.eq.Archived`)
+      .single();
+
+    const updatePayload: any = {
+      status: "Archived",
+      updated_at: new Date().toISOString()
+    };
+    if (sOpt) updatePayload.status_id = sOpt.id;
+
     const { error } = await supabase
       .from("batches")
-      .update({ status: "Archived", updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("id", params.batchId);
 
     if (error) throw error;

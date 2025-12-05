@@ -22,12 +22,17 @@ export type InventoryBatch = {
 export async function getSaleableBatches(): Promise<InventoryBatch[]> {
     const supabase = await createClient();
 
-    // Fetch available batches
-    // Criteria: Status is "Ready" or "Looking Good", Quantity > 0
+    // Fetch available batches based on status behavior = 'available'
     const { data, error } = await supabase
         .from("batches")
-        .select("*, plant_varieties(name), plant_sizes(name), nursery_locations(name)")
-        .in("status", ["Ready", "Looking Good"])
+        .select(`
+            *,
+            plant_varieties(name),
+            plant_sizes(name),
+            nursery_locations(name),
+            attribute_options!inner(behavior, display_label)
+        `)
+        .eq("attribute_options.behavior", "available")
         .gt("quantity", 0);
 
     if (error) {
@@ -40,7 +45,7 @@ export async function getSaleableBatches(): Promise<InventoryBatch[]> {
         batchNumber: d.batch_number,
         plantVariety: d.plant_varieties?.name ?? null,
         size: d.plant_sizes?.name ?? null,
-        status: d.status,
+        status: d.attribute_options?.display_label ?? d.status,
         qcStatus: d.qc_status,
         quantity: d.quantity,
         grade: d.grade,

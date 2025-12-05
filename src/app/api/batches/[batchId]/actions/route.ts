@@ -50,6 +50,7 @@ const BATCH_FIELDS = [
   "initial_quantity",
   "phase",
   "status",
+  "status_id",
   "plant_variety_id",
   "size_id",
   "location_id",
@@ -66,6 +67,7 @@ type BatchRow = {
   initial_quantity: number | null;
   phase: string | null;
   status: string | null;
+  status_id: string | null;
   plant_variety_id: string | null;
   size_id: string | null;
   location_id: string | null;
@@ -272,6 +274,7 @@ async function handleMove(ctx: HandlerArgs): Promise<HandlerResult> {
         size_id: batch.size_id,
         location_id: destination.id,
         status: batch.status ?? "Growing",
+        status_id: batch.status_id, // Inherit
         quantity: qty,
         initial_quantity: qty,
         unit: batch.unit ?? "plants",
@@ -384,14 +387,28 @@ async function handleDump(ctx: HandlerArgs): Promise<HandlerResult> {
   const quantityAfter = Number(remainingQty ?? 0);
   const shouldArchive = quantityAfter === 0;
 
-  const { error: updateErr } = await supabase
-    .from("batches")
-    .update({
+  const updatePayload: any = {
       quantity: quantityAfter,
       status: shouldArchive ? "Archived" : batch.status,
       archived_at: shouldArchive ? occurredAt.toISOString() : null,
       updated_at: occurredAt.toISOString(),
-    })
+  };
+
+  if (shouldArchive) {
+     // Resolve 'Archived' status_id
+     const { data: sOpt } = await supabase
+      .from("attribute_options")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("attribute_key", "production_status")
+      .or(`system_code.eq.Archived,display_label.eq.Archived`)
+      .single();
+     if (sOpt) updatePayload.status_id = sOpt.id;
+  }
+
+  const { error: updateErr } = await supabase
+    .from("batches")
+    .update(updatePayload)
     .eq("id", batch.id)
     .eq("org_id", orgId);
   if (updateErr) throw new Error(updateErr.message);
@@ -434,6 +451,16 @@ async function handleCheckOrNote(
   };
   if (updateStatus && input.status) {
     updates.status = input.status;
+
+    // Resolve status_id
+    const { data: sOpt } = await supabase
+      .from("attribute_options")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("attribute_key", "production_status")
+      .or(`system_code.eq.${input.status},display_label.eq.${input.status}`)
+      .single();
+    if (sOpt) updates.status_id = sOpt.id;
   }
 
   const { error: updateErr } = await supabase
@@ -475,7 +502,7 @@ async function loadBatch(
       .eq("org_id", orgId)
       .eq("id", identifier)
       .maybeSingle();
-    if (byId.data) return byId.data as BatchRow;
+    if (byId.data) return byId.data as unknown as BatchRow;
     if (byId.error && byId.error.code !== "PGRST116") {
       throw new Error(byId.error.message);
     }
@@ -492,7 +519,7 @@ async function loadBatch(
     throw new Error(byNumber.error.message);
   }
 
-  return (byNumber.data as BatchRow) ?? null;
+  return (byNumber.data as unknown as BatchRow) ?? null;
 }
 
 async function resolveLocation(

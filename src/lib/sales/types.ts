@@ -39,6 +39,8 @@ export const CreateOrderLineSchema = z
 export const CreateOrderSchema = z.object({
   customerId: z.string().min(1),
   storeId: z.string().min(1).optional(),
+  deliveryAddress: z.string().optional(),
+  orderReference: z.string().optional(),
   deliveryDate: z.string().optional(), // ISO
   shipMethod: z.enum(["van", "haulier"]).optional(),
   notesCustomer: z.string().optional(),
