@@ -16,13 +16,13 @@ export const CreateOrderLineSchema = z
   .object({
     productId: z.string().uuid().optional(),
     // Product identity fallback (variety + size)
-    plantVariety: z.string().min(1).optional(),
-    size: z.string().min(1).optional(),
+    plantVariety: z.string().optional(),
+    size: z.string().optional(),
     description: z.string().optional(),
-    qty: z.number().int().positive(),
-    allowSubstitute: z.boolean().optional().default(false),
-    unitPrice: z.number().nonnegative().optional(), // optional override
-    vatRate: z.number().min(0).max(100).optional(),
+    qty: z.coerce.number().int().positive().default(1),
+    allowSubstitute: z.boolean().optional().default(true),
+    unitPrice: z.coerce.number().nonnegative().optional(), // optional override
+    vatRate: z.coerce.number().min(0).max(100).optional(),
     // Batch-specific ordering
     specificBatchId: z.string().uuid().optional(), // Request specific batch
     gradePreference: z.enum(['A', 'B', 'C']).optional(), // Grade preference
@@ -31,7 +31,7 @@ export const CreateOrderLineSchema = z
   .refine(
     (val) => Boolean(val.productId) || (Boolean(val.plantVariety) && Boolean(val.size)),
     {
-      message: "Provide a productId or both plant variety and size",
+      message: "Select a product or provide both plant variety and size",
       path: ["productId"],
     }
   );
@@ -42,7 +42,7 @@ export const CreateOrderSchema = z.object({
   deliveryAddress: z.string().optional(),
   orderReference: z.string().optional(),
   deliveryDate: z.string().optional(), // ISO
-  shipMethod: z.enum(["van", "haulier"]).optional(),
+  shipMethod: z.enum(["van", "haulier", "collection"]).optional().or(z.literal('')),
   notesCustomer: z.string().optional(),
   notesInternal: z.string().optional(),
   autoPrint: z.boolean().optional().default(true),
