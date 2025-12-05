@@ -23,8 +23,21 @@ export type OfflineBatchDoc = {
   updatedAt: string | null;
 };
 
+export type OfflineOrderDoc = {
+  id: string;
+  orgId: string | null;
+  orderNumber: string;
+  customerName: string | null;
+  requestedDeliveryDate: string | null;
+  status: string | null;
+  paymentStatus: string | null;
+  totalIncVat: number | null;
+  updatedAt: string | null;
+};
+
 type OfflineCollections = {
   batches: RxCollection<OfflineBatchDoc>;
+  orders: RxCollection<OfflineOrderDoc>;
 };
 
 const batchSchema: RxJsonSchema<OfflineBatchDoc> = {
@@ -49,6 +62,26 @@ const batchSchema: RxJsonSchema<OfflineBatchDoc> = {
   indexes: ['batchNumberIndex'],
 };
 
+const orderSchema: RxJsonSchema<OfflineOrderDoc> = {
+  title: 'offline-orders',
+  version: 0,
+  primaryKey: 'id',
+  type: 'object',
+  required: ['id', 'orderNumber'],
+  properties: {
+    id: { type: 'string', maxLength: 50 },
+    orgId: { type: 'string', nullable: true },
+    orderNumber: { type: 'string' },
+    customerName: { type: ['string', 'null'] },
+    requestedDeliveryDate: { type: ['string', 'null'] },
+    status: { type: ['string', 'null'] },
+    paymentStatus: { type: ['string', 'null'] },
+    totalIncVat: { type: ['number', 'null'] },
+    updatedAt: { type: ['string', 'null'] },
+  },
+  indexes: ['orderNumber'],
+};
+
 let dbPromise: Promise<RxDatabase<OfflineCollections>> | null = null;
 
 async function initDb() {
@@ -66,6 +99,9 @@ async function initDb() {
       await db.addCollections({
         batches: {
           schema: batchSchema,
+        },
+        orders: {
+          schema: orderSchema,
         },
       });
       return db;
@@ -87,6 +123,17 @@ export async function replaceOfflineBatches(docs: OfflineBatchDoc[]) {
   }
   if (docs.length) {
     await db.batches.bulkInsert(docs);
+  }
+}
+
+export async function replaceOfflineOrders(docs: OfflineOrderDoc[]) {
+  const db = await getOfflineDb();
+  const existing = await db.orders.find().exec();
+  if (existing.length) {
+    await Promise.all(existing.map((doc) => doc.remove()));
+  }
+  if (docs.length) {
+    await db.orders.bulkInsert(docs);
   }
 }
 

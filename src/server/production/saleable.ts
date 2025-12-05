@@ -40,8 +40,17 @@ export async function fetchSaleableBatches(orgId: string, options: FetchOptions 
     }
   }
 
-  // Map legacy "Ready for Sale" to "Ready"
-  statuses = statuses.map((s) => (s === "Ready for Sale" ? "Ready" : s));
+  // Include legacy "Ready for Sale" records whenever "Ready" is selected so older data still appears.
+  const queryStatuses = Array.from(
+    new Set(
+      statuses.flatMap((status) => {
+        if (status === "Ready" || status === "Ready for Sale") {
+          return ["Ready", "Ready for Sale"];
+        }
+        return [status];
+      })
+    )
+  );
 
   let query = supabase
     .from("batches")
@@ -64,8 +73,8 @@ export async function fetchSaleableBatches(orgId: string, options: FetchOptions 
     .gt("quantity", 0)
     .order("updated_at", { ascending: false });
 
-  if (statuses.length > 0) {
-    query = query.in("status", statuses);
+  if (queryStatuses.length > 0) {
+    query = query.in("status", queryStatuses);
   }
 
   const { data, error } = await query;

@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { normalizeSystemCode } from "@/lib/attributeOptions";
+import { type SupabaseClient } from "@supabase/supabase-js";
 
 export type BatchNode = {
   id: string;
@@ -27,6 +28,38 @@ export type BatchNode = {
   sizeId?: string | null;
   // Add other fields as needed
 };
+
+async function resolveProductionStatus(
+  supabase: SupabaseClient,
+  orgId: string,
+  desiredStatus?: string | null
+) {
+  const requested = (desiredStatus ?? "Growing").trim();
+
+  const { data, error } = await supabase
+    .from("attribute_options")
+    .select("id, system_code")
+    .eq("org_id", orgId)
+    .eq("attribute_key", "production_status")
+    .ilike("system_code", requested)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (data) return data;
+
+  const { data: fallback, error: fallbackErr } = await supabase
+    .from("attribute_options")
+    .select("id, system_code")
+    .eq("org_id", orgId)
+    .eq("attribute_key", "production_status")
+    .eq("system_code", "Growing")
+    .single();
+
+  if (fallbackErr) throw fallbackErr;
+
+  return fallback;
+}
 
 export async function getBatchById(id: string): Promise<BatchNode | null> {
   const supabase = await createClient();
@@ -98,6 +131,7 @@ export type PropagationInput = any;
 export async function createPropagationBatch(params: { input: PropagationInput; userId: string }) {
   const { supabase, orgId } = await getUserAndOrg();
   const input = params.input as any;
+  const statusOption = await resolveProductionStatus(supabase, orgId, input?.status);
   const { data, error } = await supabase
     .from("batches")
     .insert({
@@ -107,7 +141,8 @@ export async function createPropagationBatch(params: { input: PropagationInput; 
       size_id: input?.sizeId ?? input?.size_id,
       location_id: input?.locationId ?? input?.location_id,
       phase: normalizeSystemCode(input?.phase ?? "propagation").toLowerCase(),
-      status: input?.status ?? "Growing",
+      status: statusOption.system_code, // legacy text (deprecated)
+      status_id: statusOption.id,
       quantity: input?.quantity ?? input?.units ?? 0,
       initial_quantity: input?.quantity ?? input?.units ?? 0,
       planted_at: input?.plantingDate ?? input?.planted_at ?? null,
@@ -125,6 +160,7 @@ export type CheckinInput = any;
 export async function createCheckinBatch(params: { input: CheckinInput; userId: string }) {
   const { supabase, orgId } = await getUserAndOrg();
   const input = params.input as any;
+  const statusOption = await resolveProductionStatus(supabase, orgId, input?.status ?? "Incoming");
   const { data, error } = await supabase
     .from("batches")
     .insert({
@@ -134,7 +170,8 @@ export async function createCheckinBatch(params: { input: CheckinInput; userId: 
       size_id: input?.sizeId ?? input?.size_id,
       location_id: input?.locationId ?? input?.location_id,
       phase: normalizeSystemCode(input?.phase ?? "propagation").toLowerCase(),
-      status: input?.status ?? "Incoming",
+      status: statusOption.system_code, // legacy text (deprecated)
+      status_id: statusOption.id,
       quantity: input?.totalUnits ?? input?.quantity ?? 0,
       initial_quantity: input?.totalUnits ?? input?.quantity ?? 0,
       incoming_date: input?.incomingDate ?? null,
