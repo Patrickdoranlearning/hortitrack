@@ -101,12 +101,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     // Invite user via Supabase Auth Admin API
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: {
         default_org_id: orgId,
         default_org_role: role,
+        org_name: org?.name || "HortiTrack",
       },
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/`,
+      redirectTo: `${siteUrl}/api/auth/callback?type=invite`,
     });
 
     if (error) {

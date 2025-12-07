@@ -409,6 +409,8 @@ export interface ActiveDeliveryRunSummary {
   totalDeliveries: number;
   completedDeliveries: number;
   pendingDeliveries: number;
+  haulierId?: string;
+  haulierName?: string;
 }
 
 export interface CustomerTrolleySummary {
@@ -448,3 +450,67 @@ export interface DeliveryRunWithItems extends DeliveryRun {
 
 export type DeliveryRunUpdateInput = Partial<Omit<DeliveryRun, 'id' | 'orgId' | 'createdAt' | 'updatedAt' | 'runNumber'>>;
 export type TrolleyUpdateInput = Partial<Omit<Trolley, 'id' | 'orgId' | 'createdAt' | 'updatedAt' | 'trolleyNumber'>>;
+
+// --- Dispatch Board ---
+
+export type DispatchStage =
+  | "to_pick"
+  | "picking"
+  | "ready_to_load"
+  | "on_route";
+
+export interface DispatchBoardOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  county?: string;
+  requestedDeliveryDate?: string;
+  trolleysEstimated: number;
+  // Stage (computed from pick_list + packing + delivery_item status)
+  stage: DispatchStage;
+  status: string; // Order status (e.g., "confirmed")
+  totalIncVat: number;
+  // Picking - uses individual picker (grower) instead of team
+  pickListId?: string;
+  pickerId?: string;
+  pickerName?: string;
+  pickListStatus?: string;
+  pickProgress?: { picked: number; total: number };
+  // Delivery
+  deliveryItemId?: string;
+  deliveryRunId?: string;
+  deliveryRunNumber?: string;
+  haulierId?: string;
+  haulierName?: string;
+  deliveryItemStatus?: string;
+}
+
+export interface DispatchOrder {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  customerName: string;
+  requestedDeliveryDate?: string;
+  totalIncVat: number;
+  status: string;
+  trolleysEstimated?: number;
+  shipToAddress?: {
+    line1: string;
+    line2?: string;
+    city?: string;
+    county?: string;
+    eircode?: string;
+  };
+  // Joined from pick_lists
+  pickListId?: string;
+  assignedTeamId?: string;
+  pickingTeamName?: string;
+  pickListStatus?: string;
+  // Joined from delivery_items and delivery_runs
+  deliveryItemId?: string;
+  deliveryRunId?: string;
+  deliveryRunNumber?: string;
+  haulierId?: string;
+  haulierName?: string;
+  deliveryItemStatus?: DeliveryItemStatusType;
+}

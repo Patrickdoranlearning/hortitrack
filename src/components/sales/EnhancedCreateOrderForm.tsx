@@ -10,10 +10,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createOrder } from '@/app/sales/actions';
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Plus, Trash2, Layers, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Layers, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { BatchSelectionDialog, BatchAllocation, Batch } from './BatchSelectionDialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export interface Product {
   id: string;
@@ -33,8 +34,29 @@ export interface Product {
   }>;
 }
 
+export interface CustomerAddress {
+  id: string;
+  label: string;
+  storeName: string | null;
+  line1: string;
+  line2: string | null;
+  city: string | null;
+  county: string | null;
+  eircode: string | null;
+  countryCode: string;
+  isDefaultShipping: boolean;
+  isDefaultBilling: boolean;
+}
+
 interface EnhancedCreateOrderFormProps {
-  customers: { id: string; name: string; store?: string | null }[];
+  customers: { 
+    id: string; 
+    name: string; 
+    store?: string | null;
+    currency?: string;
+    countryCode?: string;
+    addresses?: CustomerAddress[];
+  }[];
   products: Product[];
 }
 
@@ -46,6 +68,8 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [batchDialogLineIndex, setBatchDialogLineIndex] = useState<number | null>(null);
   const [lineAllocations, setLineAllocations] = useState<Map<number, BatchAllocation[]>>(new Map());
+  const [submitError, setSubmitError] = useState<{ message: string; details?: string } | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const form = useForm<CreateOrderInput>({
     resolver: zodResolver(CreateOrderSchema),
@@ -85,17 +109,32 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
     [customers, selectedCustomerId]
   );
 
-  const storeLabel = selectedCustomer?.store || 'Main premises';
+  const customerAddresses = useMemo(() => {
+    return selectedCustomer?.addresses ?? [];
+  }, [selectedCustomer]);
+
+  const defaultShippingAddress = useMemo(() => {
+    return customerAddresses.find(a => a.isDefaultShipping) ?? customerAddresses[0];
+  }, [customerAddresses]);
+
+  const formatAddress = (address: CustomerAddress) => {
+    const parts = [address.line1, address.line2, address.city, address.county, address.eircode].filter(Boolean);
+    return parts.join(', ');
+  };
 
   useEffect(() => {
-    if (selectedCustomer?.store) {
+    if (defaultShippingAddress) {
+      form.setValue('storeId', defaultShippingAddress.id);
+      form.setValue('deliveryAddress', formatAddress(defaultShippingAddress));
+    } else if (selectedCustomer?.store) {
       form.setValue('storeId', selectedCustomer.store);
+      form.setValue('deliveryAddress', '');
     } else {
       form.setValue('storeId', 'main');
+      form.setValue('deliveryAddress', '');
     }
-    form.setValue('deliveryAddress', '');
     setShowAllProducts(false);
-  }, [selectedCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedCustomer?.id, defaultShippingAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredProducts = useMemo(() => {
     if (!selectedCustomerId) return products;
@@ -187,6 +226,9 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
 
   async function onSubmit(data: CreateOrderInput) {
     setIsSubmitting(true);
+    setSubmitError(null);
+    setSubmitSuccess(false);
+    
     try {
       console.log('Submitting order:', data);
       
@@ -194,7 +236,17 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       const validation = CreateOrderSchema.safeParse(data);
       if (!validation.success) {
         console.error('Zod validation failed:', validation.error.flatten());
-        alert('Validation failed: ' + validation.error.errors.map(e => e.message).join(', '));
+        const errors = validation.error.flatten();
+        const errorMessages: string[] = [];
+        Object.entries(errors.fieldErrors).forEach(([field, msgs]) => {
+          errorMessages.push(`${field}: ${(msgs as string[]).join(', ')}`);
+        });
+        errors.formErrors.forEach(msg => errorMessages.push(msg));
+        
+        setSubmitError({
+          message: 'Validation failed',
+          details: errorMessages.join('\n')
+        });
         setIsSubmitting(false);
         return;
       }
@@ -202,14 +254,25 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       const result = await createOrder(validation.data);
       if (result?.error) {
         console.error('Order creation error:', result.error, result.details);
-        alert(`Error: ${result.error}`);
+        const detailsStr = result.details 
+          ? JSON.stringify(result.details, null, 2) 
+          : undefined;
+        setSubmitError({
+          message: result.error,
+          details: detailsStr
+        });
       } else {
+        setSubmitSuccess(true);
         form.reset();
         setLineAllocations(new Map());
+        // Success message will show briefly before redirect (if redirect happens)
       }
     } catch (error) {
       console.error('Failed to create order', error);
-      alert('Failed to create order. Check console for details.');
+      setSubmitError({
+        message: 'Failed to create order',
+        details: error instanceof Error ? error.message : 'An unexpected error occurred. Check console for details.'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -217,6 +280,9 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
   
   // Manual submit handler that bypasses react-hook-form validation
   const handleManualSubmit = async () => {
+    setSubmitError(null);
+    setSubmitSuccess(false);
+    
     const values = form.getValues();
     console.log('Manual submit - form values:', values);
     
@@ -232,7 +298,10 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       });
       errors.formErrors.forEach(msg => messages.push(msg));
       
-      alert('Validation errors:\n\n' + messages.join('\n'));
+      setSubmitError({
+        message: 'Please fix the following validation errors',
+        details: messages.join('\n')
+      });
       return;
     }
     
@@ -269,9 +338,15 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
     }
     
     if (messages.length > 0) {
-      alert('Please fix the following errors:\n\n' + messages.join('\n'));
+      setSubmitError({
+        message: 'Please fix the following errors',
+        details: messages.join('\n')
+      });
     } else {
-      alert('Unknown validation error. Check console for details.');
+      setSubmitError({
+        message: 'Unknown validation error',
+        details: 'Check console for details.'
+      });
     }
   }, [form]);
 
@@ -282,21 +357,50 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
     <div className="max-w-7xl mx-auto">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
-          {/* Form Errors Display */}
-          {Object.keys(form.formState.errors).length > 0 && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-destructive text-sm">
-              <p className="font-medium mb-2">Please fix the following errors:</p>
-              <ul className="list-disc list-inside space-y-1">
-                {form.formState.errors.customerId && <li>Customer is required</li>}
-                {form.formState.errors.lines && (
-                  <li>
-                    {Array.isArray(form.formState.errors.lines)
-                      ? 'Some order lines have errors - check product selection and quantity'
-                      : 'At least one order line is required'}
-                  </li>
-                )}
-              </ul>
-            </div>
+          {/* Success Message */}
+          {submitSuccess && (
+            <Alert className="border-green-500 bg-green-50">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-800">Order Created Successfully!</AlertTitle>
+              <AlertDescription className="text-green-700">
+                Your order has been created. You will be redirected to the orders page.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Server Error Display */}
+          {submitError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{submitError.message}</AlertTitle>
+              {submitError.details && (
+                <AlertDescription>
+                  <pre className="mt-2 text-xs whitespace-pre-wrap font-mono bg-destructive/10 p-2 rounded">
+                    {submitError.details}
+                  </pre>
+                </AlertDescription>
+              )}
+            </Alert>
+          )}
+
+          {/* Form Validation Errors Display */}
+          {Object.keys(form.formState.errors).length > 0 && !submitError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Please fix the following errors:</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc list-inside space-y-1 mt-2">
+                  {form.formState.errors.customerId && <li>Customer is required</li>}
+                  {form.formState.errors.lines && (
+                    <li>
+                      {Array.isArray(form.formState.errors.lines)
+                        ? 'Some order lines have errors - check product selection and quantity'
+                        : 'At least one order line is required'}
+                    </li>
+                  )}
+                </ul>
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Header Section - Invoice Style */}
@@ -395,15 +499,46 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deliver To</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || 'main'} disabled={!selectedCustomer}>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Update delivery address based on selection
+                        if (value === 'custom') {
+                          form.setValue('deliveryAddress', '');
+                        } else {
+                          const address = customerAddresses.find(a => a.id === value);
+                          if (address) {
+                            form.setValue('deliveryAddress', formatAddress(address));
+                          }
+                        }
+                      }} 
+                      value={field.value || 'main'} 
+                      disabled={!selectedCustomer}
+                    >
                       <FormControl>
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder={selectedCustomer ? 'Select delivery location' : 'Select a customer first'} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={selectedCustomer?.store || 'main'}>{storeLabel}</SelectItem>
-                        <SelectItem value="custom">Custom delivery address</SelectItem>
+                        {customerAddresses.length > 0 ? (
+                          <>
+                            {customerAddresses.map((address) => (
+                              <SelectItem key={address.id} value={address.id}>
+                                {address.storeName || address.label}
+                                {address.isDefaultShipping && ' (Default)'}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="custom">Custom delivery address</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value={selectedCustomer?.store || 'main'}>
+                              {selectedCustomer?.store || 'Main premises'}
+                            </SelectItem>
+                            <SelectItem value="custom">Custom delivery address</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -411,21 +546,27 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                 )}
               />
 
-              {storeId === 'custom' && (
-                <FormField
-                  control={form.control}
-                  name="deliveryAddress"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Custom Address</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter delivery address" {...field} value={field.value ?? ''} className="bg-white" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+              <FormField
+                control={form.control}
+                name="deliveryAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {storeId === 'custom' ? 'Custom Address' : 'Delivery Address'}
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder={storeId === 'custom' ? "Enter delivery address" : "Address will auto-fill"} 
+                        {...field} 
+                        value={field.value ?? ''} 
+                        className="bg-white"
+                        readOnly={storeId !== 'custom'}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           </div>
 

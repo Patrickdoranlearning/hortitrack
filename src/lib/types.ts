@@ -130,6 +130,12 @@ export const CustomerSchema = z.object({
   store: z.string().optional(),
   accountsEmail: z.string().email().optional(),
   pricingTier: z.string().optional(),
+  // New fields for multi-country support
+  currency: z.enum(['EUR', 'GBP']).default('EUR'),
+  countryCode: z.enum(['IE', 'GB', 'XI', 'NL']).default('IE'),
+  paymentTermsDays: z.number().int().min(0).default(30),
+  creditLimit: z.number().nonnegative().optional(),
+  accountCode: z.string().optional(),
 });
 export type Customer = z.infer<typeof CustomerSchema>;
 
@@ -145,8 +151,25 @@ export const CustomerAddressSchema = z.object({
   countryCode: z.string().default('IE'),
   isDefaultShipping: z.boolean().default(false),
   isDefaultBilling: z.boolean().default(false),
+  // New fields for store locations
+  storeName: z.string().optional(),
+  contactName: z.string().optional(),
+  contactEmail: z.string().email().optional(),
+  contactPhone: z.string().optional(),
 });
 export type CustomerAddress = z.infer<typeof CustomerAddressSchema>;
+
+export const CustomerContactSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  name: z.string().min(1),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  mobile: z.string().optional(),
+  role: z.string().optional(),
+  isPrimary: z.boolean().default(false),
+});
+export type CustomerContact = z.infer<typeof CustomerContactSchema>;
 
 // --- Batches ---
 export const BatchSchema = z.object({

@@ -1,5 +1,5 @@
 
-import { type LucideIcon, ShoppingCart, Receipt, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck } from "lucide-react";
+import { type LucideIcon, ShoppingCart, Receipt, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, ClipboardList, Store } from "lucide-react";
 
 export type NavItem = {
   key: string;
@@ -58,9 +58,20 @@ export const APP_NAV: NavItem[] = [
     href: "/dispatch",
     icon: Truck,
     items: [
-      { label: "Dispatch Dashboard", href: "/dispatch", description: "Packing and delivery schedules." },
-      { label: "Packing", href: "/dispatch/packing", description: "Pack orders for shipment." },
-      { label: "Deliveries", href: "/dispatch/deliveries", description: "Manage delivery routes and status." },
+      { label: "Dashboard", href: "/dispatch", description: "Command center for order flow and logistics." },
+      { label: "Picking", href: "/dispatch/picking", description: "Picker task list and order picking." },
+      { label: "Deliveries", href: "/dispatch/deliveries", description: "Route planning and management." },
+      { label: "Driver View", href: "/dispatch/driver", description: "Mobile view for drivers on route." },
+    ]
+  },
+  {
+    key: "b2b",
+    label: "B2B Portal",
+    href: "/b2b/impersonate",
+    icon: Store,
+    items: [
+      { label: "Place Order (as Customer)", href: "/b2b/impersonate", description: "Impersonate customer to place orders." },
+      { label: "Customer Login", href: "/b2b/login", description: "Direct link to customer portal login." },
     ]
   },
 ];

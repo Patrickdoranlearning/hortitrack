@@ -197,7 +197,17 @@ export async function createOrder(data: CreateOrderInput) {
         created_by: user.id,
     });
 
+    // Auto-create pick list for confirmed orders
+    try {
+        const { createPickListFromOrder } = await import('@/server/sales/picking');
+        await createPickListFromOrder(order.id);
+    } catch (e) {
+        console.error('Failed to create pick list:', e);
+        // Don't fail the order creation if pick list fails
+    }
+
     revalidatePath('/sales/orders');
+    revalidatePath('/sales/picking');
     redirect('/sales/orders');
 }
 

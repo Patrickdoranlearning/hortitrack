@@ -75,3 +75,69 @@ export async function changePasswordAction(formData: FormData) {
 
   return { success: true };
 }
+
+export async function updateCompanyProfileAction(formData: FormData) {
+  const orgId = formData.get("orgId") as string;
+  const name = formData.get("name") as string;
+  const countryCode = formData.get("countryCode") as string;
+  const logoUrl = formData.get("logoUrl") as string;
+  const email = formData.get("email") as string;
+  const phone = formData.get("phone") as string;
+  const website = formData.get("website") as string;
+  const address = formData.get("address") as string;
+
+  if (!orgId) {
+    return { error: "Organization ID is required" };
+  }
+
+  if (!name || name.trim().length === 0) {
+    return { error: "Company name is required" };
+  }
+
+  const supabase = await getSupabaseServerApp();
+  const { userId, orgId: userOrgId } = await getUserIdAndOrgId();
+
+  if (!userId) {
+    return { error: "Not authenticated" };
+  }
+
+  // Verify user belongs to this org and has admin/owner role
+  if (userOrgId !== orgId) {
+    return { error: "You do not have permission to edit this organization" };
+  }
+
+  const { data: membership } = await supabase
+    .from("org_memberships")
+    .select("role")
+    .eq("org_id", orgId)
+    .eq("user_id", userId)
+    .single();
+
+  if (!membership || (membership.role !== "admin" && membership.role !== "owner")) {
+    return { error: "You must be an admin or owner to edit company settings" };
+  }
+
+  // Update organization
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      name: name.trim(),
+      country_code: countryCode || "IE",
+      logo_url: logoUrl || null,
+      email: email?.trim() || null,
+      phone: phone?.trim() || null,
+      website: website?.trim() || null,
+      address: address?.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orgId);
+
+  if (error) {
+    console.error("Error updating company profile:", error);
+    return { error: "Failed to update company profile" };
+  }
+
+  revalidatePath("/account");
+  revalidatePath("/"); // Revalidate home page too since company name may be displayed there
+  return { success: true };
+}
