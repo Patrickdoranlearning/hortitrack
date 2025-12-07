@@ -18,6 +18,11 @@ export default async function CustomersPage() {
       currency: row.currency ?? "EUR",
       isDefault: row.is_default ?? false,
     })),
+    products: data.products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      skuCode: p.sku_code,
+    })),
   };
 
   return (

@@ -99,8 +99,11 @@ export default function DropdownManagerPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // UUID regex to validate real database IDs vs default placeholders
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const payload = items.map((opt, idx) => ({
-        id: opt.id, // only send persisted IDs
+        // Only send id if it's a valid UUID (not default placeholder IDs like "default-delivery_route-DUBLIN")
+        id: opt.id && UUID_RE.test(opt.id) ? opt.id : undefined,
         systemCode: opt.systemCode,
         displayLabel: opt.displayLabel,
         isActive: opt.isActive,

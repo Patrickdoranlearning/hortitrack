@@ -95,6 +95,7 @@ export type ProductAlias = {
   customerSkuCode: string | null;
   customerBarcode: string | null;
   unitPriceExVat: number | null;
+  rrp: number | null; // Recommended retail price - what customer charges end consumers
   priceListId: string | null;
   priceListName: string | null;
   isActive: boolean;

@@ -1,5 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import type { Haulier } from "@/lib/types";
+import { listAttributeOptions } from "@/server/attributeOptions/service";
+import type { AttributeOption } from "@/lib/attributeOptions";
 import type {
   DeliveryRun,
   DeliveryItem,
@@ -19,6 +22,9 @@ import type {
   ActiveDeliveryRunSummary,
   CustomerTrolleySummary,
   DeliveryRunWithItems,
+  DispatchOrder,
+  DispatchBoardOrder,
+  DispatchStage
 } from "@/lib/dispatch/types";
 import { generateId } from "@/server/utils/ids";
 
@@ -110,6 +116,10 @@ export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[
     totalDeliveries: d.total_deliveries,
     completedDeliveries: d.completed_deliveries,
     pendingDeliveries: d.pending_deliveries,
+    haulierId: d.haulier_id,
+    haulierName: d.hauliers?.name // Note: v_active_delivery_runs view might need hauliers joined or it might not be there. 
+                                  // If it's not in the view, this will be undefined. 
+                                  // Ideally the view should include it.
   }));
 }
 
@@ -804,9 +814,223 @@ export async function getOrderStatusUpdates(orderId: string): Promise<OrderStatu
 }
 
 // ================================================
-// HELPER FUNCTIONS - DB MAPPING
+// DISPATCH BOARD DATA
 // ================================================
 
+// Type for grower members (employees who can pick orders)
+export interface GrowerMember {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+/**
+ * Get org members with 'grower' role for picker assignment
+ */
+export async function getGrowerMembers(orgId: string): Promise<GrowerMember[]> {
+  const supabase = await createClient();
+  
+  try {
+    // First try with profiles join
+    const { data, error } = await supabase
+      .from("org_memberships")
+      .select("user_id, role, profiles(id, full_name, email)")
+      .eq("org_id", orgId)
+      .eq("role", "grower");
+
+    if (error) {
+      // If profiles join fails, try without it
+      console.warn("Could not fetch grower members with profiles:", error.message);
+      
+      // Fallback: just get user_ids
+      const { data: fallbackData } = await supabase
+        .from("org_memberships")
+        .select("user_id")
+        .eq("org_id", orgId)
+        .eq("role", "grower");
+      
+      return (fallbackData || []).map((m: any) => ({
+        id: m.user_id,
+        name: "Grower",
+        email: undefined,
+      }));
+    }
+
+    return (data || [])
+      .filter((m: any) => m.profiles)
+      .map((m: any) => ({
+        id: m.user_id,
+        name: m.profiles?.full_name || m.profiles?.email || "Unknown",
+        email: m.profiles?.email,
+      }));
+  } catch (err) {
+    console.error("Error in getGrowerMembers:", err);
+    return [];
+  }
+}
+
+export async function getHauliers(): Promise<Haulier[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const { data: membership } = await supabase
+    .from("org_memberships")
+    .select("org_id")
+    .eq("user_id", user.id)
+    .single();
+  if (!membership) throw new Error("No organization membership found");
+
+  const { data, error } = await supabase
+    .from("hauliers")
+    .select("*")
+    .eq("org_id", membership.org_id)
+    .eq("is_active", true)
+    .order("name");
+
+  if (error) {
+    // If table doesn't exist, return empty
+    if (error.code === "42P01") return [];
+    console.error("Error fetching hauliers:", error);
+    return [];
+  }
+
+  return data.map((d: any) => ({
+    id: d.id,
+    orgId: d.org_id,
+    name: d.name,
+    phone: d.phone,
+    email: d.email,
+    notes: d.notes,
+    isActive: d.is_active,
+  }));
+}
+
+export async function getDispatchBoardData(): Promise<{
+  orders: DispatchBoardOrder[];
+  hauliers: Haulier[];
+  growers: GrowerMember[];
+  routes: AttributeOption[];
+  deliveryRuns: ActiveDeliveryRunSummary[];
+}> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const { data: membership } = await supabase
+    .from("org_memberships")
+    .select("org_id")
+    .eq("user_id", user.id)
+    .single();
+  if (!membership) throw new Error("No organization membership found");
+
+  const orgId = membership.org_id;
+
+  // Fetch data in parallel
+  const [hauliers, growers, routesResult, activeRuns, ordersData] = await Promise.all([
+    getHauliers(),
+    getGrowerMembers(orgId),
+    listAttributeOptions({ orgId, attributeKey: "delivery_route" }),
+    getActiveDeliveryRuns(), // Use active runs instead of just planned
+    supabase
+      .from("orders")
+      .select(`
+        id,
+        order_number,
+        customer_id,
+        status,
+        requested_delivery_date,
+        trolleys_estimated,
+        total_inc_vat,
+        customers(name),
+        customer_addresses(
+          line1, city, county, eircode
+        ),
+        pick_lists(id, assigned_team_id, status),
+        order_packing(status),
+        delivery_items(id, delivery_run_id, status, delivery_runs(run_number, haulier_id))
+      `)
+      .eq("org_id", orgId)
+      .in("status", ["confirmed"])
+      .order("requested_delivery_date", { ascending: true })
+  ]);
+
+  if (ordersData.error) {
+    console.error("Error fetching dispatch board orders:", JSON.stringify(ordersData.error, null, 2));
+    throw new Error(`Failed to fetch orders: ${ordersData.error.message}`);
+  }
+
+  const orders: DispatchBoardOrder[] = ordersData.data.map((o: any) => {
+    const pickLists = Array.isArray(o.pick_lists) ? o.pick_lists : (o.pick_lists ? [o.pick_lists] : []);
+    const pickList = pickLists[0];
+    
+    const packingRecords = Array.isArray(o.order_packing) ? o.order_packing : (o.order_packing ? [o.order_packing] : []);
+    const packingRecord = packingRecords[0];
+
+    const deliveryItems = Array.isArray(o.delivery_items) ? o.delivery_items : (o.delivery_items ? [o.delivery_items] : []);
+    const deliveryItem = deliveryItems.find((di: any) => di.delivery_run_id);
+
+    // Look up haulier name from the hauliers list (no FK constraint in DB)
+    const haulierId = deliveryItem?.delivery_runs?.haulier_id;
+    const haulierName = haulierId ? hauliers.find(h => h.id === haulierId)?.name : undefined;
+
+    // Get picker info - assigned_user_id may not exist until migration is run
+    // If the column exists, it will be in the data; otherwise pickerId stays undefined
+    const pickerId = (pickList as any)?.assigned_user_id;
+    const pickerName = pickerId ? growers.find(g => g.id === pickerId)?.name : undefined;
+
+    // Compute Stage (simplified workflow: To Pick -> Picking -> Ready to Load -> On Route)
+    let stage: DispatchStage = "to_pick";
+
+    if (deliveryItem?.delivery_run_id) {
+      // Assigned to a delivery run
+      stage = "on_route";
+    } else if (pickList?.status === "completed" || packingRecord?.status === "completed" || packingRecord?.status === "verified") {
+      // Picking done (or packing done) = Ready to load onto truck
+      stage = "ready_to_load";
+    } else if (pickerId || pickList?.status === "in_progress") {
+      // Picker assigned or actively picking
+      stage = "picking";
+    }
+    // Default: "to_pick" - needs picker assignment
+
+    return {
+      id: o.id,
+      orderNumber: o.order_number,
+      customerName: o.customers?.name || "Unknown",
+      county: o.customer_addresses?.county,
+      requestedDeliveryDate: o.requested_delivery_date,
+      trolleysEstimated: o.trolleys_estimated || 0,
+      totalIncVat: o.total_inc_vat,
+      status: o.status,
+      stage,
+      
+      // Picking - now uses individual picker (grower) instead of team
+      pickListId: pickList?.id,
+      pickerId,
+      pickerName,
+      pickListStatus: pickList?.status,
+      
+      // Delivery
+      deliveryItemId: deliveryItem?.id,
+      deliveryRunId: deliveryItem?.delivery_run_id,
+      deliveryRunNumber: deliveryItem?.delivery_runs?.run_number,
+      haulierId,
+      haulierName,
+      deliveryItemStatus: deliveryItem?.status,
+    };
+  });
+
+  return {
+    orders,
+    hauliers,
+    growers,
+    routes: routesResult.options,
+    deliveryRuns: activeRuns
+  };
+}
+
+// ... (helper functions remain unchanged)
 function mapDeliveryRunFromDb(d: any): DeliveryRun {
   return {
     id: d.id,

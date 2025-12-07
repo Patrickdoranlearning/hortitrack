@@ -55,6 +55,7 @@ export type ProductRow = {
     customer_sku_code: string | null;
     customer_barcode: string | null;
     unit_price_ex_vat: number | null;
+    rrp: number | null;
     price_list_id: string | null;
     is_active: boolean | null;
     notes: string | null;
@@ -157,6 +158,7 @@ export async function fetchProductManagementData(
           customer_sku_code,
           customer_barcode,
           unit_price_ex_vat,
+          rrp,
           price_list_id,
           is_active,
           notes,
@@ -325,6 +327,7 @@ export function mapProducts(rows: ProductRow[]): ProductManagementPayload["produ
         customerSkuCode: alias.customer_sku_code,
         customerBarcode: alias.customer_barcode,
         unitPriceExVat: alias.unit_price_ex_vat,
+        rrp: alias.rrp,
         priceListId: alias.price_list_id,
         priceListName: alias.price_lists?.name ?? null,
         isActive: alias.is_active ?? true,

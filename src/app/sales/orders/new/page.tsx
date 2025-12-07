@@ -8,10 +8,30 @@ import { redirect } from 'next/navigation';
 async function getCustomers(orgId: string) {
   const supabase = await getSupabaseServerApp();
 
-  // Fetch only this org's customers
+  // Fetch customers with addresses
   const { data: customers, error } = await supabase
     .from('customers')
-    .select('id, name, org_id, store')
+    .select(`
+      id,
+      name,
+      org_id,
+      store,
+      currency,
+      country_code,
+      customer_addresses (
+        id,
+        label,
+        store_name,
+        line1,
+        line2,
+        city,
+        county,
+        eircode,
+        country_code,
+        is_default_shipping,
+        is_default_billing
+      )
+    `)
     .eq('org_id', orgId)
     .order('name');
 
@@ -22,7 +42,38 @@ async function getCustomers(orgId: string) {
 
   const filtered = (customers || []).filter(c => c.org_id === orgId);
 
-  return filtered.map(c => ({ id: c.id, name: c.name, store: c.store }));
+  return filtered.map(c => ({
+    id: c.id,
+    name: c.name,
+    store: c.store,
+    currency: c.currency ?? 'EUR',
+    countryCode: c.country_code ?? 'IE',
+    addresses: (c.customer_addresses ?? []).map((a: {
+      id: string;
+      label: string;
+      store_name: string | null;
+      line1: string;
+      line2: string | null;
+      city: string | null;
+      county: string | null;
+      eircode: string | null;
+      country_code: string;
+      is_default_shipping: boolean;
+      is_default_billing: boolean;
+    }) => ({
+      id: a.id,
+      label: a.label,
+      storeName: a.store_name,
+      line1: a.line1,
+      line2: a.line2,
+      city: a.city,
+      county: a.county,
+      eircode: a.eircode,
+      countryCode: a.country_code,
+      isDefaultShipping: a.is_default_shipping,
+      isDefaultBilling: a.is_default_billing,
+    })),
+  }));
 }
 
 export default async function CreateOrderPage() {

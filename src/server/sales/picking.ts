@@ -1,0 +1,1150 @@
+// src/server/sales/picking.ts
+import "server-only";
+import { getSupabaseServerApp } from "@/server/db/supabase";
+import { getUserAndOrg } from "@/server/auth/org";
+
+// ================================================
+// TYPES
+// ================================================
+
+export type PickListStatus = "pending" | "in_progress" | "completed" | "cancelled";
+export type PickItemStatus = "pending" | "picked" | "short" | "substituted" | "skipped";
+
+export interface PickingTeam {
+  id: string;
+  orgId: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  memberCount?: number;
+}
+
+export interface PickingTeamMember {
+  id: string;
+  teamId: string;
+  userId: string;
+  isLead: boolean;
+  displayName?: string;
+  email?: string;
+}
+
+export interface PickList {
+  id: string;
+  orgId: string;
+  orderId: string;
+  assignedTeamId?: string;
+  sequence: number;
+  status: PickListStatus;
+  startedAt?: string;
+  completedAt?: string;
+  startedBy?: string;
+  completedBy?: string;
+  notes?: string;
+  createdAt: string;
+  // Joined fields
+  orderNumber?: string;
+  orderStatus?: string;
+  customerName?: string;
+  requestedDeliveryDate?: string;
+  teamName?: string;
+  totalItems?: number;
+  pickedItems?: number;
+  totalQty?: number;
+  pickedQty?: number;
+}
+
+export interface PickItem {
+  id: string;
+  pickListId: string;
+  orderItemId: string;
+  targetQty: number;
+  pickedQty: number;
+  status: PickItemStatus;
+  originalBatchId?: string;
+  pickedBatchId?: string;
+  substitutionReason?: string;
+  notes?: string;
+  pickedAt?: string;
+  pickedBy?: string;
+  locationHint?: string;
+  // Joined fields
+  productName?: string;
+  plantVariety?: string;
+  size?: string;
+  originalBatchNumber?: string;
+  pickedBatchNumber?: string;
+  batchLocation?: string;
+}
+
+export interface CreatePickListInput {
+  orderId: string;
+  assignedTeamId?: string;
+  sequence?: number;
+}
+
+export interface UpdatePickItemInput {
+  pickItemId: string;
+  pickedQty: number;
+  pickedBatchId?: string;
+  substitutionReason?: string;
+  notes?: string;
+  status?: PickItemStatus;
+}
+
+// ================================================
+// TEAMS
+// ================================================
+
+export async function getPickingTeams(orgId: string): Promise<PickingTeam[]> {
+  const supabase = await getSupabaseServerApp();
+
+  try {
+    const { data, error } = await supabase
+      .from("picking_teams")
+      .select(`
+        *,
+        picking_team_members(count)
+      `)
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("name");
+
+    if (error) {
+      // Table might not exist yet
+      if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        console.warn("picking_teams table does not exist yet. Run the migration.");
+        return [];
+      }
+      console.error("Error fetching picking teams:", error.message || error);
+      return [];
+    }
+
+    return (data || []).map((t: any) => ({
+      id: t.id,
+      orgId: t.org_id,
+      name: t.name,
+      description: t.description,
+      isActive: t.is_active,
+      createdAt: t.created_at,
+      memberCount: t.picking_team_members?.[0]?.count ?? 0,
+    }));
+  } catch (e) {
+    console.error("Exception fetching picking teams:", e);
+    return [];
+  }
+}
+
+export async function createPickingTeam(
+  orgId: string,
+  name: string,
+  description?: string
+): Promise<{ team?: PickingTeam; error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("picking_teams")
+    .insert({
+      org_id: orgId,
+      name,
+      description,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating picking team:", error);
+    return { error: error.message };
+  }
+
+  return {
+    team: {
+      id: data.id,
+      orgId: data.org_id,
+      name: data.name,
+      description: data.description,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+    },
+  };
+}
+
+export async function addTeamMember(
+  teamId: string,
+  userId: string,
+  isLead: boolean = false
+): Promise<{ error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("picking_team_members")
+    .insert({
+      team_id: teamId,
+      user_id: userId,
+      is_lead: isLead,
+    });
+
+  if (error) {
+    console.error("Error adding team member:", error);
+    return { error: error.message };
+  }
+
+  return {};
+}
+
+export async function removeTeamMember(
+  teamId: string,
+  userId: string
+): Promise<{ error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("picking_team_members")
+    .delete()
+    .eq("team_id", teamId)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Error removing team member:", error);
+    return { error: error.message };
+  }
+
+  return {};
+}
+
+export async function getTeamMembers(teamId: string): Promise<PickingTeamMember[]> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("picking_team_members")
+    .select(`
+      *,
+      profiles:user_id(display_name, email)
+    `)
+    .eq("team_id", teamId);
+
+  if (error) {
+    console.error("Error fetching team members:", error);
+    return [];
+  }
+
+  return (data || []).map((m: any) => ({
+    id: m.id,
+    teamId: m.team_id,
+    userId: m.user_id,
+    isLead: m.is_lead,
+    displayName: m.profiles?.display_name,
+    email: m.profiles?.email,
+  }));
+}
+
+// ================================================
+// EMPLOYEES
+// ================================================
+
+export interface Employee {
+  id: string;
+  orgId: string;
+  name: string;
+  role?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface TeamEmployee {
+  id: string;
+  teamId: string;
+  employeeId: string;
+  isLead: boolean;
+  employeeName?: string;
+  employeeRole?: string;
+}
+
+export async function getEmployees(orgId: string): Promise<Employee[]> {
+  const supabase = await getSupabaseServerApp();
+
+  try {
+    const { data, error } = await supabase
+      .from("employees")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("name");
+
+    if (error) {
+      if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        console.warn("employees table does not exist yet. Run the migration.");
+        return [];
+      }
+      console.error("Error fetching employees:", error.message || error);
+      return [];
+    }
+
+    return (data || []).map((e: any) => ({
+      id: e.id,
+      orgId: e.org_id,
+      name: e.name,
+      role: e.role,
+      phone: e.phone,
+      email: e.email,
+      isActive: e.is_active,
+      notes: e.notes,
+      createdAt: e.created_at,
+    }));
+  } catch (e) {
+    console.error("Exception fetching employees:", e);
+    return [];
+  }
+}
+
+export async function createEmployee(
+  orgId: string,
+  name: string,
+  role?: string,
+  phone?: string,
+  email?: string
+): Promise<{ employee?: Employee; error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("employees")
+    .insert({
+      org_id: orgId,
+      name,
+      role,
+      phone,
+      email,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating employee:", error);
+    return { error: error.message };
+  }
+
+  return {
+    employee: {
+      id: data.id,
+      orgId: data.org_id,
+      name: data.name,
+      role: data.role,
+      phone: data.phone,
+      email: data.email,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+    },
+  };
+}
+
+export async function updateEmployee(
+  employeeId: string,
+  updates: { name?: string; role?: string; phone?: string; email?: string; isActive?: boolean }
+): Promise<{ error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("employees")
+    .update({
+      name: updates.name,
+      role: updates.role,
+      phone: updates.phone,
+      email: updates.email,
+      is_active: updates.isActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", employeeId);
+
+  if (error) {
+    console.error("Error updating employee:", error);
+    return { error: error.message };
+  }
+
+  return {};
+}
+
+export async function getTeamEmployees(teamId: string): Promise<TeamEmployee[]> {
+  const supabase = await getSupabaseServerApp();
+
+  try {
+    const { data, error } = await supabase
+      .from("team_employees")
+      .select(`
+        *,
+        employees(name, role)
+      `)
+      .eq("team_id", teamId);
+
+    if (error) {
+      if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        return [];
+      }
+      console.error("Error fetching team employees:", error);
+      return [];
+    }
+
+    return (data || []).map((m: any) => ({
+      id: m.id,
+      teamId: m.team_id,
+      employeeId: m.employee_id,
+      isLead: m.is_lead,
+      employeeName: m.employees?.name,
+      employeeRole: m.employees?.role,
+    }));
+  } catch (e) {
+    console.error("Exception fetching team employees:", e);
+    return [];
+  }
+}
+
+export async function addEmployeeToTeam(
+  teamId: string,
+  employeeId: string,
+  isLead: boolean = false
+): Promise<{ error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("team_employees")
+    .insert({
+      team_id: teamId,
+      employee_id: employeeId,
+      is_lead: isLead,
+    });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "Employee is already assigned to this team" };
+    }
+    console.error("Error adding employee to team:", error);
+    return { error: error.message };
+  }
+
+  return {};
+}
+
+export async function removeEmployeeFromTeam(
+  teamId: string,
+  employeeId: string
+): Promise<{ error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("team_employees")
+    .delete()
+    .eq("team_id", teamId)
+    .eq("employee_id", employeeId);
+
+  if (error) {
+    console.error("Error removing employee from team:", error);
+    return { error: error.message };
+  }
+
+  return {};
+}
+
+export async function getUserTeams(userId: string): Promise<PickingTeam[]> {
+  const supabase = await getSupabaseServerApp();
+
+  try {
+    const { data, error } = await supabase
+      .from("picking_team_members")
+      .select(`
+        picking_teams(*)
+      `)
+      .eq("user_id", userId);
+
+    if (error) {
+      // Table might not exist yet
+      if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        console.warn("picking_team_members table does not exist yet. Run the migration.");
+        return [];
+      }
+      console.error("Error fetching user teams:", error.message || error);
+      return [];
+    }
+
+    return (data || [])
+      .filter((d: any) => d.picking_teams)
+      .map((d: any) => ({
+        id: d.picking_teams.id,
+        orgId: d.picking_teams.org_id,
+        name: d.picking_teams.name,
+        description: d.picking_teams.description,
+        isActive: d.picking_teams.is_active,
+        createdAt: d.picking_teams.created_at,
+      }));
+  } catch (e) {
+    console.error("Exception fetching user teams:", e);
+    return [];
+  }
+}
+
+// ================================================
+// PICK LISTS
+// ================================================
+
+export async function createPickList(
+  input: CreatePickListInput
+): Promise<{ pickList?: PickList; error?: string }> {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  // Get max sequence for the team (or org if unassigned)
+  const { data: maxSeq } = await supabase
+    .from("pick_lists")
+    .select("sequence")
+    .eq("org_id", orgId)
+    .eq("assigned_team_id", input.assignedTeamId ?? null)
+    .order("sequence", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextSequence = input.sequence ?? ((maxSeq?.sequence ?? 0) + 1);
+
+  const { data, error } = await supabase
+    .from("pick_lists")
+    .insert({
+      org_id: orgId,
+      order_id: input.orderId,
+      assigned_team_id: input.assignedTeamId,
+      sequence: nextSequence,
+      status: "pending",
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating pick list:", error);
+    return { error: error.message };
+  }
+
+  // Create pick items from order items
+  const { data: orderItems } = await supabase
+    .from("order_items")
+    .select(`
+      id,
+      quantity,
+      skus(plant_variety_id, size_id),
+      product_id
+    `)
+    .eq("order_id", input.orderId);
+
+  if (orderItems && orderItems.length > 0) {
+    const pickItems = orderItems.map((oi: any) => ({
+      pick_list_id: data.id,
+      order_item_id: oi.id,
+      target_qty: oi.quantity,
+      status: "pending",
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("pick_items")
+      .insert(pickItems);
+
+    if (itemsError) {
+      console.error("Error creating pick items:", itemsError);
+    }
+  }
+
+  // Log event
+  await logPickListEvent(orgId, data.id, null, "created", "Pick list created");
+
+  return {
+    pickList: {
+      id: data.id,
+      orgId: data.org_id,
+      orderId: data.order_id,
+      assignedTeamId: data.assigned_team_id,
+      sequence: data.sequence,
+      status: data.status,
+      createdAt: data.created_at,
+    },
+  };
+}
+
+export async function getPickListsForTeam(
+  teamId: string,
+  statuses?: PickListStatus[]
+): Promise<PickList[]> {
+  const supabase = await getSupabaseServerApp();
+
+  let query = supabase
+    .from("pick_lists")
+    .select(`
+      *,
+      orders(order_number, status, requested_delivery_date, customer_id,
+        customers(name)
+      ),
+      picking_teams(name)
+    `)
+    .eq("assigned_team_id", teamId)
+    .order("sequence", { ascending: true });
+
+  if (statuses && statuses.length > 0) {
+    query = query.in("status", statuses);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Error fetching pick lists for team:", error);
+    return [];
+  }
+
+  return (data || []).map(mapPickListRow);
+}
+
+export async function getPickListsForOrg(
+  orgId: string,
+  options?: {
+    statuses?: PickListStatus[];
+    teamId?: string;
+    limit?: number;
+  }
+): Promise<PickList[]> {
+  const supabase = await getSupabaseServerApp();
+
+  try {
+    let query = supabase
+      .from("pick_lists")
+      .select(`
+        *,
+        orders(order_number, status, requested_delivery_date, customer_id,
+          customers(name)
+        ),
+        picking_teams(name)
+      `)
+      .eq("org_id", orgId)
+      .order("sequence", { ascending: true });
+
+    if (options?.statuses && options.statuses.length > 0) {
+      query = query.in("status", options.statuses);
+    }
+
+    if (options?.teamId) {
+      query = query.eq("assigned_team_id", options.teamId);
+    }
+
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      // Table might not exist yet
+      if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        console.warn("pick_lists table does not exist yet. Run the migration.");
+        return [];
+      }
+      console.error("Error fetching pick lists:", error.message || error);
+      return [];
+    }
+
+    return (data || []).map(mapPickListRow);
+  } catch (e) {
+    console.error("Exception fetching pick lists:", e);
+    return [];
+  }
+}
+
+export async function getPickListById(pickListId: string): Promise<PickList | null> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("pick_lists")
+    .select(`
+      *,
+      orders(order_number, status, requested_delivery_date, customer_id,
+        customers(name)
+      ),
+      picking_teams(name)
+    `)
+    .eq("id", pickListId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching pick list:", error);
+    return null;
+  }
+
+  return mapPickListRow(data);
+}
+
+function mapPickListRow(row: any): PickList {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    orderId: row.order_id,
+    assignedTeamId: row.assigned_team_id,
+    sequence: row.sequence,
+    status: row.status,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    startedBy: row.started_by,
+    completedBy: row.completed_by,
+    notes: row.notes,
+    createdAt: row.created_at,
+    orderNumber: row.orders?.order_number,
+    orderStatus: row.orders?.status,
+    customerName: row.orders?.customers?.name,
+    requestedDeliveryDate: row.orders?.requested_delivery_date,
+    teamName: row.picking_teams?.name,
+  };
+}
+
+// ================================================
+// PICK LIST ACTIONS
+// ================================================
+
+export async function startPickList(
+  pickListId: string
+): Promise<{ error?: string }> {
+  const { user, orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("pick_lists")
+    .update({
+      status: "in_progress",
+      started_at: new Date().toISOString(),
+      started_by: user.id,
+    })
+    .eq("id", pickListId)
+    .eq("status", "pending");
+
+  if (error) {
+    console.error("Error starting pick list:", error);
+    return { error: error.message };
+  }
+
+  await logPickListEvent(orgId, pickListId, null, "started", "Pick list started");
+
+  return {};
+}
+
+export async function completePickList(
+  pickListId: string
+): Promise<{ error?: string }> {
+  const { user, orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  // Check all items are picked or short
+  const { data: pendingItems } = await supabase
+    .from("pick_items")
+    .select("id")
+    .eq("pick_list_id", pickListId)
+    .eq("status", "pending");
+
+  if (pendingItems && pendingItems.length > 0) {
+    return { error: `${pendingItems.length} items still pending` };
+  }
+
+  const { error } = await supabase
+    .from("pick_lists")
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      completed_by: user.id,
+    })
+    .eq("id", pickListId)
+    .eq("status", "in_progress");
+
+  if (error) {
+    console.error("Error completing pick list:", error);
+    return { error: error.message };
+  }
+
+  // Update order status
+  const { data: pickList } = await supabase
+    .from("pick_lists")
+    .select("order_id")
+    .eq("id", pickListId)
+    .single();
+
+  if (pickList?.order_id) {
+    await supabase
+      .from("orders")
+      .update({ status: "ready_for_dispatch" })
+      .eq("id", pickList.order_id);
+  }
+
+  await logPickListEvent(orgId, pickListId, null, "completed", "Pick list completed");
+
+  return {};
+}
+
+export async function assignPickListToTeam(
+  pickListId: string,
+  teamId: string | null
+): Promise<{ error?: string }> {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("pick_lists")
+    .update({ assigned_team_id: teamId })
+    .eq("id", pickListId);
+
+  if (error) {
+    console.error("Error assigning pick list to team:", error);
+    return { error: error.message };
+  }
+
+  await logPickListEvent(
+    orgId,
+    pickListId,
+    null,
+    "assigned",
+    teamId ? `Assigned to team` : "Unassigned from team",
+    { teamId }
+  );
+
+  return {};
+}
+
+export async function updatePickListSequence(
+  pickListId: string,
+  newSequence: number
+): Promise<{ error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("pick_lists")
+    .update({ sequence: newSequence })
+    .eq("id", pickListId);
+
+  if (error) {
+    console.error("Error updating pick list sequence:", error);
+    return { error: error.message };
+  }
+
+  return {};
+}
+
+export async function reorderPickLists(
+  orgId: string,
+  teamId: string | null,
+  orderedIds: string[]
+): Promise<{ error?: string }> {
+  const supabase = await getSupabaseServerApp();
+
+  // Update each pick list with its new sequence
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("pick_lists")
+      .update({ sequence: i + 1 })
+      .eq("id", orderedIds[i]);
+
+    if (error) {
+      console.error("Error reordering pick lists:", error);
+      return { error: error.message };
+    }
+  }
+
+  return {};
+}
+
+// ================================================
+// PICK ITEMS
+// ================================================
+
+export async function getPickItems(pickListId: string): Promise<PickItem[]> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("pick_items")
+    .select(`
+      *,
+      order_items(
+        description,
+        quantity,
+        skus(
+          code,
+          plant_varieties(name),
+          plant_sizes(name)
+        ),
+        products(name)
+      ),
+      original_batch:original_batch_id(batch_number, nursery_locations(name)),
+      picked_batch:picked_batch_id(batch_number, nursery_locations(name))
+    `)
+    .eq("pick_list_id", pickListId)
+    .order("created_at");
+
+  if (error) {
+    console.error("Error fetching pick items:", error);
+    return [];
+  }
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    pickListId: row.pick_list_id,
+    orderItemId: row.order_item_id,
+    targetQty: row.target_qty,
+    pickedQty: row.picked_qty,
+    status: row.status,
+    originalBatchId: row.original_batch_id,
+    pickedBatchId: row.picked_batch_id,
+    substitutionReason: row.substitution_reason,
+    notes: row.notes,
+    pickedAt: row.picked_at,
+    pickedBy: row.picked_by,
+    locationHint: row.location_hint,
+    productName: row.order_items?.products?.name || row.order_items?.description,
+    plantVariety: row.order_items?.skus?.plant_varieties?.name,
+    size: row.order_items?.skus?.plant_sizes?.name,
+    originalBatchNumber: row.original_batch?.batch_number,
+    pickedBatchNumber: row.picked_batch?.batch_number,
+    batchLocation: row.original_batch?.nursery_locations?.name || row.picked_batch?.nursery_locations?.name,
+  }));
+}
+
+export async function updatePickItem(
+  input: UpdatePickItemInput
+): Promise<{ error?: string }> {
+  const { user, orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  // Get current pick item
+  const { data: current } = await supabase
+    .from("pick_items")
+    .select("*, pick_lists(org_id)")
+    .eq("id", input.pickItemId)
+    .single();
+
+  if (!current) {
+    return { error: "Pick item not found" };
+  }
+
+  // Determine status
+  let status: PickItemStatus = input.status || "picked";
+  if (input.pickedQty === 0) {
+    status = "skipped";
+  } else if (input.pickedQty < current.target_qty) {
+    status = "short";
+  } else if (input.pickedBatchId && input.pickedBatchId !== current.original_batch_id) {
+    status = "substituted";
+  }
+
+  const { error } = await supabase
+    .from("pick_items")
+    .update({
+      picked_qty: input.pickedQty,
+      picked_batch_id: input.pickedBatchId || current.original_batch_id,
+      substitution_reason: input.substitutionReason,
+      notes: input.notes,
+      status,
+      picked_at: new Date().toISOString(),
+      picked_by: user.id,
+    })
+    .eq("id", input.pickItemId);
+
+  if (error) {
+    console.error("Error updating pick item:", error);
+    return { error: error.message };
+  }
+
+  // Deduct from batch inventory
+  if (input.pickedQty > 0 && input.pickedBatchId) {
+    await supabase.rpc("decrement_batch_quantity", {
+      batch_id: input.pickedBatchId,
+      amount: input.pickedQty,
+    });
+  }
+
+  await logPickListEvent(
+    current.pick_lists.org_id,
+    current.pick_list_id,
+    input.pickItemId,
+    status === "substituted" ? "item_substituted" : "item_picked",
+    `Picked ${input.pickedQty} of ${current.target_qty}`,
+    {
+      pickedQty: input.pickedQty,
+      targetQty: current.target_qty,
+      batchId: input.pickedBatchId,
+      substitutionReason: input.substitutionReason,
+    }
+  );
+
+  return {};
+}
+
+export async function substituteBatch(
+  pickItemId: string,
+  newBatchId: string,
+  reason: string
+): Promise<{ error?: string }> {
+  const { user, orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data: current } = await supabase
+    .from("pick_items")
+    .select("*, pick_lists(org_id)")
+    .eq("id", pickItemId)
+    .single();
+
+  if (!current) {
+    return { error: "Pick item not found" };
+  }
+
+  const { error } = await supabase
+    .from("pick_items")
+    .update({
+      picked_batch_id: newBatchId,
+      substitution_reason: reason,
+      status: "substituted",
+    })
+    .eq("id", pickItemId);
+
+  if (error) {
+    console.error("Error substituting batch:", error);
+    return { error: error.message };
+  }
+
+  await logPickListEvent(
+    current.pick_lists.org_id,
+    current.pick_list_id,
+    pickItemId,
+    "batch_substituted",
+    `Batch substituted: ${reason}`,
+    {
+      originalBatchId: current.original_batch_id,
+      newBatchId,
+      reason,
+    }
+  );
+
+  return {};
+}
+
+// ================================================
+// AVAILABLE BATCHES FOR PICKING
+// ================================================
+
+export async function getAvailableBatchesForItem(
+  pickItemId: string
+): Promise<{
+  id: string;
+  batchNumber: string;
+  quantity: number;
+  location: string;
+  grade?: string;
+  status?: string;
+}[]> {
+  const supabase = await getSupabaseServerApp();
+
+  // Get the pick item to find variety/size
+  const { data: pickItem } = await supabase
+    .from("pick_items")
+    .select(`
+      order_items(
+        skus(plant_variety_id, size_id)
+      )
+    `)
+    .eq("id", pickItemId)
+    .single();
+
+  if (!pickItem?.order_items?.skus) {
+    return [];
+  }
+
+  const { plant_variety_id, size_id } = pickItem.order_items.skus;
+
+  // Get available batches with same variety/size
+  const { data: batches, error } = await supabase
+    .from("batches")
+    .select(`
+      id,
+      batch_number,
+      quantity,
+      status,
+      nursery_locations(name)
+    `)
+    .eq("plant_variety_id", plant_variety_id)
+    .eq("size_id", size_id)
+    .gt("quantity", 0)
+    .in("status", ["Ready", "Looking Good"])
+    .order("planted_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching available batches:", error);
+    return [];
+  }
+
+  return (batches || []).map((b: any) => ({
+    id: b.id,
+    batchNumber: b.batch_number,
+    quantity: b.quantity,
+    location: b.nursery_locations?.name || "Unknown",
+    status: b.status,
+  }));
+}
+
+// ================================================
+// HELPERS
+// ================================================
+
+async function logPickListEvent(
+  orgId: string,
+  pickListId: string,
+  pickItemId: string | null,
+  eventType: string,
+  description: string,
+  metadata: Record<string, any> = {}
+) {
+  const { user } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  await supabase.from("pick_list_events").insert({
+    org_id: orgId,
+    pick_list_id: pickListId,
+    pick_item_id: pickItemId,
+    event_type: eventType,
+    description,
+    metadata,
+    created_by: user?.id,
+  });
+}
+
+// ================================================
+// AUTO-CREATE PICK LISTS
+// ================================================
+
+export async function createPickListFromOrder(
+  orderId: string,
+  teamId?: string
+): Promise<{ pickList?: PickList; error?: string }> {
+  return createPickList({
+    orderId,
+    assignedTeamId: teamId,
+  });
+}
+
+// Check if order already has a pick list
+export async function getPickListForOrder(orderId: string): Promise<PickList | null> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("pick_lists")
+    .select(`
+      *,
+      orders(order_number, status, requested_delivery_date, customer_id,
+        customers(name)
+      ),
+      picking_teams(name)
+    `)
+    .eq("order_id", orderId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return mapPickListRow(data);
+}
+

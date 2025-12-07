@@ -6,7 +6,8 @@ export type AttributeKey =
   | "waste_reason"
   | "sub_location"
   | "audit_type"
-  | "plant_category";
+  | "plant_category"
+  | "delivery_route";
 
 export type AttributeBehavior = "growing" | "available" | "waste" | "archived";
 
@@ -64,6 +65,10 @@ export const ATTRIBUTE_META: Record<
     label: "Plant Categories",
     description: "Taxonomy for crops, e.g. Bedding, Perennials, Shrubs.",
   },
+  delivery_route: {
+    label: "Delivery Routes",
+    description: "Predefined delivery routes for dispatch planning.",
+  },
 };
 
 // Defaults keep legacy values to avoid breaking existing data,
@@ -109,6 +114,14 @@ const DEFAULTS: Record<AttributeKey, DefaultOption[]> = {
     { systemCode: "PERENNIAL", displayLabel: "Perennials", sortOrder: 20, isActive: true },
     { systemCode: "SHRUB", displayLabel: "Shrubs", sortOrder: 30, isActive: true },
     { systemCode: "TREE", displayLabel: "Trees", sortOrder: 40, isActive: true },
+  ],
+  delivery_route: [
+    { systemCode: "DUBLIN", displayLabel: "Dublin", sortOrder: 10, isActive: true },
+    { systemCode: "CORK", displayLabel: "Cork", sortOrder: 20, isActive: true },
+    { systemCode: "GALWAY", displayLabel: "Galway", sortOrder: 30, isActive: true },
+    { systemCode: "LIMERICK", displayLabel: "Limerick", sortOrder: 40, isActive: true },
+    { systemCode: "NORTH", displayLabel: "North", sortOrder: 50, isActive: true },
+    { systemCode: "SOUTH", displayLabel: "South", sortOrder: 60, isActive: true },
   ],
 };
 

@@ -28,9 +28,9 @@ export async function getActiveOrgId(existingClient?: SupabaseClient) {
   return resolveActiveOrgId({ supabase, admin, user });
 }
 
-async function ensureOrgLink(user: User, admin = getSupabaseAdmin()): Promise<string | null> {
+async function ensureOrgLink(user: User, adminClient?: SupabaseClient): Promise<string | null> {
   try {
-    const admin = getSupabaseAdmin();
+    const admin = adminClient ?? getSupabaseAdmin();
     let targetOrgId =
       process.env.NEXT_PUBLIC_DEFAULT_ORG_ID ||
       process.env.DEFAULT_ORG_ID ||
@@ -54,8 +54,30 @@ async function ensureOrgLink(user: User, admin = getSupabaseAdmin()): Promise<st
       return null;
     }
 
+    const displayName =
+      (user.user_metadata?.full_name as string | undefined) ||
+      (user.email ? user.email.split("@")[0] : "User");
+
+    // Create profile FIRST (org_memberships has a foreign key to profiles)
+    const { error: profileUpsertErr } = await admin
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          display_name: displayName,
+          email: user.email ?? null,
+          active_org_id: targetOrgId,
+        },
+        { onConflict: "id" }
+      );
+    if (profileUpsertErr) {
+      console.error("[getUserAndOrg] failed to upsert profile", profileUpsertErr);
+      return null;
+    }
+
+    // Then create the org membership
     const fallbackRole =
-      (user.app_metadata?.default_org_role as string | undefined) || "owner";
+      (user.app_metadata?.default_org_role as string | undefined) || "editor";
 
     const { error: membershipUpsertErr } = await admin
       .from("org_memberships")
@@ -72,27 +94,8 @@ async function ensureOrgLink(user: User, admin = getSupabaseAdmin()): Promise<st
         "[getUserAndOrg] failed to upsert org membership",
         membershipUpsertErr
       );
-      return null;
-    }
-
-    const displayName =
-      (user.user_metadata?.full_name as string | undefined) ||
-      (user.email ? user.email.split("@")[0] : "User");
-
-    const { error: profileUpsertErr } = await admin
-      .from("profiles")
-      .upsert(
-        {
-          id: user.id,
-          display_name: displayName,
-          email: user.email ?? null,
-          active_org_id: targetOrgId,
-        },
-        { onConflict: "id" }
-      );
-    if (profileUpsertErr) {
-      console.error("[getUserAndOrg] failed to upsert profile", profileUpsertErr);
-      return null;
+      // Profile was created successfully, so still return the org ID
+      // The user can function with just a profile+active_org_id
     }
 
     console.info(
@@ -141,6 +144,7 @@ async function resolveActiveOrgId({
   }
 
   if (!activeOrgId) {
+    console.info("[resolveActiveOrgId] No org found for user, attempting auto-link", user.id);
     activeOrgId = await ensureOrgLink(user, admin);
   }
 

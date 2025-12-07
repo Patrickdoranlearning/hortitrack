@@ -1130,6 +1130,7 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
     customerSkuCode: "",
     customerBarcode: "",
     unitPriceExVat: "",
+    rrp: "",
     priceListId: "",
     notes: "",
   });
@@ -1149,6 +1150,7 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
         customerSkuCode: form.customerSkuCode || null,
         customerBarcode: form.customerBarcode || null,
         unitPriceExVat: form.unitPriceExVat ? Number(form.unitPriceExVat) : null,
+        rrp: form.rrp ? Number(form.rrp) : null,
         priceListId: form.priceListId || null,
         notes: form.notes || null,
       });
@@ -1163,6 +1165,7 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
         customerSkuCode: "",
         customerBarcode: "",
         unitPriceExVat: "",
+        rrp: "",
         priceListId: "",
         notes: "",
       });
@@ -1242,6 +1245,17 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
             />
           </div>
           <div className="space-y-1.5">
+            <Label>RRP (for labels)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Customer sells at this price"
+              value={form.rrp}
+              onChange={(event) => setForm((prev) => ({ ...prev, rrp: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label>Price list (optional)</Label>
             <Select
               value={form.priceListId || "__none__"}
@@ -1290,8 +1304,12 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
                     <p className="text-sm text-muted-foreground">
                       {alias.customerSkuCode || "No customer SKU"} • {alias.customerName ?? "All customers"}
                     </p>
-                    {alias.unitPriceExVat !== null && (
-                      <p className="text-sm text-muted-foreground">Price: €{alias.unitPriceExVat.toFixed(2)}</p>
+                    {(alias.unitPriceExVat !== null || alias.rrp !== null) && (
+                      <p className="text-sm text-muted-foreground">
+                        {alias.unitPriceExVat !== null && `Price: €${alias.unitPriceExVat.toFixed(2)}`}
+                        {alias.unitPriceExVat !== null && alias.rrp !== null && " • "}
+                        {alias.rrp !== null && `RRP: €${alias.rrp.toFixed(2)}`}
+                      </p>
                     )}
                     {alias.priceListName && (
                       <p className="text-xs text-muted-foreground">Price list: {alias.priceListName}</p>
