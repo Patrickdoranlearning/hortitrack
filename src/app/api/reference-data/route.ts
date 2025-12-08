@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import { getUserAndOrg } from "@/server/auth/org";
 
@@ -10,7 +10,7 @@ import { getUserAndOrg } from "@/server/auth/org";
  * Never uses a service-role key.
  */
 export async function GET(_req: NextRequest) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await createClient();
 
   // Try to detect a user; if none, we'll skip org-scoped queries
   const { data: userWrap } = await supabase.auth.getUser();

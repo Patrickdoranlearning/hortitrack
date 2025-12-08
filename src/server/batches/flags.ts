@@ -1,4 +1,4 @@
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 export type FlagKey = "isTopPerformer" | "quarantined" | "priority"; // extend as needed
 
@@ -13,7 +13,7 @@ export type FlagEvent = {
 };
 
 export async function getFlags(batchId: string) {
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
   
   // Fetch generic flag events
   const { data, error } = await supabase
@@ -54,7 +54,7 @@ export async function setFlag(batchId: string, key: FlagKey, value: any, opts?: 
   reason?: string | null;
   notes?: string | null;
 }) {
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
 
   // We need org_id to insert into batch_events. 
   // Fetch it from the batch.

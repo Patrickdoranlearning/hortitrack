@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -16,7 +17,7 @@ import {
 import { updateCompanyProfileAction } from "@/app/account/actions";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseClient } from "@/lib/supabase/client";
-import { Building2, Upload, X, Loader2 } from "lucide-react";
+import { Building2, Upload, X, Loader2, CreditCard, FileText } from "lucide-react";
 import Image from "next/image";
 
 const COUNTRY_OPTIONS = [
@@ -41,6 +42,15 @@ interface CompanyProfileFormProps {
     phone: string | null;
     website: string | null;
     address: string | null;
+    // Business details
+    vatNumber: string | null;
+    companyRegNumber: string | null;
+    bankName: string | null;
+    bankIban: string | null;
+    bankBic: string | null;
+    defaultPaymentTerms: number | null;
+    invoicePrefix: string | null;
+    invoiceFooterText: string | null;
   };
 }
 
@@ -141,15 +151,19 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Company Profile</CardTitle>
-        <CardDescription>
-          Manage your company information. These details will be used on invoices and other documents.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={handleSubmit} className="space-y-6">
+    <form action={handleSubmit} className="space-y-6">
+      {/* Basic Information Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Company Information
+          </CardTitle>
+          <CardDescription>
+            Basic company details that appear on invoices and documents.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
           {/* Logo Upload Section */}
           <div className="space-y-3">
             <Label>Company Logo</Label>
@@ -214,7 +228,7 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
 
           {/* Company Name */}
           <div className="space-y-2">
-            <Label htmlFor="name">Company Name</Label>
+            <Label htmlFor="name">Company Name *</Label>
             <Input
               id="name"
               name="name"
@@ -246,6 +260,22 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
             </Select>
           </div>
 
+          {/* Address */}
+          <div className="space-y-2">
+            <Label htmlFor="address">Business Address</Label>
+            <Textarea
+              id="address"
+              name="address"
+              defaultValue={initialData.address || ""}
+              disabled={isLoading}
+              placeholder="123 Main Street&#10;Dublin&#10;D01 AB12"
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">
+              Full business address for invoices and correspondence
+            </p>
+          </div>
+
           {/* Contact Information */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -256,7 +286,7 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
                 type="email"
                 defaultValue={initialData.email || ""}
                 disabled={isLoading}
-                placeholder="company@example.com"
+                placeholder="sales@company.com"
               />
             </div>
             <div className="space-y-2">
@@ -281,32 +311,157 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
               type="url"
               defaultValue={initialData.website || ""}
               disabled={isLoading}
-              placeholder="https://www.example.com"
+              placeholder="https://www.company.com"
             />
           </div>
 
-          {/* Address */}
+          {/* Registration Numbers */}
+          <Separator />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="vatNumber">VAT Number</Label>
+              <Input
+                id="vatNumber"
+                name="vatNumber"
+                defaultValue={initialData.vatNumber || ""}
+                disabled={isLoading}
+                placeholder="IE1234567X"
+              />
+              <p className="text-xs text-muted-foreground">
+                Your VAT registration number
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="companyRegNumber">Company Registration Number</Label>
+              <Input
+                id="companyRegNumber"
+                name="companyRegNumber"
+                defaultValue={initialData.companyRegNumber || ""}
+                disabled={isLoading}
+                placeholder="123456"
+              />
+              <p className="text-xs text-muted-foreground">
+                Company registration/CRO number
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Banking & Payment Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Banking & Payment Details
+          </CardTitle>
+          <CardDescription>
+            Bank details for receiving payments. These appear on your invoices.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Textarea
-              id="address"
-              name="address"
-              defaultValue={initialData.address || ""}
+            <Label htmlFor="bankName">Bank Name</Label>
+            <Input
+              id="bankName"
+              name="bankName"
+              defaultValue={initialData.bankName || ""}
               disabled={isLoading}
-              placeholder="123 Main Street&#10;Dublin&#10;D01 AB12"
-              rows={3}
+              placeholder="Allied Irish Banks"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="bankIban">IBAN</Label>
+              <Input
+                id="bankIban"
+                name="bankIban"
+                defaultValue={initialData.bankIban || ""}
+                disabled={isLoading}
+                placeholder="IE12 AIBK 9312 3456 7890 12"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bankBic">BIC / SWIFT Code</Label>
+              <Input
+                id="bankBic"
+                name="bankBic"
+                defaultValue={initialData.bankBic || ""}
+                disabled={isLoading}
+                placeholder="AIBKIE2D"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="defaultPaymentTerms">Default Payment Terms (days)</Label>
+            <Input
+              id="defaultPaymentTerms"
+              name="defaultPaymentTerms"
+              type="number"
+              min="0"
+              max="365"
+              defaultValue={initialData.defaultPaymentTerms || 30}
+              disabled={isLoading}
+              placeholder="30"
             />
             <p className="text-xs text-muted-foreground">
-              Full business address for invoices and correspondence
+              Number of days customers have to pay invoices
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Invoice Settings Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Invoice Settings
+          </CardTitle>
+          <CardDescription>
+            Customize how your invoices appear to customers.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="invoicePrefix">Invoice Number Prefix</Label>
+            <Input
+              id="invoicePrefix"
+              name="invoicePrefix"
+              defaultValue={initialData.invoicePrefix || "INV"}
+              disabled={isLoading}
+              placeholder="INV"
+              maxLength={10}
+            />
+            <p className="text-xs text-muted-foreground">
+              Prefix for invoice numbers (e.g., INV-001, DN-001)
             </p>
           </div>
 
-          <Button type="submit" disabled={isLoading || isUploading}>
-            {isLoading ? "Saving..." : "Save Changes"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+          <div className="space-y-2">
+            <Label htmlFor="invoiceFooterText">Invoice Footer Text</Label>
+            <Textarea
+              id="invoiceFooterText"
+              name="invoiceFooterText"
+              defaultValue={initialData.invoiceFooterText || ""}
+              disabled={isLoading}
+              placeholder="Thank you for your business!&#10;Registered in Ireland • Company No. 123456"
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">
+              Custom text that appears at the bottom of invoices
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button type="submit" disabled={isLoading || isUploading} size="lg">
+          {isLoading ? "Saving..." : "Save All Changes"}
+        </Button>
+      </div>
+    </form>
   );
 }
-

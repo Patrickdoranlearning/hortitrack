@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer } from 'lucide-react';
+import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
@@ -27,6 +27,20 @@ export default function DataManagementPage() {
           </Button>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+
+          <Card className="border-primary/50 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><UserPlus /> Team Members</CardTitle>
+              <CardDescription>Invite employees, assign roles (Growers = Pickers), and manage access.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/team">
+                  Manage Team
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

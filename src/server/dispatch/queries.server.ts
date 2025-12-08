@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Haulier } from "@/lib/types";
 import { listAttributeOptions } from "@/server/attributeOptions/service";
+import { getUserAndOrg } from "@/server/auth/org";
 import type { AttributeOption } from "@/lib/attributeOptions";
 import type {
   DeliveryRun,
@@ -42,21 +43,12 @@ export async function listDeliveryRuns(
     limit?: number;
   }
 ): Promise<DeliveryRun[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { orgId, supabase } = await getUserAndOrg();
 
   let query = supabase
     .from("delivery_runs")
     .select("*")
-    .eq("org_id", membership.org_id)
+    .eq("org_id", orgId)
     .order("run_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(filters?.limit || 100);
@@ -81,21 +73,12 @@ export async function listDeliveryRuns(
  * Get active delivery runs with item counts
  */
 export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { orgId, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("v_active_delivery_runs")
     .select("*")
-    .eq("org_id", membership.org_id);
+    .eq("org_id", orgId);
 
   if (error) {
     console.error("Error fetching active delivery runs:", error);
@@ -127,23 +110,14 @@ export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[
  * Get a single delivery run with all its items
  */
 export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRunWithItems | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { orgId, supabase } = await getUserAndOrg();
 
   // Get delivery run
   const { data: runData, error: runError } = await supabase
     .from("delivery_runs")
     .select("*")
     .eq("id", runId)
-    .eq("org_id", membership.org_id)
+    .eq("org_id", orgId)
     .single();
 
   if (runError || !runData) {
@@ -209,23 +183,14 @@ export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRu
  * Create a new delivery run
  */
 export async function createDeliveryRun(input: CreateDeliveryRun): Promise<string> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   // Generate run number (format: DR-YYYYMMDD-NNN)
   const datePart = input.runDate.replace(/-/g, "");
   const { data: existingRuns } = await supabase
     .from("delivery_runs")
     .select("run_number")
-    .eq("org_id", membership.org_id)
+    .eq("org_id", orgId)
     .like("run_number", `DR-${datePart}-%`)
     .order("run_number", { ascending: false })
     .limit(1);
@@ -242,7 +207,7 @@ export async function createDeliveryRun(input: CreateDeliveryRun): Promise<strin
     .from("delivery_runs")
     .insert({
       id: generateId(),
-      org_id: membership.org_id,
+      org_id: orgId,
       run_number: runNumber,
       run_date: input.runDate,
       haulier_id: input.haulierId,
@@ -316,16 +281,7 @@ export async function updateDeliveryRun(
  * Add an order to a delivery run
  */
 export async function addOrderToDeliveryRun(input: AddToDeliveryRun): Promise<string> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   // Get order details to determine trolleys
   const { data: orderData } = await supabase
@@ -366,7 +322,7 @@ export async function addOrderToDeliveryRun(input: AddToDeliveryRun): Promise<st
     .from("delivery_items")
     .insert({
       id: generateId(),
-      org_id: membership.org_id,
+      org_id: orgId,
       delivery_run_id: input.deliveryRunId,
       order_id: input.orderId,
       sequence_number: sequenceNumber,
@@ -446,21 +402,12 @@ export async function updateDeliveryItem(
  * Get orders ready for dispatch
  */
 export async function getOrdersReadyForDispatch(): Promise<OrderReadyForDispatch[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { orgId, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("v_orders_ready_for_dispatch")
     .select("*")
-    .eq("org_id", membership.org_id);
+    .eq("org_id", orgId);
 
   if (error) {
     console.error("Error fetching orders ready for dispatch:", error);
@@ -485,16 +432,7 @@ export async function getOrdersReadyForDispatch(): Promise<OrderReadyForDispatch
  * Get or create packing record for an order
  */
 export async function getOrCreateOrderPacking(orderId: string): Promise<OrderPacking> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   // Check if packing record exists
   const { data: existing } = await supabase
@@ -512,7 +450,7 @@ export async function getOrCreateOrderPacking(orderId: string): Promise<OrderPac
     .from("order_packing")
     .insert({
       id: generateId(),
-      org_id: membership.org_id,
+      org_id: orgId,
       order_id: orderId,
       status: "not_started",
     })
@@ -584,21 +522,12 @@ export async function updateOrderPacking(
  * List all trolleys with optional filtering
  */
 export async function listTrolleys(filters?: { status?: string }): Promise<Trolley[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { orgId, supabase } = await getUserAndOrg();
 
   let query = supabase
     .from("trolleys")
     .select("*, customers(name), delivery_runs(run_number)")
-    .eq("org_id", membership.org_id)
+    .eq("org_id", orgId)
     .order("trolley_number", { ascending: true });
 
   if (filters?.status) {
@@ -618,21 +547,12 @@ export async function listTrolleys(filters?: { status?: string }): Promise<Troll
  * Get customer trolley balances
  */
 export async function getCustomerTrolleyBalances(): Promise<CustomerTrolleySummary[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { orgId, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("v_customer_trolley_summary")
     .select("*")
-    .eq("org_id", membership.org_id);
+    .eq("org_id", orgId);
 
   if (error) {
     console.error("Error fetching customer trolley balances:", error);
@@ -654,22 +574,13 @@ export async function getCustomerTrolleyBalances(): Promise<CustomerTrolleySumma
  * Create a new trolley
  */
 export async function createTrolley(input: CreateTrolley): Promise<string> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("trolleys")
     .insert({
       id: generateId(),
-      org_id: membership.org_id,
+      org_id: orgId,
       trolley_number: input.trolleyNumber,
       trolley_type: input.trolleyType,
       status: input.status,
@@ -692,22 +603,13 @@ export async function createTrolley(input: CreateTrolley): Promise<string> {
 export async function recordTrolleyTransaction(
   input: CreateTrolleyTransaction
 ): Promise<string> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("trolley_transactions")
     .insert({
       id: generateId(),
-      org_id: membership.org_id,
+      org_id: orgId,
       trolley_id: input.trolleyId,
       transaction_type: input.transactionType,
       quantity: input.quantity,
@@ -758,22 +660,13 @@ export async function recordTrolleyTransaction(
 export async function createOrderStatusUpdate(
   input: CreateOrderStatusUpdate
 ): Promise<string> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("order_status_updates")
     .insert({
       id: generateId(),
-      org_id: membership.org_id,
+      org_id: orgId,
       order_id: input.orderId,
       delivery_item_id: input.deliveryItemId,
       status_type: input.statusType,
@@ -870,21 +763,12 @@ export async function getGrowerMembers(orgId: string): Promise<GrowerMember[]> {
 }
 
 export async function getHauliers(): Promise<Haulier[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
+  const { orgId, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("hauliers")
     .select("*")
-    .eq("org_id", membership.org_id)
+    .eq("org_id", orgId)
     .eq("is_active", true)
     .order("name");
 
@@ -913,18 +797,7 @@ export async function getDispatchBoardData(): Promise<{
   routes: AttributeOption[];
   deliveryRuns: ActiveDeliveryRunSummary[];
 }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .single();
-  if (!membership) throw new Error("No organization membership found");
-
-  const orgId = membership.org_id;
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   // Fetch data in parallel
   const [hauliers, growers, routesResult, activeRuns, ordersData] = await Promise.all([

@@ -30,11 +30,35 @@ export type Phase = z.infer<typeof PhaseSchema>;
 export const ProductionStatusSchema = z.string().min(1);
 export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
 
+// Growing status - tracks plant health
+export const GrowingStatusSchema = z.enum([
+  "healthy",
+  "struggling", 
+  "excellent",
+  "looking_good",
+  "damaged",
+  "dead"
+]);
+export type GrowingStatus = z.infer<typeof GrowingStatusSchema>;
+
+// Sales status - tracks availability for sale
+export const SalesStatusSchema = z.enum([
+  "not_available",
+  "available",
+  "reserved",
+  "allocated",
+  "sold"
+]);
+export type SalesStatus = z.infer<typeof SalesStatusSchema>;
+
 export const BatchSchema = z.object({
   id: z.string(),
   batchNumber: z.string(),
   phase: PhaseSchema,
   status: ProductionStatusSchema.optional(),
+  // Dual status system
+  growingStatus: GrowingStatusSchema.optional().default("healthy"),
+  salesStatus: SalesStatusSchema.optional().default("not_available"),
   varietyId: z.string().optional(),
   variety: z.string().optional(),
   family: z.string().nullable().optional(),

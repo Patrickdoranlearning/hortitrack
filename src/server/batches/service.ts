@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { normalizeSystemCode } from "@/lib/attributeOptions";
 import { type SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
 export type BatchNode = {
   id: string;
@@ -124,31 +125,65 @@ export async function getBatchPhotos(id: string, limit = 60) {
 }
 
 // -----------------------------------------------------------------------------
-// Temporary implementations to satisfy imports; replace with full logic as needed.
+// Service Methods
 // -----------------------------------------------------------------------------
 
-export type PropagationInput = any;
+const PropagationServiceInputSchema = z.object({
+  batchNumber: z.string().optional(),
+  varietyId: z.string().optional(),
+  plant_variety_id: z.string().optional(),
+  sizeId: z.string().optional(),
+  size_id: z.string().optional(),
+  locationId: z.string().optional(),
+  location_id: z.string().optional(),
+  phase: z.string().optional(),
+  status: z.string().optional(),
+  quantity: z.number().optional(),
+  units: z.number().optional(),
+  plantingDate: z.string().optional(),
+  planted_at: z.string().optional(),
+  supplierId: z.string().optional(),
+  supplier_id: z.string().optional(),
+  supplierBatchNumber: z.string().optional(),
+  notes: z.string().nullable().optional(),
+  // Calculation support
+  fullTrays: z.number().optional(),
+  partialCells: z.number().optional(),
+  sizeMultiple: z.number().optional(),
+});
+
+export type PropagationInput = z.infer<typeof PropagationServiceInputSchema>;
+
 export async function createPropagationBatch(params: { input: PropagationInput; userId: string }) {
   const { supabase, orgId } = await getUserAndOrg();
-  const input = params.input as any;
-  const statusOption = await resolveProductionStatus(supabase, orgId, input?.status);
+  const input = PropagationServiceInputSchema.parse(params.input);
+  
+  const statusOption = await resolveProductionStatus(supabase, orgId, input.status);
+
+  // Resolve quantity: prefer explicit quantity/units, fallback to calculation
+  let quantity = input.quantity ?? input.units ?? 0;
+  if (!quantity && (input.fullTrays !== undefined || input.partialCells !== undefined)) {
+    const multiple = input.sizeMultiple ?? 1;
+    quantity = (input.fullTrays ?? 0) * multiple + (input.partialCells ?? 0);
+  }
+
   const { data, error } = await supabase
     .from("batches")
     .insert({
       org_id: orgId,
-      batch_number: input?.batchNumber ?? `PR-${Date.now()}`,
-      plant_variety_id: input?.varietyId ?? input?.plant_variety_id,
-      size_id: input?.sizeId ?? input?.size_id,
-      location_id: input?.locationId ?? input?.location_id,
-      phase: normalizeSystemCode(input?.phase ?? "propagation").toLowerCase(),
-      status: statusOption.system_code, // legacy text (deprecated)
+      batch_number: input.batchNumber ?? `PR-${Date.now()}`,
+      plant_variety_id: input.varietyId ?? input.plant_variety_id,
+      size_id: input.sizeId ?? input.size_id,
+      location_id: input.locationId ?? input.location_id,
+      phase: normalizeSystemCode(input.phase ?? "propagation").toLowerCase(),
+      status: statusOption.system_code,
       status_id: statusOption.id,
-      quantity: input?.quantity ?? input?.units ?? 0,
-      initial_quantity: input?.quantity ?? input?.units ?? 0,
-      planted_at: input?.plantingDate ?? input?.planted_at ?? null,
-      supplier_id: input?.supplierId ?? input?.supplier_id ?? null,
-      supplier_batch_number: input?.supplierBatchNumber ?? "",
-      notes: input?.notes ?? null,
+      quantity,
+      initial_quantity: quantity,
+      planted_at: input.plantingDate ?? input.planted_at ?? null,
+      supplier_id: input.supplierId ?? input.supplier_id ?? null,
+      supplier_batch_number: input.supplierBatchNumber ?? "",
+      notes: input.notes ?? null,
     })
     .select("*")
     .single();
@@ -156,28 +191,52 @@ export async function createPropagationBatch(params: { input: PropagationInput; 
   return data;
 }
 
-export type CheckinInput = any;
+const CheckinServiceInputSchema = z.object({
+  batchNumber: z.string().optional(),
+  varietyId: z.string().optional(),
+  plant_variety_id: z.string().optional(),
+  sizeId: z.string().optional(),
+  size_id: z.string().optional(),
+  locationId: z.string().optional(),
+  location_id: z.string().optional(),
+  phase: z.string().optional(),
+  status: z.string().optional(),
+  quantity: z.number().optional(),
+  totalUnits: z.number().optional(),
+  incomingDate: z.string().optional(),
+  supplierId: z.string().optional(),
+  supplier_id: z.string().optional(),
+  supplierBatchNumber: z.string().optional(),
+  passportC: z.string().optional(),
+  notes: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+});
+
+export type CheckinInput = z.infer<typeof CheckinServiceInputSchema>;
+
 export async function createCheckinBatch(params: { input: CheckinInput; userId: string }) {
   const { supabase, orgId } = await getUserAndOrg();
-  const input = params.input as any;
-  const statusOption = await resolveProductionStatus(supabase, orgId, input?.status ?? "Incoming");
+  const input = CheckinServiceInputSchema.parse(params.input);
+  
+  const statusOption = await resolveProductionStatus(supabase, orgId, input.status ?? "Incoming");
+  
   const { data, error } = await supabase
     .from("batches")
     .insert({
       org_id: orgId,
-      batch_number: input?.batchNumber ?? `IN-${Date.now()}`,
-      plant_variety_id: input?.varietyId ?? input?.plant_variety_id,
-      size_id: input?.sizeId ?? input?.size_id,
-      location_id: input?.locationId ?? input?.location_id,
-      phase: normalizeSystemCode(input?.phase ?? "propagation").toLowerCase(),
-      status: statusOption.system_code, // legacy text (deprecated)
+      batch_number: input.batchNumber ?? `IN-${Date.now()}`,
+      plant_variety_id: input.varietyId ?? input.plant_variety_id,
+      size_id: input.sizeId ?? input.size_id,
+      location_id: input.locationId ?? input.location_id,
+      phase: normalizeSystemCode(input.phase ?? "propagation").toLowerCase(),
+      status: statusOption.system_code,
       status_id: statusOption.id,
-      quantity: input?.totalUnits ?? input?.quantity ?? 0,
-      initial_quantity: input?.totalUnits ?? input?.quantity ?? 0,
-      incoming_date: input?.incomingDate ?? null,
-      supplier_id: input?.supplierId ?? input?.supplier_id ?? null,
-      supplier_batch_number: input?.supplierBatchNumber ?? input?.passportC ?? "",
-      notes: input?.note ?? input?.notes ?? null,
+      quantity: input.totalUnits ?? input.quantity ?? 0,
+      initial_quantity: input.totalUnits ?? input.quantity ?? 0,
+      incoming_date: input.incomingDate ?? null,
+      supplier_id: input.supplierId ?? input.supplier_id ?? null,
+      supplier_batch_number: input.supplierBatchNumber ?? input.passportC ?? "",
+      notes: input.note ?? input.notes ?? null,
     })
     .select("*")
     .single();

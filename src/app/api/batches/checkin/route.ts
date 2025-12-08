@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 // Structured payload (legacy)
 const StructuredSchema = z.object({
@@ -114,7 +114,7 @@ function normalizeFlat(p: z.infer<typeof FlatSchema>): Normalized {
 }
 
 export async function POST(req: Request) {
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
 
   let body: any = {};
   try {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles } from "lucide-react";
+import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -59,10 +59,6 @@ export default function ProductManagementClient(props: ProductManagementPayload)
   const selectedProduct =
     sheetMode === "edit" && selectedProductId ? props.products.find((prod) => prod.id === selectedProductId) ?? null : null;
 
-  const handleCreateProduct = () => {
-    router.push("/sales/products/new");
-  };
-
   const handleManageProduct = (productId: string) => {
     router.push(`/sales/products/${productId}`);
   };
@@ -78,20 +74,14 @@ export default function ProductManagementClient(props: ProductManagementPayload)
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Products catalog</CardTitle>
-            <CardDescription>Link finished stock to customer-facing products with pricing.</CardDescription>
-          </div>
-          <Button onClick={handleCreateProduct}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add product
-          </Button>
+        <CardHeader>
+          <CardTitle>Products catalog</CardTitle>
+          <CardDescription>Link finished stock to customer-facing products with pricing.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {props.products.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              <p>No products yet. Click “Add product” to get started.</p>
+              <p>No products yet. Click "New Product" above to get started.</p>
             </div>
           ) : (
             <Table>
@@ -100,31 +90,46 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                   <TableHead>Name</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Linked batches</TableHead>
+                  <TableHead>Inventory</TableHead>
                   <TableHead>Price lists</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {props.products.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.sku?.code ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={product.isActive ? "default" : "outline"}>
-                        {product.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{product.batches.length}</TableCell>
-                    <TableCell>{product.prices.length}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleManageProduct(product.id)}>
-                        <Settings2 className="mr-2 h-4 w-4" />
-                        Manage
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {props.products.map((product) => {
+                  // Calculate available vs pipeline quantities
+                  const availableBatches = product.batches.filter(b => b.batch?.behavior === "available");
+                  const pipelineBatches = product.batches.filter(b => b.batch?.behavior !== "available");
+                  const availableQty = availableBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+                  const pipelineQty = pipelineBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+                  
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>{product.sku?.code ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={product.isActive ? "default" : "outline"}>
+                          {product.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-green-700">{availableQty} available</span>
+                          {pipelineQty > 0 && (
+                            <span className="text-xs text-muted-foreground">{pipelineQty} coming</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{product.prices.length}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => handleManageProduct(product.id)}>
+                          <Settings2 className="mr-2 h-4 w-4" />
+                          Manage
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -671,33 +676,62 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
           <p className="text-sm text-muted-foreground">No batches linked yet.</p>
         ) : (
           <div className="space-y-3">
-            {linkedBatches.map((entry) => (
-              <div key={entry.id} className="flex items-start justify-between rounded-lg border p-3">
-                <div>
-                  <p className="font-medium">
-                    #{entry.batch?.batchNumber ?? "Unknown"}{" "}
-                    <span className="text-muted-foreground">
-                      {entry.batch?.varietyName ?? "Variety"} · {entry.batch?.sizeName ?? "Size"}
-                    </span>
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {entry.batch?.quantity ?? 0} units • Status: {entry.batch?.status ?? "—"}
-                  </p>
-                  {entry.availableQuantityOverride !== null ? (
-                    <p className="text-xs text-muted-foreground">Override: {entry.availableQuantityOverride}</p>
-                  ) : null}
+            {/* Summary */}
+            {(() => {
+              const available = linkedBatches.filter(b => b.batch?.behavior === "available");
+              const pipeline = linkedBatches.filter(b => b.batch?.behavior !== "available");
+              const availableQty = available.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+              const pipelineQty = pipeline.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+              return (
+                <div className="flex gap-4 p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-2xl font-bold text-green-700">{availableQty}</p>
+                    <p className="text-xs text-muted-foreground">Available now</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-600">{pipelineQty}</p>
+                    <p className="text-xs text-muted-foreground">In pipeline</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{linkedBatches.length}</p>
+                    <p className="text-xs text-muted-foreground">Total batches</p>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive"
-                  onClick={() => handleRemove(entry.id)}
-                  disabled={pending}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+              );
+            })()}
+            {linkedBatches.map((entry) => {
+              const isAvailable = entry.batch?.behavior === "available";
+              return (
+                <div key={entry.id} className={`flex items-start justify-between rounded-lg border p-3 ${isAvailable ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
+                  <div>
+                    <p className="font-medium">
+                      #{entry.batch?.batchNumber ?? "Unknown"}{" "}
+                      <span className="text-muted-foreground">
+                        {entry.batch?.varietyName ?? "Variety"} · {entry.batch?.sizeName ?? "Size"}
+                      </span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {entry.batch?.quantity ?? 0} units • 
+                      <span className={isAvailable ? "text-green-700 font-medium" : "text-amber-700"}>
+                        {" "}{isAvailable ? "Available" : entry.batch?.status ?? "Growing"}
+                      </span>
+                    </p>
+                    {entry.availableQuantityOverride !== null ? (
+                      <p className="text-xs text-muted-foreground">Override: {entry.availableQuantityOverride}</p>
+                    ) : null}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => handleRemove(entry.id)}
+                    disabled={pending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

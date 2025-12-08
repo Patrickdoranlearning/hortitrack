@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 import EventsCard from "@/components/batches/EventsCard";
 import PassportsCard from "@/components/batches/PassportsCard";
 import AncestryCard from "@/components/batches/AncestryCard";
@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export default async function Page({ params }: { params: { batchId: string } }) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await createClient();
   const { data: batch, error } = await supabase
     .from("batches")
     .select("*, plant_varieties(name, category), plant_sizes(name), nursery_locations(name)")

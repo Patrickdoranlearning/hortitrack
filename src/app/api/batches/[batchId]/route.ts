@@ -7,25 +7,26 @@ import { toMessage } from "@/lib/errors";
 import { getBatchById, getBatchLogs, getBatchPhotos } from "@/server/batches/service";
 import { createClient } from "@/lib/supabase/server"; // Keep this for PATCH/DELETE
 
-type Params = { params: { batchId: string } };
+type Params = { params: Promise<{ batchId: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   try {
-    const batch = await getBatchById(params.batchId);
+    const { batchId } = await params;
+    const batch = await getBatchById(batchId);
 
     if (!batch) {
       return NextResponse.json({ ok: false, error: { code: "NOT_FOUND", message: "Not found" } }, { status: 404 });
     }
 
     // Photos (split by type)
-    const photos = await getBatchPhotos(params.batchId);
+    const photos = await getBatchPhotos(batchId);
     const photosSplit = {
       grower: (photos || []).filter((p: any) => p.type === "GROWER"),
       sales: (photos || []).filter((p: any) => p.type === "SALES")
     };
 
     // Logs
-    const logs = await getBatchLogs(params.batchId);
+    const logs = await getBatchLogs(batchId);
 
     // Ancestry (simplified for now, or reuse buildBatchRoute logic if needed)
     // For now, let's just return empty ancestry or basic parent info
@@ -68,6 +69,7 @@ const PatchBody = z.object({
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
+    const { batchId } = await params;
     const updates = PatchBody.parse(await req.json());
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -86,7 +88,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
     if (!activeOrgId) return NextResponse.json({ error: "No active organization found" }, { status: 400 });
 
-    const { data: stored, error: fetchError } = await supabase.from("batches").select("*").eq("id", params.batchId).single();
+    const { data: stored, error: fetchError } = await supabase.from("batches").select("*").eq("id", batchId).single();
 
     if (fetchError || !stored) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -166,7 +168,7 @@ export async function PATCH(req: Request, { params }: Params) {
     const { data: updatedBatch, error: updateError } = await supabase
       .from("batches")
       .update(serverUpdate)
-      .eq("id", params.batchId)
+      .eq("id", batchId)
       .select()
       .single();
 
@@ -177,7 +179,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (becameArchived) {
       await supabase.from("logs").insert({
         org_id: activeOrgId, // Added org_id
-        batch_id: params.batchId,
+        batch_id: batchId,
         type: "ARCHIVE",
         note: "Batch quantity reached zero and was automatically archived.",
         date: new Date().toISOString(),
@@ -195,6 +197,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   try {
+    const { batchId } = await params;
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -229,7 +232,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     const { error } = await supabase
       .from("batches")
       .update(updatePayload)
-      .eq("id", params.batchId);
+      .eq("id", batchId);
 
     if (error) throw error;
     return NextResponse.json({ ok: true });

@@ -6,8 +6,10 @@ import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { PasswordChangeForm } from "@/components/account/PasswordChangeForm";
-import { TeamManagement } from "@/components/account/TeamManagement";
 import { CompanyProfileForm } from "@/components/account/CompanyProfileForm";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Users } from "lucide-react";
 
 export default async function AccountPage() {
   const { userId, orgId } = await getUserIdAndOrgId();
@@ -48,6 +50,15 @@ export default async function AccountPage() {
     phone: string | null;
     website: string | null;
     address: string | null;
+    // Business details
+    vat_number: string | null;
+    company_reg_number: string | null;
+    bank_name: string | null;
+    bank_iban: string | null;
+    bank_bic: string | null;
+    default_payment_terms: number | null;
+    invoice_prefix: string | null;
+    invoice_footer_text: string | null;
   } | null = null;
   
   if (orgId && isAdminOrOwner) {
@@ -59,16 +70,26 @@ export default async function AccountPage() {
       .single();
 
     if (org) {
+      const orgData = org as Record<string, unknown>;
       organization = {
         id: org.id,
         name: org.name,
         country_code: org.country_code ?? null,
         // These columns may not exist until migration is applied
-        logo_url: (org as Record<string, unknown>).logo_url as string | null ?? null,
-        email: (org as Record<string, unknown>).email as string | null ?? null,
-        phone: (org as Record<string, unknown>).phone as string | null ?? null,
-        website: (org as Record<string, unknown>).website as string | null ?? null,
-        address: (org as Record<string, unknown>).address as string | null ?? null,
+        logo_url: orgData.logo_url as string | null ?? null,
+        email: orgData.email as string | null ?? null,
+        phone: orgData.phone as string | null ?? null,
+        website: orgData.website as string | null ?? null,
+        address: orgData.address as string | null ?? null,
+        // Business details
+        vat_number: orgData.vat_number as string | null ?? null,
+        company_reg_number: orgData.company_reg_number as string | null ?? null,
+        bank_name: orgData.bank_name as string | null ?? null,
+        bank_iban: orgData.bank_iban as string | null ?? null,
+        bank_bic: orgData.bank_bic as string | null ?? null,
+        default_payment_terms: orgData.default_payment_terms as number | null ?? 30,
+        invoice_prefix: orgData.invoice_prefix as string | null ?? "INV",
+        invoice_footer_text: orgData.invoice_footer_text as string | null ?? null,
       };
     }
   }
@@ -99,7 +120,6 @@ export default async function AccountPage() {
           <TabsList>
             <TabsTrigger value="profile">Profile</TabsTrigger>
             {isAdminOrOwner && <TabsTrigger value="company">Company</TabsTrigger>}
-            {isAdminOrOwner && <TabsTrigger value="team">Team</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="profile" className="space-y-6">
@@ -122,17 +142,31 @@ export default async function AccountPage() {
                   phone: organization.phone || null,
                   website: organization.website || null,
                   address: organization.address || null,
+                  // Business details
+                  vatNumber: organization.vat_number || null,
+                  companyRegNumber: organization.company_reg_number || null,
+                  bankName: organization.bank_name || null,
+                  bankIban: organization.bank_iban || null,
+                  bankBic: organization.bank_bic || null,
+                  defaultPaymentTerms: organization.default_payment_terms || 30,
+                  invoicePrefix: organization.invoice_prefix || "INV",
+                  invoiceFooterText: organization.invoice_footer_text || null,
                 }}
               />
             </TabsContent>
           )}
-
-          {isAdminOrOwner && (
-            <TabsContent value="team">
-              <TeamManagement />
-            </TabsContent>
-          )}
         </Tabs>
+
+        {isAdminOrOwner && (
+          <div className="pt-4 border-t">
+            <Button asChild variant="outline">
+              <Link href="/settings/team">
+                <Users className="mr-2 h-4 w-4" />
+                Manage Team Members
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
     </PageFrame>
   );

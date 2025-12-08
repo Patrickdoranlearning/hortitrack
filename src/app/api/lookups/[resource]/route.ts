@@ -2,7 +2,8 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { z } from "zod";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
+import { type SupabaseClient } from "@supabase/supabase-js";
 
 const Resource = z.enum(["varieties", "sizes", "locations", "suppliers"]);
 
@@ -12,7 +13,7 @@ function cache(resp: NextResponse) {
   return resp;
 }
 
-async function getOrgId(supabase: Awaited<ReturnType<typeof getSupabaseForRequest>>) {
+async function getOrgId(supabase: SupabaseClient) {
   // Prefer explicit header, else use the user's profile.active_org_id
   const hdr = await headers();
   const byHeader = hdr.get("x-org-id");
@@ -35,7 +36,7 @@ export async function GET(_: Request, ctx: { params: { resource: string } }) {
   }
 
   const resource = parse.data;
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
   try {
     let data: any[] = [];
     switch (resource) {

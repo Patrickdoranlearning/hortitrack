@@ -102,8 +102,8 @@ export default function PickingQueueClient({
         return;
       }
 
-      // Navigate to the picking workflow
-      router.push(`/dispatch/picking/${pickListId}`);
+      // Navigate to the new picking workflow
+      router.push(`/dispatch/picking/${pickListId}/workflow`);
     } catch (error) {
       console.error('Error starting pick list:', error);
       toast({
@@ -115,7 +115,7 @@ export default function PickingQueueClient({
   };
 
   const handleSelectPickList = (pickListId: string) => {
-    router.push(`/dispatch/picking/${pickListId}`);
+    router.push(`/dispatch/picking/${pickListId}/workflow`);
   };
 
   return (

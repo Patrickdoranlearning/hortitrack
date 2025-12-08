@@ -4,14 +4,14 @@
 import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch, Customer, Haulier, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
-import { getSupabaseServerClient } from '@/server/db/supabase';
+import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/supabase';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
 import { getUserAndOrg } from '@/server/auth/org';
 
 async function getSupabaseForApp() {
-  return getSupabaseServerClient();
+  return createClient();
 }
 
 // Use typed view row instead of `any`

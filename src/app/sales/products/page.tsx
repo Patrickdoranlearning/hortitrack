@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { Plus, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getUserAndOrg } from "@/server/auth/org";
 import { PageFrame } from "@/ui/templates/PageFrame";
@@ -62,12 +62,20 @@ export default async function ProductsPage() {
         title="Products & Pricing"
         description="Manage saleable products, linked batches, and customer-facing price lists."
         actionsSlot={
-          <Button asChild variant="outline">
-            <Link href="/sales/products/new">
-              <ArrowLeft className="mr-2 h-4 w-4 rotate-180" />
-              Open form
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href="/sales/products/mapping">
+                <Settings2 className="mr-2 h-4 w-4" />
+                Mapping Rules
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/sales/products/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Product
+              </Link>
+            </Button>
+          </div>
         }
       />
       <ProductManagementClient {...payload} />

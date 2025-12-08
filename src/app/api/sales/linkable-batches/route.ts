@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
-import { getSupabaseServerClient } from "@/server/db/supabase";
+import { getSupabaseServerApp } from "@/server/db/supabase";
 
 const SALEABLE_STATUSES = ["Ready", "Looking Good"] as const;
 
 export async function GET() {
   try {
     const { orgId } = await getUserAndOrg();
-    const supabase = await getSupabaseServerClient();
+    const supabase = await getSupabaseServerApp();
 
     const { data, error } = await supabase
       .from("batches")
