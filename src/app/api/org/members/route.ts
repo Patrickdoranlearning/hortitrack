@@ -58,6 +58,28 @@ export async function GET() {
   }
 }
 
+// Generate a secure random password
+function generatePassword(length = 12): string {
+  const lowercase = 'abcdefghijkmnpqrstuvwxyz'; // removed l, o for clarity
+  const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // removed I, O for clarity
+  const numbers = '23456789'; // removed 0, 1 for clarity
+  const all = lowercase + uppercase + numbers;
+  
+  let password = '';
+  // Ensure at least one of each type
+  password += lowercase[Math.floor(Math.random() * lowercase.length)];
+  password += uppercase[Math.floor(Math.random() * uppercase.length)];
+  password += numbers[Math.floor(Math.random() * numbers.length)];
+  
+  // Fill the rest randomly
+  for (let i = password.length; i < length; i++) {
+    password += all[Math.floor(Math.random() * all.length)];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId, orgId } = await getUserIdAndOrgId();
@@ -81,10 +103,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, role } = body;
+    const { email, role, fullName } = body;
 
     if (!email || !role) {
       return NextResponse.json({ error: "Email and role are required" }, { status: 400 });
+    }
+
+    if (!fullName) {
+      return NextResponse.json({ error: "Full name is required" }, { status: 400 });
     }
 
     // Validate role
@@ -93,36 +119,123 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
 
-    // Get organization name for the invite email
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("name")
-      .eq("id", orgId)
-      .single();
+    // Check if user already exists
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    
+    if (existingUser) {
+      // Check if they're already in this org
+      const { data: existingMembership } = await supabase
+        .from("org_memberships")
+        .select("user_id")
+        .eq("org_id", orgId)
+        .eq("user_id", existingUser.id)
+        .maybeSingle();
 
-    // Invite user via Supabase Auth Admin API
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: {
+      if (existingMembership) {
+        return NextResponse.json(
+          { error: "This user is already a member of your organization" },
+          { status: 400 }
+        );
+      }
+
+      // Add existing user to this org - use admin client to bypass RLS
+      const { error: membershipError } = await supabaseAdmin
+        .from("org_memberships")
+        .insert({
+          org_id: orgId,
+          user_id: existingUser.id,
+          role: role,
+        });
+
+      if (membershipError) {
+        console.error("Error adding existing user to org:", membershipError);
+        return NextResponse.json(
+          { error: "Failed to add user to organization" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `${email} has been added to your organization`,
+        existingUser: true,
+      });
+    }
+
+    // Generate a temporary password
+    const tempPassword = generatePassword(12);
+
+    // Create new user with password
+    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true, // Auto-confirm email so they can log in immediately
+      user_metadata: {
+        full_name: fullName,
         default_org_id: orgId,
         default_org_role: role,
-        org_name: org?.name || "HortiTrack",
       },
-      redirectTo: `${siteUrl}/api/auth/callback?type=invite`,
     });
 
-    if (error) {
-      console.error("Error inviting user:", error);
+    if (createError) {
+      console.error("Error creating user:", createError);
       return NextResponse.json(
-        { error: error.message || "Failed to invite user" },
+        { error: createError.message || "Failed to create user" },
         { status: 500 }
       );
     }
 
+    if (!newUser.user) {
+      return NextResponse.json(
+        { error: "Failed to create user - no user returned" },
+        { status: 500 }
+      );
+    }
+
+    // Create org membership - use admin client to bypass RLS
+    const { error: membershipError } = await supabaseAdmin
+      .from("org_memberships")
+      .insert({
+        org_id: orgId,
+        user_id: newUser.user.id,
+        role: role,
+      });
+
+    if (membershipError) {
+      console.error("Error creating org membership:", membershipError);
+      // Delete the auth user since we couldn't add them to the org
+      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+      return NextResponse.json(
+        { error: "Failed to add user to organization. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    // Update or create profile with full name - use admin client to bypass RLS
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .upsert({
+        id: newUser.user.id,
+        email: email,
+        full_name: fullName,
+        active_org_id: orgId,
+      }, {
+        onConflict: "id",
+      });
+
+    if (profileError) {
+      console.error("Error creating/updating profile:", profileError);
+      // Don't fail - user can still log in
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Invitation sent to ${email}`,
-      user: data.user,
+      message: `User account created for ${fullName}`,
+      credentials: {
+        email,
+        password: tempPassword,
+      },
     });
   } catch (error) {
     console.error("Error in POST /api/org/members:", error);

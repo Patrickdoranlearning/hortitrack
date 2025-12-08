@@ -1,14 +1,24 @@
+import { redirect } from "next/navigation";
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import DispatchTable from '@/components/dispatch/DispatchTable';
 import { getDispatchBoardData } from '@/server/dispatch/queries.server';
 
 export default async function DispatchPage() {
-  // Fetch data server-side
-  const { orders, hauliers, growers, routes, deliveryRuns } = await getDispatchBoardData().catch((error) => {
+  let data;
+
+  try {
+    // Fetch data server-side
+    data = await getDispatchBoardData();
+  } catch (error: any) {
+    if (error.message === "Unauthorized") {
+      redirect("/login?next=/dispatch");
+    }
     console.error("Error fetching dispatch board data:", error);
-    return { orders: [], hauliers: [], growers: [], routes: [], deliveryRuns: [] };
-  });
+    data = { orders: [], hauliers: [], growers: [], routes: [], deliveryRuns: [] };
+  }
+
+  const { orders, hauliers, growers, routes, deliveryRuns } = data;
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">

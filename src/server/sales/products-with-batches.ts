@@ -142,12 +142,22 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
     return [];
   }
 
+  // First get available status IDs
+  const { data: availableStatuses } = await supabase
+    .from('attribute_options')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('attribute_key', 'production_status')
+    .eq('behavior', 'available');
+
+  const availableStatusIds = (availableStatuses ?? []).map(s => s.id);
+
   const { data: batches, error: batchesError } = await supabase
     .from('batches')
-    .select('id, batch_number, quantity, status, phase, planted_at, plant_variety_id, size_id, location_id')
+    .select('id, batch_number, quantity, status, status_id, phase, planted_at, plant_variety_id, size_id, location_id')
     .eq('org_id', orgId)
     .in('id', batchIds)
-    .in('status', ['Ready', 'Looking Good'])
+    .in('status_id', availableStatusIds.length > 0 ? availableStatusIds : ['00000000-0000-0000-0000-000000000000'])
     .gt('quantity', 0)
     .order('planted_at', { ascending: true });
 
@@ -239,11 +249,21 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
 export async function getVarietiesWithBatches(orgId: string) {
   const supabase = await getSupabaseServerApp();
 
+  // First get available status IDs
+  const { data: availableStatuses } = await supabase
+    .from('attribute_options')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('attribute_key', 'production_status')
+    .eq('behavior', 'available');
+
+  const availableStatusIds = (availableStatuses ?? []).map(s => s.id);
+
   const { data: batches, error } = await supabase
     .from('batches')
-    .select('id, batch_number, quantity, status, phase, planted_at, plant_variety_id, size_id, location_id')
+    .select('id, batch_number, quantity, status, status_id, phase, planted_at, plant_variety_id, size_id, location_id')
     .eq('org_id', orgId)
-    .in('status', ['Ready', 'Looking Good'])
+    .in('status_id', availableStatusIds.length > 0 ? availableStatusIds : ['00000000-0000-0000-0000-000000000000'])
     .gt('quantity', 0)
     .order('planted_at', { ascending: true });
 

@@ -125,12 +125,15 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
   useEffect(() => {
     if (defaultShippingAddress) {
       form.setValue('storeId', defaultShippingAddress.id);
+      form.setValue('shipToAddressId', defaultShippingAddress.id);
       form.setValue('deliveryAddress', formatAddress(defaultShippingAddress));
     } else if (selectedCustomer?.store) {
       form.setValue('storeId', selectedCustomer.store);
+      form.setValue('shipToAddressId', undefined);
       form.setValue('deliveryAddress', '');
     } else {
       form.setValue('storeId', 'main');
+      form.setValue('shipToAddressId', undefined);
       form.setValue('deliveryAddress', '');
     }
     setShowAllProducts(false);
@@ -502,13 +505,17 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                     <Select 
                       onValueChange={(value) => {
                         field.onChange(value);
-                        // Update delivery address based on selection
+                        // Update delivery address and shipToAddressId based on selection
                         if (value === 'custom') {
                           form.setValue('deliveryAddress', '');
+                          form.setValue('shipToAddressId', undefined);
                         } else {
                           const address = customerAddresses.find(a => a.id === value);
                           if (address) {
                             form.setValue('deliveryAddress', formatAddress(address));
+                            form.setValue('shipToAddressId', address.id);
+                          } else {
+                            form.setValue('shipToAddressId', undefined);
                           }
                         }
                       }} 

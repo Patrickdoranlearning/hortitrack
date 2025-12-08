@@ -85,6 +85,16 @@ export async function updateCompanyProfileAction(formData: FormData) {
   const phone = formData.get("phone") as string;
   const website = formData.get("website") as string;
   const address = formData.get("address") as string;
+  
+  // Business details
+  const vatNumber = formData.get("vatNumber") as string;
+  const companyRegNumber = formData.get("companyRegNumber") as string;
+  const bankName = formData.get("bankName") as string;
+  const bankIban = formData.get("bankIban") as string;
+  const bankBic = formData.get("bankBic") as string;
+  const defaultPaymentTerms = formData.get("defaultPaymentTerms") as string;
+  const invoicePrefix = formData.get("invoicePrefix") as string;
+  const invoiceFooterText = formData.get("invoiceFooterText") as string;
 
   if (!orgId) {
     return { error: "Organization ID is required" };
@@ -128,6 +138,15 @@ export async function updateCompanyProfileAction(formData: FormData) {
       phone: phone?.trim() || null,
       website: website?.trim() || null,
       address: address?.trim() || null,
+      // Business details
+      vat_number: vatNumber?.trim() || null,
+      company_reg_number: companyRegNumber?.trim() || null,
+      bank_name: bankName?.trim() || null,
+      bank_iban: bankIban?.trim() || null,
+      bank_bic: bankBic?.trim() || null,
+      default_payment_terms: defaultPaymentTerms ? parseInt(defaultPaymentTerms, 10) : 30,
+      invoice_prefix: invoicePrefix?.trim() || "INV",
+      invoice_footer_text: invoiceFooterText?.trim() || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", orgId);

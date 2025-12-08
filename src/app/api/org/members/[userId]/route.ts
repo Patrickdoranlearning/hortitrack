@@ -4,9 +4,10 @@ import { getSupabaseServerApp } from "@/server/db/supabase";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId: targetUserId } = await params;
     const { userId: requesterId, orgId } = await getUserIdAndOrgId();
 
     if (!requesterId || !orgId) {
@@ -28,54 +29,71 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { role } = body;
+    const { role, fullName } = body;
 
-    if (!role) {
-      return NextResponse.json({ error: "Role is required" }, { status: 400 });
-    }
+    // Handle name update
+    if (fullName !== undefined) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName })
+        .eq("id", targetUserId);
 
-    // Validate role
-    const validRoles = ["owner", "admin", "grower", "sales", "viewer"];
-    if (!validRoles.includes(role)) {
-      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
-    }
+      if (profileError) {
+        console.error("Error updating member name:", profileError);
+        return NextResponse.json({ error: "Failed to update member name" }, { status: 500 });
+      }
 
-    // Check if target user is the last owner
-    if (role !== "owner") {
-      const { data: targetMembership } = await supabase
-        .from("org_memberships")
-        .select("role")
-        .eq("org_id", orgId)
-        .eq("user_id", params.userId)
-        .single();
-
-      if (targetMembership?.role === "owner") {
-        // Count owners in the org
-        const { count } = await supabase
-          .from("org_memberships")
-          .select("*", { count: "exact", head: true })
-          .eq("org_id", orgId)
-          .eq("role", "owner");
-
-        if (count && count <= 1) {
-          return NextResponse.json(
-            { error: "Cannot demote the last owner of the organization" },
-            { status: 400 }
-          );
-        }
+      // If only updating name (no role change), return success
+      if (role === undefined) {
+        return NextResponse.json({ success: true });
       }
     }
 
-    // Update the role
-    const { error } = await supabase
-      .from("org_memberships")
-      .update({ role })
-      .eq("org_id", orgId)
-      .eq("user_id", params.userId);
+    // Handle role update
+    if (role !== undefined) {
+      // Validate role
+      const validRoles = ["owner", "admin", "grower", "sales", "viewer"];
+      if (!validRoles.includes(role)) {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      }
 
-    if (error) {
-      console.error("Error updating member role:", error);
-      return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
+      // Check if target user is the last owner
+      if (role !== "owner") {
+        const { data: targetMembership } = await supabase
+          .from("org_memberships")
+          .select("role")
+          .eq("org_id", orgId)
+          .eq("user_id", targetUserId)
+          .single();
+
+        if (targetMembership?.role === "owner") {
+          // Count owners in the org
+          const { count } = await supabase
+            .from("org_memberships")
+            .select("*", { count: "exact", head: true })
+            .eq("org_id", orgId)
+            .eq("role", "owner");
+
+          if (count && count <= 1) {
+            return NextResponse.json(
+              { error: "Cannot demote the last owner of the organization" },
+              { status: 400 }
+            );
+          }
+        }
+      }
+
+      // Update the role
+      const { error } = await supabase
+        .from("org_memberships")
+        .update({ role })
+        .eq("org_id", orgId)
+        .eq("user_id", targetUserId);
+
+      if (error) {
+        console.error("Error updating member role:", error);
+        return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });
@@ -87,9 +105,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId: targetUserId } = await params;
     const { userId: requesterId, orgId } = await getUserIdAndOrgId();
 
     if (!requesterId || !orgId) {
@@ -115,7 +134,7 @@ export async function DELETE(
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
-      .eq("user_id", params.userId)
+      .eq("user_id", targetUserId)
       .single();
 
     if (targetMembership?.role === "owner") {
@@ -139,7 +158,7 @@ export async function DELETE(
       .from("org_memberships")
       .delete()
       .eq("org_id", orgId)
-      .eq("user_id", params.userId);
+      .eq("user_id", targetUserId);
 
     if (error) {
       console.error("Error removing member:", error);

@@ -60,7 +60,11 @@ export const APP_NAV: NavItem[] = [
     items: [
       { label: "Dashboard", href: "/dispatch", description: "Command center for order flow and logistics." },
       { label: "Picking", href: "/dispatch/picking", description: "Picker task list and order picking." },
+      { label: "Bulk Picking", href: "/dispatch/bulk-picking", description: "Group pick orders by delivery date." },
+      { label: "Packing", href: "/dispatch/packing", description: "Pack orders onto trolleys." },
+      { label: "QC Review", href: "/dispatch/qc", description: "Quality check picked orders before dispatch." },
       { label: "Deliveries", href: "/dispatch/deliveries", description: "Route planning and management." },
+      { label: "Trolleys", href: "/dispatch/trolleys", description: "Track trolley inventory and customer balances." },
       { label: "Driver View", href: "/dispatch/driver", description: "Mobile view for drivers on route." },
     ]
   },

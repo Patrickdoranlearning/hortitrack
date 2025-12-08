@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { CreateOrderSchema } from "@/lib/sales/types";
 import { createClient } from "@/lib/supabase/server";
 import { ok, fail } from "@/server/utils/envelope";
+import { createPickListFromOrder } from "@/server/sales/picking";
 
 export async function GET(req: Request) {
   try {
@@ -138,6 +139,14 @@ export async function POST(req: Request) {
       .insert(linesToInsert.map(l => ({ ...l, order_id: orderId })));
 
     if (linesErr) throw new Error(`Lines create failed: ${linesErr.message}`);
+
+    // Auto-create pick list for confirmed orders (so they appear in dispatch/picking queue)
+    try {
+      await createPickListFromOrder(orderId);
+    } catch (e) {
+      console.error('Failed to create pick list:', e);
+      // Don't fail the order creation if pick list fails
+    }
 
     return NextResponse.json({ ok: true, id: orderId }, { status: 201 });
   } catch (err) {

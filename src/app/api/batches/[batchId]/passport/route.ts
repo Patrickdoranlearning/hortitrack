@@ -19,9 +19,10 @@ function pick<T extends object, K extends keyof T>(obj: T | null | undefined, ke
   return out;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { batchId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ batchId: string }> }) {
   try {
-    const batchId = params.batchId?.trim();
+    const { batchId: rawBatchId } = await params;
+    const batchId = rawBatchId?.trim();
     if (!batchId) {
       return NextResponse.json({ error: "Batch ID is required." }, { status: 400 });
     }

@@ -5,7 +5,6 @@ import {
   getSupabaseServerApp,
   type CookieBridge,
 } from "./supabaseServerApp";
-import { getSupabaseForRequest, getSupabaseServerClient } from "./supabaseServer";
 import { getSupabaseServerPages } from "./supabaseServerPages";
 import { supabaseBrowser } from "./supabaseBrowser";
 import { supabaseAdmin } from "./supabaseAdmin";
@@ -39,8 +38,6 @@ export {
   CookieBridge,
   createSupabaseServerWithCookies,
   getSupabaseServerApp,
-  getSupabaseServerClient,
-  getSupabaseForRequest,
   getSupabaseServerPages,
   supabaseBrowser,
   supabaseAdmin,

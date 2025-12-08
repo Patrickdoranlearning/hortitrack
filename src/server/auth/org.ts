@@ -1,9 +1,9 @@
-import { getSupabaseServerClient } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 export async function getUserAndOrg() {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await createClient();
   const admin = getSupabaseAdmin();
 
   const {
@@ -17,7 +17,7 @@ export async function getUserAndOrg() {
 }
 
 export async function getActiveOrgId(existingClient?: SupabaseClient) {
-  const supabase = existingClient ?? (await getSupabaseServerClient());
+  const supabase = existingClient ?? (await createClient());
   const admin = getSupabaseAdmin();
   const {
     data: { user },

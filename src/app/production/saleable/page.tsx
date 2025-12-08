@@ -1,11 +1,11 @@
 import { Metadata } from "next";
 import { getUserAndOrg } from "@/server/auth/org";
 import { PageFrame } from "@/ui/templates/PageFrame";
-import { fetchSaleableBatches, SALEABLE_STATUSES } from "@/server/production/saleable";
+import { fetchSaleableBatches, fetchLocations, fetchVarieties, fetchProductionStatusOptions, SALEABLE_STATUSES } from "@/server/production/saleable";
 import SaleableBatchesClient from "./SaleableBatchesClient";
 
 export const metadata: Metadata = {
-  title: "Saleable Batches | Production",
+  title: "Batch Availability | Production",
 };
 
 type PageProps = {
@@ -20,16 +20,23 @@ export default async function SaleableBatchesPage({ searchParams }: PageProps) {
     ? searchParams.status.split(",").filter(Boolean)
     : undefined;
 
-  const batches = await fetchSaleableBatches(orgId, {
-    statuses: statusFilter,
-  });
+  // Fetch batches, locations, varieties and status options in parallel
+  // Show ALL batches by default so the user can manage any batch's status
+  const [batches, locations, varieties, statusOptions] = await Promise.all([
+    fetchSaleableBatches(orgId, { showAll: true }),
+    fetchLocations(orgId),
+    fetchVarieties(orgId),
+    fetchProductionStatusOptions(orgId),
+  ]);
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <SaleableBatchesClient
         initialBatches={batches}
-        statusOptions={SALEABLE_STATUSES as unknown as string[]}
+        productionStatusOptions={statusOptions}
         defaultStatuses={statusFilter && statusFilter.length > 0 ? statusFilter : [...SALEABLE_STATUSES]}
+        locations={locations}
+        varieties={varieties}
       />
     </PageFrame>
   );

@@ -34,6 +34,8 @@ export type ProductRow = {
       batch_number: string;
       quantity: number | null;
       status: string | null;
+      status_id: string | null;
+      attribute_options?: { behavior: string | null } | null;
       plant_varieties?: { name: string | null } | null;
       plant_sizes?: { name: string | null } | null;
     } | null;
@@ -137,6 +139,8 @@ export async function fetchProductManagementData(
             batch_number,
             quantity,
             status,
+            status_id,
+            attribute_options ( behavior ),
             plant_varieties ( name ),
             plant_sizes ( name )
           )
@@ -202,7 +206,6 @@ export async function fetchProductManagementData(
       `
       )
       .eq("org_id", orgId)
-      .in("status", ["Ready for Sale", "Looking Good"])
       .gt("quantity", 0)
       .order("batch_number", { ascending: true })
       .then(async (res) => {
@@ -234,7 +237,7 @@ export async function fetchProductManagementData(
                 .in("id", varietyIds)
             : { data: [], error: null },
           sizeIds.length
-            ? supabase.from("plant_sizes").select("id, name").eq("org_id", orgId).in("id", sizeIds)
+            ? supabase.from("plant_sizes").select("id, name").in("id", sizeIds)
             : { data: [], error: null },
         ]);
 
@@ -344,6 +347,7 @@ export function mapProducts(rows: ProductRow[]): ProductManagementPayload["produ
               batchNumber: pb.batches.batch_number,
               quantity: pb.batches.quantity ?? 0,
               status: pb.batches.status ?? "",
+              behavior: pb.batches.attribute_options?.behavior ?? null,
               varietyName: pb.batches.plant_varieties?.name ?? null,
               sizeName: pb.batches.plant_sizes?.name ?? null,
             }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseClient } from "@/lib/supabase/client";
 import ScannerDialog from "@/components/scan-and-act-dialog";
@@ -8,9 +8,16 @@ import { candidateBatchNumbers } from "@/lib/scan/parse";
 import { parseScanCode } from "@/lib/scan/parse.client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -19,66 +26,185 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Camera, Loader2, QrCode } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Camera,
+  ChevronDown,
+  Download,
+  Loader2,
+  QrCode,
+  Search,
+  Filter,
+  CheckCircle2,
+  Leaf,
+  ShoppingCart,
+  X,
+  Image as ImageIcon,
+  Settings2,
+} from "lucide-react";
+import Link from "next/link";
 
+// Types
 type SaleableBatchRow = {
   id: string;
   batchNumber: string;
   status: string | null;
+  statusId: string | null;
+  behavior: string | null; // growing, available, archived
   quantity: number;
   plantVariety: string | null;
+  plantVarietyId: string | null;
   size: string | null;
+  sizeId: string | null;
   location: string | null;
+  locationId: string | null;
   plantedAt: string | null;
   updatedAt: string | null;
   growerPhotoUrl: string | null;
   salesPhotoUrl: string | null;
 };
 
+type ProductionStatusOption = {
+  id: string;
+  systemCode: string;
+  displayLabel: string;
+  behavior: string | null;
+  color: string | null;
+};
+
 type Props = {
   initialBatches: SaleableBatchRow[];
-  statusOptions: string[];
+  productionStatusOptions: ProductionStatusOption[];
   defaultStatuses: string[];
+  varieties?: Array<{ id: string; name: string }>;
+  locations?: Array<{ id: string; name: string }>;
+};
+
+// Behavior colors
+const BEHAVIOR_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  growing: { bg: "bg-blue-100", text: "text-blue-700", label: "Growing" },
+  available: { bg: "bg-green-100", text: "text-green-700", label: "Available" },
+  archived: { bg: "bg-slate-100", text: "text-slate-500", label: "Archived" },
 };
 
 function formatDate(value: string | null) {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleDateString();
+    const date = new Date(value);
+    // Use ISO-style format to avoid hydration mismatch between server/client locales
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return value;
   }
 }
 
+function getBehaviorStyle(behavior: string | null) {
+  return BEHAVIOR_STYLES[behavior ?? ""] ?? { bg: "bg-slate-100", text: "text-slate-700", label: "Unknown" };
+}
+
 export default function SaleableBatchesClient({
   initialBatches,
-  statusOptions,
+  productionStatusOptions,
   defaultStatuses,
+  varieties = [],
+  locations = [],
 }: Props) {
   const { toast } = useToast();
   const [batches, setBatches] = useState(initialBatches);
+  
+  // Search and filter state
   const [search, setSearch] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(defaultStatuses);
+  const [behaviorFilter, setBehaviorFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [varietyFilter, setVarietyFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+  
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // Scan state
   const [scanValue, setScanValue] = useState("");
-  const [markLookingGood, setMarkLookingGood] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [lastScannedId, setLastScannedId] = useState<string | null>(null);
-  const [lastScannedNumber, setLastScannedNumber] = useState<string | null>(null);
   const [isScanOpen, setIsScanOpen] = useState(false);
+  const [defaultScanStatus, setDefaultScanStatus] = useState<string>("");
+  const [showScanDropdown, setShowScanDropdown] = useState(false);
+  const [selectedScanBatch, setSelectedScanBatch] = useState<SaleableBatchRow | null>(null);
+  
+  // Photo upload state
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const quickPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoTargetId, setPhotoTargetId] = useState<string | null>(null);
+  
+  // Bulk action state
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  // Group status options by behavior
+  const statusesByBehavior = useMemo(() => {
+    const grouped: Record<string, ProductionStatusOption[]> = {
+      available: [],
+      growing: [],
+      archived: [],
+    };
+    for (const opt of productionStatusOptions) {
+      const behavior = opt.behavior ?? "growing";
+      if (!grouped[behavior]) grouped[behavior] = [];
+      grouped[behavior].push(opt);
+    }
+    return grouped;
+  }, [productionStatusOptions]);
+
+  // Default scan status (first "available" status, or first status)
+  const defaultAvailableStatus = useMemo(() => {
+    const available = statusesByBehavior.available?.[0];
+    return available?.id ?? productionStatusOptions[0]?.id ?? "";
+  }, [statusesByBehavior, productionStatusOptions]);
 
   const toText = (value: string | number | null | undefined) =>
     (value ?? "").toString().toLowerCase();
 
+  // Matches for the scan autocomplete
+  const scanMatches = useMemo(() => {
+    const query = scanValue.trim().toLowerCase();
+    if (!query) return [];
+    return batches.filter((batch) =>
+      toText(batch.batchNumber).includes(query) ||
+      toText(batch.plantVariety).includes(query) ||
+      toText(batch.location).includes(query)
+    );
+  }, [batches, scanValue]);
+
+  // Filtered batches with all filters applied
   const filteredBatches = useMemo(() => {
     const query = search.trim().toLowerCase();
     return batches.filter((batch) => {
-      const normalizedStatus = batch.status === "Ready for Sale" ? "Ready" : batch.status ?? "";
-      const matchesStatus =
-        selectedStatuses.length === 0 || selectedStatuses.includes(normalizedStatus);
-      if (!matchesStatus) return false;
-
+      // Behavior filter
+      if (behaviorFilter !== "all" && batch.behavior !== behaviorFilter) {
+        return false;
+      }
+      // Status filter
+      if (statusFilter !== "all" && batch.statusId !== statusFilter) {
+        return false;
+      }
+      // Variety filter
+      if (varietyFilter !== "all" && batch.plantVarietyId !== varietyFilter) {
+        return false;
+      }
+      // Location filter
+      if (locationFilter !== "all" && batch.locationId !== locationFilter) {
+        return false;
+      }
+      // Search query
       if (!query) return true;
       return (
         toText(batch.batchNumber).includes(query) ||
@@ -86,185 +212,112 @@ export default function SaleableBatchesClient({
         toText(batch.location).includes(query)
       );
     });
-  }, [batches, search, selectedStatuses]);
+  }, [batches, search, behaviorFilter, statusFilter, varietyFilter, locationFilter]);
 
-  const resolveBatchFromInput = (raw: string) => {
-    const cleaned = raw.trim();
-    if (!cleaned) return { batch: null as SaleableBatchRow | null, reason: "empty" as const };
+  // Stats
+  const stats = useMemo(() => {
+    const available = filteredBatches.filter((b) => b.behavior === "available");
+    const growing = filteredBatches.filter((b) => b.behavior === "growing");
+    return {
+      total: filteredBatches.length,
+      totalUnits: filteredBatches.reduce((sum, b) => sum + (b.quantity ?? 0), 0),
+      available: available.length,
+      availableUnits: available.reduce((sum, b) => sum + (b.quantity ?? 0), 0),
+      growing: growing.length,
+      withPhotos: filteredBatches.filter((b) => b.salesPhotoUrl || b.growerPhotoUrl).length,
+    };
+  }, [filteredBatches]);
 
-    const parsed = parseScanCode(cleaned);
-    const normalized = cleaned.toLowerCase().replace(/^#/, "");
+  // Select all / none
+  const allSelected = filteredBatches.length > 0 && filteredBatches.every((b) => selectedIds.has(b.id));
+  const someSelected = selectedIds.size > 0;
 
-    const matchesQuery = (batch: SaleableBatchRow) =>
-      [toText(batch.batchNumber), toText(batch.plantVariety), toText(batch.location)].some((field) =>
-        field.includes(normalized)
-      );
-
-    if (parsed?.by === "id") {
-      const match = batches.find((batch) => toText(batch.id) === parsed.value.toLowerCase());
-      if (match) return { batch: match, reason: null as const, query: normalized };
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredBatches.map((b) => b.id)));
     }
+  };
 
-    if (parsed?.by === "batchNumber") {
-      const candidates = candidateBatchNumbers(parsed.value).map((v) => v.toLowerCase());
-      const candidateMatches = batches.filter((batch) => candidates.includes(toText(batch.batchNumber)));
-      if (candidateMatches.length === 1) {
-        return { batch: candidateMatches[0], reason: null as const, query: candidates[0] ?? normalized };
-      }
-      if (candidateMatches.length > 1) {
-        return { batch: null, reason: "ambiguous" as const, matches: candidateMatches.length, query: normalized };
-      }
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
     }
-
-    const fuzzyMatches = batches.filter(matchesQuery);
-    if (fuzzyMatches.length === 1) return { batch: fuzzyMatches[0], reason: null as const, query: normalized };
-    if (fuzzyMatches.length > 1) {
-      return { batch: null, reason: "ambiguous" as const, matches: fuzzyMatches.length, query: normalized };
-    }
-
-    return { batch: null as SaleableBatchRow | null, reason: "not_found" as const, query: normalized };
+    setSelectedIds(newSet);
   };
 
-  const saleableCount = filteredBatches.length;
-  const totalUnits = filteredBatches.reduce((sum, batch) => sum + (batch.quantity ?? 0), 0);
-  const readyCount = filteredBatches.filter((b) => b.status === "Ready").length;
-  const lookingGoodCount = filteredBatches.filter((b) => b.status === "Looking Good").length;
+  const clearSelection = () => setSelectedIds(new Set());
 
-  const toggleStatus = (status: string) => {
-    setSelectedStatuses((prev) => {
-      if (prev.includes(status)) {
-        return prev.filter((s) => s !== status);
-      }
-      return [...prev, status];
-    });
-  };
-
-  const downloadFile = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const escapeCsv = (value: string | number | null | undefined) => {
-    const str = value ?? "";
-    if (typeof str === "number") return str.toString();
-    const needsQuotes = /[",\n]/.test(str);
-    const cleaned = str.replace(/"/g, '""');
-    return needsQuotes ? `"${cleaned}"` : cleaned;
-  };
-
-  const handleDownloadAvailability = () => {
-    const headers = ["Batch", "Variety", "Size", "Status", "Units", "Location", "Updated"];
-    const rows = filteredBatches.map((batch) => [
-      batch.batchNumber,
-      batch.plantVariety ?? "Unknown variety",
-      batch.size ?? "Size unknown",
-      batch.status ?? "—",
-      batch.quantity ?? 0,
-      batch.location ?? "—",
-      formatDate(batch.updatedAt),
-    ]);
-
-    const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
-    downloadFile(
-      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
-      `availability-${new Date().toISOString().slice(0, 10)}.csv`
-    );
-  };
-
-  const handleDownloadLookingGood = () => {
-    const cards = filteredBatches
-      .map((batch) => {
-        const photo = batch.salesPhotoUrl ?? batch.growerPhotoUrl;
-        return `
-          <div class="card">
-            <div class="meta">
-              <div class="title">#${batch.batchNumber}</div>
-              <div class="sub">${batch.plantVariety ?? "Unknown variety"} • ${batch.size ?? "Size unknown"}</div>
-              <div class="pill">${batch.status ?? "—"}</div>
-              <div class="muted">${batch.location ?? "—"} • ${formatDate(batch.updatedAt)}</div>
-            </div>
-            ${
-              photo
-                ? `<img src="${photo}" alt="Photo for ${batch.batchNumber}" />`
-                : `<div class="placeholder">No photo available</div>`
-            }
-          </div>
-        `;
-      })
-      .join("\n");
-
-    const html = `<!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Looking Good List</title>
-        <style>
-          body { font-family: Inter, system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f7f7f7; }
-          h1 { margin: 0 0 8px; }
-          .subtitle { color: #475467; margin: 0 0 24px; }
-          .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-          .card { background: #fff; border: 1px solid #e4e7ec; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.04); display: flex; flex-direction: column; }
-          .card img { width: 100%; height: 220px; object-fit: cover; }
-          .placeholder { height: 220px; display: flex; align-items: center; justify-content: center; color: #98a2b3; background: #f2f4f7; }
-          .meta { padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-          .title { font-weight: 600; }
-          .sub { color: #475467; }
-          .muted { color: #98a2b3; font-size: 13px; }
-          .pill { align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 12px; font-weight: 600; }
-        </style>
-      </head>
-      <body>
-        <h1>Looking Good List</h1>
-        <p class="subtitle">Generated ${new Date().toLocaleString()}</p>
-        <div class="grid">
-          ${cards}
-        </div>
-      </body>
-    </html>`;
-
-    downloadFile(
-      new Blob([html], { type: "text/html;charset=utf-8" }),
-      `looking-good-${new Date().toISOString().slice(0, 10)}.html`
-    );
-  };
-
-  const handleScanSubmit = async (event?: FormEvent, overrideValue?: string) => {
-    if (event) event.preventDefault();
-    const inputValue = (overrideValue ?? scanValue).trim();
-    if (!inputValue) return;
-
-    const matchResult = resolveBatchFromInput(inputValue);
-    const match = matchResult.batch;
-
-    if (!match) {
-      setSearch(matchResult.query ?? inputValue.toLowerCase());
-      setScanValue("");
-      toast({
-        variant: "destructive",
-        title: matchResult.reason === "ambiguous" ? "Multiple batches match" : "Batch not found",
-        description:
-          matchResult.reason === "ambiguous"
-            ? `Narrow your search; ${matchResult.matches ?? 0} batches match that code or text.`
-            : `No batch matches ${inputValue}.`,
-      });
+  // Bulk status update
+  const handleBulkStatusUpdate = async (statusOption: ProductionStatusOption) => {
+    if (selectedIds.size === 0) {
+      toast({ variant: "destructive", title: "No batches selected" });
       return;
     }
 
-    setIsScanning(true);
-    const targetStatus = markLookingGood ? "Looking Good" : "Ready";
-
+    setIsBulkUpdating(true);
     try {
       const response = await fetch("/api/batches/bulk-status", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          batchIds: [match.id],
-          status: targetStatus,
-          flags: markLookingGood ? ["looking_good"] : undefined,
+          batchIds: Array.from(selectedIds),
+          statusId: statusOption.id,
+          status: statusOption.systemCode,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to update batches.");
+      }
+
+      // Update local state
+      setBatches((prev) =>
+        prev.map((batch) => {
+          if (selectedIds.has(batch.id)) {
+            return {
+              ...batch,
+              status: statusOption.systemCode,
+              statusId: statusOption.id,
+              behavior: statusOption.behavior,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return batch;
+        })
+      );
+
+      toast({
+        title: `Updated ${selectedIds.size} batch${selectedIds.size === 1 ? "" : "es"}`,
+        description: `Status set to "${statusOption.displayLabel}".`,
+      });
+      clearSelection();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: error.message ?? String(error),
+      });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  // Single batch status update
+  const handleSingleStatusUpdate = async (batchId: string, statusOption: ProductionStatusOption) => {
+    try {
+      const response = await fetch("/api/batches/bulk-status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          batchIds: [batchId],
+          statusId: statusOption.id,
+          status: statusOption.systemCode,
         }),
       });
 
@@ -275,61 +328,188 @@ export default function SaleableBatchesClient({
 
       setBatches((prev) =>
         prev.map((batch) =>
-          batch.id === match.id
-            ? { ...batch, status: targetStatus, updatedAt: new Date().toISOString() }
+          batch.id === batchId
+            ? { 
+                ...batch, 
+                status: statusOption.systemCode,
+                statusId: statusOption.id,
+                behavior: statusOption.behavior,
+                updatedAt: new Date().toISOString() 
+              }
             : batch
         )
       );
-      setLastScannedId(match.id);
-      setLastScannedNumber(match.batchNumber);
-      setSearch(matchResult.query ?? toText(match.batchNumber));
 
-      toast({
-        title: `Marked ${targetStatus}`,
-        description: `Batch #${match.batchNumber} is now ${targetStatus}.`,
-      });
+      toast({ title: "Status updated" });
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Update failed",
         description: error.message ?? String(error),
       });
+    }
+  };
+
+  // Scanner functions
+  const resolveBatchFromInput = (raw: string) => {
+    const cleaned = raw.trim();
+    if (!cleaned) return { batch: null as SaleableBatchRow | null, reason: "empty" as const };
+
+    const parsed = parseScanCode(cleaned);
+    const normalized = cleaned.toLowerCase().replace(/^#/, "");
+
+    if (parsed?.by === "id") {
+      const match = batches.find((batch) => toText(batch.id) === parsed.value.toLowerCase());
+      if (match) return { batch: match, reason: null as const };
+    }
+
+    if (parsed?.by === "batchNumber") {
+      const candidates = candidateBatchNumbers(parsed.value).map((v) => v.toLowerCase());
+      const matches = batches.filter((batch) => candidates.includes(toText(batch.batchNumber)));
+      if (matches.length === 1) return { batch: matches[0], reason: null as const };
+      if (matches.length > 1) return { batch: null, reason: "ambiguous" as const, matches: matches.length };
+    }
+
+    const fuzzyMatches = batches.filter((batch) =>
+      [toText(batch.batchNumber), toText(batch.plantVariety), toText(batch.location)].some((f) =>
+        f.includes(normalized)
+      )
+    );
+    if (fuzzyMatches.length === 1) return { batch: fuzzyMatches[0], reason: null as const };
+    if (fuzzyMatches.length > 1) return { batch: null, reason: "ambiguous" as const, matches: fuzzyMatches.length };
+
+    return { batch: null, reason: "not_found" as const };
+  };
+
+  const handleScanSubmit = async (event?: FormEvent, overrideBatch?: SaleableBatchRow) => {
+    if (event) event.preventDefault();
+    
+    const targetBatch = overrideBatch ?? selectedScanBatch;
+    
+    if (!targetBatch) {
+      // Try to find a single match from what's typed
+      if (scanMatches.length === 1) {
+        setSelectedScanBatch(scanMatches[0]);
+        handleScanSubmit(undefined, scanMatches[0]);
+        return;
+      } else if (scanMatches.length > 1) {
+        toast({
+          variant: "destructive",
+          title: "Multiple batches match",
+          description: "Please select a batch from the dropdown.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "No batch selected",
+          description: "Please select a batch from the dropdown.",
+        });
+      }
+      return;
+    }
+
+    // Find the target status (first available status or user-selected)
+    const targetStatusId = defaultScanStatus || defaultAvailableStatus;
+    const targetStatus = productionStatusOptions.find(s => s.id === targetStatusId);
+    
+    if (!targetStatus) {
+      toast({ variant: "destructive", title: "No target status configured" });
+      return;
+    }
+
+    setIsScanning(true);
+    setShowScanDropdown(false);
+    
+    try {
+      const response = await fetch("/api/batches/bulk-status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          batchIds: [targetBatch.id],
+          statusId: targetStatus.id,
+          status: targetStatus.systemCode,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Update failed.");
+
+      setBatches((prev) =>
+        prev.map((batch) =>
+          batch.id === targetBatch.id
+            ? { 
+                ...batch, 
+                status: targetStatus.systemCode,
+                statusId: targetStatus.id,
+                behavior: targetStatus.behavior,
+                updatedAt: new Date().toISOString() 
+              }
+            : batch
+        )
+      );
+
+      toast({
+        title: `Marked as ${targetStatus.displayLabel}`,
+        description: `Batch #${targetBatch.batchNumber} updated.`,
+      });
+      
+      // Clear selection after successful update
+      setSelectedScanBatch(null);
+      setScanValue("");
+      setSearch(targetBatch.batchNumber);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Update failed", description: error.message });
     } finally {
       setIsScanning(false);
-      setScanValue("");
     }
   };
 
   const handleScanDetected = (text: string) => {
-    const value = text?.trim();
-    if (!value) return;
+    if (!text?.trim()) return;
     setIsScanOpen(false);
-    setScanValue(value);
-    // Use the decoded value directly so we process DataMatrix/QR payloads immediately.
-    handleScanSubmit(undefined, value);
+    
+    // Try to find the batch by the scanned code
+    const matchResult = resolveBatchFromInput(text.trim());
+    if (matchResult.batch) {
+      setSelectedScanBatch(matchResult.batch);
+      setScanValue(`#${matchResult.batch.batchNumber} - ${matchResult.batch.plantVariety}`);
+      // Auto-submit after scanning
+      handleScanSubmit(undefined, matchResult.batch);
+    } else {
+      setScanValue(text.trim());
+      toast({
+        variant: "destructive",
+        title: "Batch not found",
+        description: `No batch matches scanned code "${text.trim()}"`,
+      });
+    }
   };
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowScanDropdown(false);
+    if (showScanDropdown) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [showScanDropdown]);
 
+  // Photo upload
   const handlePhotoUpload = async (batchId: string, file: File) => {
     setUploadingId(batchId);
     try {
       const supabase = supabaseClient();
       const fileExt = file.name.split(".").pop();
       const fileName = `${batchId}-${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage.from("batch-photos").upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from("batch-photos").upload(fileName, file);
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("batch-photos").getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from("batch-photos").getPublicUrl(fileName);
 
       const { error: updateError } = await supabase
         .from("batches")
-        .update({
-          sales_photo_url: publicUrl,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ sales_photo_url: publicUrl, updated_at: new Date().toISOString() })
         .eq("id", batchId);
 
       if (updateError) throw updateError;
@@ -338,320 +518,529 @@ export default function SaleableBatchesClient({
         prev.map((b) => (b.id === batchId ? { ...b, salesPhotoUrl: publicUrl } : b))
       );
 
-      toast({
-        title: "Photo uploaded",
-        description: "Sales photo saved for this batch.",
-      });
+      toast({ title: "Photo uploaded", description: "Sales photo saved." });
     } catch (error: any) {
-      console.error("Upload failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Upload failed",
-        description: error.message || "Could not upload photo.",
-      });
+      toast({ variant: "destructive", title: "Upload failed", description: error.message });
     } finally {
       setUploadingId(null);
+      setPhotoTargetId(null);
     }
   };
 
-  const handleQuickPhoto = (file: File) => {
-    if (!lastScannedId) {
-      toast({
-        variant: "destructive",
-        title: "Scan a batch first",
-        description: "Scan a batch before adding a photo.",
-      });
-      return;
-    }
-    handlePhotoUpload(lastScannedId, file);
+  // Downloads
+  const downloadCSV = () => {
+    const headers = ["Batch", "Variety", "Size", "Status", "Behavior", "Units", "Location", "Updated"];
+    const rows = filteredBatches.map((b) => [
+      b.batchNumber,
+      b.plantVariety ?? "",
+      b.size ?? "",
+      b.status ?? "",
+      getBehaviorStyle(b.behavior).label,
+      b.quantity ?? 0,
+      b.location ?? "",
+      formatDate(b.updatedAt),
+    ]);
+
+    const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `batches-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearch("");
+    setBehaviorFilter("all");
+    setStatusFilter("all");
+    setVarietyFilter("all");
+    setLocationFilter("all");
+  };
+
+  const hasActiveFilters = search || behaviorFilter !== "all" || statusFilter !== "all" || varietyFilter !== "all" || locationFilter !== "all";
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      {/* Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Saleable &amp; looking good</h1>
-          <p className="text-sm text-muted-foreground">
-            Scan batches to mark them sale-ready, optionally flag them as looking good, and export shareable lists.
+          <h1 className="text-3xl font-bold tracking-tight">Batch Availability</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage batch production status. Scan batches or use bulk actions to update status.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={handleDownloadAvailability}>
-            Download availability list
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setIsScanOpen(true)}>
+            <QrCode className="h-4 w-4 mr-2" />
+            Scanner
           </Button>
-          <Button variant="secondary" onClick={handleDownloadLookingGood}>
-            Download looking good list
+          <Button variant="outline" onClick={downloadCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/settings/dropdowns">
+              <Settings2 className="h-4 w-4 mr-2" />
+              Configure Statuses
+            </Link>
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <CardTitle>Scan &amp; mark saleable</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Scan a batch number to set it to saleable instantly. Toggle “Looking Good” to set that status too.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch
-              id="mark-looking-good"
-              checked={markLookingGood}
-              onCheckedChange={(value) => setMarkLookingGood(Boolean(value))}
-            />
-            <label htmlFor="mark-looking-good" className="text-sm">
-              Also mark “Looking Good”
-            </label>
-          </div>
+      {/* Quick Scan Card */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <QrCode className="h-5 w-5" />
+            Quick Scan
+          </CardTitle>
+          <CardDescription>
+            Scan or search for a batch to update its status or add photos
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleScanSubmit} className="flex flex-col gap-3 md:flex-row md:items-center">
-            <div className="flex w-full items-center gap-2">
-              <Input
-                placeholder="Scan or type batch #, variety, or location"
-                value={scanValue}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setScanValue(next);
-                  setSearch(next);
-                }}
-                className="flex-1"
-                autoComplete="off"
-                inputMode="text"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="shrink-0"
-                onClick={() => setIsScanOpen(true)}
-                title="Open camera scanner (Data Matrix / QR)"
-              >
-                <QrCode className="h-4 w-4" />
-                <span className="sr-only">Open scanner</span>
-              </Button>
-            </div>
-            <Button type="submit" disabled={isScanning}>
-              {isScanning ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Updating…
-                </span>
-              ) : (
-                "Scan & mark saleable"
+        <CardContent>
+          <form onSubmit={handleScanSubmit} className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1 relative">
+              <div className="relative">
+                <Input
+                  placeholder="Batch number, variety, or location..."
+                  value={scanValue}
+                  onChange={(e) => {
+                    setScanValue(e.target.value);
+                    setShowScanDropdown(true);
+                  }}
+                  onFocus={() => setShowScanDropdown(true)}
+                  className="bg-white pr-10"
+                  autoComplete="off"
+                />
+                {/* Scanner button inside input */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                  onClick={() => setIsScanOpen(true)}
+                  title="Scan barcode/QR code"
+                >
+                  <QrCode className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </div>
+              {/* Autocomplete dropdown */}
+              {showScanDropdown && scanValue.trim() && scanMatches.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                  {scanMatches.slice(0, 10).map((batch) => (
+                    <button
+                      key={batch.id}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-muted flex items-center justify-between"
+                      onClick={() => {
+                        setSelectedScanBatch(batch);
+                        setScanValue(`#${batch.batchNumber} - ${batch.plantVariety}`);
+                        setShowScanDropdown(false);
+                      }}
+                    >
+                      <div>
+                        <span className="font-medium">#{batch.batchNumber}</span>
+                        <span className="text-muted-foreground ml-2">{batch.plantVariety}</span>
+                        <span className="text-xs text-muted-foreground ml-2">({batch.size})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{batch.quantity} units</span>
+                        <Badge className={`${getBehaviorStyle(batch.behavior).bg} ${getBehaviorStyle(batch.behavior).text} text-xs`}>
+                          {batch.status}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               )}
+              {showScanDropdown && scanValue.trim() && scanMatches.length === 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg p-3 text-center text-muted-foreground">
+                  No batches match "{scanValue}"
+                </div>
+              )}
+            </div>
+            <Select value={defaultScanStatus || defaultAvailableStatus} onValueChange={setDefaultScanStatus}>
+              <SelectTrigger className="w-[200px] bg-white">
+                <SelectValue placeholder="Target status" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(statusesByBehavior).map(([behavior, statuses]) => (
+                  statuses.length > 0 && (
+                    <div key={behavior}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">
+                        {getBehaviorStyle(behavior).label}
+                      </div>
+                      {statuses.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.displayLabel}
+                        </SelectItem>
+                      ))}
+                    </div>
+                  )
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Photo upload button */}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                if (selectedScanBatch) {
+                  setPhotoTargetId(selectedScanBatch.id);
+                  quickPhotoInputRef.current?.click();
+                } else {
+                  toast({ variant: "destructive", title: "Select a batch first", description: "Search and select a batch before adding a photo." });
+                }
+              }}
+              disabled={uploadingId !== null}
+              title="Upload photo for selected batch"
+            >
+              {uploadingId === selectedScanBatch?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+            </Button>
+            <Button type="submit" disabled={isScanning || !selectedScanBatch}>
+              {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Status"}
             </Button>
           </form>
-
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="rounded-md border bg-muted/40 p-3">
-              <p className="text-xs font-semibold uppercase text-muted-foreground">Last scanned</p>
-              {lastScannedId ? (
-                <div className="mt-1 space-y-1">
-                  <p className="text-sm font-medium">#{lastScannedNumber}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Ready for a quick photo or another scan.
-                  </p>
+          {selectedScanBatch && (
+            <div className="mt-3 p-3 bg-white rounded-md border flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {selectedScanBatch.salesPhotoUrl ? (
+                  <img 
+                    src={selectedScanBatch.salesPhotoUrl} 
+                    alt="Batch photo" 
+                    className="h-12 w-12 rounded object-cover"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
+                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
+                <div>
+                  <div>
+                    <span className="font-bold">#{selectedScanBatch.batchNumber}</span>
+                    <span className="text-muted-foreground ml-2">{selectedScanBatch.plantVariety} - {selectedScanBatch.size}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {selectedScanBatch.quantity} units • {selectedScanBatch.location}
+                  </div>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Scan a batch to pin it here.</p>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                ref={quickPhotoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                capture="environment"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) handleQuickPhoto(file);
-                  event.target.value = "";
-                }}
-              />
-              <Button
-                variant="outline"
-                disabled={!lastScannedId || uploadingId === lastScannedId}
-                onClick={() => quickPhotoInputRef.current?.click()}
-              >
-                {uploadingId === lastScannedId ? "Uploading…" : "Add photo"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={!lastScannedId}
-                onClick={() => {
-                  setLastScannedId(null);
-                  setLastScannedNumber(null);
-                }}
-              >
-                Clear last scan
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setSelectedScanBatch(null);
+                setScanValue("");
+              }}>
+                <X className="h-4 w-4" />
               </Button>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
+      
+      {/* Hidden file input for quick photo upload - supports camera and gallery */}
+      <input
+        ref={quickPhotoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && photoTargetId) {
+            handlePhotoUpload(photoTargetId, file);
+          }
+          e.target.value = "";
+        }}
+      />
 
-      <Card>
-        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
-            <div>
-              <CardTitle>Filters</CardTitle>
-              <p className="text-sm text-muted-foreground">Search and focus on specific statuses.</p>
-            </div>
-            <Input
-              placeholder="Search batch, variety, or location…"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="w-full lg:w-[280px]"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {statusOptions.map((status) => {
-              const active = selectedStatuses.includes(status);
-              return (
-                <Button
-                  key={status}
-                  type="button"
-                  variant={active ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleStatus(status)}
-                >
-                  {status}
-                </Button>
-              );
-            })}
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="Batches in view" value={saleableCount.toLocaleString()} />
-          <StatCard label="Units in view" value={totalUnits.toLocaleString()} />
-          <StatCard label="Ready" value={readyCount.toLocaleString()} />
-          <StatCard label="Looking Good" value={lookingGoodCount.toLocaleString()} />
-          <StatCard
-            label="With photos"
-            value={filteredBatches.filter((b) => !!(b.salesPhotoUrl || b.growerPhotoUrl)).length.toLocaleString()}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <CardTitle>Availability &amp; looking good lists</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Export the filtered view. Availability lists exclude photos; looking good lists include photo previews.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownloadAvailability}>
-              Download availability (.csv)
-            </Button>
-            <Button size="sm" variant="secondary" onClick={handleDownloadLookingGood}>
-              Download looking good (.html)
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
-
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Showing {filteredBatches.length} of {batches.length} batches.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Scan a batch above to set status without leaving this page.
-        </p>
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-5">
+        <StatCard label="Total Batches" value={stats.total} icon={<Leaf className="h-4 w-4" />} />
+        <StatCard label="Total Units" value={stats.totalUnits.toLocaleString()} />
+        <StatCard label="Available" value={stats.available} icon={<ShoppingCart className="h-4 w-4 text-green-600" />} color="text-green-600" />
+        <StatCard label="Growing" value={stats.growing} icon={<Leaf className="h-4 w-4 text-blue-600" />} color="text-blue-600" />
+        <StatCard label="With Photos" value={stats.withPhotos} icon={<ImageIcon className="h-4 w-4 text-purple-600" />} />
       </div>
 
-      <div className="rounded-lg border">
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Filter className="h-5 w-5" />
+              Filters
+            </CardTitle>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-1" />
+                Clear filters
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-5">
+            {/* Search */}
+            <div className="relative md:col-span-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Behavior Filter */}
+            <Select value={behaviorFilter} onValueChange={setBehaviorFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Behavior" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Behaviors</SelectItem>
+                <SelectItem value="available">Available (for sale)</SelectItem>
+                <SelectItem value="growing">Growing</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {productionStatusOptions.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.displayLabel}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Variety Filter */}
+            <Select value={varietyFilter} onValueChange={setVarietyFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Variety" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Varieties</SelectItem>
+                {varieties.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Location Filter */}
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bulk Actions Bar */}
+      {someSelected && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="py-3 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-blue-600" />
+              <span className="font-medium">{selectedIds.size} batch{selectedIds.size === 1 ? "" : "es"} selected</span>
+              <Button variant="ghost" size="sm" onClick={clearSelection}>Clear</Button>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Bulk Status Update */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isBulkUpdating}>
+                    <Leaf className="h-4 w-4 mr-1" />
+                    Set Status
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {Object.entries(statusesByBehavior).map(([behavior, statuses]) => (
+                    statuses.length > 0 && (
+                      <div key={behavior}>
+                        <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">
+                          {getBehaviorStyle(behavior).label}
+                        </DropdownMenuLabel>
+                        {statuses.map((s) => (
+                          <DropdownMenuItem key={s.id} onClick={() => handleBulkStatusUpdate(s)}>
+                            {s.displayLabel}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                      </div>
+                    )
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Results count */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>Showing {filteredBatches.length} of {batches.length} batches</span>
+      </div>
+
+      {/* Batch Table */}
+      <div className="rounded-lg border bg-white overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>Batch</TableHead>
               <TableHead>Variety / Size</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Units</TableHead>
+              <TableHead className="text-right">Units</TableHead>
               <TableHead>Location</TableHead>
-              <TableHead>Photos</TableHead>
+              <TableHead>Photo</TableHead>
               <TableHead>Updated</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredBatches.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   No batches match the current filters.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredBatches.map((batch) => (
-                <TableRow key={batch.id}>
-                  <TableCell className="font-medium">
-                    #{batch.batchNumber || batch.id.slice(0, 6)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span>{batch.plantVariety ?? "Unknown variety"}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {batch.size ?? "Size unknown"}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{batch.status ?? "—"}</Badge>
-                  </TableCell>
-                  <TableCell>{(batch.quantity ?? 0).toLocaleString()}</TableCell>
-                  <TableCell>{batch.location ?? "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2 text-xs">
-                      <Badge variant={batch.growerPhotoUrl ? "default" : "outline"}>
-                        Grower {batch.growerPhotoUrl ? "✓" : "—"}
-                      </Badge>
+              filteredBatches.map((batch) => {
+                const behaviorStyle = getBehaviorStyle(batch.behavior);
+                return (
+                  <TableRow key={batch.id} className={selectedIds.has(batch.id) ? "bg-blue-50/50" : ""}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(batch.id)}
+                        onCheckedChange={() => toggleSelect(batch.id)}
+                        aria-label={`Select batch ${batch.batchNumber}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">#{batch.batchNumber}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{batch.plantVariety ?? "Unknown"}</span>
+                        <span className="text-xs text-muted-foreground">{batch.size ?? "—"}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Select
+                          value={batch.statusId ?? ""}
+                          onValueChange={(v) => {
+                            const statusOpt = productionStatusOptions.find(s => s.id === v);
+                            if (statusOpt) handleSingleStatusUpdate(batch.id, statusOpt);
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-[150px]">
+                            <SelectValue>{batch.status ?? "—"}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(statusesByBehavior).map(([behavior, statuses]) => (
+                              statuses.length > 0 && (
+                                <div key={behavior}>
+                                  <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">
+                                    {getBehaviorStyle(behavior).label}
+                                  </div>
+                                  {statuses.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>{s.displayLabel}</SelectItem>
+                                  ))}
+                                </div>
+                              )
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Badge className={`${behaviorStyle.bg} ${behaviorStyle.text} text-[10px] w-fit`}>
+                          {behaviorStyle.label}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">{(batch.quantity ?? 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">{batch.location ?? "—"}</TableCell>
+                    <TableCell>
                       <Button
                         variant={batch.salesPhotoUrl ? "ghost" : "outline"}
                         size="sm"
-                        className="h-7 px-2 text-xs"
+                        className="h-8 px-2"
                         disabled={uploadingId === batch.id}
                         onClick={() => {
-                          setLastScannedId(batch.id);
-                          setLastScannedNumber(batch.batchNumber);
-                          quickPhotoInputRef.current?.click();
+                          setPhotoTargetId(batch.id);
+                          photoInputRef.current?.click();
                         }}
-                        title={batch.salesPhotoUrl ? "Replace sales photo" : "Add sales photo"}
                       >
                         {uploadingId === batch.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : batch.salesPhotoUrl ? (
-                          "Sales ✓"
-                        ) : (
-                          <span className="inline-flex items-center gap-1">
-                            <Camera className="h-3 w-3" /> Sales
+                          <span className="flex items-center gap-1 text-green-600">
+                            <ImageIcon className="h-4 w-4" /> ✓
                           </span>
+                        ) : (
+                          <Camera className="h-4 w-4" />
                         )}
                       </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(batch.updatedAt)}
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(batch.updatedAt)}</TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Hidden file input for photo upload */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        capture="environment"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && photoTargetId) handlePhotoUpload(photoTargetId, file);
+          e.target.value = "";
+        }}
+      />
+
+      {/* Scanner Dialog */}
       <ScannerDialog open={isScanOpen} onOpenChange={setIsScanOpen} onDetected={handleScanDetected} />
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon?: React.ReactNode; color?: string }) {
   return (
-    <div className="rounded-lg border bg-muted/20 p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold">{value}</p>
-    </div>
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">{label}</p>
+          {icon}
+        </div>
+        <p className={`text-2xl font-bold mt-1 ${color ?? ""}`}>{value}</p>
+      </CardContent>
+    </Card>
   );
 }
-

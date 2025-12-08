@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireCustomerAuth } from '@/lib/auth/b2b-guard';
 import { revalidatePath } from 'next/cache';
 import type { CartItem } from '@/lib/b2b/types';
+import { createPickListFromOrder } from '@/server/sales/picking';
 
 type CreateB2BOrderInput = {
   customerId: string;
@@ -123,9 +124,18 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
     await supabase.from('order_allocations').insert(batchAllocations);
   }
 
+  // Auto-create pick list for confirmed orders (so they appear in dispatch/picking queue)
+  try {
+    await createPickListFromOrder(order.id);
+  } catch (e) {
+    console.error('Failed to create pick list for B2B order:', e);
+    // Don't fail the order creation if pick list fails
+  }
+
   // Revalidate paths
   revalidatePath('/b2b/orders');
   revalidatePath('/b2b/dashboard');
+  revalidatePath('/dispatch/picking');
 
   return { orderId: order.id };
 }

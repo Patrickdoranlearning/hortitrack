@@ -21,15 +21,19 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
   const [hoveredModule, setHoveredModule] = React.useState<string | null>(null)
   const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const [isDesktop, setIsDesktop] = React.useState(false)
-  const HOVER_HIDE_DELAY = 300
+  const HOVER_HIDE_DELAY = 150
 
-  // Find the hovered module's sub-items (hover/focus driven only on desktop)
+  // Find the current module's sub-items (always shown as fallback)
+  const currentModuleData = APP_NAV.find(item => item.key === moduleKey)
+  const currentSubNavItems = currentModuleData?.items || []
+
+  // Find the hovered module's sub-items (shown on hover)
   const hoveredModuleData = hoveredModule ? APP_NAV.find(item => item.key === hoveredModule) : null
   const hoveredSubNavItems = hoveredModuleData?.items || []
 
-  // Show subnav only when hovering/focusing a module on desktop
-  const displaySubNavItems = hoveredSubNavItems
-  const showSubNav = isDesktop && hoveredModule !== null && hoveredSubNavItems.length > 0
+  // Show hovered module's items if hovering, otherwise show current module's items
+  const displaySubNavItems = hoveredModule ? hoveredSubNavItems : currentSubNavItems
+  const showSubNav = isDesktop && displaySubNavItems.length > 0
 
   const handleModuleHover = React.useCallback((key: string | null) => {
     // Clear any pending timeout
@@ -42,7 +46,7 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
       // Immediately show on hover
       setHoveredModule(key)
     } else {
-      // Delay hiding to allow moving to SubNav
+      // Delay resetting to current module to allow smooth transitions
       hoverTimeoutRef.current = setTimeout(() => {
         setHoveredModule(null)
       }, HOVER_HIDE_DELAY)
@@ -50,7 +54,7 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
   }, [])
 
   const handleSubNavMouseEnter = React.useCallback(() => {
-    // Cancel the hide timeout when entering SubNav
+    // Cancel the reset timeout when entering SubNav
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
       hoverTimeoutRef.current = null
@@ -58,7 +62,7 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
   }, [])
 
   const handleSubNavMouseLeave = React.useCallback(() => {
-    // Hide SubNav when leaving it
+    // Reset to current module when leaving SubNav
     setHoveredModule(null)
   }, [])
 
@@ -122,10 +126,16 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
           </div>
         </div>
 
-        {/* Row 3: Sub navigation (pages) - shows on hover, desktop only */}
+        {/* Row 3: Sub navigation (pages) - always visible on desktop */}
         {showSubNav && (
-          <div onMouseEnter={handleSubNavMouseEnter}>
-            <SubNav items={displaySubNavItems} />
+          <div 
+            onMouseEnter={handleSubNavMouseEnter}
+            className="transition-all duration-150"
+          >
+            <SubNav 
+              items={displaySubNavItems} 
+              moduleLabel={hoveredModule ? hoveredModuleData?.label : undefined}
+            />
           </div>
         )}
       </div>

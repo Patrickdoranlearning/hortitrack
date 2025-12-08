@@ -19,6 +19,7 @@ export type ProductSummary = {
       batchNumber: string;
       quantity: number;
       status: string;
+      behavior: string | null;
       varietyName: string | null;
       sizeName: string | null;
     } | null;
@@ -100,5 +101,37 @@ export type ProductAlias = {
   priceListName: string | null;
   isActive: boolean;
   notes: string | null;
+};
+
+export type MappingRule = {
+  id: string;
+  productId: string;
+  name: string;
+  matchFamily: string | null;
+  matchGenus: string | null;
+  matchCategory: string | null;
+  matchSizeId: string | null;
+  matchLocationId: string | null;
+  minAgeWeeks: number | null;
+  maxAgeWeeks: number | null;
+  matchStatusIds: string[] | null;
+  priority: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Joined data
+  product?: { id: string; name: string } | null;
+  size?: { id: string; name: string } | null;
+  location?: { id: string; name: string } | null;
+};
+
+export type MappingRulePreviewMatch = {
+  id: string;
+  batchNumber: string;
+  quantity: number;
+  status: string;
+  varietyName: string;
+  sizeName: string;
+  locationName: string;
 };
 

@@ -1,12 +1,12 @@
 // src/server/auth/getUser.ts
 import "server-only";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 import { UUID } from "crypto";
 
 export type ServerUser = { uid: string; email?: string; orgId?: string };
 
 export async function getUserIdAndOrgId(): Promise<{ userId: string | null; orgId: string | null }> {
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 

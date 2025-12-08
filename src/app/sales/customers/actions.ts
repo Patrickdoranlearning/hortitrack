@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
-import { getSupabaseServerClient } from "@/server/db/supabase";
+import { getSupabaseServerApp } from "@/server/db/supabase";
 import { customerFormSchema, customerAddressSchema, customerContactSchema } from "./types";
 
 function cleanString(value?: string | null) {
@@ -19,7 +19,7 @@ function cleanString(value?: string | null) {
 export async function upsertCustomerAction(input: z.infer<typeof customerFormSchema>) {
   const parsed = customerFormSchema.parse(input);
   const { orgId } = await getUserAndOrg();
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
 
   const payload = {
     name: parsed.name.trim(),
@@ -68,7 +68,7 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
 }
 
 export async function deleteCustomerAction(customerId: string) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("customers").delete().eq("id", customerId);
   if (error) {
     console.error("[deleteCustomerAction]", error);
@@ -92,7 +92,7 @@ const priceListAssignmentSchema = z.object({
 export async function assignPriceListToCustomerAction(input: z.infer<typeof priceListAssignmentSchema>) {
   const parsed = priceListAssignmentSchema.parse(input);
   const { orgId } = await getUserAndOrg();
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
 
   const { error } = await supabase.from("price_list_customers").insert({
     org_id: orgId,
@@ -112,7 +112,7 @@ export async function assignPriceListToCustomerAction(input: z.infer<typeof pric
 }
 
 export async function removePriceListAssignmentAction(assignmentId: string) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("price_list_customers").delete().eq("id", assignmentId);
   if (error) {
     console.error("[removePriceListAssignmentAction]", error);
@@ -128,7 +128,7 @@ export async function removePriceListAssignmentAction(assignmentId: string) {
 
 export async function upsertCustomerAddressAction(input: z.infer<typeof customerAddressSchema>) {
   const parsed = customerAddressSchema.parse(input);
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
 
   const payload = {
     customer_id: parsed.customerId,
@@ -193,7 +193,7 @@ export async function upsertCustomerAddressAction(input: z.infer<typeof customer
 }
 
 export async function deleteCustomerAddressAction(addressId: string) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("customer_addresses").delete().eq("id", addressId);
   if (error) {
     console.error("[deleteCustomerAddressAction]", error);
@@ -209,7 +209,7 @@ export async function deleteCustomerAddressAction(addressId: string) {
 
 export async function upsertCustomerContactAction(input: z.infer<typeof customerContactSchema>) {
   const parsed = customerContactSchema.parse(input);
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
 
   const payload = {
     customer_id: parsed.customerId,
@@ -258,7 +258,7 @@ export async function upsertCustomerContactAction(input: z.infer<typeof customer
 }
 
 export async function deleteCustomerContactAction(contactId: string) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("customer_contacts").delete().eq("id", contactId);
   if (error) {
     console.error("[deleteCustomerContactAction]", error);
@@ -286,7 +286,7 @@ const customerProductPricingSchema = z.object({
 export async function upsertCustomerProductPricingAction(input: z.infer<typeof customerProductPricingSchema>) {
   const parsed = customerProductPricingSchema.parse(input);
   const { orgId } = await getUserAndOrg();
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
 
   // Get product name for alias if not provided
   let aliasName = parsed.aliasName;
@@ -356,7 +356,7 @@ export async function upsertCustomerProductPricingAction(input: z.infer<typeof c
 }
 
 export async function deleteCustomerProductPricingAction(aliasId: string) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("product_aliases").delete().eq("id", aliasId);
   if (error) {
     console.error("[deleteCustomerProductPricingAction]", error);
@@ -368,7 +368,7 @@ export async function deleteCustomerProductPricingAction(aliasId: string) {
 
 // Fetch customer product pricing
 export async function fetchCustomerProductPricingAction(customerId: string) {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
   
   const { data, error } = await supabase
     .from("product_aliases")
@@ -423,7 +423,7 @@ const portalPasswordSchema = z.object({
 export async function setCustomerPortalPassword(input: z.infer<typeof portalPasswordSchema>) {
   const parsed = portalPasswordSchema.parse(input);
   const { orgId } = await getUserAndOrg();
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerApp();
 
   try {
     // Create Supabase auth user with admin API

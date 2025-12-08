@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import OrderCard from '@/components/sales/OrderCard';
-import OrderDetailDialog from '@/components/sales/OrderDetailDialog';
 
 export interface SalesOrderWithCustomer {
     id: string;
@@ -27,12 +26,10 @@ interface SalesOrdersClientProps {
 }
 
 export default function SalesOrdersClient({ initialOrders }: SalesOrdersClientProps) {
-    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const router = useRouter();
 
     const handleOpenOrder = (orderId: string) => {
-        setSelectedOrderId(orderId);
-        setIsDialogOpen(true);
+        router.push(`/sales/orders/${orderId}`);
     };
 
     return (
@@ -52,12 +49,6 @@ export default function SalesOrdersClient({ initialOrders }: SalesOrdersClientPr
                     ))}
                 </div>
             )}
-
-            <OrderDetailDialog
-                orderId={selectedOrderId}
-                open={isDialogOpen}
-                onOpenChange={setIsDialogOpen}
-            />
         </>
     );
 }

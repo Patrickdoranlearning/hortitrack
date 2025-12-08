@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 export const BatchDetailSchema = z.object({
   id: z.string(),
@@ -30,7 +30,7 @@ export const BatchDetailSchema = z.object({
 export type BatchDetail = z.infer<typeof BatchDetailSchema>;
 
 export async function getBatchDetail(batchId: string): Promise<BatchDetail | null> {
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
   
   const { data, error } = await supabase
     .from("v_batch_search")

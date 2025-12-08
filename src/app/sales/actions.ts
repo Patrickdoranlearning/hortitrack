@@ -47,7 +47,7 @@ export async function createOrder(data: CreateOrderInput) {
         return { error: 'Invalid form data', details: result.error.flatten() };
     }
 
-    const { customerId, lines, deliveryDate, notesInternal, notesCustomer } = result.data;
+    const { customerId, lines, deliveryDate, notesInternal, notesCustomer, shipToAddressId, storeId } = result.data;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -132,12 +132,16 @@ export async function createOrder(data: CreateOrderInput) {
     const vatAmount = roundToTwo(resolvedLines.reduce((sum, l) => sum + l.lineVatAmount, 0));
     const totalIncVat = roundToTwo(subtotalExVat + vatAmount);
 
+    // Resolve shipping address
+    const resolvedShipToAddressId = await resolveShipToAddressId(supabase, customerId, shipToAddressId, storeId);
+
     const nowIso = new Date().toISOString();
     const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
             org_id: orgId,
             customer_id: customerId,
+            ship_to_address_id: resolvedShipToAddressId,
             order_number: `ORD-${Date.now()}`,
             status: 'confirmed',
             subtotal_ex_vat: subtotalExVat,
@@ -214,6 +218,11 @@ export async function createOrder(data: CreateOrderInput) {
 export async function generateInvoice(orderId: string) {
     const supabase = await createClient();
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { error: 'Not authenticated' };
+    }
+
     // 1. Fetch Order and Items
     const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -225,6 +234,28 @@ export async function generateInvoice(orderId: string) {
         return { error: 'Order not found' };
     }
 
+    // Check if invoice already exists for this order
+    const { data: existingInvoice } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+    if (existingInvoice) {
+        return { error: 'Invoice already exists for this order' };
+    }
+
+    // Fetch organization settings for invoice generation
+    const { data: org } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', order.org_id)
+        .single();
+
+    const orgData = org as Record<string, unknown> | null;
+    const invoicePrefix = (orgData?.invoice_prefix as string) || 'INV';
+    const paymentTermsDays = (orgData?.default_payment_terms as number) || 30;
+
     const { data: items } = await supabase
         .from('order_items')
         .select('line_total_ex_vat, line_vat_amount')
@@ -234,34 +265,48 @@ export async function generateInvoice(orderId: string) {
     const vat = roundToTwo(items?.reduce((sum, item) => sum + (item.line_vat_amount || 0), 0) ?? 0);
     const total = roundToTwo(subtotal + vat);
 
+    // Generate invoice number using org prefix
+    const invoiceNumber = `${invoicePrefix}-${Date.now()}`;
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const dueDate = new Date(Date.now() + paymentTermsDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
     // 3. Create Invoice
     const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
             org_id: order.org_id,
             customer_id: order.customer_id,
+            order_id: orderId,
+            invoice_number: invoiceNumber,
+            currency: 'EUR',
             status: 'issued',
-            issue_date: new Date().toISOString(),
-            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days due
+            issue_date: today,
+            due_date: dueDate,
             subtotal_ex_vat: subtotal,
             vat_amount: vat,
             total_inc_vat: total,
+            balance_due: total,
         })
         .select()
         .single();
 
     if (invoiceError) {
         console.error('Error creating invoice:', invoiceError);
-        return { error: 'Failed to create invoice' };
+        return { error: `Failed to create invoice: ${invoiceError.message}` };
     }
 
     revalidatePath('/sales/invoices');
     revalidatePath('/sales/orders');
+    revalidatePath(`/sales/orders/${orderId}`);
+    
     await supabase.from('order_events').insert({
+        org_id: order.org_id,
         order_id: orderId,
         event_type: 'invoice_generated',
-        description: 'Invoice generated from order detail view',
+        description: `Invoice ${invoiceNumber} generated`,
+        created_by: user.id,
     });
+    
     return { success: true, invoice };
 }
 
@@ -355,6 +400,61 @@ async function fetchCustomerWithOrg(client: ServerClient, customerId: string): P
         return null;
     }
     return data;
+}
+
+/**
+ * Resolve the shipping address ID for an order.
+ * Priority: explicit shipToAddressId > storeId (if UUID) > customer's default shipping address
+ */
+async function resolveShipToAddressId(
+    client: ServerClient,
+    customerId: string,
+    shipToAddressId?: string,
+    storeId?: string
+): Promise<string | null> {
+    // If explicit shipToAddressId provided, use it
+    if (shipToAddressId) {
+        return shipToAddressId;
+    }
+
+    // If storeId looks like a UUID, it might be an address ID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (storeId && uuidRegex.test(storeId)) {
+        // Verify it's a valid address for this customer
+        const { data: address } = await client
+            .from('customer_addresses')
+            .select('id')
+            .eq('id', storeId)
+            .eq('customer_id', customerId)
+            .maybeSingle();
+        
+        if (address) {
+            return address.id;
+        }
+    }
+
+    // Fall back to customer's default shipping address
+    const { data: defaultAddress } = await client
+        .from('customer_addresses')
+        .select('id')
+        .eq('customer_id', customerId)
+        .eq('is_default_shipping', true)
+        .maybeSingle();
+
+    if (defaultAddress) {
+        return defaultAddress.id;
+    }
+
+    // If no default, try first address
+    const { data: firstAddress } = await client
+        .from('customer_addresses')
+        .select('id')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+    return firstAddress?.id ?? null;
 }
 
 async function fetchOrgProducts(client: ServerClient, orgId: string): Promise<ProductRow[]> {

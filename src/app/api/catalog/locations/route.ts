@@ -2,7 +2,7 @@
 // src/app/api/catalog/locations/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 import { getActiveOrgId } from "@/server/auth/org";
 
 const Query = z.object({
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     if (!parse.success) return NextResponse.json({ error: parse.error.format() }, { status: 400 });
 
     const { q, limit } = parse.data;
-    const supabase = await getSupabaseForRequest();
+    const supabase = await createClient();
     
     // Fetch the active organization ID for the current user
     const orgId = await getActiveOrgId(supabase);

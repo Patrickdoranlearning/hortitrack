@@ -27,10 +27,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AddUserDialog } from "./AddUserDialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -50,6 +60,9 @@ export function TeamManagement() {
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editName, setEditName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   async function fetchMembers() {
@@ -137,6 +150,46 @@ export function TeamManagement() {
     }
   }
 
+  function openEditDialog(member: Member) {
+    setEditingMember(member);
+    setEditName(member.profiles?.full_name || "");
+  }
+
+  async function handleUpdateName() {
+    if (!editingMember) return;
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(`/api/org/members/${editingMember.user_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName: editName }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update name");
+      }
+
+      toast({
+        title: "Success",
+        description: "Team member updated successfully",
+      });
+
+      fetchMembers();
+      setEditingMember(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update name",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <>
       <Card>
@@ -187,13 +240,24 @@ export function TeamManagement() {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteUserId(member.user_id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(member)}
+                          title="Edit member"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteUserId(member.user_id)}
+                          title="Remove member"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -217,6 +281,36 @@ export function TeamManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!editingMember} onOpenChange={(open) => !open && setEditingMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Team Member</DialogTitle>
+            <DialogDescription>
+              Update the details for {editingMember?.profiles?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editName">Full Name</Label>
+              <Input
+                id="editName"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Enter full name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingMember(null)} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateName} disabled={isSaving || !editName.trim()}>
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

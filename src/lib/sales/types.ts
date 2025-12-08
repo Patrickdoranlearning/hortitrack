@@ -39,6 +39,7 @@ export const CreateOrderLineSchema = z
 export const CreateOrderSchema = z.object({
   customerId: z.string().min(1),
   storeId: z.string().min(1).optional(),
+  shipToAddressId: z.string().uuid().optional(), // The customer_addresses.id for shipping
   deliveryAddress: z.string().optional(),
   orderReference: z.string().optional(),
   deliveryDate: z.string().optional(), // ISO

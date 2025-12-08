@@ -2,7 +2,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 const Query = z.object({
   q: z.string().trim().min(0).max(100).optional(),
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const sb = await getSupabaseForRequest();
+  const sb = await createClient();
 
   // base select with exact count for pagination
   let query = sb.from("v_batch_search")
