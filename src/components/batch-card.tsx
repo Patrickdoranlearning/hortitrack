@@ -81,6 +81,10 @@ export function BatchCard({
   const isIncoming = batch.status === "Incoming";
   const isGhostBatch = isPlanned || isIncoming;
 
+  const familyLabel =
+    batch.plantFamily ||
+    (batch as any)?.plant_family ||
+    "Unspecified";
   const getStatusVariant = (
     status: Batch['status']
   ): 'default' | 'secondary' | 'destructive' | 'outline' | 'accent' | 'info' => {
@@ -218,18 +222,13 @@ export function BatchCard({
               <div className="font-serif text-xl leading-tight">
                 {batch.plantVariety || batch.batchNumber}
               </div>
-              {batch.plantFamily && (
-                <div className="text-sm text-muted-foreground line-clamp-1">
-                  {batch.plantFamily}
-                </div>
-              )}
             </div>
             <div className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
               {batch.batchNumber}
             </div>
           </div>
           <div className="text-xs text-muted-foreground">
-            {[batch.size, batch.phase?.toString()?.replace(/_/g, " ")].filter(Boolean).join(" • ") || " "}
+            {[familyLabel, batch.size, batch.phase?.toString()?.replace(/_/g, " ")].filter(Boolean).join(" • ") || " "}
           </div>
         </div>
 

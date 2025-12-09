@@ -39,8 +39,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Plus, Trash2, ArrowDown, Clock, ChevronDown, Thermometer, Droplets, Sun, Leaf } from "lucide-react";
+import { Plus, Trash2, ArrowDown, Clock, ChevronDown, Thermometer, Droplets, Sun, Leaf, AlertCircle } from "lucide-react";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { FieldErrors } from "react-hook-form";
 
 type GrowingConditions = {
   media?: string;
@@ -274,6 +276,49 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
     setSizeFlow((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Handle validation errors
+  function onInvalid(errors: FieldErrors<FormValues>) {
+    console.error("[ProtocolDrawer] Validation failed:", errors);
+    // Show toast for validation errors
+    const errorMessages: string[] = [];
+    
+    // Check each field for errors
+    Object.entries(errors).forEach(([field, error]) => {
+      if (error?.message) {
+        errorMessages.push(String(error.message));
+      } else if (error?.root?.message) {
+        // Handle nested root errors from refinements
+        errorMessages.push(String(error.root.message));
+      }
+    });
+    
+    // If no specific errors but validation failed, do a manual check
+    if (errorMessages.length === 0) {
+      const values = form.getValues();
+      if (!values.name || values.name.length < 2) {
+        errorMessages.push("Name is required");
+      }
+      if (!values.targetFamily) {
+        errorMessages.push("Family is required");
+      }
+    }
+    
+    if (errorMessages.length > 0) {
+      toast({
+        title: "Please fix form errors",
+        description: errorMessages.join(". "),
+        variant: "destructive",
+      });
+    } else {
+      // Fallback message if we still can't determine the error
+      toast({
+        title: "Form validation failed",
+        description: "Please check all required fields are filled in correctly.",
+        variant: "destructive",
+      });
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     if (sizeFlow.length < 2) {
       toast({ title: "Need at least start and end stages", variant: "destructive" });
@@ -387,9 +432,21 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form className="flex-1 flex flex-col overflow-hidden" onSubmit={form.handleSubmit(onSubmit)}>
+          <form className="flex-1 flex flex-col overflow-hidden" onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
             <div className="flex-1 overflow-y-auto pr-2 space-y-6">
               
+              {/* Form-level validation errors */}
+              {Object.keys(form.formState.errors).length > 0 && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    {Object.entries(form.formState.errors).map(([field, error]) => (
+                      <div key={field}>{error?.message ? String(error.message) : `Invalid ${field}`}</div>
+                    ))}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField

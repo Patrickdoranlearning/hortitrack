@@ -79,12 +79,14 @@ export async function saveAttributeOptions({ orgId, attributeKey, options, supab
   const requiresBehavior = !!ATTRIBUTE_META[attributeKey]?.requiresBehavior;
 
   const normalized = options.map((opt, idx) => {
-    const systemCode = (opt.systemCode?.trim?.() || normalizeSystemCode(opt.displayLabel)).trim();
+    // Generate systemCode from displayLabel if not provided
+    const systemCode = (opt.systemCode?.trim?.() || normalizeSystemCode(opt.displayLabel || `OPTION_${idx + 1}`)).trim();
     const displayLabel = opt.displayLabel?.trim?.() || systemCode;
     const behavior = requiresBehavior ? (opt.behavior ?? "growing") : opt.behavior ?? null;
 
-    return {
-      id: opt.id,
+    // Build the record - only include id if it's a valid UUID
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const record: Record<string, unknown> = {
       org_id: orgId,
       attribute_key: attributeKey,
       system_code: systemCode,
@@ -94,15 +96,35 @@ export async function saveAttributeOptions({ orgId, attributeKey, options, supab
       behavior,
       color: opt.color ?? null,
     };
+    
+    // Only include id if it's a valid UUID (for updates), otherwise let DB generate one
+    if (opt.id && UUID_RE.test(opt.id)) {
+      record.id = opt.id;
+    }
+
+    return record;
   });
 
+  // Use upsert with the unique constraint on org_id, attribute_key, system_code
   const { error: upsertErr } = await sb
     .from("attribute_options")
     .upsert(normalized, { onConflict: "org_id,attribute_key,system_code" });
   if (upsertErr) throw new Error(upsertErr.message);
 
-  const keepIds = new Set(normalized.map((o) => o.id).filter(Boolean) as string[]);
-  const staleIds = (existing ?? []).map((r) => r.id).filter((id): id is string => !!id && !keepIds.has(id));
+  // Get the system_codes we're keeping
+  const keepSystemCodes = new Set(normalized.map((o) => o.system_code));
+  
+  // Find stale records that should be deactivated (records in DB but not in our new list)
+  const { data: existingFull } = await sb
+    .from("attribute_options")
+    .select("id, system_code")
+    .eq("org_id", orgId)
+    .eq("attribute_key", attributeKey);
+  
+  const staleIds = (existingFull ?? [])
+    .filter((r) => !keepSystemCodes.has(r.system_code))
+    .map((r) => r.id)
+    .filter((id): id is string => !!id);
 
   if (staleIds.length) {
     const { error: disableErr } = await sb

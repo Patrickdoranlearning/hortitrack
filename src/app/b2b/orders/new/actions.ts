@@ -108,20 +108,42 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
     return { error: 'Failed to create order items' };
   }
 
-  // Optionally create batch allocations based on customer batch selections
-  // This is a preference hint, not a strict allocation
-  const batchAllocations = cart
-    .filter((item) => item.batchId)
-    .map((item) => ({
-      order_id: order.id,
-      batch_id: item.batchId!,
-      quantity_allocated: item.quantity,
-    }));
+  // Create batch allocations based on customer batch selections
+  // Supports both single batch (batchId) and multiple batches (batchAllocations)
+  const allBatchAllocations: Array<{
+    order_id: string;
+    batch_id: string;
+    quantity_allocated: number;
+  }> = [];
 
-  if (batchAllocations.length > 0) {
+  for (const item of cart) {
+    // Prefer multi-batch allocations if present
+    if (item.batchAllocations && item.batchAllocations.length > 0) {
+      for (const allocation of item.batchAllocations) {
+        allBatchAllocations.push({
+          order_id: order.id,
+          batch_id: allocation.batchId,
+          quantity_allocated: allocation.qty,
+        });
+      }
+    } else if (item.batchId) {
+      // Fall back to single batch allocation
+      allBatchAllocations.push({
+        order_id: order.id,
+        batch_id: item.batchId,
+        quantity_allocated: item.quantity,
+      });
+    }
+  }
+
+  if (allBatchAllocations.length > 0) {
     // Note: This assumes you have an order_allocations table
     // If not, you can skip this step
-    await supabase.from('order_allocations').insert(batchAllocations);
+    const { error: allocError } = await supabase.from('order_allocations').insert(allBatchAllocations);
+    if (allocError) {
+      console.warn('Failed to create batch allocations:', allocError.message);
+      // Don't fail the order if allocations fail
+    }
   }
 
   // Auto-create pick list for confirmed orders (so they appear in dispatch/picking queue)

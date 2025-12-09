@@ -47,6 +47,9 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   PROPAGATE: "Propagated",
   TRANSPLANT: "Transplanted",
   STATUS_CHANGE: "Status Changed",
+  PICKED: "Picked for Order",
+  SOLD: "Sold",
+  ARCHIVE: "Archived",
 };
 
 interface BatchDetailDialogProps {
@@ -220,7 +223,7 @@ export function BatchDetailDialog({
                   )}
                 </TabsContent>
                 <TabsContent value="history">
-                  <div className="max-h-72 overflow-y-auto text-sm space-y-3 mt-4">
+                  <div className="max-h-80 overflow-y-auto mt-4">
                     {eventsLoading && (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -231,43 +234,76 @@ export function BatchDetailDialog({
                       <div className="text-sm text-red-600 py-4">{eventsError}</div>
                     )}
                     {!eventsLoading && !eventsError && events.length === 0 && (
-                      <div className="text-muted-foreground py-4">No events logged yet.</div>
+                      <div className="text-muted-foreground py-4 text-center">No events logged yet.</div>
                     )}
-                    {!eventsLoading && events.map((event) => {
-                      const payload = typeof event.payload === "string" 
-                        ? JSON.parse(event.payload) 
-                        : event.payload;
-                      const typeLabel = EVENT_TYPE_LABELS[event.type] || event.type;
-                      
-                      return (
-                        <div key={event.id} className="rounded-lg border p-3 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{typeLabel}</span>
-                            <span className="text-muted-foreground text-xs">
-                              {new Date(event.at || event.created_at).toLocaleString()}
-                            </span>
-                          </div>
-                          {payload?.reason && (
-                            <div className="text-muted-foreground">Reason: {payload.reason}</div>
-                          )}
-                          {payload?.units_dumped && (
-                            <div className="text-muted-foreground">Units: {payload.units_dumped}</div>
-                          )}
-                          {payload?.units_moved && (
-                            <div className="text-muted-foreground">Units moved: {payload.units_moved}</div>
-                          )}
-                          {payload?.to_location_name && (
-                            <div className="text-muted-foreground">To: {payload.to_location_name}</div>
-                          )}
-                          {payload?.status && (
-                            <div className="text-muted-foreground">Status: {payload.status}</div>
-                          )}
-                          {payload?.notes && (
-                            <div className="text-muted-foreground">{payload.notes}</div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {!eventsLoading && events.length > 0 && (
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-background border-b">
+                          <tr className="text-left text-muted-foreground">
+                            <th className="py-2 pr-2 font-medium w-28">Date</th>
+                            <th className="py-2 px-2 font-medium">Event</th>
+                            <th className="py-2 px-2 font-medium text-right w-20">Qty</th>
+                            <th className="py-2 pl-2 font-medium">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {events.map((event) => {
+                            const payload = typeof event.payload === "string" 
+                              ? JSON.parse(event.payload) 
+                              : event.payload;
+                            const typeLabel = EVENT_TYPE_LABELS[event.type] || event.type;
+                            
+                            // Extract quantity from various payload fields
+                            const qty = payload?.units_picked 
+                              || payload?.units_dumped 
+                              || payload?.units_moved 
+                              || payload?.quantityActual
+                              || payload?.quantity
+                              || null;
+                            
+                            // Determine if this is a decrease (negative) event
+                            const isDecrease = ["DUMP", "PICKED", "SOLD", "TRANSPLANT"].includes(event.type);
+                            
+                            // Build details string
+                            const details: string[] = [];
+                            if (payload?.to_location_name) details.push(`→ ${payload.to_location_name}`);
+                            if (payload?.order_number) details.push(`Order #${payload.order_number}`);
+                            if (payload?.customer_name) details.push(payload.customer_name);
+                            if (payload?.reason) details.push(payload.reason);
+                            if (payload?.status) details.push(`Status: ${payload.status}`);
+                            if (payload?.notes) details.push(payload.notes);
+                            
+                            return (
+                              <tr key={event.id} className="hover:bg-muted/30">
+                                <td className="py-2 pr-2 text-muted-foreground whitespace-nowrap">
+                                  {new Date(event.at || event.created_at).toLocaleDateString('en-GB', { 
+                                    day: '2-digit', 
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </td>
+                                <td className="py-2 px-2 font-medium">
+                                  {typeLabel}
+                                </td>
+                                <td className={`py-2 px-2 text-right font-mono ${
+                                  qty 
+                                    ? isDecrease 
+                                      ? 'text-red-600' 
+                                      : 'text-green-600'
+                                    : 'text-muted-foreground'
+                                }`}>
+                                  {qty ? (isDecrease ? `-${qty}` : `+${qty}`) : '—'}
+                                </td>
+                                <td className="py-2 pl-2 text-muted-foreground truncate max-w-[180px]" title={details.join(' · ')}>
+                                  {details.join(' · ') || '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 </TabsContent>
                 <TabsContent value="ancestry">

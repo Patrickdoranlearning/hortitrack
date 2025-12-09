@@ -23,14 +23,15 @@ function transformVBatchSearchData(data: VBatchSearchRow): Batch {
         ...camelCaseData,
         batchNumber: camelCaseData.batchNumber,
         plantVariety: camelCaseData.varietyName ?? '',
-        plantFamily: camelCaseData.varietyFamily ?? null,
+        // The view column is "family" (not "variety_family"), so after snakeToCamel it's just "family"
+        plantFamily: camelCaseData.family ?? camelCaseData.varietyFamily ?? null,
         size: camelCaseData.sizeName ?? '',
         location: camelCaseData.locationName ?? null,
         supplier: camelCaseData.supplierName ?? null,
         initialQuantity: camelCaseData.initialQuantity ?? camelCaseData.quantity ?? 0,
         plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
         plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
-        category: camelCaseData.varietyCategory ?? '',
+        category: camelCaseData.category ?? camelCaseData.varietyCategory ?? '',
         createdAt: camelCaseData.createdAt,
         updatedAt: camelCaseData.updatedAt,
         logHistory: [], 
@@ -331,14 +332,14 @@ export async function getBatchesAction(options: GetBatchesOptions = {}) {
             query = query.eq('status', options.status);
         }
 
-        // Apply plant family filter
+        // Apply plant family filter (column is "family" in v_batch_search view)
         if (options.plantFamily && options.plantFamily !== 'all') {
-            query = query.eq('variety_family', options.plantFamily);
+            query = query.eq('family', options.plantFamily);
         }
 
-        // Apply category filter
+        // Apply category filter (column is "category" in v_batch_search view)
         if (options.category && options.category !== 'all') {
-            query = query.eq('variety_category', options.category);
+            query = query.eq('category', options.category);
         }
 
         // Apply pagination (with sensible defaults)

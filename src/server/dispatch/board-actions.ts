@@ -134,10 +134,10 @@ export async function assignOrderToRun(orderId: string, runId: string) {
 
 export async function createRunAndAssign(orderId: string, haulierId: string, date: string) {
   try {
-    // Create run
+    // Create run (haulierId might be 'default' if no hauliers exist)
     const runId = await createDeliveryRun({
       runDate: date,
-      haulierId: haulierId,
+      haulierId: haulierId === 'default' ? undefined : haulierId,
       status: "planned"
     });
     

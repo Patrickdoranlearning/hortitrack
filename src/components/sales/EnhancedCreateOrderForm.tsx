@@ -49,9 +49,9 @@ export interface CustomerAddress {
 }
 
 interface EnhancedCreateOrderFormProps {
-  customers: { 
-    id: string; 
-    name: string; 
+  customers: {
+    id: string;
+    name: string;
     store?: string | null;
     currency?: string;
     countryCode?: string;
@@ -231,10 +231,10 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(false);
-    
+
     try {
       console.log('Submitting order:', data);
-      
+
       // Double-check validation
       const validation = CreateOrderSchema.safeParse(data);
       if (!validation.success) {
@@ -245,7 +245,7 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
           errorMessages.push(`${field}: ${(msgs as string[]).join(', ')}`);
         });
         errors.formErrors.forEach(msg => errorMessages.push(msg));
-        
+
         setSubmitError({
           message: 'Validation failed',
           details: errorMessages.join('\n')
@@ -253,12 +253,12 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
         setIsSubmitting(false);
         return;
       }
-      
+
       const result = await createOrder(validation.data);
       if (result?.error) {
         console.error('Order creation error:', result.error, result.details);
-        const detailsStr = result.details 
-          ? JSON.stringify(result.details, null, 2) 
+        const detailsStr = result.details
+          ? JSON.stringify(result.details, null, 2)
           : undefined;
         setSubmitError({
           message: result.error,
@@ -280,34 +280,34 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       setIsSubmitting(false);
     }
   }
-  
+
   // Manual submit handler that bypasses react-hook-form validation
   const handleManualSubmit = async () => {
     setSubmitError(null);
     setSubmitSuccess(false);
-    
+
     const values = form.getValues();
     console.log('Manual submit - form values:', values);
-    
+
     // Validate with Zod directly
     const validation = CreateOrderSchema.safeParse(values);
     if (!validation.success) {
       console.error('Manual validation failed:', validation.error.flatten());
       const errors = validation.error.flatten();
       const messages: string[] = [];
-      
+
       Object.entries(errors.fieldErrors).forEach(([field, msgs]) => {
         messages.push(`${field}: ${(msgs as string[]).join(', ')}`);
       });
       errors.formErrors.forEach(msg => messages.push(msg));
-      
+
       setSubmitError({
         message: 'Please fix the following validation errors',
         details: messages.join('\n')
       });
       return;
     }
-    
+
     // If validation passes, submit
     await onSubmit(validation.data);
   };
@@ -316,15 +316,15 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
   const onInvalid = useCallback((errors: any) => {
     console.error('Form validation errors:', errors);
     console.error('Current form values:', form.getValues());
-    
+
     // Manually validate to get better error messages
     const values = form.getValues();
     const messages: string[] = [];
-    
+
     if (!values.customerId) {
       messages.push('Customer is required');
     }
-    
+
     if (!values.lines || values.lines.length === 0) {
       messages.push('At least one order line is required');
     } else {
@@ -339,7 +339,7 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
         }
       });
     }
-    
+
     if (messages.length > 0) {
       setSubmitError({
         message: 'Please fix the following errors',
@@ -423,7 +423,13 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Customer *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        form.setValue('customerId', val, { shouldValidate: true });
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder="Search for a Customer" />
@@ -502,7 +508,7 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deliver To</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => {
                         field.onChange(value);
                         // Update delivery address and shipToAddressId based on selection
@@ -518,8 +524,8 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                             form.setValue('shipToAddressId', undefined);
                           }
                         }
-                      }} 
-                      value={field.value || 'main'} 
+                      }}
+                      value={field.value || 'main'}
                       disabled={!selectedCustomer}
                     >
                       <FormControl>
@@ -562,10 +568,10 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                       {storeId === 'custom' ? 'Custom Address' : 'Delivery Address'}
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder={storeId === 'custom' ? "Enter delivery address" : "Address will auto-fill"} 
-                        {...field} 
-                        value={field.value ?? ''} 
+                      <Input
+                        placeholder={storeId === 'custom' ? "Enter delivery address" : "Address will auto-fill"}
+                        {...field}
+                        value={field.value ?? ''}
                         className="bg-white"
                         readOnly={storeId !== 'custom'}
                       />
@@ -902,10 +908,10 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                   <span className="text-sm">Auto print pick list and invoice</span>
                 </div>
 
-                <Button 
-                  type="button" 
-                  disabled={isSubmitting} 
-                  size="lg" 
+                <Button
+                  type="button"
+                  disabled={isSubmitting}
+                  size="lg"
                   className="w-full"
                   onClick={handleManualSubmit}
                 >

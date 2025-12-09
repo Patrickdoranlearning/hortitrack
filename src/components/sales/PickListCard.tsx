@@ -28,8 +28,12 @@ export interface PickListCardData {
   totalQty?: number;
   pickedQty?: number;
   teamName?: string;
+  assignedTeamId?: string;
+  assignedUserId?: string;
+  assignedUserName?: string;
   notes?: string;
   startedAt?: string;
+  county?: string;
 }
 
 interface PickListCardProps {
@@ -38,6 +42,7 @@ interface PickListCardProps {
   onStart?: (id: string) => void;
   showSequence?: boolean;
   compact?: boolean;
+  isAssignedToMe?: boolean;
 }
 
 const statusConfig = {
@@ -77,6 +82,7 @@ export default function PickListCard({
   onStart,
   showSequence = false,
   compact = false,
+  isAssignedToMe = false,
 }: PickListCardProps) {
   const config = statusConfig[pickList.status];
   const StatusIcon = config.icon;
@@ -94,16 +100,27 @@ export default function PickListCard({
         pickList.status === 'in_progress' && 'border-l-blue-500',
         pickList.status === 'completed' && 'border-l-green-500',
         pickList.status === 'cancelled' && 'border-l-destructive',
+        isAssignedToMe && 'ring-2 ring-primary ring-offset-2',
         config.bg
       )}
       onClick={() => onSelect(pickList.id)}
     >
       <div className={cn('p-4', compact && 'p-3')}>
+        {/* Priority indicator */}
+        {isAssignedToMe && (
+          <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-bl">
+            ASSIGNED TO YOU
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             {showSequence && (
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
+              <div className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm shrink-0",
+                isAssignedToMe ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
+              )}>
                 {pickList.sequence}
               </div>
             )}
@@ -118,10 +135,18 @@ export default function PickListCard({
               )}
             </div>
           </div>
-          <Badge variant={config.variant} className="shrink-0">
-            <StatusIcon className="h-3 w-3 mr-1" />
-            {config.label}
-          </Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant={config.variant} className="shrink-0">
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {config.label}
+            </Badge>
+            {pickList.assignedUserName && !isAssignedToMe && (
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <User className="h-3 w-3" />
+                {pickList.assignedUserName}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Info Row */}

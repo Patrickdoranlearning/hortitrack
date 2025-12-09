@@ -34,6 +34,7 @@ export default async function B2BNewOrderPage() {
         plant_varieties (
           id,
           name,
+          family,
           category
         ),
         plant_sizes (
@@ -50,7 +51,7 @@ export default async function B2BNewOrderPage() {
           quantity,
           reserved_quantity,
           plant_variety_id,
-          plant_varieties ( name )
+          plant_varieties ( name, family )
         )
       ),
       product_prices!inner (
@@ -90,6 +91,7 @@ export default async function B2BNewOrderPage() {
           id: batch.id,
           batchNumber: batch.batch_number || '',
           varietyName: batch.plant_varieties?.name || null,
+          family: batch.plant_varieties?.family || null,
           availableQty,
         };
       })
@@ -97,6 +99,7 @@ export default async function B2BNewOrderPage() {
         id: string;
         batchNumber: string;
         varietyName: string | null;
+        family: string | null;
         availableQty: number;
       }>;
 
@@ -116,6 +119,7 @@ export default async function B2BNewOrderPage() {
       skuCode: sku?.code || null,
       varietyId: variety?.id || null,
       varietyName: variety?.name || null,
+      family: variety?.family || null,
       sizeId: size?.id || null,
       sizeName: size?.name || null,
       category: variety?.category || null,

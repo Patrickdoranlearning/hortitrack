@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { LogOut, User } from 'lucide-react';
 import { startImpersonation, endImpersonation } from './actions';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 type Customer = {
@@ -56,7 +57,12 @@ export function ImpersonateClient({ customers, activeSession }: ImpersonateClien
     formData.append('customerId', selectedCustomerId);
     formData.append('notes', notes);
 
-    await startImpersonation(formData);
+    const result = await startImpersonation(formData);
+
+    if (result?.error) {
+      toast.error(result.error);
+      setIsLoading(false);
+    }
   };
 
   const handleEndImpersonation = async () => {

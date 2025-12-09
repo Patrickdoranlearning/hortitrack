@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 import ProductSkuSheet from "./ProductSkuSheet";
 import {
   ProductDetailsSection,
@@ -26,6 +27,7 @@ type Props = {
 
 export default function ProductFormClient({ mode, product, skus, batches, priceLists, customers }: Props) {
   const router = useRouter();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
   const [productId, setProductId] = useState<string | null>(product?.id ?? null);
   const [skuSheetOpen, setSkuSheetOpen] = useState(false);
@@ -64,6 +66,10 @@ export default function ProductFormClient({ mode, product, skus, batches, priceL
               forcedSkuId={lastCreatedSkuId}
               onForcedSkuApplied={() => setLastCreatedSkuId(null)}
               onSaved={(id) => {
+                toast({
+                  title: mode === "create" ? "Product created" : "Product updated",
+                  description: "Product details have been saved successfully.",
+                });
                 if (mode === "create" && id) {
                   // Redirect to edit page so inventory/pricing/aliases tabs work
                   router.push(`/sales/products/${id}`);
@@ -118,6 +124,11 @@ export default function ProductFormClient({ mode, product, skus, batches, priceL
         onCreated={(sku) => {
           setSkuOptions((prev) => [sku, ...prev]);
           setLastCreatedSkuId(sku.id);
+          setSkuSheetOpen(false);
+          toast({
+            title: "SKU created",
+            description: `${sku.code} has been added.`,
+          });
         }}
       />
     </Card>

@@ -37,8 +37,9 @@ import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { useToast } from "@/hooks/use-toast";
 import type { ProtocolSummary, PlanningBatch } from "@/lib/planning/types";
-import { AlertTriangle, Info, QrCode } from "lucide-react";
+import { AlertTriangle, Info, QrCode, AlertCircle } from "lucide-react";
 import ScannerDialog from "@/components/scan-and-act-dialog";
+import type { FieldErrors } from "react-hook-form";
 
 const OPTIONAL_VALUE = "__option__";
 
@@ -248,6 +249,52 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
     setIsScanOpen(false);
   }, [parents, toast]);
 
+  // Handle validation errors
+  function onInvalid(errors: FieldErrors<FormValues>) {
+    console.error("[FutureAllocationDialog] Validation failed:", errors);
+    // Show toast for validation errors
+    const errorMessages: string[] = [];
+    
+    // Check each field for errors
+    Object.entries(errors).forEach(([field, error]) => {
+      if (error?.message) {
+        errorMessages.push(String(error.message));
+      } else if (error?.root?.message) {
+        // Handle nested root errors from refinements
+        errorMessages.push(String(error.root.message));
+      }
+    });
+    
+    // If no specific errors but validation failed, do a manual check
+    if (errorMessages.length === 0) {
+      const values = form.getValues();
+      if (!values.parentBatchId && !values.plantVarietyId) {
+        errorMessages.push("Select a parent batch or variety");
+      }
+      if (!values.sizeId) {
+        errorMessages.push("Size is required");
+      }
+      if (!values.units || values.units <= 0) {
+        errorMessages.push("Units must be positive");
+      }
+    }
+    
+    if (errorMessages.length > 0) {
+      toast({
+        title: "Please fix form errors",
+        description: errorMessages.join(". "),
+        variant: "destructive",
+      });
+    } else {
+      // Fallback message if we still can't determine the error
+      toast({
+        title: "Form validation failed",
+        description: "Please check all required fields are filled in correctly.",
+        variant: "destructive",
+      });
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
     try {
@@ -305,9 +352,20 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form className="flex-1 flex flex-col overflow-hidden" onSubmit={form.handleSubmit(onSubmit)}>
+          <form className="flex-1 flex flex-col overflow-hidden" onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
             <div className="flex-1 overflow-y-auto pr-2">
               <div className="grid gap-4 p-1">
+                {/* Form-level validation errors */}
+                {Object.keys(form.formState.errors).length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      {Object.entries(form.formState.errors).map(([field, error]) => (
+                        <div key={field}>{error?.message ? String(error.message) : `Invalid ${field}`}</div>
+                      ))}
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <FormField
                   control={form.control}
                   name="parentBatchId"

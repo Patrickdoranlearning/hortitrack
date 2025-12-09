@@ -955,6 +955,22 @@ export async function updatePickItem(
       batch_id: input.pickedBatchId,
       amount: input.pickedQty,
     });
+
+    // Log to batch_events so it shows in batch's Log History
+    await supabase.from("batch_events").insert({
+      org_id: orgId,
+      batch_id: input.pickedBatchId,
+      type: "PICKED",
+      payload: {
+        units_picked: input.pickedQty,
+        pick_item_id: input.pickItemId,
+        pick_list_id: current.pick_list_id,
+        notes: input.notes,
+        substitution_reason: input.substitutionReason,
+      },
+      by_user_id: user.id,
+      at: new Date().toISOString(),
+    });
   }
 
   await logPickListEvent(
