@@ -88,11 +88,14 @@ export async function allocateForProductLine(params: AllocationOptions): Promise
   }
 
   // 6) Split allocation across saleable batches until qty satisfied
+  // Use availableQuantity (quantity - reserved) to avoid double-booking
   let remaining = qty;
   const out: Allocation[] = [];
   for (const b of saleable) {
     if (remaining <= 0) break;
-    const take = Math.min(b.quantity || 0, remaining);
+    // Use availableQuantity which accounts for reserved stock
+    const availableQty = b.availableQuantity ?? (b.quantity || 0);
+    const take = Math.min(availableQty, remaining);
     if (take > 0) {
       out.push({
         batchId: b.id,

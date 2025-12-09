@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles } from "lucide-react";
+import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -48,6 +48,16 @@ import {
   deleteProductAliasAction,
 } from "./actions";
 import type { ProductManagementPayload, ProductSummary, ProductSkuOption } from "./types";
+import dynamic from "next/dynamic";
+
+// Lazy load gallery to avoid slowing down initial page load
+const ProductGallerySection = dynamic(
+  () => import("@/components/products/ProductGallerySection"),
+  { 
+    loading: () => <div className="p-4 text-center text-muted-foreground">Loading gallery...</div>,
+    ssr: false 
+  }
+);
 
 export default function ProductManagementClient(props: ProductManagementPayload) {
   const { toast } = useToast();
@@ -102,6 +112,13 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                   const pipelineBatches = product.batches.filter(b => b.batch?.behavior !== "available");
                   const availableQty = availableBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
                   const pipelineQty = pipelineBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+                  const varietyNames = Array.from(
+                    new Set(
+                      product.batches
+                        .map((b) => b.batch?.varietyName)
+                        .filter((v): v is string => Boolean(v))
+                    )
+                  );
                   
                   return (
                     <TableRow key={product.id}>
@@ -117,6 +134,12 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                           <span className="text-sm font-medium text-green-700">{availableQty} available</span>
                           {pipelineQty > 0 && (
                             <span className="text-xs text-muted-foreground">{pipelineQty} coming</span>
+                          )}
+                          {varietyNames.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              Varieties: {varietyNames.slice(0, 3).join(", ")}
+                              {varietyNames.length > 3 && ` +${varietyNames.length - 3} more`}
+                            </span>
                           )}
                         </div>
                       </TableCell>
@@ -203,7 +226,7 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
           <SheetTitle>{mode === "edit" ? `Manage ${product?.name ?? "product"}` : "Create product"}</SheetTitle>
         </SheetHeader>
         <Tabs value={activeTab} onValueChange={(next) => setActiveTab(next as typeof activeTab)}>
-          <TabsList className="grid grid-cols-4">
+          <TabsList className="grid grid-cols-5">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="inventory" disabled={!currentProductId}>
               Inventory
@@ -213,6 +236,10 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
             </TabsTrigger>
             <TabsTrigger value="aliases" disabled={!currentProductId}>
               Aliases
+            </TabsTrigger>
+            <TabsTrigger value="gallery" disabled={!currentProductId}>
+              <ImageIcon className="h-4 w-4 mr-1.5" />
+              Gallery
             </TabsTrigger>
           </TabsList>
           <TabsContent value="details">
@@ -285,6 +312,13 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
               />
             ) : (
               <EmptyTabState label="Save product details first to manage aliases." />
+            )}
+          </TabsContent>
+          <TabsContent value="gallery">
+            {currentProductId ? (
+              <ProductGallerySection productId={currentProductId} />
+            ) : (
+              <EmptyTabState label="Save product details first to add gallery photos." />
             )}
           </TabsContent>
         </Tabs>

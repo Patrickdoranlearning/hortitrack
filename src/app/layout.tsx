@@ -1,11 +1,11 @@
 
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { PT_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from '@/lib/utils';
 import { OrgProvider } from "@/lib/org/context";
-import { ReferenceDataProvider } from "@/contexts/ReferenceDataContext";
 import { OfflineProvider } from "@/offline/OfflineProvider";
 
 const ptSans = PT_Sans({
@@ -41,45 +41,20 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
-import { createClient } from "@/lib/supabase/server";
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  let activeOrgId: string | null = null;
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('active_org_id')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.active_org_id) {
-      activeOrgId = profile.active_org_id;
-    } else {
-      const { data: membership } = await supabase
-        .from('org_memberships')
-        .select('org_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single();
-      if (membership) {
-        activeOrgId = membership.org_id;
-      }
-    }
-  }
+  const cookieStore = cookies();
+  const activeOrgId = cookieStore.get("active_org_id")?.value ?? null;
 
   return (
     <html lang="en">
       <body className={cn(ptSans.variable, playfairDisplay.variable, 'font-body', 'antialiased', 'overflow-x-hidden')}>
         <OrgProvider initialOrgId={activeOrgId}>
           <OfflineProvider>
-            <ReferenceDataProvider>{children}</ReferenceDataProvider>
+            {children}
           </OfflineProvider>
         </OrgProvider>
         <Toaster />

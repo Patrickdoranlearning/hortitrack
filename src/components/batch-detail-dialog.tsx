@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,10 @@ import {
   Trash2,
   Share2,
   Loader2,
+  ImageIcon,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 import type { Batch } from '@/lib/types';
 import { ProductionProtocolDialog } from "./production-protocol-dialog";
 import { CareRecommendationsDialog } from "./care-recommendations-dialog";
@@ -28,6 +32,20 @@ import AncestryStrip from "./ancestry-strip";
 import { PlantPassportCard } from "./batches/PlantPassportCard";
 import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
 import type { ActionMode } from "@/components/actions/types";
+
+// Lazy load gallery to avoid slowing down dialog open
+const BatchGallerySection = dynamic(
+  () => import("@/components/batches/BatchGallerySection"),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+        Loading photos...
+      </div>
+    ),
+    ssr: false 
+  }
+);
 
 type BatchEvent = {
   id: string;
@@ -189,6 +207,10 @@ export function BatchDetailDialog({
                 <TabsList>
                   <TabsTrigger value="summary">Summary</TabsTrigger>
                   <TabsTrigger value="history">Log History</TabsTrigger>
+                  <TabsTrigger value="photos">
+                    <ImageIcon className="h-4 w-4 mr-1" />
+                    Photos
+                  </TabsTrigger>
                   <TabsTrigger value="ancestry">Ancestry</TabsTrigger>
                 </TabsList>
                 <TabsContent value="summary" className="pt-4 space-y-4">
@@ -306,6 +328,14 @@ export function BatchDetailDialog({
                     )}
                   </div>
                 </TabsContent>
+                <TabsContent value="photos" className="pt-4">
+                  {batch.id && (
+                    <BatchGallerySection 
+                      batchId={batch.id} 
+                      varietyId={batch.plantVarietyId}
+                    />
+                  )}
+                </TabsContent>
                 <TabsContent value="ancestry">
                     <AncestryStrip
                       currentId={batch.id!}
@@ -321,6 +351,13 @@ export function BatchDetailDialog({
               <Button onClick={() => onTransplant(batch)} variant="outline" disabled={(batch.quantity ?? 0) === 0}><Sprout /> Transplant</Button>
               <ActionMenuButton batch={batch} onSelect={(mode) => onLogAction(batch, mode)} className="w-full" />
               <Button onClick={() => setIsChatOpen(true)} variant="outline"><Share2 /> Chat about Batch</Button>
+              {batch.id && (
+                <Button asChild variant="outline">
+                  <Link href={`/production/batches/${batch.id}`} target="_blank">
+                    <ExternalLink className="mr-2 h-4 w-4" /> View Full Page
+                  </Link>
+                </Button>
+              )}
               
               <div className="!mt-auto pt-4 border-t">
                   <h4 className="font-semibold text-lg mb-3">AI Tools</h4>

@@ -913,12 +913,59 @@ export async function updatePickItem(
   // Get current pick item
   const { data: current } = await supabase
     .from("pick_items")
-    .select("*, pick_lists(org_id)")
+    .select(
+      `
+        *,
+        pick_lists(org_id),
+        order_items(
+          id,
+          product_id,
+          required_variety_id,
+          required_batch_id
+        )
+      `
+    )
     .eq("id", input.pickItemId)
     .single();
 
   if (!current) {
     return { error: "Pick item not found" };
+  }
+
+  // Validate picked batch against constraints if provided
+  if (input.pickedBatchId) {
+    // 1) Ensure batch belongs to product (via product_batches)
+    if (current.order_items?.product_id) {
+      const { data: pbMatch } = await supabase
+        .from("product_batches")
+        .select("id")
+        .eq("product_id", current.order_items.product_id)
+        .eq("batch_id", input.pickedBatchId)
+        .maybeSingle();
+      if (!pbMatch) {
+        return { error: "Picked batch does not belong to the ordered product" };
+      }
+    }
+
+    // 2) Ensure variety requirement matches if set
+    if (current.order_items?.required_variety_id) {
+      const { data: batchRow } = await supabase
+        .from("batches")
+        .select("plant_variety_id")
+        .eq("id", input.pickedBatchId)
+        .maybeSingle();
+      if (batchRow?.plant_variety_id !== current.order_items.required_variety_id) {
+        return { error: "Picked batch has wrong variety for this line" };
+      }
+    }
+
+    // 3) Ensure specific batch requirement matches if set
+    if (
+      current.order_items?.required_batch_id &&
+      current.order_items.required_batch_id !== input.pickedBatchId
+    ) {
+      return { error: "This line requires a specific batch; scanned batch is different" };
+    }
   }
 
   // Determine status
@@ -1000,12 +1047,56 @@ export async function substituteBatch(
 
   const { data: current } = await supabase
     .from("pick_items")
-    .select("*, pick_lists(org_id)")
+    .select(
+      `
+        *,
+        pick_lists(org_id),
+        order_items(
+          id,
+          product_id,
+          required_variety_id,
+          required_batch_id
+        )
+      `
+    )
     .eq("id", pickItemId)
     .single();
 
   if (!current) {
     return { error: "Pick item not found" };
+  }
+
+  // Validation same as updatePickItem
+  {
+    if (current.order_items?.product_id) {
+      const { data: pbMatch } = await supabase
+        .from("product_batches")
+        .select("id")
+        .eq("product_id", current.order_items.product_id)
+        .eq("batch_id", newBatchId)
+        .maybeSingle();
+      if (!pbMatch) {
+        return { error: "Picked batch does not belong to the ordered product" };
+      }
+    }
+
+    if (current.order_items?.required_variety_id) {
+      const { data: batchRow } = await supabase
+        .from("batches")
+        .select("plant_variety_id")
+        .eq("id", newBatchId)
+        .maybeSingle();
+      if (batchRow?.plant_variety_id !== current.order_items.required_variety_id) {
+        return { error: "Picked batch has wrong variety for this line" };
+      }
+    }
+
+    if (
+      current.order_items?.required_batch_id &&
+      current.order_items.required_batch_id !== newBatchId
+    ) {
+      return { error: "This line requires a specific batch; scanned batch is different" };
+    }
   }
 
   const { error } = await supabase
@@ -1054,25 +1145,96 @@ export async function getAvailableBatchesForItem(
 }[]> {
   const supabase = await getSupabaseServerApp();
 
-  // Get the pick item to find variety/size
+  // Get the pick item to find variety/size AND any required variety/batch constraints
   const { data: pickItem } = await supabase
     .from("pick_items")
     .select(`
       order_items(
+        required_variety_id,
+        required_batch_id,
+        product_id,
         skus(plant_variety_id, size_id)
       )
     `)
     .eq("id", pickItemId)
     .single();
 
-  if (!pickItem?.order_items?.skus) {
+  if (!pickItem?.order_items) {
     return [];
   }
 
-  const { plant_variety_id, size_id } = pickItem.order_items.skus;
+  const orderItem = pickItem.order_items as {
+    required_variety_id?: string;
+    required_batch_id?: string;
+    product_id?: string;
+    skus?: { plant_variety_id: string; size_id: string };
+  };
 
-  // Get available batches with same variety/size
-  const { data: batches, error } = await supabase
+  // If a specific batch is required, return only that batch
+  if (orderItem.required_batch_id) {
+    const { data: requiredBatch } = await supabase
+      .from("batches")
+      .select(`
+        id,
+        batch_number,
+        quantity,
+        status,
+        nursery_locations(name)
+      `)
+      .eq("id", orderItem.required_batch_id)
+      .single();
+
+    if (!requiredBatch) return [];
+
+    return [{
+      id: requiredBatch.id,
+      batchNumber: requiredBatch.batch_number,
+      quantity: requiredBatch.quantity,
+      location: (requiredBatch.nursery_locations as any)?.name || "Unknown",
+      status: requiredBatch.status ?? undefined,
+    }];
+  }
+
+  // Determine variety filter - required_variety_id takes precedence over SKU variety
+  const varietyId = orderItem.required_variety_id || orderItem.skus?.plant_variety_id;
+  const sizeId = orderItem.skus?.size_id;
+
+  if (!varietyId) {
+    // If no variety constraint, fall back to product-linked batches
+    if (orderItem.product_id) {
+      const { data: productBatches, error } = await supabase
+        .from("product_batches")
+        .select(`
+          batches(
+            id,
+            batch_number,
+            quantity,
+            status,
+            nursery_locations(name)
+          )
+        `)
+        .eq("product_id", orderItem.product_id);
+
+      if (error) {
+        console.error("Error fetching product batches:", error);
+        return [];
+      }
+
+      return (productBatches || [])
+        .filter((pb: any) => pb.batches && pb.batches.quantity > 0)
+        .map((pb: any) => ({
+          id: pb.batches.id,
+          batchNumber: pb.batches.batch_number,
+          quantity: pb.batches.quantity,
+          location: pb.batches.nursery_locations?.name || "Unknown",
+          status: pb.batches.status,
+        }));
+    }
+    return [];
+  }
+
+  // Get available batches with matching variety (and optionally size)
+  let query = supabase
     .from("batches")
     .select(`
       id,
@@ -1081,11 +1243,17 @@ export async function getAvailableBatchesForItem(
       status,
       nursery_locations(name)
     `)
-    .eq("plant_variety_id", plant_variety_id)
-    .eq("size_id", size_id)
+    .eq("plant_variety_id", varietyId)
     .gt("quantity", 0)
     .in("status", ["Ready", "Looking Good"])
     .order("planted_at", { ascending: true });
+
+  // If size is specified on the SKU, filter by size as well
+  if (sizeId) {
+    query = query.eq("size_id", sizeId);
+  }
+
+  const { data: batches, error } = await query;
 
   if (error) {
     console.error("Error fetching available batches:", error);

@@ -21,13 +21,15 @@ type ProductRow = {
     skus?: {
         id: string;
         default_vat_rate: number | null;
+        plant_variety_id: string | null;
+        size_id: string | null;
         plant_varieties?:
-            | { name: string | null }
-            | Array<{ name: string | null }>
+            | { id: string | null; name: string | null }
+            | Array<{ id: string | null; name: string | null }>
             | null;
         plant_sizes?:
-            | { name: string | null }
-            | Array<{ name: string | null }>
+            | { id: string | null; name: string | null }
+            | Array<{ id: string | null; name: string | null }>
             | null;
     } | null;
 };
@@ -125,6 +127,8 @@ export async function createOrder(data: CreateOrderInput) {
                 gradePreference: line.gradePreference,
                 preferredBatchNumbers: line.preferredBatchNumbers,
             },
+            requiredVarietyId: line.requiredVarietyId ?? product.skus?.plant_variety_id ?? null,
+            requiredBatchId: line.requiredBatchId ?? line.specificBatchId ?? null,
         });
     }
 
@@ -182,6 +186,8 @@ export async function createOrder(data: CreateOrderInput) {
             discount_pct: 0,
             line_total_ex_vat: line.lineTotalExVat,
             line_vat_amount: line.lineVatAmount,
+            required_variety_id: line.requiredVarietyId,
+            required_batch_id: line.requiredBatchId,
         };
     });
 
@@ -469,8 +475,10 @@ async function fetchOrgProducts(client: ServerClient, orgId: string): Promise<Pr
             skus (
                 id,
                 default_vat_rate,
-                plant_varieties ( name ),
-                plant_sizes ( name )
+                plant_variety_id,
+                size_id,
+                plant_varieties ( id, name ),
+                plant_sizes ( id, name )
             )
         `)
         .eq('org_id', orgId)

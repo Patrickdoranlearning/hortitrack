@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import dynamic from "next/dynamic";
 import EventsCard from "@/components/batches/EventsCard";
 import PassportsCard from "@/components/batches/PassportsCard";
 import AncestryCard from "@/components/batches/AncestryCard";
@@ -9,6 +10,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
+// Lazy load gallery to avoid slowing down initial page load
+const BatchGalleryCard = dynamic(
+  () => import("@/components/batches/BatchGalleryCard"),
+  { 
+    loading: () => (
+      <Card>
+        <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
+        <CardContent><div className="text-sm text-muted-foreground">Loading...</div></CardContent>
+      </Card>
+    ),
+    ssr: false 
+  }
+);
 
 export default async function Page({ params }: { params: { batchId: string } }) {
   const supabase = await createClient();
@@ -64,6 +79,10 @@ export default async function Page({ params }: { params: { batchId: string } }) 
           <AncestryCard batchId={batch.id} />
         </div>
         <div className="space-y-4">
+          <BatchGalleryCard
+            batchId={batch.id}
+            varietyId={batch.plant_variety_id}
+          />
           <PassportsCard batchId={batch.id} />
         </div>
       </div>

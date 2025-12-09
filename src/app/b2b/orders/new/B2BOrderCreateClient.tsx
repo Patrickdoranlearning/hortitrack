@@ -57,10 +57,11 @@ export function B2BOrderCreateClient({
         const searchLower = filters.search.toLowerCase();
         const matchesName = product.productName.toLowerCase().includes(searchLower);
         const matchesVariety = product.varietyName?.toLowerCase().includes(searchLower);
+        const matchesVarietyAlias = product.varietyAliases?.some((a) => a.toLowerCase().includes(searchLower));
         const matchesAlias = product.aliasName?.toLowerCase().includes(searchLower);
         const matchesSku = product.skuCode?.toLowerCase().includes(searchLower);
 
-        if (!matchesName && !matchesVariety && !matchesAlias && !matchesSku) {
+        if (!matchesName && !matchesVariety && !matchesVarietyAlias && !matchesAlias && !matchesSku) {
           return false;
         }
       }

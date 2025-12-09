@@ -85,6 +85,8 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       lines: [{
         plantVariety: '',
         size: '',
+        requiredVarietyId: undefined,
+        requiredBatchId: undefined,
         qty: 1,
         allowSubstitute: true,
         unitPrice: undefined,
@@ -218,6 +220,12 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       form.setValue(`lines.${batchDialogLineIndex}.qty`, totalQty);
       // Store batch preferences
       form.setValue(`lines.${batchDialogLineIndex}.preferredBatchNumbers`, allocations.map(a => a.batchNumber));
+      // If a single batch is selected, set required batch id; otherwise clear
+      if (allocations.length === 1) {
+        form.setValue(`lines.${batchDialogLineIndex}.requiredBatchId`, allocations[0].batchId);
+      } else {
+        form.setValue(`lines.${batchDialogLineIndex}.requiredBatchId`, undefined);
+      }
     }
   };
 
@@ -355,6 +363,14 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
 
   const batchDialogProduct = batchDialogLineIndex !== null ? getSelectedProduct(batchDialogLineIndex) : null;
   const batchDialogAllocations = batchDialogLineIndex !== null ? (lineAllocations.get(batchDialogLineIndex) ?? []) : [];
+  const batchDialogSelectedVariety =
+    batchDialogLineIndex !== null ? form.getValues(`lines.${batchDialogLineIndex}.plantVariety`) : undefined;
+  const batchDialogBatches =
+    batchDialogProduct?.batches?.filter((b) =>
+      batchDialogSelectedVariety && batchDialogSelectedVariety !== 'any'
+        ? b.plantVariety === batchDialogSelectedVariety
+        : true
+    ) ?? [];
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -660,7 +676,48 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
                     />
 
                     {selectedProduct && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Variety selection (by name, filters batches) */}
+                        {selectedProduct?.batches && selectedProduct.batches.length > 0 && (
+                          <FormField
+                            control={form.control}
+                            name={`lines.${index}.plantVariety`}
+                            render={({ field }) => (
+                              <FormItem className="w-48">
+                                <FormLabel className="text-xs text-muted-foreground">Variety</FormLabel>
+                                <Select
+                                  onValueChange={(val) => {
+                                    field.onChange(val);
+                                    // Clear allocations when variety changes
+                                    const next = new Map(lineAllocations);
+                                    next.delete(index);
+                                    setLineAllocations(next);
+                                    // Clear required batch/variety ids (no IDs available here)
+                                    form.setValue(`lines.${index}.requiredBatchId`, undefined);
+                                  }}
+                                  value={field.value || 'any'}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-8">
+                                      <SelectValue placeholder="Any / Assorted" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="any">Any / Assorted</SelectItem>
+                                    {Array.from(
+                                      new Set((selectedProduct.batches ?? []).map((b) => b.plantVariety).filter(Boolean))
+                                    ).map((name) => (
+                                      <SelectItem key={name} value={name!}>
+                                        {name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
                         <Button
                           type="button"
                           variant="outline"
@@ -931,9 +988,9 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       <BatchSelectionDialog
         open={batchDialogOpen}
         onOpenChange={setBatchDialogOpen}
-        batches={batchDialogProduct?.batches ?? []}
+        batches={batchDialogBatches}
         productName={batchDialogProduct ? resolveProductLabel(batchDialogProduct) : ''}
-        productVariety={batchDialogProduct?.plantVariety ?? ''}
+        productVariety={batchDialogSelectedVariety || batchDialogProduct?.plantVariety || ''}
         productSize={batchDialogProduct?.size ?? ''}
         currentAllocations={batchDialogAllocations}
         onConfirm={handleBatchConfirm}
