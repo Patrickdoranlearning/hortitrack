@@ -25,6 +25,7 @@ export async function middleware(request: NextRequest) {
   });
 
   const pathname = request.nextUrl.pathname;
+  const ACTIVE_ORG_COOKIE = "active_org_id";
 
   // 1. Security Origin Check (API only)
   if (pathname.startsWith("/api/")) {
@@ -45,7 +46,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 2. Supabase Session Refresh
+  // 2. Supabase Session Refresh + Org resolution
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -71,8 +72,43 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // This will refresh session if needed
-  await supabase.auth.getUser();
+  // Refresh session (auth cookie rotation)
+  const { data: { user } = { user: null } } = await supabase.auth.getUser();
+
+  const activeOrgFromCookie = request.cookies.get(ACTIVE_ORG_COOKIE)?.value ?? null;
+  let activeOrgId: string | null = activeOrgFromCookie ?? null;
+
+  if (!activeOrgId && user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("active_org_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.active_org_id) {
+      activeOrgId = profile.active_org_id;
+    } else {
+      const { data: membership } = await supabase
+        .from("org_memberships")
+        .select("org_id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .single();
+      if (membership?.org_id) {
+        activeOrgId = membership.org_id;
+      }
+    }
+  }
+
+  if (!user && activeOrgFromCookie) {
+    response.cookies.delete(ACTIVE_ORG_COOKIE);
+  } else if (activeOrgId && activeOrgId !== activeOrgFromCookie) {
+    response.cookies.set(ACTIVE_ORG_COOKIE, activeOrgId, {
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+  }
 
   return response;
 }

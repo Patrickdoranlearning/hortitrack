@@ -12,17 +12,20 @@ export type CustomerCatalogProduct = {
   skuCode: string | null;
   varietyId: string | null;
   varietyName: string | null;
+  varietyAliases?: string[] | null;
   family: string | null; // Plant family (e.g., Lamiaceae for Lavender)
   sizeId: string | null;
   sizeName: string | null;
   category: string | null;
   containerType: string | null;
   heroImageUrl: string | null;
+  galleryImages?: Array<{ url: string; badge?: string }> | null;
   isActive: boolean;
   // Available batches for this product
   availableBatches: Array<{
     id: string;
     batchNumber: string;
+    varietyId: string | null; // Plant variety ID for order constraints
     varietyName: string | null; // For different cultivars (e.g., Hidcote, Munstead)
     family: string | null; // Plant family
     availableQty: number;
@@ -61,6 +64,9 @@ export type CartItem = {
   quantity: number;
   unitPriceExVat: number;
   vatRate: number;
+  requiredVarietyId?: string;
+  requiredVarietyName?: string | null;
+  requiredBatchId?: string;
   // Optional batch selection - supports single or multiple batches
   batchId?: string;
   batchNumber?: string;
@@ -162,4 +168,53 @@ export type CustomerFavoriteProduct = {
   product: Pick<CustomerCatalogProduct, 'productId' | 'productName' | 'varietyName' | 'sizeName' | 'heroImageUrl' | 'unitPriceExVat'>;
   sortOrder: number;
   createdAt: string;
+};
+
+/**
+ * Batch information for variety-level display
+ */
+export type VarietyBatchInfo = {
+  id: string;
+  batchNumber: string;
+  availableQty: number;
+  growingStatus: string | null;
+  salesStatus: string | null;
+  qcStatus: string | null;
+  notes: string | null;
+  plantedAt: string | null;
+  locationName: string | null;
+};
+
+/**
+ * Variety-level aggregate information for accordion display
+ * Groups batches by variety and calculates availability
+ */
+export type VarietyInfo = {
+  varietyId: string;
+  varietyName: string;
+  family: string | null;
+  totalAvailableQty: number;
+  status: 'plenty' | 'low' | 'out';  // Stock level indicator
+  batchCount: number;
+  batches: VarietyBatchInfo[];
+};
+
+/**
+ * Enhanced catalog product with variety-level breakdown
+ * Used by accordion component for multi-level selection
+ */
+export type CustomerCatalogProductWithVarieties = CustomerCatalogProduct & {
+  varieties: VarietyInfo[];
+};
+
+/**
+ * Variety allocation state for accordion component
+ * Tracks user's quantity allocation per variety
+ */
+export type VarietyAllocation = {
+  varietyId: string;
+  varietyName: string;
+  quantity: number;
+  batchAllocations?: BatchAllocation[];
+  hasBatchSelection: boolean;
 };

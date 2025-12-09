@@ -18,6 +18,8 @@ export const CreateOrderLineSchema = z
     // Product identity fallback (variety + size)
     plantVariety: z.string().optional(),
     size: z.string().optional(),
+    requiredVarietyId: z.string().uuid().optional(),
+    requiredBatchId: z.string().uuid().optional(),
     description: z.string().optional(),
     qty: z.coerce.number().int().positive().default(1),
     allowSubstitute: z.boolean().optional().default(true),

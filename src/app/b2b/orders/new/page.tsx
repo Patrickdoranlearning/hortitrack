@@ -90,6 +90,7 @@ export default async function B2BNewOrderPage() {
         return {
           id: batch.id,
           batchNumber: batch.batch_number || '',
+          varietyId: batch.plant_variety_id || null,
           varietyName: batch.plant_varieties?.name || null,
           family: batch.plant_varieties?.family || null,
           availableQty,
@@ -98,6 +99,7 @@ export default async function B2BNewOrderPage() {
       .filter(Boolean) as Array<{
         id: string;
         batchNumber: string;
+        varietyId: string | null;
         varietyName: string | null;
         family: string | null;
         availableQty: number;

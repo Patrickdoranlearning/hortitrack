@@ -16,6 +16,7 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { AlertTriangle, Plus, ImageIcon, Layers } from 'lucide-react';
 import type { CustomerCatalogProduct, CartItem, BatchAllocation } from '@/lib/b2b/types';
 import { B2BBatchSelectionDialog, type B2BBatch } from './B2BBatchSelectionDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type B2BProductCardProps = {
   product: CustomerCatalogProduct;
@@ -32,14 +33,27 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [batchAllocations, setBatchAllocations] = useState<BatchAllocation[]>([]);
+  const [selectedVariety, setSelectedVariety] = useState<string>('any');
 
   const isLowStock = product.totalAvailableQty < LOW_STOCK_THRESHOLD;
   
   // Calculate total quantity from batch allocations
   const totalQuantity = batchAllocations.reduce((sum, a) => sum + a.qty, 0);
+
+  const varietyOptions = Array.from(
+    new Set(
+      product.availableBatches
+        .map((b) => b.varietyName)
+        .filter((name): name is string => Boolean(name))
+    )
+  );
+
+  const filteredBatches = selectedVariety === 'any'
+    ? product.availableBatches
+    : product.availableBatches.filter((b) => b.varietyName === selectedVariety);
   
   // Convert product batches to B2BBatch format
-  const b2bBatches: B2BBatch[] = product.availableBatches.map((b) => ({
+  const b2bBatches: B2BBatch[] = filteredBatches.map((b) => ({
     id: b.id,
     batchNumber: b.batchNumber,
     varietyName: b.varietyName,
@@ -54,6 +68,16 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
   const handleAddToCart = () => {
     if (!product.unitPriceExVat || totalQuantity < 1) return;
 
+    // Resolve variety ID from selected variety name (via batches)
+    let resolvedVarietyId: string | undefined;
+    if (selectedVariety !== 'any') {
+      const matchingBatch = product.availableBatches.find(b => b.varietyName === selectedVariety);
+      resolvedVarietyId = matchingBatch?.varietyId ?? undefined;
+    }
+
+    // Resolve batch ID - if only one batch allocated, use it
+    const resolvedBatchId = batchAllocations.length === 1 ? batchAllocations[0].batchId : undefined;
+
     const cartItem: CartItem = {
       productId: product.productId,
       skuId: product.skuId,
@@ -63,9 +87,12 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
       quantity: totalQuantity,
       unitPriceExVat: product.unitPriceExVat,
       vatRate: product.vatRate,
+      requiredVarietyId: resolvedVarietyId,
+      requiredVarietyName: selectedVariety === 'any' ? undefined : selectedVariety,
+      requiredBatchId: resolvedBatchId,
       // Use batchAllocations for multi-batch, or single batchId for backwards compatibility
       batchAllocations: batchAllocations.length > 0 ? batchAllocations : undefined,
-      batchId: batchAllocations.length === 1 ? batchAllocations[0].batchId : undefined,
+      batchId: resolvedBatchId,
       batchNumber: batchAllocations.length === 1 ? batchAllocations[0].batchNumber : undefined,
       rrp: rrp ? parseFloat(rrp) : undefined,
       multibuyPrice2: multibuyPrice2 ? parseFloat(multibuyPrice2) : undefined,
@@ -89,7 +116,30 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
           <DialogTitle>{product.aliasName || product.productName}</DialogTitle>
         </VisuallyHidden>
         <div className="relative aspect-square w-full">
-          {product.heroImageUrl ? (
+          {product.galleryImages && product.galleryImages.length > 0 ? (
+            <div className="h-full w-full flex overflow-x-auto snap-x snap-mandatory">
+              {product.galleryImages.map((img, idx) => (
+                <div
+                  key={idx}
+                  className="relative w-full h-full flex-shrink-0 snap-start"
+                  style={{ minWidth: '100%' }}
+                >
+                  <Image
+                    src={img.url}
+                    alt={product.aliasName || product.productName}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 100vw, 500px"
+                  />
+                  {img.badge && (
+                    <Badge className="absolute top-2 left-2" variant="secondary">
+                      {img.badge}
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : product.heroImageUrl ? (
             <Image
               src={product.heroImageUrl}
               alt={product.aliasName || product.productName}
@@ -146,6 +196,29 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
     }
     return product.varietyName || product.productName;
   };
+
+  const varietySelector = (compact = false) => (
+    <div className={compact ? 'flex-1 min-w-[140px]' : 'space-y-1'}>
+      {!compact && (
+        <Label className="text-xs">
+          Variety
+        </Label>
+      )}
+      <Select value={selectedVariety} onValueChange={setSelectedVariety}>
+        <SelectTrigger className={compact ? 'h-8 text-xs' : 'h-8'}>
+          <SelectValue placeholder="Any / Grower's Choice" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any / Grower&apos;s Choice</SelectItem>
+          {varietyOptions.map((v) => (
+            <SelectItem key={v} value={v}>
+              {v}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   // Batch Selector Button (shared by both views)
   const batchSelector = (compact = false) => (
@@ -230,6 +303,9 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
             <span className="font-semibold">€{product.unitPriceExVat?.toFixed(2) || '0.00'}</span>
           </div>
 
+          {/* Variety Selection */}
+          {varietySelector(true)}
+
           {/* Batch Selection */}
           {batchSelector(true)}
 
@@ -299,6 +375,9 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
               €{product.unitPriceExVat?.toFixed(2) || '0.00'}
             </span>
           </div>
+
+          {/* Variety Selection */}
+          {varietySelector(false)}
 
           {/* Batch Selection */}
           {batchSelector(false)}

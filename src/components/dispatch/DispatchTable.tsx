@@ -692,7 +692,7 @@ export default function DispatchTable({
                   {/* Dropdowns: Route & Picker */}
                   <div className="grid grid-cols-2 gap-2 pt-2">
                     <Select 
-                      value={order.deliveryRunId || 'none'} 
+                      value={order.routeName || 'none'} 
                       onValueChange={(v) => handleRouteChange(order.id, v, order.requestedDeliveryDate)}
                     >
                       <SelectTrigger className="h-9">
@@ -703,42 +703,19 @@ export default function DispatchTable({
                         <SelectItem value="none" className="text-muted-foreground">
                           — None —
                         </SelectItem>
-                        {deliveryRuns.length > 0 && (
-                          <SelectGroup>
-                            <SelectLabel>Active Runs</SelectLabel>
-                            {deliveryRuns.map(run => (
-                              <SelectItem key={run.id} value={run.id}>
-                                {run.runNumber}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        )}
-                        {routes.length > 0 && (
-                          <>
-                            <Separator className="my-1" />
-                            <SelectGroup>
-                              <SelectLabel>Create Route</SelectLabel>
-                              {routes.map(route => (
-                                <SelectItem key={route.id} value={`new:${hauliers[0]?.id || 'default'}:${route.systemCode}`}>
-                                  + {route.displayLabel}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </>
-                        )}
-                        {hauliers.length > 0 && (
-                          <>
-                            <Separator className="my-1" />
-                            <SelectGroup>
-                              <SelectLabel>New Run (by Haulier)</SelectLabel>
-                              {hauliers.map(h => (
-                                <SelectItem key={h.id} value={`new:${h.id}`}>
-                                  + {h.name}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </>
-                        )}
+                        {routes.map(route => (
+                          <SelectItem key={route.id} value={`new:${hauliers[0]?.id || 'default'}:${route.systemCode}`}>
+                            <div className="flex items-center gap-2">
+                              {route.color && (
+                                <div 
+                                  className="h-3 w-3 rounded-full border"
+                                  style={{ backgroundColor: route.color }}
+                                />
+                              )}
+                              {route.displayLabel}
+                            </div>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
 
@@ -900,58 +877,35 @@ export default function DispatchTable({
 
                   {/* Route with color */}
                   <TableCell>
-                    {(deliveryRuns.length > 0 || routes.length > 0 || hauliers.length > 0) ? (
+                    {routes.length > 0 ? (
                       <Select 
-                        value={order.deliveryRunId || 'none'} 
+                        value={order.routeName || 'none'} 
                         onValueChange={(v) => handleRouteChange(order.id, v, order.requestedDeliveryDate)}
                       >
                         <SelectTrigger className="h-8 w-full border-transparent bg-transparent hover:bg-muted">
-                          {order.deliveryRunId ? (
+                          {order.routeName ? (
                             renderRouteBadge(order)
                           ) : (
-                            <SelectValue placeholder="— None —" />
+                            <SelectValue placeholder="— Select Route —" />
                           )}
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none" className="text-muted-foreground">
                             — None —
                           </SelectItem>
-                          {deliveryRuns.length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Active Runs</SelectLabel>
-                              {deliveryRuns.map(run => (
-                                <SelectItem key={run.id} value={run.id}>
-                                  {run.runNumber}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          )}
-                          {routes.length > 0 && (
-                            <>
-                              <Separator className="my-1" />
-                              <SelectGroup>
-                                <SelectLabel>Create Route</SelectLabel>
-                                {routes.map(route => (
-                                  <SelectItem key={route.id} value={`new:${hauliers[0]?.id || 'default'}:${route.systemCode}`}>
-                                    + {route.displayLabel}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </>
-                          )}
-                          {hauliers.length > 0 && (
-                            <>
-                              <Separator className="my-1" />
-                              <SelectGroup>
-                                <SelectLabel>New Run (by Haulier)</SelectLabel>
-                                {hauliers.map(h => (
-                                  <SelectItem key={h.id} value={`new:${h.id}`}>
-                                    + {h.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </>
-                          )}
+                          {routes.map(route => (
+                            <SelectItem key={route.id} value={`new:${hauliers[0]?.id || 'default'}:${route.systemCode}`}>
+                              <div className="flex items-center gap-2">
+                                {route.color && (
+                                  <div 
+                                    className="h-3 w-3 rounded-full border"
+                                    style={{ backgroundColor: route.color }}
+                                  />
+                                )}
+                                {route.displayLabel}
+                              </div>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     ) : (

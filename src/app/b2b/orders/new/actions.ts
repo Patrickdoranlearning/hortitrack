@@ -81,11 +81,14 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
     const lineTotalExVat = item.quantity * item.unitPriceExVat;
     const lineVatAmount = lineTotalExVat * (item.vatRate / 100);
 
+    // Determine variety description
+    const varietyDesc = item.requiredVarietyName || item.varietyName;
+
     return {
       order_id: order.id,
       product_id: item.productId,
       sku_id: item.skuId,
-      description: `${item.productName}${item.varietyName ? ` - ${item.varietyName}` : ''}${item.sizeName ? ` (${item.sizeName})` : ''}`,
+      description: `${item.productName}${varietyDesc ? ` - ${varietyDesc}` : ''}${item.sizeName ? ` (${item.sizeName})` : ''}`,
       quantity: item.quantity,
       unit_price_ex_vat: item.unitPriceExVat,
       vat_rate: item.vatRate,
@@ -94,6 +97,9 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
       rrp: item.rrp || null,
       multibuy_price_2: item.multibuyPrice2 || null,
       multibuy_qty_2: item.multibuyQty2 || null,
+      // Variety and batch constraints for picking validation
+      required_variety_id: item.requiredVarietyId || null,
+      required_batch_id: item.requiredBatchId || item.batchId || null,
     };
   });
 

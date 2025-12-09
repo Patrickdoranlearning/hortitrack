@@ -13,7 +13,7 @@ export async function GET(_: NextRequest, { params }: { params: { orderId: strin
     if (!authz.ok) return fail(authz.reason === "unauthenticated" ? 401 : 403, authz.reason, "Not allowed.");
 
     const { data: order, error: orderErr } = await supabaseAdmin
-      .from("sales_orders")
+      .from("orders")
       .select("*")
       .eq("id", params.orderId)
       .single();
@@ -21,7 +21,7 @@ export async function GET(_: NextRequest, { params }: { params: { orderId: strin
     if (orderErr || !order) return fail(404, "not_found", "Order not found.");
 
     const { data: lines, error: linesErr } = await supabaseAdmin
-      .from("sales_order_lines")
+      .from("order_items")
       .select("*")
       .eq("order_id", params.orderId);
 
@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { orderId: s
     if (!parsed.success) return fail(400, "invalid_input", "Invalid payload.", parsed.error.flatten());
 
     const { data: order, error: orderErr } = await supabaseAdmin
-      .from("sales_orders")
+      .from("orders")
       .select("status")
       .eq("id", params.orderId)
       .single();
@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { orderId: s
     }
 
     const { error: updateErr } = await supabaseAdmin
-      .from("sales_orders")
+      .from("orders")
       .update({ status: target, updated_at: new Date().toISOString() })
       .eq("id", params.orderId);
 
