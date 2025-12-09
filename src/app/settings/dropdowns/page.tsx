@@ -9,7 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Move, PlusCircle, RefreshCw, Save } from "lucide-react";
+import { Move, PlusCircle, RefreshCw, Save, Palette } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { PageFrame } from "@/ui/templates/PageFrame";
 import {
   ATTRIBUTE_META,
@@ -30,6 +35,22 @@ const BEHAVIOR_OPTIONS: { value: AttributeOption["behavior"]; label: string }[] 
   { value: "available", label: "Available for sale" },
   { value: "waste", label: "Waste / dumped" },
   { value: "archived", label: "Archived" },
+];
+
+// Preset colors for routes
+const COLOR_PRESETS = [
+  { color: "#ef4444", label: "Red" },
+  { color: "#f97316", label: "Orange" },
+  { color: "#eab308", label: "Yellow" },
+  { color: "#22c55e", label: "Green" },
+  { color: "#14b8a6", label: "Teal" },
+  { color: "#3b82f6", label: "Blue" },
+  { color: "#8b5cf6", label: "Purple" },
+  { color: "#ec4899", label: "Pink" },
+  { color: "#6b7280", label: "Gray" },
+  { color: "#78716c", label: "Stone" },
+  { color: "#0ea5e9", label: "Sky" },
+  { color: "#a855f7", label: "Violet" },
 ];
 
 export default function DropdownManagerPage() {
@@ -269,6 +290,90 @@ export default function DropdownManagerPage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                          </div>
+                        )}
+                        {meta.allowColor && (
+                          <div className="mt-3">
+                            <Label className="text-xs text-muted-foreground">Color</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button 
+                                    variant="outline" 
+                                    className="w-full md:w-64 justify-start gap-2"
+                                  >
+                                    {opt.color ? (
+                                      <>
+                                        <div 
+                                          className="h-4 w-4 rounded border"
+                                          style={{ backgroundColor: opt.color }}
+                                        />
+                                        <span>{opt.color}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Palette className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Choose color</span>
+                                      </>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-3" align="start">
+                                  <div className="space-y-3">
+                                    <div className="grid grid-cols-6 gap-2">
+                                      {COLOR_PRESETS.map((preset) => (
+                                        <button
+                                          key={preset.color}
+                                          type="button"
+                                          title={preset.label}
+                                          className={`h-8 w-8 rounded-md border-2 transition-all hover:scale-110 ${
+                                            opt.color === preset.color 
+                                              ? 'border-primary ring-2 ring-primary ring-offset-2' 
+                                              : 'border-transparent'
+                                          }`}
+                                          style={{ backgroundColor: preset.color }}
+                                          onClick={() => {
+                                            const next = [...items];
+                                            next[idx] = { ...opt, color: preset.color };
+                                            setItems(next);
+                                            setDirty(true);
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
+                                    <Separator />
+                                    <div className="flex items-center gap-2">
+                                      <Label className="text-xs">Custom:</Label>
+                                      <Input
+                                        type="color"
+                                        value={opt.color || "#3b82f6"}
+                                        onChange={(e) => {
+                                          const next = [...items];
+                                          next[idx] = { ...opt, color: e.target.value };
+                                          setItems(next);
+                                          setDirty(true);
+                                        }}
+                                        className="h-8 w-12 p-1 cursor-pointer"
+                                      />
+                                      {opt.color && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            const next = [...items];
+                                            next[idx] = { ...opt, color: null };
+                                            setItems(next);
+                                            setDirty(true);
+                                          }}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
                           </div>
                         )}
                       </div>

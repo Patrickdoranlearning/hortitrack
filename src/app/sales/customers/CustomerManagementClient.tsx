@@ -295,7 +295,7 @@ export default function CustomerManagementClient({ customers, priceLists, produc
       const primaryAddress = customer.addresses.find(a => a.isDefaultShipping) ?? customer.addresses[0];
       // Get primary contact or first contact
       const primaryContact = customer.contacts.find(c => c.isPrimary) ?? customer.contacts[0];
-      
+
       return [
         // Basic info
         customer.name ?? "",
@@ -684,16 +684,18 @@ function CustomerSheet({
         return;
       }
       toast({ title: mode === "create" ? "Customer created" : "Customer updated" });
-      
+
       // Store the new customer ID for subsequent tabs
       if (result.data?.id) {
         setCurrentCustomerId(result.data.id);
       }
-      
+
       onSaved();
       if (mode === "create" && result.data?.id) {
-        // Keep sheet open to allow adding addresses etc.
-        setCurrentCustomerId(result.data.id);
+        // Close the sheet after creation as per user request to improve UX
+        onOpenChange(false);
+      } else {
+        onOpenChange(false);
       }
     });
   };

@@ -6,9 +6,10 @@ type NodeWithProportion = BatchNode & { proportion?: number | null };
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { supabase, orgId } = await getUserAndOrg();
 
     const [{ data: parents, error: pErr }, { data: children, error: cErr }] =
@@ -17,12 +18,12 @@ export async function GET(
           .from("batch_ancestry")
           .select("parent_batch_id, proportion")
           .eq("org_id", orgId)
-          .eq("child_batch_id", params.id),
+          .eq("child_batch_id", id),
         supabase
           .from("batch_ancestry")
           .select("child_batch_id, proportion")
           .eq("org_id", orgId)
-          .eq("parent_batch_id", params.id),
+          .eq("parent_batch_id", id),
       ]);
 
     if (pErr) throw pErr;
@@ -35,7 +36,7 @@ export async function GET(
       .map((r) => r.child_batch_id)
       .filter(Boolean);
 
-    const current = await getBatchById(params.id);
+    const current = await getBatchById(id);
     const parentNodes = (await Promise.all(
       (parents ?? []).map(async (record) => {
         const node = await getBatchById(record.parent_batch_id);

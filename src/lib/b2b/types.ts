@@ -12,6 +12,7 @@ export type CustomerCatalogProduct = {
   skuCode: string | null;
   varietyId: string | null;
   varietyName: string | null;
+  family: string | null; // Plant family (e.g., Lamiaceae for Lavender)
   sizeId: string | null;
   sizeName: string | null;
   category: string | null;
@@ -23,6 +24,7 @@ export type CustomerCatalogProduct = {
     id: string;
     batchNumber: string;
     varietyName: string | null; // For different cultivars (e.g., Hidcote, Munstead)
+    family: string | null; // Plant family
     availableQty: number;
   }>;
   totalAvailableQty: number; // For low stock indicator
@@ -39,6 +41,15 @@ export type CustomerCatalogProduct = {
 };
 
 /**
+ * Batch allocation for a cart item
+ */
+export type BatchAllocation = {
+  batchId: string;
+  batchNumber: string;
+  qty: number;
+};
+
+/**
  * Shopping cart item for B2B order creation
  */
 export type CartItem = {
@@ -50,9 +61,11 @@ export type CartItem = {
   quantity: number;
   unitPriceExVat: number;
   vatRate: number;
-  // Optional batch selection
+  // Optional batch selection - supports single or multiple batches
   batchId?: string;
   batchNumber?: string;
+  // Multi-batch allocations (takes precedence over single batchId if present)
+  batchAllocations?: BatchAllocation[];
   // Customer-set pricing
   rrp?: number;
   multibuyPrice2?: number;
@@ -76,6 +89,11 @@ export const B2BOrderSchema = z.object({
     unitPriceExVat: z.number().nonnegative(),
     vatRate: z.number().min(0).max(100),
     batchId: z.string().uuid().optional(),
+    batchAllocations: z.array(z.object({
+      batchId: z.string().uuid(),
+      batchNumber: z.string(),
+      qty: z.number().int().positive(),
+    })).optional(),
     rrp: z.number().nonnegative().optional(),
     multibuyPrice2: z.number().nonnegative().optional(),
     multibuyQty2: z.number().int().positive().optional(),

@@ -4,6 +4,35 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { ensureVirtualLocation } from "@/server/locations/virtual";
 import { inferPhase } from "@/lib/production/phase";
 import { nextBatchNumber } from "@/server/numbering/batches";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Resolve status_id from attribute_options
+async function resolveStatusId(
+  supabase: SupabaseClient,
+  orgId: string,
+  statusCode: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("attribute_options")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("attribute_key", "production_status")
+    .ilike("system_code", statusCode)
+    .maybeSingle();
+
+  if (data) return data.id;
+
+  // Fallback to Growing if not found
+  const { data: fallback } = await supabase
+    .from("attribute_options")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("attribute_key", "production_status")
+    .eq("system_code", "Growing")
+    .maybeSingle();
+
+  return fallback?.id ?? null;
+}
 
 const DateOnly = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -62,6 +91,12 @@ export async function POST(req: Request) {
     const phaseCounter = PHASE_COUNTER[phase] ?? 2;
     const batchNumber = await nextBatchNumber(phaseCounter);
 
+    // Resolve status_id for "Incoming" status
+    const statusId = await resolveStatusId(supabase, orgId, "Incoming");
+    if (!statusId) {
+      return NextResponse.json({ error: "Could not resolve status. Please ensure 'Incoming' status exists in your organization settings." }, { status: 400 });
+    }
+
     const { data: batch, error } = await supabase
       .from("batches")
       .insert({
@@ -73,6 +108,7 @@ export async function POST(req: Request) {
         supplier_id: payload.supplierId ?? null,
         location_id: locationId,
         status: "Incoming",
+        status_id: statusId,
         quantity: units,
         initial_quantity: units,
         unit: "plants",

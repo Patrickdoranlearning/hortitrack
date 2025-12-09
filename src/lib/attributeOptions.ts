@@ -68,6 +68,7 @@ export const ATTRIBUTE_META: Record<
   delivery_route: {
     label: "Delivery Routes",
     description: "Predefined delivery routes for dispatch planning.",
+    allowColor: true,
   },
 };
 

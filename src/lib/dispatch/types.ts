@@ -464,6 +464,7 @@ export interface DispatchBoardOrder {
   orderNumber: string;
   customerName: string;
   county?: string;
+  eircode?: string;
   requestedDeliveryDate?: string;
   trolleysEstimated: number;
   // Stage (computed from pick_list + packing + delivery_item status)
@@ -480,6 +481,8 @@ export interface DispatchBoardOrder {
   deliveryItemId?: string;
   deliveryRunId?: string;
   deliveryRunNumber?: string;
+  routeName?: string;
+  routeColor?: string;
   haulierId?: string;
   haulierName?: string;
   deliveryItemStatus?: string;

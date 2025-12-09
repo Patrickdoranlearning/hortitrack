@@ -21,6 +21,7 @@ export interface Batch {
   id: string;
   batchNumber: string;
   plantVariety: string;
+  family?: string | null;
   size: string;
   quantity: number;
   grade?: string;
@@ -33,6 +34,7 @@ export interface BatchAllocation {
   batchId: string;
   batchNumber: string;
   plantVariety: string;
+  family?: string | null;
   size: string;
   qty: number;
   grade?: string;
@@ -105,6 +107,7 @@ export function BatchSelectionDialog({
         (b) =>
           b.batchNumber.toLowerCase().includes(q) ||
           b.plantVariety.toLowerCase().includes(q) ||
+          b.family?.toLowerCase().includes(q) ||
           b.location?.toLowerCase().includes(q)
       );
     }
@@ -141,6 +144,7 @@ export function BatchSelectionDialog({
             batchId: batch.id,
             batchNumber: batch.batchNumber,
             plantVariety: batch.plantVariety || productVariety,
+            family: batch.family || null,
             size: batch.size || productSize,
             qty,
             grade: batch.grade,
@@ -153,12 +157,15 @@ export function BatchSelectionDialog({
     onOpenChange(false);
   };
 
-  // Helper to format batch display: variety · size · location · batch number
+  // Helper to format batch display: family > variety · size · batch number
   const formatBatchLabel = (batch: Batch) => {
+    const family = batch.family || '';
     const variety = batch.plantVariety || productVariety || 'Unknown';
     const size = batch.size || productSize || '';
-    const location = batch.location || '';
-    const parts = [variety, size, location, batch.batchNumber].filter(Boolean);
+    
+    // Format as: Family > Variety · Size · Batch Number
+    const varietyPart = family ? `${family} > ${variety}` : variety;
+    const parts = [varietyPart, size, batch.batchNumber].filter(Boolean);
     return parts.join(' · ');
   };
 

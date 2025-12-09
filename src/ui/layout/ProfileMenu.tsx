@@ -24,6 +24,7 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
         <DropdownMenuGroup>
           <DropdownMenuItem asChild><Link href="/settings">Data Management</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/account">Account</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/documents/designer">Document Designer</Link></DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Switch Module</DropdownMenuLabel>

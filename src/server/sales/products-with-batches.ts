@@ -4,6 +4,7 @@ export interface BatchInfo {
   id: string;
   batchNumber: string;
   plantVariety: string;
+  family?: string | null;
   size: string;
   quantity: number;
   grade?: string;
@@ -25,6 +26,7 @@ export interface ProductWithBatches {
   id: string;
   name: string;
   plantVariety: string;
+  family?: string | null;
   size: string;
   availableStock: number;
   batches: BatchInfo[];
@@ -67,13 +69,13 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
   const sizeIds = skus?.map(s => s.size_id).filter(Boolean) || [];
 
   const [{ data: varieties }, { data: sizes }] = await Promise.all([
-    supabase.from('plant_varieties').select('id, name').in('id', varietyIds),
+    supabase.from('plant_varieties').select('id, name, family').in('id', varietyIds),
     supabase.from('plant_sizes').select('id, name').in('id', sizeIds),
   ]);
 
   // Create lookup maps
   const skuMap = new Map(skus?.map(s => [s.id, s]) || []);
-  const varietyMap = new Map(varieties?.map(v => [v.id, v.name]) || []);
+  const varietyMap = new Map(varieties?.map(v => [v.id, { name: v.name, family: v.family }]) || []);
   const sizeMap = new Map(sizes?.map(s => [s.id, s.name]) || []);
 
   // Get product-batch mappings
@@ -113,7 +115,12 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
     }
 
     // Create a map of default prices by product
-    priceItems?.forEach((item: any) => {
+    type PriceItem = {
+      product_id: string;
+      unit_price_ex_vat: number | null;
+      price_lists: { is_default: boolean } | null;
+    };
+    (priceItems as PriceItem[] | null)?.forEach((item) => {
       if (item.price_lists?.is_default && item.unit_price_ex_vat != null) {
         defaultPriceMap.set(item.product_id, Number(item.unit_price_ex_vat));
       }
@@ -180,12 +187,14 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
   const batchMap = new Map(
     batches?.map(b => {
       const qc = qcMap.get(b.id);
+      const variety = varietyMap.get(b.plant_variety_id);
       return [
         b.id,
         {
           id: b.id,
           batchNumber: b.batch_number || '',
-          plantVariety: varietyMap.get(b.plant_variety_id) || '',
+          plantVariety: variety?.name || '',
+          family: variety?.family || null,
           size: sizeMap.get(b.size_id) || '',
           quantity: b.quantity || 0,
           grade: qc?.grade,
@@ -216,13 +225,16 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
     const totalStock = productBatches.reduce((sum, b) => sum + b.quantity, 0);
 
     // Get product-level variety and size from SKU
-    const productVariety = varietyMap.get(sku?.plant_variety_id || '') || '';
+    const skuVariety = varietyMap.get(sku?.plant_variety_id || '');
+    const productVariety = skuVariety?.name || '';
+    const productFamily = skuVariety?.family || null;
     const productSize = sizeMap.get(sku?.size_id || '') || '';
 
     // Ensure each batch has variety and size, falling back to product-level values
     const enrichedBatches = productBatches.map(batch => ({
       ...batch,
       plantVariety: batch.plantVariety || productVariety,
+      family: batch.family || productFamily,
       size: batch.size || productSize,
     }));
 
@@ -230,6 +242,7 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
       id: product.id,
       name: product.name || sku?.display_name || 'Unknown Product',
       plantVariety: productVariety,
+      family: productFamily,
       size: productSize,
       availableStock: totalStock,
       batches: enrichedBatches,
@@ -283,13 +296,13 @@ export async function getVarietiesWithBatches(orgId: string) {
   const batchIds = batches.map(b => b.id);
 
   const [{ data: varieties }, { data: sizes }, { data: locations }, { data: qcData }] = await Promise.all([
-    supabase.from('plant_varieties').select('id, name').in('id', varietyIds),
+    supabase.from('plant_varieties').select('id, name, family').in('id', varietyIds),
     supabase.from('plant_sizes').select('id, name').in('id', sizeIds),
     supabase.from('locations').select('id, name').in('id', locationIds),
     supabase.from('batch_qc').select('batch_id, grade, status').in('batch_id', batchIds),
   ]);
 
-  const varietyMap = new Map(varieties?.map(v => [v.id, v]) || []);
+  const varietyMap = new Map(varieties?.map(v => [v.id, { id: v.id, name: v.name, family: v.family }]) || []);
   const sizeMap = new Map(sizes?.map(s => [s.id, s]) || []);
   const locationMap = new Map(locations?.map(l => [l.id, l.name]) || []);
   const qcMap = new Map(qcData?.map(q => [q.batch_id, q]) || []);
@@ -298,6 +311,7 @@ export async function getVarietiesWithBatches(orgId: string) {
   const groupedMap = new Map<string, {
     plantVariety: string;
     plantVarietyId: string;
+    family: string | null;
     size: string;
     sizeId: string;
     totalQuantity: number;
@@ -314,6 +328,7 @@ export async function getVarietiesWithBatches(orgId: string) {
       groupedMap.set(key, {
         plantVariety: variety?.name || '',
         plantVarietyId: variety?.id || '',
+        family: variety?.family || null,
         size: size?.name || '',
         sizeId: size?.id || '',
         totalQuantity: 0,
@@ -327,6 +342,7 @@ export async function getVarietiesWithBatches(orgId: string) {
       id: batch.id,
       batchNumber: batch.batch_number || '',
       plantVariety: variety?.name || '',
+      family: variety?.family || null,
       size: size?.name || '',
       quantity: batch.quantity || 0,
       grade: qc?.grade,

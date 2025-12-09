@@ -1,5 +1,5 @@
 
-import { type LucideIcon, ShoppingCart, Receipt, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, ClipboardList, Store } from "lucide-react";
+import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, ClipboardList, Store } from "lucide-react";
 
 export type NavItem = {
   key: string;

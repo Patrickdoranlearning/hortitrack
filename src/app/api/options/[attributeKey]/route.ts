@@ -25,9 +25,10 @@ function parseAttributeKey(raw: string): AttributeKey {
   return raw;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { attributeKey: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ attributeKey: string }> }) {
   try {
-    const attributeKey = parseAttributeKey(params.attributeKey);
+    const { attributeKey: rawKey } = await params;
+    const attributeKey = parseAttributeKey(rawKey);
     const includeInactive = ["1", "true", "yes"].includes((req.nextUrl.searchParams.get("includeInactive") ?? "").toLowerCase());
 
     const { orgId, supabase } = await getUserAndOrg();
@@ -40,9 +41,10 @@ export async function GET(req: NextRequest, { params }: { params: { attributeKey
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { attributeKey: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ attributeKey: string }> }) {
   try {
-    const attributeKey = parseAttributeKey(params.attributeKey);
+    const { attributeKey: rawKey } = await params;
+    const attributeKey = parseAttributeKey(rawKey);
     const body = BodySchema.parse(await req.json());
     const { orgId, supabase } = await getUserAndOrg();
 

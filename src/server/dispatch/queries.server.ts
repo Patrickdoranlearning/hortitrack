@@ -718,33 +718,35 @@ export interface GrowerMember {
 }
 
 /**
- * Get org members with 'grower' role for picker assignment
+ * Get org members for picker assignment
+ * Returns all members who can be pickers (grower, staff, admin, owner, editor)
  */
 export async function getGrowerMembers(orgId: string): Promise<GrowerMember[]> {
   const supabase = await createClient();
   
   try {
-    // First try with profiles join
+    // Get org members with roles that can be pickers
+    // Valid roles: admin, editor, grower, owner, sales, staff, viewer
     const { data, error } = await supabase
       .from("org_memberships")
       .select("user_id, role, profiles(id, full_name, email)")
       .eq("org_id", orgId)
-      .eq("role", "grower");
+      .in("role", ["grower", "admin", "owner", "editor", "staff"]);
 
     if (error) {
       // If profiles join fails, try without it
-      console.warn("Could not fetch grower members with profiles:", error.message);
+      console.warn("Could not fetch org members with profiles:", error.message);
       
-      // Fallback: just get user_ids
+      // Fallback: just get user_ids with valid roles
       const { data: fallbackData } = await supabase
         .from("org_memberships")
-        .select("user_id")
+        .select("user_id, role")
         .eq("org_id", orgId)
-        .eq("role", "grower");
+        .in("role", ["grower", "admin", "owner", "editor", "staff"]);
       
       return (fallbackData || []).map((m: any) => ({
         id: m.user_id,
-        name: "Grower",
+        name: m.role || "Staff",
         email: undefined,
       }));
     }
@@ -824,7 +826,7 @@ export async function getDispatchBoardData(): Promise<{
         delivery_items(id, delivery_run_id, status, delivery_runs(run_number, haulier_id))
       `)
       .eq("org_id", orgId)
-      .in("status", ["confirmed"])
+      .in("status", ["confirmed", "picking", "packed", "dispatched"])
       .order("requested_delivery_date", { ascending: true })
   ]);
 
@@ -852,6 +854,11 @@ export async function getDispatchBoardData(): Promise<{
     const pickerId = (pickList as any)?.assigned_user_id;
     const pickerName = pickerId ? growers.find(g => g.id === pickerId)?.name : undefined;
 
+    // Route name comes from the delivery run number for now
+    // Route colors can be matched by run number prefix if routes follow naming conventions
+    const routeName = deliveryItem?.delivery_runs?.run_number;
+    const routeColor: string | undefined = undefined; // Will be populated when route_name column is added
+
     // Compute Stage (simplified workflow: To Pick -> Picking -> Ready to Load -> On Route)
     let stage: DispatchStage = "to_pick";
 
@@ -872,6 +879,7 @@ export async function getDispatchBoardData(): Promise<{
       orderNumber: o.order_number,
       customerName: o.customers?.name || "Unknown",
       county: o.customer_addresses?.county,
+      eircode: o.customer_addresses?.eircode,
       requestedDeliveryDate: o.requested_delivery_date,
       trolleysEstimated: o.trolleys_estimated || 0,
       totalIncVat: o.total_inc_vat,
@@ -888,6 +896,8 @@ export async function getDispatchBoardData(): Promise<{
       deliveryItemId: deliveryItem?.id,
       deliveryRunId: deliveryItem?.delivery_run_id,
       deliveryRunNumber: deliveryItem?.delivery_runs?.run_number,
+      routeName,
+      routeColor,
       haulierId,
       haulierName,
       deliveryItemStatus: deliveryItem?.status,

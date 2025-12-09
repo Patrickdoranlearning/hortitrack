@@ -8,20 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { AlertTriangle, Plus, ImageIcon } from 'lucide-react';
-import type { CustomerCatalogProduct, CartItem } from '@/lib/b2b/types';
+import { AlertTriangle, Plus, ImageIcon, Layers } from 'lucide-react';
+import type { CustomerCatalogProduct, CartItem, BatchAllocation } from '@/lib/b2b/types';
+import { B2BBatchSelectionDialog, type B2BBatch } from './B2BBatchSelectionDialog';
 
 type B2BProductCardProps = {
   product: CustomerCatalogProduct;
@@ -32,20 +26,33 @@ type B2BProductCardProps = {
 const LOW_STOCK_THRESHOLD = 100;
 
 export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BProductCardProps) {
-  const [quantity, setQuantity] = useState(1);
-  const [selectedBatchId, setSelectedBatchId] = useState(
-    product.availableBatches[0]?.id || ''
-  );
   const [rrp, setRrp] = useState(product.suggestedRrp?.toString() || '');
   const [multibuyPrice2, setMultibuyPrice2] = useState('');
   const [multibuyQty2, setMultibuyQty2] = useState('');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [batchAllocations, setBatchAllocations] = useState<BatchAllocation[]>([]);
 
   const isLowStock = product.totalAvailableQty < LOW_STOCK_THRESHOLD;
-  const selectedBatch = product.availableBatches.find((b) => b.id === selectedBatchId);
+  
+  // Calculate total quantity from batch allocations
+  const totalQuantity = batchAllocations.reduce((sum, a) => sum + a.qty, 0);
+  
+  // Convert product batches to B2BBatch format
+  const b2bBatches: B2BBatch[] = product.availableBatches.map((b) => ({
+    id: b.id,
+    batchNumber: b.batchNumber,
+    varietyName: b.varietyName,
+    family: b.family,
+    availableQty: b.availableQty,
+  }));
+
+  const handleBatchConfirm = (allocations: BatchAllocation[]) => {
+    setBatchAllocations(allocations);
+  };
 
   const handleAddToCart = () => {
-    if (!product.unitPriceExVat) return;
+    if (!product.unitPriceExVat || totalQuantity < 1) return;
 
     const cartItem: CartItem = {
       productId: product.productId,
@@ -53,11 +60,13 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
       productName: product.aliasName || product.productName,
       varietyName: product.varietyName,
       sizeName: product.sizeName,
-      quantity,
+      quantity: totalQuantity,
       unitPriceExVat: product.unitPriceExVat,
       vatRate: product.vatRate,
-      batchId: selectedBatchId || undefined,
-      batchNumber: selectedBatch?.batchNumber,
+      // Use batchAllocations for multi-batch, or single batchId for backwards compatibility
+      batchAllocations: batchAllocations.length > 0 ? batchAllocations : undefined,
+      batchId: batchAllocations.length === 1 ? batchAllocations[0].batchId : undefined,
+      batchNumber: batchAllocations.length === 1 ? batchAllocations[0].batchNumber : undefined,
       rrp: rrp ? parseFloat(rrp) : undefined,
       multibuyPrice2: multibuyPrice2 ? parseFloat(multibuyPrice2) : undefined,
       multibuyQty2: multibuyQty2 ? parseInt(multibuyQty2) : undefined,
@@ -66,7 +75,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
     onAddToCart(cartItem);
 
     // Reset form
-    setQuantity(1);
+    setBatchAllocations([]);
     setRrp(product.suggestedRrp?.toString() || '');
     setMultibuyPrice2('');
     setMultibuyQty2('');
@@ -130,37 +139,62 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
     </button>
   );
 
-  // Batch Selector (shared by both views)
+  // Format product display name with family
+  const formatProductDisplay = () => {
+    if (product.family && product.varietyName) {
+      return `${product.family} > ${product.varietyName}`;
+    }
+    return product.varietyName || product.productName;
+  };
+
+  // Batch Selector Button (shared by both views)
   const batchSelector = (compact = false) => (
     product.availableBatches.length > 0 && (
       <div className={compact ? 'flex-1 min-w-[140px]' : 'space-y-1'}>
         {!compact && (
-          <Label htmlFor={`batch-${product.productId}`} className="text-xs">
-            Select Batch ({product.availableBatches.length} available)
+          <Label className="text-xs">
+            Select Batches ({product.availableBatches.length} available)
           </Label>
         )}
-        <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-          <SelectTrigger id={`batch-${product.productId}`} className="h-8 text-xs">
-            <SelectValue placeholder="Batch..." />
-          </SelectTrigger>
-          <SelectContent>
-            {product.availableBatches.map((batch) => (
-              <SelectItem key={batch.id} value={batch.id}>
-                <span className="flex items-center gap-2">
-                  <span>
-                    {batch.batchNumber}
-                    {batch.varietyName && ` - ${batch.varietyName}`}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {batch.availableQty}
-                  </Badge>
-                </span>
-              </SelectItem>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={compact ? 'h-8 w-full text-xs' : 'h-8 w-full text-xs'}
+          onClick={() => setBatchDialogOpen(true)}
+        >
+          <Layers className="h-3 w-3 mr-1" />
+          {batchAllocations.length > 0 
+            ? `${batchAllocations.length} batch(es) - ${totalQuantity} plants`
+            : 'Select Batches'
+          }
+        </Button>
+        {batchAllocations.length > 0 && !compact && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {batchAllocations.slice(0, 2).map((a) => (
+              <Badge key={a.batchId} variant="secondary" className="text-[10px]">
+                {a.batchNumber}: {a.qty}
+              </Badge>
             ))}
-          </SelectContent>
-        </Select>
+            {batchAllocations.length > 2 && (
+              <Badge variant="outline" className="text-[10px]">+{batchAllocations.length - 2} more</Badge>
+            )}
+          </div>
+        )}
       </div>
     )
+  );
+
+  // Batch Selection Dialog
+  const batchDialog = (
+    <B2BBatchSelectionDialog
+      open={batchDialogOpen}
+      onOpenChange={setBatchDialogOpen}
+      batches={b2bBatches}
+      productName={product.aliasName || product.productName}
+      currentAllocations={batchAllocations}
+      onConfirm={handleBatchConfirm}
+    />
   );
 
   // LIST VIEW
@@ -168,6 +202,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
     return (
       <>
         {imageDialog}
+        {batchDialog}
         <div className="flex items-center gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
           {/* Image */}
           {imageThumbnail('sm')}
@@ -186,7 +221,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
               )}
             </div>
             <p className="text-xs text-muted-foreground truncate">
-              {product.varietyName} {product.sizeName && `• ${product.sizeName}`}
+              {formatProductDisplay()} {product.sizeName && `• ${product.sizeName}`}
             </p>
           </div>
 
@@ -198,14 +233,10 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
           {/* Batch Selection */}
           {batchSelector(true)}
 
-          {/* Quantity */}
-          <Input
-            type="number"
-            min="1"
-            value={quantity}
-            onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-            className="h-8 w-20"
-          />
+          {/* Quantity Display */}
+          <div className="w-20 text-center text-sm font-medium">
+            {totalQuantity > 0 ? `${totalQuantity} pcs` : '-'}
+          </div>
 
           {/* RRP (compact) */}
           <Input
@@ -220,7 +251,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
           {/* Add Button */}
           <Button
             onClick={handleAddToCart}
-            disabled={!product.unitPriceExVat || quantity < 1}
+            disabled={!product.unitPriceExVat || totalQuantity < 1}
             size="sm"
           >
             <Plus className="h-4 w-4" />
@@ -234,6 +265,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
   return (
     <>
       {imageDialog}
+      {batchDialog}
       <Card className="flex flex-col h-full">
         <CardHeader className="pb-3">
           <div className="flex items-start gap-3">
@@ -245,7 +277,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
                     {product.aliasName || product.productName}
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    {product.varietyName} {product.sizeName && `• ${product.sizeName}`}
+                    {formatProductDisplay()} {product.sizeName && `• ${product.sizeName}`}
                   </CardDescription>
                 </div>
                 {isLowStock && (
@@ -270,26 +302,14 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
 
           {/* Batch Selection */}
           {batchSelector(false)}
-          {selectedBatch && (
-            <p className="text-xs text-muted-foreground -mt-2">
-              Stock: {selectedBatch.availableQty} units
-            </p>
+          
+          {/* Quantity Display */}
+          {totalQuantity > 0 && (
+            <div className="flex items-center justify-between text-sm bg-primary/5 rounded-md px-3 py-2 -mt-1">
+              <span className="text-muted-foreground">Total Qty:</span>
+              <span className="font-semibold">{totalQuantity} plants</span>
+            </div>
           )}
-
-          {/* Quantity */}
-          <div className="space-y-1">
-            <Label htmlFor={`qty-${product.productId}`} className="text-xs">
-              Quantity
-            </Label>
-            <Input
-              id={`qty-${product.productId}`}
-              type="number"
-              min="1"
-              value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-              className="h-8"
-            />
-          </div>
 
           {/* RRP (Optional) */}
           <div className="space-y-1">
@@ -332,12 +352,12 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
           {/* Add to Cart Button */}
           <Button
             onClick={handleAddToCart}
-            disabled={!product.unitPriceExVat || quantity < 1}
+            disabled={!product.unitPriceExVat || totalQuantity < 1}
             className="w-full mt-auto"
             size="sm"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add to Cart
+            {totalQuantity > 0 ? `Add ${totalQuantity} to Cart` : 'Select Batches First'}
           </Button>
         </CardContent>
       </Card>
