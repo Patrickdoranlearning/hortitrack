@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
-import { customerFormSchema, customerAddressSchema, customerContactSchema } from "./types";
+import { customerFormSchema, customerAddressSchema, customerContactSchema, deliveryPreferencesSchema } from "./types";
 
 function cleanString(value?: string | null) {
   if (value === undefined || value === null) return null;
@@ -65,6 +65,30 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
 
   revalidatePath("/sales/customers");
   return { success: true, data };
+}
+
+export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typeof deliveryPreferencesSchema>) {
+  const parsed = deliveryPreferencesSchema.parse(input);
+  const supabase = await getSupabaseServerApp();
+
+  const prefs = {
+    preferredTrolleyType: parsed.preferences.preferredTrolleyType ?? null,
+    labelRequirements: parsed.preferences.labelRequirements ?? null,
+    specialInstructions: parsed.preferences.specialInstructions ?? null,
+  };
+
+  const { error } = await supabase
+    .from("customers")
+    .update({ delivery_preferences: prefs })
+    .eq("id", parsed.customerId);
+
+  if (error) {
+    console.error("[updateCustomerDeliveryPreferencesAction]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/sales/customers");
+  return { success: true };
 }
 
 export async function deleteCustomerAction(customerId: string) {

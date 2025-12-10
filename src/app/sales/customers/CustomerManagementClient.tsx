@@ -74,6 +74,7 @@ import type {
   CustomerAddressSummary,
   CustomerContactSummary,
   CustomerProductPricing,
+  DeliveryPreferences,
 } from "./types";
 import { COUNTRY_OPTIONS, CURRENCY_OPTIONS } from "./types";
 import { DataPageShell } from "@/components/data-management/DataPageShell";
@@ -88,6 +89,7 @@ import {
   upsertCustomerProductPricingAction,
   deleteCustomerProductPricingAction,
   fetchCustomerProductPricingAction,
+  updateCustomerDeliveryPreferencesAction,
 } from "./actions";
 
 type Props = CustomerManagementPayload;
@@ -772,11 +774,18 @@ function CustomerSheet({
           {/* Tab 2: Delivery Addresses */}
           <TabsContent value="delivery" className="space-y-4 pt-4">
             {effectiveCustomerId ? (
-              <DeliveryAddressesTab
-                customerId={effectiveCustomerId}
-                addresses={customer?.addresses ?? []}
-                onUpdated={() => router.refresh()}
-              />
+              <div className="space-y-4">
+                <DeliveryAddressesTab
+                  customerId={effectiveCustomerId}
+                  addresses={customer?.addresses ?? []}
+                  onUpdated={() => router.refresh()}
+                />
+                <DeliveryPreferencesCard
+                  customerId={effectiveCustomerId}
+                  initialPreferences={customer?.deliveryPreferences ?? null}
+                  onUpdated={() => router.refresh()}
+                />
+              </div>
             ) : (
               <EmptyTabState message="Save customer details first to add delivery addresses." />
             )}
@@ -1399,6 +1408,116 @@ function AddressDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DeliveryPreferencesCard({
+  customerId,
+  initialPreferences,
+  onUpdated,
+}: {
+  customerId: string;
+  initialPreferences: DeliveryPreferences | null;
+  onUpdated: () => void;
+}) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [prefs, setPrefs] = useState<DeliveryPreferences>({
+    preferredTrolleyType: initialPreferences?.preferredTrolleyType ?? undefined,
+    labelRequirements: initialPreferences?.labelRequirements ?? undefined,
+    specialInstructions: initialPreferences?.specialInstructions ?? undefined,
+  });
+
+  const handleSave = () => {
+    startTransition(async () => {
+      const result = await updateCustomerDeliveryPreferencesAction({
+        customerId,
+        preferences: {
+          preferredTrolleyType: prefs.preferredTrolleyType || null,
+          labelRequirements: prefs.labelRequirements || null,
+          specialInstructions: prefs.specialInstructions || null,
+        },
+      });
+
+      if (!result.success) {
+        toast({ variant: "destructive", title: "Save failed", description: result.error });
+        return;
+      }
+
+      toast({ title: "Delivery preferences saved" });
+      onUpdated();
+      router.refresh();
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Delivery Preferences</CardTitle>
+        <CardDescription>
+          Capture customer-specific requirements such as trolley type and tagging.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Preferred trolley type</Label>
+            <Select
+              value={prefs.preferredTrolleyType ?? ""}
+              onValueChange={(v) =>
+                setPrefs((p) => ({ ...p, preferredTrolleyType: (v as DeliveryPreferences['preferredTrolleyType']) || undefined }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No preference" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tag6">Tag 6 (Yellow)</SelectItem>
+                <SelectItem value="dc">No Tag (DC)</SelectItem>
+                <SelectItem value="danish">Danish</SelectItem>
+                <SelectItem value="dutch">Dutch</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Label requirements</Label>
+            <Select
+              value={prefs.labelRequirements ?? ""}
+              onValueChange={(v) =>
+                setPrefs((p) => ({ ...p, labelRequirements: (v as DeliveryPreferences['labelRequirements']) || undefined }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No preference" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yellow_tag">Yellow tag only</SelectItem>
+                <SelectItem value="no_tag">No tags</SelectItem>
+                <SelectItem value="any">Any</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Special instructions</Label>
+          <Textarea
+            placeholder="E.g., stack on Danish, no barcodes on plants"
+            value={prefs.specialInstructions ?? ""}
+            onChange={(e) => setPrefs((p) => ({ ...p, specialInstructions: e.target.value || undefined }))}
+            rows={3}
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={pending}>
+            {pending ? "Saving..." : "Save preferences"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -139,33 +139,10 @@ export async function createOrder(data: CreateOrderInput) {
     // Resolve shipping address
     const resolvedShipToAddressId = await resolveShipToAddressId(supabase, customerId, shipToAddressId, storeId);
 
-    const nowIso = new Date().toISOString();
-    const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-            org_id: orgId,
-            customer_id: customerId,
-            ship_to_address_id: resolvedShipToAddressId,
-            order_number: `ORD-${Date.now()}`,
-            status: 'confirmed',
-            subtotal_ex_vat: subtotalExVat,
-            vat_amount: vatAmount,
-            total_inc_vat: totalIncVat,
-            requested_delivery_date: deliveryDate || null,
-            notes: notesInternal ?? null,
-            created_at: nowIso,
-            updated_at: nowIso,
-        })
-        .select()
-        .single();
-
-    if (orderError || !order) {
-        console.error('Error creating order:', orderError);
-        return { error: 'Failed to create order' };
-    }
-
-    const orderItemsPayload = resolvedLines.map(line => {
-        // Create description that includes batch preferences if specified
+    // Prepare payload for atomic RPC
+    const orderNumber = `ORD-${Date.now()}`;
+    const rpcLines = resolvedLines.map(line => {
+        // Build description with any preferences for traceability
         let description = line.description;
         if (line.batchPreferences?.specificBatchId) {
             description += ` [Batch: ${line.batchPreferences.specificBatchId}]`;
@@ -175,42 +152,81 @@ export async function createOrder(data: CreateOrderInput) {
             description += ` [Preferred Batches: ${line.batchPreferences.preferredBatchNumbers.join(', ')}]`;
         }
 
+        // Map any explicit batch request into an allocation to leverage locking
+        const allocations =
+            line.requiredBatchId
+                ? [{ batch_id: line.requiredBatchId, qty: line.quantity }]
+                : line.batchPreferences?.specificBatchId
+                    ? [{ batch_id: line.batchPreferences.specificBatchId, qty: line.quantity }]
+                    : [];
+
         return {
-            order_id: order.id,
-            product_id: line.productId,
             sku_id: line.skuId,
-            description,
             quantity: line.quantity,
-            unit_price_ex_vat: line.unitPrice,
+            unit_price: line.unitPrice,
             vat_rate: line.vatRate,
-            discount_pct: 0,
-            line_total_ex_vat: line.lineTotalExVat,
-            line_vat_amount: line.lineVatAmount,
-            required_variety_id: line.requiredVarietyId,
-            required_batch_id: line.requiredBatchId,
+            description,
+            allocations,
         };
     });
 
-    const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsPayload);
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('create_order_with_allocations', {
+        p_org_id: orgId,
+        p_customer_id: customerId,
+        p_order_number: orderNumber,
+        p_lines: rpcLines,
+        p_requested_delivery_date: deliveryDate || null,
+        p_notes: notesInternal ?? null,
+    });
 
-    if (itemsError) {
-        console.error('Error creating order items:', itemsError);
-        return { error: 'Failed to create order items' };
+    if (rpcError || !rpcResult?.order_id) {
+        console.error('Error creating order via RPC:', rpcError);
+        return { error: 'Failed to create order', details: rpcError?.message };
     }
 
+    const orderId = rpcResult.order_id as string;
+
+    // Update totals and shipping address after creation (non-blocking to RPC)
+    await supabase
+        .from('orders')
+        .update({
+            ship_to_address_id: resolvedShipToAddressId,
+            subtotal_ex_vat: subtotalExVat,
+            vat_amount: vatAmount,
+            total_inc_vat: totalIncVat,
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+
     await supabase.from('order_events').insert({
-        order_id: order.id,
+        order_id: orderId,
         event_type: 'order_created',
         description: 'Order created via internal UI',
         created_by: user.id,
     });
 
+    // Persist pre-pricing (RRP) values on order items if provided
+    try {
+        const rrpUpdates = resolvedLines
+            .map((line, idx) => ({ ...line, rrp: data.lines[idx]?.rrp ?? null }))
+            .filter((line) => line.rrp != null);
+        if (rrpUpdates.length > 0) {
+            for (const line of rrpUpdates) {
+                await supabase
+                    .from('order_items')
+                    .update({ rrp: line.rrp })
+                    .eq('order_id', orderId)
+                    .eq('sku_id', line.skuId);
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to persist pre-pricing (rrp) values', e);
+    }
+
     // Auto-create pick list for confirmed orders
     try {
         const { createPickListFromOrder } = await import('@/server/sales/picking');
-        await createPickListFromOrder(order.id);
+        await createPickListFromOrder(orderId);
     } catch (e) {
         console.error('Failed to create pick list:', e);
         // Don't fail the order creation if pick list fails
@@ -341,6 +357,87 @@ export async function getOrderDetails(orderId: string) {
 
 function roundToTwo(value: number) {
     return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export async function getCustomerRecentOrders(customerId: string) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_number, created_at, total_inc_vat, requested_delivery_date, status, order_items (id)')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+    if (error) {
+        console.error('Failed to load recent orders', error);
+        return { error: 'Failed to load recent orders' };
+    }
+
+    const orders =
+        data?.map((row) => ({
+            id: row.id,
+            orderNumber: row.order_number,
+            createdAt: row.created_at,
+            total: row.total_inc_vat ?? 0,
+            deliveryDate: row.requested_delivery_date ?? null,
+            status: row.status,
+            lineCount: Array.isArray(row.order_items) ? row.order_items.length : 0,
+        })) || [];
+
+    return { orders };
+}
+
+export async function getOrderForCopy(orderId: string) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('orders')
+        .select(
+            `
+            id,
+            customer_id,
+            ship_to_address_id,
+            requested_delivery_date,
+            order_items (
+              product_id,
+              sku_id,
+              quantity,
+              unit_price_ex_vat,
+              vat_rate,
+              description,
+              required_batch_id,
+              required_variety_id,
+              rrp
+            )
+          `
+        )
+        .eq('id', orderId)
+        .maybeSingle();
+
+    if (error || !data) {
+        console.error('Failed to load order for copy', error);
+        return { error: 'Order not found' };
+    }
+
+    const lines =
+        data.order_items?.map((item) => ({
+            productId: item.product_id || undefined,
+            qty: item.quantity,
+            unitPrice: item.unit_price_ex_vat,
+            vatRate: item.vat_rate,
+            description: item.description ?? undefined,
+            requiredBatchId: item.required_batch_id ?? undefined,
+            requiredVarietyId: item.required_variety_id ?? undefined,
+            rrp: item.rrp ?? undefined,
+        })) || [];
+
+    return {
+        order: {
+            customerId: data.customer_id,
+            shipToAddressId: data.ship_to_address_id ?? undefined,
+            deliveryDate: data.requested_delivery_date ?? undefined,
+            lines,
+        },
+    };
 }
 
 function buildProductMaps(products: ProductRow[]) {

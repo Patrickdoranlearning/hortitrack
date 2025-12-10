@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+export type DeliveryPreferences = {
+  preferredTrolleyType?: 'tag6' | 'dc' | 'danish' | 'dutch';
+  labelRequirements?: 'yellow_tag' | 'no_tag' | 'any';
+  specialInstructions?: string;
+};
+
 /**
  * Product catalog item for B2B customer portal
  * Filtered by customer's price list with batch and pricing information

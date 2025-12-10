@@ -20,15 +20,26 @@ export function ReferenceDataProvider({ children }: { children: React.ReactNode 
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    const res = await fetchReferenceData();
-    if (res.errors.length) setError(res.errors.join("; "));
-    setData({
-      varieties: res.varieties,
-      sizes: res.sizes,
-      locations: res.locations,
-      suppliers: res.suppliers,
-    });
-    setLoading(false);
+    try {
+      const res = await fetchReferenceData();
+      if (res.errors.length) setError(res.errors.join("; "));
+      setData({
+        varieties: res.varieties,
+        sizes: res.sizes,
+        locations: res.locations,
+        suppliers: res.suppliers,
+      });
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load reference data");
+      setData({
+        varieties: [],
+        sizes: [],
+        locations: [],
+        suppliers: [],
+      });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   React.useEffect(() => {

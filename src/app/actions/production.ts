@@ -12,7 +12,14 @@ export async function createPropagationBatchAction(input: z.infer<typeof Propaga
       return { success: false, error: "Unauthorized" };
     }
 
-    const batch = await createPropagationBatch({ input, userId });
+    const batch = await createPropagationBatch({
+      input: {
+        ...input,
+        varietyId: input.varietyId ?? input.variety,
+        plant_variety_id: input.varietyId ?? input.variety,
+      },
+      userId,
+    });
     return { success: true, data: batch };
   } catch (e: any) {
     console.error("createPropagationBatchAction error", e);

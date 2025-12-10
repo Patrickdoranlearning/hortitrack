@@ -128,7 +128,7 @@ export function B2BBatchSelectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+      <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Select Batches</DialogTitle>
           <DialogDescription>
@@ -164,68 +164,73 @@ export function B2BBatchSelectionDialog({
               return (
                 <div
                   key={batch.id}
-                  className={`flex items-center gap-3 p-3 border rounded-lg transition-colors cursor-pointer ${
+                  className={`p-3 border rounded-lg transition-colors cursor-pointer ${
                     isSelected ? 'bg-primary/5 border-primary/40' : 'hover:bg-muted/30'
                   }`}
                   onClick={() => toggleBatch(batch.id, !isSelected)}
                 >
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={(checked) => toggleBatch(batch.id, !!checked)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">
-                      {formatBatchLabel(batch)}
-                    </div>
-
-                    {/* Batch notes (e.g., "Blooming", "Budded") */}
-                    {batch.notes && (
-                      <div className="text-xs text-muted-foreground mt-0.5 italic">
-                        {formatBatchNotes(batch.notes)}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                      {/* Available quantity */}
-                      <div className="flex items-center gap-1">
-                        <Package className="h-3 w-3" />
-                        <span className="font-medium text-foreground">{batch.availableQty}</span>
-                        <span>available</span>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={(checked) => toggleBatch(batch.id, !!checked)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">
+                        {formatBatchLabel(batch)}
                       </div>
 
-                      {/* Location */}
-                      {batch.locationName && (
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          <span>{batch.locationName}</span>
+                      {/* Batch notes (e.g., "Blooming", "Budded") */}
+                      {batch.notes && (
+                        <div className="text-xs text-muted-foreground mt-0.5 italic">
+                          {formatBatchNotes(batch.notes)}
                         </div>
                       )}
 
-                      {/* Planted date */}
-                      {batch.plantedAt && (
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                        {/* Available quantity */}
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{formatPlantedDate(batch.plantedAt)}</span>
+                          <Package className="h-3 w-3" />
+                          <span className="font-medium text-foreground">{batch.availableQty}</span>
+                          <span>available</span>
                         </div>
-                      )}
+
+                        {/* Location */}
+                        {batch.locationName && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            <span>{batch.locationName}</span>
+                          </div>
+                        )}
+
+                        {/* Planted date */}
+                        {batch.plantedAt && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{formatPlantedDate(batch.plantedAt)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Quantity input - separate row on mobile for better touch targets */}
                   {isSelected && (
                     <div
-                      className="flex items-center gap-2 shrink-0"
+                      className="flex items-center gap-2 mt-3 pt-3 border-t"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Label className="text-xs whitespace-nowrap sr-only">Qty:</Label>
+                      <Label className="text-xs whitespace-nowrap">Quantity:</Label>
                       <Input
                         type="number"
                         min="1"
                         max={batch.availableQty}
                         value={qty}
                         onChange={(e) => updateQty(batch.id, parseInt(e.target.value) || 0)}
-                        className="w-20 h-8"
+                        className="flex-1 h-10 text-base"
                       />
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">/ {batch.availableQty}</span>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">/ {batch.availableQty}</span>
                     </div>
                   )}
                 </div>

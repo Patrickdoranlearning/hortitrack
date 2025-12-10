@@ -30,6 +30,7 @@ export type CustomerSummary = {
   paymentTermsDays: number;
   creditLimit: number | null;
   accountCode: string | null;
+  deliveryPreferences: DeliveryPreferences | null;
   // Aggregated data
   orderCount: number;
   aliasCount: number;
@@ -70,6 +71,12 @@ export type CustomerContactSummary = {
   mobile: string | null;
   role: string | null;
   isPrimary: boolean;
+};
+
+export type DeliveryPreferences = {
+  preferredTrolleyType?: 'tag6' | 'dc' | 'danish' | 'dutch';
+  labelRequirements?: 'yellow_tag' | 'no_tag' | 'any';
+  specialInstructions?: string | null;
 };
 
 export type CustomerFormData = {
@@ -139,6 +146,15 @@ export const customerContactSchema = z.object({
   mobile: z.string().max(30).optional().nullable(),
   role: z.string().max(50).optional().nullable(),
   isPrimary: z.boolean().default(false),
+});
+
+export const deliveryPreferencesSchema = z.object({
+  customerId: z.string().uuid(),
+  preferences: z.object({
+    preferredTrolleyType: z.enum(['tag6', 'dc', 'danish', 'dutch']).optional().nullable(),
+    labelRequirements: z.enum(['yellow_tag', 'no_tag', 'any']).optional().nullable(),
+    specialInstructions: z.string().max(500).optional().nullable(),
+  }),
 });
 
 export type CustomerManagementPayload = {

@@ -87,7 +87,8 @@ export async function requireCustomerAuth(): Promise<B2BAuthContext> {
 
 /**
  * Check if current user is internal staff (for impersonation page access)
- * Allows users with portal_role='internal' OR regular org members (admin/member roles)
+ * Allows any authenticated user who is NOT a customer portal user.
+ * Customer portal users have portal_role='customer', everyone else is considered staff.
  */
 export async function isInternalStaff(): Promise<boolean> {
   const supabase = await createClient();
@@ -97,29 +98,15 @@ export async function isInternalStaff(): Promise<boolean> {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('portal_role, active_org_id')
+    .select('portal_role')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  // Check 1: Explicit internal portal role
-  if (profile?.portal_role === 'internal') {
-    return true;
+  // If portal_role is explicitly 'customer', they're not staff
+  if (profile?.portal_role === 'customer') {
+    return false;
   }
 
-  // Check 2: User is a member of an org (regular staff logged in via main app)
-  if (profile?.active_org_id) {
-    const { data: orgMember } = await supabase
-      .from('org_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('org_id', profile.active_org_id)
-      .single();
-
-    // Allow org admins, members, or owners to impersonate customers
-    if (orgMember && ['owner', 'admin', 'member'].includes(orgMember.role)) {
-      return true;
-    }
-  }
-
-  return false;
+  // Any other authenticated user (internal, null, or no profile) is considered staff
+  return true;
 }

@@ -40,20 +40,30 @@ export async function GET(
     const parentNodes = (await Promise.all(
       (parents ?? []).map(async (record) => {
         const node = await getBatchById(record.parent_batch_id);
-        return node ? { ...node, proportion: record.proportion } : null;
+        if (!node) return null;
+        return {
+          id: node.id,
+          batch_number: node.batchNumber ?? node.id,
+          proportion: record.proportion ?? 1,
+        };
       })
-    )) as Array<NodeWithProportion | null>;
+    )).filter(Boolean);
     const childNodes = (await Promise.all(
       (children ?? []).map(async (record) => {
         const node = await getBatchById(record.child_batch_id);
-        return node ? { ...node, proportion: record.proportion } : null;
+        if (!node) return null;
+        return {
+          id: node.id,
+          batch_number: node.batchNumber ?? node.id,
+          proportion: record.proportion ?? 1,
+        };
       })
-    )) as Array<NodeWithProportion | null>;
+    )).filter(Boolean);
 
     return NextResponse.json({
-      current,
-      parents: parentNodes.filter(Boolean),
-      children: childNodes.filter(Boolean),
+      current: current ? { ...current, batch_number: current.batchNumber } : null,
+      parents: parentNodes,
+      children: childNodes,
     });
   } catch (e: any) {
     const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
