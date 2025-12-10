@@ -19,3 +19,5 @@ CREATE INDEX IF NOT EXISTS idx_varieties_name_trgm ON public.plant_varieties USI
 -- Check for other potential duplicates from report
 -- (None explicitly listed in prompt other than these, but good practice to verify)
 
+
+

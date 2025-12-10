@@ -89,3 +89,5 @@ for each row execute function public.sync_reserved_quantity();
 
 commit;
 
+
+

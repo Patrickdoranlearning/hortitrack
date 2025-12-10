@@ -9,3 +9,5 @@ comment on column public.batches.sales_photo_url is 'Customer-facing hero photo 
 
 commit;
 
+
+

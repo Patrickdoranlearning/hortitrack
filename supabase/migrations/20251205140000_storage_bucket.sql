@@ -14,3 +14,5 @@ create policy "Authenticated Update"
 on storage.objects for update
 using ( bucket_id = 'batch-photos' and auth.role() = 'authenticated' );
 
+
+

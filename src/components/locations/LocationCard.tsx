@@ -207,3 +207,5 @@ export function LocationCard({ location, onView, onPrint, className }: LocationC
   );
 }
 
+
+

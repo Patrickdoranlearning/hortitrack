@@ -2,7 +2,8 @@ import { requireCustomerAuth } from '@/lib/auth/b2b-guard';
 import { B2BPortalLayout } from '@/components/b2b/B2BPortalLayout';
 import { B2BOrderCreateClient } from './B2BOrderCreateClient';
 import { createClient } from '@/lib/supabase/server';
-import type { CustomerCatalogProduct } from '@/lib/b2b/types';
+import type { CustomerCatalogProduct, CustomerCatalogProductWithVarieties, VarietyInfo, VarietyBatchInfo } from '@/lib/b2b/types';
+import { calculateVarietyStatus } from '@/lib/b2b/varietyStatus';
 
 export default async function B2BNewOrderPage() {
   const authContext = await requireCustomerAuth();
@@ -51,7 +52,14 @@ export default async function B2BNewOrderPage() {
           quantity,
           reserved_quantity,
           plant_variety_id,
-          plant_varieties ( name, family )
+          growing_status,
+          sales_status,
+          qc_status,
+          notes,
+          planted_at,
+          nursery_location_id,
+          plant_varieties ( name, family ),
+          nursery_locations ( name )
         )
       ),
       product_prices!inner (
@@ -72,13 +80,14 @@ export default async function B2BNewOrderPage() {
     .eq('product_prices.price_list_id', authContext.customer.default_price_list_id || '')
     .order('name');
 
-  // Transform to catalog format with batch availability
-  const catalogProducts: CustomerCatalogProduct[] = (productRows || []).map((row) => {
+  // Transform to catalog format with batch availability and variety aggregation
+  const catalogProducts: CustomerCatalogProductWithVarieties[] = (productRows || []).map((row) => {
     const sku = row.skus;
     const variety = sku?.plant_varieties;
     const size = sku?.plant_sizes;
 
-    // Calculate available batches
+    // Calculate available batches with full batch info
+    // Filter to only show saleable batches (sales_status='available', has stock, not rejected)
     const availableBatches = (row.product_batches || [])
       .map((pb) => {
         const batch = pb.batches;
@@ -87,6 +96,12 @@ export default async function B2BNewOrderPage() {
         const availableQty = (batch.quantity || 0) - (batch.reserved_quantity || 0);
         if (availableQty <= 0) return null;
 
+        // B2B should only see available batches (not growing, not sold out)
+        if (batch.sales_status !== 'available') return null;
+
+        // Filter out rejected batches
+        if (batch.qc_status === 'rejected') return null;
+
         return {
           id: batch.id,
           batchNumber: batch.batch_number || '',
@@ -94,18 +109,48 @@ export default async function B2BNewOrderPage() {
           varietyName: batch.plant_varieties?.name || null,
           family: batch.plant_varieties?.family || null,
           availableQty,
+          growingStatus: batch.growing_status || null,
+          salesStatus: batch.sales_status || null,
+          qcStatus: batch.qc_status || null,
+          notes: batch.notes || null,
+          plantedAt: batch.planted_at || null,
+          locationName: batch.nursery_locations?.name || null,
         };
       })
-      .filter(Boolean) as Array<{
-        id: string;
-        batchNumber: string;
-        varietyId: string | null;
-        varietyName: string | null;
-        family: string | null;
-        availableQty: number;
-      }>;
+      .filter(Boolean) as VarietyBatchInfo[];
 
     const totalAvailableQty = availableBatches.reduce((sum, b) => sum + b.availableQty, 0);
+
+    // Group batches by variety for accordion display
+    const varietyMap = new Map<string, VarietyInfo>();
+    availableBatches.forEach((batch) => {
+      if (!batch.varietyId) return; // Skip batches without variety
+
+      const key = batch.varietyId;
+      if (!varietyMap.has(key)) {
+        varietyMap.set(key, {
+          varietyId: batch.varietyId,
+          varietyName: batch.varietyName || 'Unknown',
+          family: batch.family,
+          totalAvailableQty: 0,
+          status: 'out', // Will be recalculated
+          batchCount: 0,
+          batches: [],
+        });
+      }
+
+      const varietyInfo = varietyMap.get(key)!;
+      varietyInfo.totalAvailableQty += batch.availableQty;
+      varietyInfo.batchCount += 1;
+      varietyInfo.batches.push(batch);
+    });
+
+    // Calculate variety-level status for each variety
+    varietyMap.forEach((varietyInfo) => {
+      varietyInfo.status = calculateVarietyStatus(varietyInfo.batches);
+    });
+
+    const varieties = Array.from(varietyMap.values());
 
     // Get customer-specific alias if exists
     const customerAlias = row.product_aliases?.find((a) => a.customer_id === authContext.customerId);
@@ -128,8 +173,16 @@ export default async function B2BNewOrderPage() {
       containerType: size?.container_type || null,
       heroImageUrl: row.hero_image_url,
       isActive: row.is_active ?? true,
-      availableBatches,
+      availableBatches: availableBatches.map((b) => ({
+        id: b.id,
+        batchNumber: b.batchNumber,
+        varietyId: b.varietyId,
+        varietyName: b.varietyName,
+        family: b.family,
+        availableQty: b.availableQty,
+      })),
       totalAvailableQty,
+      varieties, // NEW: variety-level aggregation for accordion
       priceListId: priceEntry?.price_list_id || null,
       unitPriceExVat: priceEntry?.unit_price_ex_vat || null,
       currency: priceEntry?.currency || 'EUR',

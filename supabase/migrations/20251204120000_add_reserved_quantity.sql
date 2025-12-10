@@ -16,3 +16,5 @@ create index if not exists batches_reserved_quantity_idx
 
 comment on column public.batches.reserved_quantity is 'Quantity reserved for planned batches (not yet transferred)';
 
+
+

@@ -26,3 +26,5 @@ export async function requireDocumentAccess(): Promise<DocumentAccessContext> {
   return { supabase, orgId, user, role };
 }
 
+
+

@@ -73,3 +73,5 @@ COMMENT ON COLUMN print_jobs.label_type IS 'Type of label: sale, batch, location
 COMMENT ON COLUMN print_jobs.payload_json IS 'JSON payload containing the label data for reprinting';
 COMMENT ON COLUMN print_jobs.status IS 'Job status: pending, completed, failed';
 
+
+

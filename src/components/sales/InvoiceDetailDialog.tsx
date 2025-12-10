@@ -137,3 +137,5 @@ export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: Inv
   );
 }
 
+
+

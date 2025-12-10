@@ -129,3 +129,5 @@ COMMENT ON TABLE label_templates IS 'Stores label templates for various label ty
 COMMENT ON COLUMN label_templates.label_type IS 'Type of label: batch, sale, location';
 COMMENT ON COLUMN label_templates.layout IS 'JSON configuration for label layout options';
 
+
+

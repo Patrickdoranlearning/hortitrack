@@ -87,3 +87,5 @@ create index if not exists batches_status_id_idx on public.batches(status_id);
 
 comment on column public.batches.status_id is 'FK to attribute_options (production_status). Legacy text status column is deprecated.';
 
+
+

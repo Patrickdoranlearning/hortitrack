@@ -46,7 +46,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const activeOrgId = cookieStore.get("active_org_id")?.value ?? null;
 
   return (

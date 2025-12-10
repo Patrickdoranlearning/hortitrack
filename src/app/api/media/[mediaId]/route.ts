@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 
+const MEDIA_BUCKET = "batch-photos";
+
 type RouteParams = {
   params: Promise<{ mediaId: string }>;
 };
@@ -33,7 +35,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     // Delete from storage if path exists
     if (media.storage_path) {
       const { error: storageError } = await supabase.storage
-        .from("media")
+        .from(MEDIA_BUCKET)
         .remove([media.storage_path]);
 
       if (storageError) {
@@ -71,4 +73,6 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     );
   }
 }
+
+
 
