@@ -75,6 +75,7 @@ import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
 import EditBatchForm from '@/components/batches/EditBatchForm';
+import { ReferenceDataProvider } from '@/contexts/ReferenceDataContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -557,6 +558,7 @@ export default function HomePageView({
   if (!user) return null;
 
   return (
+    <ReferenceDataProvider>
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader 
@@ -1231,5 +1233,6 @@ export default function HomePageView({
         </DialogContent>
       </Dialog>
     </PageFrame>
+    </ReferenceDataProvider>
   );
 }
