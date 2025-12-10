@@ -1,7 +1,7 @@
 
 import { getSupabaseServerApp } from '@/server/db/supabase';
 import { PageFrame } from '@/ui/templates/PageFrame';
-import EnhancedCreateOrderForm from '@/components/sales/EnhancedCreateOrderForm';
+import { SalesOrderWizard } from '@/components/sales/wizard/SalesOrderWizard';
 import { getProductsWithBatches } from '@/server/sales/products-with-batches';
 import { redirect } from 'next/navigation';
 
@@ -76,7 +76,12 @@ async function getCustomers(orgId: string) {
   }));
 }
 
-export default async function CreateOrderPage() {
+export default async function CreateOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ copyOrderId?: string }>;
+}) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await getSupabaseServerApp();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -160,9 +165,10 @@ export default async function CreateOrderPage() {
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="sales">
       <div className="py-6">
-        <EnhancedCreateOrderForm
+        <SalesOrderWizard
           customers={customers}
           products={products}
+          copyOrderId={resolvedSearchParams?.copyOrderId}
         />
       </div>
     </PageFrame>

@@ -18,31 +18,50 @@ export const NewOrderSchema = z.object({
 });
 export type NewOrder = z.infer<typeof NewOrderSchema>;
 
-export async function listOrders(limit = 100, status?: string): Promise<Order[]> {
+export async function listOrders(params: { page?: number; pageSize?: number; status?: string } = {}): Promise<{
+  orders: Array<Order & { org_id: string; order_number: string; total_inc_vat: number | null; requested_delivery_date: string | null; customer?: { name: string | null } | null }>;
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
   const supabase = await createClient();
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.max(1, Math.min(params.pageSize ?? 20, 100));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
   let query = supabase
     .from("orders")
-    .select("*, customers(name)")
+    .select("*, customers(name)", { count: "exact" })
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(from, to);
 
-  if (status) {
-    query = query.eq("status", status);
+  if (params.status) {
+    query = query.eq("status", params.status);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) {
     console.error("Error listing orders:", error);
-    return [];
+    return { orders: [], total: 0, page, pageSize };
   }
 
-  return data.map((d: any) => ({
+  const mapped = (data || []).map((d: any) => ({
     id: d.id,
-    customerName: d.customers?.name || "Unknown",
-    customerId: d.customer_id,
+    org_id: d.org_id,
+    order_number: d.order_number,
+    customer_id: d.customer_id,
     status: d.status,
-    createdAt: d.created_at,
+    created_at: d.created_at,
+    requested_delivery_date: d.requested_delivery_date,
+    subtotal_ex_vat: d.subtotal_ex_vat ?? null,
+    vat_amount: d.vat_amount ?? null,
+    total_inc_vat: d.total_inc_vat ?? null,
+    customerName: d.customers?.name || "Unknown",
+    customer: d.customers ? { name: d.customers.name } : null,
   }));
+
+  return { orders: mapped, total: count ?? mapped.length, page, pageSize };
 }
 
 export async function createOrder(input: NewOrder): Promise<string> {

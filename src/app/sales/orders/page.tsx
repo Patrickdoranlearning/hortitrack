@@ -1,20 +1,24 @@
-import { createClient } from '@/lib/supabase/server';
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import SalesOrdersClient from './SalesOrdersClient';
+import { listOrders } from '@/server/sales/queries.server';
 
-export default async function SalesOrdersPage() {
-    const supabase = await createClient();
+export default async function SalesOrdersPage({
+    searchParams,
+}: {
+    searchParams?: { page?: string; status?: string; pageSize?: string };
+}) {
+    const page = Number(searchParams?.page) || 1;
+    const status = searchParams?.status || undefined;
+    const pageSize = Number(searchParams?.pageSize) || 20;
 
-    const { data: orders } = await supabase
-        .from('orders')
-        .select(`
-            *,
-            customer:customers(name)
-        `)
-        .order('created_at', { ascending: false });
+    const { orders, total, page: currentPage, pageSize: currentPageSize } = await listOrders({
+        page,
+        pageSize,
+        status,
+    });
 
     return (
         <PageFrame companyName="Doran Nurseries" moduleKey="sales">
@@ -29,7 +33,13 @@ export default async function SalesOrdersPage() {
                     }
                 />
 
-                <SalesOrdersClient initialOrders={orders || []} />
+                <SalesOrdersClient
+                    initialOrders={orders || []}
+                    total={total}
+                    page={currentPage}
+                    pageSize={currentPageSize}
+                    statusFilter={status}
+                />
             </div>
         </PageFrame>
     );

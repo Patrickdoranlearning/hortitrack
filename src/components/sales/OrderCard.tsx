@@ -8,9 +8,10 @@ import type { SalesOrderWithCustomer } from '@/app/sales/orders/SalesOrdersClien
 interface OrderCardProps {
   order: SalesOrderWithCustomer;
   onOpen: () => void;
+  onCopy?: () => void;
 }
 
-export default function OrderCard({ order, onOpen }: OrderCardProps) {
+export default function OrderCard({ order, onOpen, onCopy }: OrderCardProps) {
   const customerName = order.customer?.name || 'Unknown Customer';
 
   return (
@@ -32,11 +33,24 @@ export default function OrderCard({ order, onOpen }: OrderCardProps) {
         <div className="text-xs text-muted-foreground">
           {order.created_at ? format(new Date(order.created_at), 'PPP') : 'No date'}
         </div>
-        {order.requested_delivery_date && (
-          <div className="text-xs text-muted-foreground">
-            Delivery: {format(new Date(order.requested_delivery_date), 'MMM d')}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {order.requested_delivery_date && (
+            <div className="text-xs text-muted-foreground">
+              Delivery: {format(new Date(order.requested_delivery_date), 'MMM d')}
+            </div>
+          )}
+          {onCopy && (
+            <button
+              className="text-xs text-primary underline-offset-2 hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopy();
+              }}
+            >
+              Copy to new order
+            </button>
+          )}
+        </div>
       </div>
     </Card>
   );

@@ -24,6 +24,7 @@ export type CustomerRow = {
   payment_terms_days: number;
   credit_limit: number | null;
   account_code: string | null;
+  delivery_preferences: Record<string, unknown> | null;
   // Relations
   price_lists: { id: string; name: string } | null;
   price_list_customers: Array<{
@@ -97,6 +98,7 @@ export async function fetchCustomerManagementData(
         payment_terms_days,
         credit_limit,
         account_code,
+        delivery_preferences,
         price_lists ( id, name ),
         price_list_customers (
           id,
@@ -182,6 +184,7 @@ export function mapCustomers(rows: CustomerRow[]): CustomerSummary[] {
     paymentTermsDays: row.payment_terms_days ?? 30,
     creditLimit: row.credit_limit,
     accountCode: row.account_code,
+    deliveryPreferences: (row.delivery_preferences as any) ?? null,
     // Aggregated
     orderCount: 0, // TODO: aggregate from orders
     aliasCount: 0, // TODO: aggregate from product_aliases

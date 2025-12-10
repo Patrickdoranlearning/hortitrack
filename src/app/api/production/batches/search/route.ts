@@ -25,10 +25,12 @@ export async function GET(req: Request) {
 
   const sb = await createClient();
 
-  // base select with exact count for pagination
+  // base select with estimated count for faster pagination
   let query = sb.from("v_batch_search")
-    .select("id, org_id, batch_number, status, phase, quantity, ready_at, variety_name, size_name, location_name, supplier_name",
-      { count: "exact" })
+    .select(
+      "id, org_id, batch_number, status, phase, quantity, ready_at, variety_name, family, category, size_name, location_name, supplier_name",
+      { count: "planned" }
+    )
     .order("ready_at", { ascending: true, nullsFirst: false })
     .range(from, to);
 

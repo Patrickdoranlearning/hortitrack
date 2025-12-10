@@ -214,6 +214,39 @@ CREATE POLICY "Admin write plant_varieties" ON public.plant_varieties
     )
   );
 
+-- Product Mapping Rules: consolidate to single tenant isolation policy
+DROP POLICY IF EXISTS "Users can view their org's mapping rules" ON public.product_mapping_rules;
+DROP POLICY IF EXISTS "Users can insert mapping rules for their org" ON public.product_mapping_rules;
+DROP POLICY IF EXISTS "Users can update their org's mapping rules" ON public.product_mapping_rules;
+DROP POLICY IF EXISTS "Users can delete their org's mapping rules" ON public.product_mapping_rules;
+
+CREATE POLICY tenant_isolation_product_mapping_rules ON public.product_mapping_rules
+  FOR ALL
+  USING (public.user_in_org(org_id))
+  WITH CHECK (public.user_in_org(org_id));
+
+-- Media Library: consolidate policies
+DROP POLICY IF EXISTS "Users can view media in their org" ON public.media_library;
+DROP POLICY IF EXISTS "Users can insert media in their org" ON public.media_library;
+DROP POLICY IF EXISTS "Users can update media in their org" ON public.media_library;
+DROP POLICY IF EXISTS "Users can delete media in their org" ON public.media_library;
+
+CREATE POLICY tenant_isolation_media_library ON public.media_library
+  FOR ALL
+  USING (public.user_in_org(org_id))
+  WITH CHECK (public.user_in_org(org_id));
+
+-- Media Attachments: consolidate policies
+DROP POLICY IF EXISTS "Users can view attachments in their org" ON public.media_attachments;
+DROP POLICY IF EXISTS "Users can insert attachments in their org" ON public.media_attachments;
+DROP POLICY IF EXISTS "Users can update attachments in their org" ON public.media_attachments;
+DROP POLICY IF EXISTS "Users can delete attachments in their org" ON public.media_attachments;
+
+CREATE POLICY tenant_isolation_media_attachments ON public.media_attachments
+  FOR ALL
+  USING (public.user_in_org(org_id))
+  WITH CHECK (public.user_in_org(org_id));
+
 -- Price Lists: Consolidate `Allow all access for authenticated users`, `org_rw_price_lists`
 DROP POLICY IF EXISTS "Allow all access for authenticated users" ON public.price_lists;
 DROP POLICY IF EXISTS org_rw_price_lists ON public.price_lists;

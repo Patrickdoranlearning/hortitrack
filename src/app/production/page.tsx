@@ -71,6 +71,7 @@ export default function ProductionHome() {
           description="Start a new batch from propagation (seed/cuttings)."
           schema={propagationFormSchema}
           defaultValues={{
+            varietyId: "",
             variety: "",
             family: "",
             sizeId: "",
@@ -88,6 +89,8 @@ export default function ProductionHome() {
           onSubmit={async (values) => {
             const res = await createPropagationBatchAction({
               ...values,
+              varietyId: values.varietyId,
+              variety: values.variety,
               family: values.family || null,
               // If specific fields are missing/optional in schema but required by action, handle here
             })
@@ -101,13 +104,19 @@ export default function ProductionHome() {
         >
           {({ form }) => (
             <div className="grid gap-4 md:grid-cols-2">
+              {refLoading ? (
+                <div className="col-span-2 text-sm text-muted-foreground">
+                  Loading reference data...
+                </div>
+              ) : null}
               <div className="col-span-2">
                 <Label htmlFor="variety">Variety</Label>
                 <Select
-                  value={form.watch("variety")}
+                  value={form.watch("varietyId")}
                   onValueChange={(value) => {
-                    form.setValue("variety", value, { shouldValidate: true });
-                    const selected = varietyOptions.find((v) => v.name === value);
+                    form.setValue("varietyId", value, { shouldValidate: true });
+                    const selected = varietyOptions.find((v) => v.id === value);
+                    form.setValue("variety", selected?.name ?? "", { shouldDirty: true });
                     form.setValue("family", selected?.family ?? "", { shouldDirty: true });
                   }}
                 >
@@ -116,13 +125,13 @@ export default function ProductionHome() {
                   </SelectTrigger>
                   <SelectContent>
                     {varietyOptions.map((v) => (
-                      <SelectItem key={v.id} value={v.name}>
+                      <SelectItem key={v.id} value={v.id}>
                         {v.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <FieldError msg={form.formState.errors.variety?.message} />
+                <FieldError msg={form.formState.errors.varietyId?.message} />
               </div>
               
               <div>

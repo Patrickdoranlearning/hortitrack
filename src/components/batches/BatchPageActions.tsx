@@ -61,6 +61,9 @@ export function BatchPageActions({ batch }: Props) {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Batch</DialogTitle>
+            <DialogDescription className="sr-only">
+              Update batch details such as size, location, and status.
+            </DialogDescription>
           </DialogHeader>
           <EditBatchForm
             batch={batch as any}

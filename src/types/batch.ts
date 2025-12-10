@@ -90,15 +90,15 @@ export type BatchEvent = z.infer<typeof BatchEventSchema>;
 
 // Form Schemas
 export const PropagationFormSchema = z.object({
-  varietyId: z.string().optional(),
-  variety: z.string().min(1),
+  varietyId: z.string().uuid("Variety is required"),
+  variety: z.string().optional(),
   family: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
-  sizeId: z.string().min(1),
+  sizeId: z.string().uuid(),
   sizeMultiple: z.number().int().positive(),
   fullTrays: z.number().int().min(0),
   partialCells: z.number().int().min(0).default(0),
-  locationId: z.string().min(1),
+  locationId: z.string().uuid(),
   plantingDate: z.string(), // ISO
 });
 export type PropagationFormInput = z.infer<typeof PropagationFormSchema>;

@@ -64,15 +64,15 @@ export type PropagationInput = z.infer<typeof PropagationInputSchema>;
  * Maps to PropagationInputSchema via transformation
  */
 export const PropagationFormSchema = z.object({
-  varietyId: z.string().optional(),
-  variety: z.string().min(1, "Variety is required"),
+  varietyId: z.string().uuid("Variety is required"),
+  variety: z.string().optional(),
   family: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
-  sizeId: z.string().min(1, "Size is required"),
+  sizeId: z.string().uuid("Size is required"),
   sizeMultiple: z.number().int().positive("Must be > 0"),
   fullTrays: z.number().int().min(0, "Must be >= 0"),
   partialCells: z.number().int().min(0).default(0),
-  locationId: z.string().min(1, "Location is required"),
+  locationId: z.string().uuid("Location is required"),
   plantingDate: z.string().min(1, "Planting date is required"),
 });
 export type PropagationFormValues = z.infer<typeof PropagationFormSchema>;

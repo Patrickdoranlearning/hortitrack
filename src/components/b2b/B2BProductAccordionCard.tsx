@@ -6,7 +6,6 @@ import { ChevronDown, Plus, ImageIcon, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
   Accordion,
@@ -44,9 +43,6 @@ export function B2BProductAccordionCard({
   onAddToCart,
   viewMode = 'card',
 }: B2BProductAccordionCardProps) {
-  const [rrp, setRrp] = useState(product.suggestedRrp?.toString() || '');
-  const [multibuyPrice2, setMultibuyPrice2] = useState('');
-  const [multibuyQty2, setMultibuyQty2] = useState('');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string>('');
 
@@ -75,39 +71,27 @@ export function B2BProductAccordionCard({
   const handleQuickAdd = () => {
     if (!product.unitPriceExVat || genericQuantity < 1) return;
 
-    const cartItems = toCartItems(
-      rrp ? parseFloat(rrp) : undefined,
-      multibuyPrice2 ? parseFloat(multibuyPrice2) : undefined,
-      multibuyQty2 ? parseInt(multibuyQty2) : undefined
-    );
+    // Pricing (RRP, multi-buy) is set in the checkout pricing step
+    const cartItems = toCartItems();
 
     // Pass single item for generic, array for variety/batch
     onAddToCart(cartItems.length === 1 ? cartItems[0] : cartItems);
 
     // Reset form
     reset();
-    setRrp(product.suggestedRrp?.toString() || '');
-    setMultibuyPrice2('');
-    setMultibuyQty2('');
     setAccordionValue(''); // Collapse accordion
   };
 
   const handleAddToCart = () => {
     if (!product.unitPriceExVat || !isValid) return;
 
-    const cartItems = toCartItems(
-      rrp ? parseFloat(rrp) : undefined,
-      multibuyPrice2 ? parseFloat(multibuyPrice2) : undefined,
-      multibuyQty2 ? parseInt(multibuyQty2) : undefined
-    );
+    // Pricing (RRP, multi-buy) is set in the checkout pricing step
+    const cartItems = toCartItems();
 
     onAddToCart(cartItems.length === 1 ? cartItems[0] : cartItems);
 
     // Reset form
     reset();
-    setRrp(product.suggestedRrp?.toString() || '');
-    setMultibuyPrice2('');
-    setMultibuyQty2('');
     setAccordionValue('');
   };
 
@@ -174,11 +158,22 @@ export function B2BProductAccordionCard({
     </Dialog>
   );
 
-  // Image Thumbnail Button
+  // Image Thumbnail - uses div to avoid nested button issue inside AccordionTrigger
   const imageThumbnail = (size: 'sm' | 'md' = 'md') => (
-    <button
-      type="button"
-      onClick={() => setImageDialogOpen(true)}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        setImageDialogOpen(true);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          setImageDialogOpen(true);
+        }
+      }}
       className={cn(
         'relative shrink-0 rounded-md overflow-hidden border bg-muted hover:ring-2 hover:ring-primary/50 transition-all cursor-zoom-in',
         size === 'sm' ? 'w-12 h-12' : 'w-16 h-16'
@@ -198,7 +193,7 @@ export function B2BProductAccordionCard({
           <ImageIcon className={size === 'sm' ? 'h-4 w-4' : 'h-6 w-6'} />
         </div>
       )}
-    </button>
+    </div>
   );
 
   // LIST VIEW
@@ -214,8 +209,8 @@ export function B2BProductAccordionCard({
           className="w-full"
         >
           <AccordionItem value="item-1" className="border rounded-lg">
-            <AccordionTrigger className="hover:no-underline px-4 py-3">
-              <div className="flex items-center gap-4 w-full">
+            <AccordionTrigger asChild className="hover:no-underline px-4 py-3 cursor-pointer">
+              <div className="flex items-center gap-4 w-full" tabIndex={0} role="button">
                 {/* Image */}
                 {imageThumbnail('sm')}
 
@@ -252,7 +247,7 @@ export function B2BProductAccordionCard({
                 </div>
 
                 {/* Generic Quantity Input (Level 1) */}
-                <div className="w-24" onClick={(e) => e.stopPropagation()}>
+                <div className="w-24" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   {mode === 'generic' ? (
                     <Input
                       type="number"
@@ -274,7 +269,7 @@ export function B2BProductAccordionCard({
 
                 {/* Quick Add Button (appears when generic qty > 0) */}
                 {mode === 'generic' && genericQuantity > 0 && (
-                  <div onClick={(e) => e.stopPropagation()}>
+                  <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                     <Button
                       onClick={handleQuickAdd}
                       disabled={!product.unitPriceExVat}
@@ -287,8 +282,11 @@ export function B2BProductAccordionCard({
                   </div>
                 )}
 
-                {/* Chevron icon (auto-rotates via Radix) */}
-                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                {/* Chevron icon */}
+                <ChevronDown className={cn(
+                  "h-4 w-4 shrink-0 transition-transform duration-200",
+                  accordionValue === 'item-1' && "rotate-180"
+                )} />
               </div>
             </AccordionTrigger>
 
@@ -312,48 +310,6 @@ export function B2BProductAccordionCard({
                     <span className="text-lg font-semibold">{totalQuantity} plants</span>
                   </div>
                 )}
-
-                {/* RRP (Optional) */}
-                <div className="space-y-1">
-                  <Label htmlFor={`rrp-${product.productId}`} className="text-xs">
-                    RRP (Optional)
-                  </Label>
-                  <Input
-                    id={`rrp-${product.productId}`}
-                    type="number"
-                    step="0.01"
-                    placeholder={
-                      product.suggestedRrp
-                        ? `Suggested: €${product.suggestedRrp.toFixed(2)}`
-                        : 'Enter RRP'
-                    }
-                    value={rrp}
-                    onChange={(e) => setRrp(e.target.value)}
-                    className="h-8"
-                  />
-                </div>
-
-                {/* Multi-buy Pricing (Optional) */}
-                <div className="space-y-1">
-                  <Label className="text-xs">Multi-buy (Optional)</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Qty (e.g., 3)"
-                      value={multibuyQty2}
-                      onChange={(e) => setMultibuyQty2(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Price (e.g., 10)"
-                      value={multibuyPrice2}
-                      onChange={(e) => setMultibuyPrice2(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
 
                 {/* Add to Cart Button */}
                 <Button
@@ -387,8 +343,8 @@ export function B2BProductAccordionCard({
         >
           <AccordionItem value="item-1" className="border-0">
             <CardHeader className="pb-3">
-              <AccordionTrigger className="hover:no-underline p-0">
-                <div className="flex items-start gap-3 w-full">
+              <AccordionTrigger asChild className="cursor-pointer">
+                <div className="flex items-start gap-3 w-full" tabIndex={0} role="button">
                   {imageThumbnail('md')}
                   <div className="flex-1 min-w-0 text-left">
                     <div className="flex items-start justify-between gap-2">
@@ -400,12 +356,18 @@ export function B2BProductAccordionCard({
                           {formatProductDisplay()} {product.sizeName && `• ${product.sizeName}`}
                         </p>
                       </div>
-                      {isLowStock && (
-                        <Badge variant="destructive" className="flex items-center gap-1 shrink-0">
-                          <AlertTriangle className="h-3 w-3" />
-                          Low
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isLowStock && (
+                          <Badge variant="destructive" className="flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Low
+                          </Badge>
+                        )}
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform duration-200",
+                          accordionValue === 'item-1' && "rotate-180"
+                        )} />
+                      </div>
                     </div>
 
                     {/* Price & Stock */}
@@ -419,7 +381,7 @@ export function B2BProductAccordionCard({
                     </div>
 
                     {/* Generic Quantity Input (Level 1) */}
-                    <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-3" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                       {mode === 'generic' ? (
                         <div className="flex gap-2">
                           <Input
@@ -467,48 +429,6 @@ export function B2BProductAccordionCard({
                     productName={product.aliasName || product.productName}
                   />
                 )}
-
-                {/* RRP (Optional) */}
-                <div className="space-y-1">
-                  <Label htmlFor={`rrp-${product.productId}`} className="text-xs">
-                    RRP (Optional)
-                  </Label>
-                  <Input
-                    id={`rrp-${product.productId}`}
-                    type="number"
-                    step="0.01"
-                    placeholder={
-                      product.suggestedRrp
-                        ? `Suggested: €${product.suggestedRrp.toFixed(2)}`
-                        : 'Enter RRP'
-                    }
-                    value={rrp}
-                    onChange={(e) => setRrp(e.target.value)}
-                    className="h-8"
-                  />
-                </div>
-
-                {/* Multi-buy Pricing (Optional) */}
-                <div className="space-y-1">
-                  <Label className="text-xs">Multi-buy (Optional)</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Qty (e.g., 3)"
-                      value={multibuyQty2}
-                      onChange={(e) => setMultibuyQty2(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Price (e.g., 10)"
-                      value={multibuyPrice2}
-                      onChange={(e) => setMultibuyPrice2(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
 
                 {/* Add to Cart Button */}
                 <Button

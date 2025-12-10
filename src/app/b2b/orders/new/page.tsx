@@ -4,6 +4,7 @@ import { B2BOrderCreateClient } from './B2BOrderCreateClient';
 import { createClient } from '@/lib/supabase/server';
 import type { CustomerCatalogProduct, CustomerCatalogProductWithVarieties, VarietyInfo, VarietyBatchInfo } from '@/lib/b2b/types';
 import { calculateVarietyStatus } from '@/lib/b2b/varietyStatus';
+import { getLastUsedPricing } from '@/server/b2b/pricing-history';
 
 export default async function B2BNewOrderPage() {
   const authContext = await requireCustomerAuth();
@@ -54,10 +55,8 @@ export default async function B2BNewOrderPage() {
           plant_variety_id,
           growing_status,
           sales_status,
-          qc_status,
-          notes,
           planted_at,
-          nursery_location_id,
+          location_id,
           plant_varieties ( name, family ),
           nursery_locations ( name )
         )
@@ -99,9 +98,6 @@ export default async function B2BNewOrderPage() {
         // B2B should only see available batches (not growing, not sold out)
         if (batch.sales_status !== 'available') return null;
 
-        // Filter out rejected batches
-        if (batch.qc_status === 'rejected') return null;
-
         return {
           id: batch.id,
           batchNumber: batch.batch_number || '',
@@ -111,8 +107,6 @@ export default async function B2BNewOrderPage() {
           availableQty,
           growingStatus: batch.growing_status || null,
           salesStatus: batch.sales_status || null,
-          qcStatus: batch.qc_status || null,
-          notes: batch.notes || null,
           plantedAt: batch.planted_at || null,
           locationName: batch.nursery_locations?.name || null,
         };
@@ -197,6 +191,11 @@ export default async function B2BNewOrderPage() {
   // Extract unique categories and sizes for filters
   const categories = Array.from(new Set(catalogProducts.map((p) => p.category).filter(Boolean))) as string[];
   const sizes = Array.from(new Set(catalogProducts.map((p) => p.sizeName).filter(Boolean))) as string[];
+  const pricingHints = await getLastUsedPricing(
+    supabase,
+    authContext.customerId,
+    catalogProducts.map((p) => p.productId)
+  );
 
   return (
     <B2BPortalLayout authContext={authContext}>
@@ -206,6 +205,7 @@ export default async function B2BNewOrderPage() {
         categories={categories}
         sizes={sizes}
         customerId={authContext.customerId}
+        pricingHints={pricingHints}
       />
     </B2BPortalLayout>
   );

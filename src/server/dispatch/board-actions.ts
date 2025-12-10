@@ -218,11 +218,10 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
             orderId: orderId,
           });
         }
-        
-        // Update order status to dispatched
+        // Keep status at ready_for_dispatch until the run goes in_transit
         await supabase
           .from("orders")
-          .update({ status: "dispatched" })
+          .update({ status: "ready_for_dispatch" })
           .eq("id", orderId);
       })
     );

@@ -235,6 +235,7 @@ export async function createDeliveryRun(input: CreateDeliveryRun): Promise<strin
         deliveryRunId: data.id,
         orderId: input.orderIds[i],
         sequenceNumber: i + 1,
+        trolleysDelivered: 0,
       });
     }
   }
@@ -270,6 +271,35 @@ export async function updateDeliveryRun(
   if (error) {
     console.error("Error updating delivery run:", error);
     throw error;
+  }
+
+  // When a run goes out, mark linked orders as dispatched
+  if (updates.status === "in_transit") {
+    const { data: items, error: itemsError } = await supabase
+      .from("delivery_items")
+      .select("order_id")
+      .eq("delivery_run_id", runId);
+
+    if (itemsError) {
+      console.error("Error fetching delivery items for run:", itemsError);
+      throw itemsError;
+    }
+
+    const orderIds = (items || [])
+      .map((i) => i.order_id)
+      .filter(Boolean);
+
+    if (orderIds.length > 0) {
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update({ status: "dispatched" })
+        .in("id", orderIds as string[]);
+
+      if (orderError) {
+        console.error("Error updating orders to dispatched:", orderError);
+        throw orderError;
+      }
+    }
   }
 }
 
@@ -339,10 +369,10 @@ export async function addOrderToDeliveryRun(input: AddToDeliveryRun): Promise<st
     throw error;
   }
 
-  // Update order status to dispatched
+  // Mark order ready for dispatch (final dispatch happens when run goes in transit)
   await supabase
     .from("orders")
-    .update({ status: "dispatched" })
+    .update({ status: "ready_for_dispatch" })
     .eq("id", input.orderId);
 
   return data.id;
@@ -801,6 +831,15 @@ export async function getDispatchBoardData(): Promise<{
 }> {
   const { user, orgId, supabase } = await getUserAndOrg();
 
+  // Limit board to a 7-day window around today to keep payload small
+  const today = new Date();
+  const startDate = new Date(today);
+  const endDate = new Date(today);
+  startDate.setDate(today.getDate() - 7);
+  endDate.setDate(today.getDate() + 7);
+  const startDateStr = startDate.toISOString().split("T")[0];
+  const endDateStr = endDate.toISOString().split("T")[0];
+
   // Fetch data in parallel
   const [hauliers, growers, routesResult, activeRuns, ordersData] = await Promise.all([
     getHauliers(),
@@ -827,6 +866,8 @@ export async function getDispatchBoardData(): Promise<{
       `)
       .eq("org_id", orgId)
       .in("status", ["confirmed", "picking", "packed", "dispatched"])
+      .gte("requested_delivery_date", startDateStr)
+      .lte("requested_delivery_date", endDateStr)
       .order("requested_delivery_date", { ascending: true })
   ]);
 

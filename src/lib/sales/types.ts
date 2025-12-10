@@ -25,6 +25,8 @@ export const CreateOrderLineSchema = z
     allowSubstitute: z.boolean().optional().default(true),
     unitPrice: z.coerce.number().nonnegative().optional(), // optional override
     vatRate: z.coerce.number().min(0).max(100).optional(),
+    // Pre-pricing (RRP printed on pots)
+    rrp: z.coerce.number().nonnegative().optional(),
     // Batch-specific ordering
     specificBatchId: z.string().uuid().optional(), // Request specific batch
     gradePreference: z.enum(['A', 'B', 'C']).optional(), // Grade preference
@@ -117,3 +119,18 @@ export type SalesOrderItem = Database['public']['Tables']['order_items']['Row'];
 export type PickOrder = Database['public']['Tables']['pick_orders']['Row'];
 export type Invoice = Database['public']['Tables']['invoices']['Row'];
 export type CreditNote = Database['public']['Tables']['credit_notes']['Row'];
+
+// Customer address type for sales order wizard
+export type CustomerAddress = {
+  id: string;
+  label: string;
+  storeName: string | null;
+  line1: string;
+  line2: string | null;
+  city: string | null;
+  county: string | null;
+  eircode: string | null;
+  countryCode: string;
+  isDefaultShipping: boolean;
+  isDefaultBilling: boolean;
+};

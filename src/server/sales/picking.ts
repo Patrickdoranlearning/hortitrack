@@ -998,10 +998,15 @@ export async function updatePickItem(
 
   // Deduct from batch inventory
   if (input.pickedQty > 0 && input.pickedBatchId) {
-    await supabase.rpc("decrement_batch_quantity", {
-      batch_id: input.pickedBatchId,
-      amount: input.pickedQty,
+    const { error: rpcError } = await supabase.rpc("decrement_batch_quantity", {
+      p_org_id: orgId,
+      p_batch_id: input.pickedBatchId,
+      p_units: input.pickedQty,
     });
+    if (rpcError) {
+      console.error("Error decrementing batch quantity:", rpcError);
+      return { error: rpcError.message };
+    }
 
     // Log to batch_events so it shows in batch's Log History
     await supabase.from("batch_events").insert({

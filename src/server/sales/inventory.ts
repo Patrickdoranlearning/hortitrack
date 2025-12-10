@@ -36,6 +36,7 @@ export async function getSaleableBatches(): Promise<InventoryBatch[]> {
             attribute_options!inner(behavior, display_label)
         `)
         .eq("attribute_options.behavior", "available")
+        .in("attribute_options.display_label", ["Ready for Sale", "Looking Good"])
         .gt("quantity", 0);
 
     if (error) {
