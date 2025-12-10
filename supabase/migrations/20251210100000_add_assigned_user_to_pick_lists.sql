@@ -13,3 +13,5 @@ CREATE INDEX idx_pick_lists_assigned_user
 
 COMMENT ON COLUMN public.pick_lists.assigned_user_id IS 'Individual user (picker/grower) assigned to pick this order';
 
+
+

@@ -46,3 +46,5 @@ Resolution order for a customer:
 
 This plan keeps the DB immutable-friendly and provides a paper trail for audits while matching the sales spec. Let me know if any adjustments are needed before we cut migrations.
 
+
+

@@ -9,3 +9,5 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.customer_favorite_products TO ser
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.customer_resources TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.customer_resources TO service_role;
 
+
+

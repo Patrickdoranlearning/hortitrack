@@ -3,24 +3,28 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { B2BProductCard } from '@/components/b2b/B2BProductCard';
+import { B2BProductAccordionCard } from '@/components/b2b/B2BProductAccordionCard';
 import { B2BProductFilters } from '@/components/b2b/B2BProductFilters';
 import { B2BCartSidebar } from '@/components/b2b/B2BCartSidebar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, LayoutGrid, List } from 'lucide-react';
 import { createB2BOrder } from './actions';
-import type { CustomerCatalogProduct, CartItem } from '@/lib/b2b/types';
+import type { CustomerCatalogProduct, CustomerCatalogProductWithVarieties, CartItem } from '@/lib/b2b/types';
 import type { Database } from '@/types/supabase';
 
 type CustomerAddress = Database['public']['Tables']['customer_addresses']['Row'];
 
 type B2BOrderCreateClientProps = {
-  products: CustomerCatalogProduct[];
+  products: CustomerCatalogProductWithVarieties[];
   addresses: CustomerAddress[];
   categories: string[];
   sizes: string[];
   customerId: string;
 };
+
+// Feature flag for accordion card (can be env var later)
+const USE_ACCORDION_CARD = process.env.NEXT_PUBLIC_USE_ACCORDION_CARD === 'true';
 
 export function B2BOrderCreateClient({
   products,
@@ -70,24 +74,31 @@ export function B2BOrderCreateClient({
     });
   }, [products, filters]);
 
-  const handleAddToCart = (item: CartItem) => {
-    // Check if item already exists in cart
-    const existingIndex = cart.findIndex(
-      (cartItem) =>
-        cartItem.productId === item.productId &&
-        cartItem.batchId === item.batchId
-    );
+  const handleAddToCart = (item: CartItem | CartItem[]) => {
+    // Handle both single item and array of items (from accordion multi-variety orders)
+    const itemsToAdd = Array.isArray(item) ? item : [item];
 
-    if (existingIndex >= 0) {
-      // Update quantity if item exists
-      const newCart = [...cart];
-      newCart[existingIndex].quantity += item.quantity;
-      setCart(newCart);
-    } else {
-      // Add new item
-      setCart([...cart, item]);
-    }
+    const newCart = [...cart];
 
+    itemsToAdd.forEach((cartItem) => {
+      // Check if item already exists in cart
+      const existingIndex = newCart.findIndex(
+        (c) =>
+          c.productId === cartItem.productId &&
+          c.batchId === cartItem.batchId &&
+          c.requiredVarietyId === cartItem.requiredVarietyId
+      );
+
+      if (existingIndex >= 0) {
+        // Update quantity if item exists
+        newCart[existingIndex].quantity += cartItem.quantity;
+      } else {
+        // Add new item
+        newCart.push(cartItem);
+      }
+    });
+
+    setCart(newCart);
     setError(null);
   };
 
@@ -181,38 +192,66 @@ export function B2BOrderCreateClient({
                 No products found matching your filters.
               </p>
             </div>
-          ) : viewMode === 'card' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredProducts.map((product) => (
-                <B2BProductCard
-                  key={product.productId}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                  viewMode="card"
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {/* List Header */}
-              <div className="hidden md:flex items-center gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b">
-                <div className="w-12" />
-                <div className="flex-1">Product</div>
-                <div className="w-20 text-right">Price</div>
-                <div className="w-[140px]">Batch</div>
-                <div className="w-20">Qty</div>
-                <div className="w-20">RRP</div>
-                <div className="w-10" />
+          ) : USE_ACCORDION_CARD ? (
+            // NEW: Accordion Card View
+            viewMode === 'card' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredProducts.map((product) => (
+                  <B2BProductAccordionCard
+                    key={product.productId}
+                    product={product}
+                    onAddToCart={handleAddToCart}
+                    viewMode="card"
+                  />
+                ))}
               </div>
-              {filteredProducts.map((product) => (
-                <B2BProductCard
-                  key={product.productId}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                  viewMode="list"
-                />
-              ))}
-            </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredProducts.map((product) => (
+                  <B2BProductAccordionCard
+                    key={product.productId}
+                    product={product}
+                    onAddToCart={handleAddToCart}
+                    viewMode="list"
+                  />
+                ))}
+              </div>
+            )
+          ) : (
+            // LEGACY: Original Card View
+            viewMode === 'card' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredProducts.map((product) => (
+                  <B2BProductCard
+                    key={product.productId}
+                    product={product as CustomerCatalogProduct}
+                    onAddToCart={handleAddToCart}
+                    viewMode="card"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {/* List Header */}
+                <div className="hidden md:flex items-center gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+                  <div className="w-12" />
+                  <div className="flex-1">Product</div>
+                  <div className="w-20 text-right">Price</div>
+                  <div className="w-[140px]">Batch</div>
+                  <div className="w-20">Qty</div>
+                  <div className="w-20">RRP</div>
+                  <div className="w-10" />
+                </div>
+                {filteredProducts.map((product) => (
+                  <B2BProductCard
+                    key={product.productId}
+                    product={product as CustomerCatalogProduct}
+                    onAddToCart={handleAddToCart}
+                    viewMode="list"
+                  />
+                ))}
+              </div>
+            )
           )}
         </div>
 

@@ -26,3 +26,5 @@ COMMENT ON COLUMN public.organizations.default_payment_terms IS 'Default payment
 COMMENT ON COLUMN public.organizations.invoice_prefix IS 'Prefix for invoice numbers';
 COMMENT ON COLUMN public.organizations.invoice_footer_text IS 'Custom text to appear at bottom of invoices';
 
+
+

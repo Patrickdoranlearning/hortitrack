@@ -11,3 +11,5 @@ COMMENT ON COLUMN public.order_items.required_batch_id IS
   'If set, only this specific batch can fulfill this line (NULL = any matching batch).';
 
 
+
+

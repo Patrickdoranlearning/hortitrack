@@ -1,7 +1,8 @@
 import { getSupabaseServerApp } from "@/server/db/supabase";
 
 export type GalleryImage = {
-  id: string;
+  id: string; // media_library id (used for delete)
+  attachmentId?: string; // media_attachments id (for debugging/audit)
   url: string;
   badge?: string;
   caption?: string;
@@ -36,20 +37,19 @@ export async function getSmartGallery(
 
   const supabase = await getSupabaseServerApp();
 
-  // Build query conditions
+  // Build query conditions for PostgREST .or with grouped and() clauses
   const conditions: string[] = [];
   if (batchId) {
-    conditions.push(`(entity_type.eq.batch,entity_id.eq.${batchId})`);
+    conditions.push(`and(entity_type.eq.batch,entity_id.eq.${batchId})`);
   }
   if (varietyId) {
-    conditions.push(`(entity_type.eq.variety,entity_id.eq.${varietyId})`);
+    conditions.push(`and(entity_type.eq.variety,entity_id.eq.${varietyId})`);
   }
   if (productId) {
-    conditions.push(`(entity_type.eq.product,entity_id.eq.${productId})`);
+    conditions.push(`and(entity_type.eq.product,entity_id.eq.${productId})`);
   }
 
-  // Fetch all matching attachments with their media
-  const { data: attachments, error } = await supabase
+  const query = supabase
     .from("media_attachments")
     .select(
       `
@@ -68,8 +68,14 @@ export async function getSmartGallery(
       )
     `
     )
-    .eq("org_id", orgId)
-    .or(conditions.join(","));
+    .eq("org_id", orgId);
+
+  if (conditions.length > 0) {
+    query.or(conditions.join(","));
+  }
+
+  // Fetch all matching attachments with their media
+  const { data: attachments, error } = await query;
 
   if (error) {
     console.error("[getSmartGallery] query error:", error);
@@ -132,7 +138,8 @@ export async function getSmartGallery(
       }
 
       return {
-        id: a.id,
+        id: a.media_library!.id, // use media id so delete works
+        attachmentId: a.id,
         url: a.media_library!.file_path,
         badge,
         caption: a.caption ?? undefined,
@@ -192,4 +199,6 @@ export function galleryToProductFormat(
     badge: img.badge,
   }));
 }
+
+
 

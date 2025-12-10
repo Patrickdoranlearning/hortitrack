@@ -9,3 +9,5 @@ export default async function RecipesPage() {
   return <RecipesClient initialProtocols={protocols} />;
 }
 
+
+

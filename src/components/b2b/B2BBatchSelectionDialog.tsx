@@ -14,7 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Package } from 'lucide-react';
+import { Search, Package, MapPin, Calendar } from 'lucide-react';
+import { formatBatchNotes, formatPlantedDate } from '@/lib/b2b/varietyStatus';
 import type { BatchAllocation } from '@/lib/b2b/types';
 
 export interface B2BBatch {
@@ -23,6 +24,9 @@ export interface B2BBatch {
   varietyName: string | null;
   family: string | null;
   availableQty: number;
+  notes?: string | null;
+  locationName?: string | null;
+  plantedAt?: string | null;
 }
 
 interface B2BBatchSelectionDialogProps {
@@ -174,10 +178,37 @@ export function B2BBatchSelectionDialog({
                     <div className="font-medium text-sm truncate">
                       {formatBatchLabel(batch)}
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                      <Package className="h-3 w-3" />
-                      <span className="font-medium text-foreground">{batch.availableQty}</span>
-                      <span>available</span>
+
+                    {/* Batch notes (e.g., "Blooming", "Budded") */}
+                    {batch.notes && (
+                      <div className="text-xs text-muted-foreground mt-0.5 italic">
+                        {formatBatchNotes(batch.notes)}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                      {/* Available quantity */}
+                      <div className="flex items-center gap-1">
+                        <Package className="h-3 w-3" />
+                        <span className="font-medium text-foreground">{batch.availableQty}</span>
+                        <span>available</span>
+                      </div>
+
+                      {/* Location */}
+                      {batch.locationName && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          <span>{batch.locationName}</span>
+                        </div>
+                      )}
+
+                      {/* Planted date */}
+                      {batch.plantedAt && (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatPlantedDate(batch.plantedAt)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   {isSelected && (

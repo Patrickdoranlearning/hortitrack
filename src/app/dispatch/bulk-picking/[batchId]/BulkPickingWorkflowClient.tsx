@@ -598,3 +598,5 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
   );
 }
 
+
+

@@ -92,3 +92,5 @@ COMMENT ON COLUMN public.order_qc_checks.size_correct IS 'Correct pot size';
 COMMENT ON COLUMN public.order_qc_checks.labelling_ok IS 'Plants are properly labelled';
 COMMENT ON COLUMN public.order_qc_checks.failed_items IS 'JSON array of failed items: [{itemId, issue, notes}]';
 
+
+

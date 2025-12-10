@@ -60,3 +60,5 @@ alter table public.batches alter column status set default 'Propagation';
 drop type if exists production_phase;
 drop type if exists production_status;
 
+
+

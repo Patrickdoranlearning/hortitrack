@@ -21,7 +21,8 @@ import {
 import { cn } from '@/lib/utils';
 
 export type GalleryImage = {
-  id: string;
+  id: string; // media_library id
+  attachmentId?: string; // media_attachments id (optional)
   url: string;
   badge?: string;
   caption?: string;
@@ -341,4 +342,6 @@ export function SmartGalleryUploader({
     </div>
   );
 }
+
+
 

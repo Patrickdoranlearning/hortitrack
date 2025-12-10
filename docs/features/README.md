@@ -35,3 +35,5 @@ When adding a new feature plan:
 2. Update this README with the new feature
 3. Link to related ADRs if architectural decisions are involved
 
+
+

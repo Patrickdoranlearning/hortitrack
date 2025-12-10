@@ -158,3 +158,5 @@ END$$;
 COMMENT ON TABLE document_templates IS 'Stores document templates (invoice, delivery, order confirmation, AV list, Lookin Good) with publish status and current version.';
 COMMENT ON TABLE document_template_versions IS 'Immutable versions of document templates including layout JSON and bindings.';
 
+
+

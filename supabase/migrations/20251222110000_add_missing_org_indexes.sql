@@ -8,3 +8,5 @@ create index if not exists idx_product_aliases_org_id on public.product_aliases(
 create index if not exists idx_order_events_org_id on public.order_events(org_id);
 create index if not exists idx_order_exceptions_org_id on public.order_exceptions(org_id);
 
+
+

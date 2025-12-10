@@ -49,3 +49,5 @@ export default async function RecipeDetailPage({
   return <RecipeDetailClient protocol={protocol} />;
 }
 
+
+

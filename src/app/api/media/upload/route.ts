@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 
+const MEDIA_BUCKET = "batch-photos"; // existing public bucket for images
+
 /**
  * Upload a media file and optionally attach it to an entity (batch, variety, product)
  * 
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     // Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
-      .from("media")
+      .from(MEDIA_BUCKET)
       .upload(storagePath, file, {
         contentType: file.type,
         upsert: false,
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from("media")
+      .from(MEDIA_BUCKET)
       .getPublicUrl(storagePath);
 
     const filePath = urlData.publicUrl;
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
     if (mediaError || !mediaRecord) {
       console.error("[media/upload] media_library insert error:", mediaError);
       // Clean up uploaded file
-      await supabase.storage.from("media").remove([storagePath]);
+      await supabase.storage.from(MEDIA_BUCKET).remove([storagePath]);
       return NextResponse.json(
         { error: "Failed to create media record" },
         { status: 500 }
@@ -128,6 +130,7 @@ export async function POST(req: NextRequest) {
       mediaId: mediaRecord.id,
       filePath: mediaRecord.file_path,
       storagePath: mediaRecord.storage_path,
+      bucket: MEDIA_BUCKET,
     });
   } catch (err) {
     console.error("[media/upload] unexpected error:", err);
@@ -137,4 +140,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+
 
