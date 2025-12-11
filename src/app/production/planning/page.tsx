@@ -2,6 +2,7 @@
 import { PageFrame } from "@/ui/templates/PageFrame";
 import PlanningClient from "./PlanningClient";
 import { getPlanningSnapshot, listProtocols } from "@/server/planning/service";
+import { ReferenceDataProvider } from "@/contexts/ReferenceDataContext";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,9 @@ export default async function ProductionPlanningPage() {
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="production">
-      <PlanningClient initialSnapshot={snapshot} initialProtocols={protocols} />
+      <ReferenceDataProvider>
+        <PlanningClient initialSnapshot={snapshot} initialProtocols={protocols} />
+      </ReferenceDataProvider>
     </PageFrame>
   );
 }

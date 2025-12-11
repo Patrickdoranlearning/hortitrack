@@ -299,7 +299,7 @@ export default function TransplantForm({
       <Form {...form}>
         <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]"
+        className="grid gap-6"
         noValidate
       >
         <div className="space-y-6">

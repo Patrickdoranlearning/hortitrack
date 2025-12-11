@@ -52,9 +52,12 @@ export const DeliveryRunSchema = z.object({
   // Route Identification
   runNumber: z.string(),
   runDate: z.string(), // ISO date string
+  loadName: z.string().optional(), // Custom name like "Cork Load 1"
+  weekNumber: z.number().int().optional(), // ISO week number
 
   // Haulier & Vehicle
   haulierId: z.string().optional(),
+  vehicleId: z.string().optional(),
   driverName: z.string().optional(),
   vehicleRegistration: z.string().optional(),
   vehicleType: z.enum(['van', 'truck', 'trailer']).optional(),
@@ -75,6 +78,9 @@ export const DeliveryRunSchema = z.object({
   // Notes
   routeNotes: z.string().optional(),
 
+  // Display
+  displayOrder: z.number().int().default(0),
+
   // Metadata
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -91,7 +97,9 @@ export type DeliveryRun = z.infer<typeof DeliveryRunSchema>;
 // Input schema for creating a delivery run
 export const CreateDeliveryRunSchema = z.object({
   runDate: z.string(),
+  loadName: z.string().optional(), // Custom name for the load
   haulierId: z.string().optional(),
+  vehicleId: z.string().optional(), // Reference to haulier_vehicles
   driverName: z.string().optional(),
   vehicleRegistration: z.string().optional(),
   vehicleType: z.enum(['van', 'truck', 'trailer']).optional(),
@@ -398,6 +406,8 @@ export interface OrderReadyForDispatch {
 export interface ActiveDeliveryRunSummary {
   id: string;
   runNumber: string;
+  loadName?: string;
+  weekNumber?: number;
   orgId: string;
   runDate: string;
   status: DeliveryRunStatusType;
@@ -411,6 +421,13 @@ export interface ActiveDeliveryRunSummary {
   pendingDeliveries: number;
   haulierId?: string;
   haulierName?: string;
+  vehicleId?: string;
+  vehicleName?: string;
+  vehicleCapacity?: number;
+  displayOrder: number;
+  // Computed fill info
+  totalTrolleysAssigned: number;
+  fillPercentage: number;
 }
 
 export interface CustomerTrolleySummary {

@@ -1,5 +1,5 @@
 import "server-only";
-import { addMonths, format, isBefore, startOfMonth } from "date-fns";
+import { addMonths, format, startOfMonth } from "date-fns";
 import { getUserAndOrg } from "@/server/auth/org";
 import type { PlanningSnapshot, PlanningBatch, PlanningBucket, ProtocolSummary } from "@/lib/planning/types";
 import type { ProductionProtocolRoute } from "@/lib/protocol-types";
@@ -43,36 +43,73 @@ const GHOST_STATUSES = new Set(["Incoming", "Planned"]);
 export async function getPlanningSnapshot(horizonMonths = 12): Promise<PlanningSnapshot> {
   const { supabase, orgId } = await getUserAndOrg();
 
-  const { data, error } = await supabase
-    .from("batches")
-    .select(
-      [
-        "id",
-        "batch_number",
-        "status",
-        "phase",
-        "quantity",
-        "reserved_quantity",
-        "ready_at",
-        "planted_at",
-        "parent_batch_id",
-        "protocol_id",
-        "plant_variety_id",
-        "size_id",
-        "plant_varieties(name)",
-        "plant_sizes(name)",
-        "nursery_locations(name)",
-      ].join(",")
-    )
-    .eq("org_id", orgId)
-    .order("ready_at", { ascending: true });
+  // Use SQL aggregation for buckets (much faster than JS aggregation)
+  // and fetch batch details in parallel
+  const startDate = format(startOfMonth(new Date()), "yyyy-MM-dd");
 
-  if (error) {
-    throw new Error(error.message);
+  const [bucketsResult, batchesResult] = await Promise.all([
+    // Aggregated buckets from SQL RPC
+    supabase.rpc("get_planning_buckets", {
+      p_org_id: orgId,
+      p_start_date: startDate,
+      p_horizon_months: horizonMonths,
+    }),
+    // Batch details for the planning view (still needed for detail displays)
+    supabase
+      .from("batches")
+      .select(
+        [
+          "id",
+          "batch_number",
+          "status",
+          "phase",
+          "quantity",
+          "reserved_quantity",
+          "ready_at",
+          "planted_at",
+          "parent_batch_id",
+          "protocol_id",
+          "plant_variety_id",
+          "size_id",
+          "plant_varieties(name)",
+          "plant_sizes(name)",
+          "nursery_locations(name)",
+        ].join(",")
+      )
+      .eq("org_id", orgId)
+      .order("ready_at", { ascending: true }),
+  ]);
+
+  if (batchesResult.error) {
+    throw new Error(batchesResult.error.message);
   }
 
-  const batches = (data ?? []).map(mapBatchRow).sort(sortByReadyDate);
-  const buckets = buildBuckets(batches, horizonMonths);
+  // Prefer SQL RPC buckets, but fall back to JS aggregation when the function
+  // is missing (e.g. migration not applied yet).
+  const buckets: PlanningBucket[] =
+    bucketsResult.error && batchesResult.data
+      ? buildBucketsFromBatches(batchesResult.data, startDate, horizonMonths)
+      : (bucketsResult.data ?? []).map((row: any) => ({
+          month: row.bucket_month,
+          label: row.bucket_label,
+          physical: Number(row.physical),
+          incoming: Number(row.incoming),
+          planned: Number(row.planned),
+        }));
+
+  if (bucketsResult.error && batchesResult.data) {
+    console.warn(
+      "[planning] get_planning_buckets RPC unavailable; using JS fallback:",
+      bucketsResult.error.message
+    );
+  }
+
+  if (bucketsResult.error && !batchesResult.data) {
+    // If both the RPC failed and we have no batch data, surface the RPC error.
+    throw new Error(bucketsResult.error.message);
+  }
+
+  const batches = (batchesResult.data ?? []).map(mapBatchRow).sort(sortByReadyDate);
 
   return {
     buckets,
@@ -132,41 +169,48 @@ function mapBatchRow(row: BatchRow): PlanningBatch {
   };
 }
 
-function buildBuckets(batches: PlanningBatch[], horizonMonths: number): PlanningBucket[] {
-  const start = startOfMonth(new Date());
-  const end = addMonths(start, horizonMonths);
-  const template: PlanningBucket[] = [];
+// buildBuckets is now handled by SQL RPC get_planning_buckets for performance
 
-  for (let i = 0; i < horizonMonths; i++) {
+function buildBucketsFromBatches(rows: BatchRow[], startDate: string, horizonMonths: number): PlanningBucket[] {
+  const start = startOfMonth(new Date(startDate));
+  const horizonEnd = addMonths(start, horizonMonths);
+
+  const buckets: PlanningBucket[] = Array.from({ length: horizonMonths }, (_, i) => {
     const monthDate = addMonths(start, i);
-    template.push({
+    return {
       month: format(monthDate, "yyyy-MM"),
       label: format(monthDate, "MMM yyyy"),
       physical: 0,
       incoming: 0,
       planned: 0,
-    });
-  }
+    };
+  });
 
-  for (const batch of batches) {
-    const date = parseDate(batch.readyDate ?? batch.startDate);
+  const bucketMap = new Map(buckets.map((b) => [b.month, b]));
+
+  for (const row of rows) {
+    const date = parseDate(row.ready_at) ?? parseDate(row.planted_at);
     if (!date) continue;
-    if (isBefore(date, start) || !isBefore(date, end)) continue;
+    if (date < start || date >= horizonEnd) continue;
 
-    const bucketKey = format(startOfMonth(date), "yyyy-MM");
-    const bucket = template.find((b) => b.month === bucketKey);
+    const monthKey = format(startOfMonth(date), "yyyy-MM");
+    const bucket = bucketMap.get(monthKey);
     if (!bucket) continue;
 
-    if (batch.status === "Incoming") {
-      bucket.incoming += batch.quantity;
-    } else if (batch.status === "Planned") {
-      bucket.planned += batch.quantity;
+    const qty = Number(row.quantity ?? 0);
+    if (!Number.isFinite(qty)) continue;
+
+    const status = row.status ?? "";
+    if (status === "Incoming") {
+      bucket.incoming += qty;
+    } else if (status === "Planned") {
+      bucket.planned += qty;
     } else {
-      bucket.physical += batch.quantity;
+      bucket.physical += qty;
     }
   }
 
-  return template;
+  return buckets;
 }
 
 function parseDate(value: string | null): Date | null {

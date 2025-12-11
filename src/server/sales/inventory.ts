@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { getUserAndOrg } from "@/server/auth/org";
 
 export type InventoryBatch = {
     id: string;
@@ -21,11 +21,51 @@ export type InventoryBatch = {
     salesPhotoUrl?: string;
 };
 
+/**
+ * Get saleable batches using optimized SQL RPC
+ * - Filtering, sorting, and availability calculations done in SQL
+ * - Returns only batches with available quantity > 0
+ * - Already sorted by FEFO (planting_date ASC, created_at ASC, grade ASC)
+ */
 export async function getSaleableBatches(): Promise<InventoryBatch[]> {
-    const supabase = await createClient();
+    const { supabase, orgId } = await getUserAndOrg();
 
-    // Fetch available batches based on status behavior = 'available'
-    // Include reserved_quantity to calculate true availability
+    // Use optimized RPC that does filtering/sorting in SQL
+    const { data, error } = await supabase.rpc("get_saleable_batches", {
+        p_org_id: orgId,
+    });
+
+    if (error) {
+        console.error("Error fetching saleable batches:", error);
+        // Fallback to direct query if RPC doesn't exist yet
+        return getSaleableBatchesFallback(supabase);
+    }
+
+    return (data || []).map((d: any) => ({
+        id: d.id,
+        batchNumber: d.batch_number,
+        plantVariety: d.plant_variety,
+        size: d.size,
+        status: d.status,
+        qcStatus: d.qc_status,
+        quantity: d.quantity,
+        reservedQuantity: d.reserved_quantity,
+        availableQuantity: d.available_quantity,
+        grade: d.grade,
+        location: d.location,
+        plantingDate: d.planting_date,
+        createdAt: d.created_at,
+        hidden: d.hidden,
+        category: d.category,
+        growerPhotoUrl: d.grower_photo_url,
+        salesPhotoUrl: d.sales_photo_url,
+    }));
+}
+
+/**
+ * Fallback query for when RPC is not yet deployed
+ */
+async function getSaleableBatchesFallback(supabase: any): Promise<InventoryBatch[]> {
     const { data, error } = await supabase
         .from("batches")
         .select(`
@@ -40,7 +80,7 @@ export async function getSaleableBatches(): Promise<InventoryBatch[]> {
         .gt("quantity", 0);
 
     if (error) {
-        console.error("Error fetching saleable batches:", error);
+        console.error("Error fetching saleable batches (fallback):", error);
         return [];
     }
 
@@ -70,6 +110,5 @@ export async function getSaleableBatches(): Promise<InventoryBatch[]> {
                 salesPhotoUrl: d.sales_photo_url,
             };
         })
-        // Filter out batches with no available quantity
         .filter((b) => b.availableQuantity > 0);
 }

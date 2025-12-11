@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Home, ShoppingCart, Package, FileText, BookOpen, User, LogOut, Menu } from 'lucide-react';
 import { logoutCustomer } from '@/app/b2b/login/actions';
+import { endImpersonation } from '@/app/b2b/impersonate/actions';
 import type { B2BAuthContext } from '@/lib/auth/b2b-guard';
 
 type B2BPortalLayoutProps = {
@@ -44,7 +45,7 @@ export function B2BPortalLayout({ authContext, children }: B2BPortalLayoutProps)
       {isImpersonating && (
         <div className="bg-amber-500 text-amber-950 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2">
           <span>Placing order on behalf of: {customer.name}</span>
-          <form action={logoutCustomer} className="inline">
+          <form action={endImpersonation} className="inline">
             <Button
               type="submit"
               variant="ghost"
