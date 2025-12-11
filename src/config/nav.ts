@@ -1,5 +1,5 @@
 
-import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, ClipboardList, Store } from "lucide-react";
+import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, ClipboardList, Store, Target } from "lucide-react";
 
 export type NavItem = {
   key: string;
@@ -48,6 +48,7 @@ export const APP_NAV: NavItem[] = [
     items: [
       { label: "Sales Dashboard", href: "/sales", description: "View recent orders and sales data." },
       { label: "Orders", href: "/sales/orders", description: "Manage all customer orders." },
+      { label: "Targets", href: "/sales/targets", description: "Customer targeting and van-filling." },
       { label: "Customers", href: "/sales/customers", description: "View and manage customers." },
       { label: "Products", href: "/sales/products", description: "Manage the sales catalog." },
     ]
@@ -83,6 +84,7 @@ export const APP_NAV: NavItem[] = [
 export const NAV_SALES = [
   { label: "Dashboard", href: "/sales", icon: LayoutDashboard, requiredRoles: [] },
   { label: "Orders", href: "/sales/orders", icon: ShoppingCart, requiredRoles: [] },
+  { label: "Targets", href: "/sales/targets", icon: Target, requiredRoles: [] },
   { label: "Customers", href: "/sales/customers", icon: Users, requiredRoles: [] },
   { label: "Products", href: "/sales/products", icon: PackageSearch, requiredRoles: [] },
 ];

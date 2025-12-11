@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ok, fail } from "@/server/utils/envelope";
 import { createPickListFromOrder } from "@/server/sales/picking";
 import { allocateForProductLine } from "@/server/sales/allocation";
+import { getSaleableBatches } from "@/server/sales/inventory";
 
 export async function GET(req: Request) {
   try {
@@ -132,17 +133,24 @@ export async function POST(req: Request) {
     }
 
     // ============================================================
-    // BULK ALLOCATION: Run allocations in parallel using Promise.all
+    // BULK ALLOCATION: Fetch inventory ONCE, then run allocations in parallel
+    // This prevents the "Parallel DoS" pattern where N order lines would
+    // each trigger a separate full inventory fetch
     // ============================================================
+    const fullInventory = await getSaleableBatches();
+
     const allocationPromises = input.lines.map(line =>
-      allocateForProductLine({
-        plantVariety: line.plantVariety || "",
-        size: line.size || "",
-        qty: line.qty,
-        specificBatchId: line.specificBatchId,
-        gradePreference: line.gradePreference,
-        preferredBatchNumbers: line.preferredBatchNumbers,
-      })
+      allocateForProductLine(
+        {
+          plantVariety: line.plantVariety || "",
+          size: line.size || "",
+          qty: line.qty,
+          specificBatchId: line.specificBatchId,
+          gradePreference: line.gradePreference,
+          preferredBatchNumbers: line.preferredBatchNumbers,
+        },
+        fullInventory // Pass pre-fetched inventory to avoid N redundant queries
+      )
     );
 
     const allAllocations = await Promise.all(allocationPromises);

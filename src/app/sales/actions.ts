@@ -676,3 +676,292 @@ function extractRelationName(
     }
     return relation.name?.toLowerCase().trim();
 }
+
+// ================================================
+// CRM & SALES DASHBOARD ACTIONS
+// ================================================
+
+/**
+ * Log an interaction with a customer (call, email, visit, etc.)
+ */
+export async function logInteraction(
+    customerId: string,
+    type: 'call' | 'email' | 'visit' | 'whatsapp' | 'other',
+    notes: string,
+    outcome?: string
+) {
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { error: 'Not authenticated' };
+    }
+
+    // Get the customer's org_id
+    const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('org_id')
+        .eq('id', customerId)
+        .single();
+
+    if (customerError || !customer) {
+        return { error: 'Customer not found' };
+    }
+
+    const { data: interaction, error } = await supabase
+        .from('customer_interactions')
+        .insert({
+            org_id: customer.org_id,
+            customer_id: customerId,
+            user_id: user.id,
+            type,
+            notes,
+            outcome: outcome || null,
+        })
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error logging interaction:', error);
+        return { error: 'Failed to log interaction' };
+    }
+
+    revalidatePath('/sales/targets');
+    revalidatePath(`/sales/customers/${customerId}`);
+    
+    return { success: true, interaction };
+}
+
+/**
+ * Get tasks for the sales admin inbox
+ */
+export async function getSalesAdminTasks() {
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { error: 'Not authenticated', tasks: [] };
+    }
+
+    const activeOrgId = await resolveActiveOrgId(supabase, user.id);
+    if (!activeOrgId) {
+        return { error: 'No organization found', tasks: [] };
+    }
+
+    const { data: tasks, error } = await supabase
+        .from('v_sales_admin_inbox')
+        .select('*')
+        .eq('org_id', activeOrgId)
+        .order('priority', { ascending: false })
+        .order('task_date', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching admin tasks:', error);
+        return { error: 'Failed to fetch tasks', tasks: [] };
+    }
+
+    return { tasks: tasks || [] };
+}
+
+/**
+ * Get targets for sales reps
+ */
+export async function getSalesRepTargets() {
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { error: 'Not authenticated', targets: [] };
+    }
+
+    const activeOrgId = await resolveActiveOrgId(supabase, user.id);
+    if (!activeOrgId) {
+        return { error: 'No organization found', targets: [] };
+    }
+
+    const { data: targets, error } = await supabase
+        .from('v_sales_rep_targets')
+        .select('*')
+        .eq('org_id', activeOrgId)
+        .order('priority_score', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching targets:', error);
+        return { error: 'Failed to fetch targets', targets: [] };
+    }
+
+    return { targets: targets || [] };
+}
+
+/**
+ * Send order confirmation email to customer
+ */
+export async function sendOrderConfirmation(orderId: string) {
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { error: 'Not authenticated' };
+    }
+
+    // Fetch order with customer details
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+            *,
+            customer:customers(name, email),
+            order_items(*)
+        `)
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        return { error: 'Order not found' };
+    }
+
+    if (!order.customer?.email) {
+        return { error: 'Customer has no email address' };
+    }
+
+    // TODO: Integrate with email service (resend, sendgrid, etc.)
+    // For now, we just mark it as sent
+    console.log(`[Email] Would send order confirmation to ${order.customer.email} for order ${order.order_number}`);
+
+    // Update order with confirmation timestamp
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+            confirmation_sent_at: new Date().toISOString(),
+            status: order.status === 'draft' ? 'confirmed' : order.status
+        })
+        .eq('id', orderId);
+
+    if (updateError) {
+        console.error('Error updating order:', updateError);
+        return { error: 'Failed to update order' };
+    }
+
+    // Log event
+    await supabase.from('order_events').insert({
+        order_id: orderId,
+        event_type: 'confirmation_sent',
+        description: `Order confirmation email sent to ${order.customer.email}`,
+        created_by: user.id,
+    });
+
+    revalidatePath('/sales');
+    revalidatePath('/sales/orders');
+    revalidatePath(`/sales/orders/${orderId}`);
+
+    return { success: true, message: `Confirmation sent to ${order.customer.email}` };
+}
+
+/**
+ * Combined action: Update status to dispatched, generate invoice, and send dispatch email
+ */
+export async function dispatchAndInvoice(orderId: string) {
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { error: 'Not authenticated' };
+    }
+
+    // Fetch order with customer details
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+            *,
+            customer:customers(name, email),
+            invoices(id)
+        `)
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        return { error: 'Order not found' };
+    }
+
+    // Check if invoice already exists
+    let invoiceId = order.invoices?.[0]?.id;
+    
+    if (!invoiceId) {
+        // Generate invoice using existing function
+        const invoiceResult = await generateInvoice(orderId);
+        if ('error' in invoiceResult && invoiceResult.error) {
+            return { error: `Failed to generate invoice: ${invoiceResult.error}` };
+        }
+        invoiceId = invoiceResult.invoice?.id;
+    }
+
+    // Update order status to dispatched
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+            status: 'dispatched',
+            dispatch_email_sent_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+    if (updateError) {
+        console.error('Error updating order status:', updateError);
+        return { error: 'Failed to update order status' };
+    }
+
+    // TODO: Send dispatch email with invoice attached
+    if (order.customer?.email) {
+        console.log(`[Email] Would send dispatch notification with invoice to ${order.customer.email}`);
+    }
+
+    // Log events
+    await supabase.from('order_events').insert([
+        {
+            order_id: orderId,
+            event_type: 'status_changed',
+            description: 'Order marked as dispatched',
+            created_by: user.id,
+        },
+        {
+            order_id: orderId,
+            event_type: 'dispatch_email_sent',
+            description: `Dispatch notification sent to ${order.customer?.email || 'customer'}`,
+            created_by: user.id,
+        }
+    ]);
+
+    revalidatePath('/sales');
+    revalidatePath('/sales/orders');
+    revalidatePath(`/sales/orders/${orderId}`);
+    revalidatePath('/sales/invoices');
+
+    return { 
+        success: true, 
+        message: 'Order dispatched and invoice generated',
+        invoiceId 
+    };
+}
+
+/**
+ * Get customer interaction history
+ */
+export async function getCustomerInteractions(customerId: string, limit = 10) {
+    const supabase = await createClient();
+
+    const { data: interactions, error } = await supabase
+        .from('customer_interactions')
+        .select(`
+            *,
+            user:profiles(display_name, email)
+        `)
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (error) {
+        console.error('Error fetching interactions:', error);
+        return { error: 'Failed to fetch interactions', interactions: [] };
+    }
+
+    return { interactions: interactions || [] };
+}

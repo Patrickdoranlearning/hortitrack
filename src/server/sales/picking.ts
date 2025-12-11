@@ -34,6 +34,7 @@ export interface PickList {
   orgId: string;
   orderId: string;
   assignedTeamId?: string;
+  assignedUserId?: string;
   sequence: number;
   status: PickListStatus;
   startedAt?: string;
@@ -48,6 +49,8 @@ export interface PickList {
   customerName?: string;
   requestedDeliveryDate?: string;
   teamName?: string;
+  assignedUserName?: string;
+  county?: string;
   totalItems?: number;
   pickedItems?: number;
   totalQty?: number;
@@ -614,7 +617,8 @@ export async function getPickListsForOrg(
       .select(`
         *,
         orders(order_number, status, requested_delivery_date, customer_id,
-          customers(name)
+          customers(name),
+          customer_addresses(county)
         ),
         picking_teams(name)
       `)
@@ -652,6 +656,115 @@ export async function getPickListsForOrg(
   }
 }
 
+/**
+ * Get all orders that need picking - including orders without pick lists created yet
+ * This shows a complete view of what needs to be picked
+ */
+export async function getOrdersForPicking(orgId: string): Promise<PickList[]> {
+  const supabase = await getSupabaseServerApp();
+
+  try {
+    // Fetch all orders in confirmed or picking status
+    const { data: ordersData, error: ordersError } = await supabase
+      .from("orders")
+      .select(`
+        id,
+        order_number,
+        status,
+        requested_delivery_date,
+        customer_id,
+        customers(name),
+        customer_addresses(county),
+        pick_lists(
+          id,
+          sequence,
+          status,
+          assigned_team_id,
+          assigned_user_id,
+          started_at,
+          completed_at,
+          started_by,
+          completed_by,
+          notes,
+          created_at,
+          picking_teams(name)
+        )
+      `)
+      .eq("org_id", orgId)
+      .in("status", ["confirmed", "picking"])
+      .order("requested_delivery_date", { ascending: true });
+
+    if (ordersError) {
+      console.error("Error fetching orders for picking:", ordersError);
+      return [];
+    }
+
+    // Transform orders into pick list format for consistent display
+    const results: PickList[] = [];
+    let sequenceCounter = 1;
+
+    for (const order of ordersData || []) {
+      const pickLists = Array.isArray(order.pick_lists) 
+        ? order.pick_lists 
+        : (order.pick_lists ? [order.pick_lists] : []);
+      
+      // Handle customer_addresses which could be an array or object
+      const addresses = order.customer_addresses;
+      const address = Array.isArray(addresses) ? addresses[0] : addresses;
+
+      if (pickLists.length > 0) {
+        // Order has pick list(s) - include them if pending or in_progress
+        for (const pl of pickLists) {
+          if (pl.status === 'pending' || pl.status === 'in_progress') {
+            results.push({
+              id: pl.id,
+              orgId: orgId,
+              orderId: order.id,
+              assignedTeamId: pl.assigned_team_id,
+              assignedUserId: pl.assigned_user_id,
+              sequence: pl.sequence || sequenceCounter++,
+              status: pl.status,
+              startedAt: pl.started_at,
+              completedAt: pl.completed_at,
+              startedBy: pl.started_by,
+              completedBy: pl.completed_by,
+              notes: pl.notes,
+              createdAt: pl.created_at,
+              orderNumber: order.order_number,
+              orderStatus: order.status,
+              customerName: order.customers?.name,
+              requestedDeliveryDate: order.requested_delivery_date,
+              teamName: pl.picking_teams?.name,
+              county: address?.county,
+            });
+          }
+        }
+      } else {
+        // Order doesn't have a pick list yet - create a virtual one for display
+        // This allows users to see orders that need picking
+        results.push({
+          id: `pending-${order.id}`, // Virtual ID
+          orgId: orgId,
+          orderId: order.id,
+          sequence: sequenceCounter++,
+          status: 'pending' as PickListStatus,
+          createdAt: new Date().toISOString(),
+          orderNumber: order.order_number,
+          orderStatus: order.status,
+          customerName: order.customers?.name,
+          requestedDeliveryDate: order.requested_delivery_date,
+          county: address?.county,
+        });
+      }
+    }
+
+    return results;
+  } catch (e) {
+    console.error("Exception fetching orders for picking:", e);
+    return [];
+  }
+}
+
 export async function getPickListById(pickListId: string): Promise<PickList | null> {
   const supabase = await getSupabaseServerApp();
 
@@ -660,7 +773,8 @@ export async function getPickListById(pickListId: string): Promise<PickList | nu
     .select(`
       *,
       orders(order_number, status, requested_delivery_date, customer_id,
-        customers(name)
+        customers(name),
+        customer_addresses(county)
       ),
       picking_teams(name)
     `)
@@ -676,11 +790,16 @@ export async function getPickListById(pickListId: string): Promise<PickList | nu
 }
 
 function mapPickListRow(row: any): PickList {
+  // Handle customer_addresses which could be an array or object
+  const addresses = row.orders?.customer_addresses;
+  const address = Array.isArray(addresses) ? addresses[0] : addresses;
+  
   return {
     id: row.id,
     orgId: row.org_id,
     orderId: row.order_id,
     assignedTeamId: row.assigned_team_id,
+    assignedUserId: row.assigned_user_id,
     sequence: row.sequence,
     status: row.status,
     startedAt: row.started_at,
@@ -694,6 +813,7 @@ function mapPickListRow(row: any): PickList {
     customerName: row.orders?.customers?.name,
     requestedDeliveryDate: row.orders?.requested_delivery_date,
     teamName: row.picking_teams?.name,
+    county: address?.county,
   };
 }
 
@@ -902,6 +1022,99 @@ export async function getPickItems(pickListId: string): Promise<PickItem[]> {
     pickedBatchNumber: row.picked_batch?.batch_number,
     batchLocation: row.original_batch?.nursery_locations?.name || row.picked_batch?.nursery_locations?.name,
   }));
+}
+
+/**
+ * Fetch pick items for multiple pick lists at once (for combined picking)
+ * Returns items with their associated pick list info for order attribution
+ */
+export async function getPickItemsForMultipleLists(pickListIds: string[]): Promise<{
+  items: (PickItem & { orderNumber?: string; customerName?: string })[];
+  pickLists: { id: string; orderNumber?: string; customerName?: string }[];
+}> {
+  const supabase = await getSupabaseServerApp();
+
+  if (pickListIds.length === 0) {
+    return { items: [], pickLists: [] };
+  }
+
+  // Fetch pick lists with order info
+  const { data: pickListsData } = await supabase
+    .from("pick_lists")
+    .select(`
+      id,
+      orders(
+        order_number,
+        customers(name)
+      )
+    `)
+    .in("id", pickListIds);
+
+  const pickListMap = new Map<string, { orderNumber?: string; customerName?: string }>();
+  const pickLists = (pickListsData || []).map((pl: any) => {
+    const info = {
+      id: pl.id,
+      orderNumber: pl.orders?.order_number,
+      customerName: pl.orders?.customers?.name,
+    };
+    pickListMap.set(pl.id, info);
+    return info;
+  });
+
+  // Fetch all pick items for these lists
+  const { data, error } = await supabase
+    .from("pick_items")
+    .select(`
+      *,
+      order_items(
+        description,
+        quantity,
+        skus(
+          code,
+          plant_varieties(name),
+          plant_sizes(name)
+        ),
+        products(name)
+      ),
+      original_batch:original_batch_id(batch_number, nursery_locations(name)),
+      picked_batch:picked_batch_id(batch_number, nursery_locations(name))
+    `)
+    .in("pick_list_id", pickListIds)
+    .order("created_at");
+
+  if (error) {
+    console.error("Error fetching pick items for multiple lists:", error);
+    return { items: [], pickLists };
+  }
+
+  const items = (data || []).map((row: any) => {
+    const pickListInfo = pickListMap.get(row.pick_list_id);
+    return {
+      id: row.id,
+      pickListId: row.pick_list_id,
+      orderItemId: row.order_item_id,
+      targetQty: row.target_qty,
+      pickedQty: row.picked_qty,
+      status: row.status,
+      originalBatchId: row.original_batch_id,
+      pickedBatchId: row.picked_batch_id,
+      substitutionReason: row.substitution_reason,
+      notes: row.notes,
+      pickedAt: row.picked_at,
+      pickedBy: row.picked_by,
+      locationHint: row.location_hint,
+      productName: row.order_items?.products?.name || row.order_items?.description,
+      plantVariety: row.order_items?.skus?.plant_varieties?.name,
+      size: row.order_items?.skus?.plant_sizes?.name,
+      originalBatchNumber: row.original_batch?.batch_number,
+      pickedBatchNumber: row.picked_batch?.batch_number,
+      batchLocation: row.original_batch?.nursery_locations?.name || row.picked_batch?.nursery_locations?.name,
+      orderNumber: pickListInfo?.orderNumber,
+      customerName: pickListInfo?.customerName,
+    };
+  });
+
+  return { items, pickLists };
 }
 
 export async function updatePickItem(

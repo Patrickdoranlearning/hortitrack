@@ -19,7 +19,14 @@ export const NewOrderSchema = z.object({
 export type NewOrder = z.infer<typeof NewOrderSchema>;
 
 export async function listOrders(params: { page?: number; pageSize?: number; status?: string } = {}): Promise<{
-  orders: Array<Order & { org_id: string; order_number: string; total_inc_vat: number | null; requested_delivery_date: string | null; customer?: { name: string | null } | null }>;
+  orders: Array<Order & { 
+    org_id: string; 
+    order_number: string; 
+    total_inc_vat: number | null; 
+    requested_delivery_date: string | null; 
+    customer?: { name: string | null } | null;
+    ship_to_address?: { county: string | null; city: string | null } | null;
+  }>;
   total: number;
   page: number;
   pageSize: number;
@@ -33,7 +40,7 @@ export async function listOrders(params: { page?: number; pageSize?: number; sta
   // Removed count: "exact" for performance - use estimated count or cursor pagination instead
   let query = supabase
     .from("orders")
-    .select("*, customers(name)", { count: "estimated" })
+    .select("*, customers(name), customer_addresses!orders_ship_to_address_id_fkey(county, city)", { count: "estimated" })
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -54,12 +61,18 @@ export async function listOrders(params: { page?: number; pageSize?: number; sta
     customer_id: d.customer_id,
     status: d.status,
     created_at: d.created_at,
+    updated_at: d.updated_at,
     requested_delivery_date: d.requested_delivery_date,
     subtotal_ex_vat: d.subtotal_ex_vat ?? null,
     vat_amount: d.vat_amount ?? null,
     total_inc_vat: d.total_inc_vat ?? null,
+    notes: d.notes ?? null,
     customerName: d.customers?.name || "Unknown",
     customer: d.customers ? { name: d.customers.name } : null,
+    ship_to_address: d.customer_addresses ? { 
+      county: d.customer_addresses.county, 
+      city: d.customer_addresses.city 
+    } : null,
   }));
 
   return { orders: mapped, total: count ?? mapped.length, page, pageSize };
