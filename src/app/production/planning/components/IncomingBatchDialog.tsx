@@ -71,31 +71,49 @@ function getWeekOptions(): number[] {
   return Array.from({ length: 52 }, (_, i) => i + 1);
 }
 
-const formSchema = z.object({
-  plantVarietyId: z.string().min(1, "Variety is required"),
-  sizeId: z.string().min(1, "Size is required"),
-  supplierId: z.string().optional(),
-  units: z
-    .preprocess((val) => (val === "" || val === null ? undefined : Number(val)), z.number().int().positive())
-    .optional(),
-  containers: z
-    .preprocess((val) => (val === "" || val === null ? undefined : Number(val)), z.number().int().positive())
-    .optional(),
-  expectedYear: z.preprocess(
-    (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().int().min(2024).max(2035)
-  ),
-  expectedWeek: z.preprocess(
-    (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().int().min(1).max(53)
-  ),
-  reference: z.string().max(120).optional(),
-  notes: z.string().max(1000).optional(),
-  locationId: z.string().optional(),
-}).refine((value) => value.units || value.containers, {
-  message: "Provide units or containers",
-  path: ["units"],
-});
+const formSchema = z
+  .object({
+    plantVarietyId: z.string().min(1, "Variety is required"),
+    sizeId: z.string().min(1, "Size is required"),
+    supplierId: z.string().optional(),
+    units: z
+      .preprocess((val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      }, z.number().int().positive())
+      .optional(),
+    containers: z
+      .preprocess((val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      }, z.number().int().positive())
+      .optional(),
+    expectedYear: z.preprocess(
+      (val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      },
+      z.number().int().min(2024).max(2035)
+    ),
+    expectedWeek: z.preprocess(
+      (val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      },
+      z.number().int().min(1).max(53)
+    ),
+    reference: z.string().max(120).optional(),
+    notes: z.string().max(1000).optional(),
+    locationId: z.string().optional(),
+  })
+  .refine((value) => value.units || value.containers, {
+    message: "Provide units or containers",
+    path: ["units"],
+  });
 
 const OPTIONAL_SELECT_VALUE = "__optional__";
 
@@ -232,6 +250,30 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
   const suppliers = refData?.suppliers ?? [];
   const locations = refData?.locations ?? [];
 
+  // Auto-calc units from trays when size has a cell multiple
+  const watchedSizeId = form.watch("sizeId");
+  const watchedContainers = form.watch("containers");
+  const selectedSize = sizes.find((s) => s.id === watchedSizeId);
+  const cellMultiple = selectedSize?.cell_multiple ?? 1;
+  const isTraySize = cellMultiple > 1;
+
+  const updateUnitsFromContainers = React.useCallback(
+    (containersValue?: number) => {
+      if (!isTraySize) return;
+      const source = typeof containersValue === "number" ? containersValue : watchedContainers;
+      if (source && source > 0) {
+        form.setValue("units", source * cellMultiple, { shouldValidate: true, shouldDirty: true });
+      } else {
+        form.setValue("units", undefined, { shouldValidate: true, shouldDirty: true });
+      }
+    },
+    [cellMultiple, form, isTraySize, watchedContainers]
+  );
+
+  React.useEffect(() => {
+    updateUnitsFromContainers();
+  }, [updateUnitsFromContainers, watchedContainers, cellMultiple, isTraySize]);
+
   return (
     <Dialog open={open} onOpenChange={(value) => !submitting && onOpenChange(value)}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -315,7 +357,20 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                       <FormItem>
                         <FormLabel>Total units</FormLabel>
                         <FormControl>
-                          <Input type="number" min={1} {...field} value={field.value ?? ""} />
+                          <Input
+                            type="number"
+                            min={1}
+                            readOnly={isTraySize}
+                            className={isTraySize ? "bg-muted" : ""}
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              if (!isTraySize) {
+                                const next = e.target.value === "" ? undefined : Number(e.target.value);
+                                field.onChange(next);
+                              }
+                            }}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -328,8 +383,25 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                       <FormItem>
                         <FormLabel>Containers</FormLabel>
                         <FormControl>
-                          <Input type="number" min={1} {...field} value={field.value ?? ""} />
+                          <Input
+                            type="number"
+                            min={1}
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              const next = e.target.value === "" ? undefined : Number(e.target.value);
+                              field.onChange(next);
+                              updateUnitsFromContainers(next);
+                            }}
+                          />
                         </FormControl>
+                        {isTraySize && (
+                          <FormDescription>
+                            {watchedContainers && watchedContainers > 0
+                              ? `${watchedContainers} × ${cellMultiple} cells = ${(watchedContainers * cellMultiple).toLocaleString()} units`
+                              : "Enter number of trays to calculate total units"}
+                          </FormDescription>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}

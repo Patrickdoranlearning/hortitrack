@@ -141,13 +141,166 @@ export async function createRunAndAssign(orderId: string, haulierId: string, dat
       status: "planned"
     });
     
-    // Assign order
-    await assignOrderToRun(orderId, runId);
+    // Assign order if provided
+    if (orderId) {
+      await assignOrderToRun(orderId, runId);
+    }
     
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true, runId };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Create a new empty delivery load (no orders assigned yet)
+ */
+export async function createEmptyRoute(
+  date: string, 
+  haulierId?: string, 
+  vehicleId?: string,
+  loadName?: string
+) {
+  try {
+    const runId = await createDeliveryRun({
+      runDate: date,
+      haulierId: haulierId === 'default' ? undefined : haulierId,
+      vehicleId: vehicleId === 'default' ? undefined : vehicleId,
+      loadName,
+    });
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    return { success: true, runId };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Update a delivery load's details
+ */
+export async function updateLoad(
+  loadId: string, 
+  updates: { loadName?: string; haulierId?: string; vehicleId?: string; runDate?: string }
+) {
+  try {
+    const supabase = await createClient();
+    
+    const dbUpdates: Record<string, any> = {};
+    if (updates.loadName !== undefined) dbUpdates.load_name = updates.loadName;
+    if (updates.haulierId !== undefined) dbUpdates.haulier_id = updates.haulierId || null;
+    if (updates.vehicleId !== undefined) dbUpdates.vehicle_id = updates.vehicleId || null;
+    if (updates.runDate !== undefined) dbUpdates.run_date = updates.runDate;
+    
+    const { error } = await supabase
+      .from("delivery_runs")
+      .update(dbUpdates)
+      .eq("id", loadId);
+      
+    if (error) throw error;
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Delete a delivery load - only allowed if no orders are assigned
+ */
+export async function deleteLoad(loadId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Check if any orders are assigned to this load
+    const { data: items, error: checkError } = await supabase
+      .from("delivery_items")
+      .select("id")
+      .eq("delivery_run_id", loadId)
+      .limit(1);
+      
+    if (checkError) throw checkError;
+    
+    if (items && items.length > 0) {
+      return { error: "Cannot delete load with assigned orders. Remove all orders first." };
+    }
+    
+    // Delete the load
+    const { error } = await supabase
+      .from("delivery_runs")
+      .delete()
+      .eq("id", loadId);
+      
+    if (error) throw error;
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Reorder loads by updating their display_order
+ */
+export async function reorderLoads(loadIds: string[]) {
+  try {
+    const supabase = await createClient();
+    
+    // Update display_order for each load
+    const updates = loadIds.map((id, index) => 
+      supabase
+        .from("delivery_runs")
+        .update({ display_order: index })
+        .eq("id", id)
+    );
+    
+    await Promise.all(updates);
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Remove an order from a load (unassign from delivery run)
+ */
+export async function removeOrderFromLoad(orderId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Delete the delivery item linking order to run
+    const { error } = await supabase
+      .from("delivery_items")
+      .delete()
+      .eq("order_id", orderId);
+      
+    if (error) throw error;
+    
+    // Reset order status back to confirmed if it was ready_for_dispatch
+    await supabase
+      .from("orders")
+      .update({ status: "confirmed" })
+      .eq("id", orderId)
+      .eq("status", "ready_for_dispatch");
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    return { success: true };
   } catch (error: any) {
     return { error: error.message };
   }

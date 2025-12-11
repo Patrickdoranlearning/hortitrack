@@ -16,9 +16,9 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
     const limit = Math.min(Number(searchParams.get("limit") || 50), 200);
 
-    // Base select
+    // Base select - removed count: "exact" for performance (avoids full table scan)
     let q = supabase.from("orders")
-      .select("id, customer_id, status, created_at, customers(name)", { count: "exact" })
+      .select("id, customer_id, status, created_at, customers(name)")
       .order("created_at", { ascending: false })
       .limit(limit);
     if (status && status !== "all") q = q.eq("status", status);
@@ -67,7 +67,87 @@ export async function POST(req: Request) {
     }
     const input = parsed.data;
 
-    // Resolve SKUs, check availability, and pre-compute allocations
+    // ============================================================
+    // BULK RESOLVE: Fetch all varieties, sizes, and SKUs in 3 queries
+    // instead of 3*N sequential queries (N+1 elimination)
+    // ============================================================
+
+    // Extract unique variety names and size names from all lines
+    const varietyNames = [...new Set(input.lines.map(l => l.plantVariety).filter(Boolean))];
+    const sizeNames = [...new Set(input.lines.map(l => l.size).filter(Boolean))];
+
+    // Parallel bulk fetch: varieties, sizes
+    const [varietiesResult, sizesResult] = await Promise.all([
+      supabase.from('plant_varieties').select('id, name').in('name', varietyNames),
+      supabase.from('plant_sizes').select('id, name').in('name', sizeNames),
+    ]);
+
+    // Build lookup maps for O(1) access
+    const varietyMap = new Map<string, string>();
+    (varietiesResult.data ?? []).forEach(v => varietyMap.set(v.name, v.id));
+
+    const sizeMap = new Map<string, string>();
+    (sizesResult.data ?? []).forEach(s => sizeMap.set(s.name, s.id));
+
+    // Validate all varieties and sizes exist before proceeding
+    for (const line of input.lines) {
+      if (!varietyMap.has(line.plantVariety)) {
+        return fail(400, "invalid_product", `Variety not found: ${line.plantVariety}`);
+      }
+      if (!sizeMap.has(line.size)) {
+        return fail(400, "invalid_product", `Size not found: ${line.size}`);
+      }
+    }
+
+    // Build array of (variety_id, size_id) pairs for SKU lookup
+    const skuLookupPairs = input.lines.map(line => ({
+      varietyId: varietyMap.get(line.plantVariety)!,
+      sizeId: sizeMap.get(line.size)!,
+      key: `${varietyMap.get(line.plantVariety)}-${sizeMap.get(line.size)}`,
+    }));
+
+    // Bulk fetch SKUs for this org matching any of our variety/size combinations
+    const uniqueVarietyIds = [...new Set(skuLookupPairs.map(p => p.varietyId))];
+    const uniqueSizeIds = [...new Set(skuLookupPairs.map(p => p.sizeId))];
+
+    const { data: skusData } = await supabase
+      .from('skus')
+      .select('id, plant_variety_id, size_id')
+      .eq('org_id', activeOrgId)
+      .in('plant_variety_id', uniqueVarietyIds)
+      .in('size_id', uniqueSizeIds);
+
+    // Build SKU lookup map: "varietyId-sizeId" -> skuId
+    const skuMap = new Map<string, string>();
+    (skusData ?? []).forEach(sku => {
+      skuMap.set(`${sku.plant_variety_id}-${sku.size_id}`, sku.id);
+    });
+
+    // Validate all SKUs exist
+    for (const line of input.lines) {
+      const key = `${varietyMap.get(line.plantVariety)}-${sizeMap.get(line.size)}`;
+      if (!skuMap.has(key)) {
+        return fail(400, "no_sku", `SKU not found for: ${line.plantVariety} ${line.size}`);
+      }
+    }
+
+    // ============================================================
+    // BULK ALLOCATION: Run allocations in parallel using Promise.all
+    // ============================================================
+    const allocationPromises = input.lines.map(line =>
+      allocateForProductLine({
+        plantVariety: line.plantVariety || "",
+        size: line.size || "",
+        qty: line.qty,
+        specificBatchId: line.specificBatchId,
+        gradePreference: line.gradePreference,
+        preferredBatchNumbers: line.preferredBatchNumbers,
+      })
+    );
+
+    const allAllocations = await Promise.all(allocationPromises);
+
+    // Build prepared lines with resolved SKUs and allocations
     const preparedLines: {
       skuId: string;
       qty: number;
@@ -76,44 +156,11 @@ export async function POST(req: Request) {
       description: string;
       allocations: { batchId: string; qty: number }[];
     }[] = [];
-    for (const line of input.lines) {
-      // Find SKU by Variety + Size
-      // We need to resolve Variety ID and Size ID first
-      const { data: variety } = await supabase
-        .from('plant_varieties')
-        .select('id')
-        .eq('name', line.plantVariety)
-        .maybeSingle();
-      const { data: size } = await supabase
-        .from('plant_sizes')
-        .select('id')
-        .eq('name', line.size)
-        .maybeSingle();
 
-      if (!variety || !size) {
-        return fail(400, "invalid_product", `Product not found: ${line.plantVariety} ${line.size}`);
-      }
-
-      const { data: sku } = await supabase
-        .from('skus')
-        .select('id')
-        .eq('plant_variety_id', variety.id)
-        .eq('size_id', size.id)
-        .eq('org_id', activeOrgId)
-        .maybeSingle();
-
-      if (!sku) {
-        return fail(400, "no_sku", `SKU not found for: ${line.plantVariety} ${line.size}`);
-      }
-
-      const allocations = await allocateForProductLine({
-        plantVariety: line.plantVariety || "",
-        size: line.size || "",
-        qty: line.qty,
-        specificBatchId: line.specificBatchId,
-        gradePreference: line.gradePreference,
-        preferredBatchNumbers: line.preferredBatchNumbers,
-      });
+    for (let i = 0; i < input.lines.length; i++) {
+      const line = input.lines[i];
+      const allocations = allAllocations[i];
+      const skuKey = `${varietyMap.get(line.plantVariety)}-${sizeMap.get(line.size)}`;
 
       const totalAllocated = allocations.reduce((sum, a) => sum + a.qty, 0);
       if (totalAllocated < line.qty) {
@@ -125,10 +172,10 @@ export async function POST(req: Request) {
       }
 
       preparedLines.push({
-        skuId: sku.id,
+        skuId: skuMap.get(skuKey)!,
         qty: line.qty,
-        unitPrice: line.unitPrice ?? 0, // Should fetch from price list or SKU default
-        vatRate: line.vatRate ?? 13.5, // Default
+        unitPrice: line.unitPrice ?? 0,
+        vatRate: line.vatRate ?? 13.5,
         description: line.description ?? `${line.plantVariety} - ${line.size}`,
         allocations,
       });

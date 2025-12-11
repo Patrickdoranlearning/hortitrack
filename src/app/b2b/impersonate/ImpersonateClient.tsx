@@ -72,12 +72,6 @@ export function ImpersonateClient({ customers, activeSession }: ImpersonateClien
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Customer Impersonation</h1>
-        <p className="text-muted-foreground">
-          Place orders on behalf of customers (sales reps only)
-        </p>
-      </div>
 
       {activeSession && activeSession.customers && (
         <Alert>

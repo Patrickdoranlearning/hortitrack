@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { Haulier } from "@/lib/types";
+import type { Haulier, HaulierVehicle, HaulierWithVehicles } from "@/lib/types";
 import { listAttributeOptions } from "@/server/attributeOptions/service";
 import { getUserAndOrg } from "@/server/auth/org";
 import type { AttributeOption } from "@/lib/attributeOptions";
@@ -70,40 +70,143 @@ export async function listDeliveryRuns(
 }
 
 /**
- * Get active delivery runs with item counts
+ * Get active delivery runs with item counts and fill status
  */
 export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[]> {
   const { orgId, supabase } = await getUserAndOrg();
 
-  const { data, error } = await supabase
-    .from("v_active_delivery_runs")
+  // Query delivery runs separately from hauliers to avoid join issues
+  const { data: runsData, error: runsError } = await supabase
+    .from("delivery_runs")
     .select("*")
-    .eq("org_id", orgId);
+    .eq("org_id", orgId)
+    .in("status", ["planned", "loading", "in_transit"])
+    .order("run_date", { ascending: true });
 
-  if (error) {
-    console.error("Error fetching active delivery runs:", error);
-    throw error;
+  if (runsError) {
+    console.error("Error fetching delivery runs:", runsError);
+    // Return empty array instead of throwing to allow page to load
+    return [];
   }
 
-  return data.map((d: any) => ({
-    id: d.id,
-    runNumber: d.run_number,
-    orgId: d.org_id,
-    runDate: d.run_date,
-    status: d.status,
-    driverName: d.driver_name,
-    vehicleRegistration: d.vehicle_registration,
-    trolleysLoaded: d.trolleys_loaded,
-    trolleysReturned: d.trolleys_returned,
-    trolleysOutstanding: d.trolleys_outstanding,
-    totalDeliveries: d.total_deliveries,
-    completedDeliveries: d.completed_deliveries,
-    pendingDeliveries: d.pending_deliveries,
-    haulierId: d.haulier_id,
-    haulierName: d.hauliers?.name // Note: v_active_delivery_runs view might need hauliers joined or it might not be there. 
-                                  // If it's not in the view, this will be undefined. 
-                                  // Ideally the view should include it.
-  }));
+  if (!runsData || runsData.length === 0) {
+    return [];
+  }
+
+  // Fetch hauliers separately
+  const haulierIds = [...new Set(runsData.map((r: any) => r.haulier_id).filter(Boolean))];
+  let hauliersMap: Record<string, { name: string; trolleyCapacity: number }> = {};
+  
+  if (haulierIds.length > 0) {
+    const { data: hauliersData } = await supabase
+      .from("hauliers")
+      .select("id, name, trolley_capacity")
+      .in("id", haulierIds);
+    
+    for (const h of hauliersData || []) {
+      hauliersMap[h.id] = {
+        name: h.name,
+        trolleyCapacity: h.trolley_capacity ?? 20,
+      };
+    }
+  }
+
+  // Fetch vehicles separately
+  const vehicleIds = [...new Set(runsData.map((r: any) => r.vehicle_id).filter(Boolean))];
+  let vehiclesMap: Record<string, { name: string; trolleyCapacity: number }> = {};
+  
+  if (vehicleIds.length > 0) {
+    const { data: vehiclesData } = await supabase
+      .from("haulier_vehicles")
+      .select("id, name, trolley_capacity")
+      .in("id", vehicleIds);
+    
+    for (const v of vehiclesData || []) {
+      vehiclesMap[v.id] = {
+        name: v.name,
+        trolleyCapacity: v.trolley_capacity ?? 10,
+      };
+    }
+  }
+
+  // Get trolley totals for each run from delivery_items joined with orders
+  const runIds = runsData.map((r: any) => r.id);
+  let trolleyTotals: Record<string, { totalTrolleys: number; orderCount: number }> = {};
+  
+  if (runIds.length > 0) {
+    const { data: itemsData } = await supabase
+      .from("delivery_items")
+      .select("delivery_run_id, order_id, orders(trolleys_estimated)")
+      .in("delivery_run_id", runIds);
+
+    // Aggregate trolleys per run
+    for (const item of itemsData || []) {
+      const runId = item.delivery_run_id;
+      if (!trolleyTotals[runId]) {
+        trolleyTotals[runId] = { totalTrolleys: 0, orderCount: 0 };
+      }
+      trolleyTotals[runId].totalTrolleys += (item.orders as any)?.trolleys_estimated || 0;
+      trolleyTotals[runId].orderCount += 1;
+    }
+  }
+
+  // Sort by display_order (if available) then run_date
+  const sortedRuns = [...runsData].sort((a: any, b: any) => {
+    const orderA = a.display_order ?? 999;
+    const orderB = b.display_order ?? 999;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.run_date || '').localeCompare(b.run_date || '');
+  });
+
+  return sortedRuns.map((d: any) => {
+    const haulier = d.haulier_id ? hauliersMap[d.haulier_id] : null;
+    const vehicle = d.vehicle_id ? vehiclesMap[d.vehicle_id] : null;
+    // Use vehicle capacity if set, otherwise fall back to haulier capacity
+    const vehicleCapacity = vehicle?.trolleyCapacity ?? haulier?.trolleyCapacity ?? 20;
+    const totals = trolleyTotals[d.id] || { totalTrolleys: 0, orderCount: 0 };
+    const fillPercentage = vehicleCapacity > 0 
+      ? Math.round((totals.totalTrolleys / vehicleCapacity) * 100) 
+      : 0;
+
+    // Compute week number from run_date if not stored
+    let weekNumber = d.week_number;
+    if (!weekNumber && d.run_date) {
+      try {
+        const date = new Date(d.run_date);
+        const startOfYear = new Date(date.getFullYear(), 0, 1);
+        const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+        weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+      } catch {
+        weekNumber = undefined;
+      }
+    }
+
+    return {
+      id: d.id,
+      runNumber: d.run_number,
+      loadName: d.load_name,
+      weekNumber,
+      orgId: d.org_id,
+      runDate: d.run_date,
+      status: d.status,
+      driverName: d.driver_name,
+      vehicleRegistration: d.vehicle_registration,
+      trolleysLoaded: d.trolleys_loaded || 0,
+      trolleysReturned: d.trolleys_returned || 0,
+      trolleysOutstanding: (d.trolleys_loaded || 0) - (d.trolleys_returned || 0),
+      totalDeliveries: totals.orderCount,
+      completedDeliveries: 0,
+      pendingDeliveries: totals.orderCount,
+      haulierId: d.haulier_id,
+      haulierName: haulier?.name,
+      vehicleId: d.vehicle_id,
+      vehicleName: vehicle?.name,
+      vehicleCapacity,
+      displayOrder: d.display_order ?? 0,
+      totalTrolleysAssigned: totals.totalTrolleys,
+      fillPercentage,
+    };
+  });
 }
 
 /**
@@ -210,7 +313,9 @@ export async function createDeliveryRun(input: CreateDeliveryRun): Promise<strin
       org_id: orgId,
       run_number: runNumber,
       run_date: input.runDate,
+      load_name: input.loadName,
       haulier_id: input.haulierId,
+      vehicle_id: input.vehicleId,
       driver_name: input.driverName,
       vehicle_registration: input.vehicleRegistration,
       vehicle_type: input.vehicleType,
@@ -819,12 +924,73 @@ export async function getHauliers(): Promise<Haulier[]> {
     email: d.email,
     notes: d.notes,
     isActive: d.is_active,
+    trolleyCapacity: d.trolley_capacity ?? 20,
+  }));
+}
+
+export async function getHauliersWithVehicles(): Promise<HaulierWithVehicles[]> {
+  const { orgId, supabase } = await getUserAndOrg();
+
+  // Get hauliers
+  const { data: hauliersData, error: hauliersError } = await supabase
+    .from("hauliers")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("is_active", true)
+    .order("name");
+
+  if (hauliersError) {
+    console.error("Error fetching hauliers:", hauliersError);
+    return [];
+  }
+
+  // Get vehicles
+  const { data: vehiclesData, error: vehiclesError } = await supabase
+    .from("haulier_vehicles")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("is_active", true)
+    .order("name");
+
+  if (vehiclesError) {
+    console.error("Error fetching vehicles:", vehiclesError);
+  }
+
+  // Group vehicles by haulier
+  const vehiclesByHaulier: Record<string, HaulierVehicle[]> = {};
+  for (const v of vehiclesData || []) {
+    if (!vehiclesByHaulier[v.haulier_id]) {
+      vehiclesByHaulier[v.haulier_id] = [];
+    }
+    vehiclesByHaulier[v.haulier_id].push({
+      id: v.id,
+      orgId: v.org_id,
+      haulierId: v.haulier_id,
+      name: v.name,
+      registration: v.registration,
+      vehicleType: v.vehicle_type,
+      trolleyCapacity: v.trolley_capacity ?? 10,
+      isActive: v.is_active,
+      notes: v.notes,
+    });
+  }
+
+  return (hauliersData || []).map((d: any) => ({
+    id: d.id,
+    orgId: d.org_id,
+    name: d.name,
+    phone: d.phone,
+    email: d.email,
+    notes: d.notes,
+    isActive: d.is_active,
+    trolleyCapacity: d.trolley_capacity ?? 20,
+    vehicles: vehiclesByHaulier[d.id] || [],
   }));
 }
 
 export async function getDispatchBoardData(): Promise<{
   orders: DispatchBoardOrder[];
-  hauliers: Haulier[];
+  hauliers: HaulierWithVehicles[];
   growers: GrowerMember[];
   routes: AttributeOption[];
   deliveryRuns: ActiveDeliveryRunSummary[];
@@ -842,7 +1008,7 @@ export async function getDispatchBoardData(): Promise<{
 
   // Fetch data in parallel
   const [hauliers, growers, routesResult, activeRuns, ordersData] = await Promise.all([
-    getHauliers(),
+    getHauliersWithVehicles(),
     getGrowerMembers(orgId),
     listAttributeOptions({ orgId, attributeKey: "delivery_route" }),
     getActiveDeliveryRuns(), // Use active runs instead of just planned
@@ -860,7 +1026,7 @@ export async function getDispatchBoardData(): Promise<{
         customer_addresses(
           line1, city, county, eircode
         ),
-        pick_lists(id, assigned_team_id, status),
+        pick_lists(id, assigned_team_id, assigned_user_id, status),
         order_packing(status),
         delivery_items(id, delivery_run_id, status, delivery_runs(run_number, haulier_id))
       `)
@@ -961,7 +1127,10 @@ function mapDeliveryRunFromDb(d: any): DeliveryRun {
     orgId: d.org_id,
     runNumber: d.run_number,
     runDate: d.run_date,
+    loadName: d.load_name,
+    weekNumber: d.week_number,
     haulierId: d.haulier_id,
+    vehicleId: d.vehicle_id,
     driverName: d.driver_name,
     vehicleRegistration: d.vehicle_registration,
     vehicleType: d.vehicle_type,
@@ -973,6 +1142,7 @@ function mapDeliveryRunFromDb(d: any): DeliveryRun {
     trolleysLoaded: d.trolleys_loaded,
     trolleysReturned: d.trolleys_returned,
     routeNotes: d.route_notes,
+    displayOrder: d.display_order ?? 0,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
     createdBy: d.created_by,

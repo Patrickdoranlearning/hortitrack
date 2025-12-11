@@ -82,19 +82,35 @@ const schema = z
     plantVarietyId: z.string().optional(),
     sizeId: z.string().min(1, "Size is required"),
     containers: z.preprocess(
-      (val) => (val === "" || val === null ? undefined : Number(val)),
+      (val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      },
       z.number().int().positive().optional()
     ),
     units: z.preprocess(
-      (val) => (val === "" || val === null ? undefined : Number(val)),
+      (val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      },
       z.number().int().positive("Units must be positive")
     ),
     targetYear: z.preprocess(
-      (val) => (val === "" || val === null ? undefined : Number(val)),
+      (val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      },
       z.number().int().min(2024).max(2035)
     ),
     targetWeek: z.preprocess(
-      (val) => (val === "" || val === null ? undefined : Number(val)),
+      (val) => {
+        if (val === "" || val === null || typeof val === "undefined") return undefined;
+        const num = Number(val);
+        return Number.isNaN(num) ? undefined : num;
+      },
       z.number().int().min(1).max(53)
     ),
     protocolId: z.string().optional(),
@@ -189,13 +205,25 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
   const cellMultiple = selectedSize?.cell_multiple ?? 1;
   const isTraySize = cellMultiple > 1;
   
-  // Auto-calculate units when containers change (for tray sizes)
+  // Keep units in sync with containers for tray sizes
+  const updateUnitsFromContainers = React.useCallback(
+    (containersValue?: number) => {
+      const source = typeof containersValue === "number" ? containersValue : watchedContainers;
+      if (!isTraySize) return;
+
+      if (source && source > 0) {
+        form.setValue("units", source * cellMultiple, { shouldValidate: true, shouldDirty: true });
+      } else {
+        form.setValue("units", undefined, { shouldValidate: true, shouldDirty: true });
+      }
+    },
+    [cellMultiple, form, isTraySize, watchedContainers]
+  );
+
+  // Recalculate when trays or size change
   React.useEffect(() => {
-    if (isTraySize && watchedContainers && watchedContainers > 0) {
-      const calculatedUnits = watchedContainers * cellMultiple;
-      form.setValue("units", calculatedUnits, { shouldValidate: true });
-    }
-  }, [watchedContainers, cellMultiple, isTraySize, form]);
+    updateUnitsFromContainers();
+  }, [updateUnitsFromContainers, watchedContainers, cellMultiple, isTraySize]);
 
   // Get the selected parent's available quantity
   const selectedParent = hasParent ? parents.find((p) => p.id === watchedParentBatchId) : null;
@@ -251,7 +279,21 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
 
   // Handle validation errors
   function onInvalid(errors: FieldErrors<FormValues>) {
-    console.error("[FutureAllocationDialog] Validation failed:", errors);
+    // Validation failures are expected user input issues; log as a warning with useful detail
+    const summarizedErrors = Object.entries(errors).reduce<Record<string, unknown>>(
+      (acc, [field, error]) => {
+        acc[field] = {
+          message: error?.message ?? error?.root?.message ?? null,
+          type: (error as any)?.type ?? null,
+        };
+        return acc;
+      },
+      {}
+    );
+    console.warn("[FutureAllocationDialog] Validation failed", {
+      errors: summarizedErrors,
+      values: form.getValues(),
+    });
     // Show toast for validation errors
     const errorMessages: string[] = [];
     
@@ -492,7 +534,11 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
                               min={1}
                               {...field}
                               value={field.value ?? ""}
-                              onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                              onChange={(e) => {
+                                const next = e.target.value === "" ? undefined : Number(e.target.value);
+                                field.onChange(next);
+                                updateUnitsFromContainers(next);
+                              }}
                             />
                           </FormControl>
                           <FormDescription>

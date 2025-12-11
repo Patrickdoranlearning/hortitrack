@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import DispatchTable from '@/components/dispatch/DispatchTable';
+import DispatchBoard from '@/components/dispatch/DispatchBoard';
 import { getDispatchBoardData } from '@/server/dispatch/queries.server';
 
 export default async function DispatchPage() {
@@ -27,7 +27,7 @@ export default async function DispatchPage() {
           title="Dispatch Dashboard"
           description="Manage orders, assign routes, and dispatch deliveries."
         />
-        <DispatchTable
+        <DispatchBoard
           orders={orders}
           hauliers={hauliers}
           growers={growers}

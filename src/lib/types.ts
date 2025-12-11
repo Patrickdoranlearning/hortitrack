@@ -300,5 +300,25 @@ export const HaulierSchema = z.object({
   email: z.string().email().optional(),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
+  trolleyCapacity: z.number().int().nonnegative().default(20),
 });
 export type Haulier = z.infer<typeof HaulierSchema>;
+
+// --- Haulier Vehicles ---
+export const HaulierVehicleSchema = z.object({
+  id: z.string().optional(),
+  orgId: z.string(),
+  haulierId: z.string(),
+  name: z.string().min(1),
+  registration: z.string().optional(),
+  vehicleType: z.enum(['van', 'truck', 'trailer', 'other']).optional(),
+  trolleyCapacity: z.number().int().nonnegative().default(10),
+  isActive: z.boolean().default(true),
+  notes: z.string().optional(),
+});
+export type HaulierVehicle = z.infer<typeof HaulierVehicleSchema>;
+
+// Haulier with vehicles (for UI)
+export interface HaulierWithVehicles extends Haulier {
+  vehicles: HaulierVehicle[];
+}
