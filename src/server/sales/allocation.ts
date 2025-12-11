@@ -24,12 +24,20 @@ export interface AllocationOptions {
 
 /**
  * Enhanced allocation function with support for batch-specific preferences
+ *
+ * @param params - Allocation options (variety, size, qty, preferences)
+ * @param cachedInventory - Optional pre-fetched inventory to avoid N+1 queries.
+ *                          When processing multiple order lines, fetch inventory
+ *                          once and pass it to all allocation calls.
  */
-export async function allocateForProductLine(params: AllocationOptions): Promise<Allocation[]> {
+export async function allocateForProductLine(
+  params: AllocationOptions,
+  cachedInventory?: InventoryBatch[]
+): Promise<Allocation[]> {
   const { plantVariety, size, qty, specificBatchId, gradePreference, preferredBatchNumbers } = params;
 
-  // 1) Get all saleable batches and filter by variety/size
-  const allSaleable = await getSaleableBatches();
+  // 1) Use cached inventory if provided, otherwise fetch (backward compatibility)
+  const allSaleable = cachedInventory ?? await getSaleableBatches();
 
   let saleable = allSaleable
     .filter((b) =>

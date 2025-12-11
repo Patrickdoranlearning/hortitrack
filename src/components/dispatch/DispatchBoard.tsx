@@ -21,6 +21,9 @@ import {
   MapPin,
   Package,
   TrendingUp,
+  Send,
+  Undo2,
+  CheckCircle2,
 } from 'lucide-react';
 
 import { DispatchBoardOrder, ActiveDeliveryRunSummary } from '@/lib/dispatch/types';
@@ -94,7 +97,9 @@ import {
   deleteLoad,
   removeOrderFromLoad,
   updateOrderDate,
-  dispatchOrders
+  dispatchOrders,
+  dispatchLoad,
+  recallLoad
 } from '@/server/dispatch/board-actions';
 import { toast } from 'sonner';
 import OrderSummaryDialog from './OrderSummaryDialog';
@@ -457,6 +462,39 @@ export default function DispatchBoard({
     );
   };
 
+  const handleDispatchLoad = async (loadId: string, loadName: string, orderCount: number) => {
+    if (orderCount === 0) {
+      toast.error('No orders in this load to dispatch');
+      return;
+    }
+    
+    toast.promise(
+      dispatchLoad(loadId),
+      {
+        loading: `Dispatching ${loadName}...`,
+        success: (result) => {
+          if (result.error) throw new Error(result.error);
+          return `${loadName} dispatched with ${result.ordersDispatched} orders`;
+        },
+        error: (err) => err.message || 'Failed to dispatch load'
+      }
+    );
+  };
+
+  const handleRecallLoad = async (loadId: string, loadName: string) => {
+    toast.promise(
+      recallLoad(loadId),
+      {
+        loading: `Recalling ${loadName}...`,
+        success: (result) => {
+          if (result.error) throw new Error(result.error);
+          return `${loadName} recalled - ${result.ordersRecalled} orders reverted`;
+        },
+        error: (err) => err.message || 'Failed to recall load'
+      }
+    );
+  };
+
   const handleDispatchSelected = async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) {
@@ -791,6 +829,8 @@ export default function DispatchBoard({
           onDragEnd={handleDragEnd}
           onEditLoad={setEditingLoad}
           onDeleteLoad={setDeletingLoadId}
+          onDispatchLoad={handleDispatchLoad}
+          onRecallLoad={handleRecallLoad}
           onViewOrder={setSelectedOrder}
           onFilterByCounty={(county) => setColumnFilters(prev => ({ ...prev, county }))}
           startResize={startResize}
@@ -841,7 +881,7 @@ export default function DispatchBoard({
               />
             </div>
             <div className="space-y-2">
-              <Label>Haulier</Label>
+              <Label>Haulier {hauliers.length === 0 && <span className="text-destructive text-xs">(No hauliers found)</span>}</Label>
               <Select 
                 value={newLoadHaulier} 
                 onValueChange={(v) => {
@@ -853,12 +893,16 @@ export default function DispatchBoard({
                   <SelectValue placeholder="Select haulier..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {hauliers.map(h => (
-                    <SelectItem key={h.id} value={h.id!}>
-                      {h.name}
-                      {h.vehicles.length > 0 && ` (${h.vehicles.length} vehicles)`}
-                    </SelectItem>
-                  ))}
+                  {hauliers.length === 0 ? (
+                    <SelectItem value="_empty" disabled>No hauliers available</SelectItem>
+                  ) : (
+                    hauliers.map(h => (
+                      <SelectItem key={h.id} value={h.id!}>
+                        {h.name}
+                        {h.vehicles && h.vehicles.length > 0 && ` (${h.vehicles.length} vehicles)`}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -1159,6 +1203,8 @@ function LoadsView({
   onDragEnd,
   onEditLoad,
   onDeleteLoad,
+  onDispatchLoad,
+  onRecallLoad,
   onViewOrder,
   onFilterByCounty,
   startResize,
@@ -1188,6 +1234,8 @@ function LoadsView({
   onDragEnd: () => void;
   onEditLoad: (load: ActiveDeliveryRunSummary) => void;
   onDeleteLoad: (id: string) => void;
+  onDispatchLoad: (loadId: string, loadName: string, orderCount: number) => void;
+  onRecallLoad: (loadId: string, loadName: string) => void;
   onViewOrder: (order: DispatchBoardOrder) => void;
   onFilterByCounty: (county: string) => void;
   startResize: () => void;
@@ -1348,9 +1396,23 @@ function LoadsView({
                         </div>
                       </button>
                       <div className="flex items-center gap-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {loadOrders.length}
-                        </Badge>
+                        {load.status === 'in_transit' && (
+                          <Badge variant="default" className="text-xs bg-green-600">
+                            <Truck className="h-3 w-3 mr-1" />
+                            Dispatched
+                          </Badge>
+                        )}
+                        {load.status === 'completed' && (
+                          <Badge variant="default" className="text-xs bg-blue-600">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Completed
+                          </Badge>
+                        )}
+                        {load.status !== 'in_transit' && load.status !== 'completed' && (
+                          <Badge variant="secondary" className="text-xs">
+                            {loadOrders.length}
+                          </Badge>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -1358,6 +1420,25 @@ function LoadsView({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {load.status !== 'in_transit' && load.status !== 'completed' && (
+                              <DropdownMenuItem 
+                                onClick={() => onDispatchLoad(load.id, load.loadName || load.runNumber, loadOrders.length)}
+                                className="text-green-600"
+                              >
+                                <Send className="h-4 w-4 mr-2" />
+                                Dispatch Load
+                              </DropdownMenuItem>
+                            )}
+                            {(load.status === 'in_transit' || load.status === 'loading') && (
+                              <DropdownMenuItem 
+                                onClick={() => onRecallLoad(load.id, load.loadName || load.runNumber)}
+                                className="text-amber-600"
+                              >
+                                <Undo2 className="h-4 w-4 mr-2" />
+                                Recall Load
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => onEditLoad(load)}>
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit Load
@@ -1393,9 +1474,33 @@ function LoadsView({
                         value={Math.min(load.fillPercentage, 100)} 
                         className="h-2"
                       />
-                      <p className={cn("text-xs text-right", getFillColor(load.fillPercentage))}>
-                        {load.fillPercentage}% full
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className={cn("text-xs", getFillColor(load.fillPercentage))}>
+                          {load.fillPercentage}% full
+                        </p>
+                        {load.status !== 'in_transit' && load.status !== 'completed' && loadOrders.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                            onClick={() => onDispatchLoad(load.id, load.loadName || load.runNumber, loadOrders.length)}
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Dispatch
+                          </Button>
+                        )}
+                        {load.status === 'in_transit' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-amber-600 border-amber-600 hover:bg-amber-50"
+                            onClick={() => onRecallLoad(load.id, load.loadName || load.runNumber)}
+                          >
+                            <Undo2 className="h-3 w-3 mr-1" />
+                            Recall
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
 

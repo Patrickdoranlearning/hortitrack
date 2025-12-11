@@ -2,7 +2,7 @@ import { getUserAndOrg } from '@/server/auth/org';
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import PickingQueueClient from './PickingQueueClient';
-import { getPickListsForOrg, getUserTeams, getPickingTeams } from '@/server/sales/picking';
+import { getOrdersForPicking, getUserTeams, getPickingTeams } from '@/server/sales/picking';
 import { Card } from '@/components/ui/card';
 
 export default async function PickingQueuePage() {
@@ -36,15 +36,8 @@ export default async function PickingQueuePage() {
     // Get all teams (for filter dropdown)
     const allTeams = await getPickingTeams(orgId);
     
-    // Get pick lists - either for user's teams or all if they have no team
-    const pickLists = await getPickListsForOrg(orgId, {
-        statuses: ['pending', 'in_progress'],
-    });
-
-    // Filter to user's team pick lists (or show all unassigned if no teams)
-    const relevantPickLists = teamIds.length > 0
-        ? pickLists.filter((pl: any) => !pl.assignedTeamId || teamIds.includes(pl.assignedTeamId))
-        : pickLists;
+    // Get ALL orders that need picking - includes orders without pick lists
+    const pickLists = await getOrdersForPicking(orgId);
 
     return (
         <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
@@ -55,7 +48,7 @@ export default async function PickingQueuePage() {
                 />
 
                 <PickingQueueClient 
-                    initialPickLists={relevantPickLists}
+                    initialPickLists={pickLists}
                     teams={allTeams}
                     userTeamIds={teamIds}
                     userId={user.id}

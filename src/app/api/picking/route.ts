@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import {
   getPickListsForOrg,
+  getOrdersForPicking,
   createPickList,
   getPickingTeams,
   createPickingTeam,
@@ -17,8 +18,17 @@ export async function GET(request: NextRequest) {
     const statusParam = searchParams.get("status");
     const statuses = statusParam ? statusParam.split(",") as any[] : undefined;
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined;
+    const includeOrders = searchParams.get("includeOrders") === "true";
 
-    const pickLists = await getPickListsForOrg(orgId, { teamId, statuses, limit });
+    // Use getOrdersForPicking for the picking queue (includes orders without pick lists)
+    // Otherwise use the standard getPickListsForOrg for backward compatibility
+    let pickLists;
+    if (includeOrders || (!teamId && !statuses && !limit)) {
+      // Default behavior: get all orders for picking
+      pickLists = await getOrdersForPicking(orgId);
+    } else {
+      pickLists = await getPickListsForOrg(orgId, { teamId, statuses, limit });
+    }
 
     return NextResponse.json({ pickLists });
   } catch (error: any) {

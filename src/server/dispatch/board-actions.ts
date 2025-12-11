@@ -399,3 +399,173 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
   }
 }
 
+/**
+ * Dispatch an entire load - marks the delivery run as in_transit 
+ * and updates all orders to dispatched status
+ */
+export async function dispatchLoad(loadId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Get all orders in this load
+    const { data: deliveryItems, error: fetchError } = await supabase
+      .from("delivery_items")
+      .select("order_id")
+      .eq("delivery_run_id", loadId);
+      
+    if (fetchError) throw fetchError;
+    
+    if (!deliveryItems || deliveryItems.length === 0) {
+      return { error: "No orders in this load to dispatch" };
+    }
+    
+    const orderIds = deliveryItems.map(item => item.order_id);
+    
+    // Update delivery run status to in_transit
+    const { error: runError } = await supabase
+      .from("delivery_runs")
+      .update({ 
+        status: "in_transit",
+        actual_departure_time: new Date().toISOString()
+      })
+      .eq("id", loadId);
+      
+    if (runError) throw runError;
+    
+    // Update all delivery items to in_transit
+    const { error: itemsError } = await supabase
+      .from("delivery_items")
+      .update({ status: "in_transit" })
+      .eq("delivery_run_id", loadId);
+      
+    if (itemsError) throw itemsError;
+    
+    // Update all orders to dispatched status
+    const { error: ordersError } = await supabase
+      .from("orders")
+      .update({ status: "dispatched" })
+      .in("id", orderIds);
+      
+    if (ordersError) throw ordersError;
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    
+    return { success: true, ordersDispatched: orderIds.length };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Recall/Undispatch a load - reverses the dispatch action
+ * Use this when a load was dispatched by mistake or the driver hasn't actually left
+ */
+export async function recallLoad(loadId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Get current load status
+    const { data: load, error: loadError } = await supabase
+      .from("delivery_runs")
+      .select("status")
+      .eq("id", loadId)
+      .single();
+      
+    if (loadError) throw loadError;
+    
+    // Only allow recall from in_transit or loading status
+    if (load.status === "completed") {
+      return { error: "Cannot recall a completed load. Use reschedule instead." };
+    }
+    
+    if (load.status === "cancelled") {
+      return { error: "Cannot recall a cancelled load." };
+    }
+    
+    // Get all orders in this load
+    const { data: deliveryItems, error: fetchError } = await supabase
+      .from("delivery_items")
+      .select("order_id")
+      .eq("delivery_run_id", loadId);
+      
+    if (fetchError) throw fetchError;
+    
+    const orderIds = deliveryItems?.map(item => item.order_id) || [];
+    
+    // Reset delivery run status back to planned
+    const { error: runError } = await supabase
+      .from("delivery_runs")
+      .update({ 
+        status: "planned",
+        actual_departure_time: null 
+      })
+      .eq("id", loadId);
+      
+    if (runError) throw runError;
+    
+    // Reset delivery items to pending
+    const { error: itemsError } = await supabase
+      .from("delivery_items")
+      .update({ status: "pending" })
+      .eq("delivery_run_id", loadId);
+      
+    if (itemsError) throw itemsError;
+    
+    // Reset order status back to ready_for_dispatch (or confirmed if picking isn't done)
+    if (orderIds.length > 0) {
+      const { error: ordersError } = await supabase
+        .from("orders")
+        .update({ status: "ready_for_dispatch" })
+        .in("id", orderIds);
+        
+      if (ordersError) throw ordersError;
+    }
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    
+    return { success: true, ordersRecalled: orderIds.length };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Update the status of a delivery run
+ */
+export async function updateLoadStatus(loadId: string, status: 'planned' | 'loading' | 'in_transit' | 'completed' | 'cancelled') {
+  try {
+    const supabase = await createClient();
+    
+    const updates: Record<string, any> = { status };
+    
+    // Set timestamps based on status changes
+    if (status === 'in_transit') {
+      updates.actual_departure_time = new Date().toISOString();
+    } else if (status === 'completed') {
+      updates.actual_return_time = new Date().toISOString();
+    } else if (status === 'planned') {
+      updates.actual_departure_time = null;
+      updates.actual_return_time = null;
+    }
+    
+    const { error } = await supabase
+      .from("delivery_runs")
+      .update(updates)
+      .eq("id", loadId);
+      
+    if (error) throw error;
+    
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+

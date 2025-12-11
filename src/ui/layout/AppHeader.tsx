@@ -93,11 +93,7 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
       <div className="border-b">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2">
           <Link href="/" className="flex items-center gap-3">
-            <Logo />
-            <div className="hidden sm:flex flex-col leading-tight">
-              <span className="text-sm font-semibold">HortiTrack</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[220px]">{companyName}</span>
-            </div>
+            <Logo companyName={companyName} />
           </Link>
           <div className="flex items-center justify-end gap-2 ml-auto">
             <ProfileMenu moduleKey={moduleKey} />
