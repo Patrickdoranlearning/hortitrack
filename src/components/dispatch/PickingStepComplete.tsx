@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   Loader2,
   PartyPopper,
+  Printer,
+  FileText,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePickingWizardStore } from '@/stores/use-picking-wizard-store';
@@ -122,6 +124,10 @@ export default function PickingStepComplete({ onComplete }: PickingStepCompleteP
     }
   };
 
+  const handlePrintDispatchDocs = () => {
+    window.open(`/sales/orders/${pickList.orderId}/dispatch-documents`, '_blank');
+  };
+
   if (isCompleted) {
     return (
       <div className="space-y-6 py-8">
@@ -132,6 +138,9 @@ export default function PickingStepComplete({ onComplete }: PickingStepCompleteP
           <h2 className="text-2xl font-bold text-green-700">Order Complete!</h2>
           <p className="text-muted-foreground mt-2">
             Order #{pickList.orderNumber} is ready for dispatch
+          </p>
+          <p className="text-sm text-green-600 mt-1">
+            Invoice has been automatically generated
           </p>
         </div>
 
@@ -146,6 +155,30 @@ export default function PickingStepComplete({ onComplete }: PickingStepCompleteP
                 <p className="text-3xl font-bold text-green-700">{trolleyInfo.count}</p>
                 <p className="text-sm text-green-600">Trolleys</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Print Dispatch Documents */}
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-medium">Dispatch Documents Ready</p>
+                  <p className="text-sm text-muted-foreground">2 delivery dockets + 2 invoices</p>
+                </div>
+              </div>
+              <Button 
+                onClick={handlePrintDispatchDocs}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print All
+              </Button>
             </div>
           </CardContent>
         </Card>

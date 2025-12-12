@@ -57,7 +57,7 @@ export default async function SalesOperationsPage() {
 
   // Count tasks by type
   const webshopCount = tasks.filter(t => t.task_type === 'webshop_approval').length;
-  const dispatchCount = tasks.filter(t => t.task_type === 'dispatch_prep').length;
+  const invoiceCount = tasks.filter(t => t.task_type === 'dispatch_prep' || t.task_type === 'invoice_pending').length;
   const draftCount = tasks.filter(t => t.task_type === 'stale_draft').length;
 
   return (
@@ -65,7 +65,7 @@ export default async function SalesOperationsPage() {
       <div className="space-y-6 max-w-5xl mx-auto">
         <ModulePageHeader
           title="Sales Operations"
-          description="Manage orders, approvals, and dispatch paperwork."
+          description="Manage orders, approvals, and invoicing."
           actionsSlot={
             <div className="flex gap-2">
               <Button variant="outline" asChild>
@@ -115,7 +115,7 @@ export default async function SalesOperationsPage() {
             <CardContent>
               <div className="text-2xl font-bold">{tasks.length}</div>
               <p className="text-xs text-muted-foreground">
-                {webshopCount} webshop, {dispatchCount} dispatch, {draftCount} drafts
+                {webshopCount} webshop, {invoiceCount} invoices, {draftCount} drafts
               </p>
             </CardContent>
           </Card>
@@ -148,14 +148,15 @@ export default async function SalesOperationsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Leaving Today</CardTitle>
+              <CardTitle className="text-sm font-medium">Invoices Pending</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {tasks.filter(t => t.task_type === 'dispatch_prep' && t.priority === 3).length}
+                {tasks.filter(t => (t.task_type === 'dispatch_prep' || t.task_type === 'invoice_pending') && t.priority >= 2).length}
               </div>
               <p className="text-xs text-muted-foreground">
-                Orders need dispatch prep
+                Need invoices generated
               </p>
             </CardContent>
           </Card>

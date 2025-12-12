@@ -21,7 +21,6 @@ import OrderStatusBadge from '@/components/sales/OrderStatusBadge';
 import { 
   Printer, 
   Copy, 
-  FileText, 
   ExternalLink,
   ChevronLeft,
   ChevronRight,
@@ -157,14 +156,9 @@ export default function SalesOrdersClient({
     router.push(`/sales/orders/new?copyOrderId=${orderId}`);
   };
 
-  const handlePrintDocket = (orderId: string, e: React.MouseEvent) => {
+  const handlePrintDocs = (orderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    router.push(`/sales/orders/${orderId}/docket`);
-  };
-
-  const handlePrintInvoice = (orderId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`/sales/orders/${orderId}/invoice`);
+    window.open(`/sales/orders/${orderId}/dispatch-documents`, '_blank');
   };
 
   // Filter orders based on active tab (client-side for immediate feedback)
@@ -354,27 +348,13 @@ export default function SalesOrdersClient({
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={(e) => handlePrintDocket(order.id, e)}
+                              onClick={(e) => handlePrintDocs(order.id, e)}
                             >
                               <Printer className="h-4 w-4" />
-                              <span className="sr-only">Print docket</span>
+                              <span className="sr-only">Print documents</span>
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Print docket</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => handlePrintInvoice(order.id, e)}
-                            >
-                              <FileText className="h-4 w-4" />
-                              <span className="sr-only">Print invoice</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Print invoice</TooltipContent>
+                          <TooltipContent>Print documents</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>

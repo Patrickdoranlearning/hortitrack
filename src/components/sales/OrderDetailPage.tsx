@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, FileText, Package, ClipboardList, History } from 'lucide-react';
+import { ArrowLeft, Printer, FileText, Package, ClipboardList, History, Truck } from 'lucide-react';
 import OrderSummaryCard from './OrderSummaryCard';
 import OrderItemsTable from './OrderItemsTable';
 import OrderInvoicePanel from './OrderInvoicePanel';
@@ -121,6 +121,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     }
   };
 
+  const handlePrintDispatchDocuments = () => {
+    window.open(`/sales/orders/${order.id}/dispatch-documents`, '_blank');
+  };
+
+  // Show dispatch documents button for orders that are ready for dispatch or later
+  const showDispatchDocs = ['ready_for_dispatch', 'dispatched', 'delivered'].includes(order.status);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -143,6 +150,12 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {showDispatchDocs && (
+            <Button size="sm" onClick={handlePrintDispatchDocuments} className="bg-green-600 hover:bg-green-700">
+              <Truck className="h-4 w-4 mr-2" />
+              Print Dispatch Docs
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handlePrintDocket}>
             <Printer className="h-4 w-4 mr-2" />
             Delivery Docket
@@ -194,6 +207,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           <TabsContent value="invoice" className="mt-0">
             <OrderInvoicePanel 
               orderId={order.id}
+              customerId={order.customer_id}
+              customerName={order.customer?.name || 'Unknown Customer'}
               orderItems={order.order_items}
               invoices={order.invoices}
               orderStatus={order.status}

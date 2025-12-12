@@ -2,6 +2,7 @@
 import "server-only";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { generateInvoice } from "@/app/sales/actions";
 
 // ================================================
 // TYPES
@@ -891,6 +892,21 @@ export async function completePickList(
       .from("orders")
       .update({ status: "ready_for_dispatch" })
       .eq("id", pickList.order_id);
+
+    // Auto-generate invoice after picking is complete
+    try {
+      const invoiceResult = await generateInvoice(pickList.order_id);
+      if (invoiceResult.error) {
+        // Log the error but don't fail the pick list completion
+        console.warn(`[completePickList] Invoice generation failed for order ${pickList.order_id}:`, invoiceResult.error);
+      } else {
+        console.log(`[completePickList] Invoice generated for order ${pickList.order_id}`);
+        await logPickListEvent(orgId, pickListId, null, "invoice_generated", "Invoice auto-generated after picking");
+      }
+    } catch (err) {
+      console.error(`[completePickList] Error generating invoice for order ${pickList.order_id}:`, err);
+      // Don't fail the pick list completion if invoice generation fails
+    }
   }
 
   await logPickListEvent(orgId, pickListId, null, "completed", "Pick list completed");
