@@ -78,7 +78,7 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       storeId: 'main',
       deliveryAddress: '',
       orderReference: '',
-      deliveryDate: '',
+      deliveryDate: new Date().toISOString().split('T')[0], // Default to today
       shipMethod: '',
       notesCustomer: '',
       notesInternal: '',

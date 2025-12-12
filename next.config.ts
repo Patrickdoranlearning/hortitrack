@@ -28,6 +28,16 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: process.env.NEXT_STRICT_TYPECHECK !== '1',
   },
+  // Prevent server-only packages from being bundled into client code
+  serverExternalPackages: [
+    'genkit',
+    '@genkit-ai/core',
+    '@genkit-ai/googleai',
+    '@genkit-ai/vertexai',
+    '@genkit-ai/next',
+    'dotprompt',
+    'handlebars',
+  ],
   experimental: {
   },
 }

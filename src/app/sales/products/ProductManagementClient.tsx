@@ -927,15 +927,8 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
   const [assignmentForm, setAssignmentForm] = useState(() => ({
     priceListId: priceLists[0]?.id ?? "",
     customerId: customers[0]?.id ?? "",
-    validFrom: "",
-    validTo: "",
-  }));
-  const [defaultForm, setDefaultForm] = useState(() => ({
-    customerId: customers[0]?.id ?? "",
-    priceListId: customers[0]?.defaultPriceListId ?? "",
   }));
   const [pendingAssignment, startAssign] = useTransition();
-  const [pendingDefault, startDefault] = useTransition();
 
   useEffect(() => {
     setAssignmentForm((prev) => ({
@@ -943,10 +936,6 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
       priceListId: priceLists[0]?.id ?? "",
       customerId: customers[0]?.id ?? "",
     }));
-    setDefaultForm({
-      customerId: customers[0]?.id ?? "",
-      priceListId: customers[0]?.defaultPriceListId ?? "",
-    });
   }, [priceLists, customers]);
 
   const handleAssign = (event: React.FormEvent<HTMLFormElement>) => {
@@ -959,8 +948,6 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
       const result = await upsertPriceListCustomerAction({
         priceListId: assignmentForm.priceListId,
         customerId: assignmentForm.customerId,
-        validFrom: assignmentForm.validFrom || undefined,
-        validTo: assignmentForm.validTo || undefined,
       });
       if (!result.success) {
         toast({
@@ -972,7 +959,6 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
       }
       toast({ title: "Price list assigned" });
       router.refresh();
-      setAssignmentForm((prev) => ({ ...prev, validFrom: "", validTo: "" }));
     });
   };
 
@@ -988,35 +974,11 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
     });
   };
 
-  const handleDefaultSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!defaultForm.customerId) {
-      toast({ variant: "destructive", title: "Select a customer" });
-      return;
-    }
-    startDefault(async () => {
-      const result = await setCustomerDefaultPriceListAction(
-        defaultForm.customerId,
-        defaultForm.priceListId || null
-      );
-      if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Save failed",
-          description: result.error ?? "Unable to set default price list.",
-        });
-        return;
-      }
-      toast({ title: "Default price list saved" });
-      router.refresh();
-    });
-  };
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Price list assignments</CardTitle>
-        <CardDescription>Map customers to price lists and manage overrides.</CardDescription>
+        <CardDescription>Assign customers to their price list. Once assigned, they stay on that list until changed.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <form className="space-y-3" onSubmit={handleAssign}>
@@ -1057,81 +1019,12 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Valid from (optional)</Label>
-              <Input
-                type="date"
-                value={assignmentForm.validFrom}
-                onChange={(event) => setAssignmentForm((prev) => ({ ...prev, validFrom: event.target.value }))}
-              />
+            <div className="flex items-end">
+              <Button type="submit" disabled={pendingAssignment}>
+                {pendingAssignment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Assign
+              </Button>
             </div>
-            <div className="space-y-1.5">
-              <Label>Valid to (optional)</Label>
-              <Input
-                type="date"
-                value={assignmentForm.validTo}
-                onChange={(event) => setAssignmentForm((prev) => ({ ...prev, validTo: event.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button type="submit" disabled={pendingAssignment}>
-              {pendingAssignment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Assign price list
-            </Button>
-          </div>
-        </form>
-
-        <Separator />
-
-        <form className="grid gap-3 md:grid-cols-3" onSubmit={handleDefaultSubmit}>
-          <div className="space-y-1.5">
-            <Label>Customer default list</Label>
-            <Select
-              value={defaultForm.customerId}
-              onValueChange={(value) => {
-                setDefaultForm({
-                  customerId: value,
-                  priceListId: customers.find((c) => c.id === value)?.defaultPriceListId ?? "",
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose customer" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Default price list</Label>
-            <Select
-              value={defaultForm.priceListId || "none"}
-              onValueChange={(value) => setDefaultForm((prev) => ({ ...prev, priceListId: value === "none" ? "" : value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select price list" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {priceLists.map((priceList) => (
-                  <SelectItem key={priceList.id} value={priceList.id}>
-                    {priceList.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end justify-end">
-            <Button type="submit" disabled={pendingDefault}>
-              {pendingDefault && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save default
-            </Button>
           </div>
         </form>
 
@@ -1140,22 +1033,17 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Tag className="h-4 w-4 text-muted-foreground" />
-            <h4 className="text-sm font-semibold">Existing assignments</h4>
+            <h4 className="text-sm font-semibold">Current assignments</h4>
           </div>
           {assignments.length === 0 ? (
             <p className="text-sm text-muted-foreground">No customer-specific assignments yet.</p>
           ) : (
             <div className="space-y-2">
               {assignments.map((assignment) => (
-                <div key={assignment.id} className="flex items-start justify-between rounded-lg border p-3">
+                <div key={assignment.id} className="flex items-center justify-between rounded-lg border p-3">
                   <div>
                     <p className="font-medium">{assignment.customerName}</p>
                     <p className="text-sm text-muted-foreground">{assignment.priceListName}</p>
-                    {(assignment.validFrom || assignment.validTo) && (
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateRange(assignment.validFrom, assignment.validTo)}
-                      </p>
-                    )}
                   </div>
                   <Button
                     variant="ghost"
@@ -1174,12 +1062,6 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
       </CardContent>
     </Card>
   );
-}
-
-function formatDateRange(from?: string | null, to?: string | null) {
-  const format = (value: string | null | undefined) =>
-    value ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—";
-  return `From ${format(from)} · To ${format(to)}`;
 }
 
 type ProductAliasesSectionProps = {

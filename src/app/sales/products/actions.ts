@@ -39,8 +39,6 @@ const priceListCustomerSchema = z.object({
   id: z.string().uuid().optional(),
   priceListId: z.string().uuid(),
   customerId: z.string().uuid(),
-  validFrom: z.string().optional().nullable(),
-  validTo: z.string().optional().nullable(),
 });
 
 const productAliasSchema = z.object({
@@ -310,42 +308,35 @@ export async function upsertPriceListCustomerAction(input: z.infer<typeof priceL
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
-  const payload = {
-    org_id: orgId,
-    price_list_id: parsed.priceListId,
-    customer_id: parsed.customerId,
-    valid_from: cleanString(parsed.validFrom),
-    valid_to: cleanString(parsed.validTo),
-  };
-
-  let recordId = parsed.id ?? null;
-  if (!recordId) {
-    const { data: existing } = await supabase
-      .from('price_list_customers')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('price_list_id', parsed.priceListId)
-      .eq('customer_id', parsed.customerId)
-      .is('valid_from', payload.valid_from)
-      .is('valid_to', payload.valid_to)
-      .maybeSingle();
-    if (existing) {
-      recordId = existing.id;
-    }
-  }
+  // Check if assignment already exists for this customer
+  const { data: existing } = await supabase
+    .from('price_list_customers')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('customer_id', parsed.customerId)
+    .maybeSingle();
 
   let error;
-  if (recordId) {
+  if (existing) {
+    // Update existing assignment to new price list
     ({ error } = await supabase
       .from('price_list_customers')
       .update({
-        valid_from: payload.valid_from,
-        valid_to: payload.valid_to,
+        price_list_id: parsed.priceListId,
+        valid_from: null,
+        valid_to: null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', recordId));
+      .eq('id', existing.id));
   } else {
-    ({ error } = await supabase.from('price_list_customers').insert(payload));
+    // Create new assignment (no date restrictions)
+    ({ error } = await supabase.from('price_list_customers').insert({
+      org_id: orgId,
+      price_list_id: parsed.priceListId,
+      customer_id: parsed.customerId,
+      valid_from: null,
+      valid_to: null,
+    }));
   }
 
   if (error) {

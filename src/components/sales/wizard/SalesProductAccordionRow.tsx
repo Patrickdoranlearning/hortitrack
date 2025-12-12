@@ -1,18 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { UseFormReturn, useWatch } from 'react-hook-form';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormField } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Layers, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, Layers } from 'lucide-react';
 import { BatchSelectionDialog, BatchAllocation } from '../BatchSelectionDialog';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
 import type { CreateOrderInput } from '@/lib/sales/types';
 import { cn } from '@/lib/utils';
+
+export type PricingHint = {
+  rrp?: number | null;
+  multibuyQty2?: number | null;
+  multibuyPrice2?: number | null;
+};
 
 type Props = {
   index: number;
@@ -23,6 +27,15 @@ type Props = {
   onAllocationsChange: (index: number, allocations: BatchAllocation[]) => void;
   onRemove: () => void;
   selectedCustomerId?: string;
+  defaultExpanded?: boolean;
+  pricingHints?: Record<string, PricingHint>;
+};
+
+// Track variety quantities locally
+type VarietyQty = {
+  varietyName: string;
+  qty: number;
+  batchAllocations: BatchAllocation[];
 };
 
 export function SalesProductAccordionRow({
@@ -34,32 +47,84 @@ export function SalesProductAccordionRow({
   onAllocationsChange,
   onRemove,
   selectedCustomerId,
+  pricingHints = {},
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
-
   const line = useWatch({ control: form.control, name: `lines.${index}` });
+  const [varietiesExpanded, setVarietiesExpanded] = useState(false);
+  const [varietyQuantities, setVarietyQuantities] = useState<VarietyQty[]>([]);
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [selectedVarietyForBatches, setSelectedVarietyForBatches] = useState<string>('');
 
   const selectedProduct = useMemo(() => {
     if (!line?.productId) return undefined;
     return products.find((p) => p.id === line.productId);
   }, [line?.productId, products]);
 
-  const varietyOptions = useMemo(() => {
+  // Get unique varieties from batches with family info
+  const varietiesWithFamily = useMemo(() => {
     if (!selectedProduct) return [];
-    return Array.from(new Set(selectedProduct.batches.map((b) => b.plantVariety).filter(Boolean)));
+    const varietyMap = new Map<string, { name: string; family: string | null }>();
+    for (const batch of selectedProduct.batches) {
+      if (batch.plantVariety && !varietyMap.has(batch.plantVariety)) {
+        varietyMap.set(batch.plantVariety, {
+          name: batch.plantVariety,
+          family: batch.family || selectedProduct.family || null
+        });
+      }
+    }
+    return Array.from(varietyMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedProduct]);
 
-  const selectedVariety = line?.plantVariety || 'any';
-  const qty = typeof line?.qty === 'number' ? line.qty : Number(line?.qty) || 0;
+  // Simple list of variety names for backward compatibility
+  const varieties = varietiesWithFamily.map(v => v.name);
+
+  // Get stock info per variety
+  const varietyStockInfo = useMemo(() => {
+    if (!selectedProduct) return new Map<string, { totalQty: number; batchCount: number; family: string | null }>();
+    const info = new Map<string, { totalQty: number; batchCount: number; family: string | null }>();
+    
+    for (const batch of selectedProduct.batches) {
+      const varietyName = batch.plantVariety || '';
+      if (!info.has(varietyName)) {
+        info.set(varietyName, { totalQty: 0, batchCount: 0, family: batch.family || null });
+      }
+      const existing = info.get(varietyName)!;
+      existing.totalQty += batch.quantity;
+      existing.batchCount += 1;
+    }
+    
+    return info;
+  }, [selectedProduct]);
+
+  // Initialize variety quantities when product changes
+  useEffect(() => {
+    if (selectedProduct && varieties.length > 0) {
+      setVarietyQuantities([
+        { varietyName: '', qty: 0, batchAllocations: [] }, // Grower's Choice
+        ...varieties.map(v => ({ varietyName: v, qty: 0, batchAllocations: [] }))
+      ]);
+    } else {
+      setVarietyQuantities([]);
+    }
+  }, [selectedProduct?.id, varieties.length]);
+
+  // Calculate total from variety quantities
+  const varietyTotal = varietyQuantities.reduce((sum, v) => sum + v.qty, 0);
+  
+  // Use variety total if expanded, otherwise use form qty
+  const displayQty = varietiesExpanded && varietyTotal > 0 ? varietyTotal : (line?.qty || 0);
   const price = typeof line?.unitPrice === 'number' ? line.unitPrice : Number(line?.unitPrice) || 0;
   const vatRate = typeof line?.vatRate === 'number' ? line.vatRate : Number(line?.vatRate) || 0;
-  const lineNet = qty * price;
+  const lineNet = displayQty * price;
   const lineVat = lineNet * (vatRate / 100);
   const lineTotal = lineNet + lineVat;
 
-  const batchDialogBatches =
-    selectedProduct?.batches.filter((b) => (selectedVariety && selectedVariety !== 'any' ? b.plantVariety === selectedVariety : true)) || [];
+  // Sync variety total to form
+  useEffect(() => {
+    if (varietiesExpanded && varietyTotal > 0) {
+      form.setValue(`lines.${index}.qty`, varietyTotal);
+    }
+  }, [varietyTotal, varietiesExpanded, form, index]);
 
   const resolveProductLabel = (product: ProductWithBatches) => {
     const alias = product.aliases?.find(
@@ -79,261 +144,366 @@ export function SalesProductAccordionRow({
         return customerAlias.unitPriceExVat;
       }
     }
-    if (product.defaultPrice != null) {
-      return product.defaultPrice;
+    return product.defaultPrice ?? undefined;
+  };
+
+  const handleSelectProduct = (productId: string) => {
+    form.setValue(`lines.${index}.productId`, productId);
+    const product = products.find((p) => p.id === productId);
+    if (product) {
+      form.setValue(`lines.${index}.plantVariety`, '');
+      form.setValue(`lines.${index}.size`, product.size);
+      const productPrice = getProductPrice(product);
+      if (productPrice !== undefined) {
+        form.setValue(`lines.${index}.unitPrice`, productPrice);
+      }
+      const hint = pricingHints[productId];
+      if (hint) {
+        if (hint.rrp != null) form.setValue(`lines.${index}.rrp`, hint.rrp);
+        if (hint.multibuyQty2 != null) form.setValue(`lines.${index}.multibuyQty2`, hint.multibuyQty2);
+        if (hint.multibuyPrice2 != null) form.setValue(`lines.${index}.multibuyPrice2`, hint.multibuyPrice2);
+      }
     }
-    return undefined;
+    onAllocationsChange(index, []);
+    setVarietiesExpanded(false);
+    setVarietyQuantities([]);
+  };
+
+  const handleMainQtyChange = (newQty: number) => {
+    form.setValue(`lines.${index}.qty`, Math.max(0, newQty));
+    // If varieties were expanded but user edits main qty, collapse varieties
+    if (varietiesExpanded && varietyTotal > 0) {
+      setVarietiesExpanded(false);
+      setVarietyQuantities(prev => prev.map(v => ({ ...v, qty: 0, batchAllocations: [] })));
+    }
+    onAllocationsChange(index, []);
+  };
+
+  const handleVarietyQtyChange = (varietyName: string, newQty: number) => {
+    setVarietyQuantities(prev => 
+      prev.map(v => 
+        v.varietyName === varietyName 
+          ? { ...v, qty: Math.max(0, newQty) }
+          : v
+      )
+    );
+  };
+
+  const openBatchDialog = (varietyName: string) => {
+    setSelectedVarietyForBatches(varietyName);
+    setBatchDialogOpen(true);
   };
 
   const handleBatchConfirm = (allocs: BatchAllocation[]) => {
-    onAllocationsChange(index, allocs);
-    if (allocs.length > 0) {
-      const totalQty = allocs.reduce((sum, a) => sum + a.qty, 0);
-      form.setValue(`lines.${index}.qty`, totalQty);
-      form.setValue(
-        `lines.${index}.preferredBatchNumbers`,
-        allocs.map((a) => a.batchNumber)
-      );
-      if (allocs.length === 1) {
-        form.setValue(`lines.${index}.requiredBatchId`, allocs[0].batchId);
-      } else {
-        form.setValue(`lines.${index}.requiredBatchId`, undefined);
-      }
+    // Update the variety's batch allocations
+    setVarietyQuantities(prev =>
+      prev.map(v =>
+        v.varietyName === selectedVarietyForBatches
+          ? { 
+              ...v, 
+              batchAllocations: allocs,
+              qty: allocs.reduce((sum, a) => sum + a.qty, 0) || v.qty
+            }
+          : v
+      )
+    );
+    
+    // Update the overall allocations
+    const otherAllocations = allocations.filter(a => {
+      const batch = selectedProduct?.batches.find(b => b.id === a.batchId);
+      return batch?.plantVariety !== selectedVarietyForBatches && 
+             (selectedVarietyForBatches !== '' || batch?.plantVariety);
+    });
+    onAllocationsChange(index, [...otherAllocations, ...allocs]);
+  };
+
+  const batchDialogBatches = useMemo(() => {
+    if (!selectedProduct) return [];
+    if (selectedVarietyForBatches === '') {
+      return selectedProduct.batches; // All batches for Grower's Choice
     }
+    return selectedProduct.batches.filter(b => b.plantVariety === selectedVarietyForBatches);
+  }, [selectedProduct, selectedVarietyForBatches]);
+
+  const getVarietyAllocations = (varietyName: string) => {
+    return allocations.filter(a => {
+      const batch = selectedProduct?.batches.find(b => b.id === a.batchId);
+      if (varietyName === '') return !batch?.plantVariety || batch.plantVariety === '';
+      return batch?.plantVariety === varietyName;
+    });
   };
 
   return (
-    <Accordion type="single" collapsible value={open ? `line-${index}` : ''} onValueChange={(v) => setOpen(Boolean(v))}>
-      <AccordionItem value={`line-${index}`} className="border rounded-lg px-4">
-        <AccordionTrigger className="py-3 hover:no-underline">
-          <div className="grid grid-cols-12 gap-3 w-full items-center">
-            <div className="col-span-4 text-left">
-              <div className="text-sm font-medium">
-                {selectedProduct ? resolveProductLabel(selectedProduct) : 'Select product'}
-              </div>
-              {selectedProduct && (
-                <div className="text-xs text-muted-foreground">
-                  {selectedProduct.availableStock} available • {selectedProduct.size}
-                </div>
-              )}
-            </div>
-            <div className="col-span-2 text-sm text-muted-foreground text-right">{qty || 0} qty</div>
-            <div className="col-span-2 text-sm text-muted-foreground text-right">€{price.toFixed(2)}</div>
-            <div className="col-span-2 text-sm text-muted-foreground text-right">VAT {vatRate}%</div>
-            <div className="col-span-2 text-sm font-semibold text-right">€{lineTotal.toFixed(2)}</div>
-          </div>
-        </AccordionTrigger>
-        <AccordionContent className="pb-4">
-          <div className="grid grid-cols-12 gap-3 items-start">
-            <div className="col-span-4 space-y-2">
-              <FormField
-                control={form.control}
-                name={`lines.${index}.productId`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product *</FormLabel>
-                    <Select
-                      value={field.value || ''}
-                      onValueChange={(val) => {
-                        field.onChange(val);
-                        const product = products.find((p) => p.id === val);
-                        if (product) {
-                          form.setValue(`lines.${index}.plantVariety`, product.plantVariety);
-                          form.setValue(`lines.${index}.size`, product.size);
-                          const price = getProductPrice(product);
-                          if (price !== undefined) {
-                            form.setValue(`lines.${index}.unitPrice`, price);
-                          }
-                        }
-                        onAllocationsChange(index, []);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select product" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {filteredProducts.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {resolveProductLabel(product)}{' '}
-                            <span className="text-xs text-muted-foreground">({product.availableStock} avail)</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {selectedProduct && varietyOptions.length > 0 && (
-                <FormField
-                  control={form.control}
-                  name={`lines.${index}.plantVariety`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Variety</FormLabel>
-                      <Select
-                        value={field.value || 'any'}
-                        onValueChange={(val) => {
-                          field.onChange(val);
-                          onAllocationsChange(index, []);
-                          form.setValue(`lines.${index}.requiredBatchId`, undefined);
-                        }}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Any / Assorted" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="any">Any / Assorted</SelectItem>
-                          {varietyOptions.map((name) => (
-                            <SelectItem key={name} value={name!}>
-                              {name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              <FormField
-                control={form.control}
-                name={`lines.${index}.description`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Description (optional)" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="col-span-8 grid grid-cols-12 gap-3">
-              <div className="col-span-3">
-                <FormField
-                  control={form.control}
-                  name={`lines.${index}.qty`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantity</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="1"
-                          {...field}
-                          value={field.value ?? ''}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="col-span-3">
-                <FormField
-                  control={form.control}
-                  name={`lines.${index}.unitPrice`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          value={field.value ?? ''}
-                          onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="col-span-3">
-                <FormField
-                  control={form.control}
-                  name={`lines.${index}.vatRate`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>VAT %</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          {...field}
-                          value={field.value ?? ''}
-                          onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="col-span-3 flex items-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setBatchDialogOpen(true)}
-                  disabled={!selectedProduct}
-                >
-                  <Layers className="h-4 w-4 mr-2" />
-                  {allocations.length > 0 ? `${allocations.length} batch(es)` : 'Select batches'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="self-start"
-                  onClick={onRemove}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-
-              {allocations.length > 0 && (
-                <div className="col-span-12 flex flex-wrap gap-2">
-                  {allocations.slice(0, 3).map((a) => (
-                    <Badge key={a.batchId} variant="secondary">
-                      {a.batchNumber}: {a.qty}
-                    </Badge>
+    <div className="border-b last:border-b-0">
+      {/* Main Product Row - Excel-like */}
+      <div className="grid grid-cols-12 gap-2 items-center py-2 px-3 hover:bg-muted/30">
+        {/* Product Select - col 1-4 */}
+        <div className="col-span-4">
+          <FormField
+            control={form.control}
+            name={`lines.${index}.productId`}
+            render={({ field }) => (
+              <Select value={field.value || ''} onValueChange={handleSelectProduct}>
+                <FormControl>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select product..." />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {filteredProducts.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {resolveProductLabel(product)}
+                      <span className="text-muted-foreground ml-2">({product.availableStock})</span>
+                    </SelectItem>
                   ))}
-                  {allocations.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{allocations.length - 3} more
-                    </Badge>
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </div>
+
+        {/* Quantity - col 5 */}
+        <div className="col-span-1">
+          <FormField
+            control={form.control}
+            name={`lines.${index}.qty`}
+            render={({ field }) => (
+              <FormControl>
+                <Input
+                  type="number"
+                  min="0"
+                  className={cn(
+                    "h-9 text-sm text-center",
+                    varietiesExpanded && varietyTotal > 0 && "bg-muted text-muted-foreground"
                   )}
-                </div>
-              )}
+                  value={displayQty || ''}
+                  onChange={(e) => handleMainQtyChange(parseInt(e.target.value) || 0)}
+                  readOnly={varietiesExpanded && varietyTotal > 0}
+                  placeholder="0"
+                />
+              </FormControl>
+            )}
+          />
+        </div>
 
-              <div className="col-span-12 text-sm text-muted-foreground">
-                Line total: <span className="font-semibold text-foreground">€{lineTotal.toFixed(2)}</span> (VAT €{lineVat.toFixed(2)})
-              </div>
-            </div>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
+        {/* Price - col 6 */}
+        <div className="col-span-1">
+          <FormField
+            control={form.control}
+            name={`lines.${index}.unitPrice`}
+            render={({ field }) => (
+              <FormControl>
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="h-9 text-sm text-right"
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                  placeholder="0.00"
+                />
+              </FormControl>
+            )}
+          />
+        </div>
 
+        {/* VAT % - col 7 */}
+        <div className="col-span-1">
+          <FormField
+            control={form.control}
+            name={`lines.${index}.vatRate`}
+            render={({ field }) => (
+              <FormControl>
+                <Input
+                  type="number"
+                  step="0.5"
+                  className="h-9 text-sm text-right"
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                  placeholder="13.5"
+                />
+              </FormControl>
+            )}
+          />
+        </div>
+
+        {/* Total - col 8 */}
+        <div className="col-span-1 text-right text-sm font-medium">
+          €{lineTotal.toFixed(2)}
+        </div>
+
+        {/* Varieties Dropdown Button - col 9-11 */}
+        <div className="col-span-3 flex items-center justify-end gap-1">
+          {/* Always show varieties selector, disabled when no product or no varieties */}
+          <Button
+            type="button"
+            variant={varietiesExpanded ? "secondary" : "outline"}
+            size="sm"
+            className={cn(
+              "h-8 px-3 text-xs min-w-[100px] justify-between",
+              (!selectedProduct || varieties.length === 0) && "opacity-50"
+            )}
+            onClick={() => selectedProduct && varieties.length > 0 && setVarietiesExpanded(!varietiesExpanded)}
+            disabled={!selectedProduct || varieties.length === 0}
+          >
+            <span>
+              {!selectedProduct 
+                ? "Varieties" 
+                : varieties.length === 0 
+                  ? "No varieties" 
+                  : varietiesExpanded 
+                    ? `${varieties.length} varieties`
+                    : "▾ Varieties"
+              }
+            </span>
+            {selectedProduct && varieties.length > 0 && (
+              varietiesExpanded ? (
+                <ChevronDown className="h-3 w-3 ml-1" />
+              ) : (
+                <ChevronRight className="h-3 w-3 ml-1" />
+              )
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onRemove}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Variety Sub-Rows - Expanded */}
+      {varietiesExpanded && selectedProduct && (
+        <div className="bg-muted/20 border-t">
+          {/* Grower's Choice Row */}
+          <VarietyRow
+            varietyName=""
+            displayName="Grower's Choice"
+            family={null}
+            qty={varietyQuantities.find(v => v.varietyName === '')?.qty || 0}
+            stockInfo={{ totalQty: selectedProduct.availableStock, batchCount: selectedProduct.batches.length, family: null }}
+            allocations={getVarietyAllocations('')}
+            onQtyChange={(qty) => handleVarietyQtyChange('', qty)}
+            onBatchClick={() => openBatchDialog('')}
+            isLast={varieties.length === 0}
+          />
+          
+          {/* Individual Variety Rows */}
+          {varietiesWithFamily.map((variety, idx) => {
+            const stockInfo = varietyStockInfo.get(variety.name);
+            return (
+              <VarietyRow
+                key={variety.name}
+                varietyName={variety.name}
+                displayName={variety.name}
+                family={variety.family}
+                qty={varietyQuantities.find(v => v.varietyName === variety.name)?.qty || 0}
+                stockInfo={stockInfo}
+                allocations={getVarietyAllocations(variety.name)}
+                onQtyChange={(qty) => handleVarietyQtyChange(variety.name, qty)}
+                onBatchClick={() => openBatchDialog(variety.name)}
+                isLast={idx === varietiesWithFamily.length - 1}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Batch Selection Dialog */}
       <BatchSelectionDialog
         open={batchDialogOpen}
         onOpenChange={setBatchDialogOpen}
         batches={batchDialogBatches}
         productName={selectedProduct ? resolveProductLabel(selectedProduct) : ''}
-        productVariety={selectedVariety === 'any' ? selectedProduct?.plantVariety || '' : selectedVariety}
+        productVariety={selectedVarietyForBatches || 'Any'}
         productSize={selectedProduct?.size || ''}
-        currentAllocations={allocations}
+        currentAllocations={getVarietyAllocations(selectedVarietyForBatches)}
         onConfirm={handleBatchConfirm}
       />
-    </Accordion>
+    </div>
+  );
+}
+
+// Sub-component for variety rows
+function VarietyRow({
+  varietyName,
+  displayName,
+  family,
+  qty,
+  stockInfo,
+  allocations,
+  onQtyChange,
+  onBatchClick,
+  isLast,
+}: {
+  varietyName: string;
+  displayName: string;
+  family: string | null;
+  qty: number;
+  stockInfo?: { totalQty: number; batchCount: number; family: string | null };
+  allocations: BatchAllocation[];
+  onQtyChange: (qty: number) => void;
+  onBatchClick: () => void;
+  isLast: boolean;
+}) {
+  return (
+    <div className={cn(
+      "grid grid-cols-12 gap-2 items-center py-1.5 px-3 pl-8",
+      !isLast && "border-b border-muted"
+    )}>
+      {/* Tree connector + Variety Name + Family - col 1-4 */}
+      <div className="col-span-4 flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">{isLast ? '└' : '├'}</span>
+        <div className="flex flex-col">
+          <span className={cn(
+            qty > 0 ? "font-medium" : "text-muted-foreground"
+          )}>
+            {displayName}
+          </span>
+          {family && (
+            <span className="text-[10px] text-muted-foreground">
+              {family}
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground">
+          ({stockInfo?.totalQty || 0} avail)
+        </span>
+      </div>
+
+      {/* Quantity Input - col 5 */}
+      <div className="col-span-1">
+        <Input
+          type="number"
+          min="0"
+          className="h-8 text-sm text-center"
+          value={qty || ''}
+          onChange={(e) => onQtyChange(parseInt(e.target.value) || 0)}
+          placeholder="0"
+        />
+      </div>
+
+      {/* Empty cols 6-9 to align with parent */}
+      <div className="col-span-4" />
+
+      {/* Batch Selection - col 10-11 */}
+      <div className="col-span-2 flex justify-end">
+        {qty > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={onBatchClick}
+          >
+            <Layers className="h-3 w-3 mr-1" />
+            {allocations.length > 0 ? `${allocations.length} batch` : 'Batch'}
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

@@ -64,19 +64,12 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
     .select('id, code, display_name, plant_variety_id, size_id')
     .in('id', skuIds);
 
-  // Get varieties and sizes
-  const varietyIds = skus?.map(s => s.plant_variety_id).filter(Boolean) || [];
-  const sizeIds = skus?.map(s => s.size_id).filter(Boolean) || [];
-
-  const [{ data: varieties }, { data: sizes }] = await Promise.all([
-    supabase.from('plant_varieties').select('id, name, family').in('id', varietyIds),
-    supabase.from('plant_sizes').select('id, name').in('id', sizeIds),
-  ]);
-
-  // Create lookup maps
+  // Create SKU lookup map early
   const skuMap = new Map(skus?.map(s => [s.id, s]) || []);
-  const varietyMap = new Map(varieties?.map(v => [v.id, { name: v.name, family: v.family }]) || []);
-  const sizeMap = new Map(sizes?.map(s => [s.id, s.name]) || []);
+  
+  // Get initial SKU variety and size IDs
+  const skuVarietyIds = skus?.map(s => s.plant_variety_id).filter(Boolean) || [];
+  const skuSizeIds = skus?.map(s => s.size_id).filter(Boolean) || [];
 
   // Get product-batch mappings
   const productIds = products.map(p => p.id);
@@ -89,6 +82,62 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
   if (pbError) {
     console.error('Error fetching product batches:', pbError);
   }
+
+  // Get all relevant batches first to collect their variety IDs
+  const batchIds = productBatches?.map(pb => pb.batch_id) || [];
+
+  if (batchIds.length === 0) {
+    // No batches linked to products
+    return [];
+  }
+
+  // First get available status IDs
+  const { data: availableStatuses } = await supabase
+    .from('attribute_options')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('attribute_key', 'production_status')
+    .eq('behavior', 'available');
+
+  const availableStatusIds = (availableStatuses ?? []).map(s => s.id);
+
+  const { data: batches, error: batchesError } = await supabase
+    .from('batches')
+    .select('id, batch_number, quantity, status, status_id, phase, planted_at, plant_variety_id, size_id, location_id')
+    .eq('org_id', orgId)
+    .in('id', batchIds)
+    .in('status_id', availableStatusIds.length > 0 ? availableStatusIds : ['00000000-0000-0000-0000-000000000000'])
+    .gt('quantity', 0)
+    .order('planted_at', { ascending: true });
+
+  if (batchesError) {
+    console.error('Error fetching batches:', batchesError);
+    return [];
+  }
+
+  // Collect ALL variety and size IDs from both SKUs AND batches
+  const batchVarietyIds = (batches ?? []).map(b => b.plant_variety_id).filter((id): id is string => !!id);
+  const batchSizeIds = (batches ?? []).map(b => b.size_id).filter((id): id is string => !!id);
+  
+  // Combine unique IDs from both sources
+  const allVarietyIds = [...new Set([...skuVarietyIds, ...batchVarietyIds])] as string[];
+  const allSizeIds = [...new Set([...skuSizeIds, ...batchSizeIds])] as string[];
+
+  // Now fetch varieties and sizes for ALL collected IDs
+  const [varietiesResult, sizesResult] = await Promise.all([
+    allVarietyIds.length > 0 
+      ? supabase.from('plant_varieties').select('id, name, family').in('id', allVarietyIds)
+      : Promise.resolve({ data: [] as { id: string; name: string; family: string | null }[] }),
+    allSizeIds.length > 0
+      ? supabase.from('plant_sizes').select('id, name').in('id', allSizeIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const varieties = varietiesResult.data;
+  const sizes = sizesResult.data;
+
+  // Create lookup maps with complete variety/size data
+  const varietyMap = new Map(varieties?.map(v => [v.id, { name: v.name, family: v.family }]) || []);
+  const sizeMap = new Map(sizes?.map(s => [s.id, s.name]) || []);
 
   // Fetch product aliases for customer filtering
   const { data: aliases, error: aliasError } = await supabase
@@ -129,6 +178,7 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
 
   const aliasMap = new Map<string, ProductAliasInfo[]>();
   aliases?.forEach((alias) => {
+    if (!alias.product_id) return;
     const list = aliasMap.get(alias.product_id) || [];
     list.push({
       id: alias.id,
@@ -141,47 +191,26 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
     aliasMap.set(alias.product_id, list);
   });
 
-  // Get all relevant batches (simplified query)
-  const batchIds = productBatches?.map(pb => pb.batch_id) || [];
-
-  if (batchIds.length === 0) {
-    // No batches linked to products
-    return [];
-  }
-
-  // First get available status IDs
-  const { data: availableStatuses } = await supabase
-    .from('attribute_options')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('attribute_key', 'production_status')
-    .eq('behavior', 'available');
-
-  const availableStatusIds = (availableStatuses ?? []).map(s => s.id);
-
-  const { data: batches, error: batchesError } = await supabase
-    .from('batches')
-    .select('id, batch_number, quantity, status, status_id, phase, planted_at, plant_variety_id, size_id, location_id')
-    .eq('org_id', orgId)
-    .in('id', batchIds)
-    .in('status_id', availableStatusIds.length > 0 ? availableStatusIds : ['00000000-0000-0000-0000-000000000000'])
-    .gt('quantity', 0)
-    .order('planted_at', { ascending: true });
-
-  if (batchesError) {
-    console.error('Error fetching batches:', batchesError);
-    return [];
-  }
-
   // Get locations and QC data separately
-  const locationIds = batches?.map(b => b.location_id).filter(Boolean) || [];
-  const [{ data: locations }, { data: qcData }] = await Promise.all([
-    supabase.from('locations').select('id, name').in('id', locationIds),
-    supabase.from('batch_qc').select('batch_id, grade, status').in('batch_id', batchIds),
-  ]);
+  const locationIds = (batches ?? []).map(b => b.location_id).filter((id): id is string => !!id);
+  
+  let locations: { id: string; name: string }[] = [];
+  let qcData: { batch_id: string; grade: string | null; status: string | null }[] = [];
+  
+  if (locationIds.length > 0) {
+    // @ts-expect-error - Supabase types incomplete for locations table
+    const { data } = await supabase.from('locations').select('id, name').in('id', locationIds);
+    locations = (data as unknown as { id: string; name: string }[]) ?? [];
+  }
+  
+  if (batchIds.length > 0) {
+    // @ts-expect-error - Supabase types incomplete for batch_qc table
+    const { data } = await supabase.from('batch_qc').select('batch_id, grade, status').in('batch_id', batchIds);
+    qcData = (data as unknown as { batch_id: string; grade: string | null; status: string | null }[]) ?? [];
+  }
 
-  const locationMap = new Map(locations?.map(l => [l.id, l.name]) || []);
-  const qcMap = new Map(qcData?.map(q => [q.batch_id, q]) || []);
+  const locationMap = new Map(locations.map(l => [l.id, l.name]));
+  const qcMap = new Map(qcData.map(q => [q.batch_id, q]));
 
   // Create a map of batches by ID for quick lookup
   const batchMap = new Map(
@@ -290,22 +319,40 @@ export async function getVarietiesWithBatches(orgId: string) {
   }
 
   // Get varieties, sizes, locations, and QC data separately
-  const varietyIds = batches.map(b => b.plant_variety_id).filter(Boolean);
-  const sizeIds = batches.map(b => b.size_id).filter(Boolean);
-  const locationIds = batches.map(b => b.location_id).filter(Boolean);
+  const varietyIds = batches.map(b => b.plant_variety_id).filter((id): id is string => !!id);
+  const sizeIds = batches.map(b => b.size_id).filter((id): id is string => !!id);
+  const locationIds = batches.map(b => b.location_id).filter((id): id is string => !!id);
   const batchIds = batches.map(b => b.id);
 
-  const [{ data: varieties }, { data: sizes }, { data: locations }, { data: qcData }] = await Promise.all([
-    supabase.from('plant_varieties').select('id, name, family').in('id', varietyIds),
-    supabase.from('plant_sizes').select('id, name').in('id', sizeIds),
-    supabase.from('locations').select('id, name').in('id', locationIds),
-    supabase.from('batch_qc').select('batch_id, grade, status').in('batch_id', batchIds),
-  ]);
+  // Fetch related data
+  let varieties: { id: string; name: string; family: string | null }[] = [];
+  let sizes: { id: string; name: string }[] = [];
+  let locations: { id: string; name: string }[] = [];
+  let qcData: { batch_id: string; grade: string | null; status: string | null }[] = [];
 
-  const varietyMap = new Map(varieties?.map(v => [v.id, { id: v.id, name: v.name, family: v.family }]) || []);
-  const sizeMap = new Map(sizes?.map(s => [s.id, s]) || []);
-  const locationMap = new Map(locations?.map(l => [l.id, l.name]) || []);
-  const qcMap = new Map(qcData?.map(q => [q.batch_id, q]) || []);
+  if (varietyIds.length > 0) {
+    const { data } = await supabase.from('plant_varieties').select('id, name, family').in('id', varietyIds);
+    varieties = (data as unknown as { id: string; name: string; family: string | null }[]) ?? [];
+  }
+  if (sizeIds.length > 0) {
+    const { data } = await supabase.from('plant_sizes').select('id, name').in('id', sizeIds);
+    sizes = (data as unknown as { id: string; name: string }[]) ?? [];
+  }
+  if (locationIds.length > 0) {
+    // @ts-expect-error - Supabase types incomplete for locations table
+    const { data } = await supabase.from('locations').select('id, name').in('id', locationIds);
+    locations = (data as unknown as { id: string; name: string }[]) ?? [];
+  }
+  if (batchIds.length > 0) {
+    // @ts-expect-error - Supabase types incomplete for batch_qc table
+    const { data } = await supabase.from('batch_qc').select('batch_id, grade, status').in('batch_id', batchIds);
+    qcData = (data as unknown as { batch_id: string; grade: string | null; status: string | null }[]) ?? [];
+  }
+
+  const varietyMap = new Map(varieties.map(v => [v.id, { id: v.id, name: v.name, family: v.family }]));
+  const sizeMap = new Map(sizes.map(s => [s.id, s]));
+  const locationMap = new Map(locations.map(l => [l.id, l.name]));
+  const qcMap = new Map(qcData.map(q => [q.batch_id, q]));
 
   // Group by variety + size
   const groupedMap = new Map<string, {
@@ -345,7 +392,7 @@ export async function getVarietiesWithBatches(orgId: string) {
       family: variety?.family || null,
       size: size?.name || '',
       quantity: batch.quantity || 0,
-      grade: qc?.grade,
+      grade: qc?.grade ?? undefined,
       location: locationMap.get(batch.location_id),
       status: batch.status || '',
       plantingDate: batch.planted_at || '',

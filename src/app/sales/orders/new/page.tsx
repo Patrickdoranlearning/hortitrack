@@ -3,6 +3,7 @@ import { getSupabaseServerApp } from '@/server/db/supabase';
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { SalesOrderWizard } from '@/components/sales/wizard/SalesOrderWizard';
 import { getProductsWithBatches } from '@/server/sales/products-with-batches';
+import { getOrgFees } from '@/app/sales/settings/fees/actions';
 import { redirect } from 'next/navigation';
 
 async function getCustomers(orgId: string) {
@@ -122,13 +123,15 @@ export default async function CreateOrderPage({
     );
   }
 
-  const [customers, products] = await Promise.all([
+  const [customers, products, fees] = await Promise.all([
     getCustomers(orgId),
     getProductsWithBatches(orgId),
+    getOrgFees(),
   ]);
 
   console.log('Customers found:', customers?.length || 0);
   console.log('Products found:', products?.length || 0);
+  console.log('Fees found:', fees?.length || 0);
 
   if (!customers || customers.length === 0) {
     return (
@@ -169,6 +172,7 @@ export default async function CreateOrderPage({
           customers={customers}
           products={products}
           copyOrderId={resolvedSearchParams?.copyOrderId}
+          fees={fees}
         />
       </div>
     </PageFrame>

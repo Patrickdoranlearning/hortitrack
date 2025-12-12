@@ -24,7 +24,6 @@ export type CustomerRow = {
   payment_terms_days: number;
   credit_limit: number | null;
   account_code: string | null;
-  delivery_preferences: Record<string, unknown> | null;
   // Relations
   price_lists: { id: string; name: string } | null;
   price_list_customers: Array<{
@@ -75,6 +74,7 @@ export async function fetchCustomerManagementData(
   priceLists: Array<{ id: string; name: string; currency: string; is_default: boolean | null }>;
   products: ProductOption[];
 }> {
+  console.log("[fetchCustomerManagementData] Fetching for orgId:", orgId);
   const [customerRows, priceListRows, productRows] = await Promise.all([
     supabase
       .from("customers")
@@ -98,7 +98,6 @@ export async function fetchCustomerManagementData(
         payment_terms_days,
         credit_limit,
         account_code,
-        delivery_preferences,
         price_lists ( id, name ),
         price_list_customers (
           id,
@@ -136,7 +135,13 @@ export async function fetchCustomerManagementData(
       )
       .eq("org_id", orgId)
       .order("name", { ascending: true })
-      .then((res) => res.data ?? []),
+      .then((res) => {
+        if (res.error) {
+          console.error("[fetchCustomerManagementData] customers error:", res.error);
+        }
+        console.log("[fetchCustomerManagementData] customers count:", res.data?.length ?? 0, "for org:", orgId);
+        return res.data ?? [];
+      }),
     supabase
       .from("price_lists")
       .select("id, name, currency, is_default")
@@ -184,7 +189,7 @@ export function mapCustomers(rows: CustomerRow[]): CustomerSummary[] {
     paymentTermsDays: row.payment_terms_days ?? 30,
     creditLimit: row.credit_limit,
     accountCode: row.account_code,
-    deliveryPreferences: (row.delivery_preferences as any) ?? null,
+    deliveryPreferences: null,
     // Aggregated
     orderCount: 0, // TODO: aggregate from orders
     aliasCount: 0, // TODO: aggregate from product_aliases

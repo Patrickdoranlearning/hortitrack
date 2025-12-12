@@ -27,6 +27,9 @@ export const CreateOrderLineSchema = z
     vatRate: z.coerce.number().min(0).max(100).optional(),
     // Pre-pricing (RRP printed on pots)
     rrp: z.coerce.number().nonnegative().optional(),
+    // Multibuy pricing (e.g., "3 for €10")
+    multibuyQty2: z.coerce.number().int().positive().optional(),
+    multibuyPrice2: z.coerce.number().nonnegative().optional(),
     // Batch-specific ordering
     specificBatchId: z.string().uuid().optional(), // Request specific batch
     gradePreference: z.enum(['A', 'B', 'C']).optional(), // Grade preference
