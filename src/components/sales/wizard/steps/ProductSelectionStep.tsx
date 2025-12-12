@@ -4,10 +4,12 @@ import { useMemo, useState } from 'react';
 import { UseFieldArrayAppend, UseFieldArrayRemove, FieldArrayWithId, UseFormReturn } from 'react-hook-form';
 import type { CreateOrderInput } from '@/lib/sales/types';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
-import { SalesProductAccordionRow } from '../SalesProductAccordionRow';
+import { SalesProductAccordionRow, type PricingHint } from '../SalesProductAccordionRow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowUpDown, Filter, X } from 'lucide-react';
 import type { BatchAllocation } from '../../BatchSelectionDialog';
 
 type Props = {
@@ -19,7 +21,10 @@ type Props = {
   lineAllocations: Map<number, BatchAllocation[]>;
   onAllocationsChange: (index: number, allocations: BatchAllocation[]) => void;
   selectedCustomerId?: string;
+  pricingHints?: Record<string, PricingHint>;
 };
+
+type SortOption = 'name' | 'family' | 'stock' | 'price';
 
 export function ProductSelectionStep({
   form,
@@ -30,9 +35,30 @@ export function ProductSelectionStep({
   lineAllocations,
   onAllocationsChange,
   selectedCustomerId,
+  pricingHints = {},
 }: Props) {
   const [search, setSearch] = useState('');
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const [familyFilter, setFamilyFilter] = useState<string>('');
+  const [sortBy, setSortBy] = useState<SortOption>('name');
+  const [sortAsc, setSortAsc] = useState(true);
+
+  // Extract unique families from all products
+  const families = useMemo(() => {
+    const familySet = new Set<string>();
+    for (const product of products) {
+      if (product.family) {
+        familySet.add(product.family);
+      }
+      // Also check batch families
+      for (const batch of product.batches) {
+        if (batch.family) {
+          familySet.add(batch.family);
+        }
+      }
+    }
+    return Array.from(familySet).sort();
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     const base = products;
@@ -51,23 +77,68 @@ export function ProductSelectionStep({
       list = aliasMatches.length > 0 ? aliasMatches : base;
     }
 
-    if (!search.trim()) return list;
-    const q = search.toLowerCase();
-    return list.filter((p) => {
-      const label = p.name?.toLowerCase() || '';
-      const variety = p.plantVariety?.toLowerCase() || '';
-      const size = p.size?.toLowerCase() || '';
-      return label.includes(q) || variety.includes(q) || size.includes(q);
+    // Apply family filter
+    if (familyFilter) {
+      list = list.filter((p) => {
+        // Check product-level family
+        if (p.family === familyFilter) return true;
+        // Check batch families
+        return p.batches.some(b => b.family === familyFilter);
+      });
+    }
+
+    // Apply search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((p) => {
+        const label = p.name?.toLowerCase() || '';
+        const variety = p.plantVariety?.toLowerCase() || '';
+        const size = p.size?.toLowerCase() || '';
+        const family = p.family?.toLowerCase() || '';
+        return label.includes(q) || variety.includes(q) || size.includes(q) || family.includes(q);
+      });
+    }
+
+    // Apply sorting
+    const sorted = [...list].sort((a, b) => {
+      let cmp = 0;
+      switch (sortBy) {
+        case 'name':
+          cmp = (a.name || '').localeCompare(b.name || '');
+          break;
+        case 'family':
+          cmp = (a.family || '').localeCompare(b.family || '');
+          break;
+        case 'stock':
+          cmp = (a.availableStock || 0) - (b.availableStock || 0);
+          break;
+        case 'price':
+          cmp = (a.defaultPrice || 0) - (b.defaultPrice || 0);
+          break;
+      }
+      return sortAsc ? cmp : -cmp;
     });
-  }, [products, selectedCustomerId, showAllProducts, search]);
+
+    return sorted;
+  }, [products, selectedCustomerId, showAllProducts, search, familyFilter, sortBy, sortAsc]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setFamilyFilter('');
+    setSortBy('name');
+    setSortAsc(true);
+    setShowAllProducts(false);
+  };
+
+  const hasActiveFilters = search || familyFilter || sortBy !== 'name' || !sortAsc;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Step 2: Products & Batches</h2>
+          <h2 className="text-xl font-semibold">Step 2: Products & Varieties</h2>
           <p className="text-sm text-muted-foreground">
-            Use the accordion rows to pick varieties and batches for each product.
+            Select products, set quantities, and optionally expand to specify varieties.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -76,40 +147,109 @@ export function ProductSelectionStep({
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* Filters & Sort Row */}
+      <div className="flex flex-wrap items-center gap-3">
         <Input
-          placeholder="Search products or varieties..."
+          placeholder="Search products, varieties, or family..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md"
+          className="max-w-xs"
         />
+        
+        {/* Family Filter */}
+        {families.length > 0 && (
+          <Select 
+            value={familyFilter || '__all__'} 
+            onValueChange={(v) => setFamilyFilter(v === '__all__' ? '' : v)}
+          >
+            <SelectTrigger className="w-[160px]">
+              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="All families" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All families</SelectItem>
+              {families.map((family) => (
+                <SelectItem key={family} value={family}>
+                  {family}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* Sort */}
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+          <SelectTrigger className="w-[140px]">
+            <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">Name</SelectItem>
+            <SelectItem value="family">Family</SelectItem>
+            <SelectItem value="stock">Stock</SelectItem>
+            <SelectItem value="price">Price</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
-          onClick={() => {
-            setSearch('');
-            setShowAllProducts(false);
-          }}
+          onClick={() => setSortAsc(!sortAsc)}
         >
-          Reset
+          {sortAsc ? '↑ Asc' : '↓ Desc'}
         </Button>
+
+        {hasActiveFilters && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          {filteredProducts.length} of {products.length} products
+        </span>
       </div>
 
-      <div className="space-y-3">
-        {fields.map((field, index) => (
-          <SalesProductAccordionRow
-            key={field.id}
-            index={index}
-            form={form}
-            products={products}
-            filteredProducts={filteredProducts}
-            allocations={lineAllocations.get(index) || []}
-            onAllocationsChange={onAllocationsChange}
-            onRemove={() => remove(index)}
-            selectedCustomerId={selectedCustomerId}
-          />
-        ))}
+      {/* Table-like container */}
+      <div className="border rounded-lg overflow-hidden">
+        {/* Table Header */}
+        <div className="grid grid-cols-12 gap-2 items-center py-2 px-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="col-span-4">Product</div>
+          <div className="col-span-1 text-center">Qty</div>
+          <div className="col-span-1 text-right">Price</div>
+          <div className="col-span-1 text-right">VAT %</div>
+          <div className="col-span-1 text-right">Total</div>
+          <div className="col-span-3 text-right pr-10">Varieties</div>
+        </div>
+
+        {/* Table Body */}
+        {fields.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">
+            No products added yet. Click &ldquo;Add product line&rdquo; to start.
+          </div>
+        ) : (
+          fields.map((field, index) => (
+            <SalesProductAccordionRow
+              key={field.id}
+              index={index}
+              form={form}
+              products={products}
+              filteredProducts={filteredProducts}
+              allocations={lineAllocations.get(index) || []}
+              onAllocationsChange={onAllocationsChange}
+              onRemove={() => remove(index)}
+              selectedCustomerId={selectedCustomerId}
+              pricingHints={pricingHints}
+            />
+          ))
+        )}
       </div>
 
       <Button
@@ -127,7 +267,7 @@ export function ProductSelectionStep({
           })
         }
       >
-        Add product line
+        + Add product line
       </Button>
     </div>
   );

@@ -17,9 +17,10 @@ import { CustomerDeliveryStep } from './steps/CustomerDeliveryStep';
 import { ProductSelectionStep } from './steps/ProductSelectionStep';
 import { PricingReviewStep } from './steps/PricingReviewStep';
 import { CopyOrderDialog } from './CopyOrderDialog';
-import { createOrder, getOrderForCopy } from '@/app/sales/actions';
+import { createOrder, getOrderForCopy, getPricingHints, type PricingHint } from '@/app/sales/actions';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
 import type { BatchAllocation } from '../BatchSelectionDialog';
+import type { OrgFee } from '@/app/sales/settings/fees/actions';
 
 export type SalesCustomer = {
   id: string;
@@ -34,6 +35,7 @@ type SalesOrderWizardProps = {
   customers: SalesCustomer[];
   products: ProductWithBatches[];
   copyOrderId?: string;
+  fees?: OrgFee[];
 };
 
 const DEFAULT_LINE = {
@@ -51,17 +53,18 @@ const DEFAULT_LINE = {
 
 const steps = [
   { id: 'customer', label: 'Customer & Delivery' },
-  { id: 'products', label: 'Products & Batches' },
+  { id: 'products', label: 'Products & Varieties' },
   { id: 'pricing', label: 'Pricing & Review' },
 ];
 
-export function SalesOrderWizard({ customers, products, copyOrderId }: SalesOrderWizardProps) {
+export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }: SalesOrderWizardProps) {
   const [step, setStep] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [lineAllocations, setLineAllocations] = useState<Map<number, BatchAllocation[]>>(new Map());
   const [prefillPending, startPrefillTransition] = useTransition();
+  const [pricingHints, setPricingHints] = useState<Record<string, PricingHint>>({});
 
   const form = useForm<CreateOrderInput>({
     resolver: zodResolver(CreateOrderSchema),
@@ -70,7 +73,7 @@ export function SalesOrderWizard({ customers, products, copyOrderId }: SalesOrde
       storeId: 'main',
       deliveryAddress: '',
       orderReference: '',
-      deliveryDate: '',
+      deliveryDate: new Date().toISOString().split('T')[0], // Default to today
       shipMethod: '',
       notesCustomer: '',
       notesInternal: '',
@@ -113,6 +116,20 @@ export function SalesOrderWizard({ customers, products, copyOrderId }: SalesOrde
     }
     setLineAllocations(new Map());
   }, [defaultShippingAddress, setValue]);
+
+  // Fetch pricing hints when customer changes
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setPricingHints({});
+      return;
+    }
+    const productIds = products.map((p) => p.id);
+    if (productIds.length === 0) return;
+
+    getPricingHints(selectedCustomerId, productIds).then((hints) => {
+      setPricingHints(hints);
+    });
+  }, [selectedCustomerId, products]);
 
   // Pre-fill from query string copyOrderId on first load
   useEffect(() => {
@@ -280,6 +297,7 @@ export function SalesOrderWizard({ customers, products, copyOrderId }: SalesOrde
               lineAllocations={lineAllocations}
               onAllocationsChange={handleAllocationsChange}
               selectedCustomerId={selectedCustomerId}
+              pricingHints={pricingHints}
             />
           )}
 
@@ -288,8 +306,9 @@ export function SalesOrderWizard({ customers, products, copyOrderId }: SalesOrde
               form={form}
               totals={totals}
               lines={fields}
-              onSubmit={onSubmit}
-              isSubmitting={isSubmitting}
+              products={products}
+              selectedCustomerId={selectedCustomerId}
+              fees={fees}
             />
           )}
 

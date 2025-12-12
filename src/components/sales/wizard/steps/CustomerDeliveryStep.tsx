@@ -43,7 +43,7 @@ export function CustomerDeliveryStep({
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <FormField
           control={form.control}
           name="customerId"
@@ -94,29 +94,6 @@ export function CustomerDeliveryStep({
 
         <FormField
           control={form.control}
-          name="shipMethod"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Delivery Method</FormLabel>
-              <Select value={field.value || ''} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose method" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="van">Van Delivery</SelectItem>
-                  <SelectItem value="haulier">Haulier</SelectItem>
-                  <SelectItem value="collection">Collection</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
           name="orderReference"
           render={({ field }) => (
             <FormItem>
@@ -130,79 +107,149 @@ export function CustomerDeliveryStep({
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          control={form.control}
-          name="storeId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Deliver To</FormLabel>
-              <Select
-                value={field.value || 'main'}
-                onValueChange={(value) => {
-                  field.onChange(value);
-                  if (value === 'custom') {
-                    form.setValue('deliveryAddress', '');
-                    form.setValue('shipToAddressId', undefined);
+      {/* Delivery Location Selection */}
+      <FormField
+        control={form.control}
+        name="storeId"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Deliver To</FormLabel>
+            <Select
+              value={field.value || 'main'}
+              onValueChange={(value) => {
+                field.onChange(value);
+                if (value === 'custom') {
+                  form.setValue('deliveryAddress', '');
+                  form.setValue('shipToAddressId', undefined);
+                } else {
+                  const address = customerAddresses.find((a) => a.id === value);
+                  if (address) {
+                    form.setValue('deliveryAddress', formatAddress(address));
+                    form.setValue('shipToAddressId', address.id);
                   } else {
-                    const address = customerAddresses.find((a) => a.id === value);
-                    if (address) {
-                      form.setValue('deliveryAddress', formatAddress(address));
-                      form.setValue('shipToAddressId', address.id);
-                    } else {
-                      form.setValue('shipToAddressId', undefined);
-                    }
+                    form.setValue('shipToAddressId', undefined);
                   }
-                }}
-                disabled={!selectedCustomer}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder={selectedCustomer ? 'Select delivery location' : 'Select a customer first'} />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {customerAddresses.length > 0 ? (
-                    <>
-                      {customerAddresses.map((address) => (
-                        <SelectItem key={address.id} value={address.id}>
-                          {address.storeName || address.label}
-                          {address.isDefaultShipping && ' (Default)'}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="custom">Custom delivery address</SelectItem>
-                    </>
-                  ) : (
-                    <>
-                      <SelectItem value="main">{selectedCustomer?.name || 'Main premises'}</SelectItem>
-                      <SelectItem value="custom">Custom delivery address</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="deliveryAddress"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{storeId === 'custom' ? 'Custom Address' : 'Delivery Address'}</FormLabel>
+                }
+              }}
+              disabled={!selectedCustomer}
+            >
               <FormControl>
-                <Input
-                  placeholder={storeId === 'custom' ? 'Enter delivery address' : 'Address will auto-fill'}
-                  {...field}
-                  readOnly={storeId !== 'custom'}
-                />
+                <SelectTrigger className="max-w-md">
+                  <SelectValue placeholder={selectedCustomer ? 'Select delivery location' : 'Select a customer first'} />
+                </SelectTrigger>
               </FormControl>
-              <FormMessage />
-            </FormItem>
+              <SelectContent>
+                {customerAddresses.length > 0 ? (
+                  <>
+                    {customerAddresses.map((address) => (
+                      <SelectItem key={address.id} value={address.id}>
+                        {address.storeName || address.label}
+                        {address.isDefaultShipping && ' (Default)'}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">Custom delivery address</SelectItem>
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="main">{selectedCustomer?.name || 'Main premises'}</SelectItem>
+                    <SelectItem value="custom">Custom delivery address</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {/* Structured Address Display */}
+      {storeId && storeId !== 'main' && (
+        <div className="rounded-lg border p-4 bg-muted/30 space-y-3">
+          <h4 className="text-sm font-medium text-muted-foreground">Delivery Address</h4>
+          {storeId === 'custom' ? (
+            // Custom address - editable fields
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Store Name</label>
+                <Input
+                  placeholder="Store name (optional)"
+                  onChange={(e) => {
+                    const current = form.getValues('deliveryAddress') || '';
+                    form.setValue('deliveryAddress', e.target.value ? `${e.target.value}, ${current}` : current);
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Address Line 1 *</label>
+                <Input
+                  placeholder="Street address"
+                  onChange={(e) => form.setValue('deliveryAddress', e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Address Line 2</label>
+                <Input placeholder="Apartment, suite, etc." />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">City / Town</label>
+                <Input placeholder="City" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">County</label>
+                <Input placeholder="County" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Eircode / Postcode</label>
+                <Input placeholder="Eircode" />
+              </div>
+            </div>
+          ) : (
+            // Selected address - read-only display
+            (() => {
+              const selectedAddress = customerAddresses.find((a) => a.id === storeId);
+              if (!selectedAddress) return null;
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  {selectedAddress.storeName && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Store Name</span>
+                      <span className="font-medium">{selectedAddress.storeName}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-xs text-muted-foreground block">Address Line 1</span>
+                    <span className="font-medium">{selectedAddress.line1}</span>
+                  </div>
+                  {selectedAddress.line2 && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Address Line 2</span>
+                      <span className="font-medium">{selectedAddress.line2}</span>
+                    </div>
+                  )}
+                  {selectedAddress.city && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">City / Town</span>
+                      <span className="font-medium">{selectedAddress.city}</span>
+                    </div>
+                  )}
+                  {selectedAddress.county && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">County</span>
+                      <span className="font-medium">{selectedAddress.county}</span>
+                    </div>
+                  )}
+                  {selectedAddress.eircode && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Eircode</span>
+                      <span className="font-medium">{selectedAddress.eircode}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
           )}
-        />
-      </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
@@ -239,7 +286,7 @@ export function CustomerDeliveryStep({
           render={({ field }) => (
             <div className="flex items-center gap-2">
               <Switch checked={field.value} onCheckedChange={field.onChange} />
-              <span className="text-sm">Auto print pick list and invoice</span>
+              <span className="text-sm">Auto print invoice and delivery docket</span>
             </div>
           )}
         />

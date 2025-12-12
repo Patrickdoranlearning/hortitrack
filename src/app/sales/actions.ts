@@ -965,3 +965,81 @@ export async function getCustomerInteractions(customerId: string, limit = 10) {
 
     return { interactions: interactions || [] };
 }
+
+/**
+ * Get pricing hints for a customer + product combination
+ * Priority: 1) Order history, 2) Product alias RRP, 3) null
+ */
+export type PricingHint = {
+    rrp?: number | null;
+    multibuyQty2?: number | null;
+    multibuyPrice2?: number | null;
+};
+
+export async function getPricingHints(
+    customerId: string,
+    productIds: string[]
+): Promise<Record<string, PricingHint>> {
+    if (!customerId || productIds.length === 0) return {};
+
+    const supabase = await createClient();
+    const hints: Record<string, PricingHint> = {};
+
+    // 1) Check order history first (most recent orders take precedence)
+    const { data: orderItems, error: orderError } = await supabase
+        .from('order_items')
+        .select(`
+            product_id,
+            rrp,
+            multibuy_price_2,
+            multibuy_qty_2,
+            created_at,
+            orders!inner(customer_id)
+        `)
+        .eq('orders.customer_id', customerId)
+        .in('product_id', productIds)
+        .order('created_at', { ascending: false });
+
+    if (orderError) {
+        console.error('[getPricingHints] order history error:', orderError);
+    } else if (orderItems) {
+        for (const row of orderItems) {
+            const productId = row.product_id;
+            if (!productId || hints[productId]) continue; // Keep first (most recent)
+            if (row.rrp != null || row.multibuy_price_2 != null || row.multibuy_qty_2 != null) {
+                hints[productId] = {
+                    rrp: row.rrp,
+                    multibuyPrice2: row.multibuy_price_2,
+                    multibuyQty2: row.multibuy_qty_2,
+                };
+            }
+        }
+    }
+
+    // 2) For products without history, check product_aliases for customer-specific RRP
+    const remainingProductIds = productIds.filter(id => !hints[id]);
+    if (remainingProductIds.length > 0) {
+        const { data: aliases, error: aliasError } = await supabase
+            .from('product_aliases')
+            .select('product_id, rrp')
+            .eq('customer_id', customerId)
+            .in('product_id', remainingProductIds)
+            .eq('is_active', true);
+
+        if (aliasError) {
+            console.error('[getPricingHints] alias error:', aliasError);
+        } else if (aliases) {
+            for (const alias of aliases) {
+                if (alias.product_id && alias.rrp != null && !hints[alias.product_id]) {
+                    hints[alias.product_id] = {
+                        rrp: alias.rrp,
+                        multibuyPrice2: null,
+                        multibuyQty2: null,
+                    };
+                }
+            }
+        }
+    }
+
+    return hints;
+}
