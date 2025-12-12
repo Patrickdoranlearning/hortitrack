@@ -17,13 +17,15 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import { FileText, Printer, Plus, ExternalLink, Receipt } from 'lucide-react';
+import { FileText, Printer, Plus, Receipt } from 'lucide-react';
 import { generateInvoice } from '@/app/sales/actions';
-import CreditNoteDialog from './CreditNoteDialog';
+import CreditNoteWizard from './CreditNoteWizard';
 import type { OrderItem, OrderInvoice } from './OrderDetailPage';
 
 interface OrderInvoicePanelProps {
   orderId: string;
+  customerId: string;
+  customerName: string;
   orderItems: OrderItem[];
   invoices: OrderInvoice[];
   orderStatus: string;
@@ -35,6 +37,8 @@ interface OrderInvoicePanelProps {
 
 export default function OrderInvoicePanel({
   orderId,
+  customerId,
+  customerName,
   orderItems,
   invoices,
   orderStatus,
@@ -45,7 +49,7 @@ export default function OrderInvoicePanel({
 }: OrderInvoicePanelProps) {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
+  const [creditNoteWizardOpen, setCreditNoteWizardOpen] = useState(false);
 
   const hasInvoice = invoices.length > 0;
   const latestInvoice = invoices[0];
@@ -182,7 +186,7 @@ export default function OrderInvoicePanel({
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => setCreditNoteDialogOpen(true)}
+                    onClick={() => setCreditNoteWizardOpen(true)}
                   >
                     <Receipt className="h-4 w-4 mr-2" />
                     Create Credit Note
@@ -264,11 +268,15 @@ export default function OrderInvoicePanel({
         </Card>
       </div>
 
-      {/* Credit Note Dialog */}
-      <CreditNoteDialog
-        open={creditNoteDialogOpen}
-        onOpenChange={setCreditNoteDialogOpen}
+      {/* Credit Note Wizard */}
+      <CreditNoteWizard
+        open={creditNoteWizardOpen}
+        onOpenChange={setCreditNoteWizardOpen}
         orderId={orderId}
+        customerId={customerId}
+        customerName={customerName}
+        invoiceId={latestInvoice?.id}
+        invoiceNumber={latestInvoice?.invoice_number}
         orderItems={orderItems}
         onCreditNoteCreated={onInvoiceGenerated}
       />

@@ -6,22 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   ShoppingCart, 
-  Printer, 
+  FileText, 
   FileEdit, 
   ArrowRight, 
   CheckCircle2,
   Clock,
-  AlertTriangle
+  Send,
+  Printer
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
-import { sendOrderConfirmation, dispatchAndInvoice } from '@/app/sales/actions';
+import { formatDistanceToNow } from 'date-fns';
+import { sendOrderConfirmation, generateInvoice } from '@/app/sales/actions';
 import { toast } from 'sonner';
 import { useState } from 'react';
 
 export interface AdminTask {
   reference_id: string;
   org_id: string;
-  task_type: 'webshop_approval' | 'dispatch_prep' | 'stale_draft';
+  // 'dispatch_prep' from DB view is treated as 'invoice_pending' for sales admin
+  task_type: 'webshop_approval' | 'invoice_pending' | 'dispatch_prep' | 'stale_draft';
   title: string;
   description: string;
   task_date: string;
@@ -31,21 +33,28 @@ export interface AdminTask {
   customer_name: string;
   order_number: string;
   total_inc_vat: number | null;
+  has_invoice?: boolean;
 }
 
 interface SalesAdminInboxProps {
   tasks: AdminTask[];
 }
 
+// Helper to normalize task type (dispatch_prep -> invoice_pending for sales admin)
+const normalizeTaskType = (type: AdminTask['task_type']) => 
+  type === 'dispatch_prep' ? 'invoice_pending' : type;
+
 const TASK_ICONS = {
   webshop_approval: ShoppingCart,
-  dispatch_prep: Printer,
+  invoice_pending: FileText,
+  dispatch_prep: FileText, // Same as invoice_pending
   stale_draft: FileEdit,
 };
 
 const TASK_COLORS = {
   webshop_approval: 'bg-blue-100 text-blue-600',
-  dispatch_prep: 'bg-purple-100 text-purple-600',
+  invoice_pending: 'bg-purple-100 text-purple-600',
+  dispatch_prep: 'bg-purple-100 text-purple-600', // Same as invoice_pending
   stale_draft: 'bg-amber-100 text-amber-600',
 };
 
@@ -72,9 +81,19 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
           toast.success(result.message || 'Order confirmed');
           router.refresh();
         }
-      } else if (task.task_type === 'dispatch_prep') {
-        // Navigate to print docket
-        router.push(`/sales/orders/${task.reference_id}/docket`);
+      } else if (task.task_type === 'invoice_pending' || task.task_type === 'dispatch_prep') {
+        // Generate invoice if not exists, then view it
+        if (!task.has_invoice) {
+          const result = await generateInvoice(task.reference_id);
+          if (result.error) {
+            toast.error(result.error);
+            return;
+          }
+          toast.success('Invoice generated');
+        }
+        // Open invoice page
+        window.open(`/sales/orders/${task.reference_id}/invoice`, '_blank');
+        router.refresh();
       } else {
         // Navigate to order for stale drafts
         router.push(task.link_url);
@@ -86,23 +105,10 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
     }
   };
 
-  const handleDispatchAndInvoice = async (task: AdminTask, e: React.MouseEvent) => {
+  const handlePrintDocuments = (task: AdminTask, e: React.MouseEvent) => {
     e.stopPropagation();
-    setLoadingTaskId(task.reference_id);
-
-    try {
-      const result = await dispatchAndInvoice(task.reference_id);
-      if (result.error) {
-        toast.error(result.error);
-      } else {
-        toast.success('Order dispatched and invoice generated');
-        router.refresh();
-      }
-    } catch (error) {
-      toast.error('Failed to dispatch order');
-    } finally {
-      setLoadingTaskId(null);
-    }
+    // Open dispatch documents page (2 delivery dockets + 2 invoices)
+    window.open(`/sales/orders/${task.reference_id}/dispatch-documents`, '_blank');
   };
 
   if (tasks.length === 0) {
@@ -111,7 +117,7 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
         <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
         <h3 className="text-lg font-medium text-slate-900">All Clear!</h3>
         <p className="text-slate-500 max-w-xs mx-auto mt-2">
-          No pending webshop orders or immediate dispatch paperwork required.
+          No pending webshop orders or invoices to generate.
         </p>
       </div>
     );
@@ -169,15 +175,16 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0">
-                  {task.task_type === 'dispatch_prep' && (
+                  {(task.task_type === 'invoice_pending' || task.task_type === 'dispatch_prep') && (
                     <Button 
                       size="sm" 
                       variant="outline"
-                      className="text-xs hidden sm:flex"
-                      onClick={(e) => handleDispatchAndInvoice(task, e)}
+                      className="text-xs hidden sm:flex gap-1"
+                      onClick={(e) => handlePrintDocuments(task, e)}
                       disabled={isLoading}
                     >
-                      Dispatch & Invoice
+                      <Printer className="h-3 w-3" />
+                      Print Docs
                     </Button>
                   )}
                   <Button 
@@ -187,7 +194,11 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
                     onClick={(e) => handleQuickAction(task, e)}
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Loading...' : task.action_label}
+                    {isLoading ? 'Loading...' : (
+                      (task.task_type === 'invoice_pending' || task.task_type === 'dispatch_prep')
+                        ? (task.has_invoice ? 'View Invoice' : 'Generate Invoice')
+                        : task.action_label
+                    )}
                     <ArrowRight className="h-3 w-3" />
                   </Button>
                 </div>
@@ -201,3 +212,4 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
 }
 
 export default SalesAdminInbox;
+
