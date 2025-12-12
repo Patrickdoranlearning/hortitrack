@@ -5,11 +5,10 @@ import Link from 'next/link';
 import SalesOrdersClient from './SalesOrdersClient';
 import { listOrders } from '@/server/sales/queries.server';
 
-export default async function SalesOrdersPage({
-    searchParams,
-}: {
-    searchParams?: { page?: string; status?: string; pageSize?: string };
+export default async function SalesOrdersPage(props: {
+    searchParams?: Promise<{ page?: string; status?: string; pageSize?: string }>;
 }) {
+    const searchParams = await props.searchParams;
     const page = Number(searchParams?.page) || 1;
     const status = searchParams?.status || undefined;
     const pageSize = Number(searchParams?.pageSize) || 20;

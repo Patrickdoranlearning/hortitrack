@@ -7,10 +7,11 @@ import {
 
 export async function GET(
   req: Request,
-  { params }: { params: { runId: string } }
+  { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const run = await getDeliveryRunWithItems(params.runId);
+    const { runId } = await params;
+    const run = await getDeliveryRunWithItems(runId);
 
     if (!run) {
       return NextResponse.json(
@@ -31,11 +32,12 @@ export async function GET(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { runId: string } }
+  { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
+    const { runId } = await params;
     const json = await req.json();
-    await updateDeliveryRun(params.runId, json);
+    await updateDeliveryRun(runId, json);
 
     return NextResponse.json({ ok: true });
   } catch (err) {
