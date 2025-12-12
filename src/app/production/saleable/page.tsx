@@ -9,12 +9,13 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     status?: string;
-  };
+  }>;
 };
 
-export default async function SaleableBatchesPage({ searchParams }: PageProps) {
+export default async function SaleableBatchesPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const { orgId } = await getUserAndOrg();
   const statusFilter = searchParams?.status
     ? searchParams.status.split(",").filter(Boolean)

@@ -71,14 +71,24 @@ export async function listDeliveryRuns(
 
 /**
  * Get active delivery runs with item counts and fill status
+ * Optimized: Single query with JOINs instead of 4 separate queries
  */
 export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[]> {
   const { orgId, supabase } = await getUserAndOrg();
 
-  // Query delivery runs separately from hauliers to avoid join issues
+  // Single query with all related data using Supabase's nested select
   const { data: runsData, error: runsError } = await supabase
     .from("delivery_runs")
-    .select("*")
+    .select(`
+      *,
+      hauliers(id, name, trolley_capacity),
+      haulier_vehicles(id, name, trolley_capacity),
+      delivery_items(
+        id,
+        order_id,
+        orders(trolleys_estimated)
+      )
+    `)
     .eq("org_id", orgId)
     .in("status", ["planned", "loading", "in_transit"])
     .order("run_date", { ascending: true });
@@ -93,65 +103,29 @@ export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[
     return [];
   }
 
-  // Fetch hauliers separately
-  const haulierIds = [...new Set(runsData.map((r: any) => r.haulier_id).filter(Boolean))];
-  let hauliersMap: Record<string, { name: string; trolleyCapacity: number }> = {};
-  
-  if (haulierIds.length > 0) {
-    const { data: hauliersData } = await supabase
-      .from("hauliers")
-      .select("id, name, trolley_capacity")
-      .in("id", haulierIds);
-    
-    for (const h of hauliersData || []) {
-      hauliersMap[h.id] = {
-        name: h.name,
-        trolleyCapacity: h.trolley_capacity ?? 20,
-      };
-    }
-  }
+  // Process data - all relationships are already loaded
+  const processedRuns = runsData.map((d: any) => {
+    const haulier = d.hauliers;
+    const vehicle = d.haulier_vehicles;
+    const deliveryItems = Array.isArray(d.delivery_items) ? d.delivery_items : [];
 
-  // Fetch vehicles separately
-  const vehicleIds = [...new Set(runsData.map((r: any) => r.vehicle_id).filter(Boolean))];
-  let vehiclesMap: Record<string, { name: string; trolleyCapacity: number }> = {};
-  
-  if (vehicleIds.length > 0) {
-    const { data: vehiclesData } = await supabase
-      .from("haulier_vehicles")
-      .select("id, name, trolley_capacity")
-      .in("id", vehicleIds);
-    
-    for (const v of vehiclesData || []) {
-      vehiclesMap[v.id] = {
-        name: v.name,
-        trolleyCapacity: v.trolley_capacity ?? 10,
-      };
+    // Calculate trolley totals from nested delivery_items
+    let totalTrolleys = 0;
+    for (const item of deliveryItems) {
+      totalTrolleys += (item.orders as any)?.trolleys_estimated || 0;
     }
-  }
+    const orderCount = deliveryItems.length;
 
-  // Get trolley totals for each run from delivery_items joined with orders
-  const runIds = runsData.map((r: any) => r.id);
-  let trolleyTotals: Record<string, { totalTrolleys: number; orderCount: number }> = {};
-  
-  if (runIds.length > 0) {
-    const { data: itemsData } = await supabase
-      .from("delivery_items")
-      .select("delivery_run_id, order_id, orders(trolleys_estimated)")
-      .in("delivery_run_id", runIds);
-
-    // Aggregate trolleys per run
-    for (const item of itemsData || []) {
-      const runId = item.delivery_run_id;
-      if (!trolleyTotals[runId]) {
-        trolleyTotals[runId] = { totalTrolleys: 0, orderCount: 0 };
-      }
-      trolleyTotals[runId].totalTrolleys += (item.orders as any)?.trolleys_estimated || 0;
-      trolleyTotals[runId].orderCount += 1;
-    }
-  }
+    return {
+      ...d,
+      haulier,
+      vehicle,
+      totals: { totalTrolleys, orderCount }
+    };
+  });
 
   // Sort by display_order (if available) then run_date
-  const sortedRuns = [...runsData].sort((a: any, b: any) => {
+  const sortedRuns = [...processedRuns].sort((a: any, b: any) => {
     const orderA = a.display_order ?? 999;
     const orderB = b.display_order ?? 999;
     if (orderA !== orderB) return orderA - orderB;
@@ -159,13 +133,13 @@ export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[
   });
 
   return sortedRuns.map((d: any) => {
-    const haulier = d.haulier_id ? hauliersMap[d.haulier_id] : null;
-    const vehicle = d.vehicle_id ? vehiclesMap[d.vehicle_id] : null;
+    const haulier = d.haulier;
+    const vehicle = d.vehicle;
     // Use vehicle capacity if set, otherwise fall back to haulier capacity
-    const vehicleCapacity = vehicle?.trolleyCapacity ?? haulier?.trolleyCapacity ?? 20;
-    const totals = trolleyTotals[d.id] || { totalTrolleys: 0, orderCount: 0 };
-    const fillPercentage = vehicleCapacity > 0 
-      ? Math.round((totals.totalTrolleys / vehicleCapacity) * 100) 
+    const vehicleCapacity = vehicle?.trolley_capacity ?? haulier?.trolley_capacity ?? 20;
+    const totals = d.totals || { totalTrolleys: 0, orderCount: 0 };
+    const fillPercentage = vehicleCapacity > 0
+      ? Math.round((totals.totalTrolleys / vehicleCapacity) * 100)
       : 0;
 
     // Compute week number from run_date if not stored
@@ -929,6 +903,61 @@ export async function getHauliers(): Promise<Haulier[]> {
 }
 
 export async function getHauliersWithVehicles(): Promise<HaulierWithVehicles[]> {
+  const { orgId, supabase } = await getUserAndOrg();
+
+  // Single query with nested vehicles using Supabase's foreign key relationship
+  const { data: hauliersData, error: hauliersError } = await supabase
+    .from("hauliers")
+    .select(`
+      *,
+      haulier_vehicles(*)
+    `)
+    .eq("org_id", orgId)
+    .eq("is_active", true)
+    .order("name");
+
+  if (hauliersError) {
+    console.error("Error fetching hauliers:", hauliersError);
+    return [];
+  }
+
+  // Map results - vehicles are already nested
+  return (hauliersData || []).map((h: any) => {
+    const vehicles = (h.haulier_vehicles || [])
+      .filter((v: any) => v.is_active !== false)
+      .map((v: any) => ({
+        id: v.id,
+        orgId: v.org_id,
+        haulierId: v.haulier_id,
+        name: v.name,
+        registration: v.registration,
+        vehicleType: v.vehicle_type,
+        trolleyCapacity: v.trolley_capacity ?? 10,
+        isActive: v.is_active ?? true,
+        createdAt: v.created_at,
+        updatedAt: v.updated_at,
+      }));
+
+    return {
+      id: h.id,
+      orgId: h.org_id,
+      name: h.name,
+      contactName: h.contact_name,
+      contactPhone: h.contact_phone,
+      contactEmail: h.contact_email,
+      notes: h.notes,
+      trolleyCapacity: h.trolley_capacity ?? 20,
+      isActive: h.is_active ?? true,
+      createdAt: h.created_at,
+      updatedAt: h.updated_at,
+      vehicles,
+    };
+  });
+}
+
+// Keep old function signature for backwards compatibility but mark as deprecated
+/** @deprecated Use getHauliersWithVehicles instead */
+async function getHauliersWithVehiclesLegacy(): Promise<HaulierWithVehicles[]> {
   const { orgId, supabase } = await getUserAndOrg();
 
   // Get hauliers

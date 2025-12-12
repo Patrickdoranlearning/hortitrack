@@ -1,8 +1,8 @@
 
 'use server';
 
-import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
-import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
+import type { CareRecommendationsInput } from '@/ai/flows/care-recommendations';
+import type { BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { Batch, Customer, Haulier, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/supabase';
@@ -317,9 +317,10 @@ export async function getBatchesAction(options: GetBatchesOptions = {}) {
         const supabase = await getSupabaseForApp();
         
         // Build query with server-side filtering
+        // Using estimated count for better performance (avoids full table scan)
         let query = supabase
-            .from("v_batch_search") 
-            .select("*", { count: 'exact' });
+            .from("v_batch_search")
+            .select("*", { count: 'estimated' });
 
         // Apply text search filter
         if (options.query && options.query.trim()) {
@@ -393,6 +394,7 @@ export async function getProductionProtocolAction(batchId: string) {
 
 export async function getCareRecommendationsAction(batchId: string) {
   try {
+    const { careRecommendations } = await import('@/ai/flows/care-recommendations');
     const batch = await getBatchById(batchId);
     if (!batch) {
         return { success: false, error: 'Batch not found.' };
@@ -419,6 +421,7 @@ export async function getCareRecommendationsAction(batchId: string) {
 
 export async function batchChatAction(batchId: string, query: string) {
   try {
+    const { batchChat } = await import('@/ai/flows/batch-chat-flow');
     const batch = await getBatchById(batchId);
     if (!batch) {
         return { success: false, error: 'Batch not found.' };

@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/server/db/supabaseAdmin";
-import { getUserAndOrg, getActiveOrgId } from "@/server/auth/org";
+import { getLightweightAuth } from "@/lib/auth/lightweight";
+import { getCachedReferenceData } from "@/lib/cache/reference-data";
 
 /**
  * Returns reference data for the UI.
- * - Varieties & Sizes: available to public/auth (RLS allows read).
- * - Locations & Suppliers: only when authenticated (org-scoped).
- * Never uses a service-role key.
+ * Optimized: 
+ * - Lightweight auth (caches org lookup)
+ * - Service_role for data fetching (bypasses RLS overhead)
+ * - In-memory caching (works in dev mode)
  */
 export async function GET(_req: NextRequest) {
-  const supabase = await createClient();
-
-  // Try to detect a user; if none, we'll skip org-scoped queries
-  const { data: userWrap } = await supabase.auth.getUser();
-  const user = userWrap?.user ?? null;
-
   const results = {
     varieties: [] as any[],
     sizes: [] as any[],
@@ -24,91 +18,32 @@ export async function GET(_req: NextRequest) {
     errors: [] as string[],
   };
 
-  // Public/auth: varieties (compat view so "category" exists) & sizes
-  {
-    const { data, error } = await supabase
-      .from("plant_varieties_compat")
-      .select("id, name, family, genus, species, category")
-      .order("name");
-    if (error) results.errors.push(`varieties: ${error.message}`);
-    else results.varieties = data ?? [];
-  }
-  {
-    const { data, error } = await supabase
-      .from("plant_sizes")
-      .select("id, name, container_type, cell_multiple")
-      .order("name");
-    if (error) results.errors.push(`sizes: ${error.message}`);
-    else results.sizes = data ?? [];
-  }
+  try {
+    // Lightweight auth - caches org lookup
+    const { orgId } = await getLightweightAuth();
 
-  // Org-scoped only if authenticated
-  if (user) {
-    try {
-      // Ensure the user is linked to an org (creates membership if missing)
-      const orgId = await getActiveOrgId(supabase);
-      const { supabase: supScoped } = await getUserAndOrg();
-      const [{ data: locs, error: lErr }, { data: sups, error: sErr }] = await Promise.all([
-        supScoped
-            .from("nursery_locations")
-            .select("id, name, covered, area, nursery_site")
-            .eq("org_id", orgId)
-            .order("name"),
-        supScoped
-            .from("suppliers")
-            .select("id, name, producer_code, country_code")
-            .eq("org_id", orgId)
-            .order("name"),
-        ]);
+    // Get cached reference data (uses service_role, in-memory cache)
+    const cachedData = await getCachedReferenceData(orgId);
+    results.varieties = cachedData.varieties;
+    results.sizes = cachedData.sizes;
+    results.locations = cachedData.locations;
+    results.suppliers = cachedData.suppliers;
 
-      if (lErr) results.errors.push(`locations: ${lErr.message}`); else results.locations = locs ?? [];
-      if (sErr) results.errors.push(`suppliers: ${sErr.message}`); else results.suppliers = sups ?? [];
-    } catch (e: any) {
-      results.errors.push(e?.message ?? "No active org selected");
+  } catch (e: any) {
+    const isAuthError = /Unauthenticated|No organization/i.test(e?.message);
+    if (isAuthError) {
+      results.errors.push(e.message);
+      return NextResponse.json(results, { status: 401 });
     }
+    console.error("[reference-data] error:", e);
+    results.errors.push(e?.message ?? "Failed to fetch reference data");
   }
 
-  // Developer-friendly fallback: if we still don't have locations (e.g. user not assigned to an org),
-  // default to the first organization seeded in the project so the UI remains usable.
-  if (results.locations.length === 0 || results.suppliers.length === 0) {
-    try {
-      const preferredOrgId =
-        process.env.NEXT_PUBLIC_DEFAULT_ORG_ID ||
-        (await supabaseAdmin
-          .from("organizations")
-          .select("id")
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .single()
-          .then((res) => res.data?.id));
-
-      if (preferredOrgId) {
-        const [{ data: locs }, { data: sups }] = await Promise.all([
-          supabaseAdmin
-            .from("nursery_locations")
-            .select("id, name, covered, area, nursery_site")
-            .eq("org_id", preferredOrgId)
-            .order("name"),
-          supabaseAdmin
-            .from("suppliers")
-            .select("id, name, producer_code, country_code")
-            .eq("org_id", preferredOrgId)
-            .order("name"),
-        ]);
-        if (results.locations.length === 0) results.locations = locs ?? [];
-        if (results.suppliers.length === 0) results.suppliers = sups ?? [];
-        results.errors.push(
-          "Using default organization data because no active org is associated with this user."
-        );
-  } else {
-        results.errors.push("No organizations available to provide fallback location data.");
-      }
-    } catch (fallbackErr: any) {
-      results.errors.push(
-        `Fallback locations failed: ${fallbackErr?.message ?? String(fallbackErr)}`
-      );
-    }
-  }
-
-  return NextResponse.json(results, { status: 200 });
+  // Add cache headers for browser/CDN caching (60 seconds)
+  return NextResponse.json(results, {
+    status: 200,
+    headers: {
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+    },
+  });
 }

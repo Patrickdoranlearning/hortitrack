@@ -1,123 +1,133 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
-import { generateId } from "@/server/utils/ids";
+import { z } from "zod";
 
-const createTransactionSchema = z.object({
-  trolleyId: z.string().uuid().optional(),
-  transactionType: z.enum(["loaded", "delivered", "returned", "damaged", "lost"]),
-  quantity: z.number().int().positive().default(1),
-  customerId: z.string().uuid().optional(),
-  deliveryRunId: z.string().uuid().optional(),
-  deliveryItemId: z.string().uuid().optional(),
+const createMovementSchema = z.object({
+  type: z.enum(["delivered", "returned", "not_returned", "adjustment"]),
+  customerId: z.string().uuid(),
+  trolleys: z.number().int().min(0),
+  shelves: z.number().int().min(0),
   notes: z.string().optional(),
+  deliveryRunId: z.string().uuid().optional(),
+  signedDocketUrl: z.string().url().optional(),
 });
 
-export async function POST(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { orgId, supabase, user } = await getUserAndOrg();
-    const json = await req.json();
-    const payload = createTransactionSchema.parse(json);
+    const { orgId } = await getUserAndOrg();
+    const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const customerId = searchParams.get("customerId");
 
-    const { data, error } = await supabase
-      .from("trolley_transactions")
+    // Build query - simplified without driver relationship
+    let query = supabase
+      .from("equipment_movement_log")
+      .select(`
+        id,
+        movement_date,
+        movement_type,
+        customer_id,
+        trolleys,
+        shelves,
+        delivery_run_id,
+        notes,
+        signed_docket_url,
+        recorded_by,
+        created_at,
+        customers (
+          id,
+          name
+        ),
+        delivery_runs (
+          id,
+          run_number,
+          driver_name
+        )
+      `)
+      .eq("org_id", orgId)
+      .order("movement_date", { ascending: false })
+      .limit(limit);
+
+    if (customerId) {
+      query = query.eq("customer_id", customerId);
+    }
+
+    const { data: transactions, error } = await query;
+
+    if (error) {
+      console.error("Error fetching transactions:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Transform data
+    const formattedTransactions = (transactions || []).map((t: any) => ({
+      id: t.id,
+      date: t.movement_date,
+      type: t.movement_type,
+      customerId: t.customer_id,
+      customerName: t.customers?.name || "Unknown Customer",
+      trolleys: t.trolleys,
+      shelves: t.shelves,
+      deliveryRunId: t.delivery_run_id,
+      deliveryRunNumber: t.delivery_runs?.run_number,
+      driverName: t.delivery_runs?.driver_name,
+      notes: t.notes,
+      signedDocketUrl: t.signed_docket_url,
+      recordedBy: t.recorded_by,
+    }));
+
+    return NextResponse.json({ transactions: formattedTransactions });
+  } catch (error) {
+    console.error("Error in transactions route:", error);
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { orgId, userId } = await getUserAndOrg();
+    const supabase = await createClient();
+    const body = await request.json();
+
+    // Validate
+    const parsed = createMovementSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsed.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
+
+    // Create movement record
+    const { data: movement, error } = await supabase
+      .from("equipment_movement_log")
       .insert({
-        id: generateId(),
         org_id: orgId,
-        trolley_id: payload.trolleyId,
-        transaction_type: payload.transactionType,
-        quantity: payload.quantity,
-        customer_id: payload.customerId,
-        delivery_run_id: payload.deliveryRunId,
-        delivery_item_id: payload.deliveryItemId,
-        notes: payload.notes,
-        recorded_by: user.id,
-        transaction_date: new Date().toISOString(),
+        movement_type: data.type,
+        customer_id: data.customerId,
+        trolleys: data.trolleys,
+        shelves: data.shelves,
+        notes: data.notes || null,
+        delivery_run_id: data.deliveryRunId || null,
+        signed_docket_url: data.signedDocketUrl || null,
+        recorded_by: userId,
+        movement_date: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (error) {
-      console.error("[POST trolley-transactions] error:", error);
-      return NextResponse.json({ error: "Failed to record transaction" }, { status: 500 });
+      console.error("Error creating movement:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Update trolley status if trolleyId provided
-    if (payload.trolleyId) {
-      const statusMap: Record<string, string> = {
-        loaded: "loaded",
-        delivered: "at_customer",
-        returned: "available",
-        damaged: "damaged",
-        lost: "lost",
-      };
-
-      const newStatus = statusMap[payload.transactionType];
-      if (newStatus) {
-        await supabase
-          .from("trolleys")
-          .update({
-            status: newStatus,
-            customer_id: payload.transactionType === "delivered" ? payload.customerId : null,
-            delivery_run_id: payload.transactionType === "loaded" ? payload.deliveryRunId : null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", payload.trolleyId);
-      }
-    }
-
-    // Update customer trolley balance
-    if (payload.customerId && (payload.transactionType === "delivered" || payload.transactionType === "returned")) {
-      await updateCustomerBalance(supabase, orgId, payload.customerId, payload.transactionType, payload.quantity);
-    }
-
-    return NextResponse.json({ id: data.id, ok: true });
+    return NextResponse.json({ transaction: movement }, { status: 201 });
   } catch (error) {
-    console.error("[POST trolley-transactions] unexpected:", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors[0]?.message }, { status: 400 });
-    }
-    return NextResponse.json({ error: "Failed to record transaction" }, { status: 500 });
-  }
-}
-
-async function updateCustomerBalance(
-  supabase: any,
-  orgId: string,
-  customerId: string,
-  transactionType: string,
-  quantity: number
-) {
-  // Get or create customer trolley balance record
-  const { data: existing } = await supabase
-    .from("customer_trolley_balance")
-    .select("*")
-    .eq("org_id", orgId)
-    .eq("customer_id", customerId)
-    .maybeSingle();
-
-  const now = new Date().toISOString();
-
-  if (existing) {
-    const delta = transactionType === "delivered" ? quantity : -quantity;
-    const newBalance = Math.max(0, (existing.trolleys_out ?? 0) + delta);
-
-    await supabase
-      .from("customer_trolley_balance")
-      .update({
-        trolleys_out: newBalance,
-        last_delivery_date: transactionType === "delivered" ? now : existing.last_delivery_date,
-        last_return_date: transactionType === "returned" ? now : existing.last_return_date,
-        updated_at: now,
-      })
-      .eq("id", existing.id);
-  } else if (transactionType === "delivered") {
-    await supabase.from("customer_trolley_balance").insert({
-      id: generateId(),
-      org_id: orgId,
-      customer_id: customerId,
-      trolleys_out: quantity,
-      last_delivery_date: now,
-    });
+    console.error("Error in create movement:", error);
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }

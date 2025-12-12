@@ -119,28 +119,35 @@ async function resolveActiveOrgId({
   admin: SupabaseClient;
   user: User;
 }): Promise<string> {
-  const { data: profiles, error: perr } = await supabase
-    .from("profiles")
-    .select("active_org_id")
-    .eq("id", user.id)
-    .order("updated_at", { ascending: false })
-    .limit(1);
-
-  if (perr) throw new Error(`Profile lookup failed: ${perr.message}`);
-
-  let activeOrgId = profiles?.[0]?.active_org_id as string | null | undefined;
-
-  if (!activeOrgId) {
-    const { data: memberships, error: membershipError } = await admin
+  // OPTIMIZATION: Run profile and membership queries in parallel
+  // Most users will have active_org_id set, but we fetch both to avoid
+  // sequential round-trips when the fallback is needed
+  const [profileResult, membershipResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("active_org_id")
+      .eq("id", user.id)
+      .maybeSingle(),
+    admin
       .from("org_memberships")
       .select("org_id")
       .eq("user_id", user.id)
       .order("created_at", { ascending: true })
-      .limit(1);
-    if (membershipError) {
-      console.error("[getUserAndOrg] membership lookup failed", membershipError);
+      .limit(1),
+  ]);
+
+  if (profileResult.error) {
+    throw new Error(`Profile lookup failed: ${profileResult.error.message}`);
+  }
+
+  // Use active_org_id from profile if set, otherwise fall back to membership
+  let activeOrgId = profileResult.data?.active_org_id as string | null | undefined;
+
+  if (!activeOrgId) {
+    if (membershipResult.error) {
+      console.error("[getUserAndOrg] membership lookup failed", membershipResult.error);
     }
-    activeOrgId = memberships?.[0]?.org_id ?? null;
+    activeOrgId = membershipResult.data?.[0]?.org_id ?? null;
   }
 
   if (!activeOrgId) {

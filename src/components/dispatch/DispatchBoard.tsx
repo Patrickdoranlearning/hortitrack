@@ -24,6 +24,7 @@ import {
   Send,
   Undo2,
   CheckCircle2,
+  Eye,
 } from 'lucide-react';
 
 import { DispatchBoardOrder, ActiveDeliveryRunSummary } from '@/lib/dispatch/types';
@@ -1438,6 +1439,14 @@ function LoadsView({
                                 Recall Load
                               </DropdownMenuItem>
                             )}
+                            {(load.status === 'in_transit' || load.status === 'loading') && (
+                              <DropdownMenuItem asChild>
+                                <a href={`/dispatch/driver?runId=${load.id}`} className="text-blue-600">
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Driver View
+                                </a>
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => onEditLoad(load)}>
                               <Pencil className="h-4 w-4 mr-2" />
@@ -1478,28 +1487,44 @@ function LoadsView({
                         <p className={cn("text-xs", getFillColor(load.fillPercentage))}>
                           {load.fillPercentage}% full
                         </p>
-                        {load.status !== 'in_transit' && load.status !== 'completed' && loadOrders.length > 0 && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                            onClick={() => onDispatchLoad(load.id, load.loadName || load.runNumber, loadOrders.length)}
-                          >
-                            <Send className="h-3 w-3 mr-1" />
-                            Dispatch
-                          </Button>
-                        )}
-                        {load.status === 'in_transit' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs text-amber-600 border-amber-600 hover:bg-amber-50"
-                            onClick={() => onRecallLoad(load.id, load.loadName || load.runNumber)}
-                          >
-                            <Undo2 className="h-3 w-3 mr-1" />
-                            Recall
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {/* Driver View Button - always visible for loads with orders */}
+                          {loadOrders.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              asChild
+                            >
+                              <a href={`/dispatch/driver?runId=${load.id}`}>
+                                <Eye className="h-3 w-3 mr-1" />
+                                Driver
+                              </a>
+                            </Button>
+                          )}
+                          {load.status !== 'in_transit' && load.status !== 'completed' && loadOrders.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                              onClick={() => onDispatchLoad(load.id, load.loadName || load.runNumber, loadOrders.length)}
+                            >
+                              <Send className="h-3 w-3 mr-1" />
+                              Dispatch
+                            </Button>
+                          )}
+                          {load.status === 'in_transit' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs text-amber-600 border-amber-600 hover:bg-amber-50"
+                              onClick={() => onRecallLoad(load.id, load.loadName || load.runNumber)}
+                            >
+                              <Undo2 className="h-3 w-3 mr-1" />
+                              Recall
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

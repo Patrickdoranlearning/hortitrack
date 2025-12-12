@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default async function TrolleyManagementPage() {
-  const { userId, orgId } = await getUserAndOrg();
-
-  if (!userId) {
-    redirect("/login");
+  try {
+    await getUserAndOrg();
+  } catch {
+    redirect("/login?next=/dispatch/trolleys");
   }
 
   return (

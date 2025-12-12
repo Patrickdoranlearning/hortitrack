@@ -3,21 +3,38 @@ import { getSupabaseAdmin } from "@/server/db/supabase";
 
 export const runtime = "nodejs";
 
-async function countBatches(
-  where: { column?: string; value?: string },
-  orgId?: string | null
-) {
+// Optimized: Single query with status aggregation instead of 4 separate count queries
+async function getBatchStatusCounts(orgId?: string | null) {
   const supabase = getSupabaseAdmin();
-  let query = supabase.from("batches").select("id", { count: "exact", head: true });
+
+  // Fetch all batches with just status field (minimal data)
+  let query = supabase
+    .from("batches")
+    .select("status");
+
   if (orgId) {
     query = query.eq("org_id", orgId);
   }
-  if (where.column && where.value) {
-    query = query.eq(where.column, where.value);
-  }
-  const { count, error } = await query;
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return count ?? 0;
+
+  // Count locally - much faster than 4 separate DB queries
+  const batches = data || [];
+  const counts = {
+    all: batches.length,
+    propagation: 0,
+    ready: 0,
+    archived: 0,
+  };
+
+  for (const batch of batches) {
+    if (batch.status === "Propagation") counts.propagation++;
+    else if (batch.status === "Ready") counts.ready++;
+    else if (batch.status === "Archived") counts.archived++;
+  }
+
+  return counts;
 }
 
 export const GET = withApiGuard({
@@ -25,22 +42,10 @@ export const GET = withApiGuard({
   requireRole: "user",
   async handler({ user }) {
     const orgId = user?.orgId ?? null;
-    const [all, propagation, ready, archived] = await Promise.all([
-      countBatches({}, orgId),
-      countBatches({ column: "status", value: "Propagation" }, orgId),
-      countBatches({ column: "status", value: "Ready" }, orgId),
-      countBatches({ column: "status", value: "Archived" }, orgId),
-    ]);
+    const totals = await getBatchStatusCounts(orgId);
 
     return new Response(
-      JSON.stringify({
-        totals: {
-          all,
-          propagation,
-          ready,
-          archived,
-        },
-      }),
+      JSON.stringify({ totals }),
       { status: 200, headers: { "content-type": "application/json" } }
     );
   },

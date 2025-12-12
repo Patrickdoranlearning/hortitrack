@@ -5,9 +5,10 @@ import { updateDeliveryItem } from "@/server/dispatch/queries.server";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { itemId: string } }
+  { params }: { params: Promise<{ itemId: string }> }
 ) {
   try {
+    const { itemId } = await params;
     const json = await req.json();
     const parsed = UpdateDeliveryItemSchema.safeParse(json);
 
@@ -18,7 +19,7 @@ export async function PATCH(
       );
     }
 
-    await updateDeliveryItem(params.itemId, parsed.data);
+    await updateDeliveryItem(itemId, parsed.data);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[api:dispatch/items/[itemId]][PATCH]", err);

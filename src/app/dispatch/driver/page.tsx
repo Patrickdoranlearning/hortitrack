@@ -1,29 +1,27 @@
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import { getActiveDeliveryRuns, getDeliveryRunWithItems } from '@/server/dispatch/queries.server';
+import { getActiveDeliveryRuns } from '@/server/dispatch/queries.server';
 import { getUserAndOrg } from '@/server/auth/org';
 import DriverViewClient from './DriverViewClient';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Truck, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Truck } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
-export default async function DriverPage() {
+interface PageProps {
+  searchParams: Promise<{ runId?: string }>;
+}
+
+export default async function DriverPage({ searchParams }: PageProps) {
+  const params = await searchParams;
   let activeRuns: any[] = [];
-  let userRun: any = null;
 
   try {
-    const { user } = await getUserAndOrg();
+    await getUserAndOrg();
     activeRuns = await getActiveDeliveryRuns();
-    
-    // TODO: In the future, auto-detect which run the driver is assigned to
-    // For now, show all active runs to select from
   } catch (error) {
     console.error('Error fetching driver data:', error);
   }
-
-  // If only one active run, could auto-load it
-  // For now, let the driver select their run
 
   return (
     <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
@@ -47,7 +45,7 @@ export default async function DriverPage() {
             </CardContent>
           </Card>
         ) : (
-          <DriverViewClient activeRuns={activeRuns} />
+          <DriverViewClient activeRuns={activeRuns} initialRunId={params.runId} />
         )}
       </div>
     </PageFrame>
