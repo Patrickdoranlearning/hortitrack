@@ -14,6 +14,7 @@ export type HistoryLog = {
   userId?: string | null;
   userName?: string | null;
   media?: Array<{ url: string; name?: string | null }>;
+  quantity?: number | null; // Quantity change (+/- units)
 };
 
 type AnyDate = Date | string | number | null | undefined;
@@ -112,6 +113,35 @@ async function readEvents(batchId: string) {
   return data ?? [];
 }
 
+async function readPlantHealthLogs(batchId: string) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("plant_health_logs")
+    .select(`
+      id,
+      event_type,
+      event_at,
+      recorded_by,
+      title,
+      notes,
+      product_name,
+      rate,
+      unit,
+      method,
+      reason_for_use,
+      weather_conditions,
+      area_treated,
+      sprayer_used,
+      signed_by,
+      safe_harvest_date,
+      harvest_interval_days
+    `)
+    .eq("batch_id", batchId)
+    .order("event_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
 function parsePayload(raw: unknown): Record<string, unknown> | null {
   if (!raw) return null;
   if (typeof raw === "object") return raw as Record<string, unknown>;
@@ -195,21 +225,62 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
     }
   }
 
-  const events = await readEvents(batch.id);
+  const [events, healthLogs] = await Promise.all([
+    readEvents(batch.id),
+    readPlantHealthLogs(batch.id),
+  ]);
+
   const logs: HistoryLog[] = events.map((evt) => {
     const payload = parsePayload(evt.payload);
     const photos = getArray(payload, "photos");
+    const eventType = (evt.type ?? "event").toLowerCase();
+
+    // Extract quantity from payload based on event type
+    let quantity: number | null = null;
+    if (payload) {
+      const rawQty = payload.qty ?? payload.quantity ?? payload.units_picked ?? payload.units ?? payload.diff ?? null;
+      if (typeof rawQty === "number") {
+        // Determine sign based on event type
+        const upperType = evt.type?.toUpperCase() ?? "";
+        if (["PICKED", "LOSS", "TRANSPLANT_TO"].includes(upperType)) {
+          quantity = -Math.abs(rawQty);
+        } else if (["TRANSPLANT_FROM", "CREATE", "CHECKIN"].includes(upperType)) {
+          quantity = Math.abs(rawQty);
+        } else {
+          quantity = rawQty;
+        }
+      }
+    }
+
+    // Build better title based on event type
+    let title =
+      getString(payload, "notes") ??
+      getString(payload, "reason") ??
+      getString(payload, "stage") ??
+      evt.type ??
+      "event";
+
+    // Improve title for specific event types
+    const upperType = evt.type?.toUpperCase() ?? "";
+    if (upperType === "PICKED" && quantity) {
+      title = `${Math.abs(quantity)} units picked for sale`;
+    } else if (upperType === "TRANSPLANT_TO" && quantity) {
+      title = `${Math.abs(quantity)} units transplanted out`;
+    } else if (upperType === "TRANSPLANT_FROM" && quantity) {
+      title = `${Math.abs(quantity)} units transplanted in`;
+    } else if (upperType === "LOSS" && quantity) {
+      title = `${Math.abs(quantity)} units lost${getString(payload, "reason") ? `: ${getString(payload, "reason")}` : ""}`;
+    } else if (upperType === "STATUS_CHANGE") {
+      const status = getString(payload, "status") ?? getString(payload, "newStatus");
+      if (status) title = `Status changed to ${status}`;
+    }
+
     return {
       id: evt.id,
       batchId: batch.id,
       at: toDate(evt.at)?.toISOString() ?? new Date().toISOString(),
-      type: (evt.type ?? "event").toLowerCase(),
-      title:
-        getString(payload, "notes") ??
-        getString(payload, "reason") ??
-        getString(payload, "stage") ??
-        evt.type ??
-        "event",
+      type: eventType,
+      title,
       details:
         getString(payload, "details") ??
         getString(payload, "notes") ??
@@ -224,8 +295,45 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
           url: photo.url,
           name: photo.caption ?? null,
         })),
+      quantity,
     };
   });
+
+  // Add plant health logs (IPM treatments, etc.) to the history
+  for (const hl of healthLogs) {
+    // Build details string with application info
+    const detailParts: string[] = [];
+    if (hl.product_name) {
+      let productInfo = hl.product_name;
+      if (hl.rate && hl.unit) {
+        productInfo += ` @ ${hl.rate} ${hl.unit}`;
+      }
+      if (hl.method) {
+        productInfo += ` (${hl.method})`;
+      }
+      detailParts.push(productInfo);
+    }
+    if (hl.reason_for_use) detailParts.push(`Reason: ${hl.reason_for_use}`);
+    if (hl.weather_conditions) detailParts.push(`Weather: ${hl.weather_conditions}`);
+    if (hl.area_treated) detailParts.push(`Area: ${hl.area_treated}`);
+    if (hl.sprayer_used) detailParts.push(`Sprayer: ${hl.sprayer_used}`);
+    if (hl.safe_harvest_date) {
+      detailParts.push(`Safe harvest: ${new Date(hl.safe_harvest_date).toLocaleDateString()}`);
+    }
+    if (hl.notes) detailParts.push(hl.notes);
+
+    logs.push({
+      id: hl.id,
+      batchId: batch.id,
+      at: toDate(hl.event_at)?.toISOString() ?? new Date().toISOString(),
+      type: hl.event_type === 'treatment' ? 'treatment' : (hl.event_type ?? 'health'),
+      title: hl.title ?? hl.product_name ?? hl.event_type ?? 'Health Log',
+      details: detailParts.length > 0 ? detailParts.join(' | ') : null,
+      userId: hl.recorded_by ?? null,
+      userName: hl.signed_by ?? null,
+      media: [],
+    });
+  }
 
   const STAGE_ACTIONS = new Set([
     "cuttings",

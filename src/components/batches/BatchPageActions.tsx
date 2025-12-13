@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ActionMenuButton } from '@/components/actions/ActionMenuButton';
 import { ActionDialog } from '@/components/actions/ActionDialog';
 import type { ActionMode } from '@/components/actions/types';

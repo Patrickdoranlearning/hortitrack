@@ -17,6 +17,21 @@ type Mini = {
   proportion?: number | null;
 };
 
+// Helper to normalize batch data from API (handles both camelCase and snake_case)
+function normalizeBatch(data: Record<string, unknown>): Mini {
+  return {
+    id: String(data.id ?? ""),
+    batchNumber: (data.batchNumber ?? data.batch_number ?? null) as string | number | null,
+    plantVariety: (data.plantVariety ?? data.plant_variety ?? null) as string | null,
+    plantFamily: (data.plantFamily ?? data.plant_family ?? null) as string | null,
+    size: (data.size ?? null) as string | null,
+    status: (data.status ?? null) as string | null,
+    quantity: (data.quantity ?? null) as number | null,
+    initialQuantity: (data.initialQuantity ?? data.initial_quantity ?? null) as number | null,
+    proportion: (data.proportion ?? null) as number | null,
+  };
+}
+
 type ResponseShape = {
   parents: Mini[];
   current: Mini | null;
@@ -108,9 +123,9 @@ export default function AncestryStrip({
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "Failed to load ancestry");
         setData({
-          parents: j.parents ?? [],
-          current: j.current ?? null,
-          children: j.children ?? [],
+          parents: (j.parents ?? []).map((p: Record<string, unknown>) => normalizeBatch(p)),
+          current: j.current ? normalizeBatch(j.current) : null,
+          children: (j.children ?? []).map((c: Record<string, unknown>) => normalizeBatch(c)),
         });
       } catch (e: any) {
         toast({
