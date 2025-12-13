@@ -1,5 +1,5 @@
 
-import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, ClipboardList, Store, Target } from "lucide-react";
+import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, Store, Target, ListTodo } from "lucide-react";
 
 export type NavItem = {
   key: string;
@@ -25,6 +25,7 @@ export const APP_NAV: NavItem[] = [
       { label: "Batches", href: "/", description: "View and manage all batches." },
       { label: "Locations", href: "/production/locations", description: "View what's growing in each location." },
       { label: "Planning", href: "/production/planning", description: "Plan future production cycles." },
+      { label: "Jobs", href: "/production/jobs", description: "Create and manage production jobs." },
       { label: "Recipes", href: "/production/recipes", description: "Production recipes and timelines." },
       { label: "Saleable", href: "/production/saleable", description: "Release-ready batches and quick approvals." },
     ]
@@ -32,12 +33,14 @@ export const APP_NAV: NavItem[] = [
   {
     key: "plantHealth",
     label: "Plant Health",
-    href: "/actions",
+    href: "/plant-health",
     icon: ShieldCheck,
     items: [
-      { label: "Health Dashboard", href: "/actions", description: "Tasks and recent activities." },
-      { label: "IPM Log", href: "/actions/ipm", description: "Log and view pest management." },
-      { label: "Flagged Batches", href: "/actions/flagged", description: "Batches needing attention." },
+      { label: "Dashboard", href: "/plant-health", description: "Upcoming treatments and active programs." },
+      { label: "IPM Tasks", href: "/plant-health/tasks", description: "Spray schedules grouped by product and week." },
+      { label: "Scout Mode", href: "/plant-health/scout", description: "Scan locations to log issues and readings." },
+      { label: "IPM Products", href: "/plant-health/products", description: "Manage IPM product database." },
+      { label: "IPM Programs", href: "/plant-health/programs", description: "Create week-based treatment programs." },
     ]
   },
   {
@@ -75,6 +78,18 @@ export const APP_NAV: NavItem[] = [
     items: [
       { label: "Place Order (as Customer)", href: "/b2b/impersonate", description: "Impersonate customer to place orders." },
       { label: "Customer Login", href: "/b2b/login", description: "Direct link to customer portal login." },
+    ]
+  },
+  {
+    key: "tasks",
+    label: "Tasks",
+    href: "/tasks",
+    icon: ListTodo,
+    items: [
+      { label: "Overview", href: "/tasks", description: "Task dashboard and your daily schedule." },
+      { label: "Production Tasks", href: "/tasks/production", description: "Manage and assign production jobs." },
+      { label: "Plant Health Tasks", href: "/tasks/plant-health", description: "IPM and health-related tasks." },
+      { label: "Dispatch Tasks", href: "/tasks/dispatch", description: "Picking, packing, and loading tasks." },
     ]
   },
 ];

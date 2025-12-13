@@ -7,7 +7,9 @@ export type AttributeKey =
   | "sub_location"
   | "audit_type"
   | "plant_category"
-  | "delivery_route";
+  | "delivery_route"
+  | "plant_health_issue"
+  | "sprayer_used";
 
 export type AttributeBehavior = "growing" | "available" | "waste" | "archived";
 
@@ -70,6 +72,15 @@ export const ATTRIBUTE_META: Record<
     description: "Predefined delivery routes for dispatch planning.",
     allowColor: true,
   },
+  plant_health_issue: {
+    label: "Plant Health Issues",
+    description: "Common pest and disease issues for scouting and IPM logging.",
+    allowColor: true,
+  },
+  sprayer_used: {
+    label: "Sprayers",
+    description: "Spray equipment used for IPM applications.",
+  },
 };
 
 // Defaults keep legacy values to avoid breaking existing data,
@@ -123,6 +134,33 @@ const DEFAULTS: Record<AttributeKey, DefaultOption[]> = {
     { systemCode: "LIMERICK", displayLabel: "Limerick", sortOrder: 40, isActive: true },
     { systemCode: "NORTH", displayLabel: "North", sortOrder: 50, isActive: true },
     { systemCode: "SOUTH", displayLabel: "South", sortOrder: 60, isActive: true },
+  ],
+  plant_health_issue: [
+    { systemCode: "APHIDS", displayLabel: "Aphids", sortOrder: 10, isActive: true },
+    { systemCode: "VINE_WEEVIL", displayLabel: "Vine Weevil", sortOrder: 20, isActive: true },
+    { systemCode: "SPIDER_MITES", displayLabel: "Spider Mites", sortOrder: 30, isActive: true },
+    { systemCode: "WHITEFLY", displayLabel: "Whitefly", sortOrder: 40, isActive: true },
+    { systemCode: "THRIPS", displayLabel: "Thrips", sortOrder: 50, isActive: true },
+    { systemCode: "FUNGAL_INFECTION", displayLabel: "Fungal Infection", sortOrder: 60, isActive: true },
+    { systemCode: "POWDERY_MILDEW", displayLabel: "Powdery Mildew", sortOrder: 70, isActive: true },
+    { systemCode: "ROOT_ROT", displayLabel: "Root Rot", sortOrder: 80, isActive: true },
+    { systemCode: "NUTRIENT_DEFICIENCY", displayLabel: "Nutrient Deficiency", sortOrder: 90, isActive: true },
+    { systemCode: "OVERWATERING", displayLabel: "Overwatering", sortOrder: 100, isActive: true },
+    { systemCode: "UNDERWATERING", displayLabel: "Underwatering", sortOrder: 110, isActive: true },
+    { systemCode: "BOTRYTIS", displayLabel: "Botrytis", sortOrder: 120, isActive: true },
+    { systemCode: "SLUG_DAMAGE", displayLabel: "Slug/Snail Damage", sortOrder: 130, isActive: true },
+    { systemCode: "CATERPILLAR", displayLabel: "Caterpillar Damage", sortOrder: 140, isActive: true },
+    { systemCode: "SCALE_INSECTS", displayLabel: "Scale Insects", sortOrder: 150, isActive: true },
+    { systemCode: "MEALYBUG", displayLabel: "Mealybug", sortOrder: 160, isActive: true },
+  ],
+  sprayer_used: [
+    { systemCode: "KNAPSACK_1", displayLabel: "Knapsack #1", sortOrder: 10, isActive: true },
+    { systemCode: "KNAPSACK_2", displayLabel: "Knapsack #2", sortOrder: 20, isActive: true },
+    { systemCode: "KNAPSACK_3", displayLabel: "Knapsack #3", sortOrder: 30, isActive: true },
+    { systemCode: "BOOM_SPRAYER", displayLabel: "Boom Sprayer", sortOrder: 40, isActive: true },
+    { systemCode: "MIST_BLOWER", displayLabel: "Mist Blower", sortOrder: 50, isActive: true },
+    { systemCode: "HAND_PUMP", displayLabel: "Hand Pump Sprayer", sortOrder: 60, isActive: true },
+    { systemCode: "FOGGING_MACHINE", displayLabel: "Fogging Machine", sortOrder: 70, isActive: true },
   ],
 };
 

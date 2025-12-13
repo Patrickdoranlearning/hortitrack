@@ -41,6 +41,9 @@ export const SiteSchema = z.object({
 export type Site = z.infer<typeof SiteSchema>;
 
 // --- Locations ---
+export const HealthStatus = z.enum(['clean', 'infested', 'restricted']);
+export type HealthStatus = z.infer<typeof HealthStatus>;
+
 export const NurseryLocationSchema = z.object({
   id: z.string().optional(),
   orgId: z.string(),
@@ -50,6 +53,9 @@ export const NurseryLocationSchema = z.object({
   covered: z.boolean().default(false),
   type: z.string().optional(),
   area: z.number().nonnegative().nullable().optional(),
+  // Plant Health fields
+  healthStatus: HealthStatus.default('clean'),
+  restrictedUntil: z.string().nullable().optional(), // ISO timestamp
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
