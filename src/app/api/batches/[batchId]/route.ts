@@ -174,6 +174,41 @@ export async function PATCH(req: Request, { params }: Params) {
 
     if (updateError) throw updateError;
 
+    // Log quantity change to batch_events if quantity was modified
+    const qtyChanged = typeof updates.quantity === "number" && updates.quantity !== stored.quantity;
+    if (qtyChanged) {
+      const diff = (updates.quantity ?? 0) - (stored.quantity ?? 0);
+      await supabase.from("batch_events").insert({
+        org_id: activeOrgId,
+        batch_id: batchId,
+        type: "ADJUSTMENT",
+        payload: {
+          previousQuantity: stored.quantity,
+          newQuantity: updates.quantity,
+          diff,
+          reason: "Manual adjustment",
+        },
+        by_user_id: user.id,
+        at: new Date().toISOString(),
+      });
+    }
+
+    // Log status change to batch_events if status was modified
+    const statusChanged = updates.status && updates.status !== stored.status;
+    if (statusChanged || (shouldArchive && stored.status !== "Archived")) {
+      await supabase.from("batch_events").insert({
+        org_id: activeOrgId,
+        batch_id: batchId,
+        type: "STATUS_CHANGE",
+        payload: {
+          previousStatus: stored.status,
+          newStatus: finalStatus,
+        },
+        by_user_id: user.id,
+        at: new Date().toISOString(),
+      });
+    }
+
     // Append auto-archive log if transitioning to Archived now
     const becameArchived = shouldArchive && stored.status !== "Archived";
     if (becameArchived) {

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { Batch } from '@/lib/types';
+import type { HistoryLog as HistoryLogType } from "@/server/batches/history";
 import { ProductionProtocolDialog } from "./production-protocol-dialog";
 import { CareRecommendationsDialog } from "./care-recommendations-dialog";
 import { Badge } from "./ui/badge";
@@ -32,6 +33,7 @@ import AncestryStrip from "./ancestry-strip";
 import { PlantPassportCard } from "./batches/PlantPassportCard";
 import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
 import type { ActionMode } from "@/components/actions/types";
+import { HistoryLog } from "@/components/history/HistoryLog";
 
 // Lazy load gallery to avoid slowing down dialog open
 const BatchGallerySection = dynamic(
@@ -47,28 +49,6 @@ const BatchGallerySection = dynamic(
   }
 );
 
-type BatchEvent = {
-  id: string;
-  type: string;
-  at: string;
-  created_at: string;
-  by_user_id: string | null;
-  payload: Record<string, any> | null;
-};
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  DUMP: "Stock Dumped",
-  MOVE: "Moved",
-  MOVE_IN: "Received from Split",
-  CHECKIN: "Check-in",
-  NOTE: "Note Added",
-  PROPAGATE: "Propagated",
-  TRANSPLANT: "Transplanted",
-  STATUS_CHANGE: "Status Changed",
-  PICKED: "Picked for Order",
-  SOLD: "Sold",
-  ARCHIVE: "Archived",
-};
 
 interface BatchDetailDialogProps {
   open: boolean;
@@ -95,22 +75,22 @@ export function BatchDetailDialog({
 }: BatchDetailDialogProps) {
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
-  const [events, setEvents] = React.useState<BatchEvent[]>([]);
-  const [eventsLoading, setEventsLoading] = React.useState(false);
-  const [eventsError, setEventsError] = React.useState<string | null>(null);
+  const [historyLogs, setHistoryLogs] = React.useState<HistoryLogType[]>([]);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
+  const [historyError, setHistoryError] = React.useState<string | null>(null);
 
-  // Fetch events when dialog opens or batch changes
+  // Fetch combined history (events + plant health logs) when dialog opens or batch changes
   React.useEffect(() => {
     if (!open || !batch?.id) {
-      setEvents([]);
+      setHistoryLogs([]);
       return;
     }
 
     let cancelled = false;
-    setEventsLoading(true);
-    setEventsError(null);
+    setHistoryLoading(true);
+    setHistoryError(null);
 
-    fetch(`/api/production/batches/${batch.id}/events`)
+    fetch(`/api/production/batches/${batch.id}/history`)
       .then(async (res) => {
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
@@ -120,17 +100,17 @@ export function BatchDetailDialog({
       })
       .then((data) => {
         if (!cancelled) {
-          setEvents(data.items || []);
+          setHistoryLogs(data.logs || []);
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setEventsError(err?.message || String(err));
+          setHistoryError(err?.message || String(err));
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setEventsLoading(false);
+          setHistoryLoading(false);
         }
       });
 
@@ -246,85 +226,20 @@ export function BatchDetailDialog({
                 </TabsContent>
                 <TabsContent value="history">
                   <div className="max-h-80 overflow-y-auto mt-4">
-                    {eventsLoading && (
+                    {historyLoading && (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        Loading events...
+                        Loading history...
                       </div>
                     )}
-                    {eventsError && (
-                      <div className="text-sm text-red-600 py-4">{eventsError}</div>
+                    {historyError && (
+                      <div className="text-sm text-red-600 py-4">{historyError}</div>
                     )}
-                    {!eventsLoading && !eventsError && events.length === 0 && (
-                      <div className="text-muted-foreground py-4 text-center">No events logged yet.</div>
+                    {!historyLoading && !historyError && historyLogs.length === 0 && (
+                      <div className="text-muted-foreground py-4 text-center">No history logged yet.</div>
                     )}
-                    {!eventsLoading && events.length > 0 && (
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-background border-b">
-                          <tr className="text-left text-muted-foreground">
-                            <th className="py-2 pr-2 font-medium w-28">Date</th>
-                            <th className="py-2 px-2 font-medium">Event</th>
-                            <th className="py-2 px-2 font-medium text-right w-20">Qty</th>
-                            <th className="py-2 pl-2 font-medium">Details</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {events.map((event) => {
-                            const payload = typeof event.payload === "string" 
-                              ? JSON.parse(event.payload) 
-                              : event.payload;
-                            const typeLabel = EVENT_TYPE_LABELS[event.type] || event.type;
-                            
-                            // Extract quantity from various payload fields
-                            const qty = payload?.units_picked 
-                              || payload?.units_dumped 
-                              || payload?.units_moved 
-                              || payload?.quantityActual
-                              || payload?.quantity
-                              || null;
-                            
-                            // Determine if this is a decrease (negative) event
-                            const isDecrease = ["DUMP", "PICKED", "SOLD", "TRANSPLANT"].includes(event.type);
-                            
-                            // Build details string
-                            const details: string[] = [];
-                            if (payload?.to_location_name) details.push(`→ ${payload.to_location_name}`);
-                            if (payload?.order_number) details.push(`Order #${payload.order_number}`);
-                            if (payload?.customer_name) details.push(payload.customer_name);
-                            if (payload?.reason) details.push(payload.reason);
-                            if (payload?.status) details.push(`Status: ${payload.status}`);
-                            if (payload?.notes) details.push(payload.notes);
-                            
-                            return (
-                              <tr key={event.id} className="hover:bg-muted/30">
-                                <td className="py-2 pr-2 text-muted-foreground whitespace-nowrap">
-                                  {new Date(event.at || event.created_at).toLocaleDateString('en-GB', { 
-                                    day: '2-digit', 
-                                    month: 'short',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </td>
-                                <td className="py-2 px-2 font-medium">
-                                  {typeLabel}
-                                </td>
-                                <td className={`py-2 px-2 text-right font-mono ${
-                                  qty 
-                                    ? isDecrease 
-                                      ? 'text-red-600' 
-                                      : 'text-green-600'
-                                    : 'text-muted-foreground'
-                                }`}>
-                                  {qty ? (isDecrease ? `-${qty}` : `+${qty}`) : '—'}
-                                </td>
-                                <td className="py-2 pl-2 text-muted-foreground truncate max-w-[180px]" title={details.join(' · ')}>
-                                  {details.join(' · ') || '—'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    {!historyLoading && historyLogs.length > 0 && (
+                      <HistoryLog logs={historyLogs} />
                     )}
                   </div>
                 </TabsContent>
