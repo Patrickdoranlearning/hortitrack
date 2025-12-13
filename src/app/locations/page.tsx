@@ -543,6 +543,8 @@ function normalizeLocation(row: any): NurseryLocation | undefined {
     area: typeof row.area === 'number' ? row.area : row.area ? Number(row.area) : undefined,
     siteId: row.site_id ?? row.siteId ?? undefined,
     orgId: row.org_id ?? row.orgId ?? '',
+    healthStatus: row.health_status ?? row.healthStatus ?? 'clean',
+    restrictedUntil: row.restricted_until ?? row.restrictedUntil ?? null,
     createdAt: row.created_at ?? row.createdAt,
     updatedAt: row.updated_at ?? row.updatedAt,
   } as NurseryLocation;

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import useSWR from "swr";
+import { Check, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
@@ -9,10 +10,12 @@ import { PlanningTimeline } from "./components/PlanningTimeline";
 import { IncomingBatchDialog } from "./components/IncomingBatchDialog";
 import { FutureAllocationDialog } from "./components/FutureAllocationDialog";
 import { ProtocolDrawer } from "./components/ProtocolDrawer";
+import { CreateJobFromPlanningDialog } from "./components/CreateJobFromPlanningDialog";
 import type { PlanningSnapshot, ProtocolSummary } from "@/lib/planning/types";
 import { Badge } from "@/components/ui/badge";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 type Props = {
   initialSnapshot: PlanningSnapshot;
@@ -27,11 +30,12 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
   const [incomingOpen, setIncomingOpen] = React.useState(false);
   const [allocationOpen, setAllocationOpen] = React.useState(false);
   const [protocolOpen, setProtocolOpen] = React.useState(false);
+  const [createJobOpen, setCreateJobOpen] = React.useState(false);
+  const [selectedBatchIds, setSelectedBatchIds] = React.useState<Set<string>>(new Set());
 
   const {
     data: snapshot = initialSnapshot,
     mutate: refreshSnapshot,
-    isValidating: snapshotLoading,
   } = useSWR("/api/production/planning", planningFetcher, {
     fallbackData: initialSnapshot,
   });
@@ -46,6 +50,24 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
 
   const ghostBatches = (snapshot?.batches ?? []).filter((batch) => batch.isGhost);
   const physicalBatches = (snapshot?.batches ?? []).filter((batch) => !batch.isGhost);
+
+  const toggleBatchSelection = React.useCallback((batchId: string) => {
+    setSelectedBatchIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(batchId)) {
+        next.delete(batchId);
+      } else {
+        next.add(batchId);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearBatchSelection = React.useCallback(() => {
+    setSelectedBatchIds(new Set());
+  }, []);
+
+  const selectedBatches = ghostBatches.filter((b) => selectedBatchIds.has(b.id));
 
   return (
     <>
@@ -81,35 +103,88 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
 
           <Card>
             <CardHeader>
-              <CardTitle>Ghost batches</CardTitle>
-              <CardDescription>
-                Incoming deliveries and planned batches awaiting execution.
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Ghost batches</CardTitle>
+                  <CardDescription>
+                    Incoming deliveries and planned batches awaiting execution.
+                  </CardDescription>
+                </div>
+                {selectedBatchIds.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {selectedBatchIds.size} selected
+                    </Badge>
+                    <Button
+                      size="sm"
+                      onClick={() => setCreateJobOpen(true)}
+                    >
+                      <Briefcase className="mr-1.5 h-4 w-4" />
+                      Create Job
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={clearBatchSelection}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {ghostBatches.length === 0 && (
                 <p className="text-sm text-muted-foreground">No ghost batches scheduled.</p>
               )}
-              {ghostBatches.map((batch) => (
-                <div key={batch.id} className="border rounded-lg p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">
-                        {batch.varietyName ?? "Variety"} · {batch.sizeName ?? "Size"}
+              {ghostBatches.length > 0 && selectedBatchIds.size === 0 && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  Click batches to select them for job creation.
+                </p>
+              )}
+              {ghostBatches.map((batch) => {
+                const isSelected = selectedBatchIds.has(batch.id);
+                return (
+                  <button
+                    key={batch.id}
+                    type="button"
+                    onClick={() => toggleBatchSelection(batch.id)}
+                    className={cn(
+                      "w-full text-left border rounded-lg p-3 transition-colors hover:bg-muted/50",
+                      isSelected && "border-primary bg-primary/5"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center shrink-0",
+                            isSelected
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-input"
+                          )}
+                        >
+                          {isSelected && <Check className="h-3 w-3" />}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">
+                            {batch.varietyName ?? "Variety"} · {batch.sizeName ?? "Size"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Ready {formatDate(batch.readyDate)} · {batch.quantity} units
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Ready {formatDate(batch.readyDate)} · {batch.quantity} units
-                      </div>
+                      <Badge variant="outline">{batch.status}</Badge>
                     </div>
-                    <Badge variant="outline">{batch.status}</Badge>
-                  </div>
-                  {batch.parentBatchId && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      From {batch.parentBatchId.slice(0, 8)} · Protocol {batch.protocolId ?? "—"}
-                    </p>
-                  )}
-                </div>
-              ))}
+                    {batch.parentBatchId && (
+                      <p className="text-xs text-muted-foreground mt-1 ml-7">
+                        From {batch.parentBatchId.slice(0, 8)} · Protocol {batch.protocolId ?? "—"}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
             </CardContent>
           </Card>
         </div>
@@ -174,6 +249,15 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
         onOpenChange={setProtocolOpen}
         onSuccess={() => {
           refreshProtocols();
+        }}
+      />
+      <CreateJobFromPlanningDialog
+        open={createJobOpen}
+        onOpenChange={setCreateJobOpen}
+        selectedBatches={selectedBatches}
+        onSuccess={() => {
+          refreshSnapshot();
+          clearBatchSelection();
         }}
       />
     </>

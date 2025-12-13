@@ -162,8 +162,8 @@ function normalizeVarietyRow(row?: any): Variety | undefined {
 }
 
 const locationColumnMap = {
-  camel: ['id', 'orgId', 'siteId', 'name', 'nurserySite', 'covered', 'area', 'type'] as const,
-  snake: ['id', 'org_id', 'site_id', 'name', 'nursery_site', 'covered', 'area', 'type'] as const,
+  camel: ['id', 'orgId', 'siteId', 'name', 'nurserySite', 'covered', 'area', 'type', 'healthStatus', 'restrictedUntil'] as const,
+  snake: ['id', 'org_id', 'site_id', 'name', 'nursery_site', 'covered', 'area', 'type', 'health_status', 'restricted_until'] as const,
 };
 
 function mapLocationToDb(location: Partial<NurseryLocation>) {
