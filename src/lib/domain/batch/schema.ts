@@ -137,12 +137,14 @@ export type CheckInFormValues = z.infer<typeof CheckInFormSchema>;
 
 /**
  * Schema for transplanting from one batch to create a new batch
+ * Either containers OR units must be provided (units takes precedence)
  */
 export const TransplantInputSchema = z.object({
   parent_batch_id: z.string().uuid(),
   size_id: z.string().uuid(),
   location_id: z.string().uuid(),
-  containers: z.number().int().min(1, "At least 1 container required"),
+  containers: z.number().int().min(0).default(1), // Can be 0 if units is provided
+  units: z.number().int().min(1).optional(), // Direct unit count (takes precedence over containers)
   planted_at: DateOnly.optional(),
   notes: z.string().max(1000).optional(),
   archive_parent_if_empty: z.boolean().optional().default(true),

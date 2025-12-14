@@ -21,10 +21,13 @@ COMMENT ON COLUMN public.plant_health_logs.ph_reading IS 'pH measurement';
 COMMENT ON COLUMN public.plant_health_logs.issue_reason IS 'Reason for flagging (e.g., Aphids, Fungal Infection, Nutrient Deficiency)';
 COMMENT ON COLUMN public.plant_health_logs.severity IS 'Issue severity: low (monitor), medium (treat), critical (quarantine)';
 
--- Add check constraint for severity values
-ALTER TABLE public.plant_health_logs
-ADD CONSTRAINT plant_health_logs_severity_check 
-CHECK (severity IS NULL OR severity IN ('low', 'medium', 'critical'));
+-- Add check constraint for severity values (skip if exists)
+DO $$ BEGIN
+  ALTER TABLE public.plant_health_logs
+  ADD CONSTRAINT plant_health_logs_severity_check
+  CHECK (severity IS NULL OR severity IN ('low', 'medium', 'critical'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 2. Add health status fields to nursery_locations for safety locks
 ALTER TABLE public.nursery_locations
@@ -34,10 +37,13 @@ ADD COLUMN IF NOT EXISTS restricted_until timestamptz;
 COMMENT ON COLUMN public.nursery_locations.health_status IS 'Location health status: clean, infested, restricted';
 COMMENT ON COLUMN public.nursery_locations.restricted_until IS 'Safety lock - location restricted until this timestamp (REI expiry)';
 
--- Add check constraint for health_status values
-ALTER TABLE public.nursery_locations
-ADD CONSTRAINT nursery_locations_health_status_check 
-CHECK (health_status IS NULL OR health_status IN ('clean', 'infested', 'restricted'));
+-- Add check constraint for health_status values (skip if exists)
+DO $$ BEGIN
+  ALTER TABLE public.nursery_locations
+  ADD CONSTRAINT nursery_locations_health_status_check
+  CHECK (health_status IS NULL OR health_status IN ('clean', 'infested', 'restricted'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 3. Create index for efficient safety lock checks
 CREATE INDEX IF NOT EXISTS idx_nursery_locations_restricted 
