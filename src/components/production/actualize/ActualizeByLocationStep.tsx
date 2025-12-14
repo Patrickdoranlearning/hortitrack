@@ -36,6 +36,7 @@ export type ActualizedBatchEntry = {
   batchId: string;
   batchNumber: string;
   varietyName: string;
+  sizeId: string;
   sizeName: string;
   plannedQuantity: number;
   actualQuantity: number;
@@ -90,6 +91,7 @@ export function ActualizeByLocationStep({
       batchId: batch.id,
       batchNumber: batch.batchNumber,
       varietyName: batch.varietyName,
+      sizeId: batch.sizeId,
       sizeName: batch.sizeName,
       plannedQuantity: batch.quantity,
       actualQuantity: batch.quantity, // Default to planned

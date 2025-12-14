@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { consumeMaterialsForBatch } from "@/server/materials/consumption";
 
 const ActualizeBatchSchema = z.object({
   batch_id: z.string().uuid(),
@@ -8,12 +9,14 @@ const ActualizeBatchSchema = z.object({
   actual_location_id: z.string().uuid().optional(),
   actual_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
   notes: z.string().max(1000).optional(),
+  size_id: z.string().uuid().optional(), // For material consumption
 });
 
 const ActualizeSchema = z.object({
   batches: z.array(ActualizeBatchSchema).min(1, "At least one batch required"),
   job_id: z.string().uuid().optional(), // Optional: if actualizing as part of a job
   notes: z.string().max(2000).optional(),
+  consume_materials: z.boolean().default(true), // Enable/disable material consumption
 });
 
 // Resolve status_id from attribute_options
@@ -176,10 +179,39 @@ export async function POST(req: Request) {
           sourceUpdates.set(batch.parent_batch_id, currentConsumption + item.actual_quantity);
         }
 
+        // Consume materials if enabled and size_id is provided
+        let materialConsumption = null;
+        if (payload.consume_materials && item.size_id) {
+          try {
+            const consumptionResult = await consumeMaterialsForBatch(
+              supabase,
+              orgId,
+              user.id,
+              item.batch_id,
+              batch.batch_number,
+              item.size_id,
+              item.actual_quantity,
+              item.actual_location_id ?? null,
+              true // allowPartial - don't fail if there's a shortage
+            );
+            materialConsumption = {
+              success: consumptionResult.success,
+              transactionCount: consumptionResult.transactions.length,
+              shortages: consumptionResult.shortages,
+            };
+            console.log(`[actualize] Material consumption for batch ${batch.batch_number}:`, materialConsumption);
+          } catch (consumeErr: any) {
+            console.error("[actualize] Material consumption error:", consumeErr);
+            // Don't fail the batch actualization if material consumption fails
+            materialConsumption = { success: false, error: consumeErr.message };
+          }
+        }
+
         results.push({
           ...updatedBatch,
           previousStatus: batch.status,
           quantityDiff,
+          materialConsumption,
         });
       } catch (err: any) {
         console.error("[actualize] Error processing batch:", err);
