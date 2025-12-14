@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle, Circle, Clock, Layers, Play, ArrowRight, User, Pencil, MapPin, Settings2 } from "lucide-react";
+import { Layers, Play, User, Pencil, MapPin, Settings2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,45 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { ActualizeWizard } from "@/components/production/actualize";
+import type { PlannedBatch } from "@/components/production/actualize";
 import type { ProductionJob, JobBatch } from "@/server/production/jobs";
 import type { StaffMember } from "@/server/tasks/service";
-
-// Default wizard steps by process type
-const WIZARD_TEMPLATES: Record<string, WizardStep[]> = {
-  potting: [
-    { id: "setup", title: "Setup Machine", description: "Prepare the potting machine and workspace" },
-    { id: "materials", title: "Gather Materials", description: "Collect pots, compost, and plant material" },
-    { id: "potting", title: "Potting", description: "Pot the plants" },
-    { id: "labeling", title: "Labeling", description: "Apply batch labels to containers" },
-    { id: "placement", title: "Placement", description: "Move to designated tunnel/location" },
-    { id: "cleanup", title: "Cleanup", description: "Clean workspace and equipment" },
-  ],
-  propagation: [
-    { id: "setup", title: "Setup", description: "Prepare propagation area" },
-    { id: "materials", title: "Gather Materials", description: "Collect trays, substrate, and cuttings/seeds" },
-    { id: "propagate", title: "Propagation", description: "Sow seeds or stick cuttings" },
-    { id: "labeling", title: "Labeling", description: "Label trays with batch information" },
-    { id: "placement", title: "Placement", description: "Move to propagation house" },
-  ],
-  transplant: [
-    { id: "setup", title: "Setup", description: "Prepare transplant area" },
-    { id: "source", title: "Source Plants", description: "Collect plants to be transplanted" },
-    { id: "transplant", title: "Transplanting", description: "Move plants to new containers" },
-    { id: "labeling", title: "Labeling", description: "Update batch labels" },
-    { id: "placement", title: "Placement", description: "Move to growing location" },
-  ],
-  spacing: [
-    { id: "source", title: "Source Plants", description: "Identify plants to space" },
-    { id: "spacing", title: "Spacing", description: "Space plants to final positions" },
-    { id: "cleanup", title: "Cleanup", description: "Clean up workspace" },
-  ],
-  default: [
-    { id: "start", title: "Start Task", description: "Begin the assigned work" },
-    { id: "execute", title: "Execute", description: "Complete the main work" },
-    { id: "verify", title: "Verify", description: "Check work is complete" },
-  ],
-};
 
 const PROCESS_TYPES = [
   { value: "potting", label: "Potting" },
@@ -73,11 +37,26 @@ const PROCESS_TYPES = [
   { value: "other", label: "Other" },
 ] as const;
 
-type WizardStep = {
-  id: string;
-  title: string;
-  description: string;
-};
+// Convert JobBatch to PlannedBatch format for ActualizeWizard
+function convertToPlannedBatches(jobBatches: JobBatch[]): PlannedBatch[] {
+  return jobBatches.map((batch) => ({
+    id: batch.batchId,
+    batchNumber: batch.batchNumber ?? '',
+    varietyId: '',
+    varietyName: batch.varietyName ?? 'Unknown',
+    varietyFamily: null,
+    sizeId: '',
+    sizeName: batch.sizeName ?? 'Unknown',
+    quantity: batch.quantity,
+    status: batch.status ?? 'Planned',
+    phase: 'potted',
+    locationId: null,
+    locationName: null,
+    plannedDate: batch.readyAt,
+    parentBatchId: null,
+    parentBatchNumber: null,
+  }));
+}
 
 type Props = {
   open: boolean;
@@ -91,24 +70,21 @@ type Props = {
   onUpdate?: (updates: { name?: string; location?: string; processType?: string; machine?: string }) => Promise<void>;
 };
 
-export function TaskWizard({ 
-  open, 
-  onOpenChange, 
-  job, 
-  batches, 
+export function TaskWizard({
+  open,
+  onOpenChange,
+  job,
+  batches,
   staff = [],
-  onStart, 
+  onStart,
   onComplete,
   onAssign,
   onUpdate,
 }: Props) {
-  const [currentStep, setCurrentStep] = React.useState(0);
-  const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
   const [isStarting, setIsStarting] = React.useState(false);
-  const [isCompleting, setIsCompleting] = React.useState(false);
   const [elapsedTime, setElapsedTime] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState<"overview" | "wizard" | "edit">("overview");
-  
+
   // Edit form state
   const [editName, setEditName] = React.useState("");
   const [editLocation, setEditLocation] = React.useState("");
@@ -117,12 +93,10 @@ export function TaskWizard({
   const [isAssigning, setIsAssigning] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // Get wizard steps based on process type
-  const steps = React.useMemo(() => {
-    if (!job) return WIZARD_TEMPLATES.default;
-    const template = job.wizardTemplate || job.processType || "default";
-    return WIZARD_TEMPLATES[template] || WIZARD_TEMPLATES.default;
-  }, [job]);
+  // Convert batches to PlannedBatch format for ActualizeWizard
+  const plannedBatches = React.useMemo(() => {
+    return convertToPlannedBatches(batches);
+  }, [batches]);
 
   // Track elapsed time when job is in progress
   React.useEffect(() => {
@@ -141,25 +115,12 @@ export function TaskWizard({
   // Reset state when dialog opens
   React.useEffect(() => {
     if (open && job) {
-      // Restore progress from job.wizardProgress if available
-      const savedProgress = job.wizardProgress as { completedSteps?: string[] } | undefined;
-      if (savedProgress?.completedSteps) {
-        setCompletedSteps(new Set(savedProgress.completedSteps));
-        // Find current step
-        const lastCompleted = savedProgress.completedSteps[savedProgress.completedSteps.length - 1];
-        const lastIndex = steps.findIndex((s) => s.id === lastCompleted);
-        setCurrentStep(Math.min(lastIndex + 1, steps.length - 1));
-      } else {
-        setCompletedSteps(new Set());
-        setCurrentStep(0);
-      }
-      
       // Initialize edit form
       setEditName(job.name);
       setEditLocation(job.location || "");
       setEditMachine(job.machine || "");
       setEditProcessType(job.processType || "");
-      
+
       // Set initial tab based on job status
       if (job.status === "in_progress") {
         setActiveTab("wizard");
@@ -167,21 +128,9 @@ export function TaskWizard({
         setActiveTab("overview");
       }
     }
-  }, [open, job, steps]);
+  }, [open, job]);
 
-  const formatTime = (seconds: number): string => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    if (hrs > 0) {
-      return `${hrs}h ${mins}m`;
-    }
-    return `${mins}m ${secs}s`;
-  };
-
-  const progress = steps.length > 0 ? (completedSteps.size / steps.length) * 100 : 0;
   const isJobStarted = job?.status === "in_progress";
-  const allStepsComplete = completedSteps.size === steps.length;
   const canEdit = job?.status !== "completed" && job?.status !== "in_progress";
 
   const handleStart = async () => {
@@ -194,29 +143,15 @@ export function TaskWizard({
     }
   };
 
-  const handleStepComplete = (stepId: string) => {
-    setCompletedSteps((prev) => {
-      const newSet = new Set(prev);
-      newSet.add(stepId);
-      return newSet;
+  // Handler for when ActualizeWizard completes
+  const handleActualizeComplete = async (result: unknown) => {
+    await onComplete({
+      actualizeResult: result,
+      completedVia: 'actualize_wizard',
+      completedAt: new Date().toISOString(),
+      elapsedSeconds: elapsedTime,
     });
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handleComplete = async () => {
-    setIsCompleting(true);
-    try {
-      await onComplete({
-        completedSteps: Array.from(completedSteps),
-        completedAt: new Date().toISOString(),
-        elapsedSeconds: elapsedTime,
-      });
-      onOpenChange(false);
-    } finally {
-      setIsCompleting(false);
-    }
+    onOpenChange(false);
   };
 
   const handleAssign = async (staffId: string) => {
@@ -247,7 +182,7 @@ export function TaskWizard({
   if (!job) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(value) => !isStarting && !isCompleting && onOpenChange(value)}>
+    <Dialog open={open} onOpenChange={(value) => !isStarting && onOpenChange(value)}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{job.name}</DialogTitle>
@@ -262,7 +197,7 @@ export function TaskWizard({
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="wizard" disabled={!isJobStarted}>
-              Wizard {isJobStarted && `(${Math.round(progress)}%)`}
+              Execute
             </TabsTrigger>
             <TabsTrigger value="edit" disabled={!canEdit}>
               Edit
@@ -274,23 +209,15 @@ export function TaskWizard({
             {/* Job Summary */}
             <Card>
               <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <Badge variant={isJobStarted ? "default" : "secondary"}>
-                      {isJobStarted ? "In Progress" : job.status}
-                    </Badge>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Layers className="h-4 w-4" />
-                      {job.batchCount} batch{job.batchCount !== 1 ? "es" : ""} ·{" "}
-                      {job.totalPlants.toLocaleString()} plants
-                    </div>
+                <div className="flex items-center gap-4">
+                  <Badge variant={isJobStarted ? "default" : "secondary"}>
+                    {isJobStarted ? "In Progress" : job.status}
+                  </Badge>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Layers className="h-4 w-4" />
+                    {job.batchCount} batch{job.batchCount !== 1 ? "es" : ""} ·{" "}
+                    {job.totalPlants.toLocaleString()} plants
                   </div>
-                  {isJobStarted && (
-                    <div className="flex items-center gap-1 text-sm font-mono">
-                      <Clock className="h-4 w-4" />
-                      {formatTime(elapsedTime)}
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -400,72 +327,21 @@ export function TaskWizard({
             )}
           </TabsContent>
 
-          {/* Wizard Tab */}
-          <TabsContent value="wizard" className="flex-1 overflow-y-auto space-y-4 mt-4">
-            {/* Progress */}
-            {isJobStarted && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">Progress</span>
-                  <span className="text-muted-foreground">
-                    {completedSteps.size} of {steps.length} steps
-                  </span>
-                </div>
-                <Progress value={progress} className="h-2" />
-              </div>
+          {/* Execute Tab - Actualize Wizard */}
+          <TabsContent value="wizard" className="flex-1 overflow-y-auto mt-4">
+            {isJobStarted && plannedBatches.length > 0 && (
+              <ActualizeWizard
+                initialBatches={plannedBatches}
+                jobId={job.id}
+                onComplete={handleActualizeComplete}
+                onCancel={() => setActiveTab("overview")}
+              />
             )}
 
-            {/* Time Elapsed */}
-            {isJobStarted && (
-              <div className="flex items-center justify-center gap-2 py-2 bg-muted/50 rounded-lg">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                <span className="text-lg font-mono">{formatTime(elapsedTime)}</span>
-              </div>
-            )}
-
-            {/* Wizard Steps */}
-            {isJobStarted && (
-              <div className="space-y-2">
-                {steps.map((step, index) => {
-                  const isCompleted = completedSteps.has(step.id);
-                  const isCurrent = index === currentStep && !isCompleted;
-                  const isLocked = index > currentStep && !isCompleted;
-
-                  return (
-                    <div
-                      key={step.id}
-                      className={cn(
-                        "flex items-start gap-3 p-3 rounded-lg border transition-all",
-                        isCompleted && "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800",
-                        isCurrent && "bg-primary/5 border-primary/50",
-                        isLocked && "opacity-50"
-                      )}
-                    >
-                      <div className="mt-0.5">
-                        {isCompleted ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <Circle
-                            className={cn(
-                              "h-5 w-5",
-                              isCurrent ? "text-primary" : "text-muted-foreground"
-                            )}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{step.title}</div>
-                        <div className="text-sm text-muted-foreground">{step.description}</div>
-                      </div>
-                      {isCurrent && !isCompleted && (
-                        <Button size="sm" onClick={() => handleStepComplete(step.id)}>
-                          Complete
-                          <ArrowRight className="ml-1.5 h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
+            {isJobStarted && plannedBatches.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No batches in this job to actualize.</p>
+                <p className="text-sm mt-2">Add batches to the job from the Overview tab.</p>
               </div>
             )}
           </TabsContent>
@@ -545,11 +421,6 @@ export function TaskWizard({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          {isJobStarted && allStepsComplete && (
-            <Button onClick={handleComplete} disabled={isCompleting}>
-              {isCompleting ? "Completing..." : "Complete Job"}
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

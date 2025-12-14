@@ -41,14 +41,24 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 );
 
 -- Add check constraint for status values
-ALTER TABLE public.tasks 
-  ADD CONSTRAINT tasks_status_check 
-  CHECK (status IN ('pending', 'assigned', 'in_progress', 'completed', 'cancelled'));
+DO $$
+BEGIN
+  ALTER TABLE public.tasks
+    ADD CONSTRAINT tasks_status_check
+    CHECK (status IN ('pending', 'assigned', 'in_progress', 'completed', 'cancelled'));
+EXCEPTION WHEN duplicate_object THEN
+  NULL; -- constraint already exists
+END $$;
 
 -- Add check constraint for source_module values
-ALTER TABLE public.tasks 
-  ADD CONSTRAINT tasks_source_module_check 
-  CHECK (source_module IN ('production', 'dispatch', 'plant_health'));
+DO $$
+BEGIN
+  ALTER TABLE public.tasks
+    ADD CONSTRAINT tasks_source_module_check
+    CHECK (source_module IN ('production', 'dispatch', 'plant_health'));
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
 
 -- Create indexes for common queries
 CREATE INDEX IF NOT EXISTS tasks_org_id_idx ON public.tasks(org_id);
@@ -107,14 +117,24 @@ CREATE TABLE IF NOT EXISTS public.production_jobs (
 );
 
 -- Add check constraint for status values
-ALTER TABLE public.production_jobs 
-  ADD CONSTRAINT production_jobs_status_check 
-  CHECK (status IN ('draft', 'unassigned', 'assigned', 'in_progress', 'completed', 'cancelled'));
+DO $$
+BEGIN
+  ALTER TABLE public.production_jobs
+    ADD CONSTRAINT production_jobs_status_check
+    CHECK (status IN ('draft', 'unassigned', 'assigned', 'in_progress', 'completed', 'cancelled'));
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
 
 -- Add check constraint for process_type values
-ALTER TABLE public.production_jobs 
-  ADD CONSTRAINT production_jobs_process_type_check 
-  CHECK (process_type IS NULL OR process_type IN ('potting', 'propagation', 'transplant', 'spacing', 'other'));
+DO $$
+BEGIN
+  ALTER TABLE public.production_jobs
+    ADD CONSTRAINT production_jobs_process_type_check
+    CHECK (process_type IS NULL OR process_type IN ('potting', 'propagation', 'transplant', 'spacing', 'other'));
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS production_jobs_org_id_idx ON public.production_jobs(org_id);

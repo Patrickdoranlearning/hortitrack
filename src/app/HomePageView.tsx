@@ -68,7 +68,10 @@ import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
 import { TransplantMenuButton } from "@/components/horti/TransplantMenuButton";
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import CheckInForm from '@/components/batches/CheckInForm';
+import { CheckInWizardDialog } from '@/components/production/checkin';
+import { PlanIncomingWizardDialog } from '@/components/production/plan-incoming';
+import { PlanBatchesWizardDialog } from '@/components/production/plan-batches';
+import { ActualizeWizardDialog } from '@/components/production/actualize';
 import { useCollection } from '@/hooks/useCollection'; 
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
@@ -145,6 +148,9 @@ export default function HomePageView({
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
   const [isCheckinFormOpen, setIsCheckinFormOpen] = React.useState(false);
+  const [isPlanIncomingOpen, setIsPlanIncomingOpen] = React.useState(false);
+  const [isPlanBatchesOpen, setIsPlanBatchesOpen] = React.useState(false);
+  const [isActualizeOpen, setIsActualizeOpen] = React.useState(false);
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
   const [editingBatch, setEditingBatch] = React.useState<Batch | null>(null);
@@ -610,6 +616,22 @@ export default function HomePageView({
                                 setIsCheckinFormOpen(true);
                             }}>
                                 Check-in
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => {
+                                setIsPlanIncomingOpen(true);
+                            }}>
+                                Plan Incoming
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => {
+                                setIsPlanBatchesOpen(true);
+                            }}>
+                                Plan Batches
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => {
+                                setIsActualizeOpen(true);
+                            }}>
+                                Actualize Batches
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -1179,31 +1201,54 @@ export default function HomePageView({
       </Dialog>
 
       {/* Check-in Batch Dialog */}
-      <Dialog open={isCheckinFormOpen} onOpenChange={setIsCheckinFormOpen}>
-        <DialogContent
-          aria-describedby="checkin-desc"
-          size="xl"
-          className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden"
-        >
-          <DialogHeader className="shrink-0 pr-6">
-            <DialogTitle className="font-headline text-3xl">Check-in New Batch</DialogTitle>
-            <DialogDescription id="checkin-desc">
-              Enter variety, size, quantity, supplier, location, quality, and optional plant passport overrides.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <CheckInForm 
-              onSubmitSuccess={(batch) => {
-                const batchNumber = batch?.batch_number ?? batch?.batchNumber ?? "";
-                toast({ title: "Check-in Successful", description: batchNumber ? `Batch #${batchNumber} created.` : "Batch created." });
-                setIsCheckinFormOpen(false); 
-                forceRefresh(); 
-              }}
-              onCancel={() => setIsCheckinFormOpen(false)}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CheckInWizardDialog
+        open={isCheckinFormOpen}
+        onOpenChange={setIsCheckinFormOpen}
+        onSuccess={(batch) => {
+          const batchNumber = batch?.batch_number ?? batch?.batchNumber ?? "";
+          toast({ title: "Check-in Successful", description: batchNumber ? `Batch #${batchNumber} created.` : "Batch created." });
+          forceRefresh();
+        }}
+      />
+
+      {/* Plan Incoming Dialog */}
+      <PlanIncomingWizardDialog
+        open={isPlanIncomingOpen}
+        onOpenChange={setIsPlanIncomingOpen}
+        onSuccess={(result) => {
+          toast({
+            title: "Batches Planned",
+            description: `${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Incoming" status.`
+          });
+          forceRefresh();
+        }}
+      />
+
+      {/* Plan Batches Dialog */}
+      <PlanBatchesWizardDialog
+        open={isPlanBatchesOpen}
+        onOpenChange={setIsPlanBatchesOpen}
+        onSuccess={(result) => {
+          toast({
+            title: "Batches Planned",
+            description: `${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Planned" status.`
+          });
+          forceRefresh();
+        }}
+      />
+
+      {/* Actualize Batches Dialog */}
+      <ActualizeWizardDialog
+        open={isActualizeOpen}
+        onOpenChange={setIsActualizeOpen}
+        onSuccess={(result) => {
+          toast({
+            title: "Batches Actualized",
+            description: `${result.actualized} batch${result.actualized !== 1 ? 'es' : ''} now active.`
+          });
+          forceRefresh();
+        }}
+      />
 
       {/* Other Dialogs */}
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>

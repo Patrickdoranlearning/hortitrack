@@ -573,6 +573,12 @@ export default function SaleableBatchesClient({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/production/saleable/wizard">
+              <Camera className="h-4 w-4 mr-2" />
+              Wizard
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => setIsScanOpen(true)}>
             <QrCode className="h-4 w-4 mr-2" />
             Scanner

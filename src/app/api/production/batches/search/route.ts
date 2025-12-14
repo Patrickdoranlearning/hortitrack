@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     // base select with estimated count for faster pagination
     let query = sb.from("v_batch_search")
       .select(
-        "id, org_id, batch_number, status, phase, quantity, ready_at, variety_name, family, category, size_name, location_name, supplier_name",
+        "id, org_id, batch_number, status, status_id, phase, quantity, ready_at, variety_name, family, category, size_name, location_name, supplier_name, behavior, saleable_quantity, sales_photo_url, grower_photo_url",
         { count: "planned" }
       )
       .order("ready_at", { ascending: true, nullsFirst: false })
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
 
     const { data, error, count } = await query;
     if (error) {
-      console.error("[batch-search] Query error:", error);
+      console.error("[batch-search] Query error:", error.message, error.details, error.hint);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return NextResponse.json({

@@ -64,6 +64,59 @@ const PHASE_COUNTER: Record<string, 1 | 2 | 3> = {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * GET /api/production/batches/planned
+ * Fetches batches with Planned or Incoming status for actualization
+ */
+export async function GET(req: Request) {
+  try {
+    const { supabase, orgId } = await getUserAndOrg();
+
+    const { searchParams } = new URL(req.url);
+    const limit = parseInt(searchParams.get("limit") || "500");
+
+    const { data, error } = await supabase
+      .from("batches")
+      .select(`
+        id,
+        batch_number,
+        plant_variety_id,
+        plant_varieties (
+          id,
+          name,
+          family
+        ),
+        size_id,
+        plant_sizes (id, name),
+        quantity,
+        status,
+        phase,
+        location_id,
+        locations:nursery_locations (id, name),
+        planted_at,
+        parent_batch_id,
+        parent_batch:batches!parent_batch_id (batch_number)
+      `)
+      .eq("org_id", orgId)
+      .in("status", ["Planned", "Incoming"])
+      .gt("quantity", 0)
+      .order("planted_at", { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error("[planned-batches GET] Error fetching:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ batches: data ?? [] }, { status: 200 });
+  } catch (error: any) {
+    console.error("[planned-batches GET] Error:", error);
+    const message = error?.message ?? "Failed to fetch planned batches";
+    const status = /unauth/i.test(message) ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const payload = PlannedBatchSchema.parse(await req.json());

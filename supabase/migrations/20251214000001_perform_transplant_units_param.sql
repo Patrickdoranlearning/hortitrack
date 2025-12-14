@@ -326,7 +326,8 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.perform_transplant IS
+-- Comment requires full signature when function is overloaded
+COMMENT ON FUNCTION public.perform_transplant(uuid, uuid, uuid, uuid, integer, uuid, date, text, boolean, integer) IS
   'Atomically performs a batch transplant. Accepts either containers (calculates units from parent size)
    or p_units directly (for bulk transplant wizard). Creates child batch, decrements parent,
    links ancestry, logs events, and creates passport.';

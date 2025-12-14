@@ -279,7 +279,7 @@ SELECT
   st.target_type,
   st.target_batch_id,
   st.target_location_id,
-  st.application_number as current_application,
+  st.applications_completed + 1 as current_application,
   st.applications_total,
   st.reason as notes,
   l.name as location_name,

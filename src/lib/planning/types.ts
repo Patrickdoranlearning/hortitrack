@@ -13,9 +13,12 @@ export type PlanningBatch = {
   varietyId: string | null;
   sizeName: string | null;
   sizeId: string | null;
+  supplierId: string | null;
+  supplierName: string | null;
+  locationId: string | null;
+  locationName: string | null;
   parentBatchId: string | null;
   protocolId: string | null;
-  locationName: string | null;
   isGhost: boolean;
 };
 

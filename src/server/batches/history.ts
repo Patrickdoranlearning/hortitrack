@@ -238,13 +238,21 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
     // Extract quantity from payload based on event type
     let quantity: number | null = null;
     if (payload) {
-      const rawQty = payload.qty ?? payload.quantity ?? payload.units_picked ?? payload.units ?? payload.diff ?? null;
+      // Check various possible quantity keys used in different event types
+      const rawQty = payload.qty ??
+        payload.quantity ??
+        payload.units_picked ??
+        payload.units ??
+        payload.units_moved ??      // TRANSPLANT_OUT uses this
+        payload.units_received ??   // TRANSPLANT_IN uses this
+        payload.diff ??
+        null;
       if (typeof rawQty === "number") {
         // Determine sign based on event type
         const upperType = evt.type?.toUpperCase() ?? "";
-        if (["PICKED", "LOSS", "TRANSPLANT_TO"].includes(upperType)) {
+        if (["PICKED", "LOSS", "TRANSPLANT_OUT"].includes(upperType)) {
           quantity = -Math.abs(rawQty);
-        } else if (["TRANSPLANT_FROM", "CREATE", "CHECKIN"].includes(upperType)) {
+        } else if (["TRANSPLANT_IN", "CREATE", "CHECKIN", "PROPAGATION_IN"].includes(upperType)) {
           quantity = Math.abs(rawQty);
         } else {
           quantity = rawQty;
