@@ -59,6 +59,7 @@ const PatchBody = z.object({
   plantVariety: z.string().min(1).optional(),
   plantingDate: z.string().optional(), // ISO
   quantity: z.number().int().nonnegative().optional(),
+  saleable_quantity: z.number().int().nonnegative().nullable().optional(),
   status: ProductionStatus.optional(),
   location: z.string().optional(),
   size: z.string().optional(),
@@ -157,6 +158,7 @@ export async function PATCH(req: Request, { params }: Params) {
       grower_photo_url: updates.growerPhotoUrl,
       sales_photo_url: updates.salesPhotoUrl,
       quantity: shouldArchive ? 0 : nextQty,
+      saleable_quantity: updates.saleable_quantity,
       status: finalStatus,
       status_id: statusId,
       updated_at: new Date().toISOString(),

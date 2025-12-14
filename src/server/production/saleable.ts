@@ -120,7 +120,7 @@ export async function fetchSaleableBatches(orgId: string, options: FetchOptions 
       ? supabase.from("plant_varieties").select("id, name").eq("org_id", orgId).in("id", varietyIds)
       : { data: [], error: null },
     sizeIds.length
-      ? supabase.from("plant_sizes").select("id, name").eq("org_id", orgId).in("id", sizeIds)
+      ? supabase.from("plant_sizes").select("id, name").in("id", sizeIds)
       : { data: [], error: null },
     locationIds.length
       ? supabase

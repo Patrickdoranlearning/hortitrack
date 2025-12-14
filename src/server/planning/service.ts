@@ -17,8 +17,11 @@ type BatchRow = {
   protocol_id: string | null;
   plant_variety_id: string | null;
   size_id: string | null;
+  supplier_id: string | null;
+  location_id: string | null;
   plant_varieties?: { name: string | null };
   plant_sizes?: { name: string | null };
+  suppliers?: { name: string | null };
   nursery_locations?: { name: string | null };
 };
 
@@ -71,8 +74,11 @@ export async function getPlanningSnapshot(horizonMonths = 12): Promise<PlanningS
           "protocol_id",
           "plant_variety_id",
           "size_id",
+          "supplier_id",
+          "location_id",
           "plant_varieties(name)",
           "plant_sizes(name)",
+          "suppliers(name)",
           "nursery_locations(name)",
         ].join(",")
       )
@@ -162,9 +168,12 @@ function mapBatchRow(row: BatchRow): PlanningBatch {
     varietyId: row.plant_variety_id,
     sizeName: row.plant_sizes?.name ?? null,
     sizeId: row.size_id,
+    supplierId: row.supplier_id,
+    supplierName: row.suppliers?.name ?? null,
+    locationId: row.location_id,
+    locationName: row.nursery_locations?.name ?? null,
     parentBatchId: row.parent_batch_id,
     protocolId: row.protocol_id,
-    locationName: row.nursery_locations?.name ?? null,
     isGhost: GHOST_STATUSES.has(row.status ?? ""),
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { User, Calendar, Layers, MoreHorizontal, Play, CheckCircle, Trash2, Settings } from "lucide-react";
+import { User, Calendar, Layers, MoreHorizontal, Play, CheckCircle, Trash2, Settings, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ type Props = {
   onComplete: (job: ProductionJob) => void;
   onDelete: (job: ProductionJob) => void;
   onOpenJob: (job: ProductionJob) => void;
+  onExecuteJob?: (job: ProductionJob) => void;
 };
 
 type KanbanColumn = {
@@ -60,7 +61,7 @@ const COLUMNS: KanbanColumn[] = [
   },
 ];
 
-export function JobsKanban({ jobs, staff, onAssign, onStart, onComplete, onDelete, onOpenJob }: Props) {
+export function JobsKanban({ jobs, staff, onAssign, onStart, onComplete, onDelete, onOpenJob, onExecuteJob }: Props) {
   // Group jobs by status
   const jobsByStatus = React.useMemo(() => {
     const grouped: Record<JobStatus, ProductionJob[]> = {
@@ -117,6 +118,7 @@ export function JobsKanban({ jobs, staff, onAssign, onStart, onComplete, onDelet
                   onComplete={onComplete}
                   onDelete={onDelete}
                   onOpen={onOpenJob}
+                  onExecute={onExecuteJob}
                 />
               ))
             )}
@@ -135,9 +137,10 @@ type JobCardProps = {
   onComplete: (job: ProductionJob) => void;
   onDelete: (job: ProductionJob) => void;
   onOpen: (job: ProductionJob) => void;
+  onExecute?: (job: ProductionJob) => void;
 };
 
-function JobCard({ job, staff, onAssign, onStart, onComplete, onDelete, onOpen }: JobCardProps) {
+function JobCard({ job, staff, onAssign, onStart, onComplete, onDelete, onOpen, onExecute }: JobCardProps) {
   return (
     <Card
       className="cursor-pointer hover:shadow-md transition-shadow"
@@ -183,6 +186,18 @@ function JobCard({ job, staff, onAssign, onStart, onComplete, onDelete, onOpen }
                 >
                   <Play className="mr-2 h-4 w-4" />
                   Start Job
+                </DropdownMenuItem>
+              )}
+              {(job.status === "assigned" || job.status === "in_progress") && onExecute && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExecute(job);
+                  }}
+                  className="text-primary"
+                >
+                  <Zap className="mr-2 h-4 w-4" />
+                  Execute with Wizard
                 </DropdownMenuItem>
               )}
               {job.status === "in_progress" && (

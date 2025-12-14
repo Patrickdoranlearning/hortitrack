@@ -16,6 +16,8 @@ import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
 import { JobsKanban } from "@/app/tasks/components/JobsKanban";
 import { CreateJobDialog } from "@/app/tasks/components/CreateJobDialog";
 import { TaskWizard } from "@/app/tasks/components/TaskWizard";
+import { ActualizeWizardDialog } from "@/components/production/actualize";
+import type { PlannedBatch } from "@/components/production/actualize";
 import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import type { StaffMember } from "@/server/tasks/service";
@@ -36,6 +38,8 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
   const [selectedJob, setSelectedJob] = React.useState<ProductionJob | null>(null);
   const [selectedJobBatches, setSelectedJobBatches] = React.useState<JobBatch[]>([]);
   const [isWizardOpen, setIsWizardOpen] = React.useState(false);
+  const [isActualizeWizardOpen, setIsActualizeWizardOpen] = React.useState(false);
+  const [actualizeJobBatches, setActualizeJobBatches] = React.useState<PlannedBatch[]>([]);
   const [processTypeFilter, setProcessTypeFilter] = React.useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = React.useState<string>("all");
 
@@ -62,6 +66,27 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
 
   const allJobs = React.useMemo(() => jobsData?.jobs ?? [], [jobsData]);
   const availableBatches = React.useMemo(() => batchesData?.batches ?? [], [batchesData]);
+
+  // Convert JobBatch to PlannedBatch format for Actualize Wizard
+  const convertToPlannedBatches = React.useCallback((jobBatches: JobBatch[]): PlannedBatch[] => {
+    return jobBatches.map((batch) => ({
+      id: batch.batchId,
+      batchNumber: batch.batchNumber ?? '',
+      varietyId: '', // Not available from JobBatch
+      varietyName: batch.varietyName ?? 'Unknown',
+      varietyFamily: null,
+      sizeId: '', // Not available from JobBatch
+      sizeName: batch.sizeName ?? 'Unknown',
+      quantity: batch.quantity,
+      status: batch.status ?? 'Planned',
+      phase: 'potted', // Default phase
+      locationId: null,
+      locationName: null,
+      plannedDate: batch.readyAt,
+      parentBatchId: null,
+      parentBatchNumber: null,
+    }));
+  }, []);
 
   // Filter jobs
   const jobs = React.useMemo(() => {
@@ -191,6 +216,65 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
       console.error("Failed to fetch job details:", error);
       setSelectedJobBatches([]);
       setIsWizardOpen(true);
+    }
+  };
+
+  // Handler to execute a job using the Actualize Wizard
+  const handleExecuteJob = async (job: ProductionJob) => {
+    setSelectedJob(job);
+    try {
+      // First, start the job if not already started
+      if (job.status !== "in_progress") {
+        await fetchJson(`/api/tasks/jobs/${job.id}/start`, { method: "POST" });
+        mutateJobs();
+      }
+
+      // Fetch job batches
+      const response = await fetchJson<{ job: ProductionJob; batches: JobBatch[] }>(
+        `/api/tasks/jobs/${job.id}?includeBatches=true`
+      );
+
+      // Convert to PlannedBatch format and open Actualize Wizard
+      const plannedBatches = convertToPlannedBatches(response.batches);
+      setActualizeJobBatches(plannedBatches);
+      setIsActualizeWizardOpen(true);
+    } catch (error) {
+      console.error("Failed to start job execution:", error);
+      toast({
+        title: "Failed to start job",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handler for when Actualize Wizard completes
+  const handleActualizeWizardComplete = async (result: any) => {
+    if (!selectedJob) return;
+
+    try {
+      // Mark the job as completed
+      await fetchJson(`/api/tasks/jobs/${selectedJob.id}/complete`, {
+        method: "POST",
+        body: JSON.stringify({
+          wizardData: {
+            actualizeResult: result,
+            completedVia: 'actualize_wizard'
+          }
+        }),
+      });
+      toast({ title: "Job completed successfully!" });
+      setIsActualizeWizardOpen(false);
+      setSelectedJob(null);
+      setActualizeJobBatches([]);
+      mutateJobs();
+      mutateBatches();
+    } catch (error) {
+      toast({
+        title: "Failed to complete job",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
     }
   };
 
@@ -372,6 +456,7 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
           onComplete={handleCompleteJob}
           onDelete={handleDeleteJob}
           onOpenJob={handleOpenJob}
+          onExecuteJob={handleExecuteJob}
         />
       </div>
 
@@ -394,6 +479,21 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
         onComplete={handleWizardComplete}
         onAssign={handleWizardAssign}
         onUpdate={handleWizardUpdate}
+      />
+
+      {/* Actualize Wizard Dialog */}
+      <ActualizeWizardDialog
+        open={isActualizeWizardOpen}
+        onOpenChange={(open) => {
+          setIsActualizeWizardOpen(open);
+          if (!open) {
+            setSelectedJob(null);
+            setActualizeJobBatches([]);
+          }
+        }}
+        initialBatches={actualizeJobBatches}
+        jobId={selectedJob?.id}
+        onComplete={handleActualizeWizardComplete}
       />
     </>
   );

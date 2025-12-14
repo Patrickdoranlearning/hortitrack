@@ -47,18 +47,22 @@ CREATE INDEX IF NOT EXISTS idx_equipment_movement_log_not_returned
 ALTER TABLE equipment_movement_log ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies using org_memberships table
+DROP POLICY IF EXISTS "Users can view equipment movements in their org" ON equipment_movement_log;
 CREATE POLICY "Users can view equipment movements in their org"
   ON equipment_movement_log FOR SELECT
   USING (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can insert equipment movements in their org" ON equipment_movement_log;
 CREATE POLICY "Users can insert equipment movements in their org"
   ON equipment_movement_log FOR INSERT
   WITH CHECK (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can update equipment movements in their org" ON equipment_movement_log;
 CREATE POLICY "Users can update equipment movements in their org"
   ON equipment_movement_log FOR UPDATE
   USING (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can delete equipment movements in their org" ON equipment_movement_log;
 CREATE POLICY "Users can delete equipment movements in their org"
   ON equipment_movement_log FOR DELETE
   USING (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = auth.uid()));

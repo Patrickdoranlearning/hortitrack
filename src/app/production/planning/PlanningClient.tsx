@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { Check, Briefcase } from "lucide-react";
+import { Check, Briefcase, PackageCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
@@ -11,6 +11,8 @@ import { IncomingBatchDialog } from "./components/IncomingBatchDialog";
 import { FutureAllocationDialog } from "./components/FutureAllocationDialog";
 import { ProtocolDrawer } from "./components/ProtocolDrawer";
 import { CreateJobFromPlanningDialog } from "./components/CreateJobFromPlanningDialog";
+import { BatchCheckInDialog } from "@/components/dialogs/BatchCheckInDialog";
+import type { IncomingBatchData } from "@/components/production/checkin";
 import type { PlanningSnapshot, ProtocolSummary } from "@/lib/planning/types";
 import { Badge } from "@/components/ui/badge";
 import { fetchJson } from "@/lib/http/fetchJson";
@@ -31,6 +33,8 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
   const [allocationOpen, setAllocationOpen] = React.useState(false);
   const [protocolOpen, setProtocolOpen] = React.useState(false);
   const [createJobOpen, setCreateJobOpen] = React.useState(false);
+  const [checkInOpen, setCheckInOpen] = React.useState(false);
+  const [checkInBatch, setCheckInBatch] = React.useState<IncomingBatchData | null>(null);
   const [selectedBatchIds, setSelectedBatchIds] = React.useState<Set<string>>(new Set());
 
   const {
@@ -68,6 +72,27 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
   }, []);
 
   const selectedBatches = ghostBatches.filter((b) => selectedBatchIds.has(b.id));
+
+  // Open check-in wizard for an incoming batch
+  const handleCheckInBatch = React.useCallback((batch: typeof ghostBatches[0]) => {
+    const incomingData: IncomingBatchData = {
+      id: batch.id,
+      batchNumber: batch.batchNumber ?? undefined,
+      plantVarietyId: batch.varietyId ?? '',
+      varietyName: batch.varietyName ?? undefined,
+      sizeId: batch.sizeId ?? '',
+      sizeName: batch.sizeName ?? undefined,
+      supplierId: batch.supplierId ?? undefined,
+      supplierName: batch.supplierName ?? undefined,
+      expectedQuantity: batch.quantity,
+      expectedDate: batch.readyDate ?? undefined,
+      locationId: batch.locationId ?? undefined,
+      locationName: batch.locationName ?? undefined,
+      phase: batch.phase ?? undefined,
+    };
+    setCheckInBatch(incomingData);
+    setCheckInOpen(true);
+  }, []);
 
   return (
     <>
@@ -144,45 +169,66 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
               )}
               {ghostBatches.map((batch) => {
                 const isSelected = selectedBatchIds.has(batch.id);
+                const isIncoming = batch.status === "Incoming";
                 return (
-                  <button
+                  <div
                     key={batch.id}
-                    type="button"
-                    onClick={() => toggleBatchSelection(batch.id)}
                     className={cn(
-                      "w-full text-left border rounded-lg p-3 transition-colors hover:bg-muted/50",
+                      "border rounded-lg p-3 transition-colors",
                       isSelected && "border-primary bg-primary/5"
                     )}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={cn(
-                            "h-4 w-4 rounded border flex items-center justify-center shrink-0",
-                            isSelected
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-input"
-                          )}
-                        >
-                          {isSelected && <Check className="h-3 w-3" />}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium">
-                            {batch.varietyName ?? "Variety"} · {batch.sizeName ?? "Size"}
+                    <button
+                      type="button"
+                      onClick={() => toggleBatchSelection(batch.id)}
+                      className="w-full text-left hover:bg-muted/50 rounded-md -m-1 p-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={cn(
+                              "h-4 w-4 rounded border flex items-center justify-center shrink-0",
+                              isSelected
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-input"
+                            )}
+                          >
+                            {isSelected && <Check className="h-3 w-3" />}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            Ready {formatDate(batch.readyDate)} · {batch.quantity} units
+                          <div>
+                            <div className="text-sm font-medium">
+                              {batch.varietyName ?? "Variety"} · {batch.sizeName ?? "Size"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Ready {formatDate(batch.readyDate)} · {batch.quantity} units
+                            </div>
                           </div>
                         </div>
+                        <Badge variant="outline">{batch.status}</Badge>
                       </div>
-                      <Badge variant="outline">{batch.status}</Badge>
-                    </div>
-                    {batch.parentBatchId && (
-                      <p className="text-xs text-muted-foreground mt-1 ml-7">
-                        From {batch.parentBatchId.slice(0, 8)} · Protocol {batch.protocolId ?? "—"}
-                      </p>
+                      {batch.parentBatchId && (
+                        <p className="text-xs text-muted-foreground mt-1 ml-7">
+                          From {batch.parentBatchId.slice(0, 8)} · Protocol {batch.protocolId ?? "—"}
+                        </p>
+                      )}
+                    </button>
+                    {/* Check-in button for incoming batches */}
+                    {isIncoming && (
+                      <div className="mt-2 pt-2 border-t flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCheckInBatch(batch);
+                          }}
+                        >
+                          <PackageCheck className="mr-1.5 h-4 w-4" />
+                          Check In
+                        </Button>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </CardContent>
@@ -258,6 +304,18 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
         onSuccess={() => {
           refreshSnapshot();
           clearBatchSelection();
+        }}
+      />
+      <BatchCheckInDialog
+        open={checkInOpen}
+        onOpenChange={(open) => {
+          setCheckInOpen(open);
+          if (!open) setCheckInBatch(null);
+        }}
+        incomingBatch={checkInBatch}
+        onSuccess={() => {
+          refreshSnapshot();
+          setCheckInBatch(null);
         }}
       />
     </>

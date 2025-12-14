@@ -31,6 +31,8 @@ const TYPE_META: Record<string, { label: string; variant: "default" | "secondary
   loss:       { label: "Loss", variant: "destructive" },
   transplant_to: { label: "Transplant Out", variant: "secondary" },
   transplant_from: { label: "Transplant In", variant: "default" },
+  transplant_out: { label: "Transplant Out", variant: "secondary" },
+  transplant_in: { label: "Transplant In", variant: "default" },
   adjustment: { label: "Adjustment", variant: "outline" },
   status_change: { label: "Status Change", variant: "default" },
   create:     { label: "Created", variant: "default" },

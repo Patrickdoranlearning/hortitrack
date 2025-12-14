@@ -10,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ArrowRight, Plus, Trash2, Search, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Trash2, Search, CheckCircle2, AlertCircle, Loader2, ScanLine, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,6 +29,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import dynamic from "next/dynamic";
+
+const ScannerClient = dynamic(() => import("@/components/Scanner/ScannerClient"), {
+  ssr: false,
+  loading: () => <div className="flex h-64 items-center justify-center text-muted-foreground">Loading scanner...</div>,
+});
 
 type UploadStatus = "pending" | "uploading" | "success" | "error";
 
@@ -84,6 +96,10 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
   // Batch search state
   const [batchSearchResults, setBatchSearchResults] = React.useState<ParentBatch[]>([]);
   const [batchSearchLoading, setBatchSearchLoading] = React.useState(false);
+
+  // Scanner state - lifted up from row component
+  const [scannerOpen, setScannerOpen] = React.useState(false);
+  const [scanningRowId, setScanningRowId] = React.useState<string | null>(null);
 
   const sizeMap = React.useMemo(() => {
     const byId = new Map<string, { name: string; cell_multiple?: number }>();
@@ -167,6 +183,58 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
   const removeRow = React.useCallback((id: string) => {
     setRows((prev) => prev.filter((row) => row.id !== id));
   }, []);
+
+  const openScanner = React.useCallback((rowId: string) => {
+    setScanningRowId(rowId);
+    setScannerOpen(true);
+  }, []);
+
+  const handleScanResult = React.useCallback(async (scannedText: string) => {
+    setScannerOpen(false);
+    if (!scanningRowId) return;
+
+    // Search for batch by scanned batch number
+    try {
+      const res = await fetchJson<{ items: ParentBatch[] }>(
+        `/api/production/batches/search?q=${encodeURIComponent(scannedText)}&status=Growing&pageSize=5`
+      );
+      const items = res.items ?? [];
+      // Prefer exact match
+      const exactMatch = items.find((b) => b.batch_number === scannedText);
+      if (exactMatch) {
+        updateRow(scanningRowId, {
+          parentBatchId: exactMatch.id,
+          parentBatch: exactMatch,
+        });
+      } else if (items.length === 1) {
+        updateRow(scanningRowId, {
+          parentBatchId: items[0].id,
+          parentBatch: items[0],
+        });
+      } else if (items.length > 1) {
+        // Update search results to let user pick
+        setBatchSearchResults(items);
+        toast({
+          title: "Multiple matches found",
+          description: `Found ${items.length} batches matching "${scannedText}". Please select one from the dropdown.`,
+        });
+      } else {
+        toast({
+          title: "No batch found",
+          description: `No growing batch found matching "${scannedText}"`,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("[BulkTransplant] Scan search error:", err);
+      toast({
+        title: "Scan failed",
+        description: "Error searching for batch",
+        variant: "destructive",
+      });
+    }
+    setScanningRowId(null);
+  }, [scanningRowId, updateRow, toast]);
 
   const addRow = React.useCallback(() => {
     const newRow: TransplantRow = {
@@ -497,6 +565,7 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
                         onUpdate={updateRow}
                         onRemove={removeRow}
                         onSearchBatches={searchBatches}
+                        onOpenScanner={openScanner}
                         batchSearchResults={batchSearchResults}
                         batchSearchLoading={batchSearchLoading}
                       />
@@ -629,6 +698,27 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {/* Scanner Dialog - lifted to wizard level for proper chunk loading */}
+      <Dialog open={scannerOpen} onOpenChange={setScannerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScanLine className="h-5 w-5" />
+              Scan Batch Barcode
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <ScannerClient onDecoded={handleScanResult} />
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setScannerOpen(false)}>
+              <X className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -639,6 +729,7 @@ function TransplantRowEditor({
   onUpdate,
   onRemove,
   onSearchBatches,
+  onOpenScanner,
   batchSearchResults,
   batchSearchLoading,
 }: {
@@ -647,6 +738,7 @@ function TransplantRowEditor({
   onUpdate: (id: string, patch: Partial<TransplantRow>) => void;
   onRemove: (id: string) => void;
   onSearchBatches: (query: string) => void;
+  onOpenScanner: (rowId: string) => void;
   batchSearchResults: ParentBatch[];
   batchSearchLoading: boolean;
 }) {
@@ -680,27 +772,29 @@ function TransplantRowEditor({
     <TableRow className={insufficient ? "bg-destructive/5" : undefined}>
       <TableCell className="font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
       <TableCell>
-        <Popover open={batchOpen} onOpenChange={setBatchOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={batchOpen}
-              className="w-full justify-start font-normal"
-            >
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              {row.parentBatch ? (
-                <span className="truncate">
-                  <span className="font-medium">{row.parentBatch.batch_number}</span>
-                  <span className="ml-2 text-muted-foreground text-xs">
-                    {row.parentBatch.variety_name ?? "?"}
+        <div className="flex gap-2">
+          <Popover open={batchOpen} onOpenChange={setBatchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={batchOpen}
+                className="flex-1 justify-start font-normal"
+              >
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                {row.parentBatch ? (
+                  <span className="truncate">
+                    <span className="font-medium">{row.parentBatch.batch_number}</span>
+                    <span className="ml-2 text-muted-foreground text-xs">
+                      {row.parentBatch.variety_name ?? "?"}
+                      {row.parentBatch.size_name ? ` · ${row.parentBatch.size_name}` : ""}
+                    </span>
                   </span>
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Search batch...</span>
-              )}
-            </Button>
-          </PopoverTrigger>
+                ) : (
+                  <span className="text-muted-foreground">Search batch...</span>
+                )}
+              </Button>
+            </PopoverTrigger>
           <PopoverContent className="w-[400px] p-0" align="start">
             <Command shouldFilter={false}>
               <CommandInput
@@ -731,7 +825,9 @@ function TransplantRowEditor({
                         <div className="flex flex-col gap-0.5">
                           <div className="font-medium">{batch.batch_number}</div>
                           <div className="text-xs text-muted-foreground">
-                            {batch.variety_name ?? "—"} · {batch.quantity?.toLocaleString() ?? 0} units
+                            {batch.variety_name ?? "—"}
+                            {batch.size_name ? ` · ${batch.size_name}` : ""}
+                            {" · "}{batch.quantity?.toLocaleString() ?? 0} units
                             {batch.location_name ? ` · ${batch.location_name}` : ""}
                           </div>
                         </div>
@@ -743,6 +839,16 @@ function TransplantRowEditor({
             </Command>
           </PopoverContent>
         </Popover>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => onOpenScanner(row.id)}
+            title="Scan barcode"
+          >
+            <ScanLine className="h-4 w-4" />
+          </Button>
+        </div>
       </TableCell>
       <TableCell className="text-right">
         {row.parentBatch ? (

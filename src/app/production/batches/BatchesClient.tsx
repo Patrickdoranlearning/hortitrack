@@ -463,10 +463,11 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         ) : (
           <Card className="overflow-hidden">
             <CardContent className="p-0">
-              <Table>
+              <div className="overflow-x-auto">
+              <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[130px]">
+                    <TableHead className="w-[140px] whitespace-nowrap">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -481,7 +482,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         )}
                       </Button>
                     </TableHead>
-                    <TableHead className="min-w-[140px]">
+                    <TableHead className="min-w-[180px]">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -496,7 +497,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         )}
                       </Button>
                     </TableHead>
-                    <TableHead className="min-w-[120px]">
+                    <TableHead className="min-w-[160px]">
                       <div className="flex items-center gap-1">
                         <Select
                           value={filters.plantFamily}
@@ -526,7 +527,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         </Button>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[100px]">
+                    <TableHead className="min-w-[180px]">
                       <div className="flex items-center gap-1">
                         <Select
                           value={filters.status}
@@ -556,7 +557,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         </Button>
                       </div>
                     </TableHead>
-                    <TableHead className="min-w-[100px]">
+                    <TableHead className="min-w-[120px]">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -586,7 +587,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                         )}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right w-[120px]">Actions</TableHead>
+                    <TableHead className="text-right w-[110px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -604,7 +605,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => handleViewDetails(batch)}
                         >
-                          <TableCell className="font-mono text-sm">{batch.batchNumber}</TableCell>
+                          <TableCell className="font-mono text-sm whitespace-nowrap">{batch.batchNumber}</TableCell>
                           <TableCell>
                             <div className="font-medium">{batch.plantVariety || "Unspecified"}</div>
                             <div className="text-xs text-muted-foreground">
@@ -683,6 +684,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                       ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         )}
