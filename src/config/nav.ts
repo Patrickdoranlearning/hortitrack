@@ -1,5 +1,5 @@
 
-import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, Store, Target, ListTodo } from "lucide-react";
+import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, Store, Target, ListTodo, Package } from "lucide-react";
 
 export type NavItem = {
   key: string;
@@ -78,6 +78,18 @@ export const APP_NAV: NavItem[] = [
     items: [
       { label: "Place Order (as Customer)", href: "/b2b/impersonate", description: "Impersonate customer to place orders." },
       { label: "Customer Login", href: "/b2b/login", description: "Direct link to customer portal login." },
+    ]
+  },
+  {
+    key: "materials",
+    label: "Materials",
+    href: "/materials",
+    icon: Package,
+    items: [
+      { label: "Overview", href: "/materials", description: "Materials dashboard and low stock alerts." },
+      { label: "Catalog", href: "/materials/catalog", description: "Manage materials catalog (pots, trays, soil, etc.)." },
+      { label: "Stock", href: "/materials/stock", description: "View and manage stock levels." },
+      { label: "Purchase Orders", href: "/materials/purchase-orders", description: "Create and manage purchase orders." },
     ]
   },
   {

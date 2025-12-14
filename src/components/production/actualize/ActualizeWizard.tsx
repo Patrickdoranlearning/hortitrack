@@ -144,9 +144,11 @@ export function ActualizeWizard({
             actual_location_id: entry.actualLocationId || undefined,
             actual_date: entry.actualDate,
             notes: entry.notes || undefined,
+            size_id: entry.sizeId || undefined, // For material consumption
           })),
           job_id: jobId || undefined,
           notes: finalState.review?.globalNotes || undefined,
+          consume_materials: true, // Enable material consumption
         };
 
         console.log('[ActualizeWizard] Submitting payload:', JSON.stringify(payload, null, 2));

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,7 @@ import {
   Calendar,
   ArrowRight,
 } from 'lucide-react';
+import { MaterialConsumptionPreview } from '@/components/materials/MaterialConsumptionPreview';
 import type { ActualizedBatchEntry } from './ActualizeByLocationStep';
 
 export type ActualizeReviewStepData = {
@@ -67,6 +68,16 @@ export function ActualizeReviewStep({
 
   // Entries with quantity changes
   const entriesWithChanges = entries.filter((e) => e.actualQuantity !== e.plannedQuantity);
+
+  // Prepare consumption preview data
+  const consumptionBatches = useMemo(() => {
+    return entries.map((e) => ({
+      batchId: e.batchId,
+      sizeId: e.sizeId,
+      sizeName: e.sizeName,
+      quantity: e.actualQuantity,
+    }));
+  }, [entries]);
 
   return (
     <div className="space-y-6">
@@ -209,6 +220,9 @@ export function ActualizeReviewStep({
           </Table>
         </CardContent>
       </Card>
+
+      {/* Material Consumption Preview */}
+      <MaterialConsumptionPreview batches={consumptionBatches} />
 
       {/* Quantity Changes Alert */}
       {entriesWithChanges.length > 0 && (
