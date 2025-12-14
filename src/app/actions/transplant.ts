@@ -30,27 +30,34 @@ export type TransplantResult = {
  */
 export async function transplantBatchAction(input: TransplantInput): Promise<TransplantResult> {
   try {
+    console.log("[transplantBatchAction] Input:", JSON.stringify(input, null, 2));
+
     // Validate input
     const validated = TransplantInputSchema.parse(input);
-    
+
     // Get authenticated user and org
     const { supabase, orgId, user } = await getUserAndOrg();
-    
-    // Call the transactional RPC function
-    const { data, error } = await supabase.rpc("perform_transplant", {
+
+    const rpcParams: Record<string, unknown> = {
       p_org_id: orgId,
       p_parent_batch_id: validated.parent_batch_id,
       p_size_id: validated.size_id,
       p_location_id: validated.location_id,
-      p_containers: validated.containers,
+      p_containers: validated.containers ?? 1,
       p_user_id: user.id,
       p_planted_at: validated.planted_at ?? null,
       p_notes: validated.notes ?? null,
       p_archive_parent_if_empty: validated.archive_parent_if_empty ?? true,
-    });
+      p_units: validated.units ?? null, // Pass units directly if provided
+    };
+
+    console.log("[transplantBatchAction] RPC params:", JSON.stringify(rpcParams, null, 2));
+
+    // Call the transactional RPC function
+    const { data, error } = await supabase.rpc("perform_transplant", rpcParams);
 
     if (error) {
-      console.error("[transplantBatchAction] RPC error:", error);
+      console.error("[transplantBatchAction] RPC error:", error.message, error.details, error.hint);
       
       // Parse specific error messages for better UX
       if (error.message.includes("Insufficient quantity")) {

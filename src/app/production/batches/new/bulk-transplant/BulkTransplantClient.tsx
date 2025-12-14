@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageFrame } from "@/ui/templates/PageFrame";
 import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
-import BulkTransplantUpload from "@/components/batches/BulkTransplantUpload";
+import BulkTransplantWizard from "@/components/batches/BulkTransplantWizard";
 
 export default function BulkTransplantClient() {
   const handleComplete = React.useCallback(() => {
@@ -24,7 +24,7 @@ export default function BulkTransplantClient() {
             </Button>
           }
         />
-        <BulkTransplantUpload onComplete={handleComplete} />
+        <BulkTransplantWizard onComplete={handleComplete} />
       </div>
     </PageFrame>
   );

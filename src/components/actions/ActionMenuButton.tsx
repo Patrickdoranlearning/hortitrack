@@ -45,7 +45,6 @@ export function ActionMenuButton({
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => onSelect("MOVE", batch)}>Move batch</DropdownMenuItem>
         <DropdownMenuItem onClick={() => onSelect("DUMP", batch)}>Log dump</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onSelect("CHECKIN", batch)}>Check-in note</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

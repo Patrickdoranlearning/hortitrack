@@ -353,20 +353,20 @@ export default function SaleableBatchesClient({
   // Scanner functions
   const resolveBatchFromInput = (raw: string) => {
     const cleaned = raw.trim();
-    if (!cleaned) return { batch: null as SaleableBatchRow | null, reason: "empty" as const };
+    if (!cleaned) return { batch: null, reason: "empty" as const };
 
     const parsed = parseScanCode(cleaned);
     const normalized = cleaned.toLowerCase().replace(/^#/, "");
 
     if (parsed?.by === "id") {
       const match = batches.find((batch) => toText(batch.id) === parsed.value.toLowerCase());
-      if (match) return { batch: match, reason: null as const };
+      if (match) return { batch: match, reason: null };
     }
 
     if (parsed?.by === "batchNumber") {
       const candidates = candidateBatchNumbers(parsed.value).map((v) => v.toLowerCase());
       const matches = batches.filter((batch) => candidates.includes(toText(batch.batchNumber)));
-      if (matches.length === 1) return { batch: matches[0], reason: null as const };
+      if (matches.length === 1) return { batch: matches[0], reason: null };
       if (matches.length > 1) return { batch: null, reason: "ambiguous" as const, matches: matches.length };
     }
 
@@ -375,7 +375,7 @@ export default function SaleableBatchesClient({
         f.includes(normalized)
       )
     );
-    if (fuzzyMatches.length === 1) return { batch: fuzzyMatches[0], reason: null as const };
+    if (fuzzyMatches.length === 1) return { batch: fuzzyMatches[0], reason: null };
     if (fuzzyMatches.length > 1) return { batch: null, reason: "ambiguous" as const, matches: fuzzyMatches.length };
 
     return { batch: null, reason: "not_found" as const };

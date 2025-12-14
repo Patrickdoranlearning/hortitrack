@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/select";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { propagationFormSchema } from "@/app/production/forms/propagation-schema";
+import useSWR from "swr";
+import { fetchJson } from "@/lib/http";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type VarOption = { id: string; name: string; family?: string | null };
 type SizeOption = {
@@ -33,9 +36,25 @@ type LocationOption = {
   nurserySite?: string | null;
 };
 
+type ProductionStats = {
+  batchesInPropagation: number;
+  readyForSale: number;
+  lossLast7Days: number;
+};
+
 export default function ProductionHome() {
   const { toast } = useToast();
   const { data: refData, loading: refLoading } = React.useContext(ReferenceDataContext);
+
+  // Fetch production stats
+  const { data: stats, isLoading: statsLoading, error: statsError } = useSWR<ProductionStats>(
+    "/api/production/stats",
+    fetchJson,
+    {
+      refreshInterval: 30000, // Refresh every 30 seconds
+      revalidateOnFocus: true,
+    }
+  );
 
   const varietyOptions = React.useMemo<VarOption[]>(() => {
     return (refData?.varieties ?? []).map((v: any) => ({
@@ -87,18 +106,36 @@ export default function ProductionHome() {
             </Button>
           }
           onSubmit={async (values) => {
-            const res = await createPropagationBatchAction({
-              ...values,
-              varietyId: values.varietyId,
-              variety: values.variety,
-              family: values.family || null,
-              // If specific fields are missing/optional in schema but required by action, handle here
-            })
-            
-            if (res.success) {
-                toast({ title: "Batch Created", description: `Batch ${res.data?.batch_number} started.` })
-            } else {
-                toast({ title: "Error", description: res.error || "Failed to create batch", variant: "destructive" })
+            try {
+              const res = await createPropagationBatchAction({
+                ...values,
+                varietyId: values.varietyId,
+                variety: values.variety,
+                family: values.family || null,
+              });
+              
+              if (res.success) {
+                toast({ 
+                  title: "Batch Created", 
+                  description: `Batch ${res.data?.batch_number} started successfully.` 
+                });
+                return true; // Close dialog on success
+              } else {
+                toast({ 
+                  title: "Error creating batch", 
+                  description: res.error || "Failed to create batch. Please try again.", 
+                  variant: "destructive" 
+                });
+                return false; // Keep dialog open on error
+              }
+            } catch (error: any) {
+              console.error("[ProductionHome] Error creating batch:", error);
+              toast({ 
+                title: "Error", 
+                description: error?.message || "An unexpected error occurred. Please try again.", 
+                variant: "destructive" 
+              });
+              return false;
             }
           }}
         >
@@ -219,15 +256,39 @@ export default function ProductionHome() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Batches in Propagation</CardTitle></CardHeader>
-          <CardContent className="text-3xl font-semibold">--</CardContent>
+          <CardContent className="text-3xl font-semibold">
+            {statsLoading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : statsError ? (
+              <span className="text-muted-foreground text-lg">Error</span>
+            ) : (
+              stats?.batchesInPropagation ?? 0
+            )}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Ready for Sale</CardTitle></CardHeader>
-          <CardContent className="text-3xl font-semibold">--</CardContent>
+          <CardContent className="text-3xl font-semibold">
+            {statsLoading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : statsError ? (
+              <span className="text-muted-foreground text-lg">Error</span>
+            ) : (
+              stats?.readyForSale ?? 0
+            )}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Loss (last 7 days)</CardTitle></CardHeader>
-          <CardContent className="text-3xl font-semibold">--</CardContent>
+          <CardContent className="text-3xl font-semibold">
+            {statsLoading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : statsError ? (
+              <span className="text-muted-foreground text-lg">Error</span>
+            ) : (
+              stats?.lossLast7Days ?? 0
+            )}
+          </CardContent>
         </Card>
       </div>
     </PageFrame>
