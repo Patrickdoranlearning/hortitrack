@@ -23,8 +23,8 @@ export async function GET() {
   try {
     const protocols = await listProtocols();
     return NextResponse.json({ protocols });
-  } catch (error: any) {
-    const message = error?.message ?? "Failed to load protocols";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to load protocols";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -78,11 +78,11 @@ export async function POST(req: Request) {
 
     const protocol = rowToProtocolSummary(data as ProtocolRow);
     return NextResponse.json({ protocol }, { status: 201 });
-  } catch (error: any) {
-    if (error?.name === "ZodError") {
-      return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      return NextResponse.json({ error: "Invalid payload", issues: (error as any).issues }, { status: 400 });
     }
-    const message = error?.message ?? "Failed to create protocol";
+    const message = error instanceof Error ? error.message : "Failed to create protocol";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

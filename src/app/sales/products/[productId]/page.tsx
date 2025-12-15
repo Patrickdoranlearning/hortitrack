@@ -52,7 +52,7 @@ export default async function ProductEditPage({ params }: { params: Promise<Para
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <ModulePageHeader
         title={`Edit ${product.name}`}
         description="Update merchandising details, linked batches, and pricing."

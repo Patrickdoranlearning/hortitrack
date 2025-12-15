@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { NurseryLocation } from '@/lib/types';
 import { addLocationAction, deleteLocationAction, updateLocationAction } from '../actions';
+import { invalidateReferenceData } from '@/lib/swr/keys';
 import { LocationForm } from '@/components/location-form';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
@@ -119,6 +120,7 @@ export default function LocationsPage() {
 
     const result = await addLocationAction(payload);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Location added', description: `"${values.name}" is now available.` });
       quickForm.reset(defaultQuickValues);
     } else {
@@ -190,6 +192,10 @@ export default function LocationsPage() {
       }
     }
 
+    if (created > 0) {
+      invalidateReferenceData();
+    }
+
     toast({
       title: 'Import complete',
       description: `${created} location${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
@@ -200,6 +206,7 @@ export default function LocationsPage() {
   const handleDelete = async (id: string, name: string) => {
     const result = await deleteLocationAction(id);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Location deleted', description: `"${name}" removed.` });
     } else {
       toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
@@ -231,7 +238,7 @@ export default function LocationsPage() {
   );
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <DataPageShell
         title="Nursery Locations"
         description="Keep tunnels, glasshouses, and sections aligned across propagation forms."
@@ -280,6 +287,7 @@ export default function LocationsPage() {
                   ? updateLocationAction(values as NurseryLocation)
                   : addLocationAction(values as Omit<NurseryLocation, 'id'>);
                 if (result.success) {
+                  invalidateReferenceData();
                   toast({
                     title: (values as any).id ? 'Location updated' : 'Location added',
                     description: `"${result.data?.name ?? values.name}" saved successfully.`,

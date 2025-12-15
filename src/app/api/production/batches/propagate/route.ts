@@ -93,11 +93,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ batch, requestId }, { status: 201 });
-  } catch (e: any) {
-    console.error("[propagate]", { requestId, error: e?.message });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
     const status =
-      /Unauthenticated/i.test(e?.message) ? 401 :
-      /parse|invalid/i.test(e?.message) ? 400 : 500;
-    return NextResponse.json({ error: e?.message ?? "Server error", requestId }, { status });
+      /Unauthenticated/i.test(message) ? 401 :
+      /parse|invalid/i.test(message) ? 400 : 500;
+    return NextResponse.json({ error: message, requestId }, { status });
   }
 }

@@ -35,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 import dynamic from "next/dynamic";
 
 const ScannerClient = dynamic(() => import("@/components/Scanner/ScannerClient"), {
@@ -136,6 +137,25 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
   const errorCount = rows.filter((row) => row.status === "error").length;
   const totalUnits = rows.reduce((sum, row) => sum + (row.units || 0), 0);
 
+  // Material consumption preview data for all rows
+  const consumptionBatches = React.useMemo(() => {
+    if (!defaults.sizeId) return [];
+    const sizeInfo = sizeMap.get(defaults.sizeId);
+    if (!sizeInfo) return [];
+
+    // Aggregate units by target size (all rows use the same default size)
+    const validRows = rows.filter((row) => row.units > 0 && row.status === "pending");
+    if (validRows.length === 0) return [];
+
+    const aggregatedUnits = validRows.reduce((sum, row) => sum + row.units, 0);
+    return [{
+      batchId: 'bulk-transplant',
+      sizeId: defaults.sizeId,
+      sizeName: sizeInfo.name,
+      quantity: aggregatedUnits,
+    }];
+  }, [rows, defaults.sizeId, sizeMap]);
+
   const searchBatches = React.useCallback(async (query: string) => {
     if (!query || query.length < 2) {
       setBatchSearchResults([]);
@@ -147,8 +167,7 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
         `/api/production/batches/search?q=${encodeURIComponent(query)}&status=Growing&pageSize=20`
       );
       setBatchSearchResults(res.items ?? []);
-    } catch (err) {
-      console.error("[BulkTransplant] batch search error", err);
+    } catch {
       setBatchSearchResults([]);
     } finally {
       setBatchSearchLoading(false);
@@ -225,8 +244,7 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
           variant: "destructive",
         });
       }
-    } catch (err) {
-      console.error("[BulkTransplant] Scan search error:", err);
+    } catch {
       toast({
         title: "Scan failed",
         description: "Error searching for batch",
@@ -284,12 +302,6 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
 
       // Additional validation before upload
       if (!row.parentBatchId || !row.sizeId || !row.locationId || row.units <= 0) {
-        console.error("[BulkTransplant] Row missing required fields:", {
-          parentBatchId: row.parentBatchId,
-          sizeId: row.sizeId,
-          locationId: row.locationId,
-          units: row.units,
-        });
         failed += 1;
         updateRow(row.id, { status: "error", message: "Missing required fields" });
         continue;
@@ -297,13 +309,6 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
 
       updateRow(row.id, { status: "uploading", message: undefined });
       try {
-        console.log("[BulkTransplant] Submitting transplant:", {
-          parent_batch_id: row.parentBatchId,
-          size_id: row.sizeId,
-          location_id: row.locationId,
-          units: row.units,
-        });
-
         // Pass units directly - the RPC function will use units when provided
         const result = await transplantBatchAction({
           parent_batch_id: row.parentBatchId,
@@ -321,10 +326,9 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
 
         created += 1;
         updateRow(row.id, { status: "success", message: `Created ${result.data.childBatch.batchNumber}` });
-      } catch (err: any) {
-        console.error("[BulkTransplant] Transplant failed:", err);
+      } catch (err) {
         failed += 1;
-        const description = err?.message ?? "Failed to create transplant";
+        const description = err instanceof Error ? err.message : "Failed to create transplant";
         updateRow(row.id, {
           status: "error",
           message: description,
@@ -672,6 +676,11 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Material consumption preview */}
+            {consumptionBatches.length > 0 && (
+              <MaterialConsumptionPreview batches={consumptionBatches} />
+            )}
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={handleBack} disabled={busy === "uploading"}>

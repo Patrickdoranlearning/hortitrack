@@ -235,7 +235,7 @@ export default function PlantHealthTasksPage() {
   );
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="tasks">
+    <PageFrame moduleKey="tasks">
       <div className="space-y-6">
         <ModulePageHeader
           title="Plant Health Tasks"

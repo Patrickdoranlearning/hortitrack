@@ -13,7 +13,7 @@ export default async function ProductionTasksPage() {
   ]);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="tasks">
+    <PageFrame moduleKey="tasks">
       <ProductionTasksClient
         initialJobs={jobs}
         staff={staff}

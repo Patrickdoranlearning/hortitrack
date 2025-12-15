@@ -15,7 +15,7 @@ export default async function SalesInvoicesPage() {
     .order('created_at', { ascending: false });
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <div className="space-y-6">
         <ModulePageHeader
           title="Invoices"

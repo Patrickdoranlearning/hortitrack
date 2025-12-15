@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { Supplier } from '@/lib/types';
 import { addSupplierAction, deleteSupplierAction, updateSupplierAction } from '../actions';
+import { invalidateReferenceData } from '@/lib/swr/keys';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { SupplierForm } from '@/components/supplier-form';
@@ -34,10 +35,10 @@ const supplierTypes = [
 const quickSupplierSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   supplierType: z.string().optional(),
-  countryCode: z.string().length(2, 'Use ISO country code'),
+  countryCode: z.string().min(2, 'Use ISO country code').max(2, 'Use ISO country code'),
   producerCode: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')),
 });
 
 type QuickSupplierFormValues = z.infer<typeof quickSupplierSchema>;
@@ -120,6 +121,7 @@ export default function SuppliersPage() {
 
     const result = await addSupplierAction(payload);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Supplier added', description: `"${values.name}" is now available.` });
       quickForm.reset(defaultQuickValues);
     } else {
@@ -129,7 +131,7 @@ export default function SuppliersPage() {
 
   const handleDownloadTemplate = () => {
     const headers = ['name', 'supplierType', 'countryCode', 'producerCode', 'phone', 'email'];
-    const sample = ['Doran Nurseries', 'plant', 'IE', '12345', '+3531234567', 'hello@doran.ie'];
+    const sample = ['Example Nursery', 'plant', 'IE', '12345', '+3531234567', 'hello@example.ie'];
     downloadCsv(headers, [sample], 'suppliers_template.csv');
   };
 
@@ -194,6 +196,10 @@ export default function SuppliersPage() {
       }
     }
 
+    if (created > 0) {
+      invalidateReferenceData();
+    }
+
     toast({
       title: 'Import complete',
       description: `${created} supplier${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
@@ -204,6 +210,7 @@ export default function SuppliersPage() {
   const handleDelete = async (id: string, name: string) => {
     const result = await deleteSupplierAction(id);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Supplier deleted', description: `"${name}" removed.` });
     } else {
       toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
@@ -235,7 +242,7 @@ export default function SuppliersPage() {
   );
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <DataPageShell
         title="Suppliers"
         description="Single source for plant, haulage, hardware, and admin suppliers."
@@ -284,6 +291,7 @@ export default function SuppliersPage() {
                   ? updateSupplierAction(values as Supplier)
                   : addSupplierAction(values as Omit<Supplier, 'id'>));
                 if (result.success) {
+                  invalidateReferenceData();
                   toast({
                     title: editingSupplier ? 'Supplier updated' : 'Supplier added',
                     description: `"${result.data?.name ?? values.name}" saved successfully.`,

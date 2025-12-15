@@ -3,20 +3,20 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus } from 'lucide-react';
+import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus, Building2, User, Container } from 'lucide-react';
 import Link from 'next/link';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
 export default function DataManagementPage() {
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="font-headline text-4xl">Data Management</h1>
+            <h1 className="font-headline text-4xl">Settings</h1>
             <p className="text-muted-foreground">
-              Download a template, upload CSVs, or add quick rows to keep your golden data sets in sync across the nursery.
+              Configure your organization, manage your account, and keep your data in sync across the nursery.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -26,21 +26,59 @@ export default function DataManagementPage() {
             </Link>
           </Button>
         </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
 
-          <Card className="border-primary/50 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><UserPlus /> Team Members</CardTitle>
-              <CardDescription>Invite employees, assign roles (Growers = Pickers), and manage access.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/settings/team">
-                  Manage Team
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Organization & Account Settings */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Organization & Account</h2>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="border-primary/50 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Building2 /> Organization Settings</CardTitle>
+                <CardDescription>Configure your nursery&apos;s profile, branding, and business details.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild>
+                  <Link href="/settings/organization">
+                    Manage Organization
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/50 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><User /> My Account</CardTitle>
+                <CardDescription>Update your personal profile and security settings.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild>
+                  <Link href="/settings/account">
+                    Manage Account
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/50 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><UserPlus /> Team Members</CardTitle>
+                <CardDescription>Invite employees, assign roles (Growers = Pickers), and manage access.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild>
+                  <Link href="/settings/team">
+                    Manage Team
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Data Management */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Data Management</h2>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
 
           <Card>
             <CardHeader>
@@ -142,6 +180,20 @@ export default function DataManagementPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Container /> Vehicles</CardTitle>
+              <CardDescription>Configure truck dimensions, trolley capacity, and loading layouts.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/vehicles">
+                  Manage Vehicles
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center gap-2"><ListChecks /> Dropdown Manager</CardTitle>
               <CardDescription>Rename, reorder, or hide system dropdowns per organisation.</CardDescription>
             </CardHeader>
@@ -168,6 +220,7 @@ export default function DataManagementPage() {
             </CardContent>
           </Card>
 
+          </div>
         </div>
       </div>
     </PageFrame>

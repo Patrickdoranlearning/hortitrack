@@ -83,7 +83,7 @@ export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps
               <FormField control={form.control} name="name" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Supplier Name</FormLabel>
-                      <FormControl><Input placeholder="e.g., 'Doran Nurseries'" {...field} /></FormControl>
+                      <FormControl><Input placeholder="e.g., 'Greenfield Nursery'" {...field} /></FormControl>
                       <FormMessage />
                   </FormItem>
               )} />

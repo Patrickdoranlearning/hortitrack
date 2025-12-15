@@ -26,7 +26,7 @@ export default async function CustomersPage() {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <CustomerManagementClient {...payload} />
     </PageFrame>
   );

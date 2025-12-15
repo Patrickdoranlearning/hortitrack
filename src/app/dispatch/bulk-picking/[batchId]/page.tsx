@@ -105,7 +105,7 @@ export default async function BulkPickingBatchPage({ params }: PageProps) {
   };
   
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <BulkPickingWorkflowClient batch={transformedBatch} />
     </PageFrame>
   );

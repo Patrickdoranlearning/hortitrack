@@ -50,7 +50,7 @@ export async function listOrders(params: { page?: number; pageSize?: number; sta
 
   const { data, error, count } = await query;
   if (error) {
-    console.error("Error listing orders:", error);
+    console.error("Error listing orders:", error.message, error.code, error.details, error.hint);
     return { orders: [], total: 0, page, pageSize };
   }
 

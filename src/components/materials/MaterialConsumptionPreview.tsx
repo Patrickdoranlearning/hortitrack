@@ -61,7 +61,7 @@ export function MaterialConsumptionPreview({ batches, className }: MaterialConsu
   const { data, isLoading, error } = useSWR<PreviewResponse>(
     primaryQuery ? primaryQuery.key : null,
     (url) => fetchJson(url),
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: true, dedupingInterval: 5000 }
   );
 
   // Aggregate all previews

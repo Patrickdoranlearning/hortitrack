@@ -1,16 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { 
-  createPickListFromOrder, 
-  assignPickListToTeam, 
-  getPickListForOrder 
+import {
+  createPickListFromOrder,
+  assignPickListToTeam,
+  getPickListForOrder
 } from "@/server/sales/picking";
-import { 
-  addOrderToDeliveryRun, 
+import {
+  addOrderToDeliveryRun,
   createDeliveryRun
 } from "@/server/dispatch/queries.server";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 
 export async function assignOrderToTeam(orderId: string, teamId: string | null) {
   try {
@@ -218,34 +219,43 @@ export async function updateLoad(
  */
 export async function deleteLoad(loadId: string) {
   try {
-    const supabase = await createClient();
-    
+    console.log(`[deleteLoad] Attempting to delete load: ${loadId}`);
+
+    // Use admin client to bypass any RLS issues
     // Check if any orders are assigned to this load
-    const { data: items, error: checkError } = await supabase
+    const { data: items, error: checkError } = await supabaseAdmin
       .from("delivery_items")
       .select("id")
       .eq("delivery_run_id", loadId)
       .limit(1);
-      
-    if (checkError) throw checkError;
-    
+
+    if (checkError) {
+      console.error(`[deleteLoad] Error checking items:`, checkError);
+      throw checkError;
+    }
+
+    console.log(`[deleteLoad] Found ${items?.length ?? 0} items in load`);
+
     if (items && items.length > 0) {
       return { error: "Cannot delete load with assigned orders. Remove all orders first." };
     }
-    
-    // Delete the load
-    const { error } = await supabase
+
+    // Delete the load using admin client
+    const { error } = await supabaseAdmin
       .from("delivery_runs")
       .delete()
       .eq("id", loadId);
-      
+
+    console.log(`[deleteLoad] Delete completed, error: ${error?.message ?? 'none'}`);
+
     if (error) throw error;
-    
+
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true };
   } catch (error: any) {
+    console.error(`[deleteLoad] Error:`, error);
     return { error: error.message };
   }
 }
@@ -405,55 +415,59 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
  */
 export async function dispatchLoad(loadId: string) {
   try {
-    const supabase = await createClient();
-    
+    console.log(`[dispatchLoad] Dispatching load: ${loadId}`);
+
     // Get all orders in this load
-    const { data: deliveryItems, error: fetchError } = await supabase
+    const { data: deliveryItems, error: fetchError } = await supabaseAdmin
       .from("delivery_items")
       .select("order_id")
       .eq("delivery_run_id", loadId);
-      
+
     if (fetchError) throw fetchError;
-    
+
     if (!deliveryItems || deliveryItems.length === 0) {
       return { error: "No orders in this load to dispatch" };
     }
-    
+
     const orderIds = deliveryItems.map(item => item.order_id);
-    
+    console.log(`[dispatchLoad] Found ${orderIds.length} orders to dispatch`);
+
     // Update delivery run status to in_transit
-    const { error: runError } = await supabase
+    const { error: runError } = await supabaseAdmin
       .from("delivery_runs")
-      .update({ 
+      .update({
         status: "in_transit",
         actual_departure_time: new Date().toISOString()
       })
       .eq("id", loadId);
-      
+
     if (runError) throw runError;
-    
+
     // Update all delivery items to in_transit
-    const { error: itemsError } = await supabase
+    const { error: itemsError } = await supabaseAdmin
       .from("delivery_items")
       .update({ status: "in_transit" })
       .eq("delivery_run_id", loadId);
-      
+
     if (itemsError) throw itemsError;
-    
+
     // Update all orders to dispatched status
-    const { error: ordersError } = await supabase
+    const { error: ordersError } = await supabaseAdmin
       .from("orders")
       .update({ status: "dispatched" })
       .in("id", orderIds);
-      
+
     if (ordersError) throw ordersError;
-    
+
+    console.log(`[dispatchLoad] Successfully dispatched ${orderIds.length} orders`);
+
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
-    
+
     return { success: true, ordersDispatched: orderIds.length };
   } catch (error: any) {
+    console.error(`[dispatchLoad] Error:`, error);
     return { error: error.message };
   }
 }

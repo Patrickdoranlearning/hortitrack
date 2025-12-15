@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default function DispatchTasksPage() {
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="tasks">
+    <PageFrame moduleKey="tasks">
       <div className="space-y-6">
         <ModulePageHeader
           title="Dispatch Tasks"

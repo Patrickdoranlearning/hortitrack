@@ -24,7 +24,7 @@ export default async function PickingWorkflowPage({ params }: PageProps) {
   const items = await getPickItems(pickListId);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <WorkflowPageClient 
         pickList={pickList}
         initialItems={items}

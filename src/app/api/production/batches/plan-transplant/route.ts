@@ -91,26 +91,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  console.log("[plan-transplant] POST request received");
   try {
     const rawPayload = await req.json();
-    console.log("[plan-transplant] Raw payload:", JSON.stringify(rawPayload, null, 2));
 
     const payload = PlanTransplantSchema.parse(rawPayload);
-    console.log("[plan-transplant] Payload validated successfully");
 
     const { supabase, orgId, user } = await getUserAndOrg();
-    console.log("[plan-transplant] Auth successful, orgId:", orgId, "userId:", user?.id);
-
-    console.log("[plan-transplant] Parsed payload for org:", orgId);
 
     // Resolve status_id for "Planned"
     const statusId = await resolveStatusId(supabase, orgId, "Planned");
-    console.log("[plan-transplant] Resolved statusId for Planned:", statusId);
 
     // Get the internal supplier (owner nursery) for transplant batches
     const internalSupplierId = await getInternalSupplierId(supabase, orgId);
-    console.log("[plan-transplant] Internal supplier ID:", internalSupplierId);
 
     // Fetch all source batches to validate and get variety info
     const sourceBatchIds = [...new Set(payload.transplants.map((t) => t.source_batch_id))];
@@ -120,7 +112,6 @@ export async function POST(req: Request) {
       .in("id", sourceBatchIds);
 
     if (sourceBatchesErr) {
-      console.error("[plan-transplant] Failed to fetch source batches:", sourceBatchesErr);
       return NextResponse.json({ error: "Failed to fetch source batches" }, { status: 500 });
     }
 
@@ -134,7 +125,6 @@ export async function POST(req: Request) {
       .in("id", targetSizeIds);
 
     if (sizesErr) {
-      console.error("[plan-transplant] Failed to fetch sizes:", sizesErr);
       return NextResponse.json({ error: "Failed to fetch sizes" }, { status: 500 });
     }
 
@@ -242,7 +232,6 @@ export async function POST(req: Request) {
           .single();
 
         if (error || !batch) {
-          console.error("[plan-transplant] Failed to create batch:", error);
           errors.push(`Failed to create planned batch: ${error?.message}`);
           // Rollback reservation tracking
           const prevReserved = reservationUpdates.get(sourceBatch.id) || 0;
@@ -273,9 +262,9 @@ export async function POST(req: Request) {
           sourceBatchNumber: sourceBatch.batch_number,
           targetSizeName: targetSize.name,
         });
-      } catch (err: any) {
-        console.error("[plan-transplant] Error processing transplant:", err);
-        errors.push(`Error processing transplant: ${err.message}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`Error processing transplant: ${message}`);
       }
     }
 
@@ -321,22 +310,18 @@ export async function POST(req: Request) {
           }));
           await supabase.from("production_job_batches").insert(jobBatches);
         }
-      } catch (jobErr: any) {
-        console.error("[plan-transplant] Error creating job:", jobErr);
+      } catch (jobErr) {
         // Don't fail the whole operation if job creation fails
       }
     }
 
     // Return results
     if (results.length === 0 && errors.length > 0) {
-      console.error("[plan-transplant] All transplants failed. Errors:", errors);
       return NextResponse.json(
         { error: "All transplants failed", errors },
         { status: 400 }
       );
     }
-
-    console.log("[plan-transplant] Successfully created", results.length, "planned batches");
 
     return NextResponse.json(
       {
@@ -347,15 +332,14 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("[plan-transplant] Error:", error);
-    if (error?.name === "ZodError") {
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { error: "Invalid payload", issues: error.issues },
+        { error: "Invalid payload", issues: (error as any).issues },
         { status: 400 }
       );
     }
-    const message = error?.message ?? "Failed to plan transplants";
+    const message = error instanceof Error ? error.message : "Failed to plan transplants";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

@@ -308,7 +308,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   }
 
   return (
-     <PageFrame companyName="Doran Nurseries" moduleKey="production">
+     <PageFrame moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader 
             title="All Batches"

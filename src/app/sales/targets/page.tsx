@@ -27,7 +27,7 @@ export default async function SalesTargetsPage() {
   const activeCounties = [...new Set(vanOpportunities.map(t => t.county).filter(Boolean))];
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <div className="space-y-6">
         <ModulePageHeader
           title="Sales Targets"

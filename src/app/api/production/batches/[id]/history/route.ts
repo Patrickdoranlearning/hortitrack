@@ -12,16 +12,16 @@ export async function GET(
     // Validate user is authenticated
     try {
       await getUserAndOrg();
-    } catch (authError: any) {
-      console.error("[history] Auth error:", authError?.message);
-      return NextResponse.json({ error: authError?.message ?? "Authentication failed" }, { status: 401 });
+    } catch (authError) {
+      const message = authError instanceof Error ? authError.message : "Authentication failed";
+      return NextResponse.json({ error: message }, { status: 401 });
     }
 
     const history = await buildBatchHistory(id);
     return NextResponse.json({ logs: history.logs });
-  } catch (e: any) {
-    console.error("[history] Error:", e?.message, e?.stack);
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
-    return NextResponse.json({ error: e?.message ?? "Server error" }, { status });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
+    const status = /Unauthenticated/i.test(message) ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

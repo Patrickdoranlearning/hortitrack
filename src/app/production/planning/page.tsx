@@ -10,7 +10,7 @@ export default async function ProductionPlanningPage() {
   const [snapshot, protocols] = await Promise.all([getPlanningSnapshot(), listProtocols()]);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <ReferenceDataProvider>
         <PlanningClient initialSnapshot={snapshot} initialProtocols={protocols} />
       </ReferenceDataProvider>

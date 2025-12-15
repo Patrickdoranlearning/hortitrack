@@ -198,7 +198,7 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <OrderDetailPage order={orderDetails} />
     </PageFrame>
   );

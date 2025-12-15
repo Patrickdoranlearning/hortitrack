@@ -17,8 +17,9 @@ export async function GET(_req: NextRequest, props: RouteProps) {
 
     if (error) throw error;
     return NextResponse.json({ items: rows ?? [] });
-  } catch (e: any) {
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
-    return NextResponse.json({ error: e?.message ?? "Server error" }, { status });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
+    const status = /Unauthenticated/i.test(message) ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

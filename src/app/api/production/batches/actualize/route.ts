@@ -55,20 +55,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  console.log("[actualize] POST request received");
   try {
     const rawPayload = await req.json();
-    console.log("[actualize] Raw payload:", JSON.stringify(rawPayload, null, 2));
 
     const payload = ActualizeSchema.parse(rawPayload);
-    console.log("[actualize] Payload validated successfully");
 
     const { supabase, orgId, user } = await getUserAndOrg();
-    console.log("[actualize] Auth successful, orgId:", orgId, "userId:", user?.id);
 
     // Resolve status_id for "Growing" (the active status)
     const growingStatusId = await resolveStatusId(supabase, orgId, "Growing");
-    console.log("[actualize] Resolved statusId for Growing:", growingStatusId);
 
     // Fetch all batches to validate they exist and are in "Planned" status
     const batchIds = payload.batches.map((b) => b.batch_id);
@@ -79,7 +74,6 @@ export async function POST(req: Request) {
       .eq("org_id", orgId);
 
     if (fetchError) {
-      console.error("[actualize] Failed to fetch batches:", fetchError);
       return NextResponse.json({ error: "Failed to fetch batches" }, { status: 500 });
     }
 
@@ -145,7 +139,6 @@ export async function POST(req: Request) {
           .single();
 
         if (updateError) {
-          console.error("[actualize] Failed to update batch:", updateError);
           errors.push(`Failed to actualize batch ${batch.batch_number}: ${updateError.message}`);
           continue;
         }
@@ -199,11 +192,10 @@ export async function POST(req: Request) {
               transactionCount: consumptionResult.transactions.length,
               shortages: consumptionResult.shortages,
             };
-            console.log(`[actualize] Material consumption for batch ${batch.batch_number}:`, materialConsumption);
-          } catch (consumeErr: any) {
-            console.error("[actualize] Material consumption error:", consumeErr);
+          } catch (consumeErr) {
             // Don't fail the batch actualization if material consumption fails
-            materialConsumption = { success: false, error: consumeErr.message };
+            const errMsg = consumeErr instanceof Error ? consumeErr.message : "Unknown error";
+            materialConsumption = { success: false, error: errMsg };
           }
         }
 
@@ -213,9 +205,9 @@ export async function POST(req: Request) {
           quantityDiff,
           materialConsumption,
         });
-      } catch (err: any) {
-        console.error("[actualize] Error processing batch:", err);
-        errors.push(`Error processing batch: ${err.message}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`Error processing batch: ${message}`);
       }
     }
 
@@ -283,22 +275,18 @@ export async function POST(req: Request) {
             .update(updateJobData)
             .eq("id", payload.job_id);
         }
-      } catch (jobErr: any) {
-        console.error("[actualize] Error updating job:", jobErr);
+      } catch (jobErr) {
         // Don't fail the whole operation if job update fails
       }
     }
 
     // Return results
     if (results.length === 0 && errors.length > 0) {
-      console.error("[actualize] All batches failed. Errors:", errors);
       return NextResponse.json(
         { error: "All batches failed to actualize", errors },
         { status: 400 }
       );
     }
-
-    console.log("[actualize] Successfully actualized", results.length, "batches");
 
     return NextResponse.json(
       {
@@ -308,15 +296,14 @@ export async function POST(req: Request) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error("[actualize] Error:", error);
-    if (error?.name === "ZodError") {
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { error: "Invalid payload", issues: error.issues },
+        { error: "Invalid payload", issues: (error as any).issues },
         { status: 400 }
       );
     }
-    const message = error?.message ?? "Failed to actualize batches";
+    const message = error instanceof Error ? error.message : "Failed to actualize batches";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

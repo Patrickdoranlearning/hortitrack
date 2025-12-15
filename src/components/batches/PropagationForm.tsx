@@ -30,6 +30,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
@@ -105,6 +106,17 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
     ? watchContainers * Math.max(1, selectedSize.cell_multiple)
     : 0;
 
+  // Material consumption preview data
+  const consumptionBatches = React.useMemo(() => {
+    if (!watchSize || !selectedSize || totalUnits <= 0) return [];
+    return [{
+      batchId: 'new-propagation',
+      sizeId: watchSize,
+      sizeName: selectedSize.name,
+      quantity: totalUnits,
+    }];
+  }, [watchSize, selectedSize, totalUnits]);
+
   async function onSubmit(values: PropagationInput) {
     setSubmitting(true);
     try {
@@ -117,7 +129,6 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
       onSubmitSuccess?.(batch);
     } catch (err) {
       const e = err as HttpError;
-      console.error("[PropagationForm] submit error", e);
       toast({
         title: e.status === 401 ? "Please sign in" : "Failed to create batch",
         description: e.requestId ? `${e.message} (ref ${e.requestId})` : e.message,
@@ -370,6 +381,9 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
               <SummaryRow label="Planting date" value={watchDate || "—"} />
             </dl>
           </Card>
+          {consumptionBatches.length > 0 && (
+            <MaterialConsumptionPreview batches={consumptionBatches} />
+          )}
           {refError && (
             <Alert variant="destructive">
               <AlertTitle>Reference data warning</AlertTitle>

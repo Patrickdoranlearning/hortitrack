@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Mail } from 'lucide-react';
+import { useCompanyName } from '@/lib/org/context';
 import type { InvoiceWithCustomer } from '@/app/sales/invoices/InvoicesClient';
 
 interface InvoiceCardProps {
@@ -13,14 +14,15 @@ interface InvoiceCardProps {
 }
 
 export default function InvoiceCard({ invoice, onOpen }: InvoiceCardProps) {
+  const companyName = useCompanyName();
   const customerName = invoice.customer?.name || 'Unknown Customer';
   const customerEmail = invoice.customer?.email;
 
   const handleEmailClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const subject = encodeURIComponent(`Invoice ${invoice.invoice_number} from Doran Nurseries`);
+    const subject = encodeURIComponent(`Invoice ${invoice.invoice_number} from ${companyName}`);
     const body = encodeURIComponent(
-      `Dear ${customerName},\n\nPlease find attached invoice ${invoice.invoice_number}.\n\nTotal: €${invoice.total_inc_vat.toFixed(2)}\nDue Date: ${invoice.due_date ? format(new Date(invoice.due_date), 'PPP') : 'N/A'}\n\nThank you for your business.\n\nKind regards,\nDoran Nurseries`
+      `Dear ${customerName},\n\nPlease find attached invoice ${invoice.invoice_number}.\n\nTotal: €${invoice.total_inc_vat.toFixed(2)}\nDue Date: ${invoice.due_date ? format(new Date(invoice.due_date), 'PPP') : 'N/A'}\n\nThank you for your business.\n\nKind regards,\n${companyName}`
     );
     const mailto = customerEmail
       ? `mailto:${customerEmail}?subject=${subject}&body=${body}`

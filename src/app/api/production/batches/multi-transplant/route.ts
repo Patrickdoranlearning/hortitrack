@@ -180,9 +180,9 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (err: any) {
-    console.error("[batches/multi-transplant]", { requestId, error: err?.message });
-    return NextResponse.json({ requestId, error: err?.message ?? "Server error" }, { status: 400 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Server error";
+    return NextResponse.json({ requestId, error: message }, { status: 400 });
   }
 }
 

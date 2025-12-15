@@ -89,7 +89,7 @@ export default async function BulkPickingPage() {
   }));
   
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <div className="space-y-6">
         <ModulePageHeader
           title="Bulk Picking"

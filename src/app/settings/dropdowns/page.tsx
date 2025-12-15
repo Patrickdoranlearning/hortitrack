@@ -162,7 +162,7 @@ export default function DropdownManagerPage() {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="settings">
+    <PageFrame moduleKey="settings">
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="font-headline text-3xl">Dropdown Manager</h1>

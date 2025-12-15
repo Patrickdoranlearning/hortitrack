@@ -17,10 +17,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Card, CardContent } from '@/components/ui/card';
+import { ViewToggle, useViewToggle } from '@/components/ui/view-toggle';
 import OrderStatusBadge from '@/components/sales/OrderStatusBadge';
-import { 
-  Printer, 
-  Copy, 
+import {
+  Printer,
+  Copy,
   ExternalLink,
   ChevronLeft,
   ChevronRight,
@@ -121,6 +123,7 @@ export default function SalesOrdersClient({
   const [searchQuery, setSearchQuery] = useState('');
   const [weekFilter, setWeekFilter] = useState('');
   const [activeOnly, setActiveOnly] = useState(true);
+  const { value: viewMode, setValue: setViewMode } = useViewToggle('sales-orders-view', 'table');
 
   const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
   const INACTIVE_STATUSES = ['dispatched', 'delivered', 'cancelled'];
@@ -244,20 +247,101 @@ export default function SalesOrdersClient({
               className="sm:max-w-[140px]"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Active orders</span>
-            <Switch checked={activeOnly} onCheckedChange={setActiveOnly} />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Active</span>
+              <Switch checked={activeOnly} onCheckedChange={setActiveOnly} />
+            </div>
+            <ViewToggle
+              value={viewMode}
+              onChange={setViewMode}
+              storageKey="sales-orders-view"
+            />
           </div>
         </div>
 
-      {/* Orders Table */}
+      {/* Orders - Empty State */}
       {filteredOrders.length === 0 ? (
         <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed">
           <p className="text-muted-foreground">
             No orders in this category. Create your first order to get started.
           </p>
         </div>
+      ) : viewMode === 'card' ? (
+        /* Card View */
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredOrders.map((order) => {
+            const customerName = order.customer?.name || 'Unknown Customer';
+            const county = order.ship_to_address?.county;
+            const city = order.ship_to_address?.city;
+            const location = city && county ? `${city}, ${county}` : county || city || null;
+
+            return (
+              <Card
+                key={order.id}
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleOpenOrder(order.id)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="font-semibold">#{order.order_number}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(order.created_at), 'MMM d, yyyy')}
+                      </div>
+                    </div>
+                    <OrderStatusBadge status={order.status} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="font-medium truncate" title={customerName}>
+                      {customerName}
+                    </div>
+
+                    {location && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{location}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        {order.requested_delivery_date
+                          ? format(new Date(order.requested_delivery_date), 'EEE, MMM d')
+                          : 'No delivery date'}
+                      </div>
+                      <div className="font-semibold">
+                        €{(order.total_inc_vat || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1 mt-3 pt-2 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2"
+                      onClick={(e) => handlePrintDocs(order.id, e)}
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2"
+                      onClick={(e) => handleCopyOrder(order.id, e)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
+        /* Table View */
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -279,8 +363,8 @@ export default function SalesOrdersClient({
                 const location = city && county ? `${city}, ${county}` : county || city || null;
 
                 return (
-                  <TableRow 
-                    key={order.id} 
+                  <TableRow
+                    key={order.id}
                     className="cursor-pointer"
                     onClick={() => handleOpenOrder(order.id)}
                   >

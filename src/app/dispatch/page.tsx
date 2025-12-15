@@ -21,7 +21,7 @@ export default async function DispatchPage() {
   const { orders, hauliers, growers, routes, deliveryRuns } = data;
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <div className="space-y-6">
         <ModulePageHeader
           title="Dispatch Dashboard"

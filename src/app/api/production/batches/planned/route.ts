@@ -104,14 +104,12 @@ export async function GET(req: Request) {
       .limit(limit);
 
     if (error) {
-      console.error("[planned-batches GET] Error fetching:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ batches: data ?? [] }, { status: 200 });
-  } catch (error: any) {
-    console.error("[planned-batches GET] Error:", error);
-    const message = error?.message ?? "Failed to fetch planned batches";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch planned batches";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -251,7 +249,6 @@ export async function POST(req: Request) {
         .eq("org_id", orgId);
 
       if (reserveErr) {
-        console.error("[planned] Failed to update reserved quantity:", reserveErr);
         // Note: We don't rollback the batch creation - the reservation is a soft lock
       }
     }
@@ -272,11 +269,11 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ batch }, { status: 201 });
-  } catch (error: any) {
-    if (error?.name === "ZodError") {
-      return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      return NextResponse.json({ error: "Invalid payload", issues: (error as any).issues }, { status: 400 });
     }
-    const message = error?.message ?? "Failed to create planned batch";
+    const message = error instanceof Error ? error.message : "Failed to create planned batch";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

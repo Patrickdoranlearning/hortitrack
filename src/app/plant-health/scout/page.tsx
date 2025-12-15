@@ -6,7 +6,7 @@ import { ScoutWizard } from '@/components/plant-health/scout';
 
 export default function ScoutPage() {
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth">
+    <PageFrame moduleKey="plantHealth">
       <div className="space-y-6">
         <ModulePageHeader
           title="Scout Mode"

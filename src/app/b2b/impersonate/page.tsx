@@ -28,7 +28,7 @@ export default async function ImpersonatePage() {
 
   if (!profile?.active_org_id) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+      <PageFrame moduleKey="sales">
         <div className="flex min-h-screen items-center justify-center">
           <p>No organization found</p>
         </div>
@@ -71,7 +71,7 @@ export default async function ImpersonatePage() {
   }
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
         <ModulePageHeader
           title="Customer impersonation"

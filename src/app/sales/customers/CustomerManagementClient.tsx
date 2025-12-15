@@ -1,28 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Plus,
-  Trash2,
   Settings2,
   Mail,
   Phone,
-  MapPin,
-  Users,
-  CreditCard,
-  Tag,
-  FileText,
-  Building2,
-  Loader2,
-  Pencil,
-  Key,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -32,65 +21,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import type {
   CustomerManagementPayload,
   CustomerSummary,
-  CustomerAddressSummary,
-  CustomerContactSummary,
-  CustomerProductPricing,
-  DeliveryPreferences,
 } from "./types";
-import { COUNTRY_OPTIONS, CURRENCY_OPTIONS } from "./types";
+import { COUNTRY_OPTIONS } from "./types";
 import { DataPageShell } from "@/components/data-management/DataPageShell";
 import { DataToolbar } from "@/components/data-management/DataToolbar";
 import {
   upsertCustomerAction,
-  deleteCustomerAction,
   upsertCustomerAddressAction,
-  deleteCustomerAddressAction,
   upsertCustomerContactAction,
-  deleteCustomerContactAction,
-  upsertCustomerProductPricingAction,
-  deleteCustomerProductPricingAction,
-  fetchCustomerProductPricingAction,
-  updateCustomerDeliveryPreferencesAction,
 } from "./actions";
+import { CustomerSheet } from "./CustomerSheet";
 
 type Props = CustomerManagementPayload;
 

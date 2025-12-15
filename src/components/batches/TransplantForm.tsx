@@ -5,8 +5,9 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ProductionAPI, type TransplantInput } from "@/lib/production/client";
-import { HttpError, fetchJson } from "@/lib/http/fetchJson";
+import { ProductionAPI } from "@/lib/production/client";
+import { transplantBatchAction } from "@/app/actions/transplant";
+import { fetchJson, HttpError } from "@/lib/http/fetchJson";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
+import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
@@ -192,6 +194,17 @@ export default function TransplantForm({
     return remainder > 0 ? remainder : 0;
   }, [hasContainers, parentAvailable, requiredUnits]);
 
+  // Material consumption preview data
+  const consumptionBatches = React.useMemo(() => {
+    if (!watchSize || !selectedSize || requiredUnits <= 0) return [];
+    return [{
+      batchId: 'new-transplant',
+      sizeId: watchSize,
+      sizeName: selectedSize.name,
+      quantity: requiredUnits,
+    }];
+  }, [watchSize, selectedSize, requiredUnits]);
+
   const readiness = [
     { label: "Size", ok: Boolean(watchSize) },
     { label: "Location", ok: Boolean(watchLocation) },
@@ -203,16 +216,21 @@ export default function TransplantForm({
       writeOffRemainder && remainderUnits > 0 ? remainderUnits : 0;
     setSubmitting(true);
     try {
-      const payload: TransplantInput = {
-        parent_batch_id: values.parent_batch_id as any,
-        size_id: values.size_id as any,
-        location_id: values.location_id as any,
+      const result = await transplantBatchAction({
+        parent_batch_id: values.parent_batch_id,
+        size_id: values.size_id,
+        location_id: values.location_id,
         containers: values.containers,
         planted_at: values.planted_at,
         notes: values.notes,
         archive_parent_if_empty: values.archive_parent_if_empty ?? true,
-      };
-      const { child_batch } = await ProductionAPI.transplant(payload);
+      });
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      const child_batch = result.data.childBatch;
 
       if (remainderToWriteOff > 0) {
         await ProductionAPI.dump(values.parent_batch_id, {
@@ -226,8 +244,8 @@ export default function TransplantForm({
         title: "Transplant created",
         description:
           remainderToWriteOff > 0
-            ? `Batch ${child_batch.batch_number} created. ${remainderToWriteOff.toLocaleString()} remaining units written off.`
-            : `Batch ${child_batch.batch_number} created.`,
+            ? `Batch ${child_batch.batchNumber} created. ${remainderToWriteOff.toLocaleString()} remaining units written off.`
+            : `Batch ${child_batch.batchNumber} created.`,
       });
       form.reset({
         parent_batch_id: parentBatchId,
@@ -239,16 +257,13 @@ export default function TransplantForm({
         notes: "",
       });
       setWriteOffRemainder(false);
-      onCreated?.(child_batch);
+      onCreated?.({ id: child_batch.id, batch_number: child_batch.batchNumber });
       void loadParent();
     } catch (err) {
-      const e = err as HttpError;
-      console.error("[TransplantForm] submit error", err);
+      const e = err instanceof Error ? err : new Error("Unknown error");
       toast({
-        title: e.status === 401 ? "Please sign in" : "Failed to transplant",
-        description: e.requestId
-          ? `${e.message} (ref ${e.requestId})`
-          : e.message,
+        title: "Failed to transplant",
+        description: e.message,
         variant: "destructive",
       });
     } finally {
@@ -564,6 +579,10 @@ export default function TransplantForm({
               ))}
             </div>
           </Card>
+
+          {consumptionBatches.length > 0 && (
+            <MaterialConsumptionPreview batches={consumptionBatches} />
+          )}
         </aside>
       </form>
     </Form>

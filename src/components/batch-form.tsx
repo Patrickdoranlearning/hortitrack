@@ -25,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { cn } from '@/lib/utils';
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { useAttributeOptions } from "@/hooks/useAttributeOptions";
+import { useCompanyName } from "@/lib/org/context";
 
 const PassportFields = {
   passportType: z.enum(["received", "issued"]).optional(),
@@ -103,9 +104,10 @@ export function BatchForm({
 
   const { data, loading } = React.useContext(ReferenceDataContext);
   const { options: statusOptions, loading: statusLoading } = useAttributeOptions("production_status");
+  const companyName = useCompanyName();
 
-
-  const doranNurseries = useMemo(() => (data?.suppliers ?? []).find(s => s.name === 'Doran Nurseries'), [data?.suppliers]);
+  // Find the internal/own nursery supplier by matching the organization name
+  const internalSupplier = useMemo(() => (data?.suppliers ?? []).find(s => s.name === companyName), [data?.suppliers, companyName]);
 
   const onSuccess = React.useMemo(() => {
     if (onSubmitSuccess) return onSubmitSuccess;
@@ -132,7 +134,7 @@ export function BatchForm({
       quantity: batch?.quantity ?? 0,
       status: batch?.status ?? '',
       plantingDate: parseToDate(batch?.plantingDate),
-      supplier: batch?.supplier ?? (doranNurseries?.name || ''),
+      supplier: batch?.supplier ?? (internalSupplier?.name || ''),
       location: batch?.location ?? '',
       growerPhotoUrl: batch?.growerPhotoUrl ?? '',
       salesPhotoUrl: batch?.salesPhotoUrl ?? '',
@@ -159,13 +161,13 @@ export function BatchForm({
 
   useEffect(() => {
     if (sourceType === "Propagation") {
-      form.setValue('supplier', doranNurseries?.name || '');
+      form.setValue('supplier', internalSupplier?.name || '');
     } else {
-      if (form.getValues('supplier') === doranNurseries?.name) {
+      if (form.getValues('supplier') === internalSupplier?.name) {
         form.setValue('supplier', '');
       }
     }
-  }, [sourceType, doranNurseries, form]);
+  }, [sourceType, internalSupplier, form]);
 
   const sizeMultiple = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1
     ? selectedSizeInfo.multiple

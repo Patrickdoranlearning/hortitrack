@@ -74,20 +74,15 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const rawPayload = await req.json();
-    console.log("[plan-propagation] Raw payload:", JSON.stringify(rawPayload, null, 2));
 
     const payload = PlanPropagationSchema.parse(rawPayload);
     const { supabase, orgId, user } = await getUserAndOrg();
 
-    console.log("[plan-propagation] Parsed payload for org:", orgId);
-
     // Resolve status_id for "Planned"
     const statusId = await resolveStatusId(supabase, orgId, "Planned");
-    console.log("[plan-propagation] Resolved statusId for Planned:", statusId);
 
     // Get the internal supplier (owner nursery) for propagation batches
     const internalSupplierId = await getInternalSupplierId(supabase, orgId);
-    console.log("[plan-propagation] Internal supplier ID:", internalSupplierId);
 
     // Calculate expected ready date (21 days from planned date for propagation)
     const plannedDate = new Date(payload.planned_date);
@@ -148,7 +143,6 @@ export async function POST(req: Request) {
           .single();
 
         if (error || !batch) {
-          console.error("[plan-propagation] Failed to create batch:", error);
           errors.push(`Failed to create batch: ${error?.message}`);
           continue;
         }
@@ -168,9 +162,9 @@ export async function POST(req: Request) {
         });
 
         results.push(batch);
-      } catch (err: any) {
-        console.error("[plan-propagation] Error processing batch:", err);
-        errors.push(`Error processing batch: ${err.message}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`Error processing batch: ${message}`);
       }
     }
 
@@ -202,22 +196,18 @@ export async function POST(req: Request) {
           }));
           await supabase.from("production_job_batches").insert(jobBatches);
         }
-      } catch (jobErr: any) {
-        console.error("[plan-propagation] Error creating job:", jobErr);
+      } catch (jobErr) {
         // Don't fail the whole operation if job creation fails
       }
     }
 
     // Return results
     if (results.length === 0 && errors.length > 0) {
-      console.error("[plan-propagation] All batches failed. Errors:", errors);
       return NextResponse.json(
         { error: "All batches failed", errors },
         { status: 400 }
       );
     }
-
-    console.log("[plan-propagation] Successfully created", results.length, "batches");
 
     return NextResponse.json(
       {
@@ -228,15 +218,14 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("[plan-propagation] Error:", error);
-    if (error?.name === "ZodError") {
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { error: "Invalid payload", issues: error.issues },
+        { error: "Invalid payload", issues: (error as any).issues },
         { status: 400 }
       );
     }
-    const message = error?.message ?? "Failed to plan propagation batches";
+    const message = error instanceof Error ? error.message : "Failed to plan propagation batches";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

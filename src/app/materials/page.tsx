@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 
 export default function MaterialsPage() {
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="materials">
+    <PageFrame moduleKey="materials">
       <div className="space-y-6">
         <ModulePageHeader
           title="Materials"

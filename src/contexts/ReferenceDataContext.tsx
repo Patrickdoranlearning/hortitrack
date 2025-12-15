@@ -1,11 +1,12 @@
-
 // src/contexts/ReferenceDataContext.tsx
 "use client";
 
 import React from "react";
+import useSWR from "swr";
 import { fetchReferenceData, type ReferenceData } from "@/lib/referenceData/service";
 
-type Ctx = { data: Omit<ReferenceData, "errors"> | null; loading: boolean; reload: () => void; error?: string };
+type RefData = Omit<ReferenceData, "errors">;
+type Ctx = { data: RefData | null; loading: boolean; reload: () => void; error?: string };
 
 export const ReferenceDataContext = React.createContext<Ctx>({
   data: null,
@@ -13,38 +14,44 @@ export const ReferenceDataContext = React.createContext<Ctx>({
   reload: () => {},
 });
 
+const fetcher = async (): Promise<RefData> => {
+  const res = await fetchReferenceData();
+  return {
+    varieties: res.varieties,
+    sizes: res.sizes,
+    locations: res.locations,
+    suppliers: res.suppliers,
+  };
+};
+
 export function ReferenceDataProvider({ children }: { children: React.ReactNode }) {
-  const [data, setData] = React.useState<Ctx["data"]>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | undefined>(undefined);
-
-  const load = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetchReferenceData();
-      if (res.errors.length) setError(res.errors.join("; "));
-      setData({
-        varieties: res.varieties,
-        sizes: res.sizes,
-        locations: res.locations,
-        suppliers: res.suppliers,
-      });
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load reference data");
-      setData({
-        varieties: [],
-        sizes: [],
-        locations: [],
-        suppliers: [],
-      });
-    } finally {
-      setLoading(false);
+  const { data, error, isLoading, mutate } = useSWR<RefData>(
+    "reference-data",
+    fetcher,
+    {
+      revalidateOnFocus: true,      // Refresh when user returns to tab
+      revalidateOnReconnect: true,  // Refresh when network reconnects
+      dedupingInterval: 10000,      // Dedupe requests within 10s
+      refreshInterval: 0,           // No automatic polling (set to e.g. 60000 for 1min polling)
     }
-  }, []);
+  );
 
-  React.useEffect(() => {
-    void load();
-  }, [load]);
+  const reload = React.useCallback(() => {
+    void mutate();
+  }, [mutate]);
 
-  return <ReferenceDataContext.Provider value={{ data, loading, reload: load, error }}>{children}</ReferenceDataContext.Provider>;
+  const errorMessage = error instanceof Error ? error.message : error ? String(error) : undefined;
+
+  return (
+    <ReferenceDataContext.Provider
+      value={{
+        data: data ?? null,
+        loading: isLoading,
+        reload,
+        error: errorMessage
+      }}
+    >
+      {children}
+    </ReferenceDataContext.Provider>
+  );
 }

@@ -154,7 +154,7 @@ export default function RecipesClient({ initialProtocols }: Props) {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader
           title="Production Recipes"

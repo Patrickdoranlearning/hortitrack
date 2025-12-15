@@ -14,7 +14,7 @@ export default function LabelManagementPage() {
   const [activeTab, setActiveTab] = useState("templates");
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="settings">
+    <PageFrame moduleKey="settings">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
