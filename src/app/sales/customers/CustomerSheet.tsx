@@ -1151,8 +1151,8 @@ function PricingTab({
     async function load() {
       setLoading(true);
       const result = await fetchCustomerProductPricingAction(customerId);
-      if (result.success) {
-        setPricing(result.data);
+      if (result.success && result.data) {
+        setPricing(result.data as CustomerProductPricing[]);
       }
       setLoading(false);
     }
@@ -1188,6 +1188,9 @@ function PricingTab({
         id: customerId,
         name: "", // Will be ignored for update
         defaultPriceListId: defaultPriceListId || null,
+        currency: "EUR",
+        countryCode: "IE",
+        paymentTermsDays: 30,
       });
       if (!result.success) {
         toast({ variant: "destructive", title: "Save failed" });
@@ -1306,7 +1309,7 @@ function PricingTab({
         onSaved={() => {
           // Refresh pricing
           fetchCustomerProductPricingAction(customerId).then((result) => {
-            if (result.success) setPricing(result.data);
+            if (result.success && result.data) setPricing(result.data as CustomerProductPricing[]);
           });
           onUpdated();
         }}
@@ -1534,6 +1537,9 @@ function ContactsTab({
         id: customerId,
         name: "",
         notes: notes || null,
+        currency: "EUR",
+        countryCode: "IE",
+        paymentTermsDays: 30,
       });
       if (!result.success) {
         toast({ variant: "destructive", title: "Save failed" });

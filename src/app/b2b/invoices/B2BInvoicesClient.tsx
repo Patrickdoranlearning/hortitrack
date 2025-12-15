@@ -28,6 +28,8 @@ type Invoice = {
   balance_due: number | null;
   notes: string | null;
   created_at: string;
+  order_id: string | null;
+  orders: { order_number: string } | null;
 };
 
 type B2BInvoicesClientProps = {
@@ -57,9 +59,18 @@ export function B2BInvoicesClient({ invoices }: B2BInvoicesClientProps) {
     return true;
   });
 
-  const handleDownloadPDF = (invoiceId: string) => {
-    // Open PDF in new tab
-    window.open(`/api/b2b/invoices/${invoiceId}/pdf`, '_blank');
+  const handleDownloadPDF = (invoice: Invoice) => {
+    // Open PDF in new tab - API will return either invoice or order confirmation
+    window.open(`/api/b2b/invoices/${invoice.id}/pdf`, '_blank');
+  };
+
+  // Determine what document type will be downloaded
+  const getDownloadLabel = (invoice: Invoice) => {
+    // If invoice is draft or has no invoice number, it will be an order confirmation
+    if (invoice.status === 'draft' || !invoice.invoice_number) {
+      return 'Download Order Confirmation';
+    }
+    return 'Download Invoice';
   };
 
   return (
@@ -131,11 +142,24 @@ export function B2BInvoicesClient({ invoices }: B2BInvoicesClientProps) {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
-                      <CardTitle className="text-xl">{invoice.invoice_number}</CardTitle>
+                      <CardTitle className="text-xl">
+                        {invoice.invoice_number || `Order ${invoice.orders?.order_number || 'Pending'}`}
+                      </CardTitle>
                       <CardDescription>
-                        Issued on {format(new Date(invoice.issue_date), 'dd/MM/yyyy')}
-                        {invoice.due_date && (
-                          <> • Due {format(new Date(invoice.due_date), 'dd/MM/yyyy')}</>
+                        {invoice.invoice_number ? (
+                          <>
+                            Issued on {format(new Date(invoice.issue_date), 'dd/MM/yyyy')}
+                            {invoice.due_date && (
+                              <> • Due {format(new Date(invoice.due_date), 'dd/MM/yyyy')}</>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            Order placed {format(new Date(invoice.created_at), 'dd/MM/yyyy')}
+                            {invoice.orders?.order_number && (
+                              <> • Ref: {invoice.orders.order_number}</>
+                            )}
+                          </>
                         )}
                       </CardDescription>
                     </div>
@@ -169,10 +193,10 @@ export function B2BInvoicesClient({ invoices }: B2BInvoicesClientProps) {
                     <Button
                       variant="outline"
                       className="flex-1"
-                      onClick={() => handleDownloadPDF(invoice.id)}
+                      onClick={() => handleDownloadPDF(invoice)}
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Download PDF
+                      {getDownloadLabel(invoice)}
                     </Button>
                   </div>
                 </CardContent>

@@ -156,8 +156,8 @@ export function PlanBatchesStep({
   }, []);
 
   // Update batch location
-  const updateBatchLocation = useCallback((batchId: string, locationId: string) => {
-    const location = locations.find((l) => l.id === locationId);
+  const updateBatchLocation = useCallback((batchId: string, locationId: string | null) => {
+    const location = locationId ? locations.find((l) => l.id === locationId) : null;
     setBatches((b) =>
       b.map((batch) =>
         batch.id === batchId
@@ -237,14 +237,14 @@ export function PlanBatchesStep({
                     </TableCell>
                     <TableCell>
                       <Select
-                        value={batch.locationId ?? ''}
-                        onValueChange={(v) => updateBatchLocation(batch.id, v)}
+                        value={batch.locationId || '__tbd__'}
+                        onValueChange={(v) => updateBatchLocation(batch.id, v === '__tbd__' ? null : v)}
                       >
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="TBD" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">TBD</SelectItem>
+                          <SelectItem value="__tbd__">TBD</SelectItem>
                           {locations.map((loc) => (
                             <SelectItem key={loc.id} value={loc.id}>
                               {loc.name}

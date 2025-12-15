@@ -478,15 +478,16 @@ SELECT
   MAX(tm.measurement_date) as last_measurement_date,
   CASE
     WHEN t.start_date IS NOT NULL THEN
-      FLOOR(EXTRACT(DAY FROM (CURRENT_DATE - t.start_date)) / 7)::int
+      FLOOR((CURRENT_DATE - t.start_date)::numeric / 7)::int
     ELSE 0
-  END as current_week
+  END as current_week,
+  t.created_at
 FROM public.trials t
 LEFT JOIN public.plant_varieties v ON t.variety_id = v.id
 LEFT JOIN public.trial_groups tg ON t.id = tg.trial_id
 LEFT JOIN public.trial_subjects ts ON tg.id = ts.group_id AND ts.is_active = true
 LEFT JOIN public.trial_measurements tm ON ts.id = tm.subject_id
-GROUP BY t.id, t.org_id, t.trial_number, t.name, t.status, t.start_date, t.planned_end_date, v.name;
+GROUP BY t.id, t.org_id, t.trial_number, t.name, t.status, t.start_date, t.planned_end_date, v.name, t.created_at;
 
 -- ============================================================================
 -- 10. GRANTS

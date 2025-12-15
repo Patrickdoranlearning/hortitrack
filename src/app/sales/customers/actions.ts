@@ -64,6 +64,9 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
   }
 
   revalidatePath("/sales/customers");
+  if (data?.id) {
+    revalidatePath(`/sales/customers/${data.id}`);
+  }
   return { success: true, data };
 }
 
@@ -88,6 +91,7 @@ export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typ
   }
 
   revalidatePath("/sales/customers");
+  revalidatePath(`/sales/customers/${parsed.customerId}`);
   return { success: true };
 }
 
@@ -213,6 +217,7 @@ export async function upsertCustomerAddressAction(input: z.infer<typeof customer
   }
 
   revalidatePath("/sales/customers");
+  revalidatePath(`/sales/customers/${parsed.customerId}`);
   return { success: true, data };
 }
 
@@ -278,6 +283,7 @@ export async function upsertCustomerContactAction(input: z.infer<typeof customer
   }
 
   revalidatePath("/sales/customers");
+  revalidatePath(`/sales/customers/${parsed.customerId}`);
   return { success: true, data };
 }
 
