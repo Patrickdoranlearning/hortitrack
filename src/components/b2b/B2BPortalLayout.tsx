@@ -4,7 +4,6 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Home, ShoppingCart, Package, FileText, BookOpen, User, LogOut, Menu } from 'lucide-react';
+import { Home, ShoppingCart, Package, FileText, BookOpen, User, LogOut, Menu, Sprout } from 'lucide-react';
 import { logoutCustomer } from '@/app/b2b/login/actions';
 import { endImpersonation } from '@/app/b2b/impersonate/actions';
 import type { B2BAuthContext } from '@/lib/auth/b2b-guard';
@@ -63,10 +62,13 @@ export function B2BPortalLayout({ authContext, children }: B2BPortalLayoutProps)
         {/* Row 1: Logo, Company Name, Profile */}
         <div className="flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <Logo className="h-8 w-8" />
-            <div>
-              <div className="font-semibold text-sm">Customer Portal</div>
-              <div className="text-xs text-muted-foreground">{customer.name}</div>
+            <Sprout className="h-8 w-8 text-primary shrink-0" />
+            <div className="min-w-0">
+              <div className="font-semibold text-sm leading-tight">
+                <span className="text-primary font-bold font-headline">hortitrack</span>
+                <span className="text-muted-foreground font-normal ml-1.5">Customer Portal</span>
+              </div>
+              <div className="text-xs text-muted-foreground truncate">{customer.name}</div>
             </div>
           </div>
 

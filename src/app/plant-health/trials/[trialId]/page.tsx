@@ -46,8 +46,8 @@ import {
   Plus,
   Ruler,
 } from 'lucide-react';
-import { getTrial, updateTrialStatus, deleteTrial, getTrialStatistics } from '@/app/actions/trials';
-import type { TrialWithRelations, TrialStatus, TrialGroupWithSubjects } from '@/types/trial';
+import { getTrial, updateTrialStatus, deleteTrial, getMeasurementsForTrial } from '@/app/actions/trials';
+import type { TrialWithRelations, TrialStatus, TrialGroupWithSubjects, TrialMeasurement } from '@/types/trial';
 import { GROUP_COLORS, SCORE_LABELS } from '@/types/trial';
 
 const STATUS_CONFIG: Record<TrialStatus, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive'; color: string }> = {
@@ -64,6 +64,7 @@ export default function TrialDetailPage() {
   const trialId = params.trialId as string;
 
   const [trial, setTrial] = useState<TrialWithRelations | null>(null);
+  const [measurements, setMeasurements] = useState<TrialMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -71,12 +72,21 @@ export default function TrialDetailPage() {
 
   const fetchTrial = useCallback(async () => {
     setLoading(true);
-    const result = await getTrial(trialId);
-    if (result.success && result.data) {
-      setTrial(result.data);
+    const [trialResult, measurementsResult] = await Promise.all([
+      getTrial(trialId),
+      getMeasurementsForTrial(trialId),
+    ]);
+
+    if (trialResult.success && trialResult.data) {
+      setTrial(trialResult.data);
     } else {
       toast.error('Failed to load trial');
     }
+
+    if (measurementsResult.success && measurementsResult.data) {
+      setMeasurements(measurementsResult.data);
+    }
+
     setLoading(false);
   }, [trialId]);
 
@@ -148,13 +158,13 @@ export default function TrialDetailPage() {
       <div className="space-y-6">
         <ModulePageHeader
           title={
-            <div className="flex items-center gap-3">
+            <span className="flex items-center gap-3">
               <span>{trial.name}</span>
               <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
-            </div>
+            </span>
           }
           description={
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <span className="flex items-center gap-2 text-muted-foreground">
               <span className="font-mono">{trial.trialNumber}</span>
               {trial.variety && (
                 <>
@@ -168,7 +178,7 @@ export default function TrialDetailPage() {
                   <span>Week {currentWeek}</span>
                 </>
               )}
-            </div>
+            </span>
           }
           actionsSlot={
             <div className="flex items-center gap-2">
@@ -180,10 +190,10 @@ export default function TrialDetailPage() {
               </Link>
 
               {trial.status === 'active' && (
-                <Link href={`/plant-health/trials/${trial.id}/measure`}>
+                <Link href={`/plant-health/trials/${trial.id}/record`}>
                   <Button size="sm" className="gap-2">
                     <Ruler className="h-4 w-4" />
-                    Record Measurements
+                    Quick Record
                   </Button>
                 </Link>
               )}
@@ -243,6 +253,33 @@ export default function TrialDetailPage() {
           }
         />
 
+        {/* Draft Trial - Prominent Start Button */}
+        {trial.status === 'draft' && (
+          <Card className="border-2 border-dashed border-green-300 bg-green-50/50 dark:bg-green-950/20">
+            <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <h3 className="font-semibold text-lg">Ready to start your trial?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {trial.groups?.length || 0} groups with {totalSubjects} subjects configured
+                </p>
+              </div>
+              <Button
+                size="lg"
+                className="gap-2 w-full sm:w-auto"
+                onClick={() => handleStatusChange('active')}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Play className="h-5 w-5" />
+                )}
+                Start Trial Now
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -272,7 +309,7 @@ export default function TrialDetailPage() {
               <div className="flex items-center gap-3">
                 <BarChart3 className="h-8 w-8 text-purple-600" />
                 <div>
-                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-2xl font-bold">{measurements.length}</p>
                   <p className="text-xs text-muted-foreground">Measurements</p>
                 </div>
               </div>
@@ -375,10 +412,10 @@ export default function TrialDetailPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">Groups</CardTitle>
-                  <Link href={`/plant-health/trials/${trial.id}/measure`}>
+                  <Link href={`/plant-health/trials/${trial.id}/record`}>
                     <Button variant="outline" size="sm" disabled={trial.status !== 'active'}>
                       <Ruler className="h-4 w-4 mr-1" />
-                      Record Measurements
+                      Quick Record
                     </Button>
                   </Link>
                 </div>
@@ -419,26 +456,107 @@ export default function TrialDetailPage() {
                       Weekly measurement data for all subjects
                     </CardDescription>
                   </div>
-                  <Link href={`/plant-health/trials/${trial.id}/measure`}>
+                  <Link href={`/plant-health/trials/${trial.id}/record`}>
                     <Button disabled={trial.status !== 'active'}>
                       <Plus className="h-4 w-4 mr-1" />
-                      Record Measurements
+                      Quick Record
                     </Button>
                   </Link>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12">
-                  <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground/50" />
-                  <p className="mt-4 text-muted-foreground">No measurements recorded yet</p>
-                  {trial.status === 'active' && (
-                    <Link href={`/plant-health/trials/${trial.id}/measure`}>
-                      <Button variant="outline" className="mt-4">
-                        Record First Measurement
-                      </Button>
-                    </Link>
-                  )}
-                </div>
+                {measurements.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Group measurements by date */}
+                    {Object.entries(
+                      measurements.reduce((acc, m) => {
+                        const date = m.measurementDate;
+                        if (!acc[date]) acc[date] = [];
+                        acc[date].push(m);
+                        return acc;
+                      }, {} as Record<string, TrialMeasurement[]>)
+                    )
+                      .sort(([a], [b]) => b.localeCompare(a))
+                      .map(([date, dateMeasurements]) => (
+                        <div key={date} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium">
+                              {new Date(date).toLocaleDateString('en-IE', {
+                                weekday: 'short',
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </h4>
+                            <Badge variant="outline">
+                              Week {dateMeasurements[0]?.weekNumber ?? 0}
+                            </Badge>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {dateMeasurements.map((m) => {
+                              const subject = trial.groups
+                                ?.flatMap((g) => g.subjects || [])
+                                .find((s) => s.id === m.subjectId);
+                              const group = trial.groups?.find((g) =>
+                                g.subjects?.some((s) => s.id === m.subjectId)
+                              );
+                              return (
+                                <div
+                                  key={m.id}
+                                  className="p-3 bg-muted/50 rounded-lg text-sm"
+                                >
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div
+                                      className="w-2 h-2 rounded-full"
+                                      style={{
+                                        backgroundColor:
+                                          group?.labelColor || '#6B7280',
+                                      }}
+                                    />
+                                    <span className="font-medium">
+                                      {subject?.label || 'Unknown'}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                                    {m.heightCm && (
+                                      <span>Stem: {m.heightCm}cm</span>
+                                    )}
+                                    {m.ec && <span>EC: {m.ec}</span>}
+                                    {m.ph && <span>pH: {m.ph}</span>}
+                                    {m.vigorScore && (
+                                      <span>Vigor: {m.vigorScore}/5</span>
+                                    )}
+                                    {m.overallHealthScore && (
+                                      <span>Health: {m.overallHealthScore}/5</span>
+                                    )}
+                                  </div>
+                                  {m.observations && (
+                                    <p className="mt-2 text-xs italic text-muted-foreground">
+                                      {m.observations}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground/50" />
+                    <p className="mt-4 text-muted-foreground">
+                      No measurements recorded yet
+                    </p>
+                    {trial.status === 'active' && (
+                      <Link href={`/plant-health/trials/${trial.id}/record`}>
+                        <Button variant="outline" className="mt-4">
+                          Record First Measurement
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

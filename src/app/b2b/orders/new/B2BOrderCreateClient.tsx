@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { B2BProductAccordionCard } from '@/components/b2b/B2BProductAccordionCard';
 import { B2BProductFilters } from '@/components/b2b/B2BProductFilters';
@@ -42,6 +42,22 @@ export function B2BOrderCreateClient({
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [checkoutStep, setCheckoutStep] = useState<string>('cart');
+
+  // Auto-switch view mode based on screen width
+  useEffect(() => {
+    const handleResize = () => {
+      // Use list view on smaller screens (< 768px)
+      const shouldUseList = window.innerWidth < 768;
+      setViewMode(shouldUseList ? 'list' : 'card');
+    };
+
+    // Set initial value
+    handleResize();
+
+    // Listen for resize events
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Only show products during the cart step
   const showProducts = checkoutStep === 'cart';

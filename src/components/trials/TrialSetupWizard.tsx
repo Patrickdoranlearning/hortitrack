@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -43,7 +43,7 @@ import {
   Leaf,
 } from 'lucide-react';
 import { createTrial } from '@/app/actions/trials';
-import { useReferenceData } from '@/contexts/ReferenceDataContext';
+import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { GROUP_COLORS } from '@/types/trial';
 import type { TrialSetupInput, TrialGroupInput, GroupStrategy } from '@/types/trial';
 
@@ -108,7 +108,10 @@ const STEPS = [
 
 export function TrialSetupWizard() {
   const router = useRouter();
-  const { varieties, sizes, locations } = useReferenceData();
+  const { data: refData } = useContext(ReferenceDataContext);
+  const varieties = refData?.varieties ?? [];
+  const sizes = refData?.sizes ?? [];
+  const locations = refData?.locations ?? [];
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -120,10 +123,10 @@ export function TrialSetupWizard() {
       hypothesis: '',
       objective: '',
       methodology: '',
-      varietyId: '',
-      targetSizeId: '',
-      trialLocationId: '',
-      protocolId: '',
+      varietyId: undefined,
+      targetSizeId: undefined,
+      trialLocationId: undefined,
+      protocolId: undefined,
       groups: [
         {
           name: 'Control',
@@ -403,16 +406,15 @@ export function TrialSetupWizard() {
                   name="varietyId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Plant Variety</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormLabel>Plant Variety (optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select variety..." />
+                            <SelectValue placeholder="Any variety" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Any variety</SelectItem>
-                          {varieties.map((v) => (
+                          {varieties.filter((v) => v.id).map((v) => (
                             <SelectItem key={v.id} value={v.id}>
                               {v.name}
                             </SelectItem>
@@ -431,16 +433,15 @@ export function TrialSetupWizard() {
                   name="targetSizeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Container Size</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormLabel>Container Size (optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select size..." />
+                            <SelectValue placeholder="Any size" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Any size</SelectItem>
-                          {sizes.map((s) => (
+                          {sizes.filter((s) => s.id).map((s) => (
                             <SelectItem key={s.id} value={s.id}>
                               {s.name}
                             </SelectItem>
@@ -456,16 +457,15 @@ export function TrialSetupWizard() {
                   name="trialLocationId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Trial Location</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormLabel>Trial Location (optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select location..." />
+                            <SelectValue placeholder="No specific location" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">No specific location</SelectItem>
-                          {locations.map((l) => (
+                          {locations.filter((l) => l.id).map((l) => (
                             <SelectItem key={l.id} value={l.id}>
                               {l.name}
                             </SelectItem>
@@ -731,11 +731,11 @@ export function TrialSetupWizard() {
                       <FormLabel>Measurement Frequency</FormLabel>
                       <Select
                         onValueChange={(v) => field.onChange(parseInt(v))}
-                        value={field.value?.toString()}
+                        value={field.value ? field.value.toString() : "7"}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder="Select frequency" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>

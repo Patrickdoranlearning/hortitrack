@@ -7,7 +7,7 @@ export default async function B2BInvoicesPage() {
   const authContext = await requireCustomerAuth();
   const supabase = await createClient();
 
-  // Fetch customer invoices
+  // Fetch customer invoices with order details
   const { data: invoices } = await supabase
     .from('invoices')
     .select(`
@@ -22,7 +22,11 @@ export default async function B2BInvoicesPage() {
       amount_credited,
       balance_due,
       notes,
-      created_at
+      created_at,
+      order_id,
+      orders (
+        order_number
+      )
     `)
     .eq('customer_id', authContext.customerId)
     .order('issue_date', { ascending: false });
