@@ -129,3 +129,41 @@ export const CheckinFormSchema = z.object({
   qualityStars: z.number().int().min(1).max(6).optional(),
 });
 export type CheckinFormInput = z.infer<typeof CheckinFormSchema>;
+
+// ============================================================================
+// Ancestry Types (for batch lineage/tree views)
+// ============================================================================
+
+export const AncestryNodeSchema = z.object({
+  batchNumber: z.string(),
+  variety: z.string().nullable().optional(),
+  family: z.string().nullable().optional(),
+  supplierName: z.string().nullable().optional(),
+  size: z.string().nullable().optional(),
+  productionWeek: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  locked: z.boolean().optional(),
+});
+export type AncestryNode = z.infer<typeof AncestryNodeSchema>;
+
+export const AncestryResponseSchema = z.array(AncestryNodeSchema);
+
+// ============================================================================
+// Batch Summary Types (for detail views)
+// ============================================================================
+
+export const BatchSummarySchema = z.object({
+  id: z.string(),
+  batchNumber: z.string(),
+  variety: z.string().nullable().optional(),
+  family: z.string().nullable().optional(),
+  size: z.string().nullable().optional(),
+  productionWeek: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  phase: z.string().nullable().optional(),
+  quantity: z.number().nullable().optional(),
+  locationName: z.string().nullable().optional(),
+  plantedAt: z.string().nullable().optional(),
+  supplierName: z.string().nullable().optional(),
+});
+export type BatchSummary = z.infer<typeof BatchSummarySchema>;

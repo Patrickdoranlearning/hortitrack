@@ -15,7 +15,7 @@ export default async function PickingQueuePage() {
         orgId = result.orgId;
     } catch (e) {
         return (
-            <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+            <PageFrame moduleKey="dispatch">
                 <div className="space-y-6">
                     <ModulePageHeader
                         title="Picking Queue"
@@ -40,7 +40,7 @@ export default async function PickingQueuePage() {
     const pickLists = await getOrdersForPicking(orgId);
 
     return (
-        <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+        <PageFrame moduleKey="dispatch">
             <div className="space-y-6">
                 <ModulePageHeader
                     title="Picking Queue"

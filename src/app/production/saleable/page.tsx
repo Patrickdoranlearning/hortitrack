@@ -31,7 +31,7 @@ export default async function SaleableBatchesPage(props: PageProps) {
   ]);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <SaleableBatchesClient
         initialBatches={batches}
         productionStatusOptions={statusOptions}

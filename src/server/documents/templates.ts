@@ -131,7 +131,7 @@ export async function getDocumentTemplate(templateId: string): Promise<DocumentT
   const { data, error } = await supabase
     .from("document_templates")
     .select(
-      "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions(*)"
+      "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions!document_template_versions_template_id_fkey(*)"
     )
     .eq("id", templateId)
     .eq("org_id", orgId)
@@ -179,7 +179,7 @@ export async function saveTemplateDraft(input: z.infer<typeof TemplateInputSchem
       .update({ current_version_id: versionRow.id })
       .eq("id", templateRow.id)
       .select(
-        "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions(*)"
+        "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions!document_template_versions_template_id_fkey(*)"
       )
       .maybeSingle();
     if (uErr || !updatedTemplate) throw new Error(uErr?.message ?? "Failed to link version");
@@ -224,7 +224,7 @@ export async function saveTemplateDraft(input: z.infer<typeof TemplateInputSchem
     .eq("id", parsed.id)
     .eq("org_id", orgId)
     .select(
-      "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions(*)"
+      "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions!document_template_versions_template_id_fkey(*)"
     )
     .maybeSingle();
   if (updErr || !updated) throw new Error(updErr?.message ?? "Failed to update template");
@@ -256,7 +256,7 @@ export async function publishTemplate(templateId: string, versionId?: string): P
     .eq("id", templateId)
     .eq("org_id", orgId)
     .select(
-      "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions(*)"
+      "*, current_version:document_template_versions!document_templates_current_version_fk(*), versions:document_template_versions!document_template_versions_template_id_fkey(*)"
     )
     .maybeSingle();
   if (error || !data) throw new Error(error?.message ?? "Failed to publish");

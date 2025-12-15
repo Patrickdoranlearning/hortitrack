@@ -3,7 +3,7 @@
 
 import type { CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import type { BatchChatInput } from '@/ai/flows/batch-chat-flow';
-import type { Batch, Customer, Haulier, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
+import type { Batch, Customer, Haulier, HaulierVehicle, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/supabase';
 import { declassify } from '@/server/utils/declassify';
@@ -562,6 +562,84 @@ export async function updateHaulierAction(haulierData: Haulier) {
 export async function deleteHaulierAction(haulierId: string) {
     const supabase = await getSupabaseForApp();
     const { error } = await supabase.from('hauliers').delete().eq('id', haulierId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+// --- Haulier Vehicle Actions ---
+
+const vehicleColumnMap = {
+  camel: ['id', 'orgId', 'haulierId', 'name', 'registration', 'vehicleType', 'trolleyCapacity', 'isActive', 'notes', 'truckLayout'] as const,
+  snake: ['id', 'org_id', 'haulier_id', 'name', 'registration', 'vehicle_type', 'trolley_capacity', 'is_active', 'notes', 'truck_layout'] as const,
+};
+
+function mapVehicleToDb(vehicle: Partial<HaulierVehicle>) {
+  const payload: Record<string, any> = {};
+  vehicleColumnMap.camel.forEach((camelKey, index) => {
+    const dbKey = vehicleColumnMap.snake[index];
+    const value = (vehicle as any)[camelKey];
+    if (value !== undefined && value !== null) {
+      payload[dbKey] = value;
+    }
+  });
+  return payload;
+}
+
+function normalizeVehicleRow(row?: any): HaulierVehicle | undefined {
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    haulierId: row.haulier_id,
+    name: row.name,
+    registration: row.registration ?? undefined,
+    vehicleType: row.vehicle_type ?? undefined,
+    trolleyCapacity: row.trolley_capacity ?? 10,
+    isActive: row.is_active ?? true,
+    notes: row.notes ?? undefined,
+    truckLayout: row.truck_layout ?? undefined,
+  };
+}
+
+export async function getVehiclesAction() {
+    const [{ orgId }, supabase] = await Promise.all([getUserAndOrg(), getSupabaseForApp()]);
+    const { data, error } = await supabase
+      .from('haulier_vehicles')
+      .select('*, hauliers(name)')
+      .eq('org_id', orgId)
+      .order('name');
+    if (error) return { success: false, error: error.message, data: [] };
+    return {
+      success: true,
+      data: (data ?? []).map(row => ({
+        ...normalizeVehicleRow(row),
+        haulierName: (row as any).hauliers?.name ?? 'Unknown',
+      }))
+    };
+}
+
+export async function addVehicleAction(vehicleData: Omit<HaulierVehicle, 'id'>) {
+    const [{ orgId }, supabase] = await Promise.all([getUserAndOrg(), getSupabaseForApp()]);
+    const payload = {
+      ...mapVehicleToDb(vehicleData),
+      org_id: orgId,
+    };
+    const { data, error } = await supabase.from('haulier_vehicles').insert([payload]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: normalizeVehicleRow(data?.[0]) };
+}
+
+export async function updateVehicleAction(vehicleData: HaulierVehicle) {
+    const supabase = await getSupabaseForApp();
+    const payload = mapVehicleToDb(vehicleData);
+    const { data, error } = await supabase.from('haulier_vehicles').update(payload).eq('id', vehicleData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: normalizeVehicleRow(data?.[0]) };
+}
+
+export async function deleteVehicleAction(vehicleId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('haulier_vehicles').delete().eq('id', vehicleId);
     if (error) return { success: false, error: error.message };
     return { success: true };
 }

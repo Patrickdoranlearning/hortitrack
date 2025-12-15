@@ -448,17 +448,30 @@ export default function DispatchBoard({
   };
 
   const handleDeleteLoad = async () => {
-    if (!deletingLoadId) return;
-    
+    if (!deletingLoadId) {
+      console.log('[handleDeleteLoad] No deletingLoadId set');
+      return;
+    }
+
+    console.log('[handleDeleteLoad] Deleting load:', deletingLoadId);
+
     toast.promise(
-      deleteLoad(deletingLoadId),
+      (async () => {
+        console.log('[handleDeleteLoad] Calling deleteLoad server action');
+        const result = await deleteLoad(deletingLoadId);
+        console.log('[handleDeleteLoad] Result:', result);
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        return result;
+      })(),
       {
         loading: 'Deleting load...',
         success: () => {
           setDeletingLoadId(null);
           return 'Load deleted';
         },
-        error: (err) => err.error || 'Failed to delete load'
+        error: (err) => err.message || 'Failed to delete load'
       }
     );
   };

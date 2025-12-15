@@ -181,7 +181,7 @@ export default function IpmProgramsPage() {
     assignments.filter((a) => a.programId === programId && a.isActive);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth">
+    <PageFrame moduleKey="plantHealth">
       <div className="space-y-6">
         <ModulePageHeader
           title="IPM Programs"

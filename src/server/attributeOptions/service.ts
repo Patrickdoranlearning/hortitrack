@@ -68,60 +68,78 @@ type SaveArgs = {
 export async function saveAttributeOptions({ orgId, attributeKey, options, supabase }: SaveArgs) {
   const sb = supabase ?? (await getSupabaseServerApp());
 
-  // Load existing ids for cleanup
-  const { data: existing, error: existingErr } = await sb
-    .from("attribute_options")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("attribute_key", attributeKey);
-  if (existingErr) throw new Error(existingErr.message);
-
   const requiresBehavior = !!ATTRIBUTE_META[attributeKey]?.requiresBehavior;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const normalized = options.map((opt, idx) => {
-    // Generate systemCode from displayLabel if not provided
-    const systemCode = (opt.systemCode?.trim?.() || normalizeSystemCode(opt.displayLabel || `OPTION_${idx + 1}`)).trim();
-    const displayLabel = opt.displayLabel?.trim?.() || systemCode;
-    const behavior = requiresBehavior ? (opt.behavior ?? "growing") : opt.behavior ?? null;
-
-    // Build the record - only include id if it's a valid UUID
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const record: Record<string, unknown> = {
-      org_id: orgId,
-      attribute_key: attributeKey,
-      system_code: systemCode,
-      display_label: displayLabel,
-      sort_order: idx + 1,
-      is_active: opt.isActive ?? true,
-      behavior,
-      color: opt.color ?? null,
-    };
-    
-    // Only include id if it's a valid UUID (for updates), otherwise let DB generate one
-    if (opt.id && UUID_RE.test(opt.id)) {
-      record.id = opt.id;
-    }
-
-    return record;
-  });
-
-  // Use upsert with the unique constraint on org_id, attribute_key, system_code
-  const { error: upsertErr } = await sb
-    .from("attribute_options")
-    .upsert(normalized, { onConflict: "org_id,attribute_key,system_code" });
-  if (upsertErr) throw new Error(upsertErr.message);
-
-  // Get the system_codes we're keeping
-  const keepSystemCodes = new Set(normalized.map((o) => o.system_code));
-  
-  // Find stale records that should be deactivated (records in DB but not in our new list)
-  const { data: existingFull } = await sb
+  // Get existing options with system_code to know which ones to update vs insert
+  const { data: existingOptions, error: existingErr } = await sb
     .from("attribute_options")
     .select("id, system_code")
     .eq("org_id", orgId)
     .eq("attribute_key", attributeKey);
-  
-  const staleIds = (existingFull ?? [])
+  if (existingErr) throw new Error(existingErr.message);
+
+  const existingMap = new Map<string, string>(); // system_code -> id
+  for (const row of existingOptions ?? []) {
+    existingMap.set(row.system_code, row.id);
+  }
+
+  // Separate into updates and inserts
+  for (let idx = 0; idx < options.length; idx++) {
+    const opt = options[idx];
+    const systemCode = (opt.systemCode?.trim?.() || normalizeSystemCode(opt.displayLabel || `OPTION_${idx + 1}`)).trim();
+    const displayLabel = opt.displayLabel?.trim?.() || systemCode;
+    const behavior = requiresBehavior ? (opt.behavior ?? "growing") : opt.behavior ?? null;
+
+    const existingId = existingMap.get(systemCode) || (opt.id && UUID_RE.test(opt.id) ? opt.id : null);
+
+    if (existingId) {
+      // Update existing record
+      const { error: updateErr } = await sb
+        .from("attribute_options")
+        .update({
+          display_label: displayLabel,
+          sort_order: idx + 1,
+          is_active: opt.isActive ?? true,
+          behavior,
+          color: opt.color ?? null,
+        })
+        .eq("id", existingId);
+      if (updateErr) throw new Error(updateErr.message);
+    } else {
+      // Insert new record
+      const { error: insertErr } = await sb
+        .from("attribute_options")
+        .insert({
+          org_id: orgId,
+          attribute_key: attributeKey,
+          system_code: systemCode,
+          display_label: displayLabel,
+          sort_order: idx + 1,
+          is_active: opt.isActive ?? true,
+          behavior,
+          color: opt.color ?? null,
+        });
+      if (insertErr) throw new Error(insertErr.message);
+    }
+  }
+
+  // Get the system_codes we're keeping
+  const keepSystemCodes = new Set(
+    options.map((opt, idx) =>
+      (opt.systemCode?.trim?.() || normalizeSystemCode(opt.displayLabel || `OPTION_${idx + 1}`)).trim()
+    )
+  );
+
+  // Find stale records that should be deactivated (records in DB but not in our new list)
+  // Re-fetch to get any newly inserted records
+  const { data: allOptions } = await sb
+    .from("attribute_options")
+    .select("id, system_code")
+    .eq("org_id", orgId)
+    .eq("attribute_key", attributeKey);
+
+  const staleIds = (allOptions ?? [])
     .filter((r) => !keepSystemCodes.has(r.system_code))
     .map((r) => r.id)
     .filter((id): id is string => !!id);

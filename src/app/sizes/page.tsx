@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,6 +25,7 @@ import {
 import { SizeForm } from '@/components/size-form';
 import { useAuth } from '@/hooks/use-auth';
 import { addSizeAction, deleteSizeAction, updateSizeAction } from '../actions';
+import { invalidateReferenceData } from '@/lib/swr/keys';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection } from '@/hooks/use-collection';
 import { PageFrame } from '@/ui/templates/PageFrame';
@@ -94,6 +95,20 @@ export default function SizesPage() {
     resolver: zodResolver(quickSizeSchema),
     defaultValues: defaultQuickValues,
   });
+
+  // Watch dimensions to auto-calculate area
+  const watchedWidth = quickForm.watch('cellWidthMm');
+  const watchedLength = quickForm.watch('cellLengthMm');
+
+  useEffect(() => {
+    if (!watchedWidth || !watchedLength || Number.isNaN(watchedWidth) || Number.isNaN(watchedLength)) {
+      return;
+    }
+    const derivedArea = Number(((watchedWidth * watchedLength) / 1_000_000).toFixed(4));
+    if (derivedArea !== quickForm.getValues('area')) {
+      quickForm.setValue('area', derivedArea);
+    }
+  }, [watchedWidth, watchedLength, quickForm]);
 
   const filteredSizes = useMemo(() => {
     if (!filterText) return sizes;
@@ -165,6 +180,7 @@ export default function SizesPage() {
     if (!sizeToDelete) return;
     const result = await deleteSizeAction(sizeId);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Size deleted', description: `Removed "${sizeToDelete.name}".` });
     } else {
       toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
@@ -178,6 +194,7 @@ export default function SizesPage() {
       : await addSizeAction(data as Omit<PlantSize, 'id'>);
 
     if (result.success) {
+      invalidateReferenceData();
       toast({
         title: isEditing ? 'Size updated' : 'Size added',
         description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`,
@@ -222,6 +239,7 @@ export default function SizesPage() {
 
     const result = await addSizeAction(payload);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Size added', description: `"${values.name}" is now available.` });
       quickForm.reset(defaultQuickValues);
       nameFieldRef.current?.focus();
@@ -336,6 +354,10 @@ export default function SizesPage() {
       }
     }
 
+    if (created > 0) {
+      invalidateReferenceData();
+    }
+
     let description = `${created} new size${created === 1 ? '' : 's'} added.`;
     if (duplicates.length) {
       description += ` Skipped ${duplicates.length} duplicate${duplicates.length === 1 ? '' : 's'} (${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? ', …' : ''}).`;
@@ -354,7 +376,7 @@ export default function SizesPage() {
   const focusQuickRow = () => nameFieldRef.current?.focus();
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <DataPageShell
         title="Plant Sizes"
         description="Standardise tray, pot, and bareroot data for propagation, transplanting, and sales."
@@ -401,10 +423,10 @@ export default function SizesPage() {
                     <TableHead className="px-4 py-2 min-w-[120px]">{renderHeaderButton('Type', 'containerType')}</TableHead>
                     <TableHead className="px-4 py-2 min-w-[110px]">{renderHeaderButton('Cells', 'cellMultiple')}</TableHead>
                     <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Shelf qty', 'shelfQuantity')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Area (m²)', 'area')}</TableHead>
                     <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Volume (L)', 'cellVolumeL')}</TableHead>
                     <TableHead className="px-4 py-2 min-w-[170px]">{renderHeaderButton('Dimensions (mm)', 'cellWidthMm')}</TableHead>
                     <TableHead className="px-4 py-2 min-w-[120px]">{renderHeaderButton('Shape', 'cellShape')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Area (m²)', 'area')}</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -506,29 +528,6 @@ export default function SizesPage() {
                       <TableCell>
                         <FormField
                           control={quickForm.control}
-                          name="area"
-                          render={({ field }) => (
-                            <FormItem className="space-y-1">
-                              <FormLabel className="sr-only">Area</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="0.00"
-                                  value={field.value ?? ''}
-                                  onChange={(event) =>
-                                    field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
-                                  }
-                                />
-                              </FormControl>
-                              <FormMessage className="text-xs" />
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <FormField
-                          control={quickForm.control}
                           name="cellVolumeL"
                           render={({ field }) => (
                             <FormItem className="space-y-1">
@@ -616,6 +615,35 @@ export default function SizesPage() {
                           )}
                         />
                       </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="area"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Area</FormLabel>
+                              <FormControl>
+                                {watchedWidth && watchedLength ? (
+                                  <div className="flex h-9 items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground">
+                                    {((watchedWidth * watchedLength) / 1_000_000).toFixed(4)}
+                                  </div>
+                                ) : (
+                                  <Input
+                                    type="number"
+                                    step="0.0001"
+                                    placeholder="Auto"
+                                    value={field.value ?? ''}
+                                    onChange={(event) =>
+                                      field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                    }
+                                  />
+                                )}
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={handleQuickAdd}>
                           Add
@@ -630,7 +658,6 @@ export default function SizesPage() {
                       <TableCell className="px-4 py-2">{formatType(size.containerType)}</TableCell>
                       <TableCell className="px-4 py-2">{size.cellMultiple ?? 1}</TableCell>
                       <TableCell className="px-4 py-2">{size.shelfQuantity ?? 0}</TableCell>
-                      <TableCell className="px-4 py-2">{size.area ?? '—'}</TableCell>
                       <TableCell className="px-4 py-2">{size.cellVolumeL ?? '—'}</TableCell>
                       <TableCell className="px-4 py-2">
                         {size.cellWidthMm && size.cellLengthMm
@@ -638,6 +665,7 @@ export default function SizesPage() {
                           : '—'}
                       </TableCell>
                       <TableCell className="px-4 py-2">{size.cellShape ? capitalize(size.cellShape) : '—'}</TableCell>
+                      <TableCell className="px-4 py-2">{size.area ?? '—'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button

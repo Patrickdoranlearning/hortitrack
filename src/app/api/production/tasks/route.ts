@@ -46,7 +46,6 @@ export async function GET(req: Request) {
       totalCount: tasks.length,
     });
   } catch (error: unknown) {
-    console.error("[api/production/tasks] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const status = /unauthenticated/i.test(errorMessage) ? 401 : 500;
     return NextResponse.json(

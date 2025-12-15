@@ -145,11 +145,11 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ batch }, { status: 201 });
-  } catch (error: any) {
-    if (error?.name === "ZodError") {
-      return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      return NextResponse.json({ error: "Invalid payload", issues: (error as any).issues }, { status: 400 });
     }
-    const message = error?.message ?? "Failed to create incoming batch";
+    const message = error instanceof Error ? error.message : "Failed to create incoming batch";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

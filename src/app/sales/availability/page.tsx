@@ -6,7 +6,7 @@ export default async function SalesAvailabilityPage() {
     const products = await getSaleableProducts();
 
     return (
-        <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+        <PageFrame moduleKey="sales">
             <div className="space-y-6">
                 <ModulePageHeader
                     title="Live Availability"

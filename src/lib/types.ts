@@ -310,6 +310,15 @@ export const HaulierSchema = z.object({
 });
 export type Haulier = z.infer<typeof HaulierSchema>;
 
+// --- Truck Layout Configuration ---
+export const TruckLayoutSchema = z.object({
+  type: z.enum(['van', 'truck', 'trailer']).default('van'),
+  rows: z.number().int().min(1).max(10).default(2),
+  columns: z.number().int().min(1).max(10).default(5),
+  trolleySlots: z.number().int().min(1).max(100).default(10),
+});
+export type TruckLayout = z.infer<typeof TruckLayoutSchema>;
+
 // --- Haulier Vehicles ---
 export const HaulierVehicleSchema = z.object({
   id: z.string().optional(),
@@ -321,6 +330,7 @@ export const HaulierVehicleSchema = z.object({
   trolleyCapacity: z.number().int().nonnegative().default(10),
   isActive: z.boolean().default(true),
   notes: z.string().optional(),
+  truckLayout: TruckLayoutSchema.optional(),
 });
 export type HaulierVehicle = z.infer<typeof HaulierVehicleSchema>;
 

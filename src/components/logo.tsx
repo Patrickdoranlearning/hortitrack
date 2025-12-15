@@ -6,7 +6,7 @@ type LogoProps = {
   className?: string
 }
 
-export function Logo({ companyName = "Doran Nurseries", className }: LogoProps) {
+export function Logo({ companyName = "HortiTrack", className }: LogoProps) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <Sprout className="h-8 w-8 text-primary" />

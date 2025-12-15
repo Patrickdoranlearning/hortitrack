@@ -112,7 +112,7 @@ export default async function CreateOrderPage({
 
   if (!orgId) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+      <PageFrame moduleKey="sales">
         <div className="p-8">
           <h1 className="text-2xl font-bold text-destructive">No Active Organization</h1>
           <p className="mt-2 text-muted-foreground">
@@ -135,7 +135,7 @@ export default async function CreateOrderPage({
 
   if (!customers || customers.length === 0) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+      <PageFrame moduleKey="sales">
         <div className="p-8">
           <h1 className="text-2xl font-bold">No Customers Found</h1>
           <p className="mt-2 text-muted-foreground">
@@ -148,7 +148,7 @@ export default async function CreateOrderPage({
 
   if (!products || products.length === 0) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+      <PageFrame moduleKey="sales">
         <div className="p-8">
           <h1 className="text-2xl font-bold">No Products Available</h1>
           <p className="mt-2 text-muted-foreground">
@@ -166,7 +166,7 @@ export default async function CreateOrderPage({
   }
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <div className="py-6">
         <SalesOrderWizard
           customers={customers}

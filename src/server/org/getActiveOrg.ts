@@ -23,14 +23,7 @@ export async function resolveActiveOrgId(): Promise<string | null> {
     if (mem?.[0]?.org_id) return mem[0].org_id as string;
   }
 
-  // Fallbacks: prefer Doran Nurseries (by name), else any org
-  const { data: byName } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("name", "Doran Nurseries")
-    .maybeSingle();
-  if (byName?.id) return byName.id as string;
-
+  // Fallback: use the first organization by creation date
   const { data: anyOrg } = await supabase
     .from("organizations")
     .select("id")

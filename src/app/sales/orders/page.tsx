@@ -20,7 +20,7 @@ export default async function SalesOrdersPage(props: {
     });
 
     return (
-        <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+        <PageFrame moduleKey="sales">
             <div className="space-y-6">
                 <ModulePageHeader
                     title="Sales Orders"

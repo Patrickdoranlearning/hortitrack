@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Mail, Printer, FileText } from 'lucide-react';
+import { useCompanyName } from '@/lib/org/context';
 import type { InvoiceWithCustomer } from '@/app/sales/invoices/InvoicesClient';
 
 interface InvoiceDetailDialogProps {
@@ -14,15 +15,17 @@ interface InvoiceDetailDialogProps {
 }
 
 export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDetailDialogProps) {
+  const companyName = useCompanyName();
+
   if (!invoice) return null;
 
   const customerEmail = invoice.customer?.email;
   const customerName = invoice.customer?.name || 'Customer';
 
   const handleEmailInvoice = () => {
-    const subject = encodeURIComponent(`Invoice ${invoice.invoice_number} from Doran Nurseries`);
+    const subject = encodeURIComponent(`Invoice ${invoice.invoice_number} from ${companyName}`);
     const body = encodeURIComponent(
-      `Dear ${customerName},\n\nPlease find attached invoice ${invoice.invoice_number}.\n\nInvoice Details:\n- Invoice Number: ${invoice.invoice_number}\n- Issue Date: ${invoice.issue_date ? format(new Date(invoice.issue_date), 'PPP') : 'N/A'}\n- Due Date: ${invoice.due_date ? format(new Date(invoice.due_date), 'PPP') : 'N/A'}\n- Total: €${invoice.total_inc_vat.toFixed(2)}\n\nThank you for your business.\n\nKind regards,\nDoran Nurseries`
+      `Dear ${customerName},\n\nPlease find attached invoice ${invoice.invoice_number}.\n\nInvoice Details:\n- Invoice Number: ${invoice.invoice_number}\n- Issue Date: ${invoice.issue_date ? format(new Date(invoice.issue_date), 'PPP') : 'N/A'}\n- Due Date: ${invoice.due_date ? format(new Date(invoice.due_date), 'PPP') : 'N/A'}\n- Total: €${invoice.total_inc_vat.toFixed(2)}\n\nThank you for your business.\n\nKind regards,\n${companyName}`
     );
     const mailto = customerEmail
       ? `mailto:${customerEmail}?subject=${subject}&body=${body}`

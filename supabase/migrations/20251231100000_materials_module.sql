@@ -114,9 +114,7 @@ CREATE TABLE IF NOT EXISTS public.material_stock (
   last_movement_at timestamptz,
 
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-
-  CONSTRAINT material_stock_unique UNIQUE (org_id, material_id, COALESCE(location_id, '00000000-0000-0000-0000-000000000000'::uuid))
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.material_stock IS 'Current stock levels by material and location';
@@ -126,6 +124,9 @@ COMMENT ON COLUMN public.material_stock.location_id IS 'NULL = general/unassigne
 CREATE INDEX IF NOT EXISTS idx_material_stock_org ON public.material_stock(org_id);
 CREATE INDEX IF NOT EXISTS idx_material_stock_material ON public.material_stock(material_id);
 CREATE INDEX IF NOT EXISTS idx_material_stock_location ON public.material_stock(location_id) WHERE location_id IS NOT NULL;
+-- Unique index for material stock (COALESCE needed for NULL location handling)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_material_stock_unique
+  ON public.material_stock(org_id, material_id, COALESCE(location_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 -- RLS
 ALTER TABLE public.material_stock ENABLE ROW LEVEL SECURITY;

@@ -13,7 +13,7 @@ export default function BulkTransplantClient() {
   }, []);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader
           title="Bulk Transplant"

@@ -243,7 +243,7 @@ export default function PurchaseOrderDetailPage({
 
   if (isLoading) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="materials">
+      <PageFrame moduleKey="materials">
         <div className="space-y-6">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-[200px] w-full" />
@@ -255,7 +255,7 @@ export default function PurchaseOrderDetailPage({
 
   if (!order) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="materials">
+      <PageFrame moduleKey="materials">
         <div className="text-center py-12">
           <p className="text-muted-foreground">Purchase order not found</p>
           <Button className="mt-4" onClick={() => router.push('/materials/purchase-orders')}>
@@ -271,7 +271,7 @@ export default function PurchaseOrderDetailPage({
   const canCancel = order.status !== 'received' && order.status !== 'cancelled';
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="materials">
+    <PageFrame moduleKey="materials">
       <div className="space-y-6">
         <ModulePageHeader
           title={order.poNumber}

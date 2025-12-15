@@ -40,7 +40,7 @@ export default async function NewProductPage() {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <ModulePageHeader title="Create product" description="Capture merchandising details, inventory, and pricing." />
       {data.skus.length === 0 && (
         <Alert className="mb-6">

@@ -156,7 +156,6 @@ export async function POST(req: Request) {
         .single();
 
       if (updateErr) {
-        console.error("[check-in] Update error:", updateErr);
         return NextResponse.json({ error: updateErr.message }, { status: 500 });
       }
 
@@ -231,7 +230,6 @@ export async function POST(req: Request) {
       .single();
 
     if (error || !batch) {
-      console.error("[check-in] Insert error:", error);
       return NextResponse.json(
         { error: error?.message ?? "Failed to create batch" },
         { status: 500 }
@@ -255,15 +253,14 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ batch }, { status: 201 });
-  } catch (error: any) {
-    console.error("[check-in] Error:", error);
-    if (error?.name === "ZodError") {
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { error: "Invalid payload", issues: error.issues },
+        { error: "Invalid payload", issues: (error as any).issues },
         { status: 400 }
       );
     }
-    const message = error?.message ?? "Failed to check in batch";
+    const message = error instanceof Error ? error.message : "Failed to check in batch";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

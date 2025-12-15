@@ -54,11 +54,31 @@ export function LocationForm({ location, onSubmit, onCancel }: LocationFormProps
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(LocationFormSchema),
-    defaultValues: location ? { ...location } : defaultValues,
+    defaultValues: location
+      ? {
+          name: location.name ?? '',
+          nurserySite: location.nurserySite ?? '',
+          type: location.type ?? '',
+          covered: location.covered ?? false,
+          area: location.area,
+          siteId: location.siteId,
+        }
+      : defaultValues,
   });
 
   useEffect(() => {
-    form.reset(location ? { ...location } : defaultValues);
+    form.reset(
+      location
+        ? {
+            name: location.name ?? '',
+            nurserySite: location.nurserySite ?? '',
+            type: location.type ?? '',
+            covered: location.covered ?? false,
+            area: location.area,
+            siteId: location.siteId,
+          }
+        : defaultValues
+    );
   }, [location, form]);
 
   const handleSubmit = (values: LocationFormValues) => {

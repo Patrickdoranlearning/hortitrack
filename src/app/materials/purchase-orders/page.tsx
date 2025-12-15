@@ -178,7 +178,7 @@ export default function PurchaseOrdersPage() {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="materials">
+    <PageFrame moduleKey="materials">
       <div className="space-y-6">
         <ModulePageHeader
           title="Purchase Orders"

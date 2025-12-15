@@ -8,15 +8,13 @@ import {
   Users,
   ShoppingCart,
   Archive,
-  ArrowLeft,
   Filter,
   Search,
   TrendingDown,
   PieChart as PieIcon,
   Package,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { PageFrame } from '@/ui/templates/PageFrame';
 import {
   Select,
   SelectContent,
@@ -246,17 +244,9 @@ export default function DashboardOverviewPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
+    <PageFrame moduleKey="production">
+      <div className="space-y-4">
         <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
-        <div className="flex items-center space-x-2">
-          <Button asChild variant="outline">
-            <Link href="/">
-              <ArrowLeft />
-              Back to Nursery Stock
-            </Link>
-          </Button>
-        </div>
       </div>
       <Card>
         <CardHeader>
@@ -447,6 +437,6 @@ export default function DashboardOverviewPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageFrame>
   );
 }

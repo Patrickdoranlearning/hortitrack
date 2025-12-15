@@ -24,6 +24,7 @@ import {
   Loader2,
   ListTodo,
   Beaker,
+  Microscope,
 } from 'lucide-react';
 import {
   listIpmPrograms,
@@ -118,7 +119,7 @@ export default function PlantHealthDashboard() {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth">
+    <PageFrame moduleKey="plantHealth">
       <div className="space-y-6">
         <ModulePageHeader
           title="Plant Health"
@@ -155,7 +156,7 @@ export default function PlantHealthDashboard() {
         />
 
         {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Link href="/plant-health/products">
           <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
             <CardContent className="p-4 flex items-center gap-3">
@@ -174,6 +175,17 @@ export default function PlantHealthDashboard() {
               <div>
                 <p className="font-medium">IPM Programs</p>
                 <p className="text-xs text-muted-foreground">{programs.length} active</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/plant-health/trials">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Microscope className="h-8 w-8 text-teal-600" />
+              <div>
+                <p className="font-medium">Trials</p>
+                <p className="text-xs text-muted-foreground">Scientific tests</p>
               </div>
             </CardContent>
           </Card>

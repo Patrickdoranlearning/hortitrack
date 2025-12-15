@@ -16,7 +16,7 @@ export default async function TrolleyManagementPage() {
   }
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <TrolleyManagementClient />
     </PageFrame>
   );

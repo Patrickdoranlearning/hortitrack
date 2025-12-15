@@ -1,12 +1,20 @@
 import { DocumentDesigner } from "@/components/documents/DocumentDesigner";
+import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from "@/ui/templates/PageFrame";
 
 export const dynamic = "force-dynamic";
 
 export default function DocumentDesignerPage() {
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <DocumentDesigner />
-    </div>
+    <PageFrame moduleKey="sales">
+      <div className="space-y-4">
+        <ModulePageHeader
+          title="Document Designer"
+          description="Create and manage document templates for invoices, delivery dockets, and more"
+        />
+        <DocumentDesigner />
+      </div>
+    </PageFrame>
   );
 }
 

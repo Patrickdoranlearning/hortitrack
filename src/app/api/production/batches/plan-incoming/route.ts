@@ -66,16 +66,12 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const rawPayload = await req.json();
-    console.log("[plan-incoming] Raw payload:", JSON.stringify(rawPayload, null, 2));
 
     const payload = PlanIncomingSchema.parse(rawPayload);
     const { supabase, orgId, user } = await getUserAndOrg();
 
-    console.log("[plan-incoming] Parsed payload for org:", orgId);
-
     // Resolve status_id for "Incoming"
     const statusId = await resolveStatusId(supabase, orgId, "Incoming");
-    console.log("[plan-incoming] Resolved statusId for Incoming:", statusId);
 
     // Fetch all sizes for phase inference
     const sizeIds = [...new Set(payload.batches.map((b) => b.size_id))];
@@ -85,12 +81,10 @@ export async function POST(req: Request) {
       .in("id", sizeIds);
 
     if (sizesErr) {
-      console.error("[plan-incoming] Failed to fetch sizes:", sizesErr);
       return NextResponse.json({ error: "Failed to fetch sizes" }, { status: 500 });
     }
 
     const sizeMap = new Map(sizes?.map((s: any) => [s.id, s]) ?? []);
-    console.log("[plan-incoming] Fetched sizes:", sizes?.length ?? 0);
 
     // Calculate expected ready date (21 days from expected delivery)
     const expectedDate = new Date(payload.expected_date);
@@ -162,7 +156,6 @@ export async function POST(req: Request) {
           .single();
 
         if (error || !batch) {
-          console.error("[plan-incoming] Failed to create batch:", error);
           errors.push(`Failed to create batch: ${error?.message}`);
           continue;
         }
@@ -183,22 +176,19 @@ export async function POST(req: Request) {
         });
 
         results.push(batch);
-      } catch (err: any) {
-        console.error("[plan-incoming] Error processing batch:", err);
-        errors.push(`Error processing batch: ${err.message}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`Error processing batch: ${message}`);
       }
     }
 
     // Return results
     if (results.length === 0 && errors.length > 0) {
-      console.error("[plan-incoming] All batches failed. Errors:", errors);
       return NextResponse.json(
         { error: "All batches failed", errors },
         { status: 400 }
       );
     }
-
-    console.log("[plan-incoming] Successfully created", results.length, "batches");
 
     return NextResponse.json(
       {
@@ -208,15 +198,14 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("[plan-incoming] Error:", error);
-    if (error?.name === "ZodError") {
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { error: "Invalid payload", issues: error.issues },
+        { error: "Invalid payload", issues: (error as any).issues },
         { status: 400 }
       );
     }
-    const message = error?.message ?? "Failed to plan incoming batches";
+    const message = error instanceof Error ? error.message : "Failed to plan incoming batches";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

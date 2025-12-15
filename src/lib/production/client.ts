@@ -31,16 +31,6 @@ export type CheckInInput = {
   };
 };
 
-export type TransplantInput = {
-  parent_batch_id: UUID;
-  size_id: UUID;
-  location_id: UUID;
-  containers: number;
-  planted_at?: string;   // YYYY-MM-DD
-  notes?: string;
-  archive_parent_if_empty?: boolean;
-};
-
 export type MultiTransplantInput = {
   child: {
     plant_variety_id: UUID;
@@ -73,12 +63,6 @@ export const ProductionAPI = {
       method: "POST",
       body: JSON.stringify(input),
     });
-  },
-  transplant(input: TransplantInput) {
-    return fetchJson<ApiResponse<{ child_batch: any; parent_new_quantity: number }>>(
-      "/api/production/batches/transplant",
-      { method: "POST", body: JSON.stringify(input) }
-    );
   },
   multiTransplant(input: MultiTransplantInput) {
     return fetchJson<ApiResponse<{ child_batch: any }>>("/api/production/batches/multi-transplant", {

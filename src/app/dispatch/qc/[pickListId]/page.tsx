@@ -50,7 +50,7 @@ export default async function QCReviewPage({ params }: QCReviewPageProps) {
     userId = result.userId;
   } catch (e) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+      <PageFrame moduleKey="dispatch">
         <Card className="p-6 text-center">
           <p className="text-muted-foreground">Please log in to access QC review.</p>
         </Card>
@@ -161,7 +161,7 @@ export default async function QCReviewPage({ params }: QCReviewPageProps) {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <QCReviewClient order={orderDetails} userId={userId} />
     </PageFrame>
   );

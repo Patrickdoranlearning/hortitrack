@@ -67,16 +67,12 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const rawPayload = await req.json();
-    console.log("[check-in-multi] Raw payload:", JSON.stringify(rawPayload, null, 2));
 
     const payload = MultiCheckInSchema.parse(rawPayload);
     const { supabase, orgId, user } = await getUserAndOrg();
 
-    console.log("[check-in-multi] Parsed payload for org:", orgId);
-
     // Resolve status_id for "Growing"
     const statusId = await resolveStatusId(supabase, orgId, "Growing");
-    console.log("[check-in-multi] Resolved statusId:", statusId);
 
     // Fetch all sizes for phase inference and cell_multiple
     const sizeIds = [...new Set(payload.batches.map((b) => b.size_id))];
@@ -90,7 +86,6 @@ export async function POST(req: Request) {
     }
 
     const sizeMap = new Map(sizes?.map((s: any) => [s.id, s]) ?? []);
-    console.log("[check-in-multi] Fetched sizes:", sizes?.length ?? 0, "sizeIds requested:", sizeIds);
 
     // Calculate ready date (21 days from delivery)
     const deliveryDate = new Date(payload.delivery_date);
@@ -252,14 +247,14 @@ export async function POST(req: Request) {
 
           results.push(batch);
         }
-      } catch (err: any) {
-        errors.push(`Error processing batch: ${err.message}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`Error processing batch: ${message}`);
       }
     }
 
     // Return results
     if (results.length === 0 && errors.length > 0) {
-      console.error("[check-in-multi] All batches failed. Errors:", errors);
       return NextResponse.json(
         { error: "All batches failed", errors },
         { status: 400 }
@@ -274,15 +269,14 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("[check-in-multi] Error:", error);
-    if (error?.name === "ZodError") {
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { error: "Invalid payload", issues: error.issues },
+        { error: "Invalid payload", issues: (error as any).issues },
         { status: 400 }
       );
     }
-    const message = error?.message ?? "Failed to check in batches";
+    const message = error instanceof Error ? error.message : "Failed to check in batches";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

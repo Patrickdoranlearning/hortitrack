@@ -67,7 +67,7 @@ export default async function Page(props: PageProps) {
   } as Batch;
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="space-y-4">
         <ModulePageHeader
           title={`Batch ${batch.batch_number}`}

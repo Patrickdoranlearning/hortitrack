@@ -85,11 +85,11 @@ export async function PATCH(
 
     const protocol = rowToProtocolSummary(data as ProtocolRow);
     return NextResponse.json({ protocol });
-  } catch (error: any) {
-    if (error?.name === "ZodError") {
-      return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
+  } catch (error) {
+    if (error instanceof Error && error.name === "ZodError") {
+      return NextResponse.json({ error: "Invalid payload", issues: (error as any).issues }, { status: 400 });
     }
-    const message = error?.message ?? "Failed to update protocol";
+    const message = error instanceof Error ? error.message : "Failed to update protocol";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -112,8 +112,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    const message = error?.message ?? "Failed to delete protocol";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete protocol";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

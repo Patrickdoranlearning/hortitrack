@@ -13,7 +13,7 @@ export default async function PickManagementPage() {
         orgId = result.orgId;
     } catch (e) {
         return (
-            <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+            <PageFrame moduleKey="dispatch">
                 <div className="space-y-6">
                     <ModulePageHeader
                         title="Pick Management"
@@ -36,7 +36,7 @@ export default async function PickManagementPage() {
     });
 
     return (
-        <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+        <PageFrame moduleKey="dispatch">
             <div className="space-y-6">
                 <ModulePageHeader
                     title="Pick Management"

@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Trash2 } from "lucide-react";
+import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 import {
   Popover,
   PopoverContent,
@@ -78,6 +79,19 @@ export default function MultiParentTransplantBuilder() {
 
   const contributedUnits = React.useMemo(() => rows.reduce((acc, row) => acc + (row.units || 0), 0), [rows]);
 
+  // Material consumption preview data
+  const consumptionBatches = React.useMemo(() => {
+    if (!child.sizeId || requiredUnits <= 0) return [];
+    const selectedSize = referenceData?.sizes?.find((s) => s.id === child.sizeId);
+    if (!selectedSize) return [];
+    return [{
+      batchId: 'new-multi-transplant',
+      sizeId: child.sizeId,
+      sizeName: selectedSize.name,
+      quantity: requiredUnits,
+    }];
+  }, [child.sizeId, requiredUnits, referenceData?.sizes]);
+
   const ready =
     Boolean(child.varietyId && child.sizeId && child.locationId) &&
     requiredUnits > 0 &&
@@ -104,8 +118,7 @@ export default function MultiParentTransplantBuilder() {
         `/api/production/batches/search?q=${encodeURIComponent(query)}&status=Growing&pageSize=20`
       );
       setSearchResults(res.items ?? []);
-    } catch (err) {
-      console.error("[MultiParentTransplant] search", err);
+    } catch {
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
@@ -175,11 +188,10 @@ export default function MultiParentTransplantBuilder() {
       });
       setRows([]);
       addRow();
-    } catch (err: any) {
-      console.error("[MultiParentTransplant] submit", err);
+    } catch (err) {
       toast({
         title: "Failed to create transplant",
-        description: err?.message ?? "Check the inputs and try again.",
+        description: err instanceof Error ? err.message : "Check the inputs and try again.",
         variant: "destructive",
       });
     } finally {
@@ -318,6 +330,11 @@ export default function MultiParentTransplantBuilder() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Material consumption preview */}
+      {consumptionBatches.length > 0 && (
+        <MaterialConsumptionPreview batches={consumptionBatches} />
+      )}
 
       <Card className="border-primary/30 overflow-hidden">
         <CardHeader className="space-y-2">

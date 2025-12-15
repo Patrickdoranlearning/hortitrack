@@ -368,25 +368,20 @@ export function DocumentDesigner() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Document Designer</h1>
-          <p className="text-sm text-muted-foreground">Design PDFs, print views, and emails for invoices, dockets, confirmations, AV and Lookin&apos; Good lists.</p>
-        </div>
-        <div className="flex gap-2">
-          <Select onValueChange={(v) => handleNewTemplate(v as DocumentType)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="New template" />
-            </SelectTrigger>
-            <SelectContent>
-              {DOCUMENT_TYPES.map((d) => (
-                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={handleSaveDraft} disabled={isSaving}>Save Draft</Button>
-          <Button variant="accent" onClick={handlePublish} disabled={isSaving}>Publish</Button>
-        </div>
+      {/* Actions bar */}
+      <div className="flex items-center justify-end gap-2">
+        <Select onValueChange={(v) => handleNewTemplate(v as DocumentType)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="New template" />
+          </SelectTrigger>
+          <SelectContent>
+            {DOCUMENT_TYPES.map((d) => (
+              <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button onClick={handleSaveDraft} disabled={isSaving}>Save Draft</Button>
+        <Button variant="accent" onClick={handlePublish} disabled={isSaving}>Publish</Button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">

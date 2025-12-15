@@ -24,7 +24,7 @@ export default async function DriverPage({ searchParams }: PageProps) {
   }
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <div className="space-y-6">
         <ModulePageHeader
           title="Driver View"

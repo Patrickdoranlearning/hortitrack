@@ -31,6 +31,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
@@ -129,6 +130,17 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
     ? watchContainers * Math.max(1, selectedSize.cell_multiple)
     : 0;
 
+  // Material consumption preview data
+  const consumptionBatches = React.useMemo(() => {
+    if (!watchSize || !selectedSize || totalUnits <= 0) return [];
+    return [{
+      batchId: 'new-checkin',
+      sizeId: watchSize,
+      sizeName: selectedSize.name,
+      quantity: totalUnits,
+    }];
+  }, [watchSize, selectedSize, totalUnits]);
+
   const readyDate = React.useMemo(() => {
     if (!watchDate) return "—";
     const dt = new Date(watchDate);
@@ -189,7 +201,6 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
       onSubmitSuccess?.(batch);
     } catch (err) {
       const e = err as HttpError;
-      console.error("[CheckInForm] submit error", e);
       toast({
         title: e.status === 401 ? "Please sign in" : "Failed to check in",
         description: e.requestId ? `${e.message} (ref ${e.requestId})` : e.message,
@@ -582,6 +593,9 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
               <SummaryRow label="Est. ready" value={readyDate} />
             </dl>
           </Card>
+          {consumptionBatches.length > 0 && (
+            <MaterialConsumptionPreview batches={consumptionBatches} />
+          )}
           {refError && (
             <Alert variant="destructive">
               <AlertTitle>Reference data warning</AlertTitle>

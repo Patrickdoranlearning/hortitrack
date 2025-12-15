@@ -84,7 +84,6 @@ export async function GET(req: NextRequest) {
       .order('name');
 
     if (locError) {
-      console.error('Error fetching locations:', locError);
       return fail(500, 'DB_ERROR', 'Failed to fetch locations');
     }
 
@@ -125,7 +124,6 @@ export async function GET(req: NextRequest) {
       .gt('quantity', 0);
 
     if (batchError) {
-      console.error('Error fetching batches:', batchError);
       return fail(500, 'DB_ERROR', 'Failed to fetch batches');
     }
 
@@ -182,9 +180,9 @@ export async function GET(req: NextRequest) {
     });
 
     return ok(result);
-  } catch (err: any) {
-    console.error('[/api/production/locations GET] error:', err);
-    return fail(500, 'SERVER_ERROR', err?.message ?? 'Server error');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Server error';
+    return fail(500, 'SERVER_ERROR', message);
   }
 }
 

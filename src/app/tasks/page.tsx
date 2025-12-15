@@ -19,7 +19,7 @@ export default async function TasksOverviewPage() {
   ]);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="tasks">
+    <PageFrame moduleKey="tasks">
       <TasksOverviewClient
         allTasks={allTasks}
         myTasks={myTasks}

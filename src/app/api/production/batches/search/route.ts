@@ -56,7 +56,6 @@ export async function GET(req: Request) {
 
     const { data, error, count } = await query;
     if (error) {
-      console.error("[batch-search] Query error:", error.message, error.details, error.hint);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return NextResponse.json({
@@ -65,8 +64,8 @@ export async function GET(req: Request) {
       total: count ?? 0,
       items: data ?? [],
     });
-  } catch (e: any) {
-    console.error("[batch-search] Error:", e?.message);
-    return NextResponse.json({ error: e?.message ?? "Server error" }, { status: 500 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

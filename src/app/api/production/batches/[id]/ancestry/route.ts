@@ -28,13 +28,13 @@ export async function GET(
       const auth = await getUserAndOrg();
       supabase = auth.supabase;
       orgId = auth.orgId;
-    } catch (authError: any) {
-      console.error("[ancestry] Auth error:", authError?.message);
-      return NextResponse.json({ error: authError?.message ?? "Authentication failed" }, { status: 401 });
+    } catch (authError) {
+      const message = authError instanceof Error ? authError.message : "Authentication failed";
+      return NextResponse.json({ error: message }, { status: 401 });
     }
 
     // First try batch_ancestry table for explicit relationships
-    const [{ data: ancestryParents, error: pErr }, { data: ancestryChildren, error: cErr }] =
+    const [{ data: ancestryParents }, { data: ancestryChildren }] =
       await Promise.all([
         supabase
           .from("batch_ancestry")
@@ -47,10 +47,6 @@ export async function GET(
           .eq("org_id", orgId)
           .eq("parent_batch_id", id),
       ]);
-
-    // Don't throw on ancestry errors - table might be empty or have RLS issues
-    if (pErr) console.warn("[ancestry] Parents query error:", pErr.message);
-    if (cErr) console.warn("[ancestry] Children query error:", cErr.message);
 
     const current = await getBatchById(id);
 
@@ -104,9 +100,9 @@ export async function GET(
       parents: parentNodes,
       children: childNodes,
     });
-  } catch (e: any) {
-    console.error("[ancestry] Error:", e?.message, e?.stack);
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
-    return NextResponse.json({ error: e?.message ?? "Server error" }, { status });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
+    const status = /Unauthenticated/i.test(message) ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

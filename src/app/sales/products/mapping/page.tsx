@@ -71,7 +71,7 @@ export default async function ProductBatchMappingPage() {
   }));
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <ModulePageHeader
         title="Product Mapping"
         description="Configure rules and manage batch-to-product links for sales inventory."

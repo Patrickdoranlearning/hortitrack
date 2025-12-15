@@ -82,7 +82,7 @@ export default function ProductionHome() {
   }, [refData?.locations]);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-2xl">Production</h1>
         <DialogForm

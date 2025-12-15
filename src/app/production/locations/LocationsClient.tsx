@@ -193,7 +193,7 @@ export default function LocationsClient() {
 
   if (error) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="production">
+      <PageFrame moduleKey="production">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-4">
             <MapPin className="h-12 w-12 mx-auto text-muted-foreground" />
@@ -207,7 +207,7 @@ export default function LocationsClient() {
   }
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader
           title="Nursery Locations"

@@ -28,7 +28,7 @@ export default async function QCQueuePage() {
     orgId = result.orgId;
   } catch (e) {
     return (
-      <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+      <PageFrame moduleKey="dispatch">
         <div className="space-y-6">
           <ModulePageHeader
             title="QC Review"
@@ -150,7 +150,7 @@ export default async function QCQueuePage() {
   });
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
+    <PageFrame moduleKey="dispatch">
       <div className="space-y-6">
         <ModulePageHeader
           title="QC Review Queue"

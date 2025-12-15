@@ -30,15 +30,33 @@ interface SizeFormProps {
 export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
   const isEditing = !!size;
 
+  // Helper to ensure numeric fields are numbers or undefined (not strings/null)
+  const toNumberOrUndefined = (val: unknown): number | undefined => {
+    if (val === null || val === undefined || val === '') return undefined;
+    const num = Number(val);
+    return Number.isNaN(num) ? undefined : num;
+  };
+
   const form = useForm<SizeFormValues>({
     resolver: zodResolver(PlantSizeFormSchema),
     defaultValues: size
-      ? { ...size }
+      ? {
+          name: size.name ?? '',
+          containerType: size.containerType ?? 'pot',
+          area: toNumberOrUndefined(size.area),
+          shelfQuantity: toNumberOrUndefined(size.shelfQuantity),
+          cellMultiple: toNumberOrUndefined(size.cellMultiple) ?? 1,
+          cellVolumeL: toNumberOrUndefined(size.cellVolumeL),
+          cellDiameterMm: toNumberOrUndefined(size.cellDiameterMm),
+          cellWidthMm: toNumberOrUndefined(size.cellWidthMm),
+          cellLengthMm: toNumberOrUndefined(size.cellLengthMm),
+          cellShape: size.cellShape,
+        }
       : {
           name: '',
           containerType: 'pot',
-          area: 0,
-          shelfQuantity: 0,
+          area: undefined,
+          shelfQuantity: undefined,
           cellMultiple: 1,
           cellVolumeL: undefined,
           cellDiameterMm: undefined,
@@ -53,20 +71,34 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
 
   useEffect(() => {
     form.reset(
-      size || {
-        name: '',
-        containerType: 'pot',
-        area: 0,
-        shelfQuantity: 0,
-        cellMultiple: 1,
-        cellVolumeL: undefined,
-        cellDiameterMm: undefined,
-        cellWidthMm: undefined,
-        cellLengthMm: undefined,
-        cellShape: undefined,
-      }
+      size
+        ? {
+            name: size.name ?? '',
+            containerType: size.containerType ?? 'pot',
+            area: toNumberOrUndefined(size.area),
+            shelfQuantity: toNumberOrUndefined(size.shelfQuantity),
+            cellMultiple: toNumberOrUndefined(size.cellMultiple) ?? 1,
+            cellVolumeL: toNumberOrUndefined(size.cellVolumeL),
+            cellDiameterMm: toNumberOrUndefined(size.cellDiameterMm),
+            cellWidthMm: toNumberOrUndefined(size.cellWidthMm),
+            cellLengthMm: toNumberOrUndefined(size.cellLengthMm),
+            cellShape: size.cellShape,
+          }
+        : {
+            name: '',
+            containerType: 'pot',
+            area: undefined,
+            shelfQuantity: undefined,
+            cellMultiple: 1,
+            cellVolumeL: undefined,
+            cellDiameterMm: undefined,
+            cellWidthMm: undefined,
+            cellLengthMm: undefined,
+            cellShape: undefined,
+          }
     );
-  }, [size, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size?.id]);
 
   useEffect(() => {
     if (!widthMm || !lengthMm || Number.isNaN(widthMm) || Number.isNaN(lengthMm)) {
@@ -114,7 +146,14 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
                 <FormItem>
                   <FormLabel>Size / Label</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., P9, 54 Tray" {...field} />
+                    <Input
+                      placeholder="e.g., P9, 54 Tray"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -179,11 +218,13 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
                   <FormControl>
                     <Input
                       type="number"
+                      min={1}
                       placeholder="e.g., 54"
-                      value={field.value ?? ''}
-                      onChange={(e) =>
-                        field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))
-                      }
+                      value={field.value ?? 1}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        field.onChange(Number.isNaN(val) || val < 1 ? 1 : val);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -268,13 +309,17 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cell shape</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                  <Select
+                    onValueChange={(val) => field.onChange(val === '__none' ? undefined : val)}
+                    value={field.value ?? '__none'}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select shape" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="__none">Not specified</SelectItem>
                       <SelectItem value="round">Round</SelectItem>
                       <SelectItem value="square">Square</SelectItem>
                     </SelectContent>

@@ -19,7 +19,7 @@ export default async function SaleabilityWizardPage() {
   const statusOptions = await fetchProductionStatusOptions(orgId);
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">

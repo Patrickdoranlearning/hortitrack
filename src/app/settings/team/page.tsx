@@ -36,22 +36,8 @@ export default async function TeamPage() {
     redirect("/settings");
   }
 
-  // Get company name for header
-  let companyName = "Doran Nurseries";
-  if (orgId) {
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("name")
-      .eq("id", orgId)
-      .single();
-    
-    if (org?.name) {
-      companyName = org.name;
-    }
-  }
-
   return (
-    <PageFrame companyName={companyName} moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <ModulePageHeader

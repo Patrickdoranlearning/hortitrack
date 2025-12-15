@@ -224,7 +224,7 @@ export default function RecipeDetailClient({ protocol }: Props) {
   }
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">

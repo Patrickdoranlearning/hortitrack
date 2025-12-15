@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,11 +21,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ViewToggle, useViewToggle } from '@/components/ui/view-toggle';
 import InvoiceDetailDialog from '@/components/sales/InvoiceDetailDialog';
-import { 
-  MoreHorizontal, 
-  Printer, 
-  Mail, 
+import {
+  MoreHorizontal,
+  Printer,
+  Mail,
   ExternalLink,
   ChevronLeft,
   ChevronRight,
@@ -89,6 +91,7 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithCustomer | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const { value: viewMode, setValue: setViewMode } = useViewToggle('sales-invoices-view', 'table');
 
   const handleOpenInvoice = (invoice: InvoiceWithCustomer) => {
     setSelectedInvoice(invoice);
@@ -138,7 +141,16 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
         ))}
       </Tabs>
 
-      {/* Invoices Table */}
+      {/* View Toggle */}
+      <div className="flex justify-end mb-4">
+        <ViewToggle
+          value={viewMode}
+          onChange={setViewMode}
+          storageKey="sales-invoices-view"
+        />
+      </div>
+
+      {/* Invoices - Empty State */}
       {filteredInvoices.length === 0 ? (
         <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed">
           <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
@@ -146,7 +158,90 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
             No invoices found. Generate an invoice from an order to get started.
           </p>
         </div>
+      ) : viewMode === 'card' ? (
+        /* Card View */
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredInvoices.map((invoice) => {
+            const customerName = invoice.customer?.name || 'Unknown Customer';
+            const overdue = isOverdue(invoice);
+
+            return (
+              <Card
+                key={invoice.id}
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleOpenInvoice(invoice)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="font-semibold">#{invoice.invoice_number}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(invoice.issue_date), 'MMM d, yyyy')}
+                      </div>
+                    </div>
+                    <InvoiceStatusBadge status={overdue ? 'overdue' : invoice.status} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="font-medium truncate" title={customerName}>
+                      {customerName}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Total: </span>
+                        <span className="font-semibold">€{invoice.total_inc_vat.toFixed(2)}</span>
+                      </div>
+                      <div className="text-sm">
+                        {invoice.balance_due > 0 ? (
+                          <span className={overdue ? 'text-red-600 font-semibold' : 'font-semibold'}>
+                            Due: €{invoice.balance_due.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-green-600 font-semibold">Paid</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {invoice.due_date && (
+                      <div className="text-xs text-muted-foreground">
+                        Due: {format(new Date(invoice.due_date), 'MMM d, yyyy')}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1 mt-3 pt-2 border-t">
+                    {invoice.order_id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={(e) => handlePrintInvoice(invoice, e)}
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {invoice.customer?.email && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('Email invoice to', invoice.customer?.email);
+                        }}
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
+        /* Table View */
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -167,8 +262,8 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
                 const overdue = isOverdue(invoice);
 
                 return (
-                  <TableRow 
-                    key={invoice.id} 
+                  <TableRow
+                    key={invoice.id}
                     className="cursor-pointer"
                     onClick={() => handleOpenInvoice(invoice)}
                   >

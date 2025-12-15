@@ -57,7 +57,7 @@ export default async function ProductsPage() {
   };
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+    <PageFrame moduleKey="sales">
       <ModulePageHeader
         title="Products & Pricing"
         description="Manage saleable products, linked batches, and customer-facing price lists."

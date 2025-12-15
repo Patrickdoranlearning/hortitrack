@@ -83,11 +83,12 @@ export async function GET(
     return NextResponse.json({ batch: summary } satisfies SummaryResponse, {
       status: 200,
     });
-  } catch (e: any) {
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
+    const status = /Unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json(
       {
-        error: e?.message ?? "Server error",
+        error: message,
         requestId,
       },
       { status }
