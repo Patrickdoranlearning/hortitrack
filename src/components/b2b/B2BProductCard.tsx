@@ -20,13 +20,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 type B2BProductCardProps = {
   product: CustomerCatalogProduct;
-  onAddToCart: (item: CartItem) => void;
+  onAddToTrolley: (item: CartItem) => void;
   viewMode?: 'card' | 'list';
 };
 
 const LOW_STOCK_THRESHOLD = 100;
 
-export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BProductCardProps) {
+export function B2BProductCard({ product, onAddToTrolley, viewMode = 'card' }: B2BProductCardProps) {
   const [rrp, setRrp] = useState(product.suggestedRrp?.toString() || '');
   const [multibuyPrice2, setMultibuyPrice2] = useState('');
   const [multibuyQty2, setMultibuyQty2] = useState('');
@@ -65,7 +65,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
     setBatchAllocations(allocations);
   };
 
-  const handleAddToCart = () => {
+  const handleAddToTrolley = () => {
     if (!product.unitPriceExVat || totalQuantity < 1) return;
 
     // Resolve variety ID from selected variety name (via batches)
@@ -84,6 +84,8 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
       productName: product.aliasName || product.productName,
       varietyName: product.varietyName,
       sizeName: product.sizeName,
+      sizeId: product.sizeId ?? undefined,
+      family: product.family ?? undefined,
       quantity: totalQuantity,
       unitPriceExVat: product.unitPriceExVat,
       vatRate: product.vatRate,
@@ -99,7 +101,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
       multibuyQty2: multibuyQty2 ? parseInt(multibuyQty2) : undefined,
     };
 
-    onAddToCart(cartItem);
+    onAddToTrolley(cartItem);
 
     // Reset form
     setBatchAllocations([]);
@@ -326,7 +328,7 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
 
           {/* Add Button */}
           <Button
-            onClick={handleAddToCart}
+            onClick={handleAddToTrolley}
             disabled={!product.unitPriceExVat || totalQuantity < 1}
             size="sm"
           >
@@ -428,15 +430,15 @@ export function B2BProductCard({ product, onAddToCart, viewMode = 'card' }: B2BP
             </div>
           </div>
 
-          {/* Add to Cart Button */}
+          {/* Add to Trolley Button */}
           <Button
-            onClick={handleAddToCart}
+            onClick={handleAddToTrolley}
             disabled={!product.unitPriceExVat || totalQuantity < 1}
             className="w-full mt-auto"
             size="sm"
           >
             <Plus className="mr-2 h-4 w-4" />
-            {totalQuantity > 0 ? `Add ${totalQuantity} to Cart` : 'Select Batches First'}
+            {totalQuantity > 0 ? `Add ${totalQuantity} to Trolley` : 'Select Batches First'}
           </Button>
         </CardContent>
       </Card>

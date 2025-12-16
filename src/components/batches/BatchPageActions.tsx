@@ -8,6 +8,7 @@ import { ActionDialog } from '@/components/actions/ActionDialog';
 import type { ActionMode } from '@/components/actions/types';
 import { TransplantMenuButton } from '@/components/horti/TransplantMenuButton';
 import EditBatchForm from '@/components/batches/EditBatchForm';
+import { GrowerGuideButton } from '@/components/batches/GrowerGuideButton';
 import type { Batch, NurseryLocation } from '@/lib/types';
 import { useCollection } from '@/hooks/useCollection';
 
@@ -48,6 +49,8 @@ export function BatchPageActions({ batch }: Props) {
       >
         Edit
       </Button>
+
+      <GrowerGuideButton batchId={batch.id} size="sm" />
 
       <ActionDialog
         open={isLogActionOpen}

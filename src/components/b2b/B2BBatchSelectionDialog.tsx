@@ -250,7 +250,7 @@ export function B2BBatchSelectionDialog({
               Cancel
             </Button>
             <Button type="button" onClick={handleConfirm} disabled={totalSelected === 0}>
-              Add to Cart
+              Add to Trolley
             </Button>
           </div>
         </DialogFooter>

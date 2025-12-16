@@ -70,7 +70,7 @@ export function B2BCartSidebar({ cart, addresses, onUpdateCart, onSubmit }: B2BC
       <CardHeader>
         <div className="flex items-center gap-2">
           <ShoppingCart className="h-5 w-5" />
-          <CardTitle>Your Cart</CardTitle>
+          <CardTitle>Your Trolley</CardTitle>
         </div>
         <CardDescription>
           {cart.length} {cart.length === 1 ? 'item' : 'items'}
@@ -78,10 +78,10 @@ export function B2BCartSidebar({ cart, addresses, onUpdateCart, onSubmit }: B2BC
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Cart Items */}
+        {/* Trolley Items */}
         {cart.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            Your cart is empty. Add products to get started.
+            Your trolley is empty. Add products to get started.
           </p>
         ) : (
           <ScrollArea className="h-[300px] pr-4">

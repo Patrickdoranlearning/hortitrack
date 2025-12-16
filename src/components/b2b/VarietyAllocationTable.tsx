@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from './StatusBadge';
 import { B2BBatchSelectionDialog, type B2BBatch } from './B2BBatchSelectionDialog';
+import { BatchImageCarousel } from './BatchImageCarousel';
 import { cn } from '@/lib/utils';
 import type {
   VarietyInfo,
@@ -73,8 +74,9 @@ export function VarietyAllocationTable({
       <div className="border rounded-lg overflow-hidden">
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-muted text-xs font-medium">
+          <div className="col-span-1"></div>
           <div className="col-span-1">Status</div>
-          <div className="col-span-4">Variety</div>
+          <div className="col-span-3">Variety</div>
           <div className="col-span-2 text-right">Available</div>
           <div className="col-span-2">Quantity</div>
           <div className="col-span-2 text-center">Batches</div>
@@ -101,13 +103,23 @@ export function VarietyAllocationTable({
                 hasBatchSelection && 'bg-blue-50 border-blue-200'
               )}
             >
+              {/* Batch Images */}
+              <div className="col-span-1">
+                <BatchImageCarousel
+                  images={variety.allImages || []}
+                  size="sm"
+                  showArrows={false}
+                  showDots={false}
+                />
+              </div>
+
               {/* Status Indicator */}
               <div className="col-span-1">
                 <StatusBadge status={variety.status} size="md" />
               </div>
 
               {/* Variety Name */}
-              <div className="col-span-4">
+              <div className="col-span-3">
                 <div className="font-medium text-sm">{variety.varietyName}</div>
                 <div className="text-xs text-muted-foreground">
                   {variety.batchCount} batch{variety.batchCount !== 1 ? 'es' : ''}{' '}

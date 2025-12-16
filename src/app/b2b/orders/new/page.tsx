@@ -2,7 +2,7 @@ import { requireCustomerAuth } from '@/lib/auth/b2b-guard';
 import { B2BPortalLayout } from '@/components/b2b/B2BPortalLayout';
 import { B2BOrderCreateClient } from './B2BOrderCreateClient';
 import { createClient } from '@/lib/supabase/server';
-import type { CustomerCatalogProduct, CustomerCatalogProductWithVarieties, VarietyInfo, VarietyBatchInfo } from '@/lib/b2b/types';
+import type { CustomerCatalogProduct, CustomerCatalogProductWithVarieties, VarietyInfo, VarietyBatchInfo, BatchImage } from '@/lib/b2b/types';
 import { calculateVarietyStatus } from '@/lib/b2b/varietyStatus';
 import { getLastUsedPricing } from '@/server/b2b/pricing-history';
 
@@ -58,7 +58,13 @@ export default async function B2BNewOrderPage() {
           planted_at,
           location_id,
           plant_varieties ( name, family ),
-          nursery_locations ( name )
+          nursery_locations ( name ),
+          batch_photos (
+            id,
+            url,
+            type,
+            created_at
+          )
         )
       ),
       product_prices!inner (
@@ -98,6 +104,24 @@ export default async function B2BNewOrderPage() {
         // B2B should only see available batches (not growing, not sold out)
         if (batch.sales_status !== 'available') return null;
 
+        // Transform batch photos - B2B customers only see SALES photos
+        const images: BatchImage[] = (batch.batch_photos || [])
+          .filter((img: any) => img.type === 'SALES') // Only show sales photos to customers
+          .map((img: any) => ({
+            id: img.id,
+            imageUrl: img.url,
+            thumbnailUrl: null, // batch_photos doesn't have thumbnails yet
+            photoType: (img.type === 'SALES' ? 'sales' : 'growing') as 'growing' | 'sales',
+            statusAtCapture: null,
+            caption: null,
+            isHero: false, // First photo will be treated as hero in UI
+            takenAt: img.created_at,
+          }))
+          .sort((a: BatchImage, b: BatchImage) => {
+            // Sort by date (newest first)
+            return new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime();
+          });
+
         return {
           id: batch.id,
           batchNumber: batch.batch_number || '',
@@ -109,6 +133,7 @@ export default async function B2BNewOrderPage() {
           salesStatus: batch.sales_status || null,
           plantedAt: batch.planted_at || null,
           locationName: batch.nursery_locations?.name || null,
+          images, // Include batch photos
         };
       })
       .filter(Boolean) as VarietyBatchInfo[];
@@ -139,9 +164,16 @@ export default async function B2BNewOrderPage() {
       varietyInfo.batches.push(batch);
     });
 
-    // Calculate variety-level status for each variety
+    // Calculate variety-level status and aggregate images for each variety
     varietyMap.forEach((varietyInfo) => {
       varietyInfo.status = calculateVarietyStatus(varietyInfo.batches);
+      // Collect all images from all batches, hero images first
+      const allImages: BatchImage[] = varietyInfo.batches.flatMap(b => b.images || []);
+      allImages.sort((a, b) => {
+        if (a.isHero !== b.isHero) return b.isHero ? 1 : -1;
+        return new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime();
+      });
+      varietyInfo.allImages = allImages;
     });
 
     const varieties = Array.from(varietyMap.values());

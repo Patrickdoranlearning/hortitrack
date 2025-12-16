@@ -28,7 +28,7 @@ const LOW_STOCK_THRESHOLD = 100;
 
 type B2BProductAccordionCardProps = {
   product: CustomerCatalogProductWithVarieties;
-  onAddToCart: (items: CartItem | CartItem[]) => void;
+  onAddToTrolley: (items: CartItem | CartItem[]) => void;
   viewMode?: 'card' | 'list';
 };
 
@@ -40,7 +40,7 @@ type B2BProductAccordionCardProps = {
  */
 export function B2BProductAccordionCard({
   product,
-  onAddToCart,
+  onAddToTrolley,
   viewMode = 'card',
 }: B2BProductAccordionCardProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
@@ -72,23 +72,23 @@ export function B2BProductAccordionCard({
     if (!product.unitPriceExVat || genericQuantity < 1) return;
 
     // Pricing (RRP, multi-buy) is set in the checkout pricing step
-    const cartItems = toCartItems();
+    const trolleyItems = toCartItems();
 
     // Pass single item for generic, array for variety/batch
-    onAddToCart(cartItems.length === 1 ? cartItems[0] : cartItems);
+    onAddToTrolley(trolleyItems.length === 1 ? trolleyItems[0] : trolleyItems);
 
     // Reset form
     reset();
     setAccordionValue(''); // Collapse accordion
   };
 
-  const handleAddToCart = () => {
+  const handleAddToTrolley = () => {
     if (!product.unitPriceExVat || !isValid) return;
 
     // Pricing (RRP, multi-buy) is set in the checkout pricing step
-    const cartItems = toCartItems();
+    const trolleyItems = toCartItems();
 
-    onAddToCart(cartItems.length === 1 ? cartItems[0] : cartItems);
+    onAddToTrolley(trolleyItems.length === 1 ? trolleyItems[0] : trolleyItems);
 
     // Reset form
     reset();
@@ -159,7 +159,7 @@ export function B2BProductAccordionCard({
   );
 
   // Image Thumbnail - uses div to avoid nested button issue inside AccordionTrigger
-  const imageThumbnail = (size: 'sm' | 'md' = 'md') => (
+  const imageThumbnail = (size: 'sm' | 'md' | 'lg' = 'md') => (
     <div
       role="button"
       tabIndex={0}
@@ -176,7 +176,7 @@ export function B2BProductAccordionCard({
       }}
       className={cn(
         'relative shrink-0 rounded-md overflow-hidden border bg-muted hover:ring-2 hover:ring-primary/50 transition-all cursor-zoom-in',
-        size === 'sm' ? 'w-12 h-12' : 'w-16 h-16'
+        size === 'sm' ? 'w-12 h-12' : size === 'md' ? 'w-20 h-20' : 'w-24 h-24'
       )}
       title="Click to view larger image"
     >
@@ -186,11 +186,11 @@ export function B2BProductAccordionCard({
           alt={product.aliasName || product.productName}
           fill
           className="object-cover"
-          sizes={size === 'sm' ? '48px' : '64px'}
+          sizes={size === 'sm' ? '48px' : size === 'md' ? '80px' : '96px'}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <ImageIcon className={size === 'sm' ? 'h-4 w-4' : 'h-6 w-6'} />
+          <ImageIcon className={size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-8 w-8' : 'h-10 w-10'} />
         </div>
       )}
     </div>
@@ -208,85 +208,118 @@ export function B2BProductAccordionCard({
           onValueChange={setAccordionValue}
           className="w-full"
         >
-          <AccordionItem value="item-1" className="border rounded-lg">
-            <AccordionTrigger asChild className="hover:no-underline px-4 py-3 cursor-pointer">
-              <div className="flex items-center gap-4 w-full" tabIndex={0} role="button">
-                {/* Image */}
-                {imageThumbnail('sm')}
-
-                {/* Product Info */}
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">
-                      {product.aliasName || product.productName}
-                    </span>
-                    {isLowStock && (
-                      <Badge variant="destructive" className="shrink-0 text-xs">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        Low
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {formatProductDisplay()} {product.sizeName && `• ${product.sizeName}`}
-                  </p>
-                </div>
-
-                {/* Price */}
-                <div className="text-right shrink-0 w-20">
-                  <span className="font-semibold">
-                    €{product.unitPriceExVat?.toFixed(2) || '0.00'}
-                  </span>
-                </div>
-
-                {/* Stock Badge */}
-                <div className="shrink-0 w-24">
-                  <Badge variant={isLowStock ? 'destructive' : 'secondary'} className="text-xs">
-                    {product.totalAvailableQty} stock
-                  </Badge>
-                </div>
-
-                {/* Generic Quantity Input (Level 1) */}
-                <div className="w-24" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                  {mode === 'generic' ? (
-                    <Input
-                      type="number"
-                      min="0"
-                      max={product.totalAvailableQty}
-                      value={genericQuantity || ''}
-                      onChange={(e) => handleGenericQuantityChange(e.target.value)}
-                      placeholder="Qty"
-                      className="h-9 text-center"
+          <AccordionItem value="item-1" className="border rounded-lg bg-card overflow-hidden">
+            <AccordionTrigger asChild className="hover:no-underline p-0 cursor-pointer">
+              <div className="flex items-stretch w-full" tabIndex={0} role="button">
+                {/* Large Image - left side */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImageDialogOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setImageDialogOpen(true);
+                    }
+                  }}
+                  className="relative w-28 h-28 shrink-0 bg-muted hover:opacity-90 transition-opacity cursor-zoom-in"
+                  title="Click to view larger image"
+                >
+                  {product.heroImageUrl ? (
+                    <Image
+                      src={product.heroImageUrl}
+                      alt={product.aliasName || product.productName}
+                      fill
+                      className="object-cover"
+                      sizes="112px"
                     />
                   ) : (
-                    <div className="h-9 flex items-center justify-center">
-                      <Badge variant="secondary" className="font-semibold">
-                        {totalQuantity}
-                      </Badge>
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="h-10 w-10 text-muted-foreground/50" />
                     </div>
                   )}
                 </div>
 
-                {/* Quick Add Button (appears when generic qty > 0) */}
-                {mode === 'generic' && genericQuantity > 0 && (
-                  <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                    <Button
-                      onClick={handleQuickAdd}
-                      disabled={!product.unitPriceExVat}
-                      size="sm"
-                      className="h-9"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
+                {/* Content area */}
+                <div className="flex-1 flex items-center gap-4 px-4 py-3">
+                  {/* Product Info */}
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-base truncate">
+                        {product.aliasName || product.productName}
+                      </span>
+                      {isLowStock && (
+                        <Badge variant="destructive" className="shrink-0 text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Low
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {formatProductDisplay()} {product.sizeName && `• ${product.sizeName}`}
+                    </p>
                   </div>
-                )}
 
-                {/* Chevron icon */}
-                <ChevronDown className={cn(
-                  "h-4 w-4 shrink-0 transition-transform duration-200",
-                  accordionValue === 'item-1' && "rotate-180"
-                )} />
+                  {/* Price */}
+                  <div className="text-right shrink-0">
+                    <span className="font-bold text-lg">
+                      €{product.unitPriceExVat?.toFixed(2) || '0.00'}
+                    </span>
+                  </div>
+
+                  {/* Stock Badge */}
+                  <div className="shrink-0">
+                    <Badge variant={isLowStock ? 'destructive' : 'secondary'} className="text-xs">
+                      {product.totalAvailableQty} in stock
+                    </Badge>
+                  </div>
+
+                  {/* Generic Quantity Input (Level 1) */}
+                  <div className="w-28" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    {mode === 'generic' ? (
+                      <Input
+                        type="number"
+                        min="0"
+                        max={product.totalAvailableQty}
+                        value={genericQuantity || ''}
+                        onChange={(e) => handleGenericQuantityChange(e.target.value)}
+                        placeholder="Qty"
+                        className="h-10 text-center text-base"
+                      />
+                    ) : (
+                      <div className="h-10 flex items-center justify-center">
+                        <Badge variant="secondary" className="font-semibold text-base px-3 py-1">
+                          {totalQuantity}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Add Button (appears when generic qty > 0) */}
+                  {mode === 'generic' && genericQuantity > 0 && (
+                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                      <Button
+                        onClick={handleQuickAdd}
+                        disabled={!product.unitPriceExVat}
+                        size="default"
+                        className="h-10"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Chevron icon */}
+                  <ChevronDown className={cn(
+                    "h-5 w-5 shrink-0 transition-transform duration-200 text-muted-foreground",
+                    accordionValue === 'item-1' && "rotate-180"
+                  )} />
+                </div>
               </div>
             </AccordionTrigger>
 
@@ -311,15 +344,15 @@ export function B2BProductAccordionCard({
                   </div>
                 )}
 
-                {/* Add to Cart Button */}
+                {/* Add to Trolley Button */}
                 <Button
-                  onClick={handleAddToCart}
+                  onClick={handleAddToTrolley}
                   disabled={!product.unitPriceExVat || !isValid}
                   className="w-full"
                   size="lg"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  {isValid ? `Add ${totalQuantity} to Cart` : 'Select Quantity First'}
+                  {isValid ? `Add ${totalQuantity} to Trolley` : 'Select Quantity First'}
                 </Button>
               </div>
             </AccordionContent>
@@ -344,8 +377,8 @@ export function B2BProductAccordionCard({
           <AccordionItem value="item-1" className="border-0">
             <CardHeader className="pb-3">
               <AccordionTrigger asChild className="cursor-pointer">
-                <div className="flex items-start gap-3 w-full" tabIndex={0} role="button">
-                  {imageThumbnail('md')}
+                <div className="flex items-start gap-4 w-full" tabIndex={0} role="button">
+                  {imageThumbnail('lg')}
                   <div className="flex-1 min-w-0 text-left">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -430,15 +463,15 @@ export function B2BProductAccordionCard({
                   />
                 )}
 
-                {/* Add to Cart Button */}
+                {/* Add to Trolley Button */}
                 <Button
-                  onClick={handleAddToCart}
+                  onClick={handleAddToTrolley}
                   disabled={!product.unitPriceExVat || !isValid}
                   className="w-full mt-auto"
                   size="lg"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  {isValid ? `Add ${totalQuantity} to Cart` : 'Expand to Select Varieties'}
+                  {isValid ? `Add ${totalQuantity} to Trolley` : 'Expand to Select Varieties'}
                 </Button>
               </CardContent>
             </AccordionContent>
