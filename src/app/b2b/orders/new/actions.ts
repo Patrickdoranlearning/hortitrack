@@ -5,6 +5,8 @@ import { requireCustomerAuth } from '@/lib/auth/b2b-guard';
 import { revalidatePath } from 'next/cache';
 import type { CartItem } from '@/lib/b2b/types';
 import { createPickListFromOrder } from '@/server/sales/picking';
+import { calculateTrolleysNeeded, type OrderLineForCalculation } from '@/lib/dispatch/trolley-calculation';
+import { getTrolleyCapacityConfigs, getShelfQuantitiesForSizes } from '@/server/dispatch/trolley-capacity.server';
 
 type CreateB2BOrderInput = {
   customerId: string;
@@ -49,6 +51,35 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
   }, 0);
   const totalIncVat = subtotalExVat + vatAmount;
 
+  // Calculate estimated trolleys needed
+  let trolleysEstimated = 0;
+  try {
+    // Get capacity configs and shelf quantities
+    const sizeIds = [...new Set(cart.map(item => item.sizeId).filter(Boolean))] as string[];
+    const [capacityConfigs, shelfQuantityMap] = await Promise.all([
+      getTrolleyCapacityConfigs(),
+      getShelfQuantitiesForSizes(sizeIds),
+    ]);
+
+    // Build calculation lines
+    const calcLines: OrderLineForCalculation[] = cart
+      .filter(item => item.sizeId) // Only items with sizeId can be calculated
+      .map(item => ({
+        sizeId: item.sizeId!,
+        family: item.family ?? null,
+        quantity: item.quantity,
+        shelfQuantity: shelfQuantityMap.get(item.sizeId!) ?? 1,
+      }));
+
+    if (calcLines.length > 0) {
+      const trolleyResult = calculateTrolleysNeeded(calcLines, capacityConfigs);
+      trolleysEstimated = trolleyResult.totalTrolleys;
+    }
+  } catch (err) {
+    console.warn('Failed to calculate trolleys estimate:', err);
+    // Don't fail order creation if trolley calculation fails
+  }
+
   // Generate order number (simple timestamp-based, you may want to use a sequence)
   const orderNumber = `B2B-${Date.now()}`;
 
@@ -66,6 +97,7 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
       subtotal_ex_vat: subtotalExVat,
       vat_amount: vatAmount,
       total_inc_vat: totalIncVat,
+      trolleys_estimated: trolleysEstimated > 0 ? trolleysEstimated : null,
       created_by_staff_id: authContext.isImpersonating ? authContext.staffUserId : null,
     })
     .select()

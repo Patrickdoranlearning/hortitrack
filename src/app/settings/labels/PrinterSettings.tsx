@@ -410,6 +410,7 @@ export default function PrinterSettings() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="zebra">Zebra</SelectItem>
+                    <SelectItem value="toshiba">Toshiba</SelectItem>
                     <SelectItem value="dymo">Dymo</SelectItem>
                     <SelectItem value="brother">Brother</SelectItem>
                     <SelectItem value="generic">Generic ZPL</SelectItem>

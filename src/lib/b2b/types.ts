@@ -67,6 +67,8 @@ export type CartItem = {
   productName: string;
   varietyName: string | null;
   sizeName: string | null;
+  sizeId?: string;    // For trolley calculation
+  family?: string;    // Plant family for trolley calculation
   quantity: number;
   unitPriceExVat: number;
   vatRate: number;
@@ -177,6 +179,20 @@ export type CustomerFavoriteProduct = {
 };
 
 /**
+ * Batch image for carousel display
+ */
+export type BatchImage = {
+  id: string;
+  imageUrl: string;
+  thumbnailUrl: string | null;
+  photoType: 'growing' | 'sales'; // growing = internal, sales = customer-facing
+  statusAtCapture: string | null;
+  caption: string | null;
+  isHero: boolean;
+  takenAt: string;
+};
+
+/**
  * Batch information for variety-level display
  */
 export type VarietyBatchInfo = {
@@ -189,6 +205,8 @@ export type VarietyBatchInfo = {
   notes: string | null;
   plantedAt: string | null;
   locationName: string | null;
+  // Photos taken of this batch
+  images?: BatchImage[];
 };
 
 /**
@@ -203,6 +221,8 @@ export type VarietyInfo = {
   status: 'plenty' | 'low' | 'out';  // Stock level indicator
   batchCount: number;
   batches: VarietyBatchInfo[];
+  // All images from all saleable batches for this variety (hero images first)
+  allImages?: BatchImage[];
 };
 
 /**

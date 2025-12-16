@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, FileText, Download } from 'lucide-react';
+import { Search, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 
 type Invoice = {
@@ -59,18 +59,18 @@ export function B2BInvoicesClient({ invoices }: B2BInvoicesClientProps) {
     return true;
   });
 
-  const handleDownloadPDF = (invoice: Invoice) => {
-    // Open PDF in new tab - API will return either invoice or order confirmation
-    window.open(`/api/b2b/invoices/${invoice.id}/pdf`, '_blank');
+  const handleViewDocument = (invoice: Invoice) => {
+    // Open printable invoice/order confirmation in new tab
+    window.open(`/b2b/invoices/${invoice.id}`, '_blank');
   };
 
-  // Determine what document type will be downloaded
-  const getDownloadLabel = (invoice: Invoice) => {
+  // Determine what document type will be shown
+  const getViewLabel = (invoice: Invoice) => {
     // If invoice is draft or has no invoice number, it will be an order confirmation
     if (invoice.status === 'draft' || !invoice.invoice_number) {
-      return 'Download Order Confirmation';
+      return 'View Order Confirmation';
     }
-    return 'Download Invoice';
+    return 'View Invoice';
   };
 
   return (
@@ -193,10 +193,10 @@ export function B2BInvoicesClient({ invoices }: B2BInvoicesClientProps) {
                     <Button
                       variant="outline"
                       className="flex-1"
-                      onClick={() => handleDownloadPDF(invoice)}
+                      onClick={() => handleViewDocument(invoice)}
                     >
-                      <Download className="mr-2 h-4 w-4" />
-                      {getDownloadLabel(invoice)}
+                      <FileText className="mr-2 h-4 w-4" />
+                      {getViewLabel(invoice)}
                     </Button>
                   </div>
                 </CardContent>

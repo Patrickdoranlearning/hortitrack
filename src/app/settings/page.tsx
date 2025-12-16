@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus, Building2, User, Container } from 'lucide-react';
+import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus, Building2, User, Container, Package } from 'lucide-react';
 import Link from 'next/link';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
@@ -187,6 +187,20 @@ export default function DataManagementPage() {
               <Button asChild>
                 <Link href="/settings/vehicles">
                   Manage Vehicles
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Package /> Trolley Capacity</CardTitle>
+              <CardDescription>Configure shelves per trolley for plant family and pot size combinations.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/trolley-capacity">
+                  Configure Capacity
                 </Link>
               </Button>
             </CardContent>

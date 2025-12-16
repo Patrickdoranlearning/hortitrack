@@ -33,21 +33,21 @@ export function B2BOrderCreateClient({
   pricingHints,
 }: B2BOrderCreateClientProps) {
   const router = useRouter();
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [trolley, setTrolley] = useState<CartItem[]>([]);
   const [filters, setFilters] = useState({
     category: null as string | null,
     size: null as string | null,
     search: '',
   });
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
   const [checkoutStep, setCheckoutStep] = useState<string>('cart');
 
-  // Auto-switch view mode based on screen width
+  // Auto-switch view mode based on screen width: list for desktop, cards for mobile
   useEffect(() => {
     const handleResize = () => {
-      // Use list view on smaller screens (< 768px)
-      const shouldUseList = window.innerWidth < 768;
+      // Use list view on wide screens (≥1024px), cards for mobile/tablet
+      const shouldUseList = window.innerWidth >= 1024;
       setViewMode(shouldUseList ? 'list' : 'card');
     };
 
@@ -93,37 +93,37 @@ export function B2BOrderCreateClient({
     });
   }, [products, filters]);
 
-  const handleAddToCart = (item: CartItem | CartItem[]) => {
+  const handleAddToTrolley = (item: CartItem | CartItem[]) => {
     // Handle both single item and array of items (from accordion multi-variety orders)
     const itemsToAdd = Array.isArray(item) ? item : [item];
 
-    const newCart = [...cart];
+    const newTrolley = [...trolley];
 
-    itemsToAdd.forEach((cartItem) => {
-      // Check if item already exists in cart
-      const existingIndex = newCart.findIndex(
+    itemsToAdd.forEach((trolleyItem) => {
+      // Check if item already exists in trolley
+      const existingIndex = newTrolley.findIndex(
         (c) =>
-          c.productId === cartItem.productId &&
-          c.batchId === cartItem.batchId &&
-          c.requiredVarietyId === cartItem.requiredVarietyId
+          c.productId === trolleyItem.productId &&
+          c.batchId === trolleyItem.batchId &&
+          c.requiredVarietyId === trolleyItem.requiredVarietyId
       );
 
       if (existingIndex >= 0) {
         // Update quantity if item exists
-        newCart[existingIndex].quantity += cartItem.quantity;
+        newTrolley[existingIndex].quantity += trolleyItem.quantity;
       } else {
-        const hint = pricingHints?.[cartItem.productId];
+        const hint = pricingHints?.[trolleyItem.productId];
         const hydratedItem: CartItem = {
-          ...cartItem,
-          rrp: cartItem.rrp ?? hint?.rrp ?? undefined,
-          multibuyPrice2: cartItem.multibuyPrice2 ?? hint?.multibuyPrice2 ?? undefined,
-          multibuyQty2: cartItem.multibuyQty2 ?? hint?.multibuyQty2 ?? undefined,
+          ...trolleyItem,
+          rrp: trolleyItem.rrp ?? hint?.rrp ?? undefined,
+          multibuyPrice2: trolleyItem.multibuyPrice2 ?? hint?.multibuyPrice2 ?? undefined,
+          multibuyQty2: trolleyItem.multibuyQty2 ?? hint?.multibuyQty2 ?? undefined,
         };
-        newCart.push(hydratedItem);
+        newTrolley.push(hydratedItem);
       }
     });
 
-    setCart(newCart);
+    setTrolley(newTrolley);
     setError(null);
   };
 
@@ -137,7 +137,7 @@ export function B2BOrderCreateClient({
     try {
       const result = await createB2BOrder({
         customerId,
-        cart,
+        cart: trolley,
         deliveryAddressId,
         deliveryDate,
         notes,
@@ -164,7 +164,7 @@ export function B2BOrderCreateClient({
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Place an Order</h1>
         <p className="text-muted-foreground">
-          Browse products and add to cart. {products.length} products available.
+          Browse products and add to your trolley. {products.length} products available.
         </p>
       </div>
 
@@ -219,12 +219,12 @@ export function B2BOrderCreateClient({
                 </p>
               </div>
             ) : viewMode === 'card' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredProducts.map((product) => (
                   <B2BProductAccordionCard
                     key={product.productId}
                     product={product}
-                    onAddToCart={handleAddToCart}
+                    onAddToTrolley={handleAddToTrolley}
                     viewMode="card"
                   />
                 ))}
@@ -235,7 +235,7 @@ export function B2BOrderCreateClient({
                   <B2BProductAccordionCard
                     key={product.productId}
                     product={product}
-                    onAddToCart={handleAddToCart}
+                    onAddToTrolley={handleAddToTrolley}
                     viewMode="list"
                   />
                 ))}
@@ -247,10 +247,10 @@ export function B2BOrderCreateClient({
         {/* Checkout Wizard (1/3 width when products shown, full width otherwise) */}
         <div className={showProducts ? 'lg:col-span-1' : 'max-w-xl mx-auto w-full'}>
           <B2BCheckoutWizard
-            cart={cart}
+            cart={trolley}
             addresses={addresses}
             pricingHints={pricingHints}
-            onUpdateCart={setCart}
+            onUpdateCart={setTrolley}
             onSubmit={handleSubmitOrder}
             onStepChange={(_, stepId) => setCheckoutStep(stepId)}
             error={error}

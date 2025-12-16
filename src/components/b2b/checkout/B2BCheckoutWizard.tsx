@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, CheckCircle2, ShoppingCart, Tag } from 'lucide-react';
-import { B2BCheckoutCart } from './B2BCheckoutCart';
+import { Calendar, CheckCircle2, Package, Tag } from 'lucide-react';
+import { B2BCheckoutTrolley } from './B2BCheckoutCart';
 import { B2BCheckoutPricing, type PricingHint } from './B2BCheckoutPricing';
 import { B2BCheckoutDelivery } from './B2BCheckoutDelivery';
 import { B2BCheckoutReview } from './B2BCheckoutReview';
@@ -26,7 +26,7 @@ type Props = {
 };
 
 const steps = [
-  { id: 'cart', label: 'Cart', icon: ShoppingCart },
+  { id: 'cart', label: 'Trolley', icon: Package },
   { id: 'pricing', label: 'Pricing', icon: Tag },
   { id: 'delivery', label: 'Delivery', icon: Calendar },
   { id: 'review', label: 'Review', icon: CheckCircle2 },
@@ -104,7 +104,7 @@ export function B2BCheckoutWizard({
     switch (steps[currentStep].id) {
       case 'cart':
         return (
-          <B2BCheckoutCart cart={cart} onUpdateItem={updateItem} onRemoveItem={removeItem} />
+          <B2BCheckoutTrolley trolley={cart} onUpdateItem={updateItem} onRemoveItem={removeItem} />
         );
       case 'pricing':
         return (

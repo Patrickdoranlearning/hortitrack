@@ -24,14 +24,30 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's customer association
-    const { data: customerUser } = await supabase
-      .from("customer_users")
+    // Check for impersonation session first (staff placing orders on behalf of customer)
+    const { data: impersonation } = await supabase
+      .from("customer_impersonation_sessions")
       .select("customer_id")
-      .eq("user_id", user.id)
+      .eq("staff_user_id", user.id)
+      .is("ended_at", null)
       .single();
 
-    if (!customerUser) {
+    let customerId: string | null = impersonation?.customer_id || null;
+
+    // If not impersonating, check if user is a customer portal user
+    if (!customerId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("customer_id, portal_role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.portal_role === "customer" && profile.customer_id) {
+        customerId = profile.customer_id;
+      }
+    }
+
+    if (!customerId) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
@@ -54,7 +70,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       `
       )
       .eq("id", invoiceId)
-      .eq("customer_id", customerUser.customer_id)
+      .eq("customer_id", customerId)
       .single();
 
     if (invoiceError || !invoice) {
@@ -127,7 +143,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const { data: customer } = await supabase
       .from("customers")
       .select("name, email")
-      .eq("id", customerUser.customer_id)
+      .eq("id", customerId)
       .single();
 
     // Determine document type based on invoice status

@@ -6,6 +6,7 @@ import { ok, fail } from "@/server/utils/envelope";
 import { createPickListFromOrder } from "@/server/sales/picking";
 import { allocateForProductLine } from "@/server/sales/allocation";
 import { getSaleableBatches } from "@/server/sales/inventory";
+import { calculateTrolleysNeeded, type OrderLineForCalculation } from "@/lib/dispatch/trolley-calculation";
 
 export async function GET(req: Request) {
   try {
@@ -230,6 +231,67 @@ export async function POST(req: Request) {
 
     const orderId = (rpcResult as { order_id: string })?.order_id;
     if (!orderId) throw new Error("Order creation failed: missing order ID");
+
+    // Calculate and update trolleys_estimated
+    try {
+      // Fetch trolley capacity configs, variety families, and shelf quantities in parallel
+      const [capacityResult, varietyFamilyResult, shelfQtyResult] = await Promise.all([
+        supabase
+          .from('trolley_capacity')
+          .select('family, size_id, shelves_per_trolley')
+          .eq('org_id', activeOrgId),
+        supabase
+          .from('plant_varieties')
+          .select('id, family')
+          .in('id', [...varietyMap.values()]),
+        supabase
+          .from('plant_sizes')
+          .select('id, shelf_quantity')
+          .in('id', [...sizeMap.values()]),
+      ]);
+
+      const capacityConfigs = (capacityResult.data || []).map((c: any) => ({
+        family: c.family,
+        sizeId: c.size_id,
+        shelvesPerTrolley: c.shelves_per_trolley,
+      }));
+
+      // Build lookup maps
+      const varietyFamilyMap = new Map<string, string | null>();
+      (varietyFamilyResult.data || []).forEach((v: any) => varietyFamilyMap.set(v.id, v.family));
+
+      const shelfQtyMap = new Map<string, number>();
+      (shelfQtyResult.data || []).forEach((s: any) => shelfQtyMap.set(s.id, s.shelf_quantity ?? 1));
+
+      // Build calculation lines
+      const calcLines: OrderLineForCalculation[] = [];
+      for (const line of input.lines) {
+        const sizeId = sizeMap.get(line.size);
+        const varietyId = varietyMap.get(line.plantVariety);
+
+        if (sizeId) {
+          calcLines.push({
+            sizeId,
+            family: varietyId ? varietyFamilyMap.get(varietyId) ?? null : null,
+            quantity: line.qty,
+            shelfQuantity: shelfQtyMap.get(sizeId) ?? 1,
+          });
+        }
+      }
+
+      if (calcLines.length > 0) {
+        const trolleyResult = calculateTrolleysNeeded(calcLines, capacityConfigs);
+        if (trolleyResult.totalTrolleys > 0) {
+          await supabase
+            .from('orders')
+            .update({ trolleys_estimated: trolleyResult.totalTrolleys })
+            .eq('id', orderId);
+        }
+      }
+    } catch (trolleyErr) {
+      console.warn('Failed to calculate trolleys estimate:', trolleyErr);
+      // Don't fail order creation if trolley calculation fails
+    }
 
     // Auto-create pick list for confirmed orders (so they appear in dispatch/picking queue)
     try {

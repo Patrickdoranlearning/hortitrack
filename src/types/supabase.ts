@@ -317,6 +317,100 @@ export type Database = {
           },
         ]
       }
+      batch_images: {
+        Row: {
+          batch_id: string
+          caption: string | null
+          created_at: string
+          id: string
+          image_url: string
+          is_hero: boolean
+          org_id: string
+          photo_type: string
+          promoted_to_product_id: string | null
+          status_at_capture: string | null
+          taken_at: string
+          taken_by: string | null
+          thumbnail_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          batch_id: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          image_url: string
+          is_hero?: boolean
+          org_id: string
+          photo_type?: string
+          promoted_to_product_id?: string | null
+          status_at_capture?: string | null
+          taken_at?: string
+          taken_by?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_hero?: boolean
+          org_id?: string
+          photo_type?: string
+          promoted_to_product_id?: string | null
+          status_at_capture?: string | null
+          taken_at?: string
+          taken_by?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_images_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_images_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_images_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_images_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_images_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_images_promoted_to_product_id_fkey"
+            columns: ["promoted_to_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_logs: {
         Row: {
           actor_id: string | null
@@ -567,7 +661,7 @@ export type Database = {
           growing_status: string | null
           id: string
           initial_quantity: number | null
-          location_id: string
+          location_id: string | null
           log_history: Json
           org_id: string
           parent_batch_id: string | null
@@ -585,6 +679,7 @@ export type Database = {
           quantity_produced: number | null
           ready_at: string | null
           reserved_quantity: number
+          saleable_quantity: number | null
           sales_photo_url: string | null
           sales_status: string | null
           size_id: string
@@ -604,7 +699,7 @@ export type Database = {
           growing_status?: string | null
           id?: string
           initial_quantity?: number | null
-          location_id: string
+          location_id?: string | null
           log_history?: Json
           org_id: string
           parent_batch_id?: string | null
@@ -622,6 +717,7 @@ export type Database = {
           quantity_produced?: number | null
           ready_at?: string | null
           reserved_quantity?: number
+          saleable_quantity?: number | null
           sales_photo_url?: string | null
           sales_status?: string | null
           size_id: string
@@ -641,7 +737,7 @@ export type Database = {
           growing_status?: string | null
           id?: string
           initial_quantity?: number | null
-          location_id?: string
+          location_id?: string | null
           log_history?: Json
           org_id?: string
           parent_batch_id?: string | null
@@ -659,6 +755,7 @@ export type Database = {
           quantity_produced?: number | null
           ready_at?: string | null
           reserved_quantity?: number
+          saleable_quantity?: number | null
           sales_photo_url?: string | null
           sales_status?: string | null
           size_id?: string
@@ -977,6 +1074,27 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
+            foreignKeyName: "credit_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "credit_notes_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -1065,6 +1183,27 @@ export type Database = {
             referencedRelation: "v_customer_trolley_summary"
             referencedColumns: ["customer_id"]
           },
+          {
+            foreignKeyName: "customer_addresses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_addresses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_addresses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
         ]
       }
       customer_contacts: {
@@ -1126,6 +1265,27 @@ export type Database = {
             referencedRelation: "v_customer_trolley_summary"
             referencedColumns: ["customer_id"]
           },
+          {
+            foreignKeyName: "customer_contacts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_contacts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_contacts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
         ]
       }
       customer_favorite_products: {
@@ -1176,6 +1336,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_favorite_products_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_favorite_products_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_favorite_products_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1251,7 +1432,111 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
+            foreignKeyName: "customer_impersonation_sessions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_impersonation_sessions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_impersonation_sessions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "customer_impersonation_sessions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_interactions: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          id: string
+          notes: string | null
+          org_id: string
+          outcome: string | null
+          type: Database["public"]["Enums"]["interaction_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          notes?: string | null
+          org_id: string
+          outcome?: string | null
+          type: Database["public"]["Enums"]["interaction_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          outcome?: string | null
+          type?: Database["public"]["Enums"]["interaction_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_interactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_vat_treatment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_interactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_interactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_interactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_interactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_interactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_interactions_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1331,6 +1616,7 @@ export type Database = {
           org_id: string
           reminder_count: number
           reminder_sent_at: string | null
+          shelves_out: number
           trolleys_out: number
           updated_at: string
         }
@@ -1343,6 +1629,7 @@ export type Database = {
           org_id: string
           reminder_count?: number
           reminder_sent_at?: string | null
+          shelves_out?: number
           trolleys_out?: number
           updated_at?: string
         }
@@ -1355,6 +1642,7 @@ export type Database = {
           org_id?: string
           reminder_count?: number
           reminder_sent_at?: string | null
+          shelves_out?: number
           trolleys_out?: number
           updated_at?: string
         }
@@ -1378,6 +1666,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_trolley_balance_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_trolley_balance_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_trolley_balance_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1549,6 +1858,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "deliveries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "deliveries_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -1678,6 +1994,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "delivery_items_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -1692,10 +2015,12 @@ export type Database = {
           actual_return_time: string | null
           created_at: string
           created_by: string | null
+          display_order: number | null
           driver_name: string | null
           estimated_return_time: string | null
           haulier_id: string | null
           id: string
+          load_name: string | null
           org_id: string
           planned_departure_time: string | null
           route_notes: string | null
@@ -1705,18 +2030,22 @@ export type Database = {
           trolleys_loaded: number
           trolleys_returned: number
           updated_at: string
+          vehicle_id: string | null
           vehicle_registration: string | null
           vehicle_type: Database["public"]["Enums"]["vehicle_type"] | null
+          week_number: number | null
         }
         Insert: {
           actual_departure_time?: string | null
           actual_return_time?: string | null
           created_at?: string
           created_by?: string | null
+          display_order?: number | null
           driver_name?: string | null
           estimated_return_time?: string | null
           haulier_id?: string | null
           id?: string
+          load_name?: string | null
           org_id: string
           planned_departure_time?: string | null
           route_notes?: string | null
@@ -1726,18 +2055,22 @@ export type Database = {
           trolleys_loaded?: number
           trolleys_returned?: number
           updated_at?: string
+          vehicle_id?: string | null
           vehicle_registration?: string | null
           vehicle_type?: Database["public"]["Enums"]["vehicle_type"] | null
+          week_number?: number | null
         }
         Update: {
           actual_departure_time?: string | null
           actual_return_time?: string | null
           created_at?: string
           created_by?: string | null
+          display_order?: number | null
           driver_name?: string | null
           estimated_return_time?: string | null
           haulier_id?: string | null
           id?: string
+          load_name?: string | null
           org_id?: string
           planned_departure_time?: string | null
           route_notes?: string | null
@@ -1747,15 +2080,31 @@ export type Database = {
           trolleys_loaded?: number
           trolleys_returned?: number
           updated_at?: string
+          vehicle_id?: string | null
           vehicle_registration?: string | null
           vehicle_type?: Database["public"]["Enums"]["vehicle_type"] | null
+          week_number?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "delivery_runs_haulier_id_fkey"
+            columns: ["haulier_id"]
+            isOneToOne: false
+            referencedRelation: "hauliers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "delivery_runs_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_runs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "haulier_vehicles"
             referencedColumns: ["id"]
           },
         ]
@@ -1845,7 +2194,142 @@ export type Database = {
             referencedRelation: "v_orders_ready_for_dispatch"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dispatch_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
         ]
+      }
+      document_template_versions: {
+        Row: {
+          bindings: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          layout: Json
+          notes: string | null
+          sample_data: Json | null
+          template_id: string
+          variables: Json
+          version_number: number
+        }
+        Insert: {
+          bindings?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          layout?: Json
+          notes?: string | null
+          sample_data?: Json | null
+          template_id: string
+          variables?: Json
+          version_number: number
+        }
+        Update: {
+          bindings?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          layout?: Json
+          notes?: string | null
+          sample_data?: Json | null
+          template_id?: string
+          variables?: Json
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_templates: {
+        Row: {
+          created_at: string
+          current_version_id: string | null
+          description: string | null
+          document_type: string
+          id: string
+          name: string
+          org_id: string
+          published_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_version_id?: string | null
+          description?: string | null
+          document_type: string
+          id?: string
+          name: string
+          org_id: string
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_version_id?: string | null
+          description?: string | null
+          document_type?: string
+          id?: string
+          name?: string
+          org_id?: string
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_current_version_fk"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_template_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_templates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eircode_zones: {
+        Row: {
+          adjacent_keys: string[] | null
+          county: string
+          lat: number | null
+          lng: number | null
+          routing_key: string
+          zone_name: string
+        }
+        Insert: {
+          adjacent_keys?: string[] | null
+          county: string
+          lat?: number | null
+          lng?: number | null
+          routing_key: string
+          zone_name: string
+        }
+        Update: {
+          adjacent_keys?: string[] | null
+          county?: string
+          lat?: number | null
+          lng?: number | null
+          routing_key?: string
+          zone_name?: string
+        }
+        Relationships: []
       }
       employees: {
         Row: {
@@ -1894,6 +2378,115 @@ export type Database = {
           },
         ]
       }
+      equipment_movement_log: {
+        Row: {
+          created_at: string
+          customer_id: string
+          delivery_run_id: string | null
+          id: string
+          movement_date: string
+          movement_type: string
+          notes: string | null
+          org_id: string
+          recorded_by: string | null
+          shelves: number
+          signed_docket_url: string | null
+          trolleys: number
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          delivery_run_id?: string | null
+          id?: string
+          movement_date?: string
+          movement_type: string
+          notes?: string | null
+          org_id: string
+          recorded_by?: string | null
+          shelves?: number
+          signed_docket_url?: string | null
+          trolleys?: number
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          delivery_run_id?: string | null
+          id?: string
+          movement_date?: string
+          movement_type?: string
+          notes?: string | null
+          org_id?: string
+          recorded_by?: string | null
+          shelves?: number
+          signed_docket_url?: string | null
+          trolleys?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_movement_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_vat_treatment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_delivery_run_id_fkey"
+            columns: ["delivery_run_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_delivery_run_id_fkey"
+            columns: ["delivery_run_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_delivery_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_movement_log_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       equipment_types: {
         Row: {
           id: string
@@ -1909,6 +2502,66 @@ export type Database = {
         }
         Relationships: []
       }
+      haulier_vehicles: {
+        Row: {
+          created_at: string | null
+          haulier_id: string
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          org_id: string
+          registration: string | null
+          trolley_capacity: number
+          truck_layout: Json | null
+          updated_at: string | null
+          vehicle_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          haulier_id: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          org_id: string
+          registration?: string | null
+          trolley_capacity?: number
+          truck_layout?: Json | null
+          updated_at?: string | null
+          vehicle_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          haulier_id?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          org_id?: string
+          registration?: string | null
+          trolley_capacity?: number
+          truck_layout?: Json | null
+          updated_at?: string | null
+          vehicle_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "haulier_vehicles_haulier_id_fkey"
+            columns: ["haulier_id"]
+            isOneToOne: false
+            referencedRelation: "hauliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "haulier_vehicles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hauliers: {
         Row: {
           created_at: string
@@ -1919,6 +2572,7 @@ export type Database = {
           notes: string | null
           org_id: string
           phone: string | null
+          trolley_capacity: number | null
           updated_at: string
         }
         Insert: {
@@ -1930,6 +2584,7 @@ export type Database = {
           notes?: string | null
           org_id: string
           phone?: string | null
+          trolley_capacity?: number | null
           updated_at?: string
         }
         Update: {
@@ -1941,6 +2596,7 @@ export type Database = {
           notes?: string | null
           org_id?: string
           phone?: string | null
+          trolley_capacity?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2125,6 +2781,27 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "invoices_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -2153,11 +2830,874 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "invoices_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      ipm_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          is_active: boolean | null
+          org_id: string
+          program_id: string
+          starts_at: string | null
+          target_family: string | null
+          target_location_id: string | null
+          target_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          org_id: string
+          program_id: string
+          starts_at?: string | null
+          target_family?: string | null
+          target_location_id?: string | null
+          target_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          org_id?: string
+          program_id?: string
+          starts_at?: string | null
+          target_family?: string | null
+          target_location_id?: string | null
+          target_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_assignments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_assignments_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_assignments_target_location_id_fkey"
+            columns: ["target_location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_assignments_target_location_id_fkey"
+            columns: ["target_location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ipm_product_bottles: {
+        Row: {
+          batch_number: string | null
+          bottle_code: string
+          created_at: string
+          created_by: string | null
+          emptied_at: string | null
+          expiry_date: string | null
+          id: string
+          notes: string | null
+          opened_at: string | null
+          org_id: string
+          product_id: string
+          purchase_date: string | null
+          remaining_ml: number
+          status: string
+          updated_at: string
+          volume_ml: number
+        }
+        Insert: {
+          batch_number?: string | null
+          bottle_code: string
+          created_at?: string
+          created_by?: string | null
+          emptied_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string | null
+          org_id: string
+          product_id: string
+          purchase_date?: string | null
+          remaining_ml: number
+          status?: string
+          updated_at?: string
+          volume_ml: number
+        }
+        Update: {
+          batch_number?: string | null
+          bottle_code?: string
+          created_at?: string
+          created_by?: string | null
+          emptied_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string | null
+          org_id?: string
+          product_id?: string
+          purchase_date?: string | null
+          remaining_ml?: number
+          status?: string
+          updated_at?: string
+          volume_ml?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_product_bottles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_product_bottles_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_product_bottles_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_ipm_stock_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_product_bottles_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["product_id"]
+          },
+        ]
+      }
+      ipm_products: {
+        Row: {
+          active_ingredient: string | null
+          application_methods: string[] | null
+          created_at: string
+          default_bottle_volume_ml: number | null
+          harvest_interval_days: number | null
+          id: string
+          is_active: boolean | null
+          low_stock_threshold: number | null
+          max_rate: number | null
+          name: string
+          notes: string | null
+          org_id: string
+          pcs_number: string | null
+          rei_hours: number | null
+          suggested_rate: number | null
+          suggested_rate_unit: string | null
+          target_pests: string[] | null
+          target_stock_bottles: number | null
+          updated_at: string
+          use_restriction: string | null
+        }
+        Insert: {
+          active_ingredient?: string | null
+          application_methods?: string[] | null
+          created_at?: string
+          default_bottle_volume_ml?: number | null
+          harvest_interval_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          low_stock_threshold?: number | null
+          max_rate?: number | null
+          name: string
+          notes?: string | null
+          org_id: string
+          pcs_number?: string | null
+          rei_hours?: number | null
+          suggested_rate?: number | null
+          suggested_rate_unit?: string | null
+          target_pests?: string[] | null
+          target_stock_bottles?: number | null
+          updated_at?: string
+          use_restriction?: string | null
+        }
+        Update: {
+          active_ingredient?: string | null
+          application_methods?: string[] | null
+          created_at?: string
+          default_bottle_volume_ml?: number | null
+          harvest_interval_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          low_stock_threshold?: number | null
+          max_rate?: number | null
+          name?: string
+          notes?: string | null
+          org_id?: string
+          pcs_number?: string | null
+          rei_hours?: number | null
+          suggested_rate?: number | null
+          suggested_rate_unit?: string | null
+          target_pests?: string[] | null
+          target_stock_bottles?: number | null
+          updated_at?: string
+          use_restriction?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ipm_program_steps: {
+        Row: {
+          created_at: string
+          id: string
+          method: string | null
+          notes: string | null
+          product_id: string
+          program_id: string
+          rate: number | null
+          rate_unit: string | null
+          step_order: number
+          week_number: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          product_id: string
+          program_id: string
+          rate?: number | null
+          rate_unit?: string | null
+          step_order?: number
+          week_number?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          product_id?: string
+          program_id?: string
+          rate?: number | null
+          rate_unit?: string | null
+          step_order?: number
+          week_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_program_steps_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_program_steps_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_ipm_stock_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_program_steps_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_program_steps_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ipm_programs: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_weeks: number
+          id: string
+          interval_days: number
+          is_active: boolean | null
+          name: string
+          org_id: string
+          schedule_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_weeks: number
+          id?: string
+          interval_days: number
+          is_active?: boolean | null
+          name: string
+          org_id: string
+          schedule_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_weeks?: number
+          id?: string
+          interval_days?: number
+          is_active?: boolean | null
+          name?: string
+          org_id?: string
+          schedule_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_programs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ipm_spot_treatments: {
+        Row: {
+          application_interval_days: number | null
+          applications_completed: number
+          applications_total: number
+          created_at: string
+          created_by: string | null
+          fertilizer_name: string | null
+          fertilizer_rate: number | null
+          fertilizer_unit: string | null
+          first_application_date: string
+          id: string
+          mechanical_action: string | null
+          method: string | null
+          next_application_date: string | null
+          org_id: string
+          product_id: string
+          rate: number | null
+          rate_unit: string | null
+          reason: string | null
+          status: string | null
+          target_batch_id: string | null
+          target_location_id: string | null
+          target_type: string
+          treatment_type: string | null
+          triggered_by_log_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_interval_days?: number | null
+          applications_completed?: number
+          applications_total?: number
+          created_at?: string
+          created_by?: string | null
+          fertilizer_name?: string | null
+          fertilizer_rate?: number | null
+          fertilizer_unit?: string | null
+          first_application_date: string
+          id?: string
+          mechanical_action?: string | null
+          method?: string | null
+          next_application_date?: string | null
+          org_id: string
+          product_id: string
+          rate?: number | null
+          rate_unit?: string | null
+          reason?: string | null
+          status?: string | null
+          target_batch_id?: string | null
+          target_location_id?: string | null
+          target_type: string
+          treatment_type?: string | null
+          triggered_by_log_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_interval_days?: number | null
+          applications_completed?: number
+          applications_total?: number
+          created_at?: string
+          created_by?: string | null
+          fertilizer_name?: string | null
+          fertilizer_rate?: number | null
+          fertilizer_unit?: string | null
+          first_application_date?: string
+          id?: string
+          mechanical_action?: string | null
+          method?: string | null
+          next_application_date?: string | null
+          org_id?: string
+          product_id?: string
+          rate?: number | null
+          rate_unit?: string | null
+          reason?: string | null
+          status?: string | null
+          target_batch_id?: string | null
+          target_location_id?: string | null
+          target_type?: string
+          treatment_type?: string | null
+          triggered_by_log_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_spot_treatments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_ipm_stock_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_location_id_fkey"
+            columns: ["target_location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_location_id_fkey"
+            columns: ["target_location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_triggered_by_log_id_fkey"
+            columns: ["triggered_by_log_id"]
+            isOneToOne: false
+            referencedRelation: "plant_health_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ipm_stock_movements: {
+        Row: {
+          bottle_id: string
+          health_log_id: string | null
+          id: string
+          location_id: string | null
+          movement_type: string
+          notes: string | null
+          org_id: string
+          product_id: string
+          quantity_ml: number
+          recorded_at: string
+          recorded_by: string | null
+          remaining_after_ml: number
+          spot_treatment_id: string | null
+        }
+        Insert: {
+          bottle_id: string
+          health_log_id?: string | null
+          id?: string
+          location_id?: string | null
+          movement_type: string
+          notes?: string | null
+          org_id: string
+          product_id: string
+          quantity_ml: number
+          recorded_at?: string
+          recorded_by?: string | null
+          remaining_after_ml: number
+          spot_treatment_id?: string | null
+        }
+        Update: {
+          bottle_id?: string
+          health_log_id?: string | null
+          id?: string
+          location_id?: string | null
+          movement_type?: string
+          notes?: string | null
+          org_id?: string
+          product_id?: string
+          quantity_ml?: number
+          recorded_at?: string
+          recorded_by?: string | null
+          remaining_after_ml?: number
+          spot_treatment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_stock_movements_bottle_id_fkey"
+            columns: ["bottle_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_product_bottles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_health_log_id_fkey"
+            columns: ["health_log_id"]
+            isOneToOne: false
+            referencedRelation: "plant_health_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_ipm_stock_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_spot_treatment_id_fkey"
+            columns: ["spot_treatment_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_spot_treatments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_stock_movements_spot_treatment_id_fkey"
+            columns: ["spot_treatment_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["source_id"]
+          },
+        ]
+      }
+      ipm_tasks: {
+        Row: {
+          area_treated: string | null
+          batch_id: string | null
+          bottle_id: string | null
+          calendar_week: number | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          crop_name: string | null
+          fertiliser_composition: string | null
+          harvest_interval_days: number | null
+          id: string
+          is_tank_mix: boolean | null
+          location_id: string | null
+          method: string | null
+          notes: string | null
+          org_id: string
+          pcs_number: string | null
+          product_id: string
+          product_name: string
+          program_id: string | null
+          program_step_id: string | null
+          quantity_used_ml: number | null
+          rate: number | null
+          rate_unit: string | null
+          reason_for_use: string | null
+          safe_harvest_date: string | null
+          scheduled_date: string
+          signed_by: string | null
+          skip_reason: string | null
+          spot_treatment_id: string | null
+          sprayer_used: string | null
+          status: string
+          tank_mix_group_id: string | null
+          updated_at: string
+          weather_conditions: string | null
+          week_number: number
+        }
+        Insert: {
+          area_treated?: string | null
+          batch_id?: string | null
+          bottle_id?: string | null
+          calendar_week?: number | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          crop_name?: string | null
+          fertiliser_composition?: string | null
+          harvest_interval_days?: number | null
+          id?: string
+          is_tank_mix?: boolean | null
+          location_id?: string | null
+          method?: string | null
+          notes?: string | null
+          org_id: string
+          pcs_number?: string | null
+          product_id: string
+          product_name: string
+          program_id?: string | null
+          program_step_id?: string | null
+          quantity_used_ml?: number | null
+          rate?: number | null
+          rate_unit?: string | null
+          reason_for_use?: string | null
+          safe_harvest_date?: string | null
+          scheduled_date: string
+          signed_by?: string | null
+          skip_reason?: string | null
+          spot_treatment_id?: string | null
+          sprayer_used?: string | null
+          status?: string
+          tank_mix_group_id?: string | null
+          updated_at?: string
+          weather_conditions?: string | null
+          week_number: number
+        }
+        Update: {
+          area_treated?: string | null
+          batch_id?: string | null
+          bottle_id?: string | null
+          calendar_week?: number | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          crop_name?: string | null
+          fertiliser_composition?: string | null
+          harvest_interval_days?: number | null
+          id?: string
+          is_tank_mix?: boolean | null
+          location_id?: string | null
+          method?: string | null
+          notes?: string | null
+          org_id?: string
+          pcs_number?: string | null
+          product_id?: string
+          product_name?: string
+          program_id?: string | null
+          program_step_id?: string | null
+          quantity_used_ml?: number | null
+          rate?: number | null
+          rate_unit?: string | null
+          reason_for_use?: string | null
+          safe_harvest_date?: string | null
+          scheduled_date?: string
+          signed_by?: string | null
+          skip_reason?: string | null
+          spot_treatment_id?: string | null
+          sprayer_used?: string | null
+          status?: string
+          tank_mix_group_id?: string | null
+          updated_at?: string
+          weather_conditions?: string | null
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_tasks_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_bottle_id_fkey"
+            columns: ["bottle_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_product_bottles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_ipm_stock_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_program_step_id_fkey"
+            columns: ["program_step_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_program_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_spot_treatment_id_fkey"
+            columns: ["spot_treatment_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_spot_treatments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_tasks_spot_treatment_id_fkey"
+            columns: ["spot_treatment_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["source_id"]
           },
         ]
       }
@@ -2216,6 +3756,407 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "label_templates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_categories: {
+        Row: {
+          code: string
+          consumption_type: string
+          created_at: string
+          id: string
+          name: string
+          parent_group: string
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          consumption_type?: string
+          created_at?: string
+          id?: string
+          name: string
+          parent_group: string
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          consumption_type?: string
+          created_at?: string
+          id?: string
+          name?: string
+          parent_group?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      material_consumption_rules: {
+        Row: {
+          created_at: string
+          id: string
+          material_id: string
+          org_id: string
+          quantity_per_unit: number
+          size_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material_id: string
+          org_id: string
+          quantity_per_unit?: number
+          size_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material_id?: string
+          org_id?: string
+          quantity_per_unit?: number
+          size_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_consumption_rules_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_consumption_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_consumption_rules_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_consumption_rules_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_stock: {
+        Row: {
+          created_at: string
+          id: string
+          last_counted_at: string | null
+          last_movement_at: string | null
+          location_id: string | null
+          material_id: string
+          org_id: string
+          quantity_available: number | null
+          quantity_on_hand: number
+          quantity_reserved: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_counted_at?: string | null
+          last_movement_at?: string | null
+          location_id?: string | null
+          material_id: string
+          org_id: string
+          quantity_available?: number | null
+          quantity_on_hand?: number
+          quantity_reserved?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_counted_at?: string | null
+          last_movement_at?: string | null
+          location_id?: string | null
+          material_id?: string
+          org_id?: string
+          quantity_available?: number | null
+          quantity_on_hand?: number
+          quantity_reserved?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_stock_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_stock_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_stock_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_stock_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_transactions: {
+        Row: {
+          batch_id: string | null
+          cost_per_unit: number | null
+          created_at: string
+          created_by: string | null
+          from_location_id: string | null
+          id: string
+          material_id: string
+          notes: string | null
+          org_id: string
+          purchase_order_line_id: string | null
+          quantity: number
+          quantity_after: number | null
+          reference: string | null
+          to_location_id: string | null
+          transaction_type: Database["public"]["Enums"]["material_transaction_type"]
+          uom: string
+        }
+        Insert: {
+          batch_id?: string | null
+          cost_per_unit?: number | null
+          created_at?: string
+          created_by?: string | null
+          from_location_id?: string | null
+          id?: string
+          material_id: string
+          notes?: string | null
+          org_id: string
+          purchase_order_line_id?: string | null
+          quantity: number
+          quantity_after?: number | null
+          reference?: string | null
+          to_location_id?: string | null
+          transaction_type: Database["public"]["Enums"]["material_transaction_type"]
+          uom?: string
+        }
+        Update: {
+          batch_id?: string | null
+          cost_per_unit?: number | null
+          created_at?: string
+          created_by?: string | null
+          from_location_id?: string | null
+          id?: string
+          material_id?: string
+          notes?: string | null
+          org_id?: string
+          purchase_order_line_id?: string | null
+          quantity?: number
+          quantity_after?: number | null
+          reference?: string | null
+          to_location_id?: string | null
+          transaction_type?: Database["public"]["Enums"]["material_transaction_type"]
+          uom?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "material_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_purchase_order_line_id_fkey"
+            columns: ["purchase_order_line_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_transactions_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      materials: {
+        Row: {
+          barcode: string | null
+          base_uom: string
+          category_id: string
+          created_at: string
+          default_supplier_id: string | null
+          description: string | null
+          id: string
+          internal_barcode: string | null
+          is_active: boolean
+          linked_size_id: string | null
+          name: string
+          org_id: string
+          part_number: string
+          reorder_point: number | null
+          reorder_quantity: number | null
+          standard_cost: number | null
+          target_stock: number | null
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          base_uom?: string
+          category_id: string
+          created_at?: string
+          default_supplier_id?: string | null
+          description?: string | null
+          id?: string
+          internal_barcode?: string | null
+          is_active?: boolean
+          linked_size_id?: string | null
+          name: string
+          org_id: string
+          part_number: string
+          reorder_point?: number | null
+          reorder_quantity?: number | null
+          standard_cost?: number | null
+          target_stock?: number | null
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          base_uom?: string
+          category_id?: string
+          created_at?: string
+          default_supplier_id?: string | null
+          description?: string | null
+          id?: string
+          internal_barcode?: string | null
+          is_active?: boolean
+          linked_size_id?: string | null
+          name?: string
+          org_id?: string
+          part_number?: string
+          reorder_point?: number | null
+          reorder_quantity?: number | null
+          standard_cost?: number | null
+          target_stock?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "materials_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "material_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "materials_default_supplier_id_fkey"
+            columns: ["default_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "materials_default_supplier_id_fkey"
+            columns: ["default_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "materials_linked_size_id_fkey"
+            columns: ["linked_size_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "materials_linked_size_id_fkey"
+            columns: ["linked_size_id"]
+            isOneToOne: false
+            referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "materials_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -2320,10 +4261,12 @@ export type Database = {
           area: number | null
           covered: boolean
           created_at: string
+          health_status: string | null
           id: string
           name: string
           nursery_site: string
           org_id: string
+          restricted_until: string | null
           site_id: string | null
           type: string | null
           updated_at: string
@@ -2332,10 +4275,12 @@ export type Database = {
           area?: number | null
           covered?: boolean
           created_at?: string
+          health_status?: string | null
           id?: string
           name: string
           nursery_site: string
           org_id: string
+          restricted_until?: string | null
           site_id?: string | null
           type?: string | null
           updated_at?: string
@@ -2344,10 +4289,12 @@ export type Database = {
           area?: number | null
           covered?: boolean
           created_at?: string
+          health_status?: string | null
           id?: string
           name?: string
           nursery_site?: string
           org_id?: string
+          restricted_until?: string | null
           site_id?: string | null
           type?: string | null
           updated_at?: string
@@ -2428,6 +4375,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_orders_ready_for_dispatch"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "order_events_org_id_fkey"
@@ -2514,6 +4468,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_exceptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "order_exceptions_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
@@ -2539,6 +4500,100 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_fees: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          fee_type: string
+          id: string
+          name: string
+          order_id: string
+          org_fee_id: string | null
+          quantity: number | null
+          subtotal: number
+          total_amount: number
+          unit: string
+          unit_amount: number
+          vat_amount: number | null
+          vat_rate: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          fee_type: string
+          id?: string
+          name: string
+          order_id: string
+          org_fee_id?: string | null
+          quantity?: number | null
+          subtotal: number
+          total_amount: number
+          unit?: string
+          unit_amount: number
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          fee_type?: string
+          id?: string
+          name?: string
+          order_id?: string
+          org_fee_id?: string | null
+          quantity?: number | null
+          subtotal?: number
+          total_amount?: number
+          unit?: string
+          unit_amount?: number
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_fees_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fees_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_delivery_note_header"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_fees_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fees_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_orders_ready_for_dispatch"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fees_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_fees_org_fee_id_fkey"
+            columns: ["org_fee_id"]
+            isOneToOne: false
+            referencedRelation: "org_fees"
             referencedColumns: ["id"]
           },
         ]
@@ -2620,6 +4675,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_orders_ready_for_dispatch"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_substitutions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "order_item_substitutions_order_item_id_fkey"
@@ -2753,6 +4815,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_orders_ready_for_dispatch"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "order_items_product_id_fkey"
@@ -2905,6 +4974,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_packing_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "order_packing_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -2990,6 +5066,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_status_updates_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "order_status_updates_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -3000,9 +5083,11 @@ export type Database = {
       }
       orders: {
         Row: {
+          confirmation_sent_at: string | null
           created_at: string
           created_by_staff_id: string | null
           customer_id: string
+          dispatch_email_sent_at: string | null
           id: string
           notes: string | null
           order_number: string
@@ -3018,9 +5103,11 @@ export type Database = {
           vat_amount: number
         }
         Insert: {
+          confirmation_sent_at?: string | null
           created_at?: string
           created_by_staff_id?: string | null
           customer_id: string
+          dispatch_email_sent_at?: string | null
           id?: string
           notes?: string | null
           order_number: string
@@ -3036,9 +5123,11 @@ export type Database = {
           vat_amount?: number
         }
         Update: {
+          confirmation_sent_at?: string | null
           created_at?: string
           created_by_staff_id?: string | null
           customer_id?: string
+          dispatch_email_sent_at?: string | null
           id?: string
           notes?: string | null
           order_number?: string
@@ -3073,6 +5162,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -3116,6 +5226,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      org_fees: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          fee_type: string
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          max_amount: number | null
+          metadata: Json | null
+          min_order_value: number | null
+          name: string
+          org_id: string
+          unit: string
+          updated_at: string | null
+          vat_rate: number | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          fee_type: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          max_amount?: number | null
+          metadata?: Json | null
+          min_order_value?: number | null
+          name: string
+          org_id: string
+          unit?: string
+          updated_at?: string | null
+          vat_rate?: number | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          fee_type?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          max_amount?: number | null
+          metadata?: Json | null
+          min_order_value?: number | null
+          name?: string
+          org_id?: string
+          unit?: string
+          updated_at?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: []
       }
       org_memberships: {
         Row: {
@@ -3485,6 +5649,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "pick_lists_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -3682,6 +5853,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "picking_feedback_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "picking_feedback_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
@@ -3790,49 +5968,127 @@ export type Database = {
       }
       plant_health_logs: {
         Row: {
+          affected_batch_ids: string[] | null
+          application_number: number | null
+          area_treated: string | null
           batch_id: string | null
+          bottle_id: string | null
           created_at: string
+          crop_name: string | null
+          ec_reading: number | null
           event_at: string
           event_type: Database["public"]["Enums"]["health_event_type"]
+          fertiliser_composition: string | null
+          harvest_interval_days: number | null
           id: string
+          ipm_product_id: string | null
+          ipm_task_id: string | null
+          issue_reason: string | null
           location_id: string | null
           measurements: Json | null
+          method: string | null
           notes: string | null
           org_id: string
+          pcs_number: string | null
+          ph_reading: number | null
+          photo_url: string | null
           photos: string[] | null
+          product_name: string | null
+          quantity_used_ml: number | null
+          rate: number | null
+          reason_for_use: string | null
           recorded_by: string | null
+          safe_harvest_date: string | null
+          severity: string | null
+          signed_by: string | null
+          spot_treatment_id: string | null
+          sprayer_used: string | null
           title: string | null
+          unit: string | null
           updated_at: string
+          weather_conditions: string | null
         }
         Insert: {
+          affected_batch_ids?: string[] | null
+          application_number?: number | null
+          area_treated?: string | null
           batch_id?: string | null
+          bottle_id?: string | null
           created_at?: string
+          crop_name?: string | null
+          ec_reading?: number | null
           event_at?: string
           event_type: Database["public"]["Enums"]["health_event_type"]
+          fertiliser_composition?: string | null
+          harvest_interval_days?: number | null
           id?: string
+          ipm_product_id?: string | null
+          ipm_task_id?: string | null
+          issue_reason?: string | null
           location_id?: string | null
           measurements?: Json | null
+          method?: string | null
           notes?: string | null
           org_id: string
+          pcs_number?: string | null
+          ph_reading?: number | null
+          photo_url?: string | null
           photos?: string[] | null
+          product_name?: string | null
+          quantity_used_ml?: number | null
+          rate?: number | null
+          reason_for_use?: string | null
           recorded_by?: string | null
+          safe_harvest_date?: string | null
+          severity?: string | null
+          signed_by?: string | null
+          spot_treatment_id?: string | null
+          sprayer_used?: string | null
           title?: string | null
+          unit?: string | null
           updated_at?: string
+          weather_conditions?: string | null
         }
         Update: {
+          affected_batch_ids?: string[] | null
+          application_number?: number | null
+          area_treated?: string | null
           batch_id?: string | null
+          bottle_id?: string | null
           created_at?: string
+          crop_name?: string | null
+          ec_reading?: number | null
           event_at?: string
           event_type?: Database["public"]["Enums"]["health_event_type"]
+          fertiliser_composition?: string | null
+          harvest_interval_days?: number | null
           id?: string
+          ipm_product_id?: string | null
+          ipm_task_id?: string | null
+          issue_reason?: string | null
           location_id?: string | null
           measurements?: Json | null
+          method?: string | null
           notes?: string | null
           org_id?: string
+          pcs_number?: string | null
+          ph_reading?: number | null
+          photo_url?: string | null
           photos?: string[] | null
+          product_name?: string | null
+          quantity_used_ml?: number | null
+          rate?: number | null
+          reason_for_use?: string | null
           recorded_by?: string | null
+          safe_harvest_date?: string | null
+          severity?: string | null
+          signed_by?: string | null
+          spot_treatment_id?: string | null
+          sprayer_used?: string | null
           title?: string | null
+          unit?: string | null
           updated_at?: string
+          weather_conditions?: string | null
         }
         Relationships: [
           {
@@ -3864,6 +6120,41 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "plant_health_logs_bottle_id_fkey"
+            columns: ["bottle_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_product_bottles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plant_health_logs_ipm_product_id_fkey"
+            columns: ["ipm_product_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plant_health_logs_ipm_product_id_fkey"
+            columns: ["ipm_product_id"]
+            isOneToOne: false
+            referencedRelation: "v_ipm_stock_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "plant_health_logs_ipm_product_id_fkey"
+            columns: ["ipm_product_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "plant_health_logs_ipm_task_id_fkey"
+            columns: ["ipm_task_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_tasks"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "plant_health_logs_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -3883,6 +6174,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plant_health_logs_spot_treatment_id_fkey"
+            columns: ["spot_treatment_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_spot_treatments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plant_health_logs_spot_treatment_id_fkey"
+            columns: ["spot_treatment_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["source_id"]
           },
         ]
       }
@@ -4050,6 +6355,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "price_list_customers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "price_list_customers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "price_list_customers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -4282,6 +6608,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "product_aliases_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "product_aliases_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "product_aliases_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -4572,6 +6919,270 @@ export type Database = {
           },
         ]
       }
+      production_job_batches: {
+        Row: {
+          added_at: string
+          batch_id: string
+          job_id: string
+          sort_order: number | null
+        }
+        Insert: {
+          added_at?: string
+          batch_id: string
+          job_id: string
+          sort_order?: number | null
+        }
+        Update: {
+          added_at?: string
+          batch_id?: string
+          job_id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_job_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_job_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_job_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "production_job_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_job_batches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "production_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_job_batches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "production_jobs_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_jobs: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          location: string | null
+          machine: string | null
+          name: string
+          org_id: string
+          process_type: string | null
+          scheduled_date: string | null
+          scheduled_week: number | null
+          scheduled_year: number | null
+          started_at: string | null
+          status: string
+          task_id: string | null
+          updated_at: string
+          wizard_progress: Json | null
+          wizard_template: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          machine?: string | null
+          name: string
+          org_id: string
+          process_type?: string | null
+          scheduled_date?: string | null
+          scheduled_week?: number | null
+          scheduled_year?: number | null
+          started_at?: string | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          wizard_progress?: Json | null
+          wizard_template?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          machine?: string | null
+          name?: string
+          org_id?: string
+          process_type?: string | null
+          scheduled_date?: string | null
+          scheduled_week?: number | null
+          scheduled_year?: number | null
+          started_at?: string | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+          wizard_progress?: Json | null
+          wizard_template?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_jobs_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks_with_productivity"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productivity_logs: {
+        Row: {
+          duration_minutes: number
+          id: string
+          job_id: string | null
+          location: string | null
+          logged_at: string
+          machine: string | null
+          org_id: string
+          plant_count: number
+          task_id: string | null
+          task_type: string
+          user_id: string
+        }
+        Insert: {
+          duration_minutes: number
+          id?: string
+          job_id?: string | null
+          location?: string | null
+          logged_at?: string
+          machine?: string | null
+          org_id: string
+          plant_count: number
+          task_id?: string | null
+          task_type: string
+          user_id: string
+        }
+        Update: {
+          duration_minutes?: number
+          id?: string
+          job_id?: string | null
+          location?: string | null
+          logged_at?: string
+          machine?: string | null
+          org_id?: string
+          plant_count?: number
+          task_id?: string | null
+          task_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productivity_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "production_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productivity_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "production_jobs_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productivity_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productivity_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productivity_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks_with_productivity"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productivity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           created_at: string
@@ -4689,6 +7300,27 @@ export type Database = {
             referencedRelation: "v_customer_trolley_summary"
             referencedColumns: ["customer_id"]
           },
+          {
+            foreignKeyName: "profiles_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "profiles_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "profiles_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
         ]
       }
       protocols: {
@@ -4779,6 +7411,171 @@ export type Database = {
             columns: ["target_variety_id"]
             isOneToOne: false
             referencedRelation: "v_plant_varieties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_order_lines: {
+        Row: {
+          created_at: string
+          discount_pct: number
+          id: string
+          line_number: number
+          line_total: number
+          material_id: string
+          notes: string | null
+          purchase_order_id: string
+          quantity_ordered: number
+          quantity_received: number
+          unit_price: number
+          uom: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          discount_pct?: number
+          id?: string
+          line_number: number
+          line_total: number
+          material_id: string
+          notes?: string | null
+          purchase_order_id: string
+          quantity_ordered: number
+          quantity_received?: number
+          unit_price: number
+          uom?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          discount_pct?: number
+          id?: string
+          line_number?: number
+          line_total?: number
+          material_id?: string
+          notes?: string | null
+          purchase_order_id?: string
+          quantity_ordered?: number
+          quantity_received?: number
+          unit_price?: number
+          uom?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delivery_location_id: string | null
+          delivery_notes: string | null
+          expected_delivery_date: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          org_id: string
+          po_number: string
+          received_at: string | null
+          status: Database["public"]["Enums"]["purchase_order_status"]
+          submitted_at: string | null
+          subtotal: number
+          supplier_id: string
+          supplier_ref: string | null
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delivery_location_id?: string | null
+          delivery_notes?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          org_id: string
+          po_number: string
+          received_at?: string | null
+          status?: Database["public"]["Enums"]["purchase_order_status"]
+          submitted_at?: string | null
+          subtotal?: number
+          supplier_id: string
+          supplier_ref?: string | null
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delivery_location_id?: string | null
+          delivery_notes?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          org_id?: string
+          po_number?: string
+          received_at?: string | null
+          status?: Database["public"]["Enums"]["purchase_order_status"]
+          submitted_at?: string | null
+          subtotal?: number
+          supplier_id?: string
+          supplier_ref?: string | null
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_delivery_location_id_fkey"
+            columns: ["delivery_location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_delivery_location_id_fkey"
+            columns: ["delivery_location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -4987,6 +7784,7 @@ export type Database = {
           eircode: string | null
           email: string | null
           id: string
+          is_internal: boolean | null
           name: string
           org_id: string
           phone: string | null
@@ -5001,6 +7799,7 @@ export type Database = {
           eircode?: string | null
           email?: string | null
           id?: string
+          is_internal?: boolean | null
           name: string
           org_id: string
           phone?: string | null
@@ -5015,6 +7814,7 @@ export type Database = {
           eircode?: string | null
           email?: string | null
           id?: string
+          is_internal?: boolean | null
           name?: string
           org_id?: string
           phone?: string | null
@@ -5025,6 +7825,133 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "suppliers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      targeting_config: {
+        Row: {
+          config_key: string
+          config_value: Json
+          id: string
+          org_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          config_key: string
+          config_value: Json
+          id?: string
+          org_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          id?: string
+          org_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "targeting_config_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          org_id: string
+          plant_quantity: number | null
+          priority: number | null
+          scheduled_date: string | null
+          source_module: string
+          source_ref_id: string | null
+          source_ref_type: string | null
+          started_at: string | null
+          status: string
+          task_type: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          org_id: string
+          plant_quantity?: number | null
+          priority?: number | null
+          scheduled_date?: string | null
+          source_module: string
+          source_ref_id?: string | null
+          source_ref_type?: string | null
+          started_at?: string | null
+          status?: string
+          task_type?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          org_id?: string
+          plant_quantity?: number | null
+          priority?: number | null
+          scheduled_date?: string | null
+          source_module?: string
+          source_ref_id?: string | null
+          source_ref_type?: string | null
+          started_at?: string | null
+          status?: string
+          task_type?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -5075,6 +8002,651 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_picking_team_workload"
             referencedColumns: ["team_id"]
+          },
+        ]
+      }
+      trial_findings: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          finding_type: string
+          id: string
+          implemented_at: string | null
+          implemented_protocol_id: string | null
+          recommended_protocol_changes: Json | null
+          reviewed_by: string | null
+          status: string | null
+          supporting_data: Json | null
+          title: string
+          trial_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          finding_type: string
+          id?: string
+          implemented_at?: string | null
+          implemented_protocol_id?: string | null
+          recommended_protocol_changes?: Json | null
+          reviewed_by?: string | null
+          status?: string | null
+          supporting_data?: Json | null
+          title: string
+          trial_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          finding_type?: string
+          id?: string
+          implemented_at?: string | null
+          implemented_protocol_id?: string | null
+          recommended_protocol_changes?: Json | null
+          reviewed_by?: string | null
+          status?: string | null
+          supporting_data?: Json | null
+          title?: string
+          trial_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_findings_implemented_protocol_id_fkey"
+            columns: ["implemented_protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_findings_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "trials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_findings_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "v_trial_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          group_type: string
+          id: string
+          label_color: string | null
+          name: string
+          sort_order: number
+          strategy: Json
+          target_plant_count: number
+          trial_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          group_type: string
+          id?: string
+          label_color?: string | null
+          name: string
+          sort_order?: number
+          strategy?: Json
+          target_plant_count?: number
+          trial_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          group_type?: string
+          id?: string
+          label_color?: string | null
+          name?: string
+          sort_order?: number
+          strategy?: Json
+          target_plant_count?: number
+          trial_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_groups_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "trials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_groups_trial_id_fkey"
+            columns: ["trial_id"]
+            isOneToOne: false
+            referencedRelation: "v_trial_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_measurements: {
+        Row: {
+          anomalies: string | null
+          biomass_g: number | null
+          canopy_width_cm: number | null
+          color_score: number | null
+          created_at: string
+          disease_score: number | null
+          ec: number | null
+          flowers_count: number | null
+          fruits_count: number | null
+          harvest_weight_g: number | null
+          height_cm: number | null
+          humidity_pct: number | null
+          id: string
+          internode_length_mm: number | null
+          leaf_count: number | null
+          light_level_lux: number | null
+          measurement_date: string
+          observations: string | null
+          overall_health_score: number | null
+          pest_score: number | null
+          ph: number | null
+          photo_urls: string[] | null
+          quality_grade: string | null
+          recorded_by: string | null
+          root_score: number | null
+          stem_diameter_mm: number | null
+          subject_id: string
+          temperature_c: number | null
+          updated_at: string
+          vigor_score: number | null
+          week_number: number
+        }
+        Insert: {
+          anomalies?: string | null
+          biomass_g?: number | null
+          canopy_width_cm?: number | null
+          color_score?: number | null
+          created_at?: string
+          disease_score?: number | null
+          ec?: number | null
+          flowers_count?: number | null
+          fruits_count?: number | null
+          harvest_weight_g?: number | null
+          height_cm?: number | null
+          humidity_pct?: number | null
+          id?: string
+          internode_length_mm?: number | null
+          leaf_count?: number | null
+          light_level_lux?: number | null
+          measurement_date: string
+          observations?: string | null
+          overall_health_score?: number | null
+          pest_score?: number | null
+          ph?: number | null
+          photo_urls?: string[] | null
+          quality_grade?: string | null
+          recorded_by?: string | null
+          root_score?: number | null
+          stem_diameter_mm?: number | null
+          subject_id: string
+          temperature_c?: number | null
+          updated_at?: string
+          vigor_score?: number | null
+          week_number: number
+        }
+        Update: {
+          anomalies?: string | null
+          biomass_g?: number | null
+          canopy_width_cm?: number | null
+          color_score?: number | null
+          created_at?: string
+          disease_score?: number | null
+          ec?: number | null
+          flowers_count?: number | null
+          fruits_count?: number | null
+          harvest_weight_g?: number | null
+          height_cm?: number | null
+          humidity_pct?: number | null
+          id?: string
+          internode_length_mm?: number | null
+          leaf_count?: number | null
+          light_level_lux?: number | null
+          measurement_date?: string
+          observations?: string | null
+          overall_health_score?: number | null
+          pest_score?: number | null
+          ph?: number | null
+          photo_urls?: string[] | null
+          quality_grade?: string | null
+          recorded_by?: string | null
+          root_score?: number | null
+          stem_diameter_mm?: number | null
+          subject_id?: string
+          temperature_c?: number | null
+          updated_at?: string
+          vigor_score?: number | null
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_measurements_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "trial_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_subjects: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          dropout_date: string | null
+          dropout_reason: string | null
+          group_id: string
+          id: string
+          initial_height_cm: number | null
+          initial_leaf_count: number | null
+          initial_photo_url: string | null
+          initial_vigor_score: number | null
+          is_active: boolean
+          label: string | null
+          location_id: string | null
+          plant_identifier: string | null
+          position_notes: string | null
+          subject_number: number
+          updated_at: string
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          dropout_date?: string | null
+          dropout_reason?: string | null
+          group_id: string
+          id?: string
+          initial_height_cm?: number | null
+          initial_leaf_count?: number | null
+          initial_photo_url?: string | null
+          initial_vigor_score?: number | null
+          is_active?: boolean
+          label?: string | null
+          location_id?: string | null
+          plant_identifier?: string | null
+          position_notes?: string | null
+          subject_number: number
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          dropout_date?: string | null
+          dropout_reason?: string | null
+          group_id?: string
+          id?: string
+          initial_height_cm?: number | null
+          initial_leaf_count?: number | null
+          initial_photo_url?: string | null
+          initial_vigor_score?: number | null
+          is_active?: boolean
+          label?: string | null
+          location_id?: string | null
+          plant_identifier?: string | null
+          position_notes?: string | null
+          subject_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_subjects_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_subjects_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_subjects_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "trial_subjects_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_subjects_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "trial_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_subjects_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_subjects_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_treatments: {
+        Row: {
+          applied_by: string | null
+          created_at: string
+          group_id: string
+          id: string
+          ipm_product_id: string | null
+          material_id: string | null
+          method: string | null
+          name: string
+          notes: string | null
+          protocol_id: string | null
+          quantity_applied: number | null
+          rate: number | null
+          rate_unit: string | null
+          treatment_date: string
+          treatment_type: string
+        }
+        Insert: {
+          applied_by?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          ipm_product_id?: string | null
+          material_id?: string | null
+          method?: string | null
+          name: string
+          notes?: string | null
+          protocol_id?: string | null
+          quantity_applied?: number | null
+          rate?: number | null
+          rate_unit?: string | null
+          treatment_date: string
+          treatment_type: string
+        }
+        Update: {
+          applied_by?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          ipm_product_id?: string | null
+          material_id?: string | null
+          method?: string | null
+          name?: string
+          notes?: string | null
+          protocol_id?: string | null
+          quantity_applied?: number | null
+          rate?: number | null
+          rate_unit?: string | null
+          treatment_date?: string
+          treatment_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_treatments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "trial_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_treatments_ipm_product_id_fkey"
+            columns: ["ipm_product_id"]
+            isOneToOne: false
+            referencedRelation: "ipm_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_treatments_ipm_product_id_fkey"
+            columns: ["ipm_product_id"]
+            isOneToOne: false
+            referencedRelation: "v_ipm_stock_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "trial_treatments_ipm_product_id_fkey"
+            columns: ["ipm_product_id"]
+            isOneToOne: false
+            referencedRelation: "v_upcoming_ipm_treatments"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "trial_treatments_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_treatments_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trials: {
+        Row: {
+          actual_end_date: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          hypothesis: string | null
+          id: string
+          measurement_frequency_days: number
+          methodology: string | null
+          name: string
+          objective: string | null
+          org_id: string
+          planned_end_date: string | null
+          protocol_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["trial_status"]
+          target_size_id: string | null
+          trial_location_id: string | null
+          trial_number: string
+          updated_at: string
+          variety_id: string | null
+        }
+        Insert: {
+          actual_end_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hypothesis?: string | null
+          id?: string
+          measurement_frequency_days?: number
+          methodology?: string | null
+          name: string
+          objective?: string | null
+          org_id: string
+          planned_end_date?: string | null
+          protocol_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["trial_status"]
+          target_size_id?: string | null
+          trial_location_id?: string | null
+          trial_number: string
+          updated_at?: string
+          variety_id?: string | null
+        }
+        Update: {
+          actual_end_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hypothesis?: string | null
+          id?: string
+          measurement_frequency_days?: number
+          methodology?: string | null
+          name?: string
+          objective?: string | null
+          org_id?: string
+          planned_end_date?: string | null
+          protocol_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["trial_status"]
+          target_size_id?: string | null
+          trial_location_id?: string | null
+          trial_number?: string
+          updated_at?: string
+          variety_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_target_size_id_fkey"
+            columns: ["target_size_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_target_size_id_fkey"
+            columns: ["target_size_id"]
+            isOneToOne: false
+            referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_trial_location_id_fkey"
+            columns: ["trial_location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_trial_location_id_fkey"
+            columns: ["trial_location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_variety_id_fkey"
+            columns: ["variety_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_varieties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_variety_id_fkey"
+            columns: ["variety_id"]
+            isOneToOne: false
+            referencedRelation: "plant_varieties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_variety_id_fkey"
+            columns: ["variety_id"]
+            isOneToOne: false
+            referencedRelation: "plant_varieties_compat"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trials_variety_id_fkey"
+            columns: ["variety_id"]
+            isOneToOne: false
+            referencedRelation: "v_plant_varieties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trolley_capacity: {
+        Row: {
+          created_at: string
+          family: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          shelves_per_trolley: number
+          size_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          family?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          shelves_per_trolley?: number
+          size_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          family?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          shelves_per_trolley?: number
+          size_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trolley_capacity_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trolley_capacity_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trolley_capacity_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5141,6 +8713,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trolley_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trolley_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trolley_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -5246,6 +8839,27 @@ export type Database = {
             referencedColumns: ["customer_id"]
           },
           {
+            foreignKeyName: "trolleys_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trolleys_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "trolleys_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "trolleys_delivery_run_id_fkey"
             columns: ["delivery_run_id"]
             isOneToOne: false
@@ -5276,6 +8890,7 @@ export type Database = {
           name: string
           org_id: string
           trolley_capacity: number | null
+          truck_layout: Json | null
           type: Database["public"]["Enums"]["vehicle_type"]
           updated_at: string
         }
@@ -5286,6 +8901,7 @@ export type Database = {
           name: string
           org_id: string
           trolley_capacity?: number | null
+          truck_layout?: Json | null
           type?: Database["public"]["Enums"]["vehicle_type"]
           updated_at?: string
         }
@@ -5296,6 +8912,7 @@ export type Database = {
           name?: string
           org_id?: string
           trolley_capacity?: number | null
+          truck_layout?: Json | null
           type?: Database["public"]["Enums"]["vehicle_type"]
           updated_at?: string
         }
@@ -5376,6 +8993,72 @@ export type Database = {
           },
           {
             foreignKeyName: "batch_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_order_patterns: {
+        Row: {
+          avg_order_interval: number | null
+          avg_order_value: number | null
+          customer_id: string | null
+          interval_stddev: number | null
+          last_order_at: string | null
+          org_id: string | null
+          preferred_dow: number | null
+          preferred_week: number | null
+          total_orders: number | null
+          total_revenue: number | null
+          value_quartile: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_vat_treatment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -5609,6 +9292,137 @@ export type Database = {
         }
         Relationships: []
       }
+      production_jobs_summary: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_email: string | null
+          assigned_to_name: string | null
+          batch_count: number | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string | null
+          location: string | null
+          machine: string | null
+          name: string | null
+          org_id: string | null
+          process_type: string | null
+          scheduled_date: string | null
+          scheduled_week: number | null
+          scheduled_year: number | null
+          started_at: string | null
+          status: string | null
+          task_id: string | null
+          total_plants: number | null
+          updated_at: string | null
+          wizard_progress: Json | null
+          wizard_template: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_jobs_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks_with_productivity"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks_with_productivity: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_email: string | null
+          assigned_to_name: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string | null
+          org_id: string | null
+          plant_quantity: number | null
+          plants_per_hour: number | null
+          priority: number | null
+          scheduled_date: string | null
+          source_module: string | null
+          source_ref_id: string | null
+          source_ref_type: string | null
+          started_at: string | null
+          status: string | null
+          task_type: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_active_delivery_runs: {
         Row: {
           completed_deliveries: number | null
@@ -5628,6 +9442,29 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "delivery_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_active_delivery_zones: {
+        Row: {
+          county: string | null
+          lat: number | null
+          lng: number | null
+          order_count: number | null
+          org_id: string | null
+          requested_delivery_date: string | null
+          routing_key: string | null
+          routing_keys_in_zone: string[] | null
+          total_trolleys: number | null
+          zone_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -5811,24 +9648,26 @@ export type Database = {
       v_batch_search: {
         Row: {
           batch_number: string | null
-          category: Database["public"]["Enums"]["variety_category"] | null
+          behavior: string | null
+          category: string | null
           created_at: string | null
           family: string | null
+          grower_photo_url: string | null
           id: string | null
           initial_quantity: number | null
           location_id: string | null
           location_name: string | null
           org_id: string | null
-          parent_batch_id: string | null
           phase: string | null
           plant_variety_id: string | null
-          planted_at: string | null
           quantity: number | null
           ready_at: string | null
-          reserved_quantity: number | null
+          saleable_quantity: number | null
+          sales_photo_url: string | null
           size_id: string | null
           size_name: string | null
           status: string | null
+          status_id: string | null
           supplier_id: string | null
           supplier_name: string | null
           updated_at: string | null
@@ -5854,34 +9693,6 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_available_batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_passport"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "batches_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
             referencedColumns: ["id"]
           },
           {
@@ -5924,6 +9735,13 @@ export type Database = {
             columns: ["size_id"]
             isOneToOne: false
             referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_status_id_fkey"
+            columns: ["status_id"]
+            isOneToOne: false
+            referencedRelation: "attribute_options"
             referencedColumns: ["id"]
           },
           {
@@ -6068,6 +9886,31 @@ export type Database = {
           },
         ]
       }
+      v_ipm_stock_summary: {
+        Row: {
+          bottles_in_stock: number | null
+          bottles_open: number | null
+          bottles_sealed: number | null
+          default_bottle_volume_ml: number | null
+          is_low_stock: boolean | null
+          low_stock_threshold: number | null
+          org_id: string | null
+          product_id: string | null
+          product_name: string | null
+          target_stock_bottles: number | null
+          total_remaining_ml: number | null
+          usage_last_30_days_ml: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_order_picklist: {
         Row: {
           batch_id: string | null
@@ -6140,6 +9983,13 @@ export type Database = {
             referencedRelation: "v_orders_ready_for_dispatch"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
         ]
       }
       v_order_summary: {
@@ -6197,6 +10047,27 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_rep_targets"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -6258,6 +10129,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "v_orders_ready_for_dispatch"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "pick_lists_org_id_fkey"
@@ -6357,6 +10235,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "picking_feedback_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "picking_feedback_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
@@ -6445,6 +10330,122 @@ export type Database = {
         }
         Relationships: []
       }
+      v_sales_admin_inbox: {
+        Row: {
+          action_label: string | null
+          customer_name: string | null
+          description: string | null
+          link_url: string | null
+          order_number: string | null
+          org_id: string | null
+          priority: number | null
+          reference_id: string | null
+          task_date: string | null
+          task_type: string | null
+          title: string | null
+          total_inc_vat: number | null
+        }
+        Relationships: []
+      }
+      v_sales_rep_targets: {
+        Row: {
+          avg_order_value: number | null
+          city: string | null
+          context_note: string | null
+          county: string | null
+          customer_id: string | null
+          customer_name: string | null
+          email: string | null
+          last_interaction_at: string | null
+          last_interaction_outcome: string | null
+          last_order_at: string | null
+          org_id: string | null
+          phone: string | null
+          priority_score: number | null
+          suggested_delivery_date: string | null
+          target_reason: string | null
+          total_orders: number | null
+          van_current_load: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_scheduled_deliveries_map: {
+        Row: {
+          city: string | null
+          county: string | null
+          customer_id: string | null
+          customer_name: string | null
+          eircode: string | null
+          lat: number | null
+          lng: number | null
+          order_id: string | null
+          order_number: string | null
+          org_id: string | null
+          requested_delivery_date: string | null
+          routing_key: string | null
+          trolleys_estimated: number | null
+          zone_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_smart_sales_targets: {
+        Row: {
+          avg_order_interval: number | null
+          avg_order_value: number | null
+          city: string | null
+          context_note: string | null
+          county: string | null
+          customer_id: string | null
+          customer_name: string | null
+          eircode: string | null
+          email: string | null
+          last_interaction_at: string | null
+          last_interaction_outcome: string | null
+          last_order_at: string | null
+          lat: number | null
+          lng: number | null
+          org_id: string | null
+          phone: string | null
+          preferred_dow: number | null
+          priority_score: number | null
+          probability_score: number | null
+          route_fit_score: number | null
+          routing_key: string | null
+          suggested_delivery_date: string | null
+          target_reason: string | null
+          total_orders: number | null
+          total_revenue: number | null
+          value_quartile: number | null
+          van_current_load: number | null
+          zone_name: string | null
+          zone_order_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_substitution_requests: {
         Row: {
           applied_at: string | null
@@ -6492,6 +10493,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_item_substitutions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "order_item_substitutions_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
@@ -6524,6 +10532,105 @@ export type Database = {
             columns: ["proposed_sku_id"]
             isOneToOne: false
             referencedRelation: "skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_trial_summary: {
+        Row: {
+          created_at: string | null
+          current_week: number | null
+          group_count: number | null
+          id: string | null
+          last_measurement_date: string | null
+          measurement_count: number | null
+          name: string | null
+          org_id: string | null
+          planned_end_date: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["trial_status"] | null
+          subject_count: number | null
+          trial_number: string | null
+          variety_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_upcoming_ipm_treatments: {
+        Row: {
+          applications_total: number | null
+          batch_number: string | null
+          current_application: number | null
+          due_date: string | null
+          location_name: string | null
+          method: string | null
+          notes: string | null
+          org_id: string | null
+          product_id: string | null
+          product_name: string | null
+          rate: number | null
+          rate_unit: string | null
+          source_id: string | null
+          target_batch_id: string | null
+          target_location_id: string | null
+          target_type: string | null
+          treatment_source: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ipm_spot_treatments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
+            columns: ["target_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_location_id_fkey"
+            columns: ["target_location_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ipm_spot_treatments_target_location_id_fkey"
+            columns: ["target_location_id"]
+            isOneToOne: false
+            referencedRelation: "nursery_locations"
             referencedColumns: ["id"]
           },
         ]
@@ -6593,6 +10700,10 @@ export type Database = {
         Args: { p_key: string; p_org_id: string }
         Returns: number
       }
+      generate_bottle_code: {
+        Args: { p_org_id: string; p_product_id: string }
+        Returns: string
+      }
       generate_credit_number: {
         Args: { _issue_date: string; _org_id: string }
         Returns: string
@@ -6600,6 +10711,28 @@ export type Database = {
       generate_invoice_number: {
         Args: { _issue_date: string; _org_id: string }
         Returns: string
+      }
+      generate_trial_number: { Args: { p_org_id: string }; Returns: string }
+      get_dashboard_stats: {
+        Args: { p_org_id: string }
+        Returns: {
+          active_batches: number
+          archived_batches: number
+          family_distribution: Json
+          ready_for_sale_batches: number
+          ready_for_sale_plants: number
+          size_distribution: Json
+          total_plants: number
+        }[]
+      }
+      get_reference_data: {
+        Args: { p_org_id: string }
+        Returns: {
+          locations: Json
+          sizes: Json
+          suppliers: Json
+          varieties: Json
+        }[]
       }
       increment_counter: {
         Args: { p_key: string; p_org_id: string }
@@ -6610,22 +10743,42 @@ export type Database = {
         Returns: number
       }
       is_member_of: { Args: { _org: string }; Returns: boolean }
+      migrate_log_history_to_events: {
+        Args: { p_batch_id?: string }
+        Returns: number
+      }
       next_counter: { Args: { _key: string; _org_id: string }; Returns: number }
       next_sku_code: { Args: never; Returns: number }
-      perform_transplant: {
-        Args: {
-          p_archive_parent_if_empty?: boolean
-          p_containers: number
-          p_location_id: string
-          p_notes?: string
-          p_org_id: string
-          p_parent_batch_id: string
-          p_planted_at?: string
-          p_size_id: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
+      perform_transplant:
+        | {
+            Args: {
+              p_archive_parent_if_empty?: boolean
+              p_containers: number
+              p_location_id: string
+              p_notes?: string
+              p_org_id: string
+              p_parent_batch_id: string
+              p_planted_at?: string
+              p_size_id: string
+              p_user_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_archive_parent_if_empty?: boolean
+              p_containers: number
+              p_location_id: string
+              p_notes?: string
+              p_org_id: string
+              p_parent_batch_id: string
+              p_planted_at?: string
+              p_size_id: string
+              p_units?: number
+              p_user_id: string
+            }
+            Returns: Json
+          }
       recalc_invoice_totals: {
         Args: { _invoice_id: string }
         Returns: undefined
@@ -6634,6 +10787,17 @@ export type Database = {
       refresh_log_history_for_batch: {
         Args: { _batch_id: string }
         Returns: undefined
+      }
+      search_batches_for_scout: {
+        Args: { p_limit?: number; p_org_id: string; p_search: string }
+        Returns: {
+          batch_number: string
+          id: string
+          location_id: string
+          location_name: string
+          variety_family: string
+          variety_name: string
+        }[]
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
@@ -6674,7 +10838,16 @@ export type Database = {
         | "treatment"
         | "measurement"
         | "clearance"
+      interaction_type: "call" | "email" | "visit" | "whatsapp" | "other"
       invoice_status: "draft" | "issued" | "void"
+      material_transaction_type:
+        | "receive"
+        | "consume"
+        | "adjust"
+        | "transfer"
+        | "count"
+        | "return"
+        | "scrap"
       order_status:
         | "draft"
         | "confirmed"
@@ -6713,6 +10886,13 @@ export type Database = {
         | "Archived"
         | "Incoming"
         | "Planned"
+      purchase_order_status:
+        | "draft"
+        | "submitted"
+        | "confirmed"
+        | "partially_received"
+        | "received"
+        | "cancelled"
       resolution_status: "open" | "approved" | "rejected" | "resolved"
       size_container_type: "prop_tray" | "plug_tray" | "pot"
       substitution_status:
@@ -6721,6 +10901,7 @@ export type Database = {
         | "rejected"
         | "applied"
         | "cancelled"
+      trial_status: "draft" | "active" | "paused" | "completed" | "archived"
       trolley_status:
         | "available"
         | "loaded"
@@ -6902,7 +11083,17 @@ export const Constants = {
         "measurement",
         "clearance",
       ],
+      interaction_type: ["call", "email", "visit", "whatsapp", "other"],
       invoice_status: ["draft", "issued", "void"],
+      material_transaction_type: [
+        "receive",
+        "consume",
+        "adjust",
+        "transfer",
+        "count",
+        "return",
+        "scrap",
+      ],
       order_status: [
         "draft",
         "confirmed",
@@ -6946,6 +11137,14 @@ export const Constants = {
         "Incoming",
         "Planned",
       ],
+      purchase_order_status: [
+        "draft",
+        "submitted",
+        "confirmed",
+        "partially_received",
+        "received",
+        "cancelled",
+      ],
       resolution_status: ["open", "approved", "rejected", "resolved"],
       size_container_type: ["prop_tray", "plug_tray", "pot"],
       substitution_status: [
@@ -6955,6 +11154,7 @@ export const Constants = {
         "applied",
         "cancelled",
       ],
+      trial_status: ["draft", "active", "paused", "completed", "archived"],
       trolley_status: [
         "available",
         "loaded",
