@@ -76,6 +76,8 @@ export type ProductManagementPayload = {
     validFrom: string | null;
     validTo: string | null;
   }>;
+  plantVarieties?: Array<{ id: string; name: string }>;
+  plantSizes?: Array<{ id: string; name: string }>;
 };
 
 export type ProductSkuOption = {
@@ -133,5 +135,121 @@ export type MappingRulePreviewMatch = {
   varietyName: string;
   sizeName: string;
   locationName: string;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product Varieties (many-to-many: products ↔ varieties)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ProductVariety = {
+  id: string;
+  productId: string;
+  varietyId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Joined data
+  variety?: {
+    id: string;
+    name: string;
+    family: string | null;
+    genus: string | null;
+    category: string | null;
+  } | null;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product Groups
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ProductGroup = {
+  id: string;
+  name: string;
+  description: string | null;
+  defaultBarcode: string | null;
+  // Rule-based matching (arrays for multi-select)
+  matchCategories: string[] | null;
+  matchFamilies: string[] | null;
+  matchGenera: string[] | null;
+  matchSizeIds: string[] | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Computed
+  memberCount?: number;
+};
+
+export type ProductGroupMember = {
+  id: string;
+  groupId: string;
+  productId: string;
+  inclusionType: 'auto' | 'manual_include' | 'manual_exclude';
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Joined data
+  product?: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+export type ProductGroupAlias = {
+  id: string;
+  groupId: string;
+  customerId: string | null;
+  aliasName: string;
+  customerSkuCode: string | null;
+  customerBarcode: string | null;
+  unitPriceExVat: number | null;
+  rrp: number | null;
+  priceListId: string | null;
+  isActive: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Joined data
+  customer?: { id: string; name: string } | null;
+  priceList?: { id: string; name: string } | null;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Order Item Preferences (fulfillment breakdown)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OrderItemPreference = {
+  id: string;
+  orderItemId: string;
+  productId: string | null;
+  varietyId: string | null;
+  requestedQty: number;
+  fulfilledQty: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Joined data
+  product?: { id: string; name: string } | null;
+  variety?: { id: string; name: string } | null;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Extended Product Summary with varieties
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ProductWithVarieties = ProductSummary & {
+  varieties: ProductVariety[];
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product Group with computed members
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ProductGroupWithMembers = ProductGroup & {
+  members: Array<{
+    productId: string;
+    productName: string;
+    inclusionSource: 'rule' | 'manual_include';
+  }>;
+  aliases: ProductGroupAlias[];
 };
 

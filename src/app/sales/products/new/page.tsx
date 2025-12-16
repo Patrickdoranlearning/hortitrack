@@ -37,6 +37,8 @@ export default async function NewProductPage() {
       name: row.name,
       defaultPriceListId: row.default_price_list_id ?? null,
     })),
+    plantVarieties: data.plantVarieties,
+    plantSizes: data.plantSizes,
   };
 
   return (

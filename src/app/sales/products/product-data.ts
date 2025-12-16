@@ -75,6 +75,7 @@ export type ProductManagementData = {
     description: string | null;
     plant_variety_id: string | null;
     size_id: string | null;
+    default_vat_rate: number | null;
     plant_varieties?: { name: string | null } | null;
     plant_sizes?: { name: string | null } | null;
   }>;
@@ -99,6 +100,8 @@ export type ProductManagementData = {
     price_lists: { id: string; name: string } | null;
     customers: { id: string; name: string } | null;
   }>;
+  plantVarieties: Array<{ id: string; name: string }>;
+  plantSizes: Array<{ id: string; name: string }>;
 };
 
 export async function fetchProductManagementData(
@@ -112,6 +115,8 @@ export async function fetchProductManagementData(
     priceListRows,
     customerRows,
     priceListCustomerRows,
+    plantVarietyRows,
+    plantSizeRows,
   ] = await Promise.all([
     supabase
       .from("products")
@@ -288,6 +293,17 @@ export async function fetchProductManagementData(
       .eq("org_id", orgId)
       .order("created_at", { ascending: false })
       .then((res) => res.data ?? []),
+    supabase
+      .from("plant_varieties")
+      .select("id, name")
+      .eq("org_id", orgId)
+      .order("name", { ascending: true })
+      .then((res) => res.data ?? []),
+    supabase
+      .from("plant_sizes")
+      .select("id, name")
+      .order("name", { ascending: true })
+      .then((res) => res.data ?? []),
   ]);
 
   return {
@@ -297,6 +313,8 @@ export async function fetchProductManagementData(
     priceLists: priceListRows,
     customers: customerRows,
     priceListCustomers: priceListCustomerRows,
+    plantVarieties: plantVarietyRows.map((v) => ({ id: v.id, name: v.name ?? "" })),
+    plantSizes: plantSizeRows.map((s) => ({ id: s.id, name: s.name ?? "" })),
   };
 }
 

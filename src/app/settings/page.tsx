@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus, Building2, User, Container, Package } from 'lucide-react';
+import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus, Building2, User, Container, Package, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { PageFrame } from '@/ui/templates/PageFrame';
 
@@ -234,6 +234,26 @@ export default function DataManagementPage() {
             </CardContent>
           </Card>
 
+          </div>
+        </div>
+
+        {/* Help & Documentation */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Help & Documentation</h2>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="border-blue-500/50 bg-blue-500/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><BookOpen /> App Documentation</CardTitle>
+                <CardDescription>Learn how HortiTrack works, understand the product hierarchy, batch management, and more.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild>
+                  <Link href="/settings/docs">
+                    View Documentation
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
