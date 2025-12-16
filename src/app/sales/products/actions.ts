@@ -428,6 +428,12 @@ const createSkuSchema = z.object({
   vatRate: z.number().min(0).max(100).default(13.5),
 });
 
+const updateSkuConfigSchema = z.object({
+  skuId: z.string().uuid(),
+  plantVarietyId: z.string().uuid().nullable(),
+  sizeId: z.string().uuid().nullable(),
+});
+
 export async function createSkuAction(input: z.infer<typeof createSkuSchema>) {
   const parsed = createSkuSchema.parse(input);
   const { orgId } = await getUserAndOrg();
@@ -471,6 +477,30 @@ export async function createSkuAction(input: z.infer<typeof createSkuSchema>) {
 
   revalidatePath('/sales/products');
   return { success: true, data };
+}
+
+export async function updateSkuConfigAction(input: z.infer<typeof updateSkuConfigSchema>) {
+  const parsed = updateSkuConfigSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from('skus')
+    .update({
+      plant_variety_id: parsed.plantVarietyId,
+      size_id: parsed.sizeId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', parsed.skuId)
+    .eq('org_id', orgId);
+
+  if (error) {
+    console.error('[updateSkuConfigAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
 }
 
 async function generateSkuCode(supabase: Awaited<ReturnType<typeof getSupabaseServerApp>>) {
@@ -794,5 +824,538 @@ export async function previewRuleMatchesAction(ruleInput: Omit<MappingRuleInput,
       locationName: (b.location as { name?: string } | null)?.name ?? '',
     })),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product Varieties Actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+const productVarietySchema = z.object({
+  id: z.string().uuid().optional(),
+  productId: z.string().uuid(),
+  varietyId: z.string().uuid(),
+  isActive: z.boolean().default(true),
+});
+
+export async function addProductVarietyAction(input: z.infer<typeof productVarietySchema>) {
+  const parsed = productVarietySchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase.from('product_varieties').insert({
+    org_id: orgId,
+    product_id: parsed.productId,
+    variety_id: parsed.varietyId,
+    is_active: parsed.isActive,
+  });
+
+  if (error) {
+    console.error('[addProductVarietyAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+export async function removeProductVarietyAction(productVarietyId: string) {
+  const supabase = await getSupabaseServerApp();
+  const { error } = await supabase.from('product_varieties').delete().eq('id', productVarietyId);
+
+  if (error) {
+    console.error('[removeProductVarietyAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+export async function fetchProductVarietiesAction(productId: string) {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from('product_varieties')
+    .select(`
+      id,
+      product_id,
+      variety_id,
+      is_active,
+      created_at,
+      updated_at,
+      variety:plant_varieties(id, name, family, genus, category)
+    `)
+    .eq('org_id', orgId)
+    .eq('product_id', productId);
+
+  if (error) {
+    console.error('[fetchProductVarietiesAction]', error);
+    return { success: false, error: error.message, data: [] };
+  }
+
+  return { success: true, data: data ?? [] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product Groups Actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+const productGroupSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().max(500).optional().nullable(),
+  defaultBarcode: z.string().max(255).optional().nullable(),
+  // Arrays for multi-select
+  matchCategories: z.array(z.string()).optional().nullable(),
+  matchFamilies: z.array(z.string()).optional().nullable(),
+  matchGenera: z.array(z.string()).optional().nullable(),
+  matchSizeIds: z.array(z.string().uuid()).optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+export type ProductGroupInput = z.infer<typeof productGroupSchema>;
+
+export async function fetchProductGroupsAction() {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from('product_groups')
+    .select(`
+      id,
+      name,
+      description,
+      default_barcode,
+      match_category,
+      match_family,
+      match_genus,
+      match_size_ids,
+      is_active,
+      created_at,
+      updated_at
+    `)
+    .eq('org_id', orgId)
+    .order('name');
+
+  if (error) {
+    console.error('[fetchProductGroupsAction]', error);
+    return { success: false, error: error.message, data: [] };
+  }
+
+  return { success: true, data: data ?? [] };
+}
+
+export async function upsertProductGroupAction(input: ProductGroupInput) {
+  const parsed = productGroupSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  // Convert empty arrays to null
+  const cleanArray = <T>(arr: T[] | null | undefined): T[] | null => {
+    if (!arr || arr.length === 0) return null;
+    return arr;
+  };
+
+  const payload = {
+    name: parsed.name,
+    description: cleanString(parsed.description),
+    default_barcode: cleanString(parsed.defaultBarcode),
+    match_category: cleanArray(parsed.matchCategories),
+    match_family: cleanArray(parsed.matchFamilies),
+    match_genus: cleanArray(parsed.matchGenera),
+    match_size_ids: cleanArray(parsed.matchSizeIds),
+    is_active: parsed.isActive,
+    updated_at: new Date().toISOString(),
+  };
+
+  let error;
+  if (parsed.id) {
+    ({ error } = await supabase
+      .from('product_groups')
+      .update(payload)
+      .eq('id', parsed.id)
+      .eq('org_id', orgId));
+  } else {
+    ({ error } = await supabase.from('product_groups').insert({
+      ...payload,
+      org_id: orgId,
+    }));
+  }
+
+  if (error) {
+    console.error('[upsertProductGroupAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+export async function deleteProductGroupAction(groupId: string) {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from('product_groups')
+    .delete()
+    .eq('id', groupId)
+    .eq('org_id', orgId);
+
+  if (error) {
+    console.error('[deleteProductGroupAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+export async function getProductGroupMembersAction(groupId: string) {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase.rpc('get_product_group_members', {
+    p_group_id: groupId,
+  });
+
+  if (error) {
+    console.error('[getProductGroupMembersAction]', error);
+    return { success: false, error: error.message, data: [] };
+  }
+
+  return { success: true, data: data ?? [] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product Group Members Actions (manual include/exclude)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const productGroupMemberSchema = z.object({
+  id: z.string().uuid().optional(),
+  groupId: z.string().uuid(),
+  productId: z.string().uuid(),
+  inclusionType: z.enum(['auto', 'manual_include', 'manual_exclude']),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export async function upsertProductGroupMemberAction(input: z.infer<typeof productGroupMemberSchema>) {
+  const parsed = productGroupMemberSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data: existing } = await supabase
+    .from('product_group_members')
+    .select('id')
+    .eq('group_id', parsed.groupId)
+    .eq('product_id', parsed.productId)
+    .maybeSingle();
+
+  const payload = {
+    inclusion_type: parsed.inclusionType,
+    notes: cleanString(parsed.notes),
+    updated_at: new Date().toISOString(),
+  };
+
+  let error;
+  if (existing) {
+    ({ error } = await supabase
+      .from('product_group_members')
+      .update(payload)
+      .eq('id', existing.id));
+  } else {
+    ({ error } = await supabase.from('product_group_members').insert({
+      org_id: orgId,
+      group_id: parsed.groupId,
+      product_id: parsed.productId,
+      ...payload,
+    }));
+  }
+
+  if (error) {
+    console.error('[upsertProductGroupMemberAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+export async function removeProductGroupMemberAction(memberId: string) {
+  const supabase = await getSupabaseServerApp();
+  const { error } = await supabase.from('product_group_members').delete().eq('id', memberId);
+
+  if (error) {
+    console.error('[removeProductGroupMemberAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product Group Aliases Actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+const productGroupAliasSchema = z.object({
+  id: z.string().uuid().optional(),
+  groupId: z.string().uuid(),
+  customerId: z.string().uuid().nullable().optional(),
+  aliasName: z.string().min(1, 'Alias name is required'),
+  customerSkuCode: z.string().max(120).optional().nullable(),
+  customerBarcode: z.string().max(255).optional().nullable(),
+  unitPriceExVat: z.number().nonnegative().optional().nullable(),
+  rrp: z.number().nonnegative().optional().nullable(),
+  priceListId: z.string().uuid().nullable().optional(),
+  isActive: z.boolean().default(true),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export async function fetchProductGroupAliasesAction(groupId: string) {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from('product_group_aliases')
+    .select(`
+      id,
+      group_id,
+      customer_id,
+      alias_name,
+      customer_sku_code,
+      customer_barcode,
+      unit_price_ex_vat,
+      rrp,
+      price_list_id,
+      is_active,
+      notes,
+      created_at,
+      updated_at,
+      customer:customers(id, name),
+      price_list:price_lists(id, name)
+    `)
+    .eq('org_id', orgId)
+    .eq('group_id', groupId);
+
+  if (error) {
+    console.error('[fetchProductGroupAliasesAction]', error);
+    return { success: false, error: error.message, data: [] };
+  }
+
+  return { success: true, data: data ?? [] };
+}
+
+export async function upsertProductGroupAliasAction(input: z.infer<typeof productGroupAliasSchema>) {
+  const parsed = productGroupAliasSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const payload = {
+    org_id: orgId,
+    group_id: parsed.groupId,
+    customer_id: parsed.customerId ?? null,
+    alias_name: parsed.aliasName.trim(),
+    customer_sku_code: cleanString(parsed.customerSkuCode),
+    customer_barcode: cleanString(parsed.customerBarcode),
+    unit_price_ex_vat: parsed.unitPriceExVat ?? null,
+    rrp: parsed.rrp ?? null,
+    price_list_id: parsed.priceListId ?? null,
+    is_active: parsed.isActive,
+    notes: cleanString(parsed.notes),
+    updated_at: new Date().toISOString(),
+  };
+
+  let error;
+  if (parsed.id) {
+    ({ error } = await supabase.from('product_group_aliases').update(payload).eq('id', parsed.id));
+  } else {
+    ({ error } = await supabase.from('product_group_aliases').insert(payload));
+  }
+
+  if (error) {
+    console.error('[upsertProductGroupAliasAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+export async function deleteProductGroupAliasAction(aliasId: string) {
+  const supabase = await getSupabaseServerApp();
+  const { error } = await supabase.from('product_group_aliases').delete().eq('id', aliasId);
+
+  if (error) {
+    console.error('[deleteProductGroupAliasAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Order Item Preferences Actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+const orderItemPreferenceSchema = z.object({
+  id: z.string().uuid().optional(),
+  orderItemId: z.string().uuid(),
+  productId: z.string().uuid().nullable().optional(),
+  varietyId: z.string().uuid().nullable().optional(),
+  requestedQty: z.number().int().positive(),
+  fulfilledQty: z.number().int().nonnegative().default(0),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export async function fetchOrderItemPreferencesAction(orderItemId: string) {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from('order_item_preferences')
+    .select(`
+      id,
+      order_item_id,
+      product_id,
+      variety_id,
+      requested_qty,
+      fulfilled_qty,
+      notes,
+      created_at,
+      updated_at,
+      product:products(id, name),
+      variety:plant_varieties(id, name)
+    `)
+    .eq('org_id', orgId)
+    .eq('order_item_id', orderItemId);
+
+  if (error) {
+    console.error('[fetchOrderItemPreferencesAction]', error);
+    return { success: false, error: error.message, data: [] };
+  }
+
+  return { success: true, data: data ?? [] };
+}
+
+export async function upsertOrderItemPreferenceAction(input: z.infer<typeof orderItemPreferenceSchema>) {
+  const parsed = orderItemPreferenceSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  if (!parsed.productId && !parsed.varietyId) {
+    return { success: false, error: 'Either productId or varietyId must be provided' };
+  }
+
+  const payload = {
+    org_id: orgId,
+    order_item_id: parsed.orderItemId,
+    product_id: parsed.productId ?? null,
+    variety_id: parsed.varietyId ?? null,
+    requested_qty: parsed.requestedQty,
+    fulfilled_qty: parsed.fulfilledQty,
+    notes: cleanString(parsed.notes),
+    updated_at: new Date().toISOString(),
+  };
+
+  let error;
+  if (parsed.id) {
+    ({ error } = await supabase.from('order_item_preferences').update(payload).eq('id', parsed.id));
+  } else {
+    ({ error } = await supabase.from('order_item_preferences').insert(payload));
+  }
+
+  if (error) {
+    console.error('[upsertOrderItemPreferenceAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/orders');
+  return { success: true };
+}
+
+export async function deleteOrderItemPreferenceAction(preferenceId: string) {
+  const supabase = await getSupabaseServerApp();
+  const { error } = await supabase.from('order_item_preferences').delete().eq('id', preferenceId);
+
+  if (error) {
+    console.error('[deleteOrderItemPreferenceAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/orders');
+  return { success: true };
+}
+
+export async function updatePreferenceFulfilledQtyAction(preferenceId: string, fulfilledQty: number) {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from('order_item_preferences')
+    .update({
+      fulfilled_qty: fulfilledQty,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', preferenceId);
+
+  if (error) {
+    console.error('[updatePreferenceFulfilledQtyAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/orders');
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bulk add preferences (for WhatsApp breakdown)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const bulkPreferencesSchema = z.object({
+  orderItemId: z.string().uuid(),
+  preferences: z.array(
+    z.object({
+      productId: z.string().uuid().nullable().optional(),
+      varietyId: z.string().uuid().nullable().optional(),
+      requestedQty: z.number().int().positive(),
+      notes: z.string().max(500).optional().nullable(),
+    })
+  ),
+});
+
+export async function bulkAddOrderItemPreferencesAction(input: z.infer<typeof bulkPreferencesSchema>) {
+  const parsed = bulkPreferencesSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  for (const pref of parsed.preferences) {
+    if (!pref.productId && !pref.varietyId) {
+      return { success: false, error: 'Each preference must have either productId or varietyId' };
+    }
+  }
+
+  // Delete existing preferences for this order item
+  await supabase.from('order_item_preferences').delete().eq('order_item_id', parsed.orderItemId);
+
+  // Insert new preferences
+  const inserts = parsed.preferences.map((pref) => ({
+    org_id: orgId,
+    order_item_id: parsed.orderItemId,
+    product_id: pref.productId ?? null,
+    variety_id: pref.varietyId ?? null,
+    requested_qty: pref.requestedQty,
+    fulfilled_qty: 0,
+    notes: cleanString(pref.notes),
+  }));
+
+  const { error } = await supabase.from('order_item_preferences').insert(inserts);
+
+  if (error) {
+    console.error('[bulkAddOrderItemPreferencesAction]', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/orders');
+  return { success: true };
 }
 

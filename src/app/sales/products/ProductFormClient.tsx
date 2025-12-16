@@ -23,9 +23,11 @@ type Props = {
   batches: ProductManagementPayload["batches"];
   priceLists: ProductManagementPayload["priceLists"];
   customers: ProductManagementPayload["customers"];
+  plantVarieties?: ProductManagementPayload["plantVarieties"];
+  plantSizes?: ProductManagementPayload["plantSizes"];
 };
 
-export default function ProductFormClient({ mode, product, skus, batches, priceLists, customers }: Props) {
+export default function ProductFormClient({ mode, product, skus, batches, priceLists, customers, plantVarieties, plantSizes }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
@@ -65,6 +67,8 @@ export default function ProductFormClient({ mode, product, skus, batches, priceL
               onCreateSku={() => setSkuSheetOpen(true)}
               forcedSkuId={lastCreatedSkuId}
               onForcedSkuApplied={() => setLastCreatedSkuId(null)}
+              plantVarieties={plantVarieties}
+              plantSizes={plantSizes}
               onSaved={(id) => {
                 toast({
                   title: mode === "create" ? "Product created" : "Product updated",

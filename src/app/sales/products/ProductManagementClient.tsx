@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon } from "lucide-react";
+import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,9 +46,11 @@ import {
   upsertProductPriceAction,
   upsertProductAliasAction,
   deleteProductAliasAction,
+  updateSkuConfigAction,
 } from "./actions";
 import type { ProductManagementPayload, ProductSummary, ProductSkuOption } from "./types";
 import dynamic from "next/dynamic";
+import SkuManagementSheet from "./SkuManagementSheet";
 
 // Lazy load gallery to avoid slowing down initial page load
 const ProductGallerySection = dynamic(
@@ -65,6 +67,13 @@ export default function ProductManagementClient(props: ProductManagementPayload)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(props.products[0]?.id ?? null);
+  const [skuSheetOpen, setSkuSheetOpen] = useState(false);
+  const [skuOptions, setSkuOptions] = useState(props.skus);
+
+  // Sync skus when props change
+  useEffect(() => {
+    setSkuOptions(props.skus);
+  }, [props.skus]);
 
   const selectedProduct =
     sheetMode === "edit" && selectedProductId ? props.products.find((prod) => prod.id === selectedProductId) ?? null : null;
@@ -84,9 +93,15 @@ export default function ProductManagementClient(props: ProductManagementPayload)
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Products catalog</CardTitle>
-          <CardDescription>Link finished stock to customer-facing products with pricing.</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle>Products catalog</CardTitle>
+            <CardDescription>Link finished stock to customer-facing products with pricing.</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setSkuSheetOpen(true)}>
+            <Package className="mr-2 h-4 w-4" />
+            Manage SKUs
+          </Button>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {props.products.length === 0 ? (
@@ -170,11 +185,23 @@ export default function ProductManagementClient(props: ProductManagementPayload)
         mode={sheetMode}
         onOpenChange={setSheetOpen}
         product={selectedProduct}
-        skus={props.skus}
+        skus={skuOptions}
         batches={props.batches}
         priceLists={props.priceLists}
         customers={props.customers}
         onProductSaved={handleProductSaved}
+      />
+
+      <SkuManagementSheet
+        open={skuSheetOpen}
+        onOpenChange={setSkuSheetOpen}
+        skus={skuOptions}
+        plantVarieties={props.plantVarieties}
+        plantSizes={props.plantSizes}
+        onSkuCreated={(newSku) => {
+          setSkuOptions((prev) => [newSku, ...prev]);
+          toast({ title: "SKU created", description: `${newSku.code} has been added.` });
+        }}
       />
     </div>
   );
@@ -343,6 +370,8 @@ type ProductDetailsSectionProps = {
   onCreateSku?: () => void;
   forcedSkuId?: string | null;
   onForcedSkuApplied?: () => void;
+  plantVarieties?: ProductManagementPayload["plantVarieties"];
+  plantSizes?: ProductManagementPayload["plantSizes"];
 };
 
 export function ProductDetailsSection({
@@ -353,10 +382,13 @@ export function ProductDetailsSection({
   onCreateSku,
   forcedSkuId,
   onForcedSkuApplied,
+  plantVarieties = [],
+  plantSizes = [],
 }: ProductDetailsSectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [skuConfigPending, startSkuConfigTransition] = useTransition();
   const [formState, setFormState] = useState(() => ({
     name: product?.name ?? "",
     skuId: product?.skuId ?? (skus[0]?.id ?? ""),
@@ -457,6 +489,117 @@ export function ProductDetailsSection({
           </div>
         </div>
       </div>
+      {/* SKU Configuration - Variety and Size for trolley calculation */}
+      {formState.skuId && (plantVarieties.length > 0 || plantSizes.length > 0) && (() => {
+        const selectedSku = skus.find((s) => s.id === formState.skuId);
+        const currentVarietyId = selectedSku?.plantVarietyId ?? "";
+        const currentSizeId = selectedSku?.sizeId ?? "";
+        const currentVarietyName = plantVarieties.find((v) => v.id === currentVarietyId)?.name;
+        const currentSizeName = plantSizes.find((s) => s.id === currentSizeId)?.name;
+        const isMissing = !currentVarietyId || !currentSizeId;
+
+        return (
+          <div className={`rounded-lg border p-4 space-y-3 ${isMissing ? 'border-amber-300 bg-amber-50' : ''}`}>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-2">
+                SKU Configuration
+                {isMissing && (
+                  <Badge variant="outline" className="text-amber-700 border-amber-400">
+                    Required for trolley calculation
+                  </Badge>
+                )}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Set the variety and size for this SKU to enable trolley calculation and auto-linking batches.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Plant variety</Label>
+                <Select
+                  value={currentVarietyId || "__none__"}
+                  onValueChange={(value) => {
+                    const varietyId = value === "__none__" ? null : value;
+                    startSkuConfigTransition(async () => {
+                      const result = await updateSkuConfigAction({
+                        skuId: formState.skuId,
+                        plantVarietyId: varietyId,
+                        sizeId: currentSizeId || null,
+                      });
+                      if (!result.success) {
+                        toast({ variant: "destructive", title: "Update failed", description: result.error });
+                        return;
+                      }
+                      toast({ title: "SKU variety updated" });
+                      router.refresh();
+                    });
+                  }}
+                  disabled={skuConfigPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select variety" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="__none__">Not set</SelectItem>
+                    {plantVarieties.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {currentVarietyName && (
+                  <p className="text-xs text-muted-foreground">Current: {currentVarietyName}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Pot size</Label>
+                <Select
+                  value={currentSizeId || "__none__"}
+                  onValueChange={(value) => {
+                    const sizeId = value === "__none__" ? null : value;
+                    startSkuConfigTransition(async () => {
+                      const result = await updateSkuConfigAction({
+                        skuId: formState.skuId,
+                        plantVarietyId: currentVarietyId || null,
+                        sizeId: sizeId,
+                      });
+                      if (!result.success) {
+                        toast({ variant: "destructive", title: "Update failed", description: result.error });
+                        return;
+                      }
+                      toast({ title: "SKU size updated" });
+                      router.refresh();
+                    });
+                  }}
+                  disabled={skuConfigPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Not set</SelectItem>
+                    {plantSizes.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {currentSizeName && (
+                  <p className="text-xs text-muted-foreground">Current: {currentSizeName}</p>
+                )}
+              </div>
+            </div>
+            {skuConfigPending && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Updating SKU...
+              </div>
+            )}
+          </div>
+        );
+      })()}
       <div className="space-y-2">
         <Label>Description</Label>
         <Textarea

@@ -49,6 +49,8 @@ export default async function ProductEditPage({ params }: { params: Promise<Para
       name: row.name,
       defaultPriceListId: row.default_price_list_id ?? null,
     })),
+    plantVarieties: data.plantVarieties,
+    plantSizes: data.plantSizes,
   };
 
   return (
