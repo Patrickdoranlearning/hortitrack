@@ -534,3 +534,216 @@ export interface DispatchOrder {
   haulierName?: string;
   deliveryItemStatus?: DeliveryItemStatusType;
 }
+
+// ================================================
+// QC FEEDBACK
+// ================================================
+
+export const QCIssueType = z.enum([
+  'wrong_item',
+  'wrong_qty',
+  'quality_issue',
+  'missing_label',
+  'damaged',
+  'other'
+]);
+export type QCIssueTypeValue = z.infer<typeof QCIssueType>;
+
+export const QCActionRequired = z.enum(['repick', 'relabel', 'accept']);
+export type QCActionRequiredValue = z.infer<typeof QCActionRequired>;
+
+export const QCFeedbackSchema = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  pickListId: z.string(),
+  pickItemId: z.string().optional(),
+
+  // Feedback details
+  issueType: QCIssueType,
+  notes: z.string().optional(),
+  actionRequired: QCActionRequired.optional(),
+
+  // Resolution
+  resolvedAt: z.string().optional(),
+  resolvedBy: z.string().optional(),
+  resolutionNotes: z.string().optional(),
+
+  // Notification
+  pickerNotifiedAt: z.string().optional(),
+  pickerAcknowledgedAt: z.string().optional(),
+
+  // Metadata
+  createdAt: z.string(),
+  createdBy: z.string().optional(),
+
+  // UI helpers
+  pickerName: z.string().optional(),
+  orderNumber: z.string().optional(),
+});
+export type QCFeedback = z.infer<typeof QCFeedbackSchema>;
+
+export const CreateQCFeedbackSchema = z.object({
+  pickListId: z.string(),
+  pickItemId: z.string().optional(),
+  issueType: QCIssueType,
+  notes: z.string().optional(),
+  actionRequired: QCActionRequired.optional(),
+});
+export type CreateQCFeedback = z.infer<typeof CreateQCFeedbackSchema>;
+
+// ================================================
+// TROLLEY LABELS
+// ================================================
+
+export const TrolleyLabelSchema = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  orderId: z.string().optional(),
+  pickListId: z.string().optional(),
+
+  // Label identification
+  labelCode: z.string(), // Encoded datamatrix content
+  trolleyNumber: z.string().optional(),
+  customerName: z.string().optional(),
+  orderNumber: z.string().optional(),
+
+  // Status
+  printedAt: z.string().optional(),
+  printedBy: z.string().optional(),
+  scannedAt: z.string().optional(),
+  scannedBy: z.string().optional(),
+
+  // Metadata
+  createdAt: z.string(),
+});
+export type TrolleyLabel = z.infer<typeof TrolleyLabelSchema>;
+
+export const CreateTrolleyLabelSchema = z.object({
+  orderId: z.string().optional(),
+  pickListId: z.string().optional(),
+  trolleyNumber: z.string().optional(),
+  customerName: z.string().optional(),
+  orderNumber: z.string().optional(),
+});
+export type CreateTrolleyLabel = z.infer<typeof CreateTrolleyLabelSchema>;
+
+// ================================================
+// PICKER TASK VIEW
+// ================================================
+
+export interface PickerTask {
+  id: string;
+  orgId: string;
+  orderId: string;
+  assignedUserId?: string;
+  assignedTeamId?: string;
+  sequence: number;
+  status: string;
+  qcStatus?: string;
+  isPartial: boolean;
+  mergeStatus?: string;
+  startedAt?: string;
+  completedAt?: string;
+  notes?: string;
+  createdAt: string;
+
+  // Order details
+  orderNumber: string;
+  orderStatus: string;
+  requestedDeliveryDate?: string;
+  customerName: string;
+
+  // Progress
+  totalItems: number;
+  pickedItems: number;
+  totalQty: number;
+  pickedQty: number;
+
+  // Feedback
+  pendingFeedbackCount: number;
+  unacknowledgedFeedbackCount: number;
+}
+
+// ================================================
+// COLOR CODING
+// ================================================
+
+export const LOAD_COLORS = {
+  // Blue shades for external hauliers
+  external: [
+    'bg-blue-100 border-blue-300 text-blue-800',
+    'bg-blue-200 border-blue-400 text-blue-900',
+    'bg-sky-100 border-sky-300 text-sky-800',
+    'bg-cyan-100 border-cyan-300 text-cyan-800',
+    'bg-indigo-100 border-indigo-300 text-indigo-800',
+  ],
+  // Other colors for internal loads
+  internal: [
+    'bg-emerald-100 border-emerald-300 text-emerald-800',
+    'bg-amber-100 border-amber-300 text-amber-800',
+    'bg-rose-100 border-rose-300 text-rose-800',
+    'bg-purple-100 border-purple-300 text-purple-800',
+    'bg-teal-100 border-teal-300 text-teal-800',
+    'bg-orange-100 border-orange-300 text-orange-800',
+    'bg-lime-100 border-lime-300 text-lime-800',
+    'bg-fuchsia-100 border-fuchsia-300 text-fuchsia-800',
+  ],
+} as const;
+
+export const STATUS_PILL_COLORS = {
+  // Picking stages
+  to_pick: 'bg-gray-100 text-gray-700 border-gray-300',
+  picking: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  ready_to_load: 'bg-green-100 text-green-800 border-green-300',
+  on_route: 'bg-blue-100 text-blue-800 border-blue-300',
+  delivered: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+
+  // Pick list status
+  pending: 'bg-gray-100 text-gray-700 border-gray-300',
+  in_progress: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  completed: 'bg-green-100 text-green-800 border-green-300',
+  cancelled: 'bg-red-100 text-red-800 border-red-300',
+
+  // QC status
+  qc_pending: 'bg-orange-100 text-orange-800 border-orange-300',
+  qc_passed: 'bg-green-100 text-green-800 border-green-300',
+  qc_failed: 'bg-red-100 text-red-800 border-red-300',
+
+  // Delivery status
+  loading: 'bg-amber-100 text-amber-800 border-amber-300',
+  in_transit: 'bg-blue-100 text-blue-800 border-blue-300',
+  failed: 'bg-red-100 text-red-800 border-red-300',
+  rescheduled: 'bg-purple-100 text-purple-800 border-purple-300',
+} as const;
+
+// Helper function to get load color based on haulier type and index
+export function getLoadColor(isInternal: boolean, index: number): string {
+  const colors = isInternal ? LOAD_COLORS.internal : LOAD_COLORS.external;
+  return colors[index % colors.length];
+}
+
+// Helper function to get status pill color
+export function getStatusPillColor(status: string): string {
+  return STATUS_PILL_COLORS[status as keyof typeof STATUS_PILL_COLORS] || STATUS_PILL_COLORS.pending;
+}
+
+// ================================================
+// DISPATCH ROLES
+// ================================================
+
+export type DispatchRole = 'manager' | 'picker' | 'driver';
+
+export const DISPATCH_ROLE_MAP: Record<string, DispatchRole> = {
+  admin: 'manager',
+  owner: 'manager',
+  editor: 'manager',
+  staff: 'manager',
+  sales: 'manager',
+  picker: 'picker',
+  grower: 'picker',
+  driver: 'driver',
+};
+
+export function getDispatchRole(userRole: string): DispatchRole {
+  return DISPATCH_ROLE_MAP[userRole] || 'picker';
+}

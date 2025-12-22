@@ -38,6 +38,7 @@ import { TrolleySlotData } from '@/components/dispatch/TruckSlot';
 import DeliveryStopCard, { DeliveryStop, DeliveryStopListItem } from '@/components/dispatch/DeliveryStopCard';
 import TruckPrintView from '@/components/dispatch/TruckPrintView';
 import TruckLayoutWizard from '@/components/dispatch/TruckLayoutWizard';
+import { DeliveryManifest } from '@/components/dispatch/driver/DeliveryManifest';
 import type { TruckLayoutConfig } from '@/components/dispatch/TruckLayoutWizard';
 import TruckLoadingView, { OrderForLoading, SlotAssignment } from '@/components/dispatch/TruckLoadingView';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,7 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
   const [truckLayout, setTruckLayout] = useState<TruckLayout>(DEFAULT_LAYOUTS.van);
   const [isLayoutWizardOpen, setIsLayoutWizardOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const manifestRef = useRef<HTMLDivElement>(null);
 
   // Filters for route selection
   const [driverFilter, setDriverFilter] = useState<string>('all');
@@ -254,22 +256,19 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
     }
   };
 
-  // Native print functionality
-  const handlePrint = useCallback(() => {
-    if (!printRef.current) return;
-    
-    const printContent = printRef.current.innerHTML;
+  // Print helper function
+  const openPrintWindow = useCallback((content: string, title: string) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('Please allow popups to print');
       return;
     }
-    
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Delivery - ${selectedRun?.runNumber || 'Route'}</title>
+          <title>${title}</title>
           <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
             body { font-family: system-ui, -apple-system, sans-serif; padding: 10mm; }
@@ -281,7 +280,7 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
           </style>
         </head>
         <body class="print-colors">
-          ${printContent}
+          ${content}
         </body>
       </html>
     `);
@@ -291,7 +290,19 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
       printWindow.print();
       printWindow.close();
     }, 250);
-  }, [selectedRun?.runNumber]);
+  }, []);
+
+  // Print truck layout
+  const handlePrint = useCallback(() => {
+    if (!printRef.current) return;
+    openPrintWindow(printRef.current.innerHTML, `Truck Layout - ${selectedRun?.runNumber || 'Route'}`);
+  }, [selectedRun?.runNumber, openPrintWindow]);
+
+  // Print delivery manifest
+  const handlePrintManifest = useCallback(() => {
+    if (!manifestRef.current) return;
+    openPrintWindow(manifestRef.current.innerHTML, `Delivery Manifest - ${selectedRun?.runNumber || 'Route'}`);
+  }, [selectedRun?.runNumber, openPrintWindow]);
 
   // Progress calculations
   const completedStops = deliveryStops.filter(s => s.status === 'delivered').length;
@@ -472,7 +483,11 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-1" />
-            Print
+            Truck
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePrintManifest}>
+            <Printer className="h-4 w-4 mr-1" />
+            Manifest
           </Button>
           <Badge variant="outline" className="text-lg px-3 py-1">
             {selectedRun?.runNumber}
@@ -654,6 +669,17 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
                   stopIndex={idx}
                   onMarkDelivered={handleMarkDelivered}
                   isLoading={isLoading}
+                  showPhotoCapture={true}
+                  onPhotoUploaded={(stopId, photoUrl) => {
+                    setDeliveryStops(prev =>
+                      prev.map(s =>
+                        s.id === stopId
+                          ? { ...s, status: 'delivered', actualDeliveryTime: new Date().toISOString() }
+                          : s
+                      )
+                    );
+                    toast.success('Delivery confirmed with photo');
+                  }}
                 />
               ))}
             </div>
@@ -689,6 +715,15 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
           runDate={selectedRun?.runDate || new Date().toISOString()}
           driverName={selectedRun?.driverName}
           vehicleRegistration={selectedRun?.vehicleRegistration}
+        />
+        <DeliveryManifest
+          ref={manifestRef}
+          runNumber={selectedRun?.runNumber || ''}
+          runDate={selectedRun?.runDate || new Date().toISOString()}
+          driverName={selectedRun?.driverName}
+          vehicleRegistration={selectedRun?.vehicleRegistration}
+          stops={deliveryStops}
+          totalTrolleys={deliveryStops.reduce((sum, s) => sum + s.trolleysDelivered, 0)}
         />
       </div>
 

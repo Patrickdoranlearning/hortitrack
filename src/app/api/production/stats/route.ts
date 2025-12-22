@@ -24,7 +24,7 @@ async function getProductionStats(orgId: string): Promise<ProductionStats> {
 
   // Count in memory (still efficient since we only fetch status field)
   const batchesInPropagation = statusCounts?.filter((b) => b.status === "Propagation").length ?? 0;
-  const readyForSale = statusCounts?.filter((b) => 
+  const readyForSale = statusCounts?.filter((b) =>
     b.status === "Ready" || b.status === "Ready for Sale"
   ).length ?? 0;
 
@@ -65,7 +65,9 @@ export const GET = withApiGuard({
   method: "GET",
   requireRole: "user",
   async handler({ user }) {
-    const { orgId } = await getUserAndOrg();
+    // console.log("Stats API Handler reached. User:", user ? user.uid : "no-user");
+    const orgId = user?.orgId;
+
     if (!orgId) {
       return new Response(
         JSON.stringify({ error: "Organization not found" }),

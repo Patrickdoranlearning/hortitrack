@@ -38,6 +38,7 @@ import { submitQCCheck, rejectForRepick } from '../actions';
 import type { QCOrderDetails, QCPickItem } from './page';
 import QCChecklist from '@/components/dispatch/QCChecklist';
 import QCItemCard from '@/components/dispatch/QCItemCard';
+import { CreateQCFeedbackDialog } from '@/components/dispatch/manager/CreateQCFeedbackDialog';
 
 interface QCReviewClientProps {
   order: QCOrderDetails;
@@ -294,6 +295,26 @@ export default function QCReviewClient({ order, userId }: QCReviewClientProps) {
                 Reject & Return for Re-pick
               </Button>
 
+              <Separator className="my-2" />
+
+              {/* Send feedback to picker without rejecting */}
+              <CreateQCFeedbackDialog
+                pickListId={order.pickListId}
+                pickItems={order.items.map(item => ({
+                  id: item.id,
+                  sku: item.sku,
+                  variety: item.variety,
+                  product_name: item.productName,
+                  requested_qty: item.requestedQty,
+                }))}
+                trigger={
+                  <Button variant="outline" className="w-full gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Send Feedback to Picker
+                  </Button>
+                }
+              />
+
               {hasIssues && (
                 <div className="flex items-center gap-2 text-amber-600 text-sm">
                   <AlertTriangle className="h-4 w-4" />
@@ -404,6 +425,7 @@ export default function QCReviewClient({ order, userId }: QCReviewClientProps) {
     </div>
   );
 }
+
 
 
 

@@ -75,3 +75,4 @@ COMMENT ON COLUMN print_jobs.status IS 'Job status: pending, completed, failed';
 
 
 
+

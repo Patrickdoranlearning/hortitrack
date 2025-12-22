@@ -362,3 +362,4 @@ LEFT JOIN (
 GRANT SELECT ON public.production_jobs_summary TO authenticated;
 GRANT SELECT ON public.production_jobs_summary TO service_role;
 
+

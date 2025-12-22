@@ -13,10 +13,12 @@ import {
   Navigation,
   ChevronDown,
   ChevronUp,
+  Camera,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { getStopColor } from './TruckVisualization';
+import { DeliveryPhotoCapture } from './driver/DeliveryPhotoCapture';
 
 export interface DeliveryStop {
   id: string;
@@ -47,6 +49,8 @@ interface DeliveryStopCardProps {
   onNavigate?: (stop: DeliveryStop) => void;
   onCall?: (phone: string) => void;
   isLoading?: boolean;
+  showPhotoCapture?: boolean;
+  onPhotoUploaded?: (stopId: string, photoUrl: string) => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode }> = {
@@ -65,6 +69,8 @@ export default function DeliveryStopCard({
   onNavigate,
   onCall,
   isLoading,
+  showPhotoCapture = true,
+  onPhotoUploaded,
 }: DeliveryStopCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const color = getStopColor(stopIndex);
@@ -211,15 +217,37 @@ export default function DeliveryStopCard({
                   <Phone className="h-4 w-4" />
                 </Button>
               )}
-              <Button
-                size="sm"
-                onClick={() => onMarkDelivered?.(stop.id)}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Delivered
-              </Button>
+              {showPhotoCapture ? (
+                <DeliveryPhotoCapture
+                  deliveryItemId={stop.id}
+                  customerName={stop.customerName}
+                  orderNumber={stop.orderNumber}
+                  onPhotoCaptured={(photoUrl) => {
+                    onPhotoUploaded?.(stop.id, photoUrl);
+                    onMarkDelivered?.(stop.id);
+                  }}
+                  trigger={
+                    <Button
+                      size="sm"
+                      disabled={isLoading}
+                      className="flex-1"
+                    >
+                      <Camera className="h-4 w-4 mr-1" />
+                      Deliver
+                    </Button>
+                  }
+                />
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => onMarkDelivered?.(stop.id)}
+                  disabled={isLoading}
+                  className="flex-1"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Delivered
+                </Button>
+              )}
             </div>
           </>
         )}

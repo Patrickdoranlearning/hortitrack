@@ -63,12 +63,11 @@ export const APP_NAV: NavItem[] = [
     href: "/dispatch",
     icon: Truck,
     items: [
-      { label: "Dashboard", href: "/dispatch", description: "Command center for order flow and logistics." },
-      { label: "Picking", href: "/dispatch/picking", description: "Picker task list and order picking." },
-      { label: "Bulk Picking", href: "/dispatch/bulk-picking", description: "Group pick orders by delivery date and pack." },
-      { label: "QC Review", href: "/dispatch/qc", description: "Quality check picked orders before dispatch." },
+      { label: "Dashboard", href: "/dispatch", description: "Role-based dispatch dashboard." },
+      { label: "Manager View", href: "/dispatch/manager", description: "Orders, loads, picking, and QC management." },
+      { label: "Picker View", href: "/dispatch/picker", description: "Scan-to-pick and task list for pickers." },
+      { label: "Driver View", href: "/dispatch/driver", description: "Delivery routes and proof of delivery." },
       { label: "Trolleys", href: "/dispatch/trolleys", description: "Track trolley inventory and customer balances." },
-      { label: "Driver View", href: "/dispatch/driver", description: "Mobile view for drivers on route." },
     ]
   },
   {

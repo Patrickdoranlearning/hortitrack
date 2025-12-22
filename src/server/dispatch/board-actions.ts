@@ -478,71 +478,77 @@ export async function dispatchLoad(loadId: string) {
  */
 export async function recallLoad(loadId: string) {
   try {
-    const supabase = await createClient();
-    
+    console.log(`[recallLoad] Recalling load: ${loadId}`);
+
     // Get current load status
-    const { data: load, error: loadError } = await supabase
+    const { data: load, error: loadError } = await supabaseAdmin
       .from("delivery_runs")
       .select("status")
       .eq("id", loadId)
       .single();
-      
+
     if (loadError) throw loadError;
-    
+
+    console.log(`[recallLoad] Current status: ${load.status}`);
+
     // Only allow recall from in_transit or loading status
     if (load.status === "completed") {
       return { error: "Cannot recall a completed load. Use reschedule instead." };
     }
-    
+
     if (load.status === "cancelled") {
       return { error: "Cannot recall a cancelled load." };
     }
-    
+
     // Get all orders in this load
-    const { data: deliveryItems, error: fetchError } = await supabase
+    const { data: deliveryItems, error: fetchError } = await supabaseAdmin
       .from("delivery_items")
       .select("order_id")
       .eq("delivery_run_id", loadId);
-      
+
     if (fetchError) throw fetchError;
-    
+
     const orderIds = deliveryItems?.map(item => item.order_id) || [];
-    
+    console.log(`[recallLoad] Found ${orderIds.length} orders to recall`);
+
     // Reset delivery run status back to planned
-    const { error: runError } = await supabase
+    const { error: runError } = await supabaseAdmin
       .from("delivery_runs")
-      .update({ 
+      .update({
         status: "planned",
-        actual_departure_time: null 
+        actual_departure_time: null
       })
       .eq("id", loadId);
-      
+
     if (runError) throw runError;
-    
+
     // Reset delivery items to pending
-    const { error: itemsError } = await supabase
+    const { error: itemsError } = await supabaseAdmin
       .from("delivery_items")
       .update({ status: "pending" })
       .eq("delivery_run_id", loadId);
-      
+
     if (itemsError) throw itemsError;
-    
+
     // Reset order status back to ready_for_dispatch (or confirmed if picking isn't done)
     if (orderIds.length > 0) {
-      const { error: ordersError } = await supabase
+      const { error: ordersError } = await supabaseAdmin
         .from("orders")
         .update({ status: "ready_for_dispatch" })
         .in("id", orderIds);
-        
+
       if (ordersError) throw ordersError;
     }
-    
+
+    console.log(`[recallLoad] Successfully recalled ${orderIds.length} orders`);
+
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
-    
+
     return { success: true, ordersRecalled: orderIds.length };
   } catch (error: any) {
+    console.error(`[recallLoad] Error:`, error);
     return { error: error.message };
   }
 }

@@ -11,11 +11,13 @@ type Ctx = { data: RefData | null; loading: boolean; reload: () => void; error?:
 export const ReferenceDataContext = React.createContext<Ctx>({
   data: null,
   loading: true,
-  reload: () => {},
+  reload: () => { },
 });
 
 const fetcher = async (): Promise<RefData> => {
+  console.log("[ReferenceDataContext] fetcher called");
   const res = await fetchReferenceData();
+  console.log("[ReferenceDataContext] fetcher result:", res);
   return {
     varieties: res.varieties,
     sizes: res.sizes,

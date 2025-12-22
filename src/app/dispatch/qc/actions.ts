@@ -1,6 +1,5 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 
@@ -36,8 +35,8 @@ interface RejectForRepickInput {
 
 export async function submitQCCheck(input: SubmitQCCheckInput) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
-    const supabase = await createClient();
+    const { user, orgId, supabase } = await getUserAndOrg();
+    const userId = user.id;
 
     // Create QC check record
     const { data: qcCheck, error: qcError } = await supabase
@@ -119,8 +118,8 @@ export async function submitQCCheck(input: SubmitQCCheckInput) {
 
 export async function rejectForRepick(input: RejectForRepickInput) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
-    const supabase = await createClient();
+    const { user, orgId, supabase } = await getUserAndOrg();
+    const userId = user.id;
 
     // Create QC check record with failed status
     const { data: qcCheck, error: qcError } = await supabase
@@ -220,8 +219,7 @@ export async function rejectForRepick(input: RejectForRepickInput) {
 // Get QC history for an order
 export async function getQCHistory(orderId: string) {
   try {
-    const { orgId } = await getUserAndOrg();
-    const supabase = await createClient();
+    const { orgId, supabase } = await getUserAndOrg();
 
     const { data: checks, error } = await supabase
       .from('order_qc_checks')
@@ -244,6 +242,7 @@ export async function getQCHistory(orderId: string) {
     return { error: 'An unexpected error occurred' };
   }
 }
+
 
 
 

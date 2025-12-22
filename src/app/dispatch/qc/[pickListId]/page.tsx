@@ -1,6 +1,5 @@
 import { getUserAndOrg } from '@/server/auth/org';
 import { PageFrame } from '@/ui/templates/PageFrame';
-import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import QCReviewClient from './QCReviewClient';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,14 +39,16 @@ export interface QCOrderDetails {
 
 export default async function QCReviewPage({ params }: QCReviewPageProps) {
   const { pickListId } = await params;
-  
+
   let orgId: string;
   let userId: string;
-  
+  let supabase;
+
   try {
     const result = await getUserAndOrg();
     orgId = result.orgId;
-    userId = result.userId;
+    userId = result.user.id;
+    supabase = result.supabase;
   } catch (e) {
     return (
       <PageFrame moduleKey="dispatch">
@@ -57,8 +58,6 @@ export default async function QCReviewPage({ params }: QCReviewPageProps) {
       </PageFrame>
     );
   }
-
-  const supabase = await createClient();
 
   // Fetch pick list with order and items
   const { data: pickList, error } = await supabase
@@ -166,6 +165,7 @@ export default async function QCReviewPage({ params }: QCReviewPageProps) {
     </PageFrame>
   );
 }
+
 
 
 

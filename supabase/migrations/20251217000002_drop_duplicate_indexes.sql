@@ -21,3 +21,4 @@ CREATE INDEX IF NOT EXISTS idx_varieties_name_trgm ON public.plant_varieties USI
 
 
 
+

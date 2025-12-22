@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import type { UserSession } from "@/lib/types";
 
+import { DEV_USER_ID, DEV_ORG_ID, IS_DEV } from "@/server/auth/dev-bypass";
+
 export async function getUserFromRequest(req: NextRequest): Promise<UserSession | null> {
   try {
     const h = req.headers.get("authorization") || "";
@@ -18,22 +20,40 @@ export async function getUserFromRequest(req: NextRequest): Promise<UserSession 
 
     if (token) {
       const result = await supabase.auth.getUser(token);
-      if (result.error || !result.data.user) return null;
-      user = result.data.user;
+      if (result.data?.user) {
+        user = result.data.user;
+      }
     }
     if (!user) {
       const result = await supabase.auth.getUser();
-      if (result.error || !result.data.user) return null;
-      user = result.data.user;
+      if (result.data?.user) {
+        user = result.data.user;
+      }
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("active_org_id")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (profile?.active_org_id) {
-      orgId = profile.active_org_id;
+    // DEV BYPASS
+    if (!user && IS_DEV) {
+      const { data } = await admin.auth.admin.getUserById(DEV_USER_ID);
+      user = data.user;
+      orgId = DEV_ORG_ID; // Force Org ID for dev
+    }
+
+    if (!user) return null;
+
+    // console.log("getUserFromRequest: found user", user.id);
+
+    if (!orgId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("active_org_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profile?.active_org_id) {
+        orgId = profile.active_org_id;
+      } else {
+        // console.log("getUserFromRequest: no active_org_id in profile for user", user.id);
+      }
     }
 
     if (!orgId || !role) {
@@ -47,10 +67,14 @@ export async function getUserFromRequest(req: NextRequest): Promise<UserSession 
       if (membership) {
         orgId = orgId ?? membership.org_id ?? null;
         role = role ?? (membership.role as string | null) ?? null;
+      } else {
+        console.log("getUserFromRequest: no membership found for user", user.id);
       }
     }
 
     role = role ?? (user.app_metadata?.role as string | undefined) ?? null;
+
+    if (!orgId) console.log("getUserFromRequest: returning null because no orgId resolved");
 
     return {
       uid: user.id,

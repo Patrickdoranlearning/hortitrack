@@ -1,7 +1,6 @@
 import { getUserAndOrg } from '@/server/auth/org';
 import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import { createClient } from '@/lib/supabase/server';
 import QCQueueClient from './QCQueueClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { ClipboardCheck } from 'lucide-react';
@@ -22,10 +21,12 @@ interface QCQueueItem {
 
 export default async function QCQueuePage() {
   let orgId: string;
-  
+  let supabase;
+
   try {
     const result = await getUserAndOrg();
     orgId = result.orgId;
+    supabase = result.supabase;
   } catch (e) {
     return (
       <PageFrame moduleKey="dispatch">
@@ -41,8 +42,6 @@ export default async function QCQueuePage() {
       </PageFrame>
     );
   }
-
-  const supabase = await createClient();
 
   // Fetch pick lists that are completed and awaiting QC
   // Status 'completed' means picking is done, needs QC

@@ -106,3 +106,4 @@ export function B2BCheckoutReview({ cart, deliverySummary }: Props) {
     </div>
   );
 }
+

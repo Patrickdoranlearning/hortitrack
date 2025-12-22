@@ -3,19 +3,18 @@ import { PageFrame } from '@/ui/templates/PageFrame';
 import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
 import { getUserAndOrg } from '@/server/auth/org';
 import BulkPickingClient from './BulkPickingClient';
-import { getSupabaseServerApp } from '@/server/db/supabaseServerApp';
 
 export default async function BulkPickingPage() {
   let orgId: string;
-  
+  let supabase;
+
   try {
     const result = await getUserAndOrg();
     orgId = result.orgId;
+    supabase = result.supabase;
   } catch {
     redirect('/login?next=/dispatch/bulk-picking');
   }
-  
-  const supabase = await getSupabaseServerApp();
   
   // Fetch existing bulk pick batches
   const { data: batches } = await supabase
