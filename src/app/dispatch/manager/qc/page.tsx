@@ -109,30 +109,50 @@ export default async function DispatchQCPage() {
     }
   }
 
-  // Fetch QC stats for today
+  // Fetch QC stats for today (qc_status column may not exist in older setups)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayStr = today.toISOString();
 
-  const { data: passedToday } = await supabase
-    .from("pick_lists")
-    .select("id", { count: "exact" })
-    .eq("org_id", orgId)
-    .eq("qc_status", "passed")
-    .gte("completed_at", todayStr);
+  // Try to get QC stats - these queries may fail if qc_status column doesn't exist
+  let passedCount = 0;
+  let failedCount = 0;
+  let feedbackCount = 0;
 
-  const { data: failedToday } = await supabase
-    .from("pick_lists")
-    .select("id", { count: "exact" })
-    .eq("org_id", orgId)
-    .eq("qc_status", "failed")
-    .gte("completed_at", todayStr);
+  try {
+    const { count: passed } = await supabase
+      .from("pick_lists")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("qc_status", "passed")
+      .gte("completed_at", todayStr);
+    passedCount = passed || 0;
+  } catch {
+    // qc_status column may not exist
+  }
 
-  const { count: feedbackCount } = await supabase
-    .from("qc_feedback")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .is("resolved_at", null);
+  try {
+    const { count: failed } = await supabase
+      .from("pick_lists")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("qc_status", "failed")
+      .gte("completed_at", todayStr);
+    failedCount = failed || 0;
+  } catch {
+    // qc_status column may not exist
+  }
+
+  try {
+    const { count } = await supabase
+      .from("qc_feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("resolved_at", null);
+    feedbackCount = count || 0;
+  } catch {
+    // qc_feedback table may not exist
+  }
 
   // Transform data for display
   const qcItems: QCQueueItem[] = (pickLists || []).map((pl: any) => {
@@ -157,9 +177,9 @@ export default async function DispatchQCPage() {
 
   const stats: QCStats = {
     pending: qcItems.length,
-    passed: passedToday?.length || 0,
-    failed: failedToday?.length || 0,
-    issues: feedbackCount || 0,
+    passed: passedCount,
+    failed: failedCount,
+    issues: feedbackCount,
   };
 
   const oldestWaiting =
