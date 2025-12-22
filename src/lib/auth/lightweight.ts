@@ -1,6 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
+import { DEV_USER_ID, DEV_ORG_ID, IS_DEV } from "@/server/auth/dev-bypass";
+import { getSupabaseAdmin } from "@/server/db/supabase";
+
 // In-memory cache for org resolution (short TTL, cleared on auth changes)
 const orgCache = new Map<string, { orgId: string; timestamp: number }>();
 const ORG_CACHE_TTL = 60 * 1000; // 1 minute
@@ -13,13 +16,27 @@ const ORG_CACHE_TTL = 60 * 1000; // 1 minute
  */
 export async function getLightweightAuth() {
   const supabase = await createClient();
-  
+  const admin = getSupabaseAdmin();
+
   // Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
-  if (authError || !user) {
+  const { data: { user: fetchedUser }, error: authError } = await supabase.auth.getUser();
+
+  let user = fetchedUser;
+
+  // DEV BYPASS
+  if (IS_DEV && (!user || authError)) {
+    const { data } = await admin.auth.admin.getUserById(DEV_USER_ID);
+    user = data.user;
+    if (user) {
+      // Pre-seed cache for dev user to skip profile lookup
+      orgCache.set(user.id, { orgId: DEV_ORG_ID, timestamp: Date.now() });
+    }
+  }
+
+  if (authError && !user) { // Only throw if bypass failed or not active
     throw new Error("Unauthenticated");
   }
+  if (!user) throw new Error("Unauthenticated");
 
   // Check org cache first
   const cached = orgCache.get(user.id);
@@ -68,4 +85,5 @@ export async function getOrgIdOnly(): Promise<string> {
   const { orgId } = await getLightweightAuth();
   return orgId;
 }
+
 

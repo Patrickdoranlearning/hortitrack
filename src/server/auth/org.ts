@@ -1,16 +1,28 @@
+
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+
+import { DEV_USER_ID, IS_DEV } from "@/server/auth/dev-bypass";
 
 export async function getUserAndOrg() {
   const supabase = await createClient();
   const admin = getSupabaseAdmin();
 
   const {
-    data: { user },
+    data: { user: fetchedUser },
     error: uerr,
   } = await supabase.auth.getUser();
-  if (uerr || !user) throw new Error("Unauthenticated");
+
+  let user = fetchedUser;
+
+  // DEV BYPASS
+  if (IS_DEV && (!user || uerr)) {
+    const { data } = await admin.auth.admin.getUserById(DEV_USER_ID);
+    user = data.user;
+  }
+
+  if (!user) throw new Error("Unauthenticated");
 
   const orgId = await resolveActiveOrgId({ supabase, admin, user });
   return { user, orgId, supabase };

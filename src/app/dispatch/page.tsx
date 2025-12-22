@@ -1,40 +1,44 @@
 import { redirect } from "next/navigation";
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import DispatchBoard from '@/components/dispatch/DispatchBoard';
-import { getDispatchBoardData } from '@/server/dispatch/queries.server';
+import { getDispatchRoleForUser } from "@/server/dispatch/get-dispatch-role";
 
+/**
+ * Dispatch Module - Role-based Router
+ *
+ * Redirects users to their appropriate view based on their org role:
+ * - Managers (admin, owner, editor, staff, sales) -> /dispatch/manager
+ * - Pickers (picker, grower) -> /dispatch/picker
+ * - Drivers (driver) -> /dispatch/driver
+ */
 export default async function DispatchPage() {
-  let data;
-
   try {
-    // Fetch data server-side
-    data = await getDispatchBoardData();
+    const { role } = await getDispatchRoleForUser();
+
+    switch (role) {
+      case "manager":
+        redirect("/dispatch/manager");
+      case "picker":
+        redirect("/dispatch/picker");
+      case "driver":
+        redirect("/dispatch/driver");
+      default:
+        // Default to manager view for unknown roles
+        redirect("/dispatch/manager");
+    }
   } catch (error: any) {
-    if (error.message === "Unauthorized") {
+    if (
+      error.message === "Unauthenticated" ||
+      error.message === "Unauthorized"
+    ) {
       redirect("/login?next=/dispatch");
     }
-    console.error("Error fetching dispatch board data:", error);
-    data = { orders: [], hauliers: [], growers: [], routes: [], deliveryRuns: [] };
+
+    // For NEXT_REDIRECT errors, rethrow them
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw error;
+    }
+
+    console.error("Error determining dispatch role:", error);
+    // Default to manager view on error
+    redirect("/dispatch/manager");
   }
-
-  const { orders, hauliers, growers, routes, deliveryRuns } = data;
-
-  return (
-    <PageFrame moduleKey="dispatch">
-      <div className="space-y-6">
-        <ModulePageHeader
-          title="Dispatch Dashboard"
-          description="Manage orders, assign routes, and dispatch deliveries."
-        />
-        <DispatchBoard
-          orders={orders}
-          hauliers={hauliers}
-          growers={growers}
-          routes={routes}
-          deliveryRuns={deliveryRuns}
-        />
-      </div>
-    </PageFrame>
-  );
 }

@@ -5,10 +5,17 @@ import { UUID } from "crypto";
 
 export type ServerUser = { uid: string; email?: string; orgId?: string };
 
+import { DEV_USER_ID, DEV_ORG_ID, IS_DEV } from "@/server/auth/dev-bypass";
+
 export async function getUserIdAndOrgId(): Promise<{ userId: string | null; orgId: string | null }> {
   const supabase = await createClient();
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const { data: { user: fetchedUser }, error: userError } = await supabase.auth.getUser();
+
+  let user = fetchedUser;
+  if (IS_DEV && (!user || userError)) {
+    return { userId: DEV_USER_ID, orgId: DEV_ORG_ID };
+  }
 
   if (userError || !user) {
     // console.error("Error getting Supabase user:", userError?.message);
@@ -38,7 +45,7 @@ export async function getUser(): Promise<ServerUser> {
     throw new Error("UNAUTHENTICATED");
   }
   // You might want to fetch more user details here if needed
-  return { uid: userId, orgId: orgId ?? undefined }; 
+  return { uid: userId, orgId: orgId ?? undefined };
 }
 
 export async function getOptionalUser(): Promise<ServerUser | null> {

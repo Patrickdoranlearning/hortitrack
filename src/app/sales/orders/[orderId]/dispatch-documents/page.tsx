@@ -319,3 +319,4 @@ export default async function DispatchDocumentsPage({ params }: DispatchDocument
   return <DispatchDocumentsClient data={documentsData} />;
 }
 
+

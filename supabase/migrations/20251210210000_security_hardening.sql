@@ -139,3 +139,4 @@ SET search_path = public
 AS $$
   SELECT auth.uid();
 $$;
+

@@ -26,6 +26,23 @@ export type VisibilityRule = {
   value?: string | number | boolean | null;
 };
 
+export type Position = {
+  x: number;      // mm from left edge
+  y: number;      // mm from top edge
+  width?: number; // mm (optional, auto-fit if not set)
+  height?: number; // mm (optional)
+};
+
+export type LayoutMode = "flow" | "absolute";
+
+export type DocumentZone = "header" | "body" | "footer";
+
+export type ZoneConfig = {
+  zone: DocumentZone;
+  height: number; // mm
+  layoutMode: LayoutMode;
+};
+
 export type ComponentStyle = {
   fontSize?: number;
   bold?: boolean;
@@ -36,11 +53,14 @@ export type ComponentStyle = {
   marginBottom?: number;
   align?: Alignment;
   border?: { color?: string; width?: number };
+  position?: Position;
+  layoutMode?: LayoutMode;
 };
 
 export type BaseComponent = {
   id: string;
   type: ComponentType;
+  zone?: DocumentZone;
   label?: string;
   binding?: string;
   text?: string;
@@ -111,7 +131,22 @@ export type DocumentComponent =
   | DividerComponent
   | SpacerComponent;
 
-export type TemplateLayout = DocumentComponent[];
+export type TemplateLayout = DocumentComponent[] | DocumentLayout;
+
+export type DocumentLayout = {
+  pageSize: { width: number; height: number }; // mm, default A4 (210 x 297)
+  margins: { top: number; right: number; bottom: number; left: number };
+  zones: ZoneConfig[];
+  components: DocumentComponent[];
+};
+
+export function isDocumentLayout(layout: TemplateLayout): layout is DocumentLayout {
+  return layout !== null && typeof layout === 'object' && !Array.isArray(layout) && 'pageSize' in layout;
+}
+
+export function getLayoutComponents(layout: TemplateLayout): DocumentComponent[] {
+  return isDocumentLayout(layout) ? layout.components : layout;
+}
 
 export type DocumentTemplateVersion = {
   id: string;
@@ -153,6 +188,7 @@ export type PreviewResult = {
   html: string;
   dataUsed: Record<string, unknown>;
 };
+
 
 
 

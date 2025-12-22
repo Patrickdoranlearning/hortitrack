@@ -166,3 +166,4 @@ COMMENT ON FUNCTION public.get_dashboard_stats IS
   'Returns aggregated dashboard statistics without transferring all batch rows.
    Much faster than fetching all batches and aggregating client-side.';
 
+

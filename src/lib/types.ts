@@ -306,6 +306,7 @@ export const HaulierSchema = z.object({
   email: z.string().email().optional(),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
+  isInternal: z.boolean().default(true), // true = own fleet, false = external haulier
   trolleyCapacity: z.number().int().nonnegative().default(20),
 });
 export type Haulier = z.infer<typeof HaulierSchema>;

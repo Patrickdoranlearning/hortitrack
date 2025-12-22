@@ -151,3 +151,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.orders TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.order_items TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.invoices TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.invoice_items TO authenticated;
+

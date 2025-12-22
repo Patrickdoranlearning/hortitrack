@@ -90,7 +90,7 @@ export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[
       )
     `)
     .eq("org_id", orgId)
-    .in("status", ["planned", "loading", "in_transit"])
+    .in("status", ["planned", "loading"]) // Exclude in_transit (dispatched) loads from board
     .order("run_date", { ascending: true });
 
   if (runsError) {

@@ -34,8 +34,10 @@ function stringifyErrors(errs: any[]): string[] {
 }
 
 export async function fetchReferenceData(): Promise<ReferenceData> {
+  console.log("[refData] fetching /api/reference-data");
   const res = await fetch("/api/reference-data", { method: "GET", cache: "no-store" });
-  
+  console.log("[refData] fetch complete, status:", res.status);
+
   if (!res.ok && res.status !== 207) {
     const text = await res.text().catch(() => "");
     const payload = text ? JSON.parse(text) : {};

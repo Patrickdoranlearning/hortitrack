@@ -113,27 +113,27 @@ export default function ProductionHome() {
                 variety: values.variety,
                 family: values.family || null,
               });
-              
+
               if (res.success) {
-                toast({ 
-                  title: "Batch Created", 
-                  description: `Batch ${res.data?.batch_number} started successfully.` 
+                toast({
+                  title: "Batch Created",
+                  description: `Batch ${res.data?.batch_number} started successfully.`
                 });
                 return true; // Close dialog on success
               } else {
-                toast({ 
-                  title: "Error creating batch", 
-                  description: res.error || "Failed to create batch. Please try again.", 
-                  variant: "destructive" 
+                toast({
+                  title: "Error creating batch",
+                  description: res.error || "Failed to create batch. Please try again.",
+                  variant: "destructive"
                 });
                 return false; // Keep dialog open on error
               }
             } catch (error: any) {
               console.error("[ProductionHome] Error creating batch:", error);
-              toast({ 
-                title: "Error", 
-                description: error?.message || "An unexpected error occurred. Please try again.", 
-                variant: "destructive" 
+              toast({
+                title: "Error",
+                description: error?.message || "An unexpected error occurred. Please try again.",
+                variant: "destructive"
               });
               return false;
             }
@@ -170,7 +170,7 @@ export default function ProductionHome() {
                 </Select>
                 <FieldError msg={form.formState.errors.varietyId?.message} />
               </div>
-              
+
               <div>
                 <Label htmlFor="family">Family (Optional)</Label>
                 <Input id="family" {...form.register("family")} placeholder="e.g. Lamiaceae" />
@@ -178,9 +178,9 @@ export default function ProductionHome() {
               </div>
 
               <div>
-                 <Label htmlFor="plantingDate">Planting Date</Label>
-                 <Input id="plantingDate" type="date" {...form.register("plantingDate")} />
-                 <FieldError msg={form.formState.errors.plantingDate?.message} />
+                <Label htmlFor="plantingDate">Planting Date</Label>
+                <Input id="plantingDate" type="date" {...form.register("plantingDate")} />
+                <FieldError msg={form.formState.errors.plantingDate?.message} />
               </div>
 
               <div>
@@ -210,7 +210,7 @@ export default function ProductionHome() {
                 <FieldError msg={form.formState.errors.sizeId?.message} />
               </div>
 
-               <div>
+              <div>
                 <Label htmlFor="sizeMultiple">Cells per Tray</Label>
                 <Input id="sizeMultiple" type="number" {...form.register("sizeMultiple", { valueAsNumber: true })} />
                 <FieldError msg={form.formState.errors.sizeMultiple?.message} />
@@ -221,7 +221,7 @@ export default function ProductionHome() {
                 <Input id="fullTrays" type="number" {...form.register("fullTrays", { valueAsNumber: true })} />
                 <FieldError msg={form.formState.errors.fullTrays?.message} />
               </div>
-              
+
               <div>
                 <Label htmlFor="partialCells">Partial Cells</Label>
                 <Input id="partialCells" type="number" {...form.register("partialCells", { valueAsNumber: true })} />

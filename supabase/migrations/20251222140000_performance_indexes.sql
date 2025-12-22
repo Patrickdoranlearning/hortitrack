@@ -29,3 +29,4 @@ AS $$
       AND m.user_id = (select auth.uid())
   );
 $$;
+
