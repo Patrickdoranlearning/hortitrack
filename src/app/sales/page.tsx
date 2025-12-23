@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import * as React from 'react';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { ModulePageHeader } from '@/ui/templates';
+import { PageFrame } from '@/ui/templates';
 import { createClient } from '@/lib/supabase/server';
 import {
   startOfWeek,

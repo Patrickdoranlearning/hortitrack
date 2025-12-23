@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orderData?.order_id) {
-      await supabase.from('order_events').insert({
+      const { error: eventError } = await supabase.from('order_events').insert({
         org_id: orgId,
         order_id: orderData.order_id,
         event_type: 'delivered',
@@ -101,6 +101,9 @@ export async function POST(req: NextRequest) {
         metadata: { photoUrl, deliveryItemId },
         created_by: userId,
       });
+      if (eventError) {
+        console.error('[Delivery Photo] Error logging delivery event:', eventError);
+      }
     }
 
     return NextResponse.json({

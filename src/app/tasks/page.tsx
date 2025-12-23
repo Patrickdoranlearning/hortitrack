@@ -1,4 +1,4 @@
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import TasksOverviewClient from "./TasksOverviewClient";
 import { getTasks, getAssignableStaff } from "@/server/tasks/service";
 import { getProductionJobs } from "@/server/production/jobs";

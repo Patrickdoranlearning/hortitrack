@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Sprout, Package, Truck, ArrowRight, Database, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 
 export default function OverviewDocPage() {
   return (

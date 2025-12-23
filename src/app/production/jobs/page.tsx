@@ -1,4 +1,4 @@
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import ProductionJobsClient from "./ProductionJobsClient";
 import { getProductionJobs, getAvailableGhostBatches } from "@/server/production/jobs";
 import { getAssignableStaff } from "@/server/tasks/service";

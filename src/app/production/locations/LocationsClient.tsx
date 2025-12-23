@@ -29,8 +29,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import ScannerDialog from '@/components/scan-and-act-dialog';
 import { fetchJson } from '@/lib/http';
 import { LocationCard } from '@/components/locations/LocationCard';

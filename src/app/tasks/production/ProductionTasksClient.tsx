@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { ModulePageHeader } from '@/ui/templates';
 import { JobsKanban } from "@/app/tasks/components/JobsKanban";
 import { CreateJobDialog } from "@/app/tasks/components/CreateJobDialog";
 import { TaskWizard } from "@/app/tasks/components/TaskWizard";

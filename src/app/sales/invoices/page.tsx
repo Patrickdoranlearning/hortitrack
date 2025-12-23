@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import InvoicesClient from './InvoicesClient';
 
 export default async function SalesInvoicesPage() {

@@ -44,7 +44,9 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
           name: size.name ?? '',
           containerType: size.containerType ?? 'pot',
           area: toNumberOrUndefined(size.area),
+          trayQuantity: toNumberOrUndefined(size.trayQuantity),
           shelfQuantity: toNumberOrUndefined(size.shelfQuantity),
+          trolleyQuantity: toNumberOrUndefined(size.trolleyQuantity),
           cellMultiple: toNumberOrUndefined(size.cellMultiple) ?? 1,
           cellVolumeL: toNumberOrUndefined(size.cellVolumeL),
           cellDiameterMm: toNumberOrUndefined(size.cellDiameterMm),
@@ -56,7 +58,9 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
           name: '',
           containerType: 'pot',
           area: undefined,
+          trayQuantity: undefined,
           shelfQuantity: undefined,
+          trolleyQuantity: undefined,
           cellMultiple: 1,
           cellVolumeL: undefined,
           cellDiameterMm: undefined,
@@ -76,7 +80,9 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
             name: size.name ?? '',
             containerType: size.containerType ?? 'pot',
             area: toNumberOrUndefined(size.area),
+            trayQuantity: toNumberOrUndefined(size.trayQuantity),
             shelfQuantity: toNumberOrUndefined(size.shelfQuantity),
+            trolleyQuantity: toNumberOrUndefined(size.trolleyQuantity),
             cellMultiple: toNumberOrUndefined(size.cellMultiple) ?? 1,
             cellVolumeL: toNumberOrUndefined(size.cellVolumeL),
             cellDiameterMm: toNumberOrUndefined(size.cellDiameterMm),
@@ -88,7 +94,9 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
             name: '',
             containerType: 'pot',
             area: undefined,
+            trayQuantity: undefined,
             shelfQuantity: undefined,
+            trolleyQuantity: undefined,
             cellMultiple: 1,
             cellVolumeL: undefined,
             cellDiameterMm: undefined,
@@ -183,26 +191,76 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="shelfQuantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Shelf quantity</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="e.g., 80"
-                      value={field.value ?? ''}
-                      onChange={(e) =>
-                        field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          </SectionCard>
+
+          <SectionCard
+            title="Unit quantities"
+            description="How many units fit on a tray, shelf, or trolley. Used for dispatch calculations."
+          >
+            <div className="grid gap-4 md:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="trayQuantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tray quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 54"
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="shelfQuantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Shelf quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 80"
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="trolleyQuantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Trolley quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 480"
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </SectionCard>
 
           <SectionCard

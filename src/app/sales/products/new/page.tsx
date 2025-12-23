@@ -1,6 +1,6 @@
 import { getUserAndOrg } from "@/server/auth/org";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { fetchProductManagementData, mapProducts } from "../product-data";
 import ProductFormClient from "../ProductFormClient";

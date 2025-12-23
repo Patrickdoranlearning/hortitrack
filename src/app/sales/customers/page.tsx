@@ -1,5 +1,5 @@
 import { getUserAndOrg } from "@/server/auth/org";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import CustomerManagementClient from "./CustomerManagementClient";
 import { fetchCustomerManagementData, mapCustomers } from "./customer-data";
 import type { CustomerManagementPayload } from "./types";

@@ -38,8 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/http";
 import type { ProtocolSummary } from "@/lib/planning/types";

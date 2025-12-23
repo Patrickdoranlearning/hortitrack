@@ -38,8 +38,8 @@ import {
   SkipForward,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import {
   getGroupedTasks,
   completeTasks,

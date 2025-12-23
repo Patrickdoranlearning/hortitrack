@@ -1,6 +1,6 @@
 import { getUserAndOrg } from '@/server/auth/org';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import QCQueueClient from './QCQueueClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { ClipboardCheck } from 'lucide-react';

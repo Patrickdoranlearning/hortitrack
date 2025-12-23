@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Truck, LayoutDashboard, UserCircle } from "lucide-react";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 
 export default function DispatchDriverLayout({
   children,

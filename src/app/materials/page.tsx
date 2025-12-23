@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { Package, PackagePlus, BarChart3, ShoppingCart, AlertTriangle } from 'lucide-react';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 

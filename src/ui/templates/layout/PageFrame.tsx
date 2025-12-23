@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react"
-import { AppHeader } from "@/ui/layout/AppHeader"
+import { AppHeader } from "./AppHeader"
 import { useCompanyName } from "@/lib/org/context"
 
 type PageFrameProps = {

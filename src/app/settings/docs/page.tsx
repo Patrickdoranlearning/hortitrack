@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Package, Sprout, Truck, BookOpen, Receipt, Users, MapPin } from 'lucide-react';
 import Link from 'next/link';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 
 export default function DocumentationPage() {
   return (

@@ -139,6 +139,25 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Ensure profile exists for the existing user (required by FK constraint)
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .upsert({
+          id: existingUser.id,
+          email: existingUser.email,
+          full_name: existingUser.user_metadata?.full_name || fullName || email.split('@')[0],
+        }, {
+          onConflict: "id",
+        });
+
+      if (profileError) {
+        console.error("Error ensuring profile for existing user:", profileError);
+        return NextResponse.json(
+          { error: "Failed to prepare user profile" },
+          { status: 500 }
+        );
+      }
+
       // Add existing user to this org - use admin client to bypass RLS
       const { error: membershipError } = await supabaseAdmin
         .from("org_memberships")
@@ -193,6 +212,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create profile FIRST (required by FK constraint on org_memberships)
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .upsert({
+        id: newUser.user.id,
+        email: email,
+        full_name: fullName,
+        active_org_id: orgId,
+      }, {
+        onConflict: "id",
+      });
+
+    if (profileError) {
+      console.error("Error creating profile:", profileError);
+      // Delete the auth user since we couldn't create profile
+      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+      return NextResponse.json(
+        { error: "Failed to create user profile. Please try again." },
+        { status: 500 }
+      );
+    }
+
     // Create org membership - use admin client to bypass RLS
     const { error: membershipError } = await supabaseAdmin
       .from("org_memberships")
@@ -210,23 +251,6 @@ export async function POST(request: NextRequest) {
         { error: "Failed to add user to organization. Please try again." },
         { status: 500 }
       );
-    }
-
-    // Update or create profile with full name - use admin client to bypass RLS
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .upsert({
-        id: newUser.user.id,
-        email: email,
-        full_name: fullName,
-        active_org_id: orgId,
-      }, {
-        onConflict: "id",
-      });
-
-    if (profileError) {
-      console.error("Error creating/updating profile:", profileError);
-      // Don't fail - user can still log in
     }
 
     return NextResponse.json({

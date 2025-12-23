@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ArrowLeft, Sprout, GitBranch, Activity, Calendar, Lightbulb, ArrowDown, Info, Thermometer } from 'lucide-react';
 import Link from 'next/link';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 
 export default function BatchesDocPage() {
   return (

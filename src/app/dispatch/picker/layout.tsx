@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ClipboardList, Scan, LayoutDashboard } from "lucide-react";
 import { PickerFeedbackBadge } from "@/components/dispatch/picker/PickerFeedbackBadge";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 
 const pickerTabs = [
   {

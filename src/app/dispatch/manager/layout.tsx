@@ -12,7 +12,7 @@ import {
   UserCircle,
   Car,
 } from "lucide-react";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 
 const managerTabs = [
   {

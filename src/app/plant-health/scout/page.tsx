@@ -1,7 +1,7 @@
 'use client';
 
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { ScoutWizard } from '@/components/plant-health/scout';
 
 export default function ScoutPage() {

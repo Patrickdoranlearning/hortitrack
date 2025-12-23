@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { Check, Briefcase, PackageCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { ModulePageHeader } from '@/ui/templates';
 import { PlanningTimeline } from "./components/PlanningTimeline";
 import { IncomingBatchDialog } from "./components/IncomingBatchDialog";
 import { FutureAllocationDialog } from "./components/FutureAllocationDialog";

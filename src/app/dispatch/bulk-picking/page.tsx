@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { getUserAndOrg } from '@/server/auth/org';
 import BulkPickingClient from './BulkPickingClient';
 

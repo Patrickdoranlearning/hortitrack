@@ -46,7 +46,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/http";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";

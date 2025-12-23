@@ -14,7 +14,7 @@ import {
   PieChart as PieIcon,
   Package,
 } from 'lucide-react';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 import {
   Select,
   SelectContent,

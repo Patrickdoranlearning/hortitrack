@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { getUserAndOrg } from "@/server/auth/org";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import TrolleyManagementClient from "./TrolleyManagementClient";
 import { redirect } from "next/navigation";
 

@@ -1,8 +1,8 @@
 import { getUserIdAndOrgId } from "@/server/auth/getUser";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { redirect } from "next/navigation";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { CompanyProfileForm } from "@/components/account/CompanyProfileForm";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";

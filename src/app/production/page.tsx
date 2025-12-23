@@ -2,12 +2,12 @@
 "use client";
 
 import * as React from "react";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DialogForm } from "@/ui/templates/DialogForm";
+import { DialogForm } from '@/ui/templates';
 import { createPropagationBatchAction } from "@/app/actions/production";
 import { useToast } from "@/hooks/use-toast";
 import {

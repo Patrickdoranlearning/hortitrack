@@ -5,8 +5,8 @@ import * as z from 'zod';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2, Edit } from 'lucide-react';
-import { DataPageShell } from '@/components/data-management/DataPageShell';
-import { DataToolbar } from '@/components/data-management/DataToolbar';
+import { DataPageShell } from '@/ui/templates';
+import { DataToolbar } from '@/ui/templates';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import type { NurseryLocation } from '@/lib/types';
 import { addLocationAction, deleteLocationAction, updateLocationAction } from '../actions';
 import { invalidateReferenceData } from '@/lib/swr/keys';
 import { LocationForm } from '@/components/location-form';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 
 const quickLocationSchema = z.object({
   name: z.string().min(1, 'Name is required'),

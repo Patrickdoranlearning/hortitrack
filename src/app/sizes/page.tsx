@@ -28,9 +28,9 @@ import { addSizeAction, deleteSizeAction, updateSizeAction } from '../actions';
 import { invalidateReferenceData } from '@/lib/swr/keys';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection } from '@/hooks/use-collection';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { DataPageShell } from '@/components/data-management/DataPageShell';
-import { DataToolbar } from '@/components/data-management/DataToolbar';
+import { PageFrame } from '@/ui/templates';
+import { DataPageShell } from '@/ui/templates';
+import { DataToolbar } from '@/ui/templates';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,7 +40,9 @@ const quickSizeSchema = z.object({
   name: z.string().min(1, 'Size name is required'),
   containerType: z.enum(['pot', 'tray', 'bareroot']),
   cellMultiple: z.coerce.number().int().min(1).default(1),
+  trayQuantity: z.coerce.number().int().min(0).optional(),
   shelfQuantity: z.coerce.number().int().min(0).default(0),
+  trolleyQuantity: z.coerce.number().int().min(0).optional(),
   area: z.coerce.number().min(0).optional(),
   cellVolumeL: z.coerce.number().min(0).optional(),
   cellWidthMm: z.coerce.number().min(0).optional(),
@@ -54,7 +56,9 @@ const defaultQuickValues: QuickSizeFormValues = {
   name: '',
   containerType: 'pot',
   cellMultiple: 1,
+  trayQuantity: undefined,
   shelfQuantity: 0,
+  trolleyQuantity: undefined,
   area: undefined,
   cellVolumeL: undefined,
   cellWidthMm: undefined,
@@ -66,7 +70,9 @@ type SortableSizeKey =
   | 'name'
   | 'containerType'
   | 'cellMultiple'
+  | 'trayQuantity'
   | 'shelfQuantity'
+  | 'trolleyQuantity'
   | 'area'
   | 'cellVolumeL'
   | 'cellWidthMm'
@@ -229,7 +235,9 @@ export default function SizesPage() {
       name: values.name.trim(),
       containerType: values.containerType,
       cellMultiple: values.cellMultiple ?? 1,
+      trayQuantity: values.trayQuantity,
       shelfQuantity: values.shelfQuantity ?? 0,
+      trolleyQuantity: values.trolleyQuantity,
       area: values.area,
       cellVolumeL: values.cellVolumeL,
       cellWidthMm: values.cellWidthMm,
@@ -253,7 +261,9 @@ export default function SizesPage() {
       'name',
       'containerType',
       'cellMultiple',
+      'trayQuantity',
       'shelfQuantity',
+      'trolleyQuantity',
       'area',
       'cellVolumeL',
       'cellWidthMm',
@@ -264,7 +274,9 @@ export default function SizesPage() {
       'P9',
       'pot',
       '1',
+      '54',
       '80',
+      '480',
       '0.01',
       '',
       '',
@@ -279,7 +291,9 @@ export default function SizesPage() {
       'name',
       'containerType',
       'cellMultiple',
+      'trayQuantity',
       'shelfQuantity',
+      'trolleyQuantity',
       'area',
       'cellVolumeL',
       'cellWidthMm',
@@ -337,7 +351,9 @@ export default function SizesPage() {
         name: record.name.trim(),
         containerType: (record.containerType || 'pot').toLowerCase() as PlantSize['containerType'],
         cellMultiple: record.cellMultiple ? Number(record.cellMultiple) : 1,
+        trayQuantity: record.trayQuantity ? Number(record.trayQuantity) : undefined,
         shelfQuantity: record.shelfQuantity ? Number(record.shelfQuantity) : 0,
+        trolleyQuantity: record.trolleyQuantity ? Number(record.trolleyQuantity) : undefined,
         area: record.area ? Number(record.area) : undefined,
         cellVolumeL: record.cellVolumeL ? Number(record.cellVolumeL) : undefined,
         cellWidthMm: record.cellWidthMm ? Number(record.cellWidthMm) : undefined,
@@ -416,17 +432,19 @@ export default function SizesPage() {
                 ))}
               </div>
             ) : (
-              <Table className="min-w-[1100px] text-sm whitespace-nowrap">
+              <Table className="min-w-[1300px] text-sm whitespace-nowrap">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="px-4 py-2 min-w-[160px]">{renderHeaderButton('Size / Label', 'name')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[120px]">{renderHeaderButton('Type', 'containerType')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[110px]">{renderHeaderButton('Cells', 'cellMultiple')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Shelf qty', 'shelfQuantity')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Volume (L)', 'cellVolumeL')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[170px]">{renderHeaderButton('Dimensions (mm)', 'cellWidthMm')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[120px]">{renderHeaderButton('Shape', 'cellShape')}</TableHead>
-                    <TableHead className="px-4 py-2 min-w-[130px]">{renderHeaderButton('Area (m²)', 'area')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[100px]">{renderHeaderButton('Type', 'containerType')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[80px]">{renderHeaderButton('Cells', 'cellMultiple')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[90px]">{renderHeaderButton('Tray qty', 'trayQuantity')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[90px]">{renderHeaderButton('Shelf qty', 'shelfQuantity')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[100px]">{renderHeaderButton('Trolley qty', 'trolleyQuantity')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[100px]">{renderHeaderButton('Volume (L)', 'cellVolumeL')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[150px]">{renderHeaderButton('Dimensions (mm)', 'cellWidthMm')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[90px]">{renderHeaderButton('Shape', 'cellShape')}</TableHead>
+                    <TableHead className="px-4 py-2 min-w-[100px]">{renderHeaderButton('Area (m²)', 'area')}</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -505,6 +523,29 @@ export default function SizesPage() {
                       <TableCell>
                         <FormField
                           control={quickForm.control}
+                          name="trayQuantity"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Tray qty</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="e.g., 54"
+                                  value={field.value ?? ''}
+                                  onChange={(event) =>
+                                    field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
                           name="shelfQuantity"
                           render={({ field }) => (
                             <FormItem className="space-y-1">
@@ -514,6 +555,29 @@ export default function SizesPage() {
                                   type="number"
                                   min={0}
                                   placeholder="e.g., 80"
+                                  value={field.value ?? ''}
+                                  onChange={(event) =>
+                                    field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={quickForm.control}
+                          name="trolleyQuantity"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="sr-only">Trolley qty</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="e.g., 480"
                                   value={field.value ?? ''}
                                   onChange={(event) =>
                                     field.onChange(event.target.value === '' ? undefined : Number(event.target.value))
@@ -657,7 +721,9 @@ export default function SizesPage() {
                       <TableCell className="px-4 py-2 font-medium">{size.name}</TableCell>
                       <TableCell className="px-4 py-2">{formatType(size.containerType)}</TableCell>
                       <TableCell className="px-4 py-2">{size.cellMultiple ?? 1}</TableCell>
+                      <TableCell className="px-4 py-2">{size.trayQuantity ?? '—'}</TableCell>
                       <TableCell className="px-4 py-2">{size.shelfQuantity ?? 0}</TableCell>
+                      <TableCell className="px-4 py-2">{size.trolleyQuantity ?? '—'}</TableCell>
                       <TableCell className="px-4 py-2">{size.cellVolumeL ?? '—'}</TableCell>
                       <TableCell className="px-4 py-2">
                         {size.cellWidthMm && size.cellLengthMm
@@ -753,7 +819,9 @@ function normalizeSizeRow(row: any): PlantSize {
     name: row.name,
     containerType: row.containerType ?? row.container_type ?? 'pot',
     cellMultiple: row.cellMultiple ?? row.cell_multiple ?? 1,
+    trayQuantity: row.trayQuantity ?? row.tray_quantity,
     shelfQuantity: row.shelfQuantity ?? row.shelf_quantity ?? 0,
+    trolleyQuantity: row.trolleyQuantity ?? row.trolley_quantity,
     area: row.area,
     cellVolumeL: row.cellVolumeL ?? row.cell_volume_l,
     cellDiameterMm: row.cellDiameterMm ?? row.cell_diameter_mm,

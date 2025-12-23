@@ -48,3 +48,5 @@ firestore-debug.log.env.local
 
 # MCP configuration with sensitive credentials
 .mcp.json
+*storybook.log
+storybook-static
