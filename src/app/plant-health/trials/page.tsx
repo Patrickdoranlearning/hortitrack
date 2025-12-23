@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import {
   Plus,
   FlaskConical,

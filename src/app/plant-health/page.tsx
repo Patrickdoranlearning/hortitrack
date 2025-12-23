@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import {
   FlaskConical,
   Repeat,

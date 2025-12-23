@@ -72,14 +72,17 @@ export async function POST(req: NextRequest) {
 
     // If there's an assigned picker, mark as notified
     if (pickList.assigned_user_id) {
-      await supabase
+      const { error: notifyError } = await supabase
         .from('qc_feedback')
         .update({ picker_notified_at: new Date().toISOString() })
         .eq('id', feedback.id);
+      if (notifyError) {
+        console.error('[QC Feedback] Error updating notification timestamp:', notifyError);
+      }
     }
 
     // Log the event
-    await supabase.from('pick_list_events').insert({
+    const { error: eventError } = await supabase.from('pick_list_events').insert({
       org_id: orgId,
       pick_list_id: pickListId,
       event_type: 'qc_feedback_created',
@@ -87,6 +90,9 @@ export async function POST(req: NextRequest) {
       metadata: { feedbackId: feedback.id, issueType, actionRequired },
       created_by: userId,
     });
+    if (eventError) {
+      console.error('[QC Feedback] Error logging event:', eventError);
+    }
 
     return NextResponse.json({ ok: true, feedback });
   } catch (error: any) {
@@ -113,12 +119,40 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const pickerId = searchParams.get('pickerId');
     const unacknowledged = searchParams.get('unacknowledged') === 'true';
+    const targetPickerId = pickerId || userId;
 
+    // First, get the pick_list IDs assigned to this picker
+    const { data: pickerLists, error: pickerListsError } = await supabase
+      .from('pick_lists')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('assigned_user_id', targetPickerId);
+
+    if (pickerListsError) {
+      console.error('[QC Feedback] Error fetching picker lists:', pickerListsError);
+      return NextResponse.json(
+        { ok: false, error: 'Failed to fetch picker data' },
+        { status: 500 }
+      );
+    }
+
+    const pickListIds = (pickerLists || []).map(pl => pl.id);
+
+    // If no pick lists, return empty
+    if (pickListIds.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        feedback: [],
+        unacknowledgedCount: 0,
+      });
+    }
+
+    // Now fetch feedback for those pick lists
     let query = supabase
       .from('qc_feedback')
       .select(`
         *,
-        pick_lists:pick_list_id (
+        pick_list:pick_list_id (
           id,
           sequence,
           status,
@@ -126,29 +160,21 @@ export async function GET(req: NextRequest) {
           order:order_id (
             id,
             order_number,
-            customers:customer_id (name)
+            customer:customer_id (name)
           )
         ),
-        pick_items:pick_item_id (
+        pick_item:pick_item_id (
           id,
           product_id,
           sku,
           variety,
           requested_qty
         ),
-        created_by_profile:created_by (display_name)
+        created_by_profile:profiles!qc_feedback_created_by_fkey (display_name, full_name)
       `)
       .eq('org_id', orgId)
+      .in('pick_list_id', pickListIds)
       .order('created_at', { ascending: false });
-
-    // Filter by picker
-    if (pickerId) {
-      // Filter by assigned_user_id on the pick_list
-      query = query.eq('pick_lists.assigned_user_id', pickerId);
-    } else {
-      // Default to current user's feedback
-      query = query.eq('pick_lists.assigned_user_id', userId);
-    }
 
     // Filter unacknowledged
     if (unacknowledged) {
@@ -170,12 +196,12 @@ export async function GET(req: NextRequest) {
       .from('qc_feedback')
       .select('id', { count: 'exact', head: true })
       .eq('org_id', orgId)
-      .eq('pick_lists.assigned_user_id', pickerId || userId)
+      .in('pick_list_id', pickListIds)
       .is('picker_acknowledged_at', null);
 
     return NextResponse.json({
       ok: true,
-      feedback,
+      feedback: feedback || [],
       unacknowledgedCount: count || 0,
     });
   } catch (error: any) {

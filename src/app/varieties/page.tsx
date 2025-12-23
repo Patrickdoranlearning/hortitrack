@@ -27,9 +27,9 @@ import { addVarietyAction, updateVarietyAction, deleteVarietyAction } from "../a
 import { invalidateReferenceData } from "@/lib/swr/keys";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCollection } from "@/hooks/use-collection";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { DataPageShell } from "@/components/data-management/DataPageShell";
-import { DataToolbar } from "@/components/data-management/DataToolbar";
+import { PageFrame } from '@/ui/templates';
+import { DataPageShell } from '@/ui/templates';
+import { DataToolbar } from '@/ui/templates';
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

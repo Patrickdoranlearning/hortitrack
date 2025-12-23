@@ -73,8 +73,8 @@ import { PlanIncomingWizardDialog } from '@/components/production/plan-incoming'
 import { PlanBatchesWizardDialog } from '@/components/production/plan-batches';
 import { ActualizeWizardDialog } from '@/components/production/actualize';
 import { useCollection } from '@/hooks/useCollection'; 
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
 import EditBatchForm from '@/components/batches/EditBatchForm';

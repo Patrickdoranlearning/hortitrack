@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 import { getUserAndOrg } from '@/server/auth/org';
 import { getSupabaseServerApp } from '@/server/db/supabaseServerApp';
 import BulkPickingWorkflowClient from './BulkPickingWorkflowClient';

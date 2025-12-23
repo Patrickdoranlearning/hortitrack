@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getUserAndOrg } from '@/server/auth/org';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import ProductGroupsClient from './ProductGroupsClient';
 
 export default async function ProductGroupsPage() {

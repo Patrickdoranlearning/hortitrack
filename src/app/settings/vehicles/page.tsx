@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Edit, ArrowLeft, Container } from 'lucide-react';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

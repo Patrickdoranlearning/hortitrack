@@ -1,5 +1,5 @@
 import { getUserAndOrg } from '@/server/auth/org';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 import { notFound } from 'next/navigation';
 import QCReviewClient from './QCReviewClient';
 import { Card, CardContent } from '@/components/ui/card';

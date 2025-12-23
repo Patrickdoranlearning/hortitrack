@@ -67,7 +67,10 @@ export const PlantSizeSchema = z.object({
   name: z.string().min(1, "Size name is required"),
   containerType: SizeContainerType.default('pot'),
   cellMultiple: z.number().int().min(1).default(1),
-  shelfQuantity: z.number().int().nonnegative().optional(),
+  // Unit hierarchy: Units → Trays → Shelves → Trolleys
+  trayQuantity: z.number().int().nonnegative().optional(),    // Units per tray
+  shelfQuantity: z.number().int().nonnegative().optional(),   // Units per shelf
+  trolleyQuantity: z.number().int().nonnegative().optional(), // Units per trolley
   area: z.number().nonnegative().optional(),
   cellDiameterMm: z.number().optional(),
   cellVolumeL: z.number().optional(),

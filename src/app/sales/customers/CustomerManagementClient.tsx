@@ -27,8 +27,8 @@ import type {
   CustomerSummary,
 } from "./types";
 import { COUNTRY_OPTIONS } from "./types";
-import { DataPageShell } from "@/components/data-management/DataPageShell";
-import { DataToolbar } from "@/components/data-management/DataToolbar";
+import { DataPageShell } from '@/ui/templates';
+import { DataToolbar } from '@/ui/templates';
 import {
   upsertCustomerAction,
   upsertCustomerAddressAction,

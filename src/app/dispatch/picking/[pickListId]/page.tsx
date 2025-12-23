@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 import { getPickListById, getPickItems } from '@/server/sales/picking';
 import PickingWorkflowClient from './PickingWorkflowClient';
 

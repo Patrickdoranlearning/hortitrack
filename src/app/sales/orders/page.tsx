@@ -1,5 +1,5 @@
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import SalesOrdersClient from './SalesOrdersClient';

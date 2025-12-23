@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import {
   ATTRIBUTE_META,
   type AttributeKey,

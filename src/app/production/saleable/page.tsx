@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { getUserAndOrg } from "@/server/auth/org";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import { fetchSaleableBatches, fetchLocations, fetchVarieties, fetchProductionStatusOptions, SALEABLE_STATUSES } from "@/server/production/saleable";
 import SaleableBatchesClient from "./SaleableBatchesClient";
 

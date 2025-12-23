@@ -1,6 +1,6 @@
 
 import { getSupabaseServerApp } from '@/server/db/supabase';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 import { SalesOrderWizard } from '@/components/sales/wizard/SalesOrderWizard';
 import { getProductsWithBatches } from '@/server/sales/products-with-batches';
 import { getOrgFees } from '@/app/sales/settings/fees/actions';

@@ -1,9 +1,9 @@
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import Link from "next/link";
 import { ArrowLeft, Truck, Construction } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { ModulePageHeader } from '@/ui/templates';
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getUserAndOrg } from "@/server/auth/org";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import ProductFormClient from "../ProductFormClient";
 import { fetchProductManagementData, mapProducts } from "../product-data";
 

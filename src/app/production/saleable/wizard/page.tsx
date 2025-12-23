@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { getUserAndOrg } from "@/server/auth/org";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import { fetchProductionStatusOptions } from "@/server/production/saleable";
 import { SaleabilityWizard } from "@/components/production/saleability";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

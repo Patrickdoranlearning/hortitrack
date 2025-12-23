@@ -1,8 +1,8 @@
 import { getUserIdAndOrgId } from "@/server/auth/getUser";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { redirect } from "next/navigation";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { PasswordChangeForm } from "@/components/account/PasswordChangeForm";
 import { Button } from "@/components/ui/button";

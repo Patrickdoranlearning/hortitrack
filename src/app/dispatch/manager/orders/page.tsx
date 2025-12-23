@@ -1,35 +1,15 @@
 import { redirect } from "next/navigation";
 import { getUserAndOrg } from "@/server/auth/org";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Package, Calendar, User, Truck, Filter } from "lucide-react";
-import { format } from "date-fns";
-import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import DispatchOrdersClient from "@/components/dispatch/manager/DispatchOrdersClient";
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  confirmed: "bg-blue-100 text-blue-700",
-  processing: "bg-yellow-100 text-yellow-700",
-  picking: "bg-orange-100 text-orange-700",
-  picked: "bg-purple-100 text-purple-700",
-  qc_passed: "bg-teal-100 text-teal-700",
-  loading: "bg-indigo-100 text-indigo-700",
-  dispatched: "bg-green-100 text-green-700",
-  delivered: "bg-emerald-100 text-emerald-700",
-  cancelled: "bg-red-100 text-red-700",
-};
+// Disable caching to ensure fresh data on every request
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
- * Orders Page - Displays all orders with status and assignment info
+ * Dispatch Orders Page - Shows all active orders for dispatch management
+ * Features: filtering, sorting, resizable columns, inline assignment
  */
 export default async function DispatchOrdersPage() {
   let orgId: string;
@@ -52,8 +32,7 @@ export default async function DispatchOrdersPage() {
     );
   }
 
-  // Fetch orders with related data
-  // Note: delivery_runs are linked via delivery_items table
+  // Fetch orders with related data - exclude completed/cancelled orders
   const { data: orders, error } = await supabase
     .from("orders")
     .select(`
@@ -61,180 +40,112 @@ export default async function DispatchOrdersPage() {
       order_number,
       status,
       requested_delivery_date,
-      total_trolleys,
+      trolleys_estimated,
       notes,
       created_at,
       customer:customers(id, name),
+      ship_to_address:customer_addresses!orders_ship_to_address_id_fkey(
+        id,
+        county,
+        eircode,
+        city
+      ),
       delivery_items(
         id,
+        delivery_run_id,
         delivery_run:delivery_runs(id, load_name, run_date)
       ),
-      pick_lists(
+      pick_lists:pick_lists!pick_lists_order_id_fkey(
         id,
         status,
         assigned_user_id
       )
     `)
     .eq("org_id", orgId)
-    .in("status", ["confirmed", "processing", "picking", "picked", "qc_passed", "loading"])
+    .not("status", "in", '("draft","dispatched","delivered","cancelled")')
     .order("requested_delivery_date", { ascending: true })
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(500);
 
   if (error) {
     console.error("Error fetching orders:", error.message || JSON.stringify(error));
   }
 
-  // Fetch picker names separately (profiles table has same ID as auth.users)
-  const assignedUserIds = (orders || [])
-    .flatMap((o: any) => o.pick_lists || [])
-    .map((pl: any) => pl.assigned_user_id)
-    .filter(Boolean) as string[];
+  // Debug: Log orders with their pick_lists to verify data is being fetched
+  // Note: pick_lists can be a single object (UNIQUE constraint) or array
+  const getPickListFromOrder = (pl: any) => {
+    if (!pl) return null;
+    if (Array.isArray(pl)) return pl[0] || null;
+    return pl;
+  };
+  console.log('[Dispatch Orders] Orders count:', orders?.length);
+  console.log('[Dispatch Orders] Sample orders with pick_lists:', orders?.slice(0, 5).map((o: any) => {
+    const pickList = getPickListFromOrder(o.pick_lists);
+    return {
+      order_number: o.order_number,
+      pick_lists: o.pick_lists,
+      has_assigned_user: !!pickList?.assigned_user_id,
+      assigned_user_id: pickList?.assigned_user_id,
+    };
+  }));
 
-  let pickerMap: Record<string, string> = {};
-  if (assignedUserIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, display_name, email")
-      .in("id", [...new Set(assignedUserIds)]);
+  // Fetch all available pickers (org members who can be pickers)
+  // Valid org_role enum values: owner, admin, grower, sales, viewer
+  const { data: orgMembers, error: membersError } = await supabase
+    .from("org_memberships")
+    .select("user_id, role, profiles:profiles!org_memberships_user_id_profiles_fkey(id, display_name, full_name, email)")
+    .eq("org_id", orgId)
+    .in("role", ["grower", "admin", "owner", "sales"]);
 
-    if (profiles) {
-      pickerMap = profiles.reduce((acc: Record<string, string>, p: any) => {
-        acc[p.id] = p.display_name || p.email || "Unknown";
-        return acc;
-      }, {});
-    }
+  if (membersError) {
+    console.error("Error fetching org members:", membersError.message || JSON.stringify(membersError));
   }
 
-  // Count by status
-  const statusCounts = (orders || []).reduce((acc: Record<string, number>, order: any) => {
-    acc[order.status] = (acc[order.status] || 0) + 1;
-    return acc;
-  }, {});
+  const availablePickers: Array<{ id: string; name: string }> = (orgMembers || [])
+    .filter((m: any) => m.profiles) // Filter out members without profiles
+    .map((m: any) => ({
+      id: m.user_id,
+      name: m.profiles?.display_name || m.profiles?.full_name || m.profiles?.email || "Unknown",
+    }));
+
+  // Create picker map for display
+  const pickerMap: Record<string, string> = {};
+  availablePickers.forEach(p => {
+    pickerMap[p.id] = p.name;
+  });
+
+  // Fetch available delivery runs (loads) for assignment
+  const { data: deliveryRuns } = await supabase
+    .from("delivery_runs")
+    .select("id, load_name, run_date, status")
+    .eq("org_id", orgId)
+    .in("status", ["planned", "loading"])
+    .order("run_date", { ascending: true })
+    .limit(50);
+
+  const availableLoads: Array<{ id: string; name: string; date: string | null }> = (deliveryRuns || []).map((r: any) => ({
+    id: r.id,
+    name: r.load_name || `Load ${r.id.slice(0, 8)}`,
+    date: r.run_date,
+  }));
 
   return (
     <div className="p-6 space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Orders</h2>
-          <p className="text-muted-foreground text-sm">
-            View and manage orders for dispatch
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Filter className="h-4 w-4" />
-            Filter
-          </Button>
-        </div>
+      <div>
+        <h2 className="text-xl font-semibold">Orders</h2>
+        <p className="text-muted-foreground text-sm">
+          View and manage orders for dispatch
+        </p>
       </div>
 
-      {/* Status Summary */}
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(statusCounts).map(([status, count]) => (
-          <Badge
-            key={status}
-            variant="secondary"
-            className={`${STATUS_COLORS[status] || "bg-gray-100"} px-3 py-1`}
-          >
-            {status.replace("_", " ")}: {count}
-          </Badge>
-        ))}
-      </div>
-
-      {/* Orders Table */}
-      <Card>
-        <CardContent className="p-0">
-          {(!orders || orders.length === 0) ? (
-            <div className="text-center py-12">
-              <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold text-lg mb-2">No Orders</h3>
-              <p className="text-muted-foreground">
-                No orders currently need dispatch attention
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Delivery Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Picker</TableHead>
-                  <TableHead>Load</TableHead>
-                  <TableHead className="text-right">Trolleys</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order: any) => {
-                  const pickList = order.pick_lists?.[0];
-                  const pickerName = pickList?.assigned_user_id ? pickerMap[pickList.assigned_user_id] : null;
-                  // Get delivery run from delivery_items (first one if multiple)
-                  const deliveryItem = order.delivery_items?.[0];
-                  const deliveryRun = deliveryItem?.delivery_run;
-
-                  return (
-                    <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell>
-                        <Link
-                          href={`/sales/orders/${order.id}`}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {order.order_number}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          {order.customer?.name || "Unknown"}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {order.requested_delivery_date
-                            ? format(new Date(order.requested_delivery_date), "EEE, MMM d")
-                            : "-"}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={STATUS_COLORS[order.status] || "bg-gray-100"}
-                        >
-                          {order.status?.replace("_", " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {pickerName || (
-                          <span className="text-muted-foreground text-sm">Unassigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {deliveryRun ? (
-                          <div className="flex items-center gap-2">
-                            <Truck className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">
-                              {deliveryRun.load_name || `Load`}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {order.total_trolleys || "-"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Orders Table Client Component */}
+      <DispatchOrdersClient
+        initialOrders={orders || []}
+        pickerMap={pickerMap}
+        availablePickers={availablePickers}
+        availableLoads={availableLoads}
+      />
     </div>
   );
 }

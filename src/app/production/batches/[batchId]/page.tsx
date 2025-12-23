@@ -4,8 +4,8 @@ import PassportsCard from "@/components/batches/PassportsCard";
 import AncestryCard from "@/components/batches/AncestryCard";
 import BatchGalleryCard from "@/components/batches/BatchGalleryCard.lazy";
 import { BatchPageActions } from "@/components/batches/BatchPageActions";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { ModulePageHeader } from '@/ui/templates';
+import { PageFrame } from '@/ui/templates';
 import type { Batch } from "@/lib/types";
 import {
   Card,

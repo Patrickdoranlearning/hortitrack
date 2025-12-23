@@ -18,7 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { getStopColor } from './TruckVisualization';
-import { DeliveryPhotoCapture } from './driver/DeliveryPhotoCapture';
+import { DeliveryCompletionDialog } from './driver/DeliveryCompletionDialog';
 
 export interface DeliveryStop {
   id: string;
@@ -218,12 +218,15 @@ export default function DeliveryStopCard({
                 </Button>
               )}
               {showPhotoCapture ? (
-                <DeliveryPhotoCapture
+                <DeliveryCompletionDialog
                   deliveryItemId={stop.id}
                   customerName={stop.customerName}
                   orderNumber={stop.orderNumber}
-                  onPhotoCaptured={(photoUrl) => {
-                    onPhotoUploaded?.(stop.id, photoUrl);
+                  trolleysDelivered={stop.trolleysDelivered}
+                  onCompleted={({ photoUrl, trolleysReturned }) => {
+                    if (photoUrl) {
+                      onPhotoUploaded?.(stop.id, photoUrl);
+                    }
                     onMarkDelivered?.(stop.id);
                   }}
                   trigger={

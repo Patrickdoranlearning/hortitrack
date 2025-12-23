@@ -2,8 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { isInternalStaff } from "@/lib/auth/b2b-guard";
 import { ImpersonateClient } from "./ImpersonateClient";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 
 export default async function ImpersonatePage() {
   // Verify user is internal staff

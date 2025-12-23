@@ -1,6 +1,6 @@
 import { DocumentDesigner } from "@/components/documents/DocumentDesigner";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { ModulePageHeader } from '@/ui/templates';
+import { PageFrame } from '@/ui/templates';
 
 export const dynamic = "force-dynamic";
 

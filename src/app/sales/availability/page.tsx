@@ -1,5 +1,5 @@
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { getSaleableProducts } from '@/server/sales/queries.server';
 
 export default async function SalesAvailabilityPage() {

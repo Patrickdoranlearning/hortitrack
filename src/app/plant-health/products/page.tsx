@@ -42,8 +42,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { ProductDialog } from '@/components/plant-health/ipm/ProductDialog';
 import { StockDetailsDialog } from '@/components/plant-health/ipm/StockDetailsDialog';
 import { AddStockDialog } from '@/components/plant-health/ipm/AddStockDialog';

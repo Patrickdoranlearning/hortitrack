@@ -22,7 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { ModulePageHeader } from '@/ui/templates';
 import { EmployeeSchedule } from "./components/EmployeeSchedule";
 import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/http/fetchJson";

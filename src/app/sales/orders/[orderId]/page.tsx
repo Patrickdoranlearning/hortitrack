@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 import OrderDetailPage from '@/components/sales/OrderDetailPage';
 import type { OrderDetails } from '@/components/sales/OrderDetailPage';
 

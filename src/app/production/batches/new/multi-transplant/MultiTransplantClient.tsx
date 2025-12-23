@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { ModulePageHeader } from "@/ui/layout/ModulePageHeader";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import MultiParentTransplantBuilder from "@/components/batches/MultiParentTransplantBuilder";
 
 export default function MultiTransplantClient() {

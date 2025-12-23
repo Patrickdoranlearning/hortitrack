@@ -28,12 +28,10 @@ import { PlayCircle, Truck } from "lucide-react";
 import { ActualizeBatchDialog } from "@/components/batches/ActualizeBatchDialog";
 
 // --- runtime guard: logs undefined imports without crashing ---
-const _ensure = (x: any, name: string) => {
+const _ensure = <T,>(x: T | undefined | null, name: string): T => {
   if (!x) {
-    // This will tell you exactly which component is undefined
     console.error(`[BatchCard] ${name} is undefined (import/export mismatch)`);
-    // render no-op to avoid crash
-    return ((_: any) => null) as any;
+    return (() => null) as unknown as T;
   }
   return x;
 };
@@ -45,11 +43,23 @@ const SafeEventsCard = _ensure(EventsCard, "EventsCard");
 const SafePassportsCard = _ensure(PassportsCard, "PassportsCard");
 const SafeAncestryCard = _ensure(AncestryCard, "AncestryCard");
 
+// Extended batch type to handle both camelCase and snake_case from different data sources
+type BatchCardBatch = Batch & {
+  // These fields may come in snake_case from raw database queries
+  id?: string;
+  plant_variety_id?: string;
+  plant_family?: string;
+  supplier_id?: string | null;
+  supplier_name?: string;
+  supplier?: string;
+  supplierName?: string;
+  locationName?: string;
+};
 
 type BatchCardProps = {
-  batch: Batch;
-  onOpen?: (batch: Batch) => void;
-  onLogAction?: (batch: Batch, mode: ActionMode) => void;
+  batch: BatchCardBatch;
+  onOpen?: (batch: BatchCardBatch) => void;
+  onLogAction?: (batch: BatchCardBatch, mode: ActionMode) => void;
   actionsSlot?: React.ReactNode;
   className?: string;
 };
@@ -64,11 +74,11 @@ export function BatchCard({
   const [open, setOpen] = useState(false);
   const [actualizeOpen, setActualizeOpen] = useState(false);
   const parentSummary = {
-    id: (batch as any).id,
+    id: batch.id,
     batch_number: batch.batchNumber,
     quantity: batch.quantity ?? 0,
-    plant_variety_id: (batch as any).plant_variety_id,
-    supplier_id: (batch as any).supplier_id ?? null,
+    plant_variety_id: batch.plant_variety_id ?? batch.plantVarietyId,
+    supplier_id: batch.supplier_id ?? batch.supplierId ?? null,
   };
 
   const stockPercentage =
@@ -83,7 +93,7 @@ export function BatchCard({
 
   const familyLabel =
     batch.plantFamily ||
-    (batch as any)?.plant_family ||
+    batch.plant_family ||
     "Unspecified";
   const getStatusVariant = (
     status: Batch['status']
@@ -112,13 +122,13 @@ export function BatchCard({
   const locationLabel =
     typeof batch.location === "string"
       ? batch.location
-      : (batch as any)?.location?.name ??
-        (batch as any)?.locationName ??
+      : (batch.location as { name?: string })?.name ??
+        batch.locationName ??
         "Unassigned";
   const supplierLabel =
-    (batch as any)?.supplier ??
-    (batch as any)?.supplierName ??
-    (batch as any)?.supplier_name ??
+    batch.supplier ??
+    batch.supplierName ??
+    batch.supplier_name ??
     "Unassigned";
 
   return (
@@ -283,7 +293,7 @@ export function BatchCard({
               {/* Show target size/info if available */}
               {batch.size && (
                 <Badge variant="outline" className="text-muted-foreground">
-                  Target: {typeof batch.size === 'string' ? batch.size : (batch.size as any)?.name ?? batch.size}
+                  Target: {typeof batch.size === 'string' ? batch.size : (batch.size as { name?: string })?.name ?? String(batch.size)}
                 </Badge>
               )}
             </>

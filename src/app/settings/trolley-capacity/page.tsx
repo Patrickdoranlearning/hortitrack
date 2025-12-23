@@ -31,7 +31,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, PlusCircle, Pencil, Trash2, Package, AlertCircle } from 'lucide-react';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 import { useToast } from '@/hooks/use-toast';
 import { TROLLEY_CONSTANTS } from '@/lib/dispatch/trolley-calculation';
 

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import { createClient } from "@/lib/supabase/server";
 import { getActiveOrgId } from "@/server/auth/org";
 import CustomerDetailClient from "./CustomerDetailClient";

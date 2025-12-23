@@ -96,8 +96,29 @@ export function ComboBoxEntity(props: Props) {
 
       for (const f of filters) {
         const op = f.op ?? "eq";
-        // @ts-expect-error op is a keyof the query builder
-        q = q[op](f.column as any, op === "ilike" ? String(f.value) : f.value);
+        const column = f.column;
+        const value = op === "ilike" ? String(f.value) : f.value;
+
+        switch (op) {
+          case "eq":
+            q = q.eq(column, value);
+            break;
+          case "neq":
+            q = q.neq(column, value);
+            break;
+          case "ilike":
+            q = q.ilike(column, value);
+            break;
+          case "in":
+            q = q.in(column, value);
+            break;
+          case "gte":
+            q = q.gte(column, value);
+            break;
+          case "lte":
+            q = q.lte(column, value);
+            break;
+        }
       }
 
       const by = orderBy ?? labelKey;

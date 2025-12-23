@@ -1,5 +1,5 @@
 
-import { PageFrame } from "@/ui/templates/PageFrame";
+import { PageFrame } from '@/ui/templates';
 import PlanningClient from "./PlanningClient";
 import { getPlanningSnapshot, listProtocols } from "@/server/planning/service";
 import { ReferenceDataProvider } from "@/contexts/ReferenceDataContext";
