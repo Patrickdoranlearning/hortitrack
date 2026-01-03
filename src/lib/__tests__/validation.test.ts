@@ -1,4 +1,3 @@
-ts
 import { z } from "zod";
 import { mapError } from "@/lib/validation"; // or "../validation" if colocated
 import { ZodError } from "zod";
@@ -38,12 +37,13 @@ describe("mapError", () => {
     expect(result.body.issues[0].path).toEqual(["name"]);
   });
 
-  it("returns 500 for other errors", () => {
+  it("returns 500 for other errors with generic message (security)", () => {
     const result = mapError(new Error("boom"));
+    // Should NOT expose internal error messages for security
     expect(result).toEqual({ status: 500, body: { error: "Internal Error" } });
   });
 
-  it("returns 500 for undefined/null", () => {
+  it("returns 500 for undefined/null with generic message", () => {
     // @ts-expect-error testing robustness
     expect(mapError(undefined)).toEqual({ status: 500, body: { error: "Internal Error" } });
     // @ts-expect-error testing robustness

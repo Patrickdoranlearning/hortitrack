@@ -92,11 +92,6 @@ export interface DispatchOrder {
   delivery_items: Array<{
     id: string;
     delivery_run_id: string | null;
-    delivery_run: {
-      id: string;
-      load_name: string | null;
-      run_date: string | null;
-    } | null;
   }>;
   // Can be single object (UNIQUE constraint), array, or null
   pick_lists: PickListData | PickListData[] | null;
@@ -221,7 +216,7 @@ export default function DispatchOrdersClient({
     const map: Record<string, string> = {};
     const uniqueLoads = [...new Set(
       orders
-        .map(o => o.delivery_items?.[0]?.delivery_run?.id)
+        .map(o => o.delivery_items?.[0]?.delivery_run_id)
         .filter(Boolean) as string[]
     )];
     uniqueLoads.forEach((loadId, index) => {
@@ -359,17 +354,11 @@ export default function DispatchOrdersClient({
       // Update local state
       setOrders(prev => prev.map(o => {
         if (o.id === orderId) {
-          const selectedLoad = loads.find(l => l.id === loadId);
           return {
             ...o,
             delivery_items: loadId === 'unassign' ? [] : [{
               id: data.deliveryItemId || 'temp',
               delivery_run_id: loadId,
-              delivery_run: selectedLoad ? {
-                id: loadId,
-                load_name: selectedLoad.name,
-                run_date: selectedLoad.date,
-              } : null,
             }],
           };
         }
@@ -470,7 +459,7 @@ export default function DispatchOrdersClient({
     // Load filter
     if (loadFilter !== 'all') {
       result = result.filter(order => {
-        const loadId = order.delivery_items?.[0]?.delivery_run?.id;
+        const loadId = order.delivery_items?.[0]?.delivery_run_id;
         if (loadFilter === 'unassigned') return !loadId;
         return loadId === loadFilter;
       });
@@ -518,8 +507,10 @@ export default function DispatchOrdersClient({
             bVal = bPickList?.assigned_user_id ? pickerMap[bPickList.assigned_user_id] || '' : '';
             break;
           case 'load':
-            aVal = a.delivery_items?.[0]?.delivery_run?.load_name || '';
-            bVal = b.delivery_items?.[0]?.delivery_run?.load_name || '';
+            const aLoadId = a.delivery_items?.[0]?.delivery_run_id;
+            const bLoadId = b.delivery_items?.[0]?.delivery_run_id;
+            aVal = aLoadId ? loads.find(l => l.id === aLoadId)?.name || '' : '';
+            bVal = bLoadId ? loads.find(l => l.id === bLoadId)?.name || '' : '';
             break;
           case 'trolleys':
             aVal = a.trolleys_estimated || 0;
@@ -536,7 +527,7 @@ export default function DispatchOrdersClient({
     }
 
     return result;
-  }, [orders, searchQuery, statusFilter, weekFilter, loadFilter, sortColumn, sortDirection, pickerMap]);
+  }, [orders, searchQuery, statusFilter, weekFilter, loadFilter, sortColumn, sortDirection, pickerMap, loads]);
 
   // Get visible columns
   const visibleColumns = columns.filter(c => c.visible);
@@ -581,7 +572,7 @@ export default function DispatchOrdersClient({
 
   // Get row color based on load assignment
   const getRowColor = (order: DispatchOrder) => {
-    const loadId = order.delivery_items?.[0]?.delivery_run?.id;
+    const loadId = order.delivery_items?.[0]?.delivery_run_id;
     if (!loadId) return 'hover:bg-muted/50';
     return loadColorMap[loadId] || 'hover:bg-muted/50';
   };
@@ -591,7 +582,8 @@ export default function DispatchOrdersClient({
     const pickList = getPickList(order);
     const pickerName = pickList?.assigned_user_id ? pickerMap[pickList.assigned_user_id] : null;
     const deliveryItem = order.delivery_items?.[0];
-    const deliveryRun = deliveryItem?.delivery_run;
+    const loadId = deliveryItem?.delivery_run_id;
+    const loadInfo = loadId ? loads.find(l => l.id === loadId) : null;
 
     switch (columnId) {
       case 'order_number':
@@ -694,7 +686,7 @@ export default function DispatchOrdersClient({
         return (
           <div onClick={(e) => e.stopPropagation()}>
             <Select
-              value={deliveryRun?.id || 'unassign'}
+              value={loadId || 'unassign'}
               onValueChange={(value) => handleAssignLoad(order.id, value)}
               disabled={updatingLoad === order.id}
             >
@@ -702,10 +694,10 @@ export default function DispatchOrdersClient({
                 <SelectValue placeholder="Assign load">
                   {updatingLoad === order.id ? (
                     <span className="text-muted-foreground">Updating...</span>
-                  ) : deliveryRun ? (
+                  ) : loadInfo ? (
                     <div className="flex items-center gap-1">
                       <Truck className="h-3 w-3" />
-                      <span className="truncate">{deliveryRun.load_name || 'Load'}</span>
+                      <span className="truncate">{loadInfo.name || 'Load'}</span>
                     </div>
                   ) : (
                     <span className="text-muted-foreground">Unassigned</span>

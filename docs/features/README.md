@@ -1,40 +1,38 @@
-# Feature Plans
+# Feature Documentation
 
-This directory contains detailed planning documents for HortiTrack features.
+> **Note**: Feature planning documents have been consolidated into the `/future-plans` directory.
 
-## Active Features
+## Planning Documents
 
-| Feature | Status | Document |
-|---------|--------|----------|
-| [Production Recipes](./recipes-plan.md) | Phase 1 Complete, Phase 2 In Progress | Size flows, week planning, performance tracking |
-| [Product Aliases](../product-alias-plan.md) | Planned | Link batches to saleable products |
-| [Sales Module](../sales-module-data-plan.md) | In Progress | Orders, customers, pricing |
+All feature plans are now located in:
 
-## Planned Features
+📁 **[/future-plans](/future-plans/README.md)**
 
-- **Batch Photos** - Visual tracking and sales imagery
-- **Task Management** - Digital job board for nursery operations
-- **B2B Portal** - Customer-facing ordering system
-- **Dispatch Module** - Order fulfillment and shipping
-- **IPM Module** - Pest/disease tracking and treatment logs
+### Quick Links
 
-## Document Structure
+| Document | Description |
+|----------|-------------|
+| [Roadmap](/future-plans/roadmap.md) | High-level feature roadmap |
+| [Recipes](/future-plans/features/recipes.md) | Production recipes planning |
+| [Sales Module](/future-plans/features/sales-module.md) | Sales data architecture |
+| [Product Aliases](/future-plans/features/product-aliases.md) | Customer-specific naming |
+| [Enhanced Orders](/future-plans/features/enhanced-orders.md) | Batch-specific ordering |
+| [Suggestions](/future-plans/suggestions.md) | AI improvement recommendations |
 
-Each feature plan should include:
-1. **Overview** - What the feature does
-2. **Current State** - What's built
-3. **Proposed Enhancements** - Next steps
-4. **Data Model** - Database schema
-5. **UI/UX Notes** - Design considerations
-6. **Implementation Priority** - Effort vs value
+---
 
-## Contributing
+## This Directory
 
-When adding a new feature plan:
-1. Create `feature-name-plan.md` in this directory
-2. Update this README with the new feature
-3. Link to related ADRs if architectural decisions are involved
+This directory (`docs/features`) contains:
+- Implementation guides for completed features
+- Technical documentation
+- Form features guide
 
+### Remaining Files
 
+- `FORM-FEATURES.md` - Form component documentation
+- `MIGRATION-GUIDE.md` - Database migration guide
 
+---
 
+**Last Updated**: January 2026

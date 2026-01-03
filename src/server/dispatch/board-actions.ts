@@ -268,14 +268,20 @@ export async function reorderLoads(loadIds: string[]) {
     const supabase = await createClient();
     
     // Update display_order for each load
-    const updates = loadIds.map((id, index) => 
-      supabase
-        .from("delivery_runs")
-        .update({ display_order: index })
-        .eq("id", id)
+    const results = await Promise.all(
+      loadIds.map((id, index) => 
+        supabase
+          .from("delivery_runs")
+          .update({ display_order: index })
+          .eq("id", id)
+      )
     );
     
-    await Promise.all(updates);
+    // Check for any errors
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) {
+      throw new Error(errors[0].error?.message || "Failed to reorder loads");
+    }
     
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
@@ -287,16 +293,18 @@ export async function reorderLoads(loadIds: string[]) {
 
 /**
  * Remove an order from a load (unassign from delivery run)
+ * Only removes active delivery items, preserves historical records
  */
 export async function removeOrderFromLoad(orderId: string) {
   try {
     const supabase = await createClient();
     
-    // Delete the delivery item linking order to run
+    // Delete only ACTIVE delivery items (not historical/completed ones)
     const { error } = await supabase
       .from("delivery_items")
       .delete()
-      .eq("order_id", orderId);
+      .eq("order_id", orderId)
+      .in("status", ["pending", "loading", "in_transit"]);
       
     if (error) throw error;
     
@@ -372,15 +380,18 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
       }
     }
 
+    // Error if we couldn't create or find a route
+    if (!targetRouteId) {
+      return { error: "No delivery route available. Please create a haulier first or specify a route." };
+    }
+
     // Assign each order to the route
     const results = await Promise.allSettled(
       orderIds.map(async (orderId) => {
-        if (targetRouteId) {
-          await addOrderToDeliveryRun({
-            deliveryRunId: targetRouteId,
-            orderId: orderId,
-          });
-        }
+        await addOrderToDeliveryRun({
+          deliveryRunId: targetRouteId,
+          orderId: orderId,
+        });
         // Keep status at ready_for_dispatch until the run goes in_transit
         await supabase
           .from("orders")

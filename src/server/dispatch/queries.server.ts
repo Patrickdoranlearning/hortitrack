@@ -406,10 +406,11 @@ export async function addOrderToDeliveryRun(input: AddToDeliveryRun): Promise<st
     .eq("order_id", input.orderId)
     .single();
 
+  // Use nullish coalescing to allow explicit 0 values
   const trolleysDelivered =
-    input.trolleysDelivered ||
-    packingData?.trolleys_used ||
-    orderData?.trolleys_estimated ||
+    input.trolleysDelivered ??
+    packingData?.trolleys_used ??
+    orderData?.trolleys_estimated ??
     0;
 
   // Determine sequence number if not provided
@@ -588,7 +589,7 @@ export async function updateOrderPacking(
   const dbUpdates: any = {};
   if (updates.status !== undefined) {
     dbUpdates.status = updates.status;
-    if (updates.status === "in_progress" && !updates.status) {
+    if (updates.status === "in_progress") {
       dbUpdates.packing_started_at = new Date().toISOString();
     }
     if (updates.status === "completed") {

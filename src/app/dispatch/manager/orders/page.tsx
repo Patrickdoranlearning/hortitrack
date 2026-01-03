@@ -52,8 +52,7 @@ export default async function DispatchOrdersPage() {
       ),
       delivery_items(
         id,
-        delivery_run_id,
-        delivery_run:delivery_runs(id, load_name, run_date)
+        delivery_run_id
       ),
       pick_lists:pick_lists!pick_lists_order_id_fkey(
         id,

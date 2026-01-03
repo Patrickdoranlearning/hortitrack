@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { captureProtocolPerformance } from "@/server/production/protocol-performance";
 
 const ActualizeSchema = z.object({
   quantity: z.number().int().positive(),
@@ -196,6 +197,13 @@ export async function POST(
       }
     } catch (evtErr) {
       console.error("[actualize] unexpected event log error", evtErr);
+    }
+
+    // Capture protocol performance when batch reaches Ready status
+    if (payload.status === "Ready") {
+      captureProtocolPerformance(supabase, orgId, batchId).catch((err) => {
+        console.error("[actualize] Failed to capture protocol performance:", err);
+      });
     }
 
     return NextResponse.json({ batch: updated }, { status: 200 });

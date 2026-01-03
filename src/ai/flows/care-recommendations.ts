@@ -11,6 +11,7 @@
  * const recommendations = await careRecommendations({
  *   batchInfo: { plantFamily: 'Roses', plantVariety: 'Peace', plantingDate: '2024-01-01' },
  *   logHistory: ['Watered on 2024-03-01', 'Fertilized on 2024-02-15'],
+ *   location: { latitude: 53.35, longitude: -6.26 }, // Optional
  * });
  * console.log(recommendations.careActivities);
  * ```
@@ -18,6 +19,10 @@
 
 import {ai} from '@/ai/genkit';
 import { z } from 'zod';
+import { getWeather, DEFAULT_COORDS } from '@/lib/weather/open-meteo';
+
+// Store location for the current flow execution
+let currentLocation: { latitude: number; longitude: number } = DEFAULT_COORDS;
 
 // Define the schema for the input data
 const CareRecommendationsInputSchema = z.object({
@@ -31,6 +36,13 @@ const CareRecommendationsInputSchema = z.object({
   logHistory: z
     .array(z.string())
     .describe('Recent log history of care activities for the batch.'),
+  location: z
+    .object({
+      latitude: z.number().describe('Latitude coordinate for weather lookup.'),
+      longitude: z.number().describe('Longitude coordinate for weather lookup.'),
+    })
+    .optional()
+    .describe('Optional location for weather data. Defaults to Ireland if not provided.'),
 });
 export type CareRecommendationsInput =
   z.infer<typeof CareRecommendationsInputSchema>;
@@ -55,13 +67,12 @@ const getContextualWeatherInfo = ai.defineTool({
     precipitationForecast: z.string().describe('The precipitation forecast for the next 7 days.'),
   }),
 }, async () => {
-  // Simulate fetching weather information. In a real application, this
-  // would call an external weather API.
-  return {
-    temperature: 25,
-    humidity: 60,
-    precipitationForecast: 'No rain expected in the next 7 days.',
-  };
+  // Fetch real weather data from Open-Meteo API
+  const weather = await getWeather(
+    currentLocation.latitude,
+    currentLocation.longitude
+  );
+  return weather;
 });
 
 // Define the Genkit prompt
@@ -102,6 +113,9 @@ const careRecommendationsFlow = ai.defineFlow(
     outputSchema: CareRecommendationsOutputSchema,
   },
   async (input) => {
+    // Set location for this flow execution
+    currentLocation = input.location ?? DEFAULT_COORDS;
+    
     const {output} = await careRecommendationsPrompt(input);
     return output!;
   }
@@ -109,7 +123,7 @@ const careRecommendationsFlow = ai.defineFlow(
 
 /**
  * Provides AI-powered plant care recommendations based on batch information
- * and recent log history. It will use a tool to fetch weather data.
+ * and recent log history. It will use a tool to fetch real weather data.
  * @param input - The input data for generating care recommendations.
  * @returns A promise that resolves to the care recommendations.
  */

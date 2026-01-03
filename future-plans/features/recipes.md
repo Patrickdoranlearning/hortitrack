@@ -1,12 +1,14 @@
 # Production Recipes Feature Plan
 
+**Status**: Phase 1 ✅ COMPLETE | Phase 2 📋 PLANNED
+
 ## Overview
 
 Production Recipes define the growing timeline and conditions to take a plant from propagation (seed/cutting) to a saleable product. Recipes are reusable templates that standardize production and enable future optimization through data analysis.
 
 ---
 
-## Current State (Phase 1) ✅
+## Current State (Phase 1) ✅ COMPLETE
 
 ### What's Built
 - **Recipe Library** (`/production/recipes`) - Card grid view of all recipes
@@ -14,6 +16,7 @@ Production Recipes define the growing timeline and conditions to take a plant fr
 - **Stage Builder** - Define stages with duration, phase, and environmental targets
 - **CRUD Operations** - Create, duplicate, archive, delete recipes
 - **Planning Integration** - Assign recipes to planned batches
+- **Protocol Drawer** - Visual protocol assignment in planning
 
 ### Data Model
 ```
@@ -34,9 +37,15 @@ protocols
     └── edges[] (stage connections)
 ```
 
+### Implementation Files
+- `src/app/production/recipes/page.tsx` - Recipe library
+- `src/app/production/recipes/[id]/page.tsx` - Recipe detail/edit
+- `src/app/production/recipes/RecipesClient.tsx` - Library component
+- `src/app/production/planning/components/ProtocolDrawer.tsx` - Planning integration
+
 ---
 
-## Phase 2: Enhanced Recipe Creation 🚧
+## Phase 2: Enhanced Recipe Creation 📋 PLANNED
 
 ### Problem
 Current form is basic - just name, variety, and simple stages. Nurseries need:
@@ -80,7 +89,7 @@ timing: {
   
   // Is this a seasonal recipe?
   seasonalOnly: true,
-  seasons: ["spring", "autumn"], // Only produce for these seasons
+  seasons: ["spring", "autumn"],
 }
 ```
 
@@ -107,23 +116,26 @@ timing: {
 
 ---
 
-## Phase 3: Performance Tracking (Future)
+## Phase 3: Performance Tracking 📋 PLANNED
 
 ### Data to Capture
 When batches using a recipe complete:
 
-```
-protocol_performance
-├── protocol_id
-├── batch_id
-├── planned_duration_days (from recipe)
-├── actual_duration_days (planted_at → ready_at)
-├── planned_ready_week
-├── actual_ready_week
-├── initial_quantity
-├── final_quantity
-├── yield_pct
-└── completed_at
+```sql
+CREATE TABLE protocol_performance (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid REFERENCES organizations(id),
+  protocol_id uuid REFERENCES protocols(id),
+  batch_id uuid REFERENCES batches(id),
+  planned_duration_days integer,
+  actual_duration_days integer,
+  planned_ready_week integer,
+  actual_ready_week integer,
+  initial_quantity integer,
+  final_quantity integer,
+  yield_pct numeric,
+  completed_at timestamptz DEFAULT now()
+);
 ```
 
 ### Analytics Views
@@ -133,7 +145,7 @@ protocol_performance
 
 ---
 
-## Phase 4: Sales Integration (Future)
+## Phase 4: Sales Integration 📋 FUTURE
 
 ### When Sales Data Exists
 Link orders to batches to understand:
@@ -151,19 +163,20 @@ With enough data:
 
 ## Implementation Priority
 
-| Priority | Feature | Effort | Value |
-|----------|---------|--------|-------|
-| 1 | Size flow builder | Medium | High |
-| 2 | Target week ranges | Medium | High |
-| 3 | Improved create form | Low | Medium |
-| 4 | Performance tracking | High | High |
-| 5 | Sales correlation | High | Very High |
+| Priority | Feature | Effort | Value | Status |
+|----------|---------|--------|-------|--------|
+| 1 | Recipe library & editor | Medium | High | ✅ Done |
+| 2 | Planning integration | Medium | High | ✅ Done |
+| 3 | Size flow builder | Medium | High | 📋 Planned |
+| 4 | Target week ranges | Medium | High | 📋 Planned |
+| 5 | Performance tracking | High | High | 📋 Planned |
+| 6 | Sales correlation | High | Very High | 📋 Future |
 
 ---
 
 ## UI/UX Notes
 
-### Create Recipe Flow (Proposed)
+### Create Recipe Flow (Proposed for Phase 2)
 1. **Start**: Select variety + final product size
 2. **Build flow**: Add size steps backwards (finish → plug → propagation)
 3. **Set timing**: Choose target ready weeks, see calculated start weeks
@@ -192,6 +205,6 @@ With enough data:
    - Track changes over time? Compare old vs new?
    - Suggest: Defer to Phase 3, keep simple for now
 
+---
 
-
-
+**Last Updated**: January 2026

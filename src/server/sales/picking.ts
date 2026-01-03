@@ -3,6 +3,12 @@ import "server-only";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
 import { generateInvoice } from "@/app/sales/actions";
+import {
+  createTask,
+  updateTask,
+  deleteTaskBySourceRef,
+  getTaskBySourceRef,
+} from "@/server/tasks/service";
 
 // ================================================
 // TYPES
@@ -493,7 +499,7 @@ export async function getUserTeams(userId: string): Promise<PickingTeam[]> {
 
 export async function createPickList(
   input: CreatePickListInput
-): Promise<{ pickList?: PickList; error?: string }> {
+): Promise<{ pickList?: PickList; error?: string; warning?: string }> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -526,6 +532,17 @@ export async function createPickList(
     return { error: error.message };
   }
 
+  // Get order details for task title
+  const { data: orderData } = await supabase
+    .from("orders")
+    .select(`
+      order_number,
+      requested_delivery_date,
+      customers(name)
+    `)
+    .eq("id", input.orderId)
+    .single();
+
   // Create pick items from order items
   const { data: orderItems } = await supabase
     .from("order_items")
@@ -536,6 +553,8 @@ export async function createPickList(
       product_id
     `)
     .eq("order_id", input.orderId);
+
+  const totalQty = orderItems?.reduce((sum, oi: any) => sum + (oi.quantity || 0), 0) ?? 0;
 
   if (orderItems && orderItems.length > 0) {
     const pickItems = orderItems.map((oi: any) => ({
@@ -554,6 +573,27 @@ export async function createPickList(
     }
   }
 
+  // Create a task in the unified tasks system
+  let taskWarning: string | undefined;
+  try {
+    const customerName = (orderData?.customers as { name?: string })?.name || "Customer";
+    await createTask({
+      sourceModule: "dispatch",
+      sourceRefType: "pick_list",
+      sourceRefId: data.id,
+      title: `Pick Order #${orderData?.order_number || "Unknown"} - ${customerName}`,
+      description: `Pick list for order ${orderData?.order_number}. ${orderItems?.length || 0} line items, ${totalQty} total units.`,
+      taskType: "picking",
+      assignedTeamId: input.assignedTeamId,
+      scheduledDate: orderData?.requested_delivery_date ?? undefined,
+      plantQuantity: totalQty,
+    });
+  } catch (taskError) {
+    console.error("Error creating task for pick list:", taskError);
+    // Don't fail the pick list creation, but track that task creation failed
+    taskWarning = "Pick list created but task scheduling failed. The pick list may not appear in employee schedules.";
+  }
+
   // Log event
   await logPickListEvent(orgId, data.id, null, "created", "Pick list created");
 
@@ -567,6 +607,7 @@ export async function createPickList(
       status: data.status,
       createdAt: data.created_at,
     },
+    warning: taskWarning,
   };
 }
 
@@ -843,6 +884,16 @@ export async function startPickList(
     return { error: error.message };
   }
 
+  // Update the corresponding task
+  try {
+    const task = await getTaskBySourceRef("dispatch", "pick_list", pickListId);
+    if (task) {
+      await updateTask(task.id, { status: "in_progress" });
+    }
+  } catch (taskError) {
+    console.error("Error updating task for pick list start:", taskError);
+  }
+
   await logPickListEvent(orgId, pickListId, null, "started", "Pick list started");
 
   return {};
@@ -878,6 +929,16 @@ export async function completePickList(
   if (error) {
     console.error("Error completing pick list:", error);
     return { error: error.message };
+  }
+
+  // Update the corresponding task
+  try {
+    const task = await getTaskBySourceRef("dispatch", "pick_list", pickListId);
+    if (task) {
+      await updateTask(task.id, { status: "completed" });
+    }
+  } catch (taskError) {
+    console.error("Error updating task for pick list completion:", taskError);
   }
 
   // Update order status
@@ -929,6 +990,19 @@ export async function assignPickListToTeam(
   if (error) {
     console.error("Error assigning pick list to team:", error);
     return { error: error.message };
+  }
+
+  // Update the corresponding task
+  try {
+    const task = await getTaskBySourceRef("dispatch", "pick_list", pickListId);
+    if (task) {
+      await updateTask(task.id, {
+        assignedTeamId: teamId,
+        status: teamId ? "assigned" : "pending",
+      });
+    }
+  } catch (taskError) {
+    console.error("Error updating task for pick list assignment:", taskError);
   }
 
   await logPickListEvent(
@@ -1564,5 +1638,74 @@ export async function getPickListForOrder(orderId: string): Promise<PickList | n
   }
 
   return mapPickListRow(data);
+}
+
+/**
+ * Delete a pick list and its associated task
+ */
+export async function deletePickList(pickListId: string): Promise<{ error?: string }> {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  // Delete pick items first (foreign key constraint)
+  await supabase.from("pick_items").delete().eq("pick_list_id", pickListId);
+
+  // Delete pick list events
+  await supabase.from("pick_list_events").delete().eq("pick_list_id", pickListId);
+
+  // Delete the pick list
+  const { error } = await supabase
+    .from("pick_lists")
+    .delete()
+    .eq("id", pickListId)
+    .eq("org_id", orgId);
+
+  if (error) {
+    console.error("Error deleting pick list:", error);
+    return { error: error.message };
+  }
+
+  // Delete the associated task
+  try {
+    await deleteTaskBySourceRef("dispatch", "pick_list", pickListId);
+  } catch (taskError) {
+    console.error("Error deleting task for pick list:", taskError);
+    // Don't fail the pick list deletion if task deletion fails
+  }
+
+  return {};
+}
+
+/**
+ * Cancel a pick list (soft delete - marks as cancelled)
+ */
+export async function cancelPickList(pickListId: string): Promise<{ error?: string }> {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("pick_lists")
+    .update({ status: "cancelled" })
+    .eq("id", pickListId)
+    .eq("org_id", orgId);
+
+  if (error) {
+    console.error("Error cancelling pick list:", error);
+    return { error: error.message };
+  }
+
+  // Update the corresponding task
+  try {
+    const task = await getTaskBySourceRef("dispatch", "pick_list", pickListId);
+    if (task) {
+      await updateTask(task.id, { status: "cancelled" });
+    }
+  } catch (taskError) {
+    console.error("Error updating task for pick list cancellation:", taskError);
+  }
+
+  await logPickListEvent(orgId, pickListId, null, "cancelled", "Pick list cancelled");
+
+  return {};
 }
 

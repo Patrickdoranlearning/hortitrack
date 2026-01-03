@@ -51,6 +51,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/http";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import type { ProtocolSummary } from "@/lib/planning/types";
+import RecipePerformanceChart from "@/components/production/RecipePerformanceChart";
 
 type RouteNode = {
   id: string;
@@ -244,6 +245,12 @@ export default function RecipeDetailClient({ protocol }: Props) {
             {protocol.isActive ? "Active" : "Archived"}
           </Badge>
         </div>
+
+        {/* Performance Analytics */}
+        <RecipePerformanceChart
+          protocolId={protocol.id}
+          plannedDurationDays={totalDuration}
+        />
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

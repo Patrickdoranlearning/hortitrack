@@ -21,9 +21,10 @@ export const dynamic = "force-dynamic";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { protocolId: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: protocolId } = await params;
     const payload = ProtocolUpdateSchema.parse(await req.json());
     const { supabase, orgId } = await getUserAndOrg();
 
@@ -55,7 +56,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from("protocols")
       .update(updates)
-      .eq("id", params.protocolId)
+      .eq("id", protocolId)
       .eq("org_id", orgId)
       .select(
         [
@@ -97,14 +98,15 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { protocolId: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: protocolId } = await params;
     const { supabase, orgId } = await getUserAndOrg();
     const { error } = await supabase
       .from("protocols")
       .delete()
-      .eq("id", params.protocolId)
+      .eq("id", protocolId)
       .eq("org_id", orgId);
 
     if (error) {
@@ -118,7 +120,4 @@ export async function DELETE(
     return NextResponse.json({ error: message }, { status });
   }
 }
-
-
-
 

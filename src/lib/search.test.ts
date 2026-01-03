@@ -40,13 +40,19 @@ describe('queryMatchesBatch', () => {
     expect(queryMatchesBatch('ht:batch:2251001', mockBatch)).toBe(true);
   });
 
-  it('should match by exact ID', () => {
+  it('should match by exact ID (any format)', () => {
+    // Should match IDs regardless of format (UUID or custom like abc-123)
     expect(queryMatchesBatch('abc-123', mockBatch)).toBe(true);
   });
 
-  it('should match by ID with # prefix (if parseScanCode handles it)', () => {
-    // This test depends on parseScanCode handling #id as an ID.
+  it('should match by ID with # prefix', () => {
+    // # prefix should also work for ID matching
     expect(queryMatchesBatch('#abc-123', mockBatch)).toBe(true);
+  });
+
+  it('should match by UUID ID', () => {
+    const batchWithUuid = { ...mockBatch, id: '123e4567-e89b-12d3-a456-426614174000' };
+    expect(queryMatchesBatch('123e4567-e89b-12d3-a456-426614174000', batchWithUuid)).toBe(true);
   });
 
   it('should match by fuzzy text in plantFamily', () => {
@@ -79,8 +85,11 @@ describe('queryMatchesBatch', () => {
 
   it('should handle leading zeros correctly for batchNumber', () => {
     const batchWithLeadingZero = { ...mockBatch, batchNumber: '00123' };
-    expect(queryMatchesBatch('123', batchWithLeadingZero)).toBe(true);
+    // Exact match with leading zeros
     expect(queryMatchesBatch('00123', batchWithLeadingZero)).toBe(true);
+    // Note: '123' won't match '00123' by exact batch number logic,
+    // but it will match via fuzzy text search since '00123' contains '123'
+    expect(queryMatchesBatch('123', batchWithLeadingZero)).toBe(true);
   });
 
   it('should be case-insensitive for fuzzy matching', () => {

@@ -1,9 +1,10 @@
-
 'use client';
 
 import * as React from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   Users,
   ShoppingCart,
@@ -13,6 +14,7 @@ import {
   TrendingDown,
   PieChart as PieIcon,
   Package,
+  Leaf,
 } from 'lucide-react';
 import { PageFrame } from '@/ui/templates';
 import {
@@ -23,11 +25,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Batch } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import nextDynamic from 'next/dynamic';
 import { calculateLosses, type LossEvent } from '@/lib/metrics/losses';
 import { useCollection } from '@/hooks/use-collection';
+import QuickActions from '@/components/dashboard/QuickActions';
+import SalesKPICards from '@/components/dashboard/SalesKPICards';
+import type { DashboardStats } from '@/app/api/dashboard/stats/route';
 
 const FamilyDistributionChart = nextDynamic(
   () => import('@/components/charts/FamilyDistributionChart'),
@@ -51,6 +57,30 @@ export default function DashboardOverviewPage() {
   const { data: rawBatches, loading: isLoading } = useCollection<any>('batches');
   const { data: sizeRows } = useCollection<any>('plant_sizes');
   const { data: locationRows } = useCollection<any>('nursery_locations');
+
+  // Fetch unified dashboard stats
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        setStatsLoading(true);
+        const statsRes = await fetch('/api/dashboard/stats');
+
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          setDashboardStats(stats);
+        }
+      } catch (err) {
+        console.error('[dashboard] Failed to fetch stats:', err);
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, []);
 
   const sizeLabelById = useMemo(() => {
     const entries: Record<string, string> = {};
@@ -113,7 +143,7 @@ export default function DashboardOverviewPage() {
     location: 'all',
   });
 
-  // Helper: keep only truthy string values (avoid undefined/null → invalid keys)
+  // Helper: keep only truthy string values
   const toStringOptions = (values: Array<string | null | undefined>) => {
     if (!Array.isArray(values)) return [];
     return Array.from(
@@ -167,7 +197,7 @@ export default function DashboardOverviewPage() {
   }, [filteredBatches]);
 
   const readyForSaleBatches = useMemo(() => {
-    return filteredBatches.filter((b) => b.status === 'Ready for Sale');
+    return filteredBatches.filter((b) => b.status === 'Ready for Sale' || b.status === 'Ready');
   }, [filteredBatches]);
 
   const readyForSaleCount = readyForSaleBatches.length;
@@ -225,217 +255,264 @@ export default function DashboardOverviewPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen w-full flex-col p-6">
-        <div className="flex items-center justify-between space-y-2">
-          <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
+      <PageFrame moduleKey="production">
+        <div className="space-y-6">
+          <h1 className="text-4xl font-headline tracking-tight">Dashboard</h1>
+          <Skeleton className="h-20 w-full" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-28 w-full" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mt-6">
-          <Skeleton className="h-80 w-full" />
-          <Skeleton className="h-80 w-full" />
-        </div>
-      </div>
+      </PageFrame>
     );
   }
 
   return (
     <PageFrame moduleKey="production">
-      <div className="space-y-4">
-        <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative md:col-span-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by family, variety, or batch #..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-4xl font-headline tracking-tight">Dashboard</h1>
+        </div>
+
+        {/* Quick Actions */}
+        <QuickActions />
+
+        {/* Sales KPIs */}
+        {!statsLoading && dashboardStats && (
+          <SalesKPICards stats={dashboardStats.sales} />
+        )}
+        {statsLoading && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
           </div>
-          <Select
-            value={filters.status}
-            onValueChange={(value) => setFilters({ ...filters, status: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              {statuses.map((status) => {
-                const key = status; // always a non-empty string now
-                return (
-                  <SelectItem key={key} value={status}>
-                    {status === "all" ? "All Statuses" : status}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.size}
-            onValueChange={(value) => setFilters({ ...filters, size: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by size" />
-            </SelectTrigger>
-            <SelectContent>
-              {sizes.map((size) => {
-                const key = size;
-                return (
-                  <SelectItem key={key} value={size}>
-                    {size === "all" ? "All Sizes" : size}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.location}
-            onValueChange={(value) =>
-              setFilters({ ...filters, location: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by location" />
-            </SelectTrigger>
-            <SelectContent>
-              {locations.map((location) => {
-                const key = location;
-                return (
-                  <SelectItem key={key} value={location}>
-                    {location === "all" ? "All Locations" : location}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Plants in Stock
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {totalPlantsInStock.toLocaleString()}
+        )}
+
+        {/* Tabs */}
+        <Tabs defaultValue="production" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="production" className="flex items-center gap-2">
+              <Leaf className="h-4 w-4" />
+              Production
+            </TabsTrigger>
+            <TabsTrigger value="sales" className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              Sales
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Production Tab */}
+          <TabsContent value="production" className="space-y-4">
+            {/* Production Filters */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Filters & Search
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative md:col-span-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by family, variety, or batch #..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Select
+                  value={filters.status}
+                  onValueChange={(value) => setFilters({ ...filters, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statuses.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status === "all" ? "All Statuses" : status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.size}
+                  onValueChange={(value) => setFilters({ ...filters, size: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sizes.map((size) => (
+                      <SelectItem key={size} value={size}>
+                        {size === "all" ? "All Sizes" : size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.location}
+                  onValueChange={(value) => setFilters({ ...filters, location: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location === "all" ? "All Locations" : location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            {/* Production KPIs */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Plants in Stock
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {totalPlantsInStock.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Across all active batches
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Active Batches
+                  </CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{activeBatchesCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Currently in production
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Ready for Sale
+                  </CardTitle>
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{readyForSaleCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {readyForSaleBatches
+                      .reduce((sum, b) => sum + b.quantity, 0)
+                      .toLocaleString()}{' '}
+                    total plants
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Archived Batches
+                  </CardTitle>
+                  <Archive className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {batches.filter(
+                      (b) =>
+                        b.status === 'Archived' &&
+                        (filters.size === 'all' || b.size === filters.size) &&
+                        (filters.location === 'all' || b.location === filters.location)
+                    ).length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Completed or zeroed out
+                  </p>
+                </CardContent>
+              </Card>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Across all active batches
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Active Batches
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeBatchesCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently in production
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Batches Ready for Sale
-            </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{readyForSaleCount}</div>
-            <p className="text-xs text-muted-foreground">
-              {readyForSaleBatches
-                .reduce((sum, b) => sum + b.quantity, 0)
-                .toLocaleString()}{' '}
-              total plants
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Archived Batches
-            </CardTitle>
-            <Archive className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {
-                batches.filter(
-                  (b) =>
-                    b.status === 'Archived' &&
-                    (filters.size === 'all' || b.size === filters.size) &&
-                    (filters.location === 'all' ||
-                      b.location === filters.location)
-                ).length
-              }
+
+            {/* Production Charts */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card className="min-w-0">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieIcon className="h-5 w-5" />
+                    Plant Family Distribution
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+                    <FamilyDistributionChart data={plantFamilyData} />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="min-w-0">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieIcon className="h-5 w-5" />
+                    Plant Size Distribution
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+                    <SizeDistributionChart data={plantSizeData} />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="col-span-1 md:col-span-2 min-w-0">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingDown className="h-5 w-5" />
+                    Losses by Plant Family
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0 pl-2">
+                  <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
+                    <LossesChart data={lossData.lossByFamily.map(d => ({ name: d.label, value: d.value }))} />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Completed or zeroed out batches
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieIcon />
-              Plant Family Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0">
-            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <FamilyDistributionChart data={plantFamilyData} />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieIcon />
-              Plant Size Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0">
-            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <SizeDistributionChart data={plantSizeData} />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="col-span-1 md:col-span-2 min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingDown />
-              Losses by Plant Family
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0 pl-2">
-            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <LossesChart data={lossData.lossByFamily.map(d => ({ name: d.label, value: d.value }))} />
-            </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          {/* Sales Tab */}
+          <TabsContent value="sales" className="space-y-4">
+            <Card>
+              <CardContent className="p-8 text-center">
+                <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">Sales Dashboard</h3>
+                <p className="text-muted-foreground mb-4">
+                  View detailed revenue metrics, weekly trends, top products, and manage your sales pipeline.
+                </p>
+                <Link href="/sales">
+                  <Button size="lg">
+                    Open Sales Dashboard
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </PageFrame>
   );

@@ -17,7 +17,7 @@ import {
 import { updateCompanyProfileAction } from "@/app/account/actions";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseClient } from "@/lib/supabase/client";
-import { Building2, Upload, X, Loader2, CreditCard, FileText } from "lucide-react";
+import { Building2, Upload, X, Loader2, CreditCard, FileText, MapPin } from "lucide-react";
 import Image from "next/image";
 
 const COUNTRY_OPTIONS = [
@@ -51,6 +51,9 @@ interface CompanyProfileFormProps {
     defaultPaymentTerms: number | null;
     invoicePrefix: string | null;
     invoiceFooterText: string | null;
+    // Location for weather integration
+    latitude: number | null;
+    longitude: number | null;
   };
 }
 
@@ -59,6 +62,8 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
   const [isUploading, setIsUploading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(initialData.logoUrl);
   const [countryCode, setCountryCode] = useState(initialData.countryCode);
+  const [latitude, setLatitude] = useState<string>(initialData.latitude?.toString() || "");
+  const [longitude, setLongitude] = useState<string>(initialData.longitude?.toString() || "");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -132,6 +137,10 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
     formData.set("logoUrl", logoUrl || "");
     formData.set("countryCode", countryCode);
     formData.set("orgId", orgId);
+    
+    // Add location coordinates
+    formData.set("latitude", latitude);
+    formData.set("longitude", longitude);
 
     const result = await updateCompanyProfileAction(formData);
     setIsLoading(false);
@@ -454,6 +463,58 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
               Custom text that appears at the bottom of invoices
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Weather & Location Settings Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Location Settings
+          </CardTitle>
+          <CardDescription>
+            Set your nursery location for weather-based AI care recommendations.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="latitude">Latitude</Label>
+              <Input
+                id="latitude"
+                name="latitude"
+                type="number"
+                step="0.0001"
+                min="-90"
+                max="90"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                disabled={isLoading}
+                placeholder="53.3498"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="longitude">Longitude</Label>
+              <Input
+                id="longitude"
+                name="longitude"
+                type="number"
+                step="0.0001"
+                min="-180"
+                max="180"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                disabled={isLoading}
+                placeholder="-6.2603"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Your nursery&apos;s GPS coordinates. Used by AI care recommendations to provide weather-specific advice.
+            Find your coordinates on <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Google Maps</a> (right-click &rarr; &quot;What&apos;s here?&quot;).
+            Defaults to Dublin, Ireland if not set.
+          </p>
         </CardContent>
       </Card>
 
