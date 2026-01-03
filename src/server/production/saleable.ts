@@ -2,7 +2,20 @@ import "server-only";
 
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { getStatusCodesByBehavior, listAttributeOptions } from "@/server/attributeOptions/service";
-import type { AttributeOption } from "@/lib/attributeOptions";
+
+/**
+ * Saleable Batches Service
+ * 
+ * Note: This module uses getSupabaseAdmin() instead of getUserAndOrg() because:
+ * 1. These functions are designed to be called from server components or API routes
+ *    that have already validated the user's organization access
+ * 2. The orgId is passed explicitly to each function, ensuring data isolation
+ * 3. This allows the functions to work in contexts where cookies may not be available
+ *    (e.g., scheduled jobs, background tasks, or certain server component patterns)
+ * 
+ * Security: All functions filter by orgId to ensure multi-tenant data isolation.
+ * The caller is responsible for ensuring the user has access to the specified org.
+ */
 
 export type SaleableBatch = {
   id: string;
@@ -38,6 +51,13 @@ type FetchOptions = {
   showAll?: boolean; // If true, fetch all batches regardless of status
 };
 
+/**
+ * Fetches batches that are ready or near-ready for sale
+ * 
+ * @param orgId - Organization ID (caller must verify user has access)
+ * @param options - Filtering options
+ * @returns Array of saleable batches with joined reference data
+ */
 export async function fetchSaleableBatches(orgId: string, options: FetchOptions = {}) {
   const supabase = getSupabaseAdmin();
 
@@ -183,7 +203,12 @@ export async function fetchSaleableBatches(orgId: string, options: FetchOptions 
   })) satisfies SaleableBatch[];
 }
 
-// Fetch all locations for filter dropdown
+/**
+ * Fetches all nursery locations for filter dropdowns
+ * 
+ * @param orgId - Organization ID (caller must verify user has access)
+ * @returns Array of locations with id and name
+ */
 export async function fetchLocations(orgId: string) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -199,7 +224,12 @@ export async function fetchLocations(orgId: string) {
   return data ?? [];
 }
 
-// Fetch all varieties for filter dropdown
+/**
+ * Fetches all plant varieties for filter dropdowns
+ * 
+ * @param orgId - Organization ID (caller must verify user has access)
+ * @returns Array of varieties with id and name
+ */
 export async function fetchVarieties(orgId: string) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -215,7 +245,12 @@ export async function fetchVarieties(orgId: string) {
   return data ?? [];
 }
 
-// Fetch production status options with behaviors
+/**
+ * Fetches production status options with their behaviors for filtering
+ * 
+ * @param orgId - Organization ID (caller must verify user has access)
+ * @returns Array of status options with behavior and color information
+ */
 export async function fetchProductionStatusOptions(orgId: string): Promise<ProductionStatusOption[]> {
   const { options } = await listAttributeOptions({
     orgId,

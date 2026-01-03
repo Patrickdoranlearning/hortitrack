@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getUserAndOrg } from '@/server/auth/org';
+import { createTask, updateTask, getTaskBySourceRef } from '@/server/tasks/service';
 
 export type IpmTask = {
   id: string;
@@ -931,6 +932,124 @@ export async function bulkGenerateTasks(options?: {
     return { success: true, data: { batchesProcessed, tasksCreated } };
   } catch (error) {
     console.error('[bulkGenerateTasks] error', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+// =============================================================================
+// GENERIC TASK INTEGRATION
+// =============================================================================
+
+/**
+ * Create a summary task in the generic tasks table for a group of IPM tasks.
+ * This allows IPM work to appear in the unified employee schedule.
+ * 
+ * Called when assigning IPM work to a specific employee for a date.
+ */
+export async function createIpmSummaryTask(options: {
+  productId: string;
+  productName: string;
+  calendarWeek: number;
+  scheduledDate: string;
+  locationId?: string;
+  locationName?: string;
+  batchCount: number;
+  assignedTo?: string;
+}): Promise<TaskResult<{ taskId: string }>> {
+  try {
+    // Create a composite reference ID for linking back to IPM tasks
+    const sourceRefId = `ipm-${options.productId}-week${options.calendarWeek}`;
+    
+    // Check if task already exists
+    const existingTask = await getTaskBySourceRef('plant_health', 'ipm_summary', sourceRefId);
+    if (existingTask) {
+      return { success: true, data: { taskId: existingTask.id } };
+    }
+
+    const task = await createTask({
+      sourceModule: 'plant_health',
+      sourceRefType: 'ipm_summary',
+      sourceRefId,
+      title: `IPM: ${options.productName} - Week ${options.calendarWeek}`,
+      description: options.locationName 
+        ? `Apply ${options.productName} to ${options.batchCount} batches in ${options.locationName}`
+        : `Apply ${options.productName} to ${options.batchCount} batches`,
+      taskType: 'ipm_treatment',
+      assignedTo: options.assignedTo,
+      scheduledDate: options.scheduledDate,
+      plantQuantity: options.batchCount,
+    });
+
+    return { success: true, data: { taskId: task.id } };
+  } catch (error) {
+    console.error('[createIpmSummaryTask] error', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Complete an IPM summary task when the underlying IPM tasks are completed
+ */
+export async function completeIpmSummaryTask(options: {
+  productId: string;
+  calendarWeek: number;
+}): Promise<TaskResult> {
+  try {
+    const sourceRefId = `ipm-${options.productId}-week${options.calendarWeek}`;
+    const task = await getTaskBySourceRef('plant_health', 'ipm_summary', sourceRefId);
+    
+    if (task && task.status !== 'completed') {
+      await updateTask(task.id, { status: 'completed' });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('[completeIpmSummaryTask] error', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Assign IPM work for a specific product and week to an employee
+ */
+export async function assignIpmWork(options: {
+  productId: string;
+  productName: string;
+  calendarWeek: number;
+  scheduledDate: string;
+  assignedTo: string;
+  batchCount: number;
+  locationName?: string;
+}): Promise<TaskResult<{ taskId: string }>> {
+  try {
+    const sourceRefId = `ipm-${options.productId}-week${options.calendarWeek}`;
+    
+    // Check if task already exists
+    const existingTask = await getTaskBySourceRef('plant_health', 'ipm_summary', sourceRefId);
+    
+    if (existingTask) {
+      // Update the existing task with new assignment
+      await updateTask(existingTask.id, {
+        assignedTo: options.assignedTo,
+        scheduledDate: options.scheduledDate,
+        status: 'assigned',
+      });
+      return { success: true, data: { taskId: existingTask.id } };
+    }
+
+    // Create new task
+    return createIpmSummaryTask(options);
+  } catch (error) {
+    console.error('[assignIpmWork] error', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

@@ -95,6 +95,12 @@ export async function updateCompanyProfileAction(formData: FormData) {
   const defaultPaymentTerms = formData.get("defaultPaymentTerms") as string;
   const invoicePrefix = formData.get("invoicePrefix") as string;
   const invoiceFooterText = formData.get("invoiceFooterText") as string;
+  
+  // Location for weather integration
+  const latitudeStr = formData.get("latitude") as string;
+  const longitudeStr = formData.get("longitude") as string;
+  const latitude = latitudeStr ? parseFloat(latitudeStr) : null;
+  const longitude = longitudeStr ? parseFloat(longitudeStr) : null;
 
   if (!orgId) {
     return { error: "Organization ID is required" };
@@ -147,6 +153,9 @@ export async function updateCompanyProfileAction(formData: FormData) {
       default_payment_terms: defaultPaymentTerms ? parseInt(defaultPaymentTerms, 10) : 30,
       invoice_prefix: invoicePrefix?.trim() || "INV",
       invoice_footer_text: invoiceFooterText?.trim() || null,
+      // Location for weather integration
+      latitude: latitude && !isNaN(latitude) ? latitude : null,
+      longitude: longitude && !isNaN(longitude) ? longitude : null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", orgId);

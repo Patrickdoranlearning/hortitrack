@@ -54,6 +54,8 @@ export default async function OrganizationSettingsPage() {
     default_payment_terms: number | null;
     invoice_prefix: string | null;
     invoice_footer_text: string | null;
+    latitude: number | null;
+    longitude: number | null;
   } | null = null;
 
   if (orgId) {
@@ -82,6 +84,8 @@ export default async function OrganizationSettingsPage() {
         default_payment_terms: orgData.default_payment_terms as number | null ?? 30,
         invoice_prefix: orgData.invoice_prefix as string | null ?? "INV",
         invoice_footer_text: orgData.invoice_footer_text as string | null ?? null,
+        latitude: orgData.latitude as number | null ?? null,
+        longitude: orgData.longitude as number | null ?? null,
       };
     }
   }
@@ -140,6 +144,8 @@ export default async function OrganizationSettingsPage() {
             defaultPaymentTerms: organization.default_payment_terms || 30,
             invoicePrefix: organization.invoice_prefix || "INV",
             invoiceFooterText: organization.invoice_footer_text || null,
+            latitude: organization.latitude || null,
+            longitude: organization.longitude || null,
           }}
         />
       </div>

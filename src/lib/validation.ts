@@ -25,13 +25,14 @@ export function mapError(e: unknown): { status: number; body: ErrorBody } {
     }
   }
   
-  // Generic error
-  const msg =
-    (e as any)?.message ||
-    (typeof e === "string" ? e : "Internal Server Error");
+  // Generic error - don't expose internal error messages for security
+  // Log the actual error for debugging but return a safe message to clients
+  if (process.env.NODE_ENV === 'development') {
+    console.error('[mapError] Unhandled error:', e);
+  }
 
   return {
     status: 500,
-    body: { error: msg },
+    body: { error: "Internal Error" },
   };
 }

@@ -19,9 +19,10 @@ export const APP_NAV: NavItem[] = [
   {
     key: "production",
     label: "Production",
-    href: "/",
+    href: "/dashboard",
     icon: Sprout,
     items: [
+      { label: "Dashboard", href: "/dashboard", description: "Production overview and key metrics." },
       { label: "Batches", href: "/", description: "View and manage all batches." },
       { label: "Locations", href: "/production/locations", description: "View what's growing in each location." },
       { label: "Planning", href: "/production/planning", description: "Plan future production cycles." },

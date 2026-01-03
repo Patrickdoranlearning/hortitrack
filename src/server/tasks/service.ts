@@ -20,6 +20,8 @@ export type Task = {
   assignedTo: string | null;
   assignedToName: string | null;
   assignedToEmail: string | null;
+  assignedTeamId: string | null;
+  assignedTeamName: string | null;
   scheduledDate: string | null;
   priority: number;
   status: TaskStatus;
@@ -42,6 +44,7 @@ export type CreateTaskInput = {
   description?: string;
   taskType?: string;
   assignedTo?: string;
+  assignedTeamId?: string;
   scheduledDate?: string;
   priority?: number;
   plantQuantity?: number;
@@ -51,6 +54,7 @@ export type UpdateTaskInput = {
   title?: string;
   description?: string;
   assignedTo?: string | null;
+  assignedTeamId?: string | null;
   scheduledDate?: string | null;
   priority?: number;
   status?: TaskStatus;
@@ -83,6 +87,8 @@ type TaskRow = {
   assigned_to: string | null;
   assigned_to_name?: string | null;
   assigned_to_email?: string | null;
+  assigned_team_id: string | null;
+  assigned_team_name?: string | null;
   scheduled_date: string | null;
   priority: number;
   status: string;
@@ -110,6 +116,8 @@ function mapRowToTask(row: TaskRow): Task {
     assignedTo: row.assigned_to,
     assignedToName: row.assigned_to_name ?? null,
     assignedToEmail: row.assigned_to_email ?? null,
+    assignedTeamId: row.assigned_team_id,
+    assignedTeamName: row.assigned_team_name ?? null,
     scheduledDate: row.scheduled_date,
     priority: row.priority,
     status: row.status as TaskStatus,
@@ -248,9 +256,10 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
       description: input.description ?? null,
       task_type: input.taskType ?? null,
       assigned_to: input.assignedTo ?? null,
+      assigned_team_id: input.assignedTeamId ?? null,
       scheduled_date: input.scheduledDate ?? null,
       priority: input.priority ?? 0,
-      status: input.assignedTo ? "assigned" : "pending",
+      status: input.assignedTo || input.assignedTeamId ? "assigned" : "pending",
       plant_quantity: input.plantQuantity ?? null,
       created_by: user.id,
     })
@@ -262,7 +271,27 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
     throw new Error(error.message);
   }
 
-  return mapRowToTask(data);
+  if (!data) {
+    throw new Error("Task creation returned no data");
+  }
+
+  // Fetch from view to get joined fields (includes computed values like assignedToName)
+  const task = await getTaskById(data.id);
+  if (task) {
+    return task;
+  }
+
+  // Fallback to raw insert data (won't have joined fields, but won't crash)
+  return mapRowToTask({
+    ...data,
+    assigned_team_id: data.assigned_team_id ?? null,
+    // These fields won't exist from insert, provide defaults
+    assigned_to_name: null,
+    assigned_to_email: null,
+    assigned_team_name: null,
+    duration_minutes: null,
+    plants_per_hour: null,
+  });
 }
 
 /**
@@ -279,6 +308,7 @@ export async function updateTask(
   if (input.title !== undefined) updateData.title = input.title;
   if (input.description !== undefined) updateData.description = input.description;
   if (input.assignedTo !== undefined) updateData.assigned_to = input.assignedTo;
+  if (input.assignedTeamId !== undefined) updateData.assigned_team_id = input.assignedTeamId;
   if (input.scheduledDate !== undefined) updateData.scheduled_date = input.scheduledDate;
   if (input.priority !== undefined) updateData.priority = input.priority;
   if (input.status !== undefined) updateData.status = input.status;
@@ -297,7 +327,26 @@ export async function updateTask(
     throw new Error(error.message);
   }
 
-  return mapRowToTask(data);
+  if (!data) {
+    throw new Error(`Task ${taskId} not found or update returned no data`);
+  }
+
+  // Fetch from view to get joined fields
+  const task = await getTaskById(taskId);
+  if (task) {
+    return task;
+  }
+
+  // Fallback to raw update data
+  return mapRowToTask({
+    ...data,
+    assigned_team_id: data.assigned_team_id ?? null,
+    assigned_to_name: null,
+    assigned_to_email: null,
+    assigned_team_name: null,
+    duration_minutes: null,
+    plants_per_hour: null,
+  });
 }
 
 /**
@@ -464,6 +513,62 @@ export async function deleteTask(taskId: string): Promise<void> {
 
   if (error) {
     console.error("[tasks/service] Error deleting task:", error);
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Get a task by its source reference (e.g., pick_list or job)
+ */
+export async function getTaskBySourceRef(
+  sourceModule: SourceModule,
+  sourceRefType: string,
+  sourceRefId: string
+): Promise<Task | null> {
+  const { supabase, orgId } = await getUserAndOrg();
+
+  const { data, error } = await supabase
+    .from("tasks_with_productivity")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("source_module", sourceModule)
+    .eq("source_ref_type", sourceRefType)
+    .eq("source_ref_id", sourceRefId)
+    .maybeSingle();
+
+  if (error) {
+    // PGRST116 means no rows found - that's not an error, just no task exists
+    if (error.code === "PGRST116") {
+      return null;
+    }
+    // For real errors, throw so callers can handle appropriately
+    console.error("[tasks/service] Error fetching task by source ref:", error);
+    throw new Error(error.message);
+  }
+
+  return data ? mapRowToTask(data) : null;
+}
+
+/**
+ * Delete task by source reference
+ */
+export async function deleteTaskBySourceRef(
+  sourceModule: SourceModule,
+  sourceRefType: string,
+  sourceRefId: string
+): Promise<void> {
+  const { supabase, orgId } = await getUserAndOrg();
+
+  const { error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("source_module", sourceModule)
+    .eq("source_ref_type", sourceRefType)
+    .eq("source_ref_id", sourceRefId);
+
+  if (error) {
+    console.error("[tasks/service] Error deleting task by source ref:", error);
     throw new Error(error.message);
   }
 }

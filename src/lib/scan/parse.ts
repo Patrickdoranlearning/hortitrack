@@ -51,6 +51,14 @@ export function parseScanCode(input: string): ParsedScan | null {
 export function candidateBatchNumbers(value: string): string[] {
   const v = value.trim();
   const d = digitsOnly(v);
-  const uniq = new Set<string>([v, d]);
+  // Also try stripping leading zeros for numeric-only values
+  const noLeadingZeros = d.replace(/^0+/, '') || d;
+  const uniq = new Set<string>([v, d, noLeadingZeros]);
   return [...uniq].filter(Boolean);
+}
+
+/** Strip leading zeros from a string for comparison purposes. */
+export function normalizeForComparison(value: string): string {
+  const digits = digitsOnly(value);
+  return digits.replace(/^0+/, '') || digits;
 }

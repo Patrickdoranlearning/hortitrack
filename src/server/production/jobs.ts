@@ -1,6 +1,6 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
-import { createTask, type Task } from "@/server/tasks/service";
+import { createTask, deleteTask, type Task } from "@/server/tasks/service";
 
 // =============================================================================
 // TYPES
@@ -504,6 +504,10 @@ export async function assignJob(
 
 /**
  * Start a job (records started_at)
+ * 
+ * Note: We update the task directly here instead of using startTask() because:
+ * 1. We need the exact same timestamp for both job and task
+ * 2. startTask() creates its own timestamp internally
  */
 export async function startJob(jobId: string): Promise<ProductionJob> {
   const { supabase, orgId } = await getUserAndOrg();
@@ -514,11 +518,14 @@ export async function startJob(jobId: string): Promise<ProductionJob> {
     throw new Error("Job not found");
   }
 
+  // Use same timestamp for both job and task for consistency
+  const startedAt = new Date().toISOString();
+
   const { data, error } = await supabase
     .from("production_jobs")
     .update({
       status: "in_progress",
-      started_at: new Date().toISOString(),
+      started_at: startedAt,
     })
     .eq("id", jobId)
     .eq("org_id", orgId)
@@ -530,16 +537,26 @@ export async function startJob(jobId: string): Promise<ProductionJob> {
     throw new Error(error.message);
   }
 
-  // Also start the associated task
+  // Sync the associated task status with the exact same timestamp
   if (job.taskId) {
-    await supabase
+    const { error: taskError } = await supabase
       .from("tasks")
       .update({
         status: "in_progress",
-        started_at: new Date().toISOString(),
+        started_at: startedAt,
       })
       .eq("id", job.taskId)
       .eq("org_id", orgId);
+
+    if (taskError) {
+      // Log the error with details for debugging, but don't fail the job
+      // Job status is the source of truth, task is for employee scheduling
+      console.error("[jobs/service] Failed to sync task status:", {
+        jobId,
+        taskId: job.taskId,
+        error: taskError.message,
+      });
+    }
   }
 
   const updatedJob = await getJobById(jobId);
@@ -548,6 +565,11 @@ export async function startJob(jobId: string): Promise<ProductionJob> {
 
 /**
  * Complete a job (actualizes batches and logs productivity)
+ * 
+ * Note: We update the task directly here instead of using completeTask() because:
+ * 1. We need the exact same timestamp for both job and task
+ * 2. completeTask() logs productivity without machine/location context
+ * 3. This function handles comprehensive productivity logging with job-specific data
  */
 export async function completeJob(
   jobId: string,
@@ -561,6 +583,7 @@ export async function completeJob(
     throw new Error("Job not found");
   }
 
+  // Use same timestamp for all operations for consistency
   const now = new Date().toISOString();
 
   // Update the job
@@ -582,9 +605,10 @@ export async function completeJob(
     throw new Error(error.message);
   }
 
-  // Complete the associated task
+  // Sync the associated task completion with the exact same timestamp
+  // We don't use completeTask() to avoid duplicate productivity logging
   if (job.taskId) {
-    await supabase
+    const { error: taskError } = await supabase
       .from("tasks")
       .update({
         status: "completed",
@@ -593,9 +617,19 @@ export async function completeJob(
       })
       .eq("id", job.taskId)
       .eq("org_id", orgId);
+
+    if (taskError) {
+      // Log the error with details for debugging, but don't fail the job
+      // Job status is the source of truth, task is for employee scheduling
+      console.error("[jobs/service] Failed to sync task completion:", {
+        jobId,
+        taskId: job.taskId,
+        error: taskError.message,
+      });
+    }
   }
 
-  // Log productivity
+  // Log productivity with full job context (machine, location, etc.)
   if (job.totalPlants > 0 && job.startedAt) {
     const startedAt = new Date(job.startedAt);
     const completedAt = new Date(now);
@@ -604,7 +638,7 @@ export async function completeJob(
     );
 
     if (durationMinutes > 0) {
-      await supabase.from("productivity_logs").insert({
+      const { error: productivityError } = await supabase.from("productivity_logs").insert({
         org_id: orgId,
         user_id: job.assignedTo ?? user.id,
         task_id: job.taskId,
@@ -615,13 +649,21 @@ export async function completeJob(
         machine: job.machine,
         location: job.location,
       });
+
+      if (productivityError) {
+        // Log but don't fail - productivity logging is not critical
+        console.error("[jobs/service] Failed to log productivity:", {
+          jobId,
+          error: productivityError.message,
+        });
+      }
     }
   }
 
   // Actualize the ghost batches (change status from Planned/Incoming to Growing)
   const batches = await getJobBatches(jobId);
   for (const batch of batches) {
-    await supabase
+    const { error: batchError } = await supabase
       .from("batches")
       .update({
         status: "Growing",
@@ -629,6 +671,15 @@ export async function completeJob(
       })
       .eq("id", batch.batchId)
       .eq("org_id", orgId);
+
+    if (batchError) {
+      // Log but continue with other batches
+      console.error("[jobs/service] Failed to update batch status:", {
+        jobId,
+        batchId: batch.batchId,
+        error: batchError.message,
+      });
+    }
   }
 
   const updatedJob = await getJobById(jobId);
@@ -737,13 +788,18 @@ export async function deleteJob(jobId: string): Promise<void> {
     throw new Error(error.message);
   }
 
-  // Delete associated task if exists
+  // Delete associated task using the tasks service
   if (job?.taskId) {
-    await supabase
-      .from("tasks")
-      .delete()
-      .eq("id", job.taskId)
-      .eq("org_id", orgId);
+    try {
+      await deleteTask(job.taskId);
+    } catch (taskError) {
+      // Log but don't fail - the job is already deleted
+      console.error("[jobs/service] Failed to delete associated task:", {
+        jobId,
+        taskId: job.taskId,
+        error: taskError instanceof Error ? taskError.message : "Unknown error",
+      });
+    }
   }
 }
 
