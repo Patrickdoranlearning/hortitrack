@@ -19,6 +19,30 @@ type DialogFormProps<Schema extends ZodTypeAny> = {
   children: (args: { form: ReturnType<typeof useForm<z.infer<Schema>>> }) => React.ReactNode
 }
 
+/**
+ * DialogForm Template
+ * 
+ * A high-level wrapper for modal forms. 
+ * Handles:
+ * 1. Dialog state (open/close).
+ * 2. Form state (loading, error, submission).
+ * 3. Zod validation integration.
+ * 
+ * @example
+ * ```tsx
+ * <DialogForm
+ *   title="Add Item"
+ *   schema={itemSchema}
+ *   defaultValues={{ name: "" }}
+ *   onSubmit={async (values) => { ... }}
+ *   trigger={<Button>Open Form</Button>}
+ * >
+ *   {({ form }) => (
+ *     <FormField ... />
+ *   )}
+ * </DialogForm>
+ * ```
+ */
 export function DialogForm<Schema extends ZodTypeAny>({
   title,
   description,

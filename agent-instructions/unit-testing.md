@@ -352,3 +352,4 @@ See these existing tests for patterns:
 - **API Routes**: `src/app/api/scout-search/__tests__/route.test.ts`
 - **Test Utilities**: `src/lib/__tests__/test-utils.ts`
 
+

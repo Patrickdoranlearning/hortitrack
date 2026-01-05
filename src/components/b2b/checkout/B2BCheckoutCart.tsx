@@ -87,3 +87,4 @@ export function B2BCheckoutTrolley({ trolley, onUpdateItem, onRemoveItem }: Prop
   );
 }
 
+

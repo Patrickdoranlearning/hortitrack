@@ -230,3 +230,4 @@ CREATE TRIGGER trigger_bulk_pick_items_updated_at
 
 
 
+

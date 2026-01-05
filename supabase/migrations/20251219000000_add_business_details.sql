@@ -29,3 +29,4 @@ COMMENT ON COLUMN public.organizations.invoice_footer_text IS 'Custom text to ap
 
 
 
+

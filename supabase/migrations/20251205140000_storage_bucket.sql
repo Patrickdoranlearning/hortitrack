@@ -17,3 +17,4 @@ using ( bucket_id = 'batch-photos' and auth.role() = 'authenticated' );
 
 
 
+
