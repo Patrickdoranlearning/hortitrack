@@ -16,6 +16,17 @@ type AppHeaderProps = {
   className?: string
 }
 
+/**
+ * AppHeader Template
+ * 
+ * The main application navigation bar. Includes:
+ * 1. Brand/Logo area.
+ * 2. Module navigation (HorizontalNav).
+ * 3. Profile menu.
+ * 4. Global "Create" button.
+ * 
+ * This is automatically included in the `PageFrame`.
+ */
 export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps) {
   return (
     <header className={cn(

@@ -27,3 +27,4 @@ left join public.plant_sizes sz on sz.id = b.size_id
 left join public.suppliers sup on sup.id = b.supplier_id
 left join public.plant_varieties v on v.id = b.plant_variety_id;
 
+

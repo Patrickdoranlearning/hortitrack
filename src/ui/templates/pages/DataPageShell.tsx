@@ -14,6 +14,12 @@ type DataPageShellProps = {
   heroActions?: React.ReactNode;
 };
 
+/**
+ * DataPageShell Template (Legacy)
+ * 
+ * @deprecated Use `DataPage` for new features.
+ * This component provides a similar layout to `DataPage` but is being phased out.
+ */
 export function DataPageShell({
   title,
   description,

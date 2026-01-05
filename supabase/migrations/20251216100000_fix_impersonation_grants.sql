@@ -12,3 +12,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.customer_resources TO service_rol
 
 
 
+

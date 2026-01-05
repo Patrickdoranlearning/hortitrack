@@ -5,3 +5,4 @@ ALTER TABLE public.customers
 COMMENT ON COLUMN public.customers.delivery_preferences IS
   'Customer-specific delivery requirements: trolley_type, label_requirements, special_instructions';
 
+

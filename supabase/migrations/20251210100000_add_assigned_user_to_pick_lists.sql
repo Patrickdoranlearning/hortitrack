@@ -16,3 +16,4 @@ COMMENT ON COLUMN public.pick_lists.assigned_user_id IS 'Individual user (picker
 
 
 
+

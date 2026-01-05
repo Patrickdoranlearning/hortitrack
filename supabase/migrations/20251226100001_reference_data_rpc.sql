@@ -167,3 +167,4 @@ COMMENT ON FUNCTION public.get_dashboard_stats IS
    Much faster than fetching all batches and aggregating client-side.';
 
 
+

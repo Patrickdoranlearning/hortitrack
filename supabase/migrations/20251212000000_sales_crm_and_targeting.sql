@@ -283,3 +283,4 @@ GRANT SELECT ON v_sales_admin_inbox TO authenticated;
 GRANT SELECT ON v_sales_rep_targets TO authenticated;
 GRANT SELECT, INSERT ON customer_interactions TO authenticated;
 
+

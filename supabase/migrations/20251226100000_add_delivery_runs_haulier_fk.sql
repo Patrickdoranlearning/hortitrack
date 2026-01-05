@@ -36,3 +36,4 @@ COMMENT ON CONSTRAINT delivery_runs_haulier_id_fkey ON public.delivery_runs IS
   'FK to hauliers table - enables Supabase nested select for haulier data';
 
 
+

@@ -7,3 +7,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.attribute_options TO service_role
 
 
 
+

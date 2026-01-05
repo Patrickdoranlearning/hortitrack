@@ -38,3 +38,4 @@ All guides should:
 - **Include verification** - How to know the task is done correctly
 - **Reference examples** - Point to existing code that demonstrates the pattern
 
+
