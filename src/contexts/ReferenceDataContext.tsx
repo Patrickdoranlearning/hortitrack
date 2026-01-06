@@ -23,6 +23,7 @@ const fetcher = async (): Promise<RefData> => {
     sizes: res.sizes,
     locations: res.locations,
     suppliers: res.suppliers,
+    materials: res.materials,
   };
 };
 

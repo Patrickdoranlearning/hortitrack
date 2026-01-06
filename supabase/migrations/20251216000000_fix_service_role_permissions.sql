@@ -7,3 +7,5 @@ GRANT ALL ON ALL ROUTINES IN SCHEMA public TO service_role;
 
 
 
+
+

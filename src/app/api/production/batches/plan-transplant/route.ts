@@ -6,12 +6,19 @@ import { inferPhase } from "@/lib/production/phase";
 
 const ISOWeek = /^\d{4}-W\d{2}$/i;
 
+const PlannedMaterialSchema = z.object({
+  material_id: z.string().uuid(),
+  quantity: z.number().positive(),
+  notes: z.string().max(500).optional(),
+});
+
 const PlannedTransplantBatchSchema = z.object({
   source_batch_id: z.string().uuid(),
   target_size_id: z.string().uuid(),
   location_id: z.string().uuid().optional(),
   quantity: z.number().int().positive(),
   notes: z.string().max(1000).optional(),
+  materials: z.array(PlannedMaterialSchema).optional().default([]),
 });
 
 const PlanTransplantSchema = z.object({
@@ -256,6 +263,26 @@ export async function POST(req: Request) {
             planType: "transplant",
           },
         });
+
+        // Save planned materials if provided
+        if (transplant.materials && transplant.materials.length > 0) {
+          const materialInserts = transplant.materials.map((mat) => ({
+            org_id: orgId,
+            batch_id: batch.id,
+            material_id: mat.material_id,
+            quantity_planned: mat.quantity,
+            notes: mat.notes || null,
+          }));
+
+          const { error: matError } = await supabase
+            .from("planned_batch_materials")
+            .insert(materialInserts);
+
+          if (matError) {
+            console.warn(`[plan-transplant] Failed to save materials for batch ${batch.id}:`, matError.message);
+            // Don't fail the batch creation, just log the warning
+          }
+        }
 
         results.push({
           ...batch,

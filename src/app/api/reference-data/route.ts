@@ -15,6 +15,7 @@ export async function GET(_req: NextRequest) {
     sizes: [] as any[],
     locations: [] as any[],
     suppliers: [] as any[],
+    materials: [] as any[],
     errors: [] as string[],
   };
 
@@ -28,6 +29,7 @@ export async function GET(_req: NextRequest) {
     results.sizes = cachedData.sizes;
     results.locations = cachedData.locations;
     results.suppliers = cachedData.suppliers;
+    results.materials = cachedData.materials;
 
   } catch (e: any) {
     const isAuthError = /Unauthenticated|No organization/i.test(e?.message);

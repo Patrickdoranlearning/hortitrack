@@ -75,6 +75,18 @@ export type CachedReferenceData = {
     producer_code?: string | null;
     country_code?: string | null;
   }>;
+  materials: Array<{
+    id: string;
+    name: string;
+    part_number: string;
+    category_id: string;
+    category_name?: string | null;
+    category_code?: string | null;
+    parent_group?: string | null;
+    base_uom: string;
+    linked_size_id?: string | null;
+    is_active: boolean;
+  }>;
 };
 
 // ============================================================
@@ -103,6 +115,7 @@ async function fetchReferenceDataViaRPC(orgId: string): Promise<CachedReferenceD
     sizes: row.sizes ?? [],
     locations: row.locations ?? [],
     suppliers: row.suppliers ?? [],
+    materials: row.materials ?? [],
   };
 }
 
@@ -114,7 +127,7 @@ async function fetchReferenceDataDirect(orgId: string): Promise<CachedReferenceD
   const supabase = getSupabaseAdmin();
 
   // Run all queries in parallel
-  const [varietiesRes, sizesRes, locationsRes, suppliersRes] = await Promise.all([
+  const [varietiesRes, sizesRes, locationsRes, suppliersRes, materialsRes] = await Promise.all([
     supabase
       .from("plant_varieties")
       .select("id, name, family, genus, species, category")
@@ -133,13 +146,49 @@ async function fetchReferenceDataDirect(orgId: string): Promise<CachedReferenceD
       .select("id, name, producer_code, country_code")
       .eq("org_id", orgId)
       .order("name"),
+    // Fetch materials for containers and growing media only (for planning wizard)
+    supabase
+      .from("materials")
+      .select(`
+        id,
+        name,
+        part_number,
+        category_id,
+        base_uom,
+        linked_size_id,
+        is_active,
+        category:material_categories(name, code, parent_group)
+      `)
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("name"),
   ]);
+
+  // Transform materials to flatten category info and filter to Containers + Growing Media
+  const materials = (materialsRes.data ?? [])
+    .filter((m: any) => {
+      const parentGroup = m.category?.parent_group;
+      return parentGroup === "Containers" || parentGroup === "Growing Media";
+    })
+    .map((m: any) => ({
+      id: m.id,
+      name: m.name,
+      part_number: m.part_number,
+      category_id: m.category_id,
+      category_name: m.category?.name ?? null,
+      category_code: m.category?.code ?? null,
+      parent_group: m.category?.parent_group ?? null,
+      base_uom: m.base_uom,
+      linked_size_id: m.linked_size_id ?? null,
+      is_active: m.is_active,
+    }));
 
   return {
     varieties: varietiesRes.data ?? [],
     sizes: sizesRes.data ?? [],
     locations: locationsRes.data ?? [],
     suppliers: suppliersRes.data ?? [],
+    materials,
   };
 }
 

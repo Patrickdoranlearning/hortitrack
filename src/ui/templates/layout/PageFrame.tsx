@@ -10,19 +10,6 @@ type PageFrameProps = {
   children: React.ReactNode
 }
 
-/**
- * PageFrame Template
- * 
- * The foundational layout wrapper for all application pages.
- * It provides the AppHeader and centers the main content area.
- * 
- * @example
- * ```tsx
- * <PageFrame moduleKey="production">
- *   <YourPageContent />
- * </PageFrame>
- * ```
- */
 export function PageFrame({ companyName, moduleKey, children }: PageFrameProps) {
   const contextCompanyName = useCompanyName();
   const resolvedCompanyName = companyName ?? contextCompanyName;

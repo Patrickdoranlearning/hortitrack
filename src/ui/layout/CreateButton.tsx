@@ -194,7 +194,7 @@ function MobileCreateButton() {
           <Plus className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="h-[85vh] bg-primary border-0 rounded-t-2xl p-0 flex flex-col">
+      <SheetContent side="bottom" hideCloseButton className="h-[85vh] max-h-[85vh] bg-primary border-0 rounded-t-2xl p-0 flex flex-col overflow-hidden">
         <SheetHeader className="px-4 py-3 border-b border-primary-foreground/20 shrink-0">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-primary-foreground text-lg font-semibold">Create New</SheetTitle>
@@ -208,7 +208,7 @@ function MobileCreateButton() {
             </Button>
           </div>
         </SheetHeader>
-        <div className="overflow-y-auto flex-1 pb-8">
+        <div className="overflow-y-auto flex-1 pb-8 min-h-0">
           {CREATE_MENU.map((category) => {
             const CategoryIcon = category.icon
             const isExpanded = expandedCategory === category.label

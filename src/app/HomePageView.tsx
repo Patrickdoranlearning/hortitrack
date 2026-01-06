@@ -121,6 +121,7 @@ export default function HomePageView({
   const { user, loading: authLoading } = useAuth(); 
   const searchParams = useSearchParams();
   const urlBatchId = searchParams.get("batch");
+  const urlAction = searchParams.get("action");
   const { orgId, setOrgId } = useActiveOrg();
 
   const isReadonly = !user;
@@ -134,6 +135,36 @@ export default function HomePageView({
         setOrgId((batches[0]as any).orgId);
     }
   }, [orgId, batches, setOrgId]);
+
+  // Handle URL action parameters to open dialogs
+  React.useEffect(() => {
+    if (!urlAction) return;
+    
+    // Clear the action from URL immediately
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("action");
+    const qs = params.toString();
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+    
+    // Open the corresponding dialog
+    switch (urlAction) {
+      case "propagation":
+        setIsNewPropagationOpen(true);
+        break;
+      case "checkin":
+        setIsCheckinFormOpen(true);
+        break;
+      case "plan-incoming":
+        setIsPlanIncomingOpen(true);
+        break;
+      case "plan-batches":
+        setIsPlanBatchesOpen(true);
+        break;
+      case "actualise":
+        setIsActualizeOpen(true);
+        break;
+    }
+  }, [urlAction, router, searchParams]);
 
   const { data: nurseryLocations, forceRefresh } = useCollection<NurseryLocation>("nursery_locations");
 

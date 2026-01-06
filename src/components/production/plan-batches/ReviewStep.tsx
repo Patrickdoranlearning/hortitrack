@@ -25,10 +25,13 @@ import {
   Sprout,
   ArrowRightLeft,
   Briefcase,
+  Boxes,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { PlanType } from './PlanTypeStep';
 import type { PlanPropagationStepData, PlannedPropagationEntry } from './PlanPropagationStep';
 import type { PlannedTransplantEntry } from './ConfigureTransplantsStep';
+import type { ConfigureMaterialsStepData, PlannedMaterialEntry } from './ConfigureMaterialsStep';
 
 export type ReviewStepData = {
   globalNotes?: string;
@@ -42,6 +45,7 @@ type ReviewStepProps = {
   plannedWeek?: string; // For transplants: ISO week format YYYY-Www
   propagationData?: PlanPropagationStepData;
   transplantData?: PlannedTransplantEntry[];
+  materialsData?: ConfigureMaterialsStepData;
   initialData: ReviewStepData | null;
   onComplete: (data: ReviewStepData) => void;
   onBack: () => void;
@@ -72,6 +76,7 @@ export function ReviewStep({
   plannedWeek,
   propagationData,
   transplantData,
+  materialsData,
   initialData,
   onComplete,
   onBack,
@@ -105,6 +110,30 @@ export function ReviewStep({
       ? (propagationData?.batches ?? []).map((b) => b.varietyId)
       : (transplantData ?? []).map((t) => t.sourceBatchId)
   ).size;
+
+  // Materials summary
+  const hasMaterials = materialsData && !materialsData.skipMaterials && materialsData.materials.length > 0;
+  const totalMaterialEntries = materialsData?.materials?.length ?? 0;
+  
+  // Group materials by batch for display
+  const materialsByBatch = new Map<string, PlannedMaterialEntry[]>();
+  if (hasMaterials) {
+    materialsData.materials.forEach((mat) => {
+      const existing = materialsByBatch.get(mat.batchTempId) ?? [];
+      materialsByBatch.set(mat.batchTempId, [...existing, mat]);
+    });
+  }
+  
+  // Get batch name by ID for materials display
+  const getBatchName = (batchTempId: string): string => {
+    if (isPropagation) {
+      const batch = propagationData?.batches.find((b) => b.id === batchTempId);
+      return batch?.varietyName ?? 'Unknown';
+    } else {
+      const t = transplantData?.find((t) => t.id === batchTempId);
+      return t ? `${t.sourceBatchNumber} → ${t.targetSizeName}` : 'Unknown';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -256,6 +285,70 @@ export function ReviewStep({
           </Table>
         </CardContent>
       </Card>
+
+      {/* Planned Materials Section */}
+      {hasMaterials && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Planned Materials
+              <Badge variant="default" className="font-normal text-xs">
+                {totalMaterialEntries} item{totalMaterialEntries !== 1 ? 's' : ''}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Batch</TableHead>
+                  <TableHead>Material</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from(materialsByBatch.entries()).flatMap(([batchId, mats]) =>
+                  mats.map((mat, idx) => (
+                    <TableRow key={mat.id}>
+                      {idx === 0 ? (
+                        <TableCell rowSpan={mats.length} className="font-medium align-top">
+                          {getBatchName(batchId)}
+                        </TableCell>
+                      ) : null}
+                      <TableCell>{mat.materialName}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            mat.parentGroup === 'Containers'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-green-50 text-green-700 border-green-200'
+                          )}
+                        >
+                          {mat.categoryName}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {mat.quantity.toLocaleString()} {mat.uom}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Materials Skipped Notice */}
+      {materialsData?.skipMaterials && (
+        <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3 flex items-center gap-2">
+          <Boxes className="h-4 w-4" />
+          <span>No materials specified for these batches</span>
+        </div>
+      )}
 
       {/* Create Production Job */}
       <Card>

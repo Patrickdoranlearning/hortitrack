@@ -353,3 +353,5 @@ See these existing tests for patterns:
 - **Test Utilities**: `src/lib/__tests__/test-utils.ts`
 
 
+
+

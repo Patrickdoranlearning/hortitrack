@@ -11,6 +11,7 @@ import {
   Check,
   Loader2,
   LayoutList,
+  Boxes,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
@@ -23,6 +24,7 @@ import {
   type SourceBatch,
 } from './SelectSourceBatchesStep';
 import { ConfigureTransplantsStep, type ConfigureTransplantsStepData } from './ConfigureTransplantsStep';
+import { ConfigureMaterialsStep, type ConfigureMaterialsStepData } from './ConfigureMaterialsStep';
 import { ReviewStep, type ReviewStepData } from './ReviewStep';
 
 export type PlanBatchesWizardState = {
@@ -30,6 +32,7 @@ export type PlanBatchesWizardState = {
   propagation: PlanPropagationStepData | null;
   sourceSelection: SelectSourceBatchesStepData | null;
   transplantConfig: ConfigureTransplantsStepData | null;
+  materials: ConfigureMaterialsStepData | null;
   review: ReviewStepData | null;
 };
 
@@ -37,6 +40,7 @@ export type PlanBatchesWizardState = {
 const PROPAGATION_STEPS = [
   { id: 'type', label: 'Plan Type', icon: LayoutList },
   { id: 'propagation', label: 'Add Batches', icon: Sprout },
+  { id: 'materials', label: 'Materials', icon: Boxes },
   { id: 'review', label: 'Review', icon: ClipboardCheck },
 ] as const;
 
@@ -44,10 +48,11 @@ const TRANSPLANT_STEPS = [
   { id: 'type', label: 'Plan Type', icon: LayoutList },
   { id: 'select', label: 'Select Batches', icon: Package },
   { id: 'configure', label: 'Configure', icon: ArrowRightLeft },
+  { id: 'materials', label: 'Materials', icon: Boxes },
   { id: 'review', label: 'Review', icon: ClipboardCheck },
 ] as const;
 
-type StepId = 'type' | 'propagation' | 'select' | 'configure' | 'review';
+type StepId = 'type' | 'propagation' | 'select' | 'configure' | 'materials' | 'review';
 
 type PlanBatchesWizardProps = {
   onComplete?: (result: any) => void;
@@ -63,6 +68,7 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
     propagation: null,
     sourceSelection: null,
     transplantConfig: null,
+    materials: null,
     review: null,
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -84,6 +90,9 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
           return wizardState.sourceSelection !== null && wizardState.sourceSelection.selectedBatches.length > 0;
         case 'configure':
           return wizardState.transplantConfig !== null && wizardState.transplantConfig.transplants.length > 0;
+        case 'materials':
+          // Materials step is optional - it's complete if visited (even if skipped)
+          return wizardState.materials !== null;
         case 'review':
           return false; // Review step leads to submit
         default:
@@ -121,6 +130,7 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
       propagation: null,
       sourceSelection: null,
       transplantConfig: null,
+      materials: null,
       review: null,
     }));
     // Navigate to next step based on type
@@ -155,6 +165,14 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
     [goNext]
   );
 
+  const handleMaterialsComplete = useCallback(
+    (data: ConfigureMaterialsStepData) => {
+      setWizardState((prev) => ({ ...prev, materials: data }));
+      goNext();
+    },
+    [goNext]
+  );
+
   const handleReviewComplete = useCallback(
     async (data: ReviewStepData) => {
       setWizardState((prev) => ({ ...prev, review: data }));
@@ -184,6 +202,21 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
             return;
           }
 
+          // Build materials array grouped by batch temp ID
+          const materialsByBatch: Record<string, Array<{ material_id: string; quantity: number; notes?: string }>> = {};
+          if (finalState.materials && !finalState.materials.skipMaterials) {
+            finalState.materials.materials.forEach((mat) => {
+              if (!materialsByBatch[mat.batchTempId]) {
+                materialsByBatch[mat.batchTempId] = [];
+              }
+              materialsByBatch[mat.batchTempId].push({
+                material_id: mat.materialId,
+                quantity: mat.quantity,
+                notes: mat.notes || undefined,
+              });
+            });
+          }
+
           const payload = {
             planned_date: finalState.propagation.plannedDate,
             notes: finalState.review?.globalNotes || undefined,
@@ -193,6 +226,7 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
               location_id: batch.locationId || undefined,
               expected_quantity: batch.expectedQuantity,
               notes: batch.notes || undefined,
+              materials: materialsByBatch[batch.id] || [],
             })),
             create_job: finalState.review?.createJob ?? false,
             job_name: finalState.review?.jobName || undefined,
@@ -235,6 +269,21 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
             return;
           }
 
+          // Build materials array grouped by batch temp ID for transplants
+          const transplantMaterialsByBatch: Record<string, Array<{ material_id: string; quantity: number; notes?: string }>> = {};
+          if (finalState.materials && !finalState.materials.skipMaterials) {
+            finalState.materials.materials.forEach((mat) => {
+              if (!transplantMaterialsByBatch[mat.batchTempId]) {
+                transplantMaterialsByBatch[mat.batchTempId] = [];
+              }
+              transplantMaterialsByBatch[mat.batchTempId].push({
+                material_id: mat.materialId,
+                quantity: mat.quantity,
+                notes: mat.notes || undefined,
+              });
+            });
+          }
+
           const payload = {
             planned_week: finalState.sourceSelection.plannedWeek,
             notes: finalState.review?.globalNotes || undefined,
@@ -244,6 +293,7 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
               location_id: t.locationId || undefined,
               quantity: t.quantity,
               notes: t.notes || undefined,
+              materials: transplantMaterialsByBatch[t.id] || [],
             })),
             create_job: finalState.review?.createJob ?? false,
             job_name: finalState.review?.jobName || undefined,
@@ -394,6 +444,17 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
           />
         )}
 
+        {currentStep === 'materials' && refData && (
+          <ConfigureMaterialsStep
+            referenceData={refData}
+            propagationBatches={wizardState.propagation?.batches}
+            transplantBatches={wizardState.transplantConfig?.transplants}
+            initialData={wizardState.materials}
+            onComplete={handleMaterialsComplete}
+            onBack={goBack}
+          />
+        )}
+
         {currentStep === 'review' && wizardState.planType && (
           <ReviewStep
             planType={wizardState.planType}
@@ -409,6 +470,7 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
             }
             propagationData={wizardState.propagation ?? undefined}
             transplantData={wizardState.transplantConfig?.transplants}
+            materialsData={wizardState.materials ?? undefined}
             initialData={wizardState.review}
             onComplete={handleReviewComplete}
             onBack={goBack}

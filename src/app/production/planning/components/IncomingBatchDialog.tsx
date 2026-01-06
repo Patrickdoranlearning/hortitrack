@@ -352,36 +352,10 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="units"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total units</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={1}
-                            readOnly={isTraySize}
-                            className={isTraySize ? "bg-muted" : ""}
-                            {...field}
-                            value={field.value ?? ""}
-                            onChange={(e) => {
-                              if (!isTraySize) {
-                                const next = e.target.value === "" ? undefined : Number(e.target.value);
-                                field.onChange(next);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="containers"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Containers</FormLabel>
+                        <FormLabel>Cells</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -402,6 +376,32 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                               : "Enter number of trays to calculate total units"}
                           </FormDescription>
                         )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="units"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total units</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={1}
+                            readOnly={isTraySize}
+                            className={isTraySize ? "bg-muted" : ""}
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              if (!isTraySize) {
+                                const next = e.target.value === "" ? undefined : Number(e.target.value);
+                                field.onChange(next);
+                              }
+                            }}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

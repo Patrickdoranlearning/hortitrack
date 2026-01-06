@@ -17,23 +17,6 @@ type DataToolbarProps = {
   extraActions?: React.ReactNode;
 };
 
-/**
- * DataToolbar Template
- * 
- * A standardized action bar for data-heavy pages.
- * Provides consistent placement for:
- * - Search and filters (left)
- * - Import/Export/Add actions (right)
- * 
- * @example
- * ```tsx
- * <DataToolbar
- *   filters={<Input placeholder="Filter..." />}
- *   onAddRow={() => setIsOpen(true)}
- *   onDownloadData={handleExport}
- * />
- * ```
- */
 export function DataToolbar({
   className,
   onDownloadTemplate,

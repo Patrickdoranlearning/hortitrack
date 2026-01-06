@@ -11,6 +11,18 @@ export type ReferenceData = {
   sizes: Array<{ id: string; name: string; container_type: string; cell_multiple: number }>;
   locations: Array<{ id: string; name: string; nursery_site: string }>;
   suppliers: Array<{ id: string; name: string; producer_code: string | null; country_code: string }>;
+  materials: Array<{
+    id: string;
+    name: string;
+    part_number: string;
+    category_id: string;
+    category_name: string | null;
+    category_code: string | null;
+    parent_group: string | null;
+    base_uom: string;
+    linked_size_id: string | null;
+    is_active: boolean;
+  }>;
   errors: string[];
 };
 
@@ -44,7 +56,7 @@ export async function fetchReferenceData(): Promise<ReferenceData> {
     const msg = payload?.error || text;
     console.warn("[refdata] HTTP", res.status, msg);
     // Allow 401 to pass through as a soft error (varieties/sizes may still be present)
-    return { varieties: payload?.varieties ?? [], sizes: payload?.sizes ?? [], locations: payload?.locations ?? [], suppliers: payload?.suppliers ?? [], errors: payload?.errors ?? [`HTTP ${res.status}: ${msg || "no body"}`] };
+    return { varieties: payload?.varieties ?? [], sizes: payload?.sizes ?? [], locations: payload?.locations ?? [], suppliers: payload?.suppliers ?? [], materials: payload?.materials ?? [], errors: payload?.errors ?? [`HTTP ${res.status}: ${msg || "no body"}`] };
   }
 
   const json = await res.json().catch((e) => {
@@ -53,7 +65,7 @@ export async function fetchReferenceData(): Promise<ReferenceData> {
   });
 
   if (!json) {
-    return { varieties: [], sizes: [], locations: [], suppliers: [], errors: ["Invalid JSON"] };
+    return { varieties: [], sizes: [], locations: [], suppliers: [], materials: [], errors: ["Invalid JSON"] };
   }
 
   const errors = Array.isArray(json.errors) ? stringifyErrors(json.errors) : [];
@@ -75,6 +87,7 @@ export async function fetchReferenceData(): Promise<ReferenceData> {
     sizes: json.sizes ?? [],
     locations: json.locations ?? [],
     suppliers: json.suppliers ?? [],
+    materials: json.materials ?? [],
     errors,
   };
 }

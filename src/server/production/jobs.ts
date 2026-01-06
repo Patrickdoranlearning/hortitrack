@@ -1,6 +1,11 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
 import { createTask, deleteTask, type Task } from "@/server/tasks/service";
+import {
+  getTemplatesForProcess,
+  initializeChecklistProgress,
+  type ChecklistProgress,
+} from "@/server/tasks/checklist-service";
 
 // =============================================================================
 // TYPES
@@ -27,6 +32,7 @@ export type ProductionJob = {
   status: JobStatus;
   wizardTemplate: string | null;
   wizardProgress: Record<string, unknown>;
+  checklistProgress: ChecklistProgress;
   startedAt: string | null;
   completedAt: string | null;
   completedBy: string | null;
@@ -109,6 +115,7 @@ type JobRow = {
   status: string;
   wizard_template: string | null;
   wizard_progress: Record<string, unknown> | null;
+  checklist_progress: ChecklistProgress | null;
   started_at: string | null;
   completed_at: string | null;
   completed_by: string | null;
@@ -118,6 +125,11 @@ type JobRow = {
   batch_count?: number;
   total_plants?: number;
   duration_minutes?: number | null;
+};
+
+const DEFAULT_CHECKLIST_PROGRESS: ChecklistProgress = {
+  prerequisites: [],
+  postrequisites: [],
 };
 
 function mapRowToJob(row: JobRow): ProductionJob {
@@ -139,6 +151,7 @@ function mapRowToJob(row: JobRow): ProductionJob {
     status: row.status as JobStatus,
     wizardTemplate: row.wizard_template,
     wizardProgress: row.wizard_progress ?? {},
+    checklistProgress: row.checklist_progress ?? DEFAULT_CHECKLIST_PROGRESS,
     startedAt: row.started_at,
     completedAt: row.completed_at,
     completedBy: row.completed_by,
@@ -801,5 +814,68 @@ export async function deleteJob(jobId: string): Promise<void> {
       });
     }
   }
+}
+
+// =============================================================================
+// CHECKLIST FUNCTIONS
+// =============================================================================
+
+/**
+ * Initialize checklist progress for a job from templates
+ */
+export async function initializeJobChecklists(jobId: string): Promise<ProductionJob> {
+  const { supabase, orgId } = await getUserAndOrg();
+
+  const job = await getJobById(jobId);
+  if (!job) {
+    throw new Error("Job not found");
+  }
+
+  // Get templates for this process type
+  const processType = job.processType ?? "other";
+  const { prerequisites, postrequisites } = await getTemplatesForProcess("production", processType);
+
+  // Initialize progress from templates
+  const checklistProgress = initializeChecklistProgress(prerequisites, postrequisites);
+
+  // Update the job
+  const { error } = await supabase
+    .from("production_jobs")
+    .update({ checklist_progress: checklistProgress })
+    .eq("id", jobId)
+    .eq("org_id", orgId);
+
+  if (error) {
+    console.error("[jobs/service] Error initializing checklists:", error);
+    throw new Error(error.message);
+  }
+
+  return { ...job, checklistProgress };
+}
+
+/**
+ * Update checklist progress for a job
+ */
+export async function updateJobChecklistProgress(
+  jobId: string,
+  checklistProgress: ChecklistProgress
+): Promise<ProductionJob> {
+  const { supabase, orgId } = await getUserAndOrg();
+
+  const { data, error } = await supabase
+    .from("production_jobs")
+    .update({ checklist_progress: checklistProgress })
+    .eq("id", jobId)
+    .eq("org_id", orgId)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[jobs/service] Error updating checklist progress:", error);
+    throw new Error(error.message);
+  }
+
+  const updatedJob = await getJobById(jobId);
+  return updatedJob ?? mapRowToJob(data);
 }
 

@@ -5,10 +5,23 @@ import {
   getJobBatches,
   updateJob,
   deleteJob,
+  updateJobChecklistProgress,
 } from "@/server/production/jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const ChecklistItemProgressSchema = z.object({
+  itemId: z.string(),
+  checked: z.boolean(),
+  skippedReason: z.string().optional(),
+  timestamp: z.string().optional(),
+});
+
+const ChecklistProgressSchema = z.object({
+  prerequisites: z.array(ChecklistItemProgressSchema),
+  postrequisites: z.array(ChecklistItemProgressSchema),
+});
 
 const UpdateJobSchema = z.object({
   name: z.string().min(1).optional(),
@@ -21,6 +34,7 @@ const UpdateJobSchema = z.object({
   scheduledDate: z.string().optional(),
   wizardTemplate: z.string().optional(),
   status: z.enum(["draft", "unassigned", "assigned", "in_progress", "completed", "cancelled"]).optional(),
+  checklistProgress: ChecklistProgressSchema.optional(),
 });
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -57,7 +71,15 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     const body = await req.json();
     const input = UpdateJobSchema.parse(body);
 
-    const job = await updateJob(id, input);
+    // Handle checklist progress update separately
+    if (input.checklistProgress) {
+      const job = await updateJobChecklistProgress(id, input.checklistProgress);
+      return NextResponse.json({ job });
+    }
+
+    // Handle regular job updates
+    const { checklistProgress: _, ...jobUpdates } = input;
+    const job = await updateJob(id, jobUpdates);
 
     return NextResponse.json({ job });
   } catch (error: unknown) {
@@ -87,6 +109,8 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     return NextResponse.json({ error: message }, { status });
   }
 }
+
+
 
 
 
