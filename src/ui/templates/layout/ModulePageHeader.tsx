@@ -9,12 +9,6 @@ type Props = {
   className?: string;
 };
 
-/**
- * ModulePageHeader Template
- * 
- * A header component for the top of a module page.
- * Displays a large title, an optional description, and an actions slot (e.g., for buttons).
- */
 export function ModulePageHeader({ title, description, actionsSlot, className }: Props) {
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-4", className)}>

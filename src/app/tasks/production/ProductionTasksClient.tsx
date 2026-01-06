@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import type { StaffMember } from "@/server/tasks/service";
 import type { ProductionJob, JobBatch } from "@/server/production/jobs";
+import type { ChecklistProgress } from "@/server/tasks/checklist-service";
 
 type Props = {
   initialJobs: ProductionJob[];
@@ -253,14 +254,37 @@ export default function ProductionTasksClient({ initialJobs, staff, availableBat
       });
       toast({ title: "Job updated" });
       mutateJobs();
-      // Update selected job state
-      setSelectedJob((prev) => prev ? { ...prev, ...updates } : null);
+      // Update selected job state with proper typing
+      setSelectedJob((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          name: updates.name ?? prev.name,
+          location: updates.location ?? prev.location,
+          processType: (updates.processType as ProductionJob["processType"]) ?? prev.processType,
+          machine: updates.machine ?? prev.machine,
+        };
+      });
     } catch (error) {
       toast({
         title: "Failed to update job",
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleChecklistUpdate = async (checklistProgress: ChecklistProgress) => {
+    if (!selectedJob) return;
+    try {
+      await fetchJson(`/api/tasks/jobs/${selectedJob.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ checklistProgress }),
+      });
+      // Update selected job state silently (no toast for frequent updates)
+      setSelectedJob((prev) => prev ? { ...prev, checklistProgress } : null);
+    } catch (error) {
+      console.error("Failed to save checklist progress:", error);
     }
   };
 
@@ -401,6 +425,7 @@ export default function ProductionTasksClient({ initialJobs, staff, availableBat
         onComplete={handleWizardComplete}
         onAssign={handleWizardAssign}
         onUpdate={handleWizardUpdate}
+        onChecklistUpdate={handleChecklistUpdate}
       />
     </>
   );

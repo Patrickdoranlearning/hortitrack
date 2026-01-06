@@ -14,7 +14,7 @@ export * from './dialogs'
 export * from './sections'
 
 // Forms
-export * from './forms'
+// export * from './forms'
 
 // Inputs
 export * from './inputs'

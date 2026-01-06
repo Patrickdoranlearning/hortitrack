@@ -16,3 +16,5 @@ CREATE INDEX IF NOT EXISTS product_aliases_variety_idx
 
 
 
+
+

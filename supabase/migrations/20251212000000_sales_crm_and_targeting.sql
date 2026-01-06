@@ -284,3 +284,5 @@ GRANT SELECT ON v_sales_rep_targets TO authenticated;
 GRANT SELECT, INSERT ON customer_interactions TO authenticated;
 
 
+
+

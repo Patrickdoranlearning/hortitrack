@@ -38,6 +38,8 @@ import {
   Leaf,
   SkipForward,
   ArrowLeft,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageFrame } from '@/ui/templates';
@@ -54,13 +56,16 @@ import {
 import { getAvailableBottles, type IpmBottle } from '@/app/actions/ipm-stock';
 import { cn } from '@/lib/utils';
 import { useAttributeOptions } from '@/hooks/useAttributeOptions';
+import { PlantHealthKanban } from './PlantHealthKanban';
 
 export const dynamic = 'force-dynamic';
 
 export default function PlantHealthTasksPage() {
   const [groups, setGroups] = useState<TaskGroup[]>([]);
+  const [allGroups, setAllGroups] = useState<TaskGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<string>('pending');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [selectedGroup, setSelectedGroup] = useState<TaskGroup | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
@@ -103,6 +108,31 @@ export default function PlantHealthTasksPage() {
     }
     setLoading(false);
   }, [tab]);
+
+  // Fetch all groups for kanban view
+  const fetchAllGroups = useCallback(async () => {
+    const [pending, overdue, completed, skipped] = await Promise.all([
+      getGroupedTasks({ status: 'pending' }),
+      getGroupedTasks({ status: 'overdue' }),
+      getGroupedTasks({ status: 'completed' }),
+      getGroupedTasks({ status: 'skipped' }),
+    ]);
+
+    const all: TaskGroup[] = [];
+    if (pending.success && pending.data) all.push(...pending.data);
+    if (overdue.success && overdue.data) all.push(...overdue.data);
+    if (completed.success && completed.data) all.push(...completed.data);
+    if (skipped.success && skipped.data) all.push(...skipped.data);
+
+    setAllGroups(all);
+  }, []);
+
+  // Fetch all groups when switching to kanban view
+  useEffect(() => {
+    if (viewMode === 'kanban') {
+      fetchAllGroups();
+    }
+  }, [viewMode, fetchAllGroups]);
 
   useEffect(() => {
     fetchTasks();
@@ -241,15 +271,50 @@ export default function PlantHealthTasksPage() {
           title="Plant Health Tasks"
           description="IPM spray schedules grouped by product and week"
           actionsSlot={
-            <Link href="/tasks">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Overview
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-lg bg-muted p-1">
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={() => setViewMode('kanban')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
+              <Link href="/tasks">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Overview
+                </Button>
+              </Link>
+            </div>
           }
         />
 
+        {/* Kanban View */}
+        {viewMode === 'kanban' && (
+          <PlantHealthKanban
+            taskGroups={allGroups}
+            isLoading={loading && allGroups.length === 0}
+            onRefresh={fetchAllGroups}
+            onGroupClick={(group) => {
+              setSelectedGroup(group);
+              setSelectedTaskIds(new Set(group.tasks.map(t => t.id)));
+            }}
+          />
+        )}
+
+        {/* List View */}
+        {viewMode === 'list' && (
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="pending" className="gap-2">
@@ -375,6 +440,7 @@ export default function PlantHealthTasksPage() {
             )}
           </TabsContent>
         </Tabs>
+        )}
 
         {/* Task Group Detail Dialog */}
         <Dialog open={!!selectedGroup} onOpenChange={() => setSelectedGroup(null)}>

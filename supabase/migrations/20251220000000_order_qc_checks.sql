@@ -96,3 +96,5 @@ COMMENT ON COLUMN public.order_qc_checks.failed_items IS 'JSON array of failed i
 
 
 
+
+

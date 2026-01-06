@@ -3,7 +3,8 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus, Building2, User, Container, Package, BookOpen } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Database, Ruler, MapPin, Truck, Users, Receipt, ListChecks, Printer, UserPlus, Building2, User, Container, Package, BookOpen, ClipboardCheck, Boxes, BadgeDollarSign, MapPinned } from 'lucide-react';
 import Link from 'next/link';
 import { PageFrame } from '@/ui/templates';
 
@@ -230,6 +231,65 @@ export default function DataManagementPage() {
                 <Link href="/settings/labels">
                   Manage Labels
                 </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Boxes /> Materials Catalog</CardTitle>
+              <CardDescription>Manage pots, trays, soil, labels, and other nursery materials with stock tracking.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/materials/catalog">
+                  Manage Materials
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><ClipboardCheck /> Task Checklists</CardTitle>
+              <CardDescription>Configure prerequisite and postrequisite checklists for production, plant health, and dispatch tasks.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/checklists">
+                  Manage Checklists
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BadgeDollarSign /> Price Lists
+              </CardTitle>
+              <CardDescription>Configure pricing tiers and customer-specific pricing for products.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/sales/price-lists">
+                  Manage Price Lists
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-dashed">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPinned /> Nursery Sites
+                <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
+              </CardTitle>
+              <CardDescription>Group locations by physical site for multi-site nursery operations.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button disabled variant="outline">
+                Manage Sites
               </Button>
             </CardContent>
           </Card>
