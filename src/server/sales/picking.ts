@@ -1708,4 +1708,3 @@ export async function cancelPickList(pickListId: string): Promise<{ error?: stri
 
   return {};
 }
-

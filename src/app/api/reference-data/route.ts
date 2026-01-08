@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLightweightAuth } from "@/lib/auth/lightweight";
-import { getCachedReferenceData, type CachedReferenceData } from "@/lib/cache/reference-data";
-import { SUPABASE_SERVICE_ROLE_KEY } from "@/server/db/supabase";
+import { type CachedReferenceData } from "@/lib/cache/reference-data";
 
 /**
  * Returns reference data for the UI.
- * Optimized: 
- * - Lightweight auth (caches org lookup)
- * - Service_role for data fetching (bypasses RLS overhead)
- * - Falls back to user session if service_role unavailable
- * - In-memory caching (works in dev mode)
+ * Uses the authenticated user's session to fetch data.
  */
 export async function GET(_req: NextRequest) {
   const results = {
@@ -22,28 +17,11 @@ export async function GET(_req: NextRequest) {
   };
 
   try {
-    // Lightweight auth - caches org lookup
+    // Get authenticated user and their org
     const { orgId, supabase } = await getLightweightAuth();
 
-    // Check if service_role key is properly configured
-    const serviceRoleAvailable = SUPABASE_SERVICE_ROLE_KEY && SUPABASE_SERVICE_ROLE_KEY !== "placeholder";
-
-    let cachedData: CachedReferenceData | null = null;
-
-    if (serviceRoleAvailable) {
-      // Try service_role path first (faster, bypasses RLS)
-      try {
-        cachedData = await getCachedReferenceData(orgId);
-      } catch (serviceErr: any) {
-        console.warn("[reference-data] service_role failed, falling back to user session:", serviceErr?.message);
-      }
-    }
-
-    // Fall back to user's authenticated session if service_role unavailable or failed
-    if (!cachedData || (cachedData.varieties.length === 0 && cachedData.suppliers.length === 0)) {
-      console.log("[reference-data] Using user session fallback");
-      cachedData = await fetchReferenceDataWithUserSession(supabase, orgId);
-    }
+    // Fetch reference data using user's authenticated session
+    const cachedData = await fetchReferenceDataWithUserSession(supabase, orgId);
 
     results.varieties = cachedData.varieties;
     results.sizes = cachedData.sizes;
