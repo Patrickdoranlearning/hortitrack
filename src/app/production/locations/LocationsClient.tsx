@@ -279,9 +279,11 @@ export default function LocationsClient() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <span className="text-sm text-muted-foreground">
-              {filteredLocations.length} location{filteredLocations.length !== 1 ? 's' : ''}
-            </span>
+            {!isLoading && (
+              <span className="text-sm text-muted-foreground">
+                {filteredLocations.length} location{filteredLocations.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
 
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>

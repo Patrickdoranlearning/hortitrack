@@ -54,7 +54,7 @@ export function ActualizeReviewStep({
   };
 
   // Calculate stats
-  const totalBatches = entries.length;
+  const totalBatches = Array.isArray(entries) ? entries.length : 0;
   const totalPlannedQuantity = entries.reduce((sum, e) => sum + e.plannedQuantity, 0);
   const totalActualQuantity = entries.reduce((sum, e) => sum + e.actualQuantity, 0);
   const quantityDiff = totalActualQuantity - totalPlannedQuantity;
@@ -131,10 +131,10 @@ export function ActualizeReviewStep({
                 <div className="text-lg font-bold">
                   {entries[0]?.actualDate
                     ? new Date(entries[0].actualDate).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
                     : '—'}
                 </div>
                 <div className="text-sm text-muted-foreground">Actualization Date</div>

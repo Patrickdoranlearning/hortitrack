@@ -83,7 +83,7 @@ export function ActualizeByLocationStep({
 
   // Initialize entries from selected batches or initial data
   const [entries, setEntries] = useState<ActualizedBatchEntry[]>(() => {
-    if (initialData?.entries.length) {
+    if (initialData && Array.isArray(initialData.entries) && initialData.entries.length) {
       return initialData.entries;
     }
 
@@ -356,7 +356,7 @@ export function ActualizeByLocationStep({
                                     value === '__unassigned__'
                                       ? null
                                       : referenceData.locations.find((l) => l.id === value)?.name ??
-                                        null,
+                                      null,
                                 })
                               }
                             >

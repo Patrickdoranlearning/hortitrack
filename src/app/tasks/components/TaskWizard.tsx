@@ -120,7 +120,7 @@ export function TaskWizard({
   const processType = job?.processType ?? "other";
   const { data: templatesData } = useSWR<TemplatesResponse>(
     open && job ? `/api/settings/checklists?sourceModule=production&processType=${processType}&isActive=true` : null,
-    (url) => fetchJson(url)
+    (url: string) => fetchJson<TemplatesResponse>(url)
   );
 
   const allTemplates = templatesData?.templates ?? [];
@@ -156,7 +156,12 @@ export function TaskWizard({
       setEditProcessType(job.processType || "");
 
       // Initialize checklist progress from job or templates
-      if (job.checklistProgress && (job.checklistProgress.prerequisites.length > 0 || job.checklistProgress.postrequisites.length > 0)) {
+      const hasProgress = job.checklistProgress &&
+        Array.isArray(job.checklistProgress.prerequisites) &&
+        Array.isArray(job.checklistProgress.postrequisites) &&
+        (job.checklistProgress.prerequisites.length > 0 || job.checklistProgress.postrequisites.length > 0);
+
+      if (hasProgress) {
         setChecklistProgress(job.checklistProgress);
       } else if (allTemplates.length > 0) {
         setChecklistProgress(initializeProgressFromTemplates(allTemplates));
@@ -225,7 +230,7 @@ export function TaskWizard({
       setActiveTab("complete");
       return;
     }
-    
+
     // Otherwise complete directly
     await finalizeCompletion(result);
   };
