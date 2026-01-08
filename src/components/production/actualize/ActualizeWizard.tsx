@@ -67,9 +67,9 @@ export function ActualizeWizard({
     (stepId: StepId): boolean => {
       switch (stepId) {
         case 'select':
-          return wizardState.selection !== null && wizardState.selection.selectedBatches.length > 0;
+          return !!wizardState.selection && Array.isArray(wizardState.selection.selectedBatches) && wizardState.selection.selectedBatches.length > 0;
         case 'actualize':
-          return wizardState.actualization !== null && wizardState.actualization.entries.length > 0;
+          return !!wizardState.actualization && Array.isArray(wizardState.actualization.entries) && wizardState.actualization.entries.length > 0;
         case 'review':
           return false; // Review step leads to submit
         default:
@@ -239,8 +239,8 @@ export function ActualizeWizard({
                   isCompleted && !isActive && 'bg-primary/20 text-primary cursor-pointer',
                   !isActive && !isCompleted && 'bg-muted text-muted-foreground',
                   index > currentStepIndex &&
-                    !isStepComplete(STEPS[index - 1]?.id as StepId) &&
-                    'cursor-not-allowed opacity-50'
+                  !isStepComplete(STEPS[index - 1]?.id as StepId) &&
+                  'cursor-not-allowed opacity-50'
                 )}
               >
                 {isCompleted && !isActive ? (

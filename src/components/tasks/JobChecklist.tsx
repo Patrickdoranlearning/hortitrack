@@ -79,9 +79,9 @@ export function JobChecklist({
   }, [templates]);
 
   // Get progress for current checklist type
-  const progressList = checklistType === "prerequisite"
-    ? progress.prerequisites
-    : progress.postrequisites;
+  const progressList = (checklistType === "prerequisite"
+    ? progress?.prerequisites
+    : progress?.postrequisites) ?? [];
 
   // Calculate stats
   const stats = React.useMemo(() => {
@@ -202,7 +202,7 @@ export function JobChecklist({
         <CollapsibleContent>
           <div className="mt-2 border rounded-lg divide-y">
             {allItems.map((item) => {
-              const itemProgress = progressList.find((p) => p.itemId === item.id);
+              const itemProgress = progressList?.find((p) => p.itemId === item.id);
               const isChecked = itemProgress?.checked ?? false;
               const isSkipped = !!itemProgress?.skippedReason && !isChecked;
 
@@ -389,15 +389,15 @@ export function isChecklistComplete(
   checklistType: ChecklistType
 ): ChecklistStatus {
   const items = templates.flatMap((t) => t.items);
-  const progressList = checklistType === "prerequisite"
-    ? progress.prerequisites
-    : progress.postrequisites;
+  const progressList = (checklistType === "prerequisite"
+    ? progress?.prerequisites
+    : progress?.postrequisites) ?? [];
 
   let unchecked = 0;
   let skipped = 0;
 
   for (const item of items) {
-    const p = progressList.find((prog) => prog.itemId === item.id);
+    const p = progressList?.find((prog) => prog.itemId === item.id);
     if (p?.checked) {
       continue;
     } else if (p?.skippedReason) {
