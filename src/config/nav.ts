@@ -1,5 +1,5 @@
 
-import { type LucideIcon, ShoppingCart, Receipt, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck } from "lucide-react";
+import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, Store, Target, ListTodo, Package } from "lucide-react";
 
 export type NavItem = {
   key: string;
@@ -19,23 +19,30 @@ export const APP_NAV: NavItem[] = [
   {
     key: "production",
     label: "Production",
-    href: "/",
+    href: "/dashboard",
     icon: Sprout,
     items: [
-      { label: "Dashboard", href: "/", description: "High-level production overview." },
-      { label: "All Batches", href: "/production/batches", description: "View and manage all batches." },
+      { label: "Dashboard", href: "/dashboard", description: "Production overview and key metrics." },
+      { label: "Batches", href: "/", description: "View and manage all batches." },
+      { label: "Locations", href: "/production/locations", description: "View what's growing in each location." },
       { label: "Planning", href: "/production/planning", description: "Plan future production cycles." },
+      { label: "Jobs", href: "/production/jobs", description: "Create and manage production jobs." },
+      { label: "Recipes", href: "/production/recipes", description: "Production recipes and timelines." },
+      { label: "Saleable", href: "/production/saleable", description: "Release-ready batches and quick approvals." },
     ]
   },
   {
     key: "plantHealth",
     label: "Plant Health",
-    href: "/actions",
+    href: "/plant-health",
     icon: ShieldCheck,
     items: [
-      { label: "Health Dashboard", href: "/actions", description: "Tasks and recent activities." },
-      { label: "IPM Log", href: "/actions/ipm", description: "Log and view pest management." },
-      { label: "Flagged Batches", href: "/actions/flagged", description: "Batches needing attention." },
+      { label: "Dashboard", href: "/plant-health", description: "Upcoming treatments and active programs." },
+      { label: "IPM Tasks", href: "/plant-health/tasks", description: "Spray schedules grouped by product and week." },
+      { label: "Scout Mode", href: "/plant-health/scout", description: "Scan locations to log issues and readings." },
+      { label: "Trials", href: "/plant-health/trials", description: "Scientific trials to compare treatments and processes." },
+      { label: "IPM Products", href: "/plant-health/products", description: "Manage IPM product database." },
+      { label: "IPM Programs", href: "/plant-health/programs", description: "Create week-based treatment programs." },
     ]
   },
   {
@@ -46,6 +53,7 @@ export const APP_NAV: NavItem[] = [
     items: [
       { label: "Sales Dashboard", href: "/sales", description: "View recent orders and sales data." },
       { label: "Orders", href: "/sales/orders", description: "Manage all customer orders." },
+      { label: "Targets", href: "/sales/targets", description: "Customer targeting and van-filling." },
       { label: "Customers", href: "/sales/customers", description: "View and manage customers." },
       { label: "Products", href: "/sales/products", description: "Manage the sales catalog." },
     ]
@@ -56,9 +64,45 @@ export const APP_NAV: NavItem[] = [
     href: "/dispatch",
     icon: Truck,
     items: [
-      { label: "Dispatch Dashboard", href: "/dispatch", description: "Packing and delivery schedules." },
-      { label: "Packing", href: "/dispatch/packing", description: "Pack orders for shipment." },
-      { label: "Deliveries", href: "/dispatch/deliveries", description: "Manage delivery routes and status." },
+      { label: "Dashboard", href: "/dispatch", description: "Role-based dispatch dashboard." },
+      { label: "Manager View", href: "/dispatch/manager", description: "Orders, loads, picking, and QC management." },
+      { label: "Picker View", href: "/dispatch/picker", description: "Scan-to-pick and task list for pickers." },
+      { label: "Driver View", href: "/dispatch/driver", description: "Delivery routes and proof of delivery." },
+      { label: "Trolleys", href: "/dispatch/trolleys", description: "Track trolley inventory and customer balances." },
+    ]
+  },
+  {
+    key: "b2b",
+    label: "B2B Portal",
+    href: "/b2b/impersonate",
+    icon: Store,
+    items: [
+      { label: "Place Order (as Customer)", href: "/b2b/impersonate", description: "Impersonate customer to place orders." },
+      { label: "Customer Login", href: "/b2b/login", description: "Direct link to customer portal login." },
+    ]
+  },
+  {
+    key: "materials",
+    label: "Materials",
+    href: "/materials",
+    icon: Package,
+    items: [
+      { label: "Overview", href: "/materials", description: "Materials dashboard and low stock alerts." },
+      { label: "Catalog", href: "/materials/catalog", description: "Manage materials catalog (pots, trays, soil, etc.)." },
+      { label: "Stock", href: "/materials/stock", description: "View and manage stock levels." },
+      { label: "Purchase Orders", href: "/materials/purchase-orders", description: "Create and manage purchase orders." },
+    ]
+  },
+  {
+    key: "tasks",
+    label: "Tasks",
+    href: "/tasks",
+    icon: ListTodo,
+    items: [
+      { label: "Overview", href: "/tasks", description: "Task dashboard and your daily schedule." },
+      { label: "Production Tasks", href: "/tasks/production", description: "Manage and assign production jobs." },
+      { label: "Plant Health Tasks", href: "/tasks/plant-health", description: "IPM and health-related tasks." },
+      { label: "Dispatch Tasks", href: "/tasks/dispatch", description: "Picking, packing, and loading tasks." },
     ]
   },
 ];
@@ -66,6 +110,7 @@ export const APP_NAV: NavItem[] = [
 export const NAV_SALES = [
   { label: "Dashboard", href: "/sales", icon: LayoutDashboard, requiredRoles: [] },
   { label: "Orders", href: "/sales/orders", icon: ShoppingCart, requiredRoles: [] },
+  { label: "Targets", href: "/sales/targets", icon: Target, requiredRoles: [] },
   { label: "Customers", href: "/sales/customers", icon: Users, requiredRoles: [] },
   { label: "Products", href: "/sales/products", icon: PackageSearch, requiredRoles: [] },
 ];

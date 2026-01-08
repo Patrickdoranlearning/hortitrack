@@ -1,7 +1,7 @@
 
 // src/app/api/batches/[batchId]/passport/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserAndOrg } from "@/server/auth/org";
 
 type ComputedPassport = {
   batchId: string;
@@ -19,27 +19,35 @@ function pick<T extends object, K extends keyof T>(obj: T | null | undefined, ke
   return out;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { batchId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ batchId: string }> }) {
   try {
-    const batchId = params.batchId?.trim();
+    const { batchId: rawBatchId } = await params;
+    const batchId = rawBatchId?.trim();
     if (!batchId) {
       return NextResponse.json({ error: "Batch ID is required." }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const { supabase, orgId } = await getUserAndOrg();
+    console.log("[passport] querying batch", { batchId, orgId });
+    
     const { data: batch, error: batchErr } = await supabase
       .from("batches")
       .select(
         `
         id,
+        org_id,
         batch_number,
+        plant_variety_id,
         plant_varieties(name, family),
         supplier_id,
         suppliers (producer_code, country_code)
       `
       )
+      .eq("org_id", orgId)
       .eq("id", batchId)
       .maybeSingle();
+
+    console.log("[passport] query result", { batch: batch?.id, error: batchErr?.message });
 
     if (batchErr) {
       console.error("[passport] batch fetch failed", batchErr);
@@ -47,17 +55,18 @@ export async function GET(_req: NextRequest, { params }: { params: { batchId: st
     }
 
     if (!batch) {
+      console.warn("[passport] batch not found", { batchId, orgId });
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     const aFamily =
       (batch.plant_varieties?.family ??
-        batch.family ??
-        batch.plantFamily ??
+        (batch as any).family ??
+        (batch as any).plantFamily ??
         null) as string | null;
 
     const cBatchNumber =
-      (batch.batch_number ?? batch.batchNumber ?? batchId) as string;
+      (batch.batch_number ?? (batch as any).batchNumber ?? batchId) as string;
 
     let bProducerCode: string | null = null;
     let dCountryCode: string | null = null;

@@ -24,13 +24,41 @@ export const QuantitySnapshotSchema = z.object({
 });
 export type QuantitySnapshot = z.infer<typeof QuantitySnapshotSchema>;
 
-export const PhaseSchema = z.enum(["Propagation", "Plug/Linear", "Potted"]);
+export const PhaseSchema = z.string().min(1);
 export type Phase = z.infer<typeof PhaseSchema>;
+
+export const ProductionStatusSchema = z.string().min(1);
+export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
+
+// Growing status - tracks plant health
+export const GrowingStatusSchema = z.enum([
+  "healthy",
+  "struggling", 
+  "excellent",
+  "looking_good",
+  "damaged",
+  "dead"
+]);
+export type GrowingStatus = z.infer<typeof GrowingStatusSchema>;
+
+// Sales status - tracks availability for sale
+export const SalesStatusSchema = z.enum([
+  "not_available",
+  "available",
+  "reserved",
+  "allocated",
+  "sold"
+]);
+export type SalesStatus = z.infer<typeof SalesStatusSchema>;
 
 export const BatchSchema = z.object({
   id: z.string(),
   batchNumber: z.string(),
   phase: PhaseSchema,
+  status: ProductionStatusSchema.optional(),
+  // Dual status system
+  growingStatus: GrowingStatusSchema.optional().default("healthy"),
+  salesStatus: SalesStatusSchema.optional().default("not_available"),
   varietyId: z.string().optional(),
   variety: z.string().optional(),
   family: z.string().nullable().optional(),
@@ -46,6 +74,7 @@ export const BatchSchema = z.object({
   createdAt: z.string(),
   createdBy: z.string().nullable().optional(),
   currentPassport: PlantPassportSchema,
+  parentBatchId: z.string().nullable().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
@@ -61,15 +90,15 @@ export type BatchEvent = z.infer<typeof BatchEventSchema>;
 
 // Form Schemas
 export const PropagationFormSchema = z.object({
-  varietyId: z.string().optional(),
-  variety: z.string().min(1),
+  varietyId: z.string().uuid("Variety is required"),
+  variety: z.string().optional(),
   family: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
-  sizeId: z.string().min(1),
+  sizeId: z.string().uuid(),
   sizeMultiple: z.number().int().positive(),
   fullTrays: z.number().int().min(0),
   partialCells: z.number().int().min(0).default(0),
-  locationId: z.string().min(1),
+  locationId: z.string().uuid(),
   plantingDate: z.string(), // ISO
 });
 export type PropagationFormInput = z.infer<typeof PropagationFormSchema>;
@@ -100,3 +129,41 @@ export const CheckinFormSchema = z.object({
   qualityStars: z.number().int().min(1).max(6).optional(),
 });
 export type CheckinFormInput = z.infer<typeof CheckinFormSchema>;
+
+// ============================================================================
+// Ancestry Types (for batch lineage/tree views)
+// ============================================================================
+
+export const AncestryNodeSchema = z.object({
+  batchNumber: z.string(),
+  variety: z.string().nullable().optional(),
+  family: z.string().nullable().optional(),
+  supplierName: z.string().nullable().optional(),
+  size: z.string().nullable().optional(),
+  productionWeek: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  locked: z.boolean().optional(),
+});
+export type AncestryNode = z.infer<typeof AncestryNodeSchema>;
+
+export const AncestryResponseSchema = z.array(AncestryNodeSchema);
+
+// ============================================================================
+// Batch Summary Types (for detail views)
+// ============================================================================
+
+export const BatchSummarySchema = z.object({
+  id: z.string(),
+  batchNumber: z.string(),
+  variety: z.string().nullable().optional(),
+  family: z.string().nullable().optional(),
+  size: z.string().nullable().optional(),
+  productionWeek: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  phase: z.string().nullable().optional(),
+  quantity: z.number().nullable().optional(),
+  locationName: z.string().nullable().optional(),
+  plantedAt: z.string().nullable().optional(),
+  supplierName: z.string().nullable().optional(),
+});
+export type BatchSummary = z.infer<typeof BatchSummarySchema>;

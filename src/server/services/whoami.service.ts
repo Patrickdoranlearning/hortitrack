@@ -1,5 +1,9 @@
-import type { DecodedIdToken } from "firebase-admin/auth";
+import type { ServerUser } from "@/server/auth/getUser";
 
-export async function whoami(user: DecodedIdToken) {
-  return { uid: user.uid, email: user.email, role: (user as any).role ?? "user" };
+export async function whoami(user: ServerUser) {
+  return {
+    uid: user.uid,
+    email: user.email,
+    role: user.orgId ? "user" : "guest",
+  };
 }

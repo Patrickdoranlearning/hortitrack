@@ -14,7 +14,7 @@ export async function POST(_: NextRequest, { params }: { params: { orderId: stri
 
     const orderId = params.orderId;
     const { data: order, error: orderErr } = await supabaseAdmin
-      .from("sales_orders")
+      .from("orders")
       .select("id")
       .eq("id", orderId)
       .single();
@@ -22,7 +22,7 @@ export async function POST(_: NextRequest, { params }: { params: { orderId: stri
     if (orderErr || !order) return fail(404, "not_found", "Order not found.");
 
     const { data: lines, error: linesErr } = await supabaseAdmin
-      .from("sales_order_lines")
+      .from("order_items")
       .select("*")
       .eq("order_id", orderId);
 

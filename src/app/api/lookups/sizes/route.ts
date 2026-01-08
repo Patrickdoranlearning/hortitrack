@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("plant_sizes")
     .select("id, name, container_type, cell_multiple")

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -8,8 +9,9 @@ const FLOW = ["confirmed", "picking", "ready", "dispatched", "delivered"] as con
 
 export function UpdateStatusButton({ orderId, current }: { orderId: string; current: string }) {
   const { toast } = useToast();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const idx = FLOW.indexOf(current as any);
+  const idx = FLOW.indexOf(current as (typeof FLOW)[number]);
   const next = idx >= 0 && idx < FLOW.length - 1 ? FLOW[idx + 1] : null;
 
   async function setStatus(status: string) {
@@ -23,8 +25,7 @@ export function UpdateStatusButton({ orderId, current }: { orderId: string; curr
       const j = await res.json();
       if (!res.ok || !j?.ok) throw new Error(j?.error?.message || "Update failed");
       toast({ title: "Status updated", description: `Now ${status}` });
-      // simple refresh
-      window.location.reload();
+      router.refresh();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {

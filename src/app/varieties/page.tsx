@@ -24,11 +24,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { addVarietyAction, updateVarietyAction, deleteVarietyAction } from "../actions";
+import { invalidateReferenceData } from "@/lib/swr/keys";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCollection } from "@/hooks/use-collection";
-import { PageFrame } from "@/ui/templates/PageFrame";
-import { DataPageShell } from "@/components/data-management/DataPageShell";
-import { DataToolbar } from "@/components/data-management/DataToolbar";
+import { PageFrame } from '@/ui/templates';
+import { DataPageShell } from '@/ui/templates';
+import { DataToolbar } from '@/ui/templates';
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -148,6 +149,7 @@ export default function VarietiesPage() {
 
     const result = await deleteVarietyAction(varietyId);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: "Variety deleted", description: `Successfully removed "${varietyToDelete.name}".` });
     } else {
       toast({ variant: "destructive", title: "Delete failed", description: result.error });
@@ -162,6 +164,7 @@ export default function VarietiesPage() {
       : await addVarietyAction(varietyData);
 
     if (result.success) {
+      invalidateReferenceData();
       toast({
         title: isEditing ? "Variety updated" : "Variety added",
         description: `Successfully ${isEditing ? "updated" : "added"} "${result.data?.name}".`,
@@ -223,7 +226,6 @@ export default function VarietiesPage() {
       "Lavandula",
       "angustifolia",
       "Herb",
-      "Shrub",
       "Grey-green",
       "Purple",
       "Summer",
@@ -326,6 +328,11 @@ export default function VarietiesPage() {
       }
     }
 
+    // Invalidate cache if any varieties were created
+    if (created > 0) {
+      invalidateReferenceData();
+    }
+
     let description = `${created} new variet${created === 1 ? "y" : "ies"} added.`;
     if (duplicates.length) {
       description += ` Skipped ${duplicates.length} duplicate${duplicates.length === 1 ? "" : "s"} (${duplicates
@@ -373,6 +380,7 @@ export default function VarietiesPage() {
 
     const result = await addVarietyAction(payload);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: "Variety added", description: `"${values.name}" is now available.` });
       quickForm.reset(defaultQuickValues);
       nameFieldRef.current?.focus();
@@ -384,7 +392,7 @@ export default function VarietiesPage() {
   const focusQuickRow = () => nameFieldRef.current?.focus();
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <DataPageShell
         title="Plant Varieties"
         description="Manage the golden list used across propagation, check-in, and orders."

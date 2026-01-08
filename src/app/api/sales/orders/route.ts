@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { CreateOrderSchema } from "@/lib/sales/types";
 import { createClient } from "@/lib/supabase/server";
 import { ok, fail } from "@/server/utils/envelope";
+import { createPickListFromOrder } from "@/server/sales/picking";
+import { allocateForProductLine } from "@/server/sales/allocation";
+import { getSaleableBatches } from "@/server/sales/inventory";
+import { calculateTrolleysNeeded, type OrderLineForCalculation } from "@/lib/dispatch/trolley-calculation";
 
 export async function GET(req: Request) {
   try {
@@ -14,9 +18,9 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
     const limit = Math.min(Number(searchParams.get("limit") || 50), 200);
 
-    // Base select
+    // Base select - removed count: "exact" for performance (avoids full table scan)
     let q = supabase.from("orders")
-      .select("id, customer_id, status, created_at, customers(name)", { count: "exact" })
+      .select("id, customer_id, status, created_at, customers(name)")
       .order("created_at", { ascending: false })
       .limit(limit);
     if (status && status !== "all") q = q.eq("status", status);
@@ -65,79 +69,237 @@ export async function POST(req: Request) {
     }
     const input = parsed.data;
 
-    // Resolve SKUs and check availability
-    const linesToInsert: any[] = [];
+    // ============================================================
+    // BULK RESOLVE: Fetch all varieties, sizes, and SKUs in 3 queries
+    // instead of 3*N sequential queries (N+1 elimination)
+    // ============================================================
+
+    // Extract unique variety names and size names from all lines
+    const varietyNames = [...new Set(input.lines.map(l => l.plantVariety).filter(Boolean))];
+    const sizeNames = [...new Set(input.lines.map(l => l.size).filter(Boolean))];
+
+    // Parallel bulk fetch: varieties, sizes
+    const [varietiesResult, sizesResult] = await Promise.all([
+      supabase.from('plant_varieties').select('id, name').in('name', varietyNames),
+      supabase.from('plant_sizes').select('id, name').in('name', sizeNames),
+    ]);
+
+    // Build lookup maps for O(1) access
+    const varietyMap = new Map<string, string>();
+    (varietiesResult.data ?? []).forEach(v => varietyMap.set(v.name, v.id));
+
+    const sizeMap = new Map<string, string>();
+    (sizesResult.data ?? []).forEach(s => sizeMap.set(s.name, s.id));
+
+    // Validate all varieties and sizes exist before proceeding
     for (const line of input.lines) {
-      // Find SKU by Variety + Size
-      // We need to resolve Variety ID and Size ID first
-      const { data: variety } = await supabase
-        .from('plant_varieties')
-        .select('id')
-        .eq('name', line.plantVariety)
-        .maybeSingle();
-      const { data: size } = await supabase
-        .from('plant_sizes')
-        .select('id')
-        .eq('name', line.size)
-        .maybeSingle();
-
-      if (!variety || !size) {
-        return fail(400, "invalid_product", `Product not found: ${line.plantVariety} ${line.size}`);
+      if (!varietyMap.has(line.plantVariety)) {
+        return fail(400, "invalid_product", `Variety not found: ${line.plantVariety}`);
       }
+      if (!sizeMap.has(line.size)) {
+        return fail(400, "invalid_product", `Size not found: ${line.size}`);
+      }
+    }
 
-      const { data: sku } = await supabase
-        .from('skus')
-        .select('id')
-        .eq('plant_variety_id', variety.id)
-        .eq('size_id', size.id)
-        .eq('org_id', activeOrgId)
-        .maybeSingle();
+    // Build array of (variety_id, size_id) pairs for SKU lookup
+    const skuLookupPairs = input.lines.map(line => ({
+      varietyId: varietyMap.get(line.plantVariety)!,
+      sizeId: sizeMap.get(line.size)!,
+      key: `${varietyMap.get(line.plantVariety)}-${sizeMap.get(line.size)}`,
+    }));
 
-      if (!sku) {
+    // Bulk fetch SKUs for this org matching any of our variety/size combinations
+    const uniqueVarietyIds = [...new Set(skuLookupPairs.map(p => p.varietyId))];
+    const uniqueSizeIds = [...new Set(skuLookupPairs.map(p => p.sizeId))];
+
+    const { data: skusData } = await supabase
+      .from('skus')
+      .select('id, plant_variety_id, size_id')
+      .eq('org_id', activeOrgId)
+      .in('plant_variety_id', uniqueVarietyIds)
+      .in('size_id', uniqueSizeIds);
+
+    // Build SKU lookup map: "varietyId-sizeId" -> skuId
+    const skuMap = new Map<string, string>();
+    (skusData ?? []).forEach(sku => {
+      skuMap.set(`${sku.plant_variety_id}-${sku.size_id}`, sku.id);
+    });
+
+    // Validate all SKUs exist
+    for (const line of input.lines) {
+      const key = `${varietyMap.get(line.plantVariety)}-${sizeMap.get(line.size)}`;
+      if (!skuMap.has(key)) {
         return fail(400, "no_sku", `SKU not found for: ${line.plantVariety} ${line.size}`);
       }
+    }
 
-      // Optional: Check availability using allocateForProductLine (just for validation)
-      // const allocations = await allocateForProductLine({ ... });
-      // if (allocations.reduce((sum, a) => sum + a.qty, 0) < line.qty) ...
+    // ============================================================
+    // BULK ALLOCATION: Fetch inventory ONCE, then run allocations in parallel
+    // This prevents the "Parallel DoS" pattern where N order lines would
+    // each trigger a separate full inventory fetch
+    // ============================================================
+    const fullInventory = await getSaleableBatches();
 
-      linesToInsert.push({
-        sku_id: sku.id,
-        quantity: line.qty,
-        unit_price_ex_vat: line.unitPrice ?? 0, // Should fetch from price list or SKU default
-        vat_rate: 13.5, // Default
-        description: `${line.plantVariety} - ${line.size}`,
+    const allocationPromises = input.lines.map(line =>
+      allocateForProductLine(
+        {
+          plantVariety: line.plantVariety || "",
+          size: line.size || "",
+          qty: line.qty,
+          specificBatchId: line.specificBatchId,
+          gradePreference: line.gradePreference,
+          preferredBatchNumbers: line.preferredBatchNumbers,
+        },
+        fullInventory // Pass pre-fetched inventory to avoid N redundant queries
+      )
+    );
+
+    const allAllocations = await Promise.all(allocationPromises);
+
+    // Build prepared lines with resolved SKUs and allocations
+    const preparedLines: {
+      skuId: string;
+      qty: number;
+      unitPrice: number;
+      vatRate: number;
+      description: string;
+      allocations: { batchId: string; qty: number }[];
+    }[] = [];
+
+    for (let i = 0; i < input.lines.length; i++) {
+      const line = input.lines[i];
+      const allocations = allAllocations[i];
+      const skuKey = `${varietyMap.get(line.plantVariety)}-${sizeMap.get(line.size)}`;
+
+      const totalAllocated = allocations.reduce((sum, a) => sum + a.qty, 0);
+      if (totalAllocated < line.qty) {
+        return fail(
+          400,
+          "insufficient_stock",
+          `Insufficient stock for ${line.plantVariety} (${line.size}). Requested ${line.qty}, available ${totalAllocated}`
+        );
+      }
+
+      preparedLines.push({
+        skuId: skuMap.get(skuKey)!,
+        qty: line.qty,
+        unitPrice: line.unitPrice ?? 0,
+        vatRate: line.vatRate ?? 13.5,
+        description: line.description ?? `${line.plantVariety} - ${line.size}`,
+        allocations,
       });
     }
 
-    // Create Order
-    const { data: order, error: orderErr } = await supabase
-      .from("orders")
-      .insert({
-        org_id: activeOrgId,
-        customer_id: input.customerId,
-        // store_id: input.storeId, // Not in new schema?
-        order_number: `ORD-${Date.now()}`,
-        status: "confirmed", // MVP
-        requested_delivery_date: input.deliveryDate ?? null,
-        // ship_method: input.shipMethod ?? null, // Not in new schema?
-        notes: input.notesCustomer ?? input.notesInternal ?? null,
-        subtotal_ex_vat: 0, // Calculate?
-        vat_amount: 0,
-        total_inc_vat: 0,
-      })
-      .select("id")
-      .single();
+    // Prepare lines for RPC call
+    const orderNumber = `ORD-${Date.now()}`;
+    const rpcLines = preparedLines.map(line => ({
+      sku_id: line.skuId,
+      quantity: line.qty,
+      unit_price: line.unitPrice,
+      vat_rate: line.vatRate,
+      description: line.description,
+      allocations: line.allocations.map(a => ({
+        batch_id: a.batchId,
+        qty: a.qty,
+      })),
+    }));
 
-    if (orderErr) throw new Error(`Order create failed: ${orderErr.message}`);
-    const orderId = order.id;
+    // Create order atomically with row-level locking to prevent race conditions
+    const { data: rpcResult, error: rpcErr } = await supabase.rpc(
+      "create_order_with_allocations",
+      {
+        p_org_id: activeOrgId,
+        p_customer_id: input.customerId,
+        p_order_number: orderNumber,
+        p_lines: rpcLines,
+        p_requested_delivery_date: input.deliveryDate ?? null,
+        p_notes: input.notesCustomer ?? input.notesInternal ?? null,
+      }
+    );
 
-    // Insert Lines
-    const { error: linesErr } = await supabase
-      .from("sales_order_lines")
-      .insert(linesToInsert.map(l => ({ ...l, order_id: orderId })));
+    if (rpcErr) {
+      console.error("[api:sales/orders][POST] RPC error:", rpcErr);
+      // Parse specific error messages for better UX
+      if (rpcErr.message.includes("Insufficient stock")) {
+        return fail(400, "insufficient_stock", rpcErr.message);
+      }
+      if (rpcErr.message.includes("not found")) {
+        return fail(400, "not_found", rpcErr.message);
+      }
+      throw new Error(`Order creation failed: ${rpcErr.message}`);
+    }
 
-    if (linesErr) throw new Error(`Lines create failed: ${linesErr.message}`);
+    const orderId = (rpcResult as { order_id: string })?.order_id;
+    if (!orderId) throw new Error("Order creation failed: missing order ID");
+
+    // Calculate and update trolleys_estimated
+    try {
+      // Fetch trolley capacity configs, variety families, and shelf quantities in parallel
+      const [capacityResult, varietyFamilyResult, shelfQtyResult] = await Promise.all([
+        supabase
+          .from('trolley_capacity')
+          .select('family, size_id, shelves_per_trolley')
+          .eq('org_id', activeOrgId),
+        supabase
+          .from('plant_varieties')
+          .select('id, family')
+          .in('id', [...varietyMap.values()]),
+        supabase
+          .from('plant_sizes')
+          .select('id, shelf_quantity')
+          .in('id', [...sizeMap.values()]),
+      ]);
+
+      const capacityConfigs = (capacityResult.data || []).map((c: any) => ({
+        family: c.family,
+        sizeId: c.size_id,
+        shelvesPerTrolley: c.shelves_per_trolley,
+      }));
+
+      // Build lookup maps
+      const varietyFamilyMap = new Map<string, string | null>();
+      (varietyFamilyResult.data || []).forEach((v: any) => varietyFamilyMap.set(v.id, v.family));
+
+      const shelfQtyMap = new Map<string, number>();
+      (shelfQtyResult.data || []).forEach((s: any) => shelfQtyMap.set(s.id, s.shelf_quantity ?? 1));
+
+      // Build calculation lines
+      const calcLines: OrderLineForCalculation[] = [];
+      for (const line of input.lines) {
+        const sizeId = sizeMap.get(line.size);
+        const varietyId = varietyMap.get(line.plantVariety);
+
+        if (sizeId) {
+          calcLines.push({
+            sizeId,
+            family: varietyId ? varietyFamilyMap.get(varietyId) ?? null : null,
+            quantity: line.qty,
+            shelfQuantity: shelfQtyMap.get(sizeId) ?? 1,
+          });
+        }
+      }
+
+      if (calcLines.length > 0) {
+        const trolleyResult = calculateTrolleysNeeded(calcLines, capacityConfigs);
+        if (trolleyResult.totalTrolleys > 0) {
+          await supabase
+            .from('orders')
+            .update({ trolleys_estimated: trolleyResult.totalTrolleys })
+            .eq('id', orderId);
+        }
+      }
+    } catch (trolleyErr) {
+      console.warn('Failed to calculate trolleys estimate:', trolleyErr);
+      // Don't fail order creation if trolley calculation fails
+    }
+
+    // Auto-create pick list for confirmed orders (so they appear in dispatch/picking queue)
+    try {
+      await createPickListFromOrder(orderId);
+    } catch (e) {
+      console.error('Failed to create pick list:', e);
+      // Don't fail the order creation if pick list fails
+    }
 
     return NextResponse.json({ ok: true, id: orderId }, { status: 201 });
   } catch (err) {

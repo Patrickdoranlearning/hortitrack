@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 export const BatchDetailSchema = z.object({
   id: z.string(),
@@ -9,14 +9,28 @@ export const BatchDetailSchema = z.object({
   size: z.string().nullable().optional(),
   supplierName: z.string().nullable().optional(),
   productionWeek: z.string().nullable().optional(),
-  status: z.enum(["Active", "Archived", "Dispatched", "Growing", "Propagation", "Potted", "Ready for Sale", "Looking Good", "Plugs/Liners"]).default("Active"),
+  status: z
+    .enum([
+      "Active",
+      "Archived",
+      "Dispatched",
+      "Growing",
+      "Propagation",
+      "Potted",
+      "Ready for Sale",
+      "Looking Good",
+      "Plugs/Liners",
+      "Incoming",
+      "Planned",
+    ])
+    .default("Active"),
   ancestryNodes: z.array(z.any()).optional(), // Add ancestryNodes to the schema
 });
 
 export type BatchDetail = z.infer<typeof BatchDetailSchema>;
 
 export async function getBatchDetail(batchId: string): Promise<BatchDetail | null> {
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
   
   const { data, error } = await supabase
     .from("v_batch_search")

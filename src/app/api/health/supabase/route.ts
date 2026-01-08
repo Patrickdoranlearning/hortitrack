@@ -1,12 +1,12 @@
 
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const supabase = await getSupabaseServerClient();
+    const supabase = await createClient();
     
     // Simple query to check connection
     const { data, error } = await supabase.from("organizations").select("count").limit(1).single();

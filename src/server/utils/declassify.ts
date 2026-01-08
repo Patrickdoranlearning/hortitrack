@@ -1,21 +1,53 @@
-import { Timestamp, FieldValue } from "firebase-admin/firestore";
-
 type Primitive = string | number | boolean | null;
 
-export function declassify<T>(value: T): any {
-  if (value === undefined) return null;
-  if (value === null) return null;
-  if (value instanceof Timestamp) return value.toDate().toISOString();
-  // FieldValue cannot be serialized; drop it
-  if (value instanceof (FieldValue as any)) return null;
-  if (Array.isArray(value)) return value.map((v) => declassify(v));
+type TimestampLike = { toDate: () => Date };
+
+function isTimestampLike(value: unknown): value is TimestampLike {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    typeof (value as TimestampLike).toDate === "function"
+  );
+}
+
+export function declassify<T>(value: T): Primitive | Primitive[] | Record<string, unknown> | null {
+  if (value === undefined || value === null) return null;
+
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value.toISOString() : null;
+  }
+
+  if (isTimestampLike(value)) {
+    try {
+      const date = value.toDate();
+      return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => declassify(item));
+  }
+
   if (typeof value === "object") {
-    const out: Record<string, any> = {};
-    for (const [k, v] of Object.entries(value as any)) {
-      const dv = declassify(v as any);
-      if (dv !== undefined) out[k] = dv;
+    const out: Record<string, unknown> = {};
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      const normalized = declassify(inner);
+      if (normalized !== undefined) {
+        out[key] = normalized;
+      }
     }
     return out;
   }
-  return value as Primitive;
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string" || typeof value === "boolean") {
+    return value;
+  }
+
+  return null;
 }

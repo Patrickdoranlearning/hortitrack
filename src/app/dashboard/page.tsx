@@ -1,22 +1,24 @@
-
 'use client';
 
 import * as React from 'react';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState, useCallback } from 'react';
+import useSWR from 'swr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Users,
-  ShoppingCart,
-  Archive,
-  ArrowLeft,
-  Filter,
-  Search,
-  TrendingDown,
-  PieChart as PieIcon,
-  Package,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import {
+  Sprout,
+  Package,
+  TrendingDown,
+  ShoppingCart,
+  Leaf,
+  X,
+  Filter,
+  MapPin,
+  Calendar,
+  RefreshCw,
+} from 'lucide-react';
+import { PageFrame } from '@/ui/templates';
 import {
   Select,
   SelectContent,
@@ -24,429 +26,493 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import type { Batch } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import nextDynamic from 'next/dynamic';
-import { calculateLosses, type LossEvent } from '@/lib/metrics/losses';
-import { useCollection } from '@/hooks/use-collection';
+import { cn } from '@/lib/utils';
 
-const FamilyDistributionChart = nextDynamic(
-  () => import('@/components/charts/FamilyDistributionChart'),
-  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+// SWR fetcher that returns data directly
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const error = new Error('Failed to fetch dashboard data');
+    throw error;
+  }
+  return res.json();
+};
+import type { ProductionDashboardData } from '@/app/api/production/dashboard/route';
+
+// Dynamic imports for charts
+const PipelineFunnel = nextDynamic(
+  () => import('@/components/charts/PipelineFunnel'),
+  { ssr: false, loading: () => <Skeleton className="h-full w-full" /> }
 );
 
-const SizeDistributionChart = nextDynamic(
-  () => import('@/components/charts/SizeDistributionChart'),
-  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+const VarietyTreemap = nextDynamic(
+  () => import('@/components/charts/VarietyTreemap'),
+  { ssr: false, loading: () => <Skeleton className="h-full w-full" /> }
 );
 
-const LossesChart = nextDynamic(
-  () => import('@/components/charts/LossesChart'),
-  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full" /> }
+const LocationGrid = nextDynamic(
+  () => import('@/components/charts/LocationGrid'),
+  { ssr: false, loading: () => <Skeleton className="h-full w-full" /> }
 );
 
+const LossTrendChart = nextDynamic(
+  () => import('@/components/charts/LossTrendChart'),
+  { ssr: false, loading: () => <Skeleton className="h-full w-full" /> }
+);
+
+const BatchAgeHistogram = nextDynamic(
+  () => import('@/components/charts/BatchAgeHistogram'),
+  { ssr: false, loading: () => <Skeleton className="h-full w-full" /> }
+);
+
+const AvailabilityDonut = nextDynamic(
+  () => import('@/components/charts/AvailabilityDonut'),
+  { ssr: false, loading: () => <Skeleton className="h-full w-full" /> }
+);
+
+const BatchTable = nextDynamic(
+  () => import('@/components/production/dashboard/BatchTable'),
+  { ssr: false, loading: () => <Skeleton className="h-[400px] w-full" /> }
+);
 
 export const dynamic = "force-dynamic";
 
-export default function DashboardOverviewPage() {
-  const { data: rawBatches, loading: isLoading } = useCollection<any>('batches');
-  const { data: sizeRows } = useCollection<any>('plant_sizes');
-  const { data: locationRows } = useCollection<any>('nursery_locations');
+// Filter types
+type Filters = {
+  statuses: string[];
+  families: string[];
+  locations: string[];
+};
 
-  const sizeLabelById = useMemo(() => {
-    const entries: Record<string, string> = {};
-    const list = Array.isArray(sizeRows) ? sizeRows : [];
-    for (const row of list) {
-      if (!row || typeof row !== "object") continue;
-      const id = row.id;
-      const label = typeof row.name === "string" ? row.name.trim() : "";
-      if (typeof id === "string" && label.length) {
-        entries[id] = label;
-      }
+export default function ProductionDashboard() {
+  // Fetch dashboard data
+  const { data, isLoading, error, mutate } = useSWR<ProductionDashboardData>(
+    '/api/production/dashboard',
+    fetcher,
+    {
+      refreshInterval: 60000, // Refresh every minute
+      revalidateOnFocus: true,
     }
-    return entries;
-  }, [sizeRows]);
+  );
 
-  const locationLabelById = useMemo(() => {
-    const entries: Record<string, string> = {};
-    const list = Array.isArray(locationRows) ? locationRows : [];
-    for (const row of list) {
-      if (!row || typeof row !== "object") continue;
-      const id = row.id;
-      const parts: string[] = [];
-      if (typeof row.nursery_site === "string" && row.nursery_site.trim().length) {
-        parts.push(row.nursery_site.trim());
-      }
-      if (typeof row.name === "string" && row.name.trim().length) {
-        parts.push(row.name.trim());
-      }
-      const label = parts.join(" · ") || (typeof row.name === "string" ? row.name.trim() : "");
-      if (typeof id === "string" && label.length) {
-        entries[id] = label;
-      }
-    }
-    return entries;
-  }, [locationRows]);
-
-  const batches = useMemo(() => {
-    const list = Array.isArray(rawBatches) ? rawBatches : [];
-    return list.map((d: any) => ({
-      id: d.id,
-      batchNumber: d.batch_number,
-      plantVariety: d.plant_variety,
-      plantFamily: d.plant_family,
-      category: d.category,
-      plantingDate: d.planting_date,
-      quantity: d.quantity,
-      sizeId: d.size_id,
-      size: sizeLabelById[d.size_id as string] ?? d.size_name ?? 'Unknown size',
-      locationId: d.location_id,
-      location: locationLabelById[d.location_id as string] ?? d.location_name ?? 'Unknown location',
-      status: d.status,
-      logHistory: d.log_history,
-    } as Batch));
-  }, [rawBatches, sizeLabelById, locationLabelById]);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
-    status: 'all',
-    size: 'all',
-    location: 'all',
+  // Filter state
+  const [filters, setFilters] = useState<Filters>({
+    statuses: [],
+    families: [],
+    locations: [],
   });
 
-  // Helper: keep only truthy string values (avoid undefined/null → invalid keys)
-  const toStringOptions = (values: Array<string | null | undefined>) => {
-    if (!Array.isArray(values)) return [];
-    return Array.from(
-      new Set(
-        values
-          .filter((v): v is string => typeof v === "string")
-          .map((v) => v.trim())
-          .filter((v) => v.length > 0)
-      )
-    );
-  };
-
-  const statuses = useMemo(
-    () => ["all", ...toStringOptions(batches.map((b) => b.status))],
-    [batches]
-  );
-  const sizes = useMemo(
-    () => ["all", ...toStringOptions(batches.map((b) => b.size))],
-    [batches]
-  );
-  const locations = useMemo(
-    () => ["all", ...toStringOptions(batches.map((b) => b.location))],
-    [batches]
-  );
-
-  const filteredBatches = useMemo(() => {
-    return batches
-      .filter((batch) =>
-        `${batch.plantFamily} ${batch.plantVariety} ${batch.batchNumber}`
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
-      )
-      .filter(
-        (batch) => filters.status === 'all' || batch.status === filters.status
-      )
-      .filter((batch) => filters.size === 'all' || batch.size === filters.size)
-      .filter(
-        (batch) =>
-          filters.location === 'all' || batch.location === filters.location
-      );
-  }, [batches, filters, searchQuery]);
-
-  const totalPlantsInStock = useMemo(() => {
-    return filteredBatches
-      .filter((b) => b.status !== 'Archived')
-      .reduce((sum, b) => sum + b.quantity, 0);
-  }, [filteredBatches]);
-
-  const activeBatchesCount = useMemo(() => {
-    return filteredBatches.filter((b) => b.status !== 'Archived').length;
-  }, [filteredBatches]);
-
-  const readyForSaleBatches = useMemo(() => {
-    return filteredBatches.filter((b) => b.status === 'Ready for Sale');
-  }, [filteredBatches]);
-
-  const readyForSaleCount = readyForSaleBatches.length;
-
-  const plantFamilyData = useMemo(() => {
-    const familyCounts = filteredBatches.reduce(
-      (acc, batch) => {
-        if (batch.status !== 'Archived') {
-          acc[batch.plantFamily] =
-            (acc[batch.plantFamily] || 0) + batch.quantity;
-        }
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-
-    return Object.entries(familyCounts).map(([name, value]) => ({
-      name,
-      value,
-    }));
-  }, [filteredBatches]);
-
-  const plantSizeData = useMemo(() => {
-    const sizeCounts = filteredBatches.reduce(
-      (acc, batch) => {
-        if (batch.status !== 'Archived') {
-          acc[batch.size] = (acc[batch.size] || 0) + batch.quantity;
-        }
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-    return Object.entries(sizeCounts).map(([name, value]) => ({
-      name,
-      value,
-    }));
-  }, [filteredBatches]);
-
-  const lossData = useMemo(() => {
-    const lossEvents: LossEvent[] = filteredBatches.flatMap(batch => {
-      return (batch.logHistory ?? []).map(log => {
-        if ((log.type === 'LOSS' && typeof log.qty === 'number') || (log.type === 'ADJUST' && typeof log.qty === 'number' && log.qty < 0)) {
-          return {
-            family: batch.plantFamily,
-            quantity: Math.abs(log.qty!),
-            date: new Date(log.date)
-          };
-        }
-        return null;
-      }).filter((e): e is LossEvent => e !== null);
+  // Toggle filter value
+  const toggleFilter = useCallback((key: keyof Filters, value: string) => {
+    setFilters(prev => {
+      const current = prev[key];
+      const next = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      return { ...prev, [key]: next };
     });
-    return calculateLosses(lossEvents);
-  }, [filteredBatches]);
+  }, []);
 
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilters({ statuses: [], families: [], locations: [] });
+  }, []);
 
+  // Check if any filters are active
+  const hasActiveFilters = filters.statuses.length > 0 || 
+    filters.families.length > 0 || 
+    filters.locations.length > 0;
+
+  // Filter batch data
+  const filteredBatches = useMemo(() => {
+    if (!data?.batches || !Array.isArray(data.batches)) return [];
+    
+    return data.batches.filter(batch => {
+      if (filters.statuses.length > 0 && !filters.statuses.includes(batch.status)) {
+        return false;
+      }
+      if (filters.families.length > 0 && !filters.families.includes(batch.family)) {
+        return false;
+      }
+      if (filters.locations.length > 0 && !filters.locations.includes(batch.locationId)) {
+        return false;
+      }
+      return true;
+    });
+  }, [data?.batches, filters]);
+
+  // Calculate filtered totals
+  const filteredTotals = useMemo(() => {
+    const defaultTotals = {
+      totalPlants: 0,
+      availablePlants: 0,
+      growingPlants: 0,
+      reservedPlants: 0,
+      lossLast30Days: 0,
+      lossPercentage: 0,
+    };
+
+    if (!hasActiveFilters) {
+      return data?.totals ?? defaultTotals;
+    }
+
+    let total = 0;
+    let available = 0;
+    let reserved = 0;
+
+    for (const batch of filteredBatches) {
+      total += batch.quantity;
+      available += batch.available;
+      reserved += batch.reserved;
+    }
+
+    return {
+      totalPlants: total,
+      availablePlants: available,
+      growingPlants: total - available,
+      reservedPlants: reserved,
+      lossLast30Days: data?.totals?.lossLast30Days ?? 0,
+      lossPercentage: data?.totals?.lossPercentage ?? 0,
+    };
+  }, [data?.totals, filteredBatches, hasActiveFilters]);
+
+  // Get unique filter options
+  const filterOptions = useMemo(() => {
+    if (!data) return { statuses: [], families: [], locations: [] };
+
+    return {
+      statuses: [...new Set((data.byStatus ?? []).map(s => s.status))],
+      families: [...new Set((data.byFamily ?? []).map(f => f.family))],
+      locations: (data.byLocation ?? []).map(l => ({ id: l.locationId, name: l.locationName })),
+    };
+  }, [data]);
+
+  // Loading state
   if (isLoading) {
     return (
-      <div className="flex min-h-screen w-full flex-col p-6">
-        <div className="flex items-center justify-between space-y-2">
-          <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
+      <PageFrame moduleKey="production">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-headline tracking-tight">Production Dashboard</h1>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-28 w-full" />
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-28 w-full" />
+      </PageFrame>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <PageFrame moduleKey="production">
+        <div className="flex flex-col items-center justify-center py-12 space-y-4">
+          <p className="text-destructive">Failed to load dashboard data</p>
+          <Button onClick={() => mutate()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mt-6">
-          <Skeleton className="h-80 w-full" />
-          <Skeleton className="h-80 w-full" />
-        </div>
-      </div>
+      </PageFrame>
     );
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h1 className="text-4xl font-headline tracking-tight">Production Dashboard</h1>
-        <div className="flex items-center space-x-2">
-          <Button asChild variant="outline">
-            <Link href="/">
-              <ArrowLeft />
-              Back to Nursery Stock
-            </Link>
+    <PageFrame moduleKey="production">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-headline tracking-tight">Production Dashboard</h1>
+            <p className="text-muted-foreground mt-1">
+              Real-time snapshot of your production pipeline
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => mutate()}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
         </div>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative md:col-span-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by family, variety, or batch #..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+
+        {/* Active Filters */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">Filters:</span>
+            {filters.statuses.map(status => (
+              <Badge
+                key={status}
+                variant="secondary"
+                className="cursor-pointer"
+                onClick={() => toggleFilter('statuses', status)}
+              >
+                {status}
+                <X className="h-3 w-3 ml-1" />
+              </Badge>
+            ))}
+            {filters.families.map(family => (
+              <Badge
+                key={family}
+                variant="secondary"
+                className="cursor-pointer bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                onClick={() => toggleFilter('families', family)}
+              >
+                {family}
+                <X className="h-3 w-3 ml-1" />
+              </Badge>
+            ))}
+            {filters.locations.map(locId => {
+              const loc = filterOptions.locations.find(l => l.id === locId);
+              return (
+                <Badge
+                  key={locId}
+                  variant="secondary"
+                  className="cursor-pointer bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                  onClick={() => toggleFilter('locations', locId)}
+                >
+                  {loc?.name ?? locId}
+                  <X className="h-3 w-3 ml-1" />
+                </Badge>
+              );
+            })}
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              Clear all
+            </Button>
           </div>
-          <Select
-            value={filters.status}
-            onValueChange={(value) => setFilters({ ...filters, status: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              {statuses.map((status) => {
-                const key = status; // always a non-empty string now
-                return (
-                  <SelectItem key={key} value={status}>
-                    {status === "all" ? "All Statuses" : status}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.size}
-            onValueChange={(value) => setFilters({ ...filters, size: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by size" />
-            </SelectTrigger>
-            <SelectContent>
-              {sizes.map((size) => {
-                const key = size;
-                return (
-                  <SelectItem key={key} value={size}>
-                    {size === "all" ? "All Sizes" : size}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.location}
-            onValueChange={(value) =>
-              setFilters({ ...filters, location: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by location" />
-            </SelectTrigger>
-            <SelectContent>
-              {locations.map((location) => {
-                const key = location;
-                return (
-                  <SelectItem key={key} value={location}>
-                    {location === "all" ? "All Locations" : location}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Plants in Stock
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {totalPlantsInStock.toLocaleString()}
+        )}
+
+        {/* KPI Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Plants</CardTitle>
+              <Sprout className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                {filteredTotals.totalPlants.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                {filteredBatches.length} active batches
+                  </p>
+                </CardContent>
+              </Card>
+
+          <Card className="border-green-200 dark:border-green-800">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">
+                Available for Sale
+                  </CardTitle>
+              <ShoppingCart className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                {filteredTotals.availablePlants.toLocaleString()}
+              </div>
+                  <p className="text-xs text-muted-foreground">
+                Ready to ship
+                  </p>
+                </CardContent>
+              </Card>
+
+          <Card className="border-blue-200 dark:border-blue-800">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                In Production
+                  </CardTitle>
+              <Leaf className="h-4 w-4 text-blue-600" />
+                </CardHeader>
+                <CardContent>
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                {filteredTotals.growingPlants.toLocaleString()}
+              </div>
+                  <p className="text-xs text-muted-foreground">
+                {filteredTotals.reservedPlants.toLocaleString()} reserved
+                  </p>
+                </CardContent>
+              </Card>
+
+          <Card className="border-red-200 dark:border-red-800">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">
+                Loss (30 days)
+              </CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-700 dark:text-red-400">
+                {(data?.totals?.lossLast30Days ?? 0).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {data?.totals?.lossPercentage ?? 0}% of production
+              </p>
+            </CardContent>
+          </Card>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Across all active batches
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Active Batches
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeBatchesCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently in production
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Batches Ready for Sale
-            </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{readyForSaleCount}</div>
-            <p className="text-xs text-muted-foreground">
-              {readyForSaleBatches
-                .reduce((sum, b) => sum + b.quantity, 0)
-                .toLocaleString()}{' '}
-              total plants
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Archived Batches
-            </CardTitle>
-            <Archive className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {
-                batches.filter(
-                  (b) =>
-                    b.status === 'Archived' &&
-                    (filters.size === 'all' || b.size === filters.size) &&
-                    (filters.location === 'all' ||
-                      b.location === filters.location)
-                ).length
-              }
+
+        {/* Charts Row 1 */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Pipeline Funnel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-4 w-4" />
+                Production Pipeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                {data?.byStatus && data.byStatus.length > 0 ? (
+                  <PipelineFunnel
+                    data={data.byStatus}
+                    activeStatuses={filters.statuses}
+                    onSegmentClick={(status) => toggleFilter('statuses', status)}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Variety Treemap */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Leaf className="h-4 w-4" />
+                Variety Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                {data?.byVariety && data.byVariety.length > 0 ? (
+                  <VarietyTreemap
+                    data={data.byVariety}
+                    activeFamilies={filters.families}
+                    onFamilyClick={(family) => toggleFilter('families', family)}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts Row 2 */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Location Grid */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MapPin className="h-4 w-4" />
+                Location Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                {data?.byLocation && data.byLocation.length > 0 ? (
+                  <LocationGrid
+                    data={data.byLocation}
+                    activeLocations={filters.locations}
+                    onLocationClick={(locId) => toggleFilter('locations', locId)}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Loss Trend */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingDown className="h-4 w-4" />
+                Loss Trend (30 days)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                <LossTrendChart data={data?.lossTimeline ?? []} days={30} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts Row 3 */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Batch Age Histogram */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="h-4 w-4" />
+                Batch Age Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                {data?.byAge && data.byAge.length > 0 ? (
+                  <BatchAgeHistogram data={data.byAge} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Availability Donut */}
+          <Card>
+                <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShoppingCart className="h-4 w-4" />
+                Availability Breakdown
+                  </CardTitle>
+                </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <AvailabilityDonut
+                  available={filteredTotals.availablePlants}
+                  reserved={filteredTotals.reservedPlants}
+                  growing={filteredTotals.growingPlants - filteredTotals.reservedPlants}
+                />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Completed or zeroed out batches
-            </p>
-          </CardContent>
-        </Card>
+
+        {/* Batch Table */}
+            <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Batch Details
+              </span>
+              {hasActiveFilters && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  Showing {filteredBatches.length} of {data?.batches?.length ?? 0} batches
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BatchTable data={filteredBatches} pageSize={15} />
+              </CardContent>
+            </Card>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieIcon />
-              Plant Family Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0">
-            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <FamilyDistributionChart data={plantFamilyData} />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieIcon />
-              Plant Size Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0">
-            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <SizeDistributionChart data={plantSizeData} />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="col-span-1 md:col-span-2 min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingDown />
-              Losses by Plant Family
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0 pl-2">
-            <div className="w-full h-[220px] sm:h-[260px] lg:h-[320px]">
-              <LossesChart data={lossData.lossByFamily.map(d => ({ name: d.label, value: d.value }))} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    </PageFrame>
   );
 }

@@ -1,7 +1,13 @@
 
 'use client';
 
-import * as Recharts from 'recharts';
+import {
+  ResponsiveContainer,
+  BarChart,
+  XAxis,
+  YAxis,
+  Bar,
+} from 'recharts';
 import {
   ChartContainer,
   ChartTooltip,
@@ -27,28 +33,28 @@ const SizeDistributionChart = ({ data }: SizeDistributionChartProps) => {
       config={chartConfig}
       className="w-full h-full"
     >
-      <Recharts.ResponsiveContainer width="100%" height="100%">
-        <Recharts.BarChart 
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart 
           accessibilityLayer 
           data={data}
           margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
         >
-          <Recharts.XAxis
+          <XAxis
             dataKey="name"
             tickLine={false}
             axisLine={false}
             tickMargin={8}
             tick={{ fontSize: 12 }}
           />
-          <Recharts.YAxis tick={{ fontSize: 12 }} />
+          <YAxis tick={{ fontSize: 12 }} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Recharts.Bar
+          <Bar
             dataKey="value"
             fill="var(--color-primary)"
             radius={8}
           />
-        </Recharts.BarChart>
-      </Recharts.ResponsiveContainer>
+        </BarChart>
+      </ResponsiveContainer>
     </ChartContainer>
   );
 };

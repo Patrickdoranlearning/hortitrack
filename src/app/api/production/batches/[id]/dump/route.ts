@@ -61,9 +61,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     return NextResponse.json({ ok: true, new_quantity: newQty, requestId });
-  } catch (e: any) {
-    console.error("[batches/dump]", { requestId, error: e?.message });
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 400;
-    return NextResponse.json({ error: e?.message ?? "Invalid request", requestId }, { status });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Invalid request";
+    const status = /Unauthenticated/i.test(message) ? 401 : 400;
+    return NextResponse.json({ error: message, requestId }, { status });
   }
 }

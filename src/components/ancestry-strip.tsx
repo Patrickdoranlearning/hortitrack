@@ -14,7 +14,23 @@ type Mini = {
   status?: string | null;
   quantity?: number | null;
   initialQuantity?: number | null;
+  proportion?: number | null;
 };
+
+// Helper to normalize batch data from API (handles both camelCase and snake_case)
+function normalizeBatch(data: Record<string, unknown>): Mini {
+  return {
+    id: String(data.id ?? ""),
+    batchNumber: (data.batchNumber ?? data.batch_number ?? null) as string | number | null,
+    plantVariety: (data.plantVariety ?? data.plant_variety ?? null) as string | null,
+    plantFamily: (data.plantFamily ?? data.plant_family ?? null) as string | null,
+    size: (data.size ?? null) as string | null,
+    status: (data.status ?? null) as string | null,
+    quantity: (data.quantity ?? null) as number | null,
+    initialQuantity: (data.initialQuantity ?? data.initial_quantity ?? null) as number | null,
+    proportion: (data.proportion ?? null) as number | null,
+  };
+}
 
 type ResponseShape = {
   parents: Mini[];
@@ -44,8 +60,15 @@ function MiniBatchCard({
       <div className="text-xs uppercase tracking-wide text-muted-foreground">
         {highlight ? "Current batch" : "Batch"}
       </div>
-      <div className="font-semibold text-base">
-        #{data.batchNumber ?? "—"}
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-semibold text-base">
+          #{data.batchNumber ?? "—"}
+        </div>
+        {typeof data.proportion === "number" && !Number.isNaN(data.proportion) && (
+          <span className="text-xs text-muted-foreground">
+            {(data.proportion * 100).toFixed(0)}%
+          </span>
+        )}
       </div>
       <div className="text-sm line-clamp-1">{data.plantVariety ?? "—"}</div>
       <div className="mt-1 text-xs text-muted-foreground">
@@ -100,9 +123,9 @@ export default function AncestryStrip({
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "Failed to load ancestry");
         setData({
-          parents: j.parents ?? [],
-          current: j.current ?? null,
-          children: j.children ?? [],
+          parents: (j.parents ?? []).map((p: Record<string, unknown>) => normalizeBatch(p)),
+          current: j.current ? normalizeBatch(j.current) : null,
+          children: (j.children ?? []).map((c: Record<string, unknown>) => normalizeBatch(c)),
         });
       } catch (e: any) {
         toast({
@@ -134,14 +157,27 @@ export default function AncestryStrip({
     );
   }
 
-  return (
-    <div className="flex items-center gap-3 overflow-x-auto p-2">
-      {data.parents.map((parent) => (
-        <React.Fragment key={parent.id}>
-          <MiniBatchCard data={parent} onSelect={onSelectBatch} />
-          <span className="text-muted-foreground text-lg">→</span>
+  const renderVerticalColumn = (items: Mini[], connector: string) => (
+    <div className="flex flex-col items-stretch gap-2">
+      {items.map((item, idx) => (
+        <React.Fragment key={item.id}>
+          <MiniBatchCard data={item} onSelect={onSelectBatch} />
+          {idx < items.length - 1 && (
+            <span className="text-center text-muted-foreground text-lg">{connector}</span>
+          )}
         </React.Fragment>
       ))}
+    </div>
+  );
+
+  return (
+    <div className="flex items-start gap-4 overflow-x-auto p-2">
+      {data.parents.length > 0 && (
+        <>
+          {renderVerticalColumn(data.parents, "+")}
+          {data.current && <span className="text-muted-foreground text-2xl self-center">→</span>}
+        </>
+      )}
       {data.current && (
         <MiniBatchCard
           data={data.current}
@@ -150,16 +186,11 @@ export default function AncestryStrip({
         />
       )}
       {data.children.length > 0 && data.current && (
-        <span className="text-muted-foreground text-lg">→</span>
+        <>
+          <span className="text-muted-foreground text-2xl self-center">→</span>
+          {renderVerticalColumn(data.children, "↓")}
+        </>
       )}
-      {data.children.map((child, idx) => (
-        <React.Fragment key={child.id}>
-          <MiniBatchCard data={child} onSelect={onSelectBatch} />
-          {idx < data.children.length - 1 && (
-            <span className="text-muted-foreground text-lg">→</span>
-          )}
-        </React.Fragment>
-      ))}
     </div>
   );
 }

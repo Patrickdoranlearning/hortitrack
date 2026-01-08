@@ -45,3 +45,8 @@ firebase-debug.log
 firestore-debug.log.env.local
 .env.local
 .cursor/MCP
+
+# MCP configuration with sensitive credentials
+.mcp.json
+*storybook.log
+storybook-static

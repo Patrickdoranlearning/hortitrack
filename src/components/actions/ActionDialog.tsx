@@ -4,66 +4,51 @@
 import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ActionForm } from "./ActionForm";
+import { ActionMode, ACTION_MODE_LABELS } from "./types";
 import type { Batch, NurseryLocation } from "@/lib/types";
-import { fetchJson } from "@/lib/http";
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   batch: Batch | null;
   locations: NurseryLocation[];
+  mode: ActionMode;
+  onSuccess?: () => void;
 };
 
-export function ActionDialog({ open, onOpenChange, batch, locations = [] }: Props) {
-  const [localLocations, setLocalLocations] = React.useState(locations);
-  const [loading, setLoading] = React.useState(!locations.length);
-
-  React.useEffect(() => {
-    if (!open || locations.length) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const json = await fetchJson<any>("/api/catalog/locations");
-        const items = Array.isArray(json) ? json : [];
-        if (!cancelled) setLocalLocations(items.map((item: any) => ({id: item.value, name: item.label})));
-      } catch (e) {
-        console.error("[ActionDialog] load locations failed", e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open, locations.length]);
-
+export function ActionDialog({ open, onOpenChange, batch, locations = [], mode, onSuccess }: Props) {
+  const resolvedLocations = React.useMemo(() => locations ?? [], [locations]);
+  const hasLocations = resolvedLocations.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" aria-describedby="action-dialog-description">
         <DialogHeader>
-          <DialogTitle>Record Action</DialogTitle>
-          <DialogDescription>
-            {batch
-              ? `Apply an action to batch #${batch.batchNumber ?? batch.id}.`
-              : "Select a batch to log an action."}
+          <DialogTitle>{ACTION_MODE_LABELS[mode].title}</DialogTitle>
+          <DialogDescription id="action-dialog-description">
+            {ACTION_MODE_LABELS[mode].description}
           </DialogDescription>
         </DialogHeader>
         
-        {loading ? (
-          <p>Loading locations...</p>
-        ) : !batch ? (
+        {!batch ? (
           <p className="text-sm text-muted-foreground">
             Select a batch to log an action.
           </p>
+        ) : !hasLocations ? (
+          <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground space-y-2">
+            <p>No nursery locations available.</p>
+            <p>Add locations under Settings → Locations so moves can be logged.</p>
+          </div>
         ) : (
           <ActionForm 
             batch={batch} 
-            locations={localLocations}
+            locations={resolvedLocations}
+            mode={mode}
             onCancel={() => onOpenChange(false)}
-            onSuccess={() => onOpenChange(false)}
+            onSuccess={() => {
+              onOpenChange(false);
+              onSuccess?.();
+            }}
           />
         )}
       </DialogContent>

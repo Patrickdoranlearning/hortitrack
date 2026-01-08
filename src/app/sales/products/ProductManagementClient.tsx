@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Settings2, Trash2, Loader2, Tag, Link as LinkIcon } from "lucide-react";
+import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -35,6 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   addProductBatchAction,
+  autoLinkProductBatchesAction,
   deletePriceListCustomerAction,
   deleteProductAction,
   deleteProductPriceAction,
@@ -43,58 +44,22 @@ import {
   upsertPriceListCustomerAction,
   upsertProductAction,
   upsertProductPriceAction,
+  upsertProductAliasAction,
+  deleteProductAliasAction,
+  updateSkuConfigAction,
 } from "./actions";
+import type { ProductManagementPayload, ProductSummary, ProductSkuOption } from "./types";
+import dynamic from "next/dynamic";
+import SkuManagementSheet from "./SkuManagementSheet";
 
-export type ProductManagementPayload = {
-  products: ProductSummary[];
-  skus: Array<{ id: string; code: string; label: string }>;
-  batches: Array<{ id: string; label: string; status: string; quantity: number }>;
-  priceLists: Array<{ id: string; name: string; currency: string; isDefault: boolean }>;
-  customers: Array<{ id: string; name: string; defaultPriceListId: string | null }>;
-  priceListCustomers: Array<{
-    id: string;
-    priceListId: string;
-    customerId: string;
-    priceListName: string;
-    customerName: string;
-    validFrom: string | null;
-    validTo: string | null;
-  }>;
-};
-
-type ProductSummary = {
-  id: string;
-  name: string;
-  skuId: string;
-  description: string | null;
-  defaultStatus: string | null;
-  heroImageUrl: string | null;
-  isActive: boolean;
-  sku: { id: string; code: string; label: string } | null;
-  batches: Array<{
-    id: string;
-    batchId: string;
-    availableQuantityOverride: number | null;
-    batch: {
-      id: string;
-      batchNumber: string;
-      quantity: number;
-      status: string;
-      varietyName: string | null;
-      sizeName: string | null;
-    } | null;
-  }>;
-  prices: Array<{
-    id: string;
-    priceListId: string;
-    priceListName: string;
-    unitPriceExVat: number;
-    currency: string;
-    minQty: number;
-    validFrom: string | null;
-    validTo: string | null;
-  }>;
-};
+// Lazy load gallery to avoid slowing down initial page load
+const ProductGallerySection = dynamic(
+  () => import("@/components/products/ProductGallerySection"),
+  { 
+    loading: () => <div className="p-4 text-center text-muted-foreground">Loading gallery...</div>,
+    ssr: false 
+  }
+);
 
 export default function ProductManagementClient(props: ProductManagementPayload) {
   const { toast } = useToast();
@@ -102,20 +67,19 @@ export default function ProductManagementClient(props: ProductManagementPayload)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(props.products[0]?.id ?? null);
+  const [skuSheetOpen, setSkuSheetOpen] = useState(false);
+  const [skuOptions, setSkuOptions] = useState(props.skus);
+
+  // Sync skus when props change
+  useEffect(() => {
+    setSkuOptions(props.skus);
+  }, [props.skus]);
 
   const selectedProduct =
     sheetMode === "edit" && selectedProductId ? props.products.find((prod) => prod.id === selectedProductId) ?? null : null;
 
-  const handleCreateProduct = () => {
-    setSheetMode("create");
-    setSelectedProductId(null);
-    setSheetOpen(true);
-  };
-
   const handleManageProduct = (productId: string) => {
-    setSheetMode("edit");
-    setSelectedProductId(productId);
-    setSheetOpen(true);
+    router.push(`/sales/products/${productId}`);
   };
 
   const handleProductSaved = (productId: string | null) => {
@@ -129,20 +93,20 @@ export default function ProductManagementClient(props: ProductManagementPayload)
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div className="space-y-1">
             <CardTitle>Products catalog</CardTitle>
             <CardDescription>Link finished stock to customer-facing products with pricing.</CardDescription>
           </div>
-          <Button onClick={handleCreateProduct}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add product
+          <Button variant="outline" size="sm" onClick={() => setSkuSheetOpen(true)}>
+            <Package className="mr-2 h-4 w-4" />
+            Manage SKUs
           </Button>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {props.products.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              <p>No products yet. Click “Add product” to get started.</p>
+              <p>No products yet. Click "New Product" above to get started.</p>
             </div>
           ) : (
             <Table>
@@ -151,31 +115,59 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                   <TableHead>Name</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Linked batches</TableHead>
+                  <TableHead>Inventory</TableHead>
                   <TableHead>Price lists</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {props.products.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.sku?.code ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={product.isActive ? "default" : "outline"}>
-                        {product.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{product.batches.length}</TableCell>
-                    <TableCell>{product.prices.length}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleManageProduct(product.id)}>
-                        <Settings2 className="mr-2 h-4 w-4" />
-                        Manage
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {props.products.map((product) => {
+                  // Calculate available vs pipeline quantities
+                  const availableBatches = product.batches.filter(b => b.batch?.behavior === "available");
+                  const pipelineBatches = product.batches.filter(b => b.batch?.behavior !== "available");
+                  const availableQty = availableBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+                  const pipelineQty = pipelineBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+                  const varietyNames = Array.from(
+                    new Set(
+                      product.batches
+                        .map((b) => b.batch?.varietyName)
+                        .filter((v): v is string => Boolean(v))
+                    )
+                  );
+                  
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>{product.sku?.code ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={product.isActive ? "default" : "outline"}>
+                          {product.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-green-700">{availableQty} available</span>
+                          {pipelineQty > 0 && (
+                            <span className="text-xs text-muted-foreground">{pipelineQty} coming</span>
+                          )}
+                          {varietyNames.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              Varieties: {varietyNames.slice(0, 3).join(", ")}
+                              {varietyNames.length > 3 && ` +${varietyNames.length - 3} more`}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{product.prices.length}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => handleManageProduct(product.id)}>
+                          <Settings2 className="mr-2 h-4 w-4" />
+                          Manage
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -193,10 +185,23 @@ export default function ProductManagementClient(props: ProductManagementPayload)
         mode={sheetMode}
         onOpenChange={setSheetOpen}
         product={selectedProduct}
-        skus={props.skus}
+        skus={skuOptions}
         batches={props.batches}
         priceLists={props.priceLists}
+        customers={props.customers}
         onProductSaved={handleProductSaved}
+      />
+
+      <SkuManagementSheet
+        open={skuSheetOpen}
+        onOpenChange={setSkuSheetOpen}
+        skus={skuOptions}
+        plantVarieties={props.plantVarieties}
+        plantSizes={props.plantSizes}
+        onSkuCreated={(newSku) => {
+          setSkuOptions((prev) => [newSku, ...prev]);
+          toast({ title: "SKU created", description: `${newSku.code} has been added.` });
+        }}
       />
     </div>
   );
@@ -210,10 +215,11 @@ type ComposerProps = {
   skus: ProductManagementPayload["skus"];
   batches: ProductManagementPayload["batches"];
   priceLists: ProductManagementPayload["priceLists"];
+  customers: ProductManagementPayload["customers"];
   onProductSaved: (productId: string | null) => void;
 };
 
-function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches, priceLists, onProductSaved }: ComposerProps) {
+function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches, priceLists, customers, onProductSaved }: ComposerProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
@@ -247,13 +253,20 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
           <SheetTitle>{mode === "edit" ? `Manage ${product?.name ?? "product"}` : "Create product"}</SheetTitle>
         </SheetHeader>
         <Tabs value={activeTab} onValueChange={(next) => setActiveTab(next as typeof activeTab)}>
-          <TabsList className="grid grid-cols-3">
+          <TabsList className="grid grid-cols-5">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="inventory" disabled={!currentProductId}>
               Inventory
             </TabsTrigger>
             <TabsTrigger value="pricing" disabled={!currentProductId}>
               Pricing
+            </TabsTrigger>
+            <TabsTrigger value="aliases" disabled={!currentProductId}>
+              Aliases
+            </TabsTrigger>
+            <TabsTrigger value="gallery" disabled={!currentProductId}>
+              <ImageIcon className="h-4 w-4 mr-1.5" />
+              Gallery
             </TabsTrigger>
           </TabsList>
           <TabsContent value="details">
@@ -316,6 +329,25 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
               <EmptyTabState label="Save product details first to add pricing." />
             )}
           </TabsContent>
+          <TabsContent value="aliases">
+            {currentProductId ? (
+              <ProductAliasesSection
+                productId={currentProductId}
+                aliases={product?.aliases ?? []}
+                customers={customers}
+                priceLists={priceLists}
+              />
+            ) : (
+              <EmptyTabState label="Save product details first to manage aliases." />
+            )}
+          </TabsContent>
+          <TabsContent value="gallery">
+            {currentProductId ? (
+              <ProductGallerySection productId={currentProductId} />
+            ) : (
+              <EmptyTabState label="Save product details first to add gallery photos." />
+            )}
+          </TabsContent>
         </Tabs>
       </SheetContent>
     </Sheet>
@@ -335,12 +367,28 @@ type ProductDetailsSectionProps = {
   skus: ProductManagementPayload["skus"];
   mode: "create" | "edit";
   onSaved: (productId: string | null) => void;
+  onCreateSku?: () => void;
+  forcedSkuId?: string | null;
+  onForcedSkuApplied?: () => void;
+  plantVarieties?: ProductManagementPayload["plantVarieties"];
+  plantSizes?: ProductManagementPayload["plantSizes"];
 };
 
-function ProductDetailsSection({ product, skus, mode, onSaved }: ProductDetailsSectionProps) {
+export function ProductDetailsSection({
+  product,
+  skus,
+  mode,
+  onSaved,
+  onCreateSku,
+  forcedSkuId,
+  onForcedSkuApplied,
+  plantVarieties = [],
+  plantSizes = [],
+}: ProductDetailsSectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [skuConfigPending, startSkuConfigTransition] = useTransition();
   const [formState, setFormState] = useState(() => ({
     name: product?.name ?? "",
     skuId: product?.skuId ?? (skus[0]?.id ?? ""),
@@ -359,7 +407,20 @@ function ProductDetailsSection({ product, skus, mode, onSaved }: ProductDetailsS
       defaultStatus: product?.defaultStatus ?? "",
       isActive: product?.isActive ?? true,
     });
-  }, [product?.id, skus]);
+  }, [product?.id]);
+
+  useEffect(() => {
+    if (!formState.skuId && skus.length > 0) {
+      setFormState((prev) => ({ ...prev, skuId: skus[0].id }));
+    }
+  }, [skus, formState.skuId]);
+
+  useEffect(() => {
+    if (forcedSkuId) {
+      setFormState((prev) => ({ ...prev, skuId: forcedSkuId }));
+      onForcedSkuApplied?.();
+    }
+  }, [forcedSkuId, onForcedSkuApplied]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -404,23 +465,141 @@ function ProductDetailsSection({ product, skus, mode, onSaved }: ProductDetailsS
         </div>
         <div className="space-y-2">
           <Label>SKU</Label>
-          <Select
-            value={formState.skuId}
-            onValueChange={(value) => setFormState((prev) => ({ ...prev, skuId: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select SKU" />
-            </SelectTrigger>
-            <SelectContent>
-              {skus.map((sku) => (
-                <SelectItem key={sku.id} value={sku.id}>
-                  {sku.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              value={formState.skuId}
+              onValueChange={(value) => setFormState((prev) => ({ ...prev, skuId: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select SKU" />
+              </SelectTrigger>
+              <SelectContent>
+                {skus.map((sku) => (
+                  <SelectItem key={sku.id} value={sku.id}>
+                    {sku.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {onCreateSku && (
+              <Button type="button" variant="outline" onClick={onCreateSku}>
+                New SKU
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+      {/* SKU Configuration - Variety and Size for trolley calculation */}
+      {formState.skuId && (plantVarieties.length > 0 || plantSizes.length > 0) && (() => {
+        const selectedSku = skus.find((s) => s.id === formState.skuId);
+        const currentVarietyId = selectedSku?.plantVarietyId ?? "";
+        const currentSizeId = selectedSku?.sizeId ?? "";
+        const currentVarietyName = plantVarieties.find((v) => v.id === currentVarietyId)?.name;
+        const currentSizeName = plantSizes.find((s) => s.id === currentSizeId)?.name;
+        const isMissing = !currentVarietyId || !currentSizeId;
+
+        return (
+          <div className={`rounded-lg border p-4 space-y-3 ${isMissing ? 'border-amber-300 bg-amber-50' : ''}`}>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-2">
+                SKU Configuration
+                {isMissing && (
+                  <Badge variant="outline" className="text-amber-700 border-amber-400">
+                    Required for trolley calculation
+                  </Badge>
+                )}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Set the variety and size for this SKU to enable trolley calculation and auto-linking batches.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Plant variety</Label>
+                <Select
+                  value={currentVarietyId || "__none__"}
+                  onValueChange={(value) => {
+                    const varietyId = value === "__none__" ? null : value;
+                    startSkuConfigTransition(async () => {
+                      const result = await updateSkuConfigAction({
+                        skuId: formState.skuId,
+                        plantVarietyId: varietyId,
+                        sizeId: currentSizeId || null,
+                      });
+                      if (!result.success) {
+                        toast({ variant: "destructive", title: "Update failed", description: result.error });
+                        return;
+                      }
+                      toast({ title: "SKU variety updated" });
+                      router.refresh();
+                    });
+                  }}
+                  disabled={skuConfigPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select variety" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="__none__">Not set</SelectItem>
+                    {plantVarieties.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {currentVarietyName && (
+                  <p className="text-xs text-muted-foreground">Current: {currentVarietyName}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Pot size</Label>
+                <Select
+                  value={currentSizeId || "__none__"}
+                  onValueChange={(value) => {
+                    const sizeId = value === "__none__" ? null : value;
+                    startSkuConfigTransition(async () => {
+                      const result = await updateSkuConfigAction({
+                        skuId: formState.skuId,
+                        plantVarietyId: currentVarietyId || null,
+                        sizeId: sizeId,
+                      });
+                      if (!result.success) {
+                        toast({ variant: "destructive", title: "Update failed", description: result.error });
+                        return;
+                      }
+                      toast({ title: "SKU size updated" });
+                      router.refresh();
+                    });
+                  }}
+                  disabled={skuConfigPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Not set</SelectItem>
+                    {plantSizes.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {currentSizeName && (
+                  <p className="text-xs text-muted-foreground">Current: {currentSizeName}</p>
+                )}
+              </div>
+            </div>
+            {skuConfigPending && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Updating SKU...
+              </div>
+            )}
+          </div>
+        );
+      })()}
       <div className="space-y-2">
         <Label>Description</Label>
         <Textarea
@@ -471,16 +650,61 @@ type ProductInventorySectionProps = {
   availableBatches: ProductManagementPayload["batches"];
 };
 
-function ProductInventorySection({ productId, linkedBatches, availableBatches }: ProductInventorySectionProps) {
+export function ProductInventorySection({ productId, linkedBatches, availableBatches }: ProductInventorySectionProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const [batchOptions, setBatchOptions] = useState(availableBatches);
   const [selectedBatchId, setSelectedBatchId] = useState<string>(availableBatches[0]?.id ?? "");
   const [overrideQty, setOverrideQty] = useState<string>("");
   const [pending, startTransition] = useTransition();
+  const [isRefreshingBatches, setIsRefreshingBatches] = useState(false);
 
   useEffect(() => {
-    setSelectedBatchId(availableBatches[0]?.id ?? "");
+    setBatchOptions(availableBatches);
+    setSelectedBatchId((current) => {
+      if (current && availableBatches.some((batch) => batch.id === current)) {
+        return current;
+      }
+      return availableBatches[0]?.id ?? "";
+    });
   }, [availableBatches]);
+
+  const refreshSelectableBatches = useCallback(async () => {
+    setIsRefreshingBatches(true);
+    try {
+      const response = await fetch("/api/sales/linkable-batches", { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as {
+        batches?: ProductManagementPayload["batches"];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to load batches.");
+      }
+      const fetched = payload?.batches ?? [];
+      setBatchOptions(fetched);
+      setSelectedBatchId((current) => {
+        if (current && fetched.some((batch) => batch.id === current)) {
+          return current;
+        }
+        return fetched[0]?.id ?? "";
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast({
+        variant: "destructive",
+        title: "Failed to load batches",
+        description: message,
+      });
+    } finally {
+      setIsRefreshingBatches(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (availableBatches.length === 0) {
+      void refreshSelectableBatches();
+    }
+  }, [availableBatches.length, refreshSelectableBatches]);
 
   const handleAdd = () => {
     if (!selectedBatchId) {
@@ -500,6 +724,7 @@ function ProductInventorySection({ productId, linkedBatches, availableBatches }:
       toast({ title: "Batch linked" });
       router.refresh();
       setOverrideQty("");
+      await refreshSelectableBatches();
     });
   };
 
@@ -512,26 +737,93 @@ function ProductInventorySection({ productId, linkedBatches, availableBatches }:
       }
       toast({ title: "Batch removed" });
       router.refresh();
+      await refreshSelectableBatches();
+    });
+  };
+
+  const handleAutoLink = () => {
+    startTransition(async () => {
+      const result = await autoLinkProductBatchesAction(productId);
+      if (!result.success) {
+        toast({
+          variant: "destructive",
+          title: "Auto-link failed",
+          description: result.error ?? "Unable to link matching batches.",
+        });
+        return;
+      }
+      const linkedCount = result.linked ?? 0;
+      toast({
+        title:
+          linkedCount > 0
+            ? `Linked ${linkedCount} batch${linkedCount === 1 ? "" : "es"}`
+            : "No matching batches found",
+        description:
+          linkedCount > 0
+            ? "Matched on SKU variety and size."
+            : result.message ?? "Update the SKU variety/size to enable matching.",
+      });
+      router.refresh();
+      await refreshSelectableBatches();
     });
   };
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border p-4">
+      <div className="rounded-lg border p-4 space-y-3">
         <div className="space-y-2">
-          <Label>Link a finished batch</Label>
-          <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Label>Link a finished batch</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleAutoLink}
+                disabled={pending || batchOptions.length === 0}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Auto-link matching
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshSelectableBatches()}
+                disabled={pending || isRefreshingBatches}
+              >
+                {isRefreshingBatches && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                Refresh list
+              </Button>
+            </div>
+          </div>
+          <Select
+            value={selectedBatchId}
+            onValueChange={setSelectedBatchId}
+            disabled={batchOptions.length === 0 || pending}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Choose batch" />
             </SelectTrigger>
             <SelectContent className="max-h-60">
-              {availableBatches.map((batch) => (
-                <SelectItem key={batch.id} value={batch.id}>
-                  {batch.label} ({batch.quantity} units)
+              {batchOptions.length === 0 ? (
+                <SelectItem value="__none__" disabled>
+                  No saleable batches found
                 </SelectItem>
-              ))}
+              ) : (
+                batchOptions.map((batch) => (
+                  <SelectItem key={batch.id} value={batch.id}>
+                    {batch.label} ({batch.quantity} units)
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
+          {batchOptions.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Mark batches as “Ready for Sale” or “Looking Good” and refresh to see them here.
+            </p>
+          )}
         </div>
         <div className="mt-3 space-y-2">
           <Label>Available quantity override (optional)</Label>
@@ -561,33 +853,62 @@ function ProductInventorySection({ productId, linkedBatches, availableBatches }:
           <p className="text-sm text-muted-foreground">No batches linked yet.</p>
         ) : (
           <div className="space-y-3">
-            {linkedBatches.map((entry) => (
-              <div key={entry.id} className="flex items-start justify-between rounded-lg border p-3">
-                <div>
-                  <p className="font-medium">
-                    #{entry.batch?.batchNumber ?? "Unknown"}{" "}
-                    <span className="text-muted-foreground">
-                      {entry.batch?.varietyName ?? "Variety"} · {entry.batch?.sizeName ?? "Size"}
-                    </span>
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {entry.batch?.quantity ?? 0} units • Status: {entry.batch?.status ?? "—"}
-                  </p>
-                  {entry.availableQuantityOverride !== null ? (
-                    <p className="text-xs text-muted-foreground">Override: {entry.availableQuantityOverride}</p>
-                  ) : null}
+            {/* Summary */}
+            {(() => {
+              const available = linkedBatches.filter(b => b.batch?.behavior === "available");
+              const pipeline = linkedBatches.filter(b => b.batch?.behavior !== "available");
+              const availableQty = available.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+              const pipelineQty = pipeline.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+              return (
+                <div className="flex gap-4 p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-2xl font-bold text-green-700">{availableQty}</p>
+                    <p className="text-xs text-muted-foreground">Available now</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-600">{pipelineQty}</p>
+                    <p className="text-xs text-muted-foreground">In pipeline</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{linkedBatches.length}</p>
+                    <p className="text-xs text-muted-foreground">Total batches</p>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive"
-                  onClick={() => handleRemove(entry.id)}
-                  disabled={pending}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+              );
+            })()}
+            {linkedBatches.map((entry) => {
+              const isAvailable = entry.batch?.behavior === "available";
+              return (
+                <div key={entry.id} className={`flex items-start justify-between rounded-lg border p-3 ${isAvailable ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
+                  <div>
+                    <p className="font-medium">
+                      #{entry.batch?.batchNumber ?? "Unknown"}{" "}
+                      <span className="text-muted-foreground">
+                        {entry.batch?.varietyName ?? "Variety"} · {entry.batch?.sizeName ?? "Size"}
+                      </span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {entry.batch?.quantity ?? 0} units • 
+                      <span className={isAvailable ? "text-green-700 font-medium" : "text-amber-700"}>
+                        {" "}{isAvailable ? "Available" : entry.batch?.status ?? "Growing"}
+                      </span>
+                    </p>
+                    {entry.availableQuantityOverride !== null ? (
+                      <p className="text-xs text-muted-foreground">Override: {entry.availableQuantityOverride}</p>
+                    ) : null}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => handleRemove(entry.id)}
+                    disabled={pending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -601,7 +922,7 @@ type ProductPricingSectionProps = {
   prices: ProductSummary["prices"];
 };
 
-function ProductPricingSection({ productId, priceLists, prices }: ProductPricingSectionProps) {
+export function ProductPricingSection({ productId, priceLists, prices }: ProductPricingSectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -743,21 +1064,14 @@ type AssignmentsCardProps = {
   assignments: ProductManagementPayload["priceListCustomers"];
 };
 
-function PriceListAssignmentsCard({ priceLists, customers, assignments }: AssignmentsCardProps) {
+export function PriceListAssignmentsCard({ priceLists, customers, assignments }: AssignmentsCardProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [assignmentForm, setAssignmentForm] = useState(() => ({
     priceListId: priceLists[0]?.id ?? "",
     customerId: customers[0]?.id ?? "",
-    validFrom: "",
-    validTo: "",
-  }));
-  const [defaultForm, setDefaultForm] = useState(() => ({
-    customerId: customers[0]?.id ?? "",
-    priceListId: customers[0]?.defaultPriceListId ?? "",
   }));
   const [pendingAssignment, startAssign] = useTransition();
-  const [pendingDefault, startDefault] = useTransition();
 
   useEffect(() => {
     setAssignmentForm((prev) => ({
@@ -765,10 +1079,6 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
       priceListId: priceLists[0]?.id ?? "",
       customerId: customers[0]?.id ?? "",
     }));
-    setDefaultForm({
-      customerId: customers[0]?.id ?? "",
-      priceListId: customers[0]?.defaultPriceListId ?? "",
-    });
   }, [priceLists, customers]);
 
   const handleAssign = (event: React.FormEvent<HTMLFormElement>) => {
@@ -781,8 +1091,6 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
       const result = await upsertPriceListCustomerAction({
         priceListId: assignmentForm.priceListId,
         customerId: assignmentForm.customerId,
-        validFrom: assignmentForm.validFrom || undefined,
-        validTo: assignmentForm.validTo || undefined,
       });
       if (!result.success) {
         toast({
@@ -794,7 +1102,6 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
       }
       toast({ title: "Price list assigned" });
       router.refresh();
-      setAssignmentForm((prev) => ({ ...prev, validFrom: "", validTo: "" }));
     });
   };
 
@@ -810,35 +1117,11 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
     });
   };
 
-  const handleDefaultSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!defaultForm.customerId) {
-      toast({ variant: "destructive", title: "Select a customer" });
-      return;
-    }
-    startDefault(async () => {
-      const result = await setCustomerDefaultPriceListAction(
-        defaultForm.customerId,
-        defaultForm.priceListId || null
-      );
-      if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Save failed",
-          description: result.error ?? "Unable to set default price list.",
-        });
-        return;
-      }
-      toast({ title: "Default price list saved" });
-      router.refresh();
-    });
-  };
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Price list assignments</CardTitle>
-        <CardDescription>Map customers to price lists and manage overrides.</CardDescription>
+        <CardDescription>Assign customers to their price list. Once assigned, they stay on that list until changed.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <form className="space-y-3" onSubmit={handleAssign}>
@@ -879,81 +1162,12 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Valid from (optional)</Label>
-              <Input
-                type="date"
-                value={assignmentForm.validFrom}
-                onChange={(event) => setAssignmentForm((prev) => ({ ...prev, validFrom: event.target.value }))}
-              />
+            <div className="flex items-end">
+              <Button type="submit" disabled={pendingAssignment}>
+                {pendingAssignment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Assign
+              </Button>
             </div>
-            <div className="space-y-1.5">
-              <Label>Valid to (optional)</Label>
-              <Input
-                type="date"
-                value={assignmentForm.validTo}
-                onChange={(event) => setAssignmentForm((prev) => ({ ...prev, validTo: event.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button type="submit" disabled={pendingAssignment}>
-              {pendingAssignment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Assign price list
-            </Button>
-          </div>
-        </form>
-
-        <Separator />
-
-        <form className="grid gap-3 md:grid-cols-3" onSubmit={handleDefaultSubmit}>
-          <div className="space-y-1.5">
-            <Label>Customer default list</Label>
-            <Select
-              value={defaultForm.customerId}
-              onValueChange={(value) => {
-                setDefaultForm({
-                  customerId: value,
-                  priceListId: customers.find((c) => c.id === value)?.defaultPriceListId ?? "",
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose customer" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Default price list</Label>
-            <Select
-              value={defaultForm.priceListId ?? ""}
-              onValueChange={(value) => setDefaultForm((prev) => ({ ...prev, priceListId: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select price list" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">None</SelectItem>
-                {priceLists.map((priceList) => (
-                  <SelectItem key={priceList.id} value={priceList.id}>
-                    {priceList.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end justify-end">
-            <Button type="submit" disabled={pendingDefault}>
-              {pendingDefault && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save default
-            </Button>
           </div>
         </form>
 
@@ -962,22 +1176,17 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Tag className="h-4 w-4 text-muted-foreground" />
-            <h4 className="text-sm font-semibold">Existing assignments</h4>
+            <h4 className="text-sm font-semibold">Current assignments</h4>
           </div>
           {assignments.length === 0 ? (
             <p className="text-sm text-muted-foreground">No customer-specific assignments yet.</p>
           ) : (
             <div className="space-y-2">
               {assignments.map((assignment) => (
-                <div key={assignment.id} className="flex items-start justify-between rounded-lg border p-3">
+                <div key={assignment.id} className="flex items-center justify-between rounded-lg border p-3">
                   <div>
                     <p className="font-medium">{assignment.customerName}</p>
                     <p className="text-sm text-muted-foreground">{assignment.priceListName}</p>
-                    {(assignment.validFrom || assignment.validTo) && (
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateRange(assignment.validFrom, assignment.validTo)}
-                      </p>
-                    )}
                   </div>
                   <Button
                     variant="ghost"
@@ -998,9 +1207,224 @@ function PriceListAssignmentsCard({ priceLists, customers, assignments }: Assign
   );
 }
 
-function formatDateRange(from?: string | null, to?: string | null) {
-  const format = (value: string | null | undefined) =>
-    value ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—";
-  return `From ${format(from)} · To ${format(to)}`;
+type ProductAliasesSectionProps = {
+  productId: string;
+  aliases: ProductSummary["aliases"];
+  customers: ProductManagementPayload["customers"];
+  priceLists: ProductManagementPayload["priceLists"];
+};
+
+export function ProductAliasesSection({ productId, aliases, customers, priceLists }: ProductAliasesSectionProps) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [form, setForm] = useState({
+    aliasName: "",
+    customerId: "",
+    customerSkuCode: "",
+    customerBarcode: "",
+    unitPriceExVat: "",
+    rrp: "",
+    priceListId: "",
+    notes: "",
+  });
+  const [pending, startTransition] = useTransition();
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.aliasName.trim()) {
+      toast({ variant: "destructive", title: "Alias name required" });
+      return;
+    }
+    startTransition(async () => {
+      const result = await upsertProductAliasAction({
+        productId,
+        aliasName: form.aliasName.trim(),
+        customerId: form.customerId || null,
+        customerSkuCode: form.customerSkuCode || null,
+        customerBarcode: form.customerBarcode || null,
+        unitPriceExVat: form.unitPriceExVat ? Number(form.unitPriceExVat) : null,
+        rrp: form.rrp ? Number(form.rrp) : null,
+        priceListId: form.priceListId || null,
+        notes: form.notes || null,
+      });
+      if (!result.success) {
+        toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to save alias." });
+        return;
+      }
+      toast({ title: "Alias saved" });
+      setForm({
+        aliasName: "",
+        customerId: "",
+        customerSkuCode: "",
+        customerBarcode: "",
+        unitPriceExVat: "",
+        rrp: "",
+        priceListId: "",
+        notes: "",
+      });
+      router.refresh();
+    });
+  };
+
+  const handleDelete = (aliasId: string) => {
+    startTransition(async () => {
+      const result = await deleteProductAliasAction(aliasId);
+      if (!result.success) {
+        toast({ variant: "destructive", title: "Delete failed", description: result.error ?? "Unable to delete alias." });
+        return;
+      }
+      toast({ title: "Alias removed" });
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <form className="space-y-4 rounded-lg border p-4" onSubmit={handleSubmit}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Alias name</Label>
+            <Input
+              placeholder="Customer sees this name"
+              value={form.aliasName}
+              onChange={(event) => setForm((prev) => ({ ...prev, aliasName: event.target.value }))}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Assign to customer (optional)</Label>
+            <Select
+              value={form.customerId || "__none__"}
+              onValueChange={(value) => setForm((prev) => ({ ...prev, customerId: value === "__none__" ? "" : value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All customers" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                <SelectItem value="__none__">All customers</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Customer SKU</Label>
+            <Input
+              placeholder="e.g., ACME-001"
+              value={form.customerSkuCode}
+              onChange={(event) => setForm((prev) => ({ ...prev, customerSkuCode: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Customer barcode</Label>
+            <Input
+              placeholder="Optional barcode"
+              value={form.customerBarcode}
+              onChange={(event) => setForm((prev) => ({ ...prev, customerBarcode: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Unit price (ex VAT)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Use price list if blank"
+              value={form.unitPriceExVat}
+              onChange={(event) => setForm((prev) => ({ ...prev, unitPriceExVat: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>RRP (for labels)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Customer sells at this price"
+              value={form.rrp}
+              onChange={(event) => setForm((prev) => ({ ...prev, rrp: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Price list (optional)</Label>
+            <Select
+              value={form.priceListId || "__none__"}
+              onValueChange={(value) => setForm((prev) => ({ ...prev, priceListId: value === "__none__" ? "" : value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {priceLists.map((pl) => (
+                  <SelectItem key={pl.id} value={pl.id}>
+                    {pl.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Notes</Label>
+          <Textarea
+            rows={2}
+            value={form.notes}
+            onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+          />
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={pending}>
+            {pending ? "Saving…" : "Add alias"}
+          </Button>
+        </div>
+      </form>
+
+      <div className="space-y-4">
+        <h4 className="font-semibold">Existing aliases</h4>
+        {aliases.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No aliases defined yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {aliases.map((alias) => (
+              <div key={alias.id} className="rounded-lg border p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium">{alias.aliasName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {alias.customerSkuCode || "No customer SKU"} • {alias.customerName ?? "All customers"}
+                    </p>
+                    {(alias.unitPriceExVat !== null || alias.rrp !== null) && (
+                      <p className="text-sm text-muted-foreground">
+                        {alias.unitPriceExVat !== null && `Price: €${alias.unitPriceExVat.toFixed(2)}`}
+                        {alias.unitPriceExVat !== null && alias.rrp !== null && " • "}
+                        {alias.rrp !== null && `RRP: €${alias.rrp.toFixed(2)}`}
+                      </p>
+                    )}
+                    {alias.priceListName && (
+                      <p className="text-xs text-muted-foreground">Price list: {alias.priceListName}</p>
+                    )}
+                    {alias.notes && <p className="text-xs text-muted-foreground mt-2">{alias.notes}</p>}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => handleDelete(alias.id)}
+                    disabled={pending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 

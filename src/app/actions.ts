@@ -1,33 +1,37 @@
 
 'use server';
 
-import { careRecommendations, type CareRecommendationsInput } from '@/ai/flows/care-recommendations';
-import { batchChat, type BatchChatInput } from '@/ai/flows/batch-chat-flow';
-import type { Batch, Customer, Haulier, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
-import { getSupabaseServerApp, getSupabaseServerClient } from '@/server/db/supabase';
-import { z } from 'zod';
+import type { CareRecommendationsInput } from '@/ai/flows/care-recommendations';
+import type { BatchChatInput } from '@/ai/flows/batch-chat-flow';
+import type { Batch, Customer, Haulier, HaulierVehicle, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
+import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/types/supabase';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
 import { getUserAndOrg } from '@/server/auth/org';
 
 async function getSupabaseForApp() {
-  return getSupabaseServerClient();
+  return createClient();
 }
 
-function transformVBatchSearchData(data: any): Batch {
+// Use typed view row instead of `any`
+type VBatchSearchRow = Database['public']['Views']['v_batch_search']['Row'];
+
+function transformVBatchSearchData(data: VBatchSearchRow): Batch {
     const camelCaseData = snakeToCamel(data);
     return {
         ...camelCaseData,
         batchNumber: camelCaseData.batchNumber,
         plantVariety: camelCaseData.varietyName ?? '',
-        plantFamily: camelCaseData.varietyFamily ?? null,
+        // The view column is "family" (not "variety_family"), so after snakeToCamel it's just "family"
+        plantFamily: camelCaseData.family ?? camelCaseData.varietyFamily ?? null,
         size: camelCaseData.sizeName ?? '',
         location: camelCaseData.locationName ?? null,
         supplier: camelCaseData.supplierName ?? null,
         initialQuantity: camelCaseData.initialQuantity ?? camelCaseData.quantity ?? 0,
         plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
         plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
-        category: camelCaseData.category ?? '',
+        category: camelCaseData.category ?? camelCaseData.varietyCategory ?? '',
         createdAt: camelCaseData.createdAt,
         updatedAt: camelCaseData.updatedAt,
         logHistory: [], 
@@ -46,7 +50,7 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
         console.error('[getBatchById] Supabase error from v_batch_search:', error);
         return null;
     }
-    return data ? transformVBatchSearchData(data) : null;
+    return data ? transformVBatchSearchData(data as VBatchSearchRow) : null;
 }
 
 const plantSizeColumnMap = {
@@ -55,7 +59,9 @@ const plantSizeColumnMap = {
     'name',
     'containerType',
     'cellMultiple',
+    'trayQuantity',
     'shelfQuantity',
+    'trolleyQuantity',
     'area',
     'cellVolumeL',
     'cellDiameterMm',
@@ -68,7 +74,9 @@ const plantSizeColumnMap = {
     'name',
     'container_type',
     'cell_multiple',
+    'tray_quantity',
     'shelf_quantity',
+    'trolley_quantity',
     'area',
     'cell_volume_l',
     'cell_diameter_mm',
@@ -158,8 +166,8 @@ function normalizeVarietyRow(row?: any): Variety | undefined {
 }
 
 const locationColumnMap = {
-  camel: ['id', 'orgId', 'siteId', 'name', 'nurserySite', 'covered', 'area', 'type'] as const,
-  snake: ['id', 'org_id', 'site_id', 'name', 'nursery_site', 'covered', 'area', 'type'] as const,
+  camel: ['id', 'orgId', 'siteId', 'name', 'nurserySite', 'covered', 'area', 'type', 'healthStatus', 'restrictedUntil'] as const,
+  snake: ['id', 'org_id', 'site_id', 'name', 'nursery_site', 'covered', 'area', 'type', 'health_status', 'restricted_until'] as const,
 };
 
 function mapLocationToDb(location: Partial<NurseryLocation>) {
@@ -296,25 +304,77 @@ function normalizeHaulierRow(row?: any): Haulier | undefined {
   return normalized as Haulier;
 }
 
-export async function getBatchesAction() {
+/**
+ * Server-side batch filtering options
+ */
+export type GetBatchesOptions = {
+  query?: string;           // Search term for batch number or variety
+  status?: string;          // Filter by status
+  plantFamily?: string;     // Filter by plant family
+  category?: string;        // Filter by category
+  limit?: number;           // Pagination limit
+  offset?: number;          // Pagination offset
+};
+
+export async function getBatchesAction(options: GetBatchesOptions = {}) {
     try {
         const supabase = await getSupabaseForApp();
-        const { data: batches, error } = await supabase
-            .from("v_batch_search") 
-            .select("*") 
-            .order("created_at", { ascending: false });
+        
+        // Build query with server-side filtering
+        // Using estimated count for better performance (avoids full table scan)
+        let query = supabase
+            .from("v_batch_search")
+            .select("*", { count: 'estimated' });
+
+        // Apply text search filter
+        if (options.query && options.query.trim()) {
+            const searchTerm = `%${options.query.trim()}%`;
+            query = query.or(`batch_number.ilike.${searchTerm},variety_name.ilike.${searchTerm}`);
+        }
+
+        // Apply status filter
+        if (options.status && options.status !== 'all') {
+            query = query.eq('status', options.status);
+        }
+
+        // Apply plant family filter (column is "family" in v_batch_search view)
+        if (options.plantFamily && options.plantFamily !== 'all') {
+            query = query.eq('family', options.plantFamily);
+        }
+
+        // Apply category filter (column is "category" in v_batch_search view)
+        if (options.category && options.category !== 'all') {
+            query = query.eq('category', options.category);
+        }
+
+        // Apply pagination (with sensible defaults)
+        const limit = options.limit ?? 100;
+        const offset = options.offset ?? 0;
+        query = query.range(offset, offset + limit - 1);
+
+        // Order by created_at descending
+        query = query.order("created_at", { ascending: false });
+
+        const { data: batches, error, count } = await query;
 
         if (error) {
             console.error('[getBatchesAction] Supabase error from v_batch_search:', error);
             throw error;
         }
         
-        const transformedBatches = (batches || []).map(transformVBatchSearchData);
+        const transformedBatches = (batches || []).map((b) => 
+            transformVBatchSearchData(b as VBatchSearchRow)
+        );
         
-        return { success: true, data: declassify(transformedBatches) as Batch[] };
-    } catch (error: any) {
+        return { 
+            success: true, 
+            data: declassify(transformedBatches) as Batch[],
+            total: count ?? 0,
+        };
+    } catch (error: unknown) {
         console.error('[getBatchesAction] Error in action:', error);
-        return { success: false, error: 'Failed to fetch batches: ' + error.message };
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return { success: false, error: 'Failed to fetch batches: ' + message };
     }
 }
 
@@ -338,6 +398,7 @@ export async function getProductionProtocolAction(batchId: string) {
 
 export async function getCareRecommendationsAction(batchId: string) {
   try {
+    const { careRecommendations } = await import('@/ai/flows/care-recommendations');
     const batch = await getBatchById(batchId);
     if (!batch) {
         return { success: false, error: 'Batch not found.' };
@@ -364,6 +425,7 @@ export async function getCareRecommendationsAction(batchId: string) {
 
 export async function batchChatAction(batchId: string, query: string) {
   try {
+    const { batchChat } = await import('@/ai/flows/batch-chat-flow');
     const batch = await getBatchById(batchId);
     if (!batch) {
         return { success: false, error: 'Batch not found.' };
@@ -504,6 +566,84 @@ export async function updateHaulierAction(haulierData: Haulier) {
 export async function deleteHaulierAction(haulierId: string) {
     const supabase = await getSupabaseForApp();
     const { error } = await supabase.from('hauliers').delete().eq('id', haulierId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+// --- Haulier Vehicle Actions ---
+
+const vehicleColumnMap = {
+  camel: ['id', 'orgId', 'haulierId', 'name', 'registration', 'vehicleType', 'trolleyCapacity', 'isActive', 'notes', 'truckLayout'] as const,
+  snake: ['id', 'org_id', 'haulier_id', 'name', 'registration', 'vehicle_type', 'trolley_capacity', 'is_active', 'notes', 'truck_layout'] as const,
+};
+
+function mapVehicleToDb(vehicle: Partial<HaulierVehicle>) {
+  const payload: Record<string, any> = {};
+  vehicleColumnMap.camel.forEach((camelKey, index) => {
+    const dbKey = vehicleColumnMap.snake[index];
+    const value = (vehicle as any)[camelKey];
+    if (value !== undefined && value !== null) {
+      payload[dbKey] = value;
+    }
+  });
+  return payload;
+}
+
+function normalizeVehicleRow(row?: any): HaulierVehicle | undefined {
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    haulierId: row.haulier_id,
+    name: row.name,
+    registration: row.registration ?? undefined,
+    vehicleType: row.vehicle_type ?? undefined,
+    trolleyCapacity: row.trolley_capacity ?? 10,
+    isActive: row.is_active ?? true,
+    notes: row.notes ?? undefined,
+    truckLayout: row.truck_layout ?? undefined,
+  };
+}
+
+export async function getVehiclesAction() {
+    const [{ orgId }, supabase] = await Promise.all([getUserAndOrg(), getSupabaseForApp()]);
+    const { data, error } = await supabase
+      .from('haulier_vehicles')
+      .select('*, hauliers(name)')
+      .eq('org_id', orgId)
+      .order('name');
+    if (error) return { success: false, error: error.message, data: [] };
+    return {
+      success: true,
+      data: (data ?? []).map(row => ({
+        ...normalizeVehicleRow(row),
+        haulierName: (row as any).hauliers?.name ?? 'Unknown',
+      }))
+    };
+}
+
+export async function addVehicleAction(vehicleData: Omit<HaulierVehicle, 'id'>) {
+    const [{ orgId }, supabase] = await Promise.all([getUserAndOrg(), getSupabaseForApp()]);
+    const payload = {
+      ...mapVehicleToDb(vehicleData),
+      org_id: orgId,
+    };
+    const { data, error } = await supabase.from('haulier_vehicles').insert([payload]).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: normalizeVehicleRow(data?.[0]) };
+}
+
+export async function updateVehicleAction(vehicleData: HaulierVehicle) {
+    const supabase = await getSupabaseForApp();
+    const payload = mapVehicleToDb(vehicleData);
+    const { data, error } = await supabase.from('haulier_vehicles').update(payload).eq('id', vehicleData.id).select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: normalizeVehicleRow(data?.[0]) };
+}
+
+export async function deleteVehicleAction(vehicleId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase.from('haulier_vehicles').delete().eq('id', vehicleId);
     if (error) return { success: false, error: error.message };
     return { success: true };
 }

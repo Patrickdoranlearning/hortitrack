@@ -1,5 +1,5 @@
 import "server-only";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 import { getUserIdAndOrgId } from "@/server/auth/getUser"; // Assuming this helper exists or needs to be created
 
 /**
@@ -21,7 +21,7 @@ function isoWeek(date: Date) {
 }
 
 export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
   const { orgId } = await getUserIdAndOrgId(); // Get orgId from current user's session
 
   if (!orgId) {

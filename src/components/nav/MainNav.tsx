@@ -46,8 +46,10 @@ export default function MainNav() {
 
   // Determine which nav items are visible based on roles
   const visible = NAV_SALES.filter(i => {
-    // If roles haven't loaded yet, don't show any role-protected items.
-    if (!i.requiredRoles) return true;
+    // If no roles are required, allow access even if roles fetch failed or is pending
+    if (!i.requiredRoles || i.requiredRoles.length === 0) return true;
+
+    // If roles haven't loaded yet (or failed), don't show role-protected items.
     if (roles === null) return false;
     return i.requiredRoles.every(r => roles.includes(r));
   });

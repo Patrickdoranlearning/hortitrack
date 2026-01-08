@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import {
   Dialog,
   DialogContent,
@@ -12,13 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
   Pencil,
-  ClipboardList,
   Sprout,
   BarChart2,
   Trash2,
   Share2,
+  Loader2,
+  ImageIcon,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 import type { Batch } from '@/lib/types';
+import type { HistoryLog as HistoryLogType } from "@/server/batches/history";
 import { ProductionProtocolDialog } from "./production-protocol-dialog";
 import { CareRecommendationsDialog } from "./care-recommendations-dialog";
 import { Badge } from "./ui/badge";
@@ -26,6 +31,24 @@ import { BatchChatDialog } from "./batch-chat-dialog";
 import { BatchDistributionBar } from "./batch-distribution-bar";
 import AncestryStrip from "./ancestry-strip";
 import { PlantPassportCard } from "./batches/PlantPassportCard";
+import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
+import type { ActionMode } from "@/components/actions/types";
+import { HistoryLog } from "@/components/history/HistoryLog";
+
+// Lazy load gallery to avoid slowing down dialog open
+const BatchGallerySection = dynamic(
+  () => import("@/components/batches/BatchGallerySection"),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+        Loading photos...
+      </div>
+    ),
+    ssr: false 
+  }
+);
+
 
 interface BatchDetailDialogProps {
   open: boolean;
@@ -33,7 +56,7 @@ interface BatchDetailDialogProps {
   batch: Batch | null;
   onEdit: (batch: Batch) => void;
   onTransplant: (batch: Batch) => void;
-  onLogAction: (batch: Batch) => void;
+  onLogAction: (batch: Batch, mode: ActionMode) => void;
   onGenerateProtocol: (batch: Batch) => void;
   onCareRecommendations: (batch: Batch) => void;
   onSelectRelatedBatch?: (batchId: string) => void;
@@ -52,6 +75,49 @@ export function BatchDetailDialog({
 }: BatchDetailDialogProps) {
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
+  const [historyLogs, setHistoryLogs] = React.useState<HistoryLogType[]>([]);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
+  const [historyError, setHistoryError] = React.useState<string | null>(null);
+
+  // Fetch combined history (events + plant health logs) when dialog opens or batch changes
+  React.useEffect(() => {
+    if (!open || !batch?.id) {
+      setHistoryLogs([]);
+      return;
+    }
+
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    fetch(`/api/production/batches/${batch.id}/history`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j?.error || res.statusText);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setHistoryLogs(data.logs || []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setHistoryError(err?.message || String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setHistoryLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, batch?.id]);
 
   const getStatusVariant = (status: Batch['status']): 'default' | 'secondary' | 'destructive' | 'outline' | 'accent' | 'info' => {
      switch (status) {
@@ -121,6 +187,10 @@ export function BatchDetailDialog({
                 <TabsList>
                   <TabsTrigger value="summary">Summary</TabsTrigger>
                   <TabsTrigger value="history">Log History</TabsTrigger>
+                  <TabsTrigger value="photos">
+                    <ImageIcon className="h-4 w-4 mr-1" />
+                    Photos
+                  </TabsTrigger>
                   <TabsTrigger value="ancestry">Ancestry</TabsTrigger>
                 </TabsList>
                 <TabsContent value="summary" className="pt-4 space-y-4">
@@ -155,16 +225,31 @@ export function BatchDetailDialog({
                   )}
                 </TabsContent>
                 <TabsContent value="history">
-                  <div className="max-h-60 overflow-y-auto text-sm space-y-2 mt-4">
-                    {(batch.logHistory ?? []).slice().reverse().map((log, index) => (
-                      <div key={index} className="flex justify-between">
-                        <span>{log.note || `${log.type} action`}</span>
-                        <span className="text-muted-foreground">
-                          {new Date(log.date).toLocaleDateString()}
-                        </span>
+                  <div className="max-h-80 overflow-y-auto mt-4">
+                    {historyLoading && (
+                      <div className="flex items-center justify-center py-8 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Loading history...
                       </div>
-                    ))}
+                    )}
+                    {historyError && (
+                      <div className="text-sm text-red-600 py-4">{historyError}</div>
+                    )}
+                    {!historyLoading && !historyError && historyLogs.length === 0 && (
+                      <div className="text-muted-foreground py-4 text-center">No history logged yet.</div>
+                    )}
+                    {!historyLoading && historyLogs.length > 0 && (
+                      <HistoryLog logs={historyLogs} />
+                    )}
                   </div>
+                </TabsContent>
+                <TabsContent value="photos" className="pt-4">
+                  {batch.id && (
+                    <BatchGallerySection 
+                      batchId={batch.id} 
+                      varietyId={batch.plantVarietyId}
+                    />
+                  )}
                 </TabsContent>
                 <TabsContent value="ancestry">
                     <AncestryStrip
@@ -179,8 +264,15 @@ export function BatchDetailDialog({
               <h4 className="font-semibold text-lg">Actions</h4>
               <Button onClick={() => onEdit(batch)} variant="outline"><Pencil /> Edit Batch</Button>
               <Button onClick={() => onTransplant(batch)} variant="outline" disabled={(batch.quantity ?? 0) === 0}><Sprout /> Transplant</Button>
-              <Button onClick={() => onLogAction(batch)} variant="outline"><ClipboardList /> Log Action</Button>
+              <ActionMenuButton batch={batch} onSelect={(mode) => onLogAction(batch, mode)} className="w-full" />
               <Button onClick={() => setIsChatOpen(true)} variant="outline"><Share2 /> Chat about Batch</Button>
+              {batch.id && (
+                <Button asChild variant="outline">
+                  <Link href={`/production/batches/${batch.id}`} target="_blank">
+                    <ExternalLink className="mr-2 h-4 w-4" /> View Full Page
+                  </Link>
+                </Button>
+              )}
               
               <div className="!mt-auto pt-4 border-t">
                   <h4 className="font-semibold text-lg mb-3">AI Tools</h4>

@@ -34,6 +34,7 @@ import {
 import {
   Grid,
   LayoutGrid,
+  List,
   LogOut,
   Plus,
   QrCode,
@@ -43,12 +44,18 @@ import {
   Printer,
   MoreHorizontal,
   ShoppingCart,
+  ClipboardList,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 import dynamic from 'next/dynamic';
 import { ActionDialog } from '../components/actions/ActionDialog';
+import { ActionMenuButton } from '../components/actions/ActionMenuButton';
+import type { ActionMode } from "@/components/actions/types";
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
@@ -59,19 +66,35 @@ import { FeatureGate } from '@/components/FeatureGate';
 import { queryMatchesBatch } from '@/lib/search';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
 import { TransplantIcon, CareIcon } from '@/components/icons';
+import { TransplantMenuButton } from "@/components/horti/TransplantMenuButton";
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import CheckInForm from '@/components/batches/CheckInForm';
+import { CheckInWizardDialog } from '@/components/production/checkin';
+import { PlanIncomingWizardDialog } from '@/components/production/plan-incoming';
+import { PlanBatchesWizardDialog } from '@/components/production/plan-batches';
+import { ActualizeWizardDialog } from '@/components/production/actualize';
 import { useCollection } from '@/hooks/useCollection'; 
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { useActiveOrg } from '@/lib/org/context';
 import { supabaseClient } from '@/lib/supabase/client'; 
 import EditBatchForm from '@/components/batches/EditBatchForm';
+import { ReferenceDataProvider } from '@/contexts/ReferenceDataContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const PropagationForm = dynamic(() => import('@/components/batches/PropagationForm'), { ssr: false });
 const BulkPropagationUpload = dynamic(() => import('@/components/batches/BulkPropagationUpload'), { ssr: false });
 const VarietyForm = dynamic(() => import('@/components/varieties/VarietyForm'), { ssr: false });
+const TransplantForm = dynamic(() => import('@/components/batches/TransplantForm'), { ssr: false });
 
 interface HomePageViewProps {
   initialBatches: Batch[];
@@ -98,6 +121,7 @@ export default function HomePageView({
   const { user, loading: authLoading } = useAuth(); 
   const searchParams = useSearchParams();
   const urlBatchId = searchParams.get("batch");
+  const urlAction = searchParams.get("action");
   const { orgId, setOrgId } = useActiveOrg();
 
   const isReadonly = !user;
@@ -112,11 +136,42 @@ export default function HomePageView({
     }
   }, [orgId, batches, setOrgId]);
 
+  // Handle URL action parameters to open dialogs
+  React.useEffect(() => {
+    if (!urlAction) return;
+    
+    // Clear the action from URL immediately
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("action");
+    const qs = params.toString();
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+    
+    // Open the corresponding dialog
+    switch (urlAction) {
+      case "propagation":
+        setIsNewPropagationOpen(true);
+        break;
+      case "checkin":
+        setIsCheckinFormOpen(true);
+        break;
+      case "plan-incoming":
+        setIsPlanIncomingOpen(true);
+        break;
+      case "plan-batches":
+        setIsPlanBatchesOpen(true);
+        break;
+      case "actualise":
+        setIsActualizeOpen(true);
+        break;
+    }
+  }, [urlAction, router, searchParams]);
+
   const { data: nurseryLocations, forceRefresh } = useCollection<NurseryLocation>("nursery_locations");
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = React.useState(false);
   const [isLogActionOpen, setIsLogActionOpen] = React.useState(false);
+  const [logActionMode, setLogActionMode] = React.useState<ActionMode>("MOVE");
   const [isTransplantOpen, setIsTransplantOpen] = React.useState(false);
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] = React.useState(false);
@@ -124,6 +179,9 @@ export default function HomePageView({
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
   const [isCheckinFormOpen, setIsCheckinFormOpen] = React.useState(false);
+  const [isPlanIncomingOpen, setIsPlanIncomingOpen] = React.useState(false);
+  const [isPlanBatchesOpen, setIsPlanBatchesOpen] = React.useState(false);
+  const [isActualizeOpen, setIsActualizeOpen] = React.useState(false);
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
   const [editingBatch, setEditingBatch] = React.useState<Batch | null>(null);
@@ -136,6 +194,9 @@ export default function HomePageView({
     variety: 'all',
     location: 'all',
   });
+  const [viewMode, setViewMode] = React.useState<"card" | "list">("card");
+  const [sortConfig, setSortConfig] = React.useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'batchNumber', direction: 'desc' });
+  
   const clearBatchQuery = React.useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     if (!params.has("batch")) return;
@@ -165,7 +226,7 @@ export default function HomePageView({
   const filteredBatches = React.useMemo(() => {
     const dataToFilter = batches || [];
     const q = (searchQuery || '').trim();
-    return dataToFilter
+    const filtered = dataToFilter
       .filter((batch) => queryMatchesBatch(q, batch))
       .filter((batch) =>
         filters.plantFamily === 'all' || batch.plantFamily === filters.plantFamily
@@ -184,7 +245,57 @@ export default function HomePageView({
         if (filters.status === 'Active') return batch.status !== 'Archived';
         return batch.status === filters.status;
       });
-  }, [batches, searchQuery, filters]);
+    
+    // Apply sorting
+    return [...filtered].sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let aVal: any, bVal: any;
+      
+      switch (key) {
+        case 'batchNumber':
+          aVal = a.batchNumber || '';
+          bVal = b.batchNumber || '';
+          break;
+        case 'variety':
+          aVal = a.plantVariety || '';
+          bVal = b.plantVariety || '';
+          break;
+        case 'family':
+          aVal = a.plantFamily || '';
+          bVal = b.plantFamily || '';
+          break;
+        case 'status':
+          aVal = a.status || '';
+          bVal = b.status || '';
+          break;
+        case 'location':
+          aVal = a.location || '';
+          bVal = b.location || '';
+          break;
+        case 'quantity':
+          aVal = a.quantity ?? 0;
+          bVal = b.quantity ?? 0;
+          break;
+        default:
+          aVal = a.batchNumber || '';
+          bVal = b.batchNumber || '';
+      }
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      
+      const comparison = String(aVal).localeCompare(String(bVal));
+      return direction === 'asc' ? comparison : -comparison;
+    });
+  }, [batches, searchQuery, filters, sortConfig]);
+  
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const handleSignOut = async () => {
     const supabase = supabaseClient();
@@ -226,8 +337,9 @@ export default function HomePageView({
     [clearBatchQuery]
   );
 
-  const handleLogAction = (batch: Batch) => {
+  const handleLogAction = (batch: Batch, mode: ActionMode) => {
     setSelectedBatch(batch);
+    setLogActionMode(mode);
     setIsLogActionOpen(true);
   };
   
@@ -424,6 +536,20 @@ export default function HomePageView({
     },
     [batches, fetchBatchNode, router, toast]
   );
+
+  const refreshSelectedBatch = React.useCallback(async () => {
+    if (!selectedBatch?.id) return;
+    try {
+      const updated = await fetchBatchNode(selectedBatch.id);
+      setBatches((prev) => {
+        if (!prev) return [updated];
+        return prev.map((b) => (b.id === updated.id ? updated : b));
+      });
+      setSelectedBatch(updated);
+    } catch (err) {
+      console.error("Failed to refresh batch:", err);
+    }
+  }, [selectedBatch?.id, fetchBatchNode]);
   
   const handleEditBatch = React.useCallback((batch: Batch) => {
     setEditingBatch(batch);
@@ -469,7 +595,8 @@ export default function HomePageView({
   if (!user) return null;
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <ReferenceDataProvider>
+    <PageFrame moduleKey="production">
       <div className="space-y-6">
         <ModulePageHeader 
             title="Nursery Stock"
@@ -521,145 +648,424 @@ export default function HomePageView({
                             }}>
                                 Check-in
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => {
+                                setIsPlanIncomingOpen(true);
+                            }}>
+                                Plan Incoming
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => {
+                                setIsPlanBatchesOpen(true);
+                            }}>
+                                Plan Batches
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => {
+                                setIsActualizeOpen(true);
+                            }}>
+                                Actualize Batches
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Link href="/production/batches/new/bulk-transplant">
-                        <Button variant="outline" disabled={isReadonly} className="w-full sm:w-auto">
-                            <TransplantIcon className="mr-2 h-4 w-4" /> Bulk Transplant
-                        </Button>
-                    </Link>
+                    <TransplantMenuButton className="w-full sm:w-auto" />
                 </>
             }
         />
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Select
-            value={filters.status}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, status: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="Active">Active</SelectItem>
-              <SelectItem value="Propagation">Propagation</SelectItem>
-              <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-              <SelectItem value="Potted">Potted</SelectItem>
-              <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
-              <SelectItem value="Looking Good">Looking Good</SelectItem>
-              <SelectItem value="Archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.category}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, category: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {(categories || []).map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.plantFamily}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, plantFamily: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by family" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Families</SelectItem>
-              {(plantFamilies || []).map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.variety}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, variety: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by variety" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Varieties</SelectItem>
-              {varietyOptions.map((v) => (
-                <SelectItem key={v} value={v}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.location}
-            onValueChange={(value) =>
-              setFilters((f) => ({ ...f, location: value }))
-            }
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locationOptions.map((loc) => (
-                <SelectItem key={loc} value={loc}>
-                  {loc}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* View Toggle - always visible */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-sm text-muted-foreground">
+            {filteredBatches.length} batch{filteredBatches.length !== 1 ? 'es' : ''}
+            {filters.status !== 'all' || filters.plantFamily !== 'all' || filters.variety !== 'all' || filters.location !== 'all' || filters.category !== 'all' ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-2 h-6 px-2 text-xs"
+                onClick={() => setFilters({ plantFamily: 'all', category: 'all', status: 'Active', variety: 'all', location: 'all' })}
+              >
+                Clear filters
+              </Button>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === "card" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              className="flex items-center gap-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Cards</span>
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="flex items-center gap-2"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
-          {authLoading
-            ? [...Array(8)].map((_, i) => (
-                <Skeleton key={i} className="h-40" />
-              ))
-            : filteredBatches.map((batch) => (
-                <BatchCard
-                  key={batch.id}
-                  batch={batch}
-                  onOpen={handleOpenDetail}
-                  onLogAction={handleLogAction}
-                  actionsSlot={
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => handlePrintClick(batch)}>
-                                  <Printer className="h-5 w-5" />
-                                  <span className="sr-only">Print Label</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Print Label</p></TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    </div>
-                  }
-                />
-              ))}
-        </div>
+        {/* Filters - only in card view */}
+        {viewMode === "card" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={filters.status}
+              onValueChange={(value) => setFilters((f) => ({ ...f, status: value }))}
+            >
+              <SelectTrigger className="h-9 w-[130px] text-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Propagation">Propagation</SelectItem>
+                <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
+                <SelectItem value="Potted">Potted</SelectItem>
+                <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                <SelectItem value="Looking Good">Looking Good</SelectItem>
+                <SelectItem value="Archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.plantFamily}
+              onValueChange={(value) => setFilters((f) => ({ ...f, plantFamily: value }))}
+            >
+              <SelectTrigger className="h-9 w-[130px] text-sm">
+                <SelectValue placeholder="Family" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Families</SelectItem>
+                {(plantFamilies || []).map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.variety}
+              onValueChange={(value) => setFilters((f) => ({ ...f, variety: value }))}
+            >
+              <SelectTrigger className="h-9 w-[140px] text-sm">
+                <SelectValue placeholder="Variety" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Varieties</SelectItem>
+                {varietyOptions.map((v) => (
+                  <SelectItem key={v} value={v}>{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.location}
+              onValueChange={(value) => setFilters((f) => ({ ...f, location: value }))}
+            >
+              <SelectTrigger className="h-9 w-[130px] text-sm">
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locationOptions.map((loc) => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {viewMode === "card" ? (
+          <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
+            {authLoading
+              ? [...Array(8)].map((_, i) => (
+                  <Skeleton key={i} className="h-40" />
+                ))
+              : filteredBatches.map((batch) => (
+                  <BatchCard
+                    key={batch.id}
+                    batch={batch}
+                    onOpen={handleOpenDetail}
+                    onLogAction={handleLogAction}
+                    actionsSlot={
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" onClick={() => handlePrintClick(batch)}>
+                                    <Printer className="h-5 w-5" />
+                                    <span className="sr-only">Print Label</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Print Label</p></TooltipContent>
+                              </Tooltip>
+                          </TooltipProvider>
+                      </div>
+                    }
+                  />
+                ))}
+          </div>
+        ) : (
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[130px]">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 -ml-2 font-medium hover:bg-muted"
+                        onClick={() => handleSort('batchNumber')}
+                      >
+                        Batch
+                        {sortConfig.key === 'batchNumber' ? (
+                          sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead className="min-w-[140px]">
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={filters.variety}
+                          onValueChange={(value) => setFilters((f) => ({ ...f, variety: value }))}
+                        >
+                          <SelectTrigger className="h-8 border-0 bg-transparent shadow-none px-0 font-medium text-muted-foreground hover:text-foreground w-auto">
+                            <SelectValue placeholder="Variety" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Varieties</SelectItem>
+                            {varietyOptions.map((v) => (
+                              <SelectItem key={v} value={v}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleSort('variety')}
+                        >
+                          {sortConfig.key === 'variety' ? (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-50" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[120px]">
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={filters.plantFamily}
+                          onValueChange={(value) => setFilters((f) => ({ ...f, plantFamily: value }))}
+                        >
+                          <SelectTrigger className="h-8 border-0 bg-transparent shadow-none px-0 font-medium text-muted-foreground hover:text-foreground w-auto">
+                            <SelectValue placeholder="Family" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Families</SelectItem>
+                            {(plantFamilies || []).map((p) => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleSort('family')}
+                        >
+                          {sortConfig.key === 'family' ? (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-50" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[100px]">
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={filters.status}
+                          onValueChange={(value) => setFilters((f) => ({ ...f, status: value }))}
+                        >
+                          <SelectTrigger className="h-8 border-0 bg-transparent shadow-none px-0 font-medium text-muted-foreground hover:text-foreground w-auto">
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Growing">Growing</SelectItem>
+                            <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
+                            <SelectItem value="Archived">Archived</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleSort('status')}
+                        >
+                          {sortConfig.key === 'status' ? (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-50" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
+                    <TableHead className="min-w-[100px]">
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={filters.location}
+                          onValueChange={(value) => setFilters((f) => ({ ...f, location: value }))}
+                        >
+                          <SelectTrigger className="h-8 border-0 bg-transparent shadow-none px-0 font-medium text-muted-foreground hover:text-foreground w-auto">
+                            <SelectValue placeholder="Location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Locations</SelectItem>
+                            {locationOptions.map((loc) => (
+                              <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleSort('location')}
+                        >
+                          {sortConfig.key === 'location' ? (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-50" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right w-[90px]">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 -mr-2 font-medium hover:bg-muted"
+                        onClick={() => handleSort('quantity')}
+                      >
+                        Qty
+                        {sortConfig.key === 'quantity' ? (
+                          sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right w-[120px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {authLoading
+                    ? [...Array(6)].map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell colSpan={7} className="p-4">
+                            <Skeleton className="h-4 w-full" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : filteredBatches.map((batch) => (
+                        <TableRow
+                          key={batch.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleOpenDetail(batch)}
+                        >
+                          <TableCell className="font-mono text-sm">{batch.batchNumber}</TableCell>
+                          <TableCell>
+                            <div className="font-medium">{batch.plantVariety || "Unspecified"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {batch.size || "—"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {batch.plantFamily || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {batch.phase && (
+                                <Badge variant="secondary" className="capitalize text-xs">
+                                  {batch.phase}
+                                </Badge>
+                              )}
+                              {batch.status && (
+                                <Badge variant="outline" className="text-xs">
+                                  {batch.status}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">{batch.location || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="font-medium">
+                              {(batch.quantity ?? 0).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              of {(batch.initialQuantity ?? batch.quantity ?? 0).toLocaleString()}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => handlePrintClick(batch)}
+                                      aria-label="Print label"
+                                    >
+                                      <Printer className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Print Label</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <ActionMenuButton
+                                batch={batch}
+                                onSelect={(mode) => handleLogAction(batch, mode)}
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                label=""
+                              />
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="default"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => handleTransplantOpen(batch)}
+                                      aria-label="Transplant"
+                                    >
+                                      <TransplantIcon className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Transplant</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
         {filteredBatches.length === 0 && !authLoading && (
           <div className="text-center col-span-full py-20">
             <Grid className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -727,6 +1133,8 @@ export default function HomePageView({
         onOpenChange={setIsLogActionOpen}
         batch={selectedBatch}
         locations={nurseryLocations || []}
+        mode={logActionMode}
+        onSuccess={refreshSelectedBatch}
       />
       
       <ProductionProtocolDialog
@@ -758,6 +1166,28 @@ export default function HomePageView({
           quantity: selectedBatch.quantity,
         }}
       />}
+
+      {/* Transplant Dialog */}
+      <Dialog open={isTransplantOpen} onOpenChange={setIsTransplantOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Transplant from {selectedBatch?.batchNumber}</DialogTitle>
+            <DialogDescription>
+              {selectedBatch?.plantVariety ? `${selectedBatch.plantVariety}` : "Create a new batch from this parent."}
+              {typeof selectedBatch?.quantity === "number" ? ` • ${selectedBatch.quantity.toLocaleString()} units remaining` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBatch && (
+            <TransplantForm
+              parentBatchId={selectedBatch.id!}
+              onCreated={() => {
+                setIsTransplantOpen(false);
+                forceRefresh();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* New Propagation Dialog */}
       <Dialog open={isNewPropagationOpen} onOpenChange={setIsNewPropagationOpen}>
@@ -802,31 +1232,54 @@ export default function HomePageView({
       </Dialog>
 
       {/* Check-in Batch Dialog */}
-      <Dialog open={isCheckinFormOpen} onOpenChange={setIsCheckinFormOpen}>
-        <DialogContent
-          aria-describedby="checkin-desc"
-          size="xl"
-          className="grid grid-rows-[auto_1fr_auto] max-h-[calc(100dvh-2rem)] overflow-hidden"
-        >
-          <DialogHeader className="shrink-0 pr-6">
-            <DialogTitle className="font-headline text-3xl">Check-in New Batch</DialogTitle>
-            <DialogDescription id="checkin-desc">
-              Enter variety, size, quantity, supplier, location, quality, and optional plant passport overrides.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 overflow-y-auto overscroll-y-contain pr-6">
-            <CheckInForm 
-              onSubmitSuccess={(batch) => {
-                const batchNumber = batch?.batch_number ?? batch?.batchNumber ?? "";
-                toast({ title: "Check-in Successful", description: batchNumber ? `Batch #${batchNumber} created.` : "Batch created." });
-                setIsCheckinFormOpen(false); 
-                forceRefresh(); 
-              }}
-              onCancel={() => setIsCheckinFormOpen(false)}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CheckInWizardDialog
+        open={isCheckinFormOpen}
+        onOpenChange={setIsCheckinFormOpen}
+        onSuccess={(batch) => {
+          const batchNumber = batch?.batch_number ?? batch?.batchNumber ?? "";
+          toast({ title: "Check-in Successful", description: batchNumber ? `Batch #${batchNumber} created.` : "Batch created." });
+          forceRefresh();
+        }}
+      />
+
+      {/* Plan Incoming Dialog */}
+      <PlanIncomingWizardDialog
+        open={isPlanIncomingOpen}
+        onOpenChange={setIsPlanIncomingOpen}
+        onSuccess={(result) => {
+          toast({
+            title: "Batches Planned",
+            description: `${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Incoming" status.`
+          });
+          forceRefresh();
+        }}
+      />
+
+      {/* Plan Batches Dialog */}
+      <PlanBatchesWizardDialog
+        open={isPlanBatchesOpen}
+        onOpenChange={setIsPlanBatchesOpen}
+        onSuccess={(result) => {
+          toast({
+            title: "Batches Planned",
+            description: `${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Planned" status.`
+          });
+          forceRefresh();
+        }}
+      />
+
+      {/* Actualize Batches Dialog */}
+      <ActualizeWizardDialog
+        open={isActualizeOpen}
+        onOpenChange={setIsActualizeOpen}
+        onSuccess={(result) => {
+          toast({
+            title: "Batches Actualized",
+            description: `${result.actualized} batch${result.actualized !== 1 ? 'es' : ''} now active.`
+          });
+          forceRefresh();
+        }}
+      />
 
       {/* Other Dialogs */}
       <Dialog open={isVarietyFormOpen} onOpenChange={setIsVarietyFormOpen}>
@@ -856,5 +1309,6 @@ export default function HomePageView({
         </DialogContent>
       </Dialog>
     </PageFrame>
+    </ReferenceDataProvider>
   );
 }

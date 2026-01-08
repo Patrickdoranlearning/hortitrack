@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
-import { getUserAndOrg } from "@/server/auth/org";
+import { getLightweightAuth } from "@/lib/auth/lightweight";
+import { getCachedLocations } from "@/lib/cache/reference-data";
 
 export async function GET() {
   try {
-    const { supabase, orgId } = await getUserAndOrg();
-    const { data, error } = await supabase
-      .from("nursery_locations")
-      .select("id, name, covered, area, nursery_site, type, site_id, updated_at, created_at")
-      .eq("org_id", orgId)
-      .order("name");
+    // Lightweight auth - caches org lookup
+    const { orgId } = await getLightweightAuth();
+    
+    // Use in-memory cached locations (service_role, no RLS overhead)
+    const locations = await getCachedLocations(orgId);
 
-    if (error) throw error;
-    return NextResponse.json({ items: data ?? [] });
+    return NextResponse.json(
+      { items: locations },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+        },
+      }
+    );
   } catch (e: any) {
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
+    const status = /Unauthenticated|No organization/i.test(e?.message) ? 401 : 500;
     console.error("[lookups/locations] error", e);
     return NextResponse.json({ error: e?.message ?? "Lookup failed" }, { status });
   }

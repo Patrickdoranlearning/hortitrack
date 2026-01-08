@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
-import { ProductionAPI, type TransplantInput, type UUID } from "@/lib/production/client";
+import { transplantBatchAction } from "@/app/actions/transplant";
+import type { TransplantInput } from "@/lib/domain/batch";
 import { fetchJson, HttpError } from "@/lib/http/fetchJson";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -276,23 +277,26 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
       updateRow(row.id, { status: "uploading", message: undefined });
       try {
         const payload: TransplantInput = {
-          parent_batch_id: row.parentBatchId as UUID,
-          size_id: row.sizeId as UUID,
-          location_id: row.locationId as UUID,
+          parent_batch_id: row.parentBatchId as string,
+          size_id: row.sizeId as string,
+          location_id: row.locationId as string,
           containers: row.containers,
           planted_at: row.plantedAt || undefined,
           notes: row.notes || undefined,
           archive_parent_if_empty: row.archiveParentIfEmpty,
         };
-        await ProductionAPI.transplant(payload);
+
+        const result = await transplantBatchAction(payload);
+        
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+
         created += 1;
         updateRow(row.id, { status: "success", message: "Created" });
       } catch (err: any) {
         failed += 1;
-        const description =
-          err?.message ??
-          err?.response?.data?.error ??
-          "Failed to create transplant";
+        const description = err?.message ?? "Failed to create transplant";
         updateRow(row.id, {
           status: "error",
           message: description,
@@ -359,7 +363,7 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
     <div className="space-y-6">
       {rows.length === 0 ? (
         <Card className="border-primary/30">
-          <CardHeader className="space-y-2">
+          <CardHeader className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">Review & edit rows</CardTitle>
@@ -377,77 +381,41 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
                 </Button>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <Select
-                value={defaults.locationId ?? "none"}
-                onValueChange={(value) =>
-                  setDefaults((prev) => ({ ...prev, locationId: value === "none" ? undefined : value }))
-                }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default location</SelectItem>
-                  {referenceData.locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id!}>
-                      {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={defaults.sizeId ?? "none"}
-                onValueChange={(value) =>
-                  setDefaults((prev) => ({ ...prev, sizeId: value === "none" ? undefined : value }))
-                }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default size</SelectItem>
-                  {referenceData.sizes.map((size) => (
-                    <SelectItem key={size.id} value={size.id!}>
-                      {size.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Input
-                type="date"
-                className="w-48"
-                value={defaults.plantedAt ?? ""}
-                onChange={(event) =>
-                  setDefaults((prev) => ({ ...prev, plantedAt: event.target.value || undefined }))
-                }
-              />
-              <Button type="button" size="sm" variant="outline" onClick={applyDefaultsToEmpty}>
-                Apply defaults to empty rows
-              </Button>
-            </div>
+            <DefaultsPanel
+              defaults={defaults}
+              referenceData={referenceData}
+              setDefaults={setDefaults}
+              applyDefaultsToEmpty={applyDefaultsToEmpty}
+            />
           </CardHeader>
-          <CardContent>
-            <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-              <p>No rows yet. Upload a CSV or add rows manually.</p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={addManualRow}>
-                  Add blank row
-                </Button>
-                <Button size="sm" variant="outline" disabled>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy last
-                </Button>
+          <CardContent className="space-y-6">
+            <div className="rounded-2xl border bg-background text-sm shadow-sm">
+              <div className="grid grid-cols-[48px_minmax(0,1.2fr)_repeat(3,minmax(0,1fr))_120px_140px] items-center gap-3 border-b px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <span>#</span>
+                <span>Parent batch</span>
+                <span>Size</span>
+                <span>Location</span>
+                <span>Containers</span>
+                <span>Date</span>
+                <span className="text-right">Actions</span>
+              </div>
+              <div className="px-6 py-10 text-center text-muted-foreground">
+                <p className="text-sm font-medium">No rows yet</p>
+                <p className="text-xs mt-1">Upload a CSV or start logging transplants below.</p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                  <Button size="sm" onClick={addManualRow}>Add blank row</Button>
+                  <Button size="sm" variant="outline" disabled>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy last
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
       ) : (
         <Card className="border-primary/30 overflow-hidden">
-          <CardHeader className="space-y-2">
+          <CardHeader className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">Review & edit rows</CardTitle>
@@ -465,84 +433,25 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
                 </Button>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <Select
-                value={defaults.locationId ?? "none"}
-                onValueChange={(value) =>
-                  setDefaults((prev) => ({ ...prev, locationId: value === "none" ? undefined : value }))
-                }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default location</SelectItem>
-                  {referenceData.locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id!}>
-                      {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={defaults.sizeId ?? "none"}
-                onValueChange={(value) =>
-                  setDefaults((prev) => ({ ...prev, sizeId: value === "none" ? undefined : value }))
-                }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default size</SelectItem>
-                  {referenceData.sizes.map((size) => (
-                    <SelectItem key={size.id} value={size.id!}>
-                      {size.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Input
-                type="date"
-                className="w-48"
-                value={defaults.plantedAt ?? ""}
-                onChange={(event) =>
-                  setDefaults((prev) => ({ ...prev, plantedAt: event.target.value || undefined }))
-                }
-              />
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="default-archive"
-                  checked={defaults.archiveParentIfEmpty}
-                  onCheckedChange={(v) =>
-                    setDefaults((prev) => ({ ...prev, archiveParentIfEmpty: Boolean(v) }))
-                  }
-                />
-                <Label htmlFor="default-archive" className="text-sm">Archive empty parents</Label>
-              </div>
-              <Button type="button" size="sm" variant="outline" onClick={applyDefaultsToEmpty}>
-                Apply defaults to empty rows
-              </Button>
-            </div>
+            <DefaultsPanel
+              defaults={defaults}
+              referenceData={referenceData}
+              setDefaults={setDefaults}
+              applyDefaultsToEmpty={applyDefaultsToEmpty}
+            />
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="rounded-lg border bg-card overflow-x-auto">
-              <Table className="min-w-[1200px] text-sm">
+            <div className="rounded-2xl border bg-card overflow-x-auto shadow-sm">
+              <Table className="min-w-[960px] text-sm">
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/40">
                     <TableHead className="w-[40px]">#</TableHead>
-                    <TableHead className="min-w-[200px]">Parent Batch</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead className="w-[120px] text-right">Containers</TableHead>
-                    <TableHead className="w-[140px]">Date</TableHead>
+                    <TableHead className="min-w-[260px]">Parent Batch</TableHead>
+                    <TableHead className="w-[140px] text-right">Containers</TableHead>
                     <TableHead>Notes</TableHead>
-                    <TableHead className="w-[80px]">Archive</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-[90px] text-center">Archive</TableHead>
+                    <TableHead className="w-[140px]">Status</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -624,6 +533,116 @@ type ReferenceDataType = {
   suppliers: Array<{ id?: string; name?: string }>;
 };
 
+function DefaultsPanel({
+  defaults,
+  referenceData,
+  setDefaults,
+  applyDefaultsToEmpty,
+}: {
+  defaults: {
+    locationId?: string;
+    sizeId?: string;
+    plantedAt?: string;
+    archiveParentIfEmpty: boolean;
+  };
+  referenceData: ReferenceDataType;
+  setDefaults: React.Dispatch<
+    React.SetStateAction<{
+      locationId?: string;
+      sizeId?: string;
+      plantedAt?: string;
+      archiveParentIfEmpty: boolean;
+    }>
+  >;
+  applyDefaultsToEmpty: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border bg-muted/30 p-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            New location
+          </Label>
+          <Select
+            value={defaults.locationId ?? "none"}
+            onValueChange={(value) =>
+              setDefaults((prev) => ({ ...prev, locationId: value === "none" ? undefined : value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No default</SelectItem>
+              {referenceData.locations.map((loc) => (
+                <SelectItem key={loc.id} value={loc.id!}>
+                  {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
+                  {loc.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            New size
+          </Label>
+          <Select
+            value={defaults.sizeId ?? "none"}
+            onValueChange={(value) =>
+              setDefaults((prev) => ({ ...prev, sizeId: value === "none" ? undefined : value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select size" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No default</SelectItem>
+              {referenceData.sizes.map((size) => (
+                <SelectItem key={size.id} value={size.id!}>
+                  {size.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Transplant date
+          </Label>
+          <Input
+            type="date"
+            value={defaults.plantedAt ?? ""}
+            onChange={(event) =>
+              setDefaults((prev) => ({ ...prev, plantedAt: event.target.value || undefined }))
+            }
+          />
+        </div>
+
+        <div className="flex flex-col justify-between gap-2 rounded-xl border border-dashed border-primary/40 p-3">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="default-archive"
+              checked={defaults.archiveParentIfEmpty}
+              onCheckedChange={(v) =>
+                setDefaults((prev) => ({ ...prev, archiveParentIfEmpty: Boolean(v) }))
+              }
+            />
+            <Label htmlFor="default-archive" className="text-sm font-medium">
+              Archive parent when empty
+            </Label>
+          </div>
+          <Button size="sm" variant="outline" className="w-full" onClick={applyDefaultsToEmpty}>
+            Apply defaults to empty rows
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Separate row component to handle batch search state per row
 function TransplantTableRow({
   row,
@@ -682,118 +701,74 @@ function TransplantTableRow({
     <TableRow className={row.status === "error" || insufficient ? "bg-destructive/5" : undefined}>
       <TableCell className="font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
       <TableCell>
-        <Popover open={batchOpen} onOpenChange={setBatchOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={batchOpen}
-              className="w-full justify-start font-normal"
-            >
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              {row.parentBatch ? (
-                <span className="truncate">
-                  {row.parentBatch.batch_number}
-                  <span className="ml-2 text-muted-foreground text-xs">
-                    ({row.parentBatch.variety_name ?? "?"} • {parentAvailable} units)
+        <div className="space-y-2">
+          <Popover open={batchOpen} onOpenChange={setBatchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={batchOpen}
+                className="w-full justify-start font-normal"
+              >
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                {row.parentBatch ? (
+                  <span className="truncate">
+                    {row.parentBatch.batch_number}
+                    <span className="ml-2 text-muted-foreground text-xs">
+                      ({row.parentBatch.variety_name ?? "?"} • {parentAvailable} units)
+                    </span>
                   </span>
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Search batch…</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[400px] p-0" align="start">
-            <Command shouldFilter={false}>
-              <CommandInput
-                placeholder="Search by batch number or variety…"
-                value={searchQuery}
-                onValueChange={handleBatchSearch}
-              />
-              <CommandList>
-                {batchSearchLoading ? (
-                  <div className="py-6 text-center text-sm text-muted-foreground">
-                    Searching…
-                  </div>
-                ) : batchSearchResults.length === 0 ? (
-                  <CommandEmpty>
-                    {searchQuery.length < 2
-                      ? "Type at least 2 characters to search"
-                      : "No batches found"}
-                  </CommandEmpty>
                 ) : (
-                  <CommandGroup>
-                    {batchSearchResults.map((batch) => (
-                      <CommandItem
-                        key={batch.id}
-                        value={batch.id}
-                        onSelect={() => selectBatch(batch)}
-                        className="cursor-pointer"
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <div className="font-medium">{batch.batch_number}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {batch.variety_name ?? "—"} • {batch.quantity?.toLocaleString() ?? 0} units
-                            {batch.location_name ? ` • ${batch.location_name}` : ""}
-                          </div>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
+                  <span className="text-muted-foreground">Search batch…</span>
                 )}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </TableCell>
-      <TableCell className="max-w-[180px]">
-        <Select
-          value={row.sizeId ?? "none"}
-          onValueChange={(value) => {
-            if (value === "none") {
-              onUpdate(row.id, { sizeId: undefined, sizeName: "" });
-              return;
-            }
-            onUpdate(row.id, { sizeId: value, sizeName: sizeMap.byId.get(value)?.name ?? "" });
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Pick size" />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            <SelectItem value="none">—</SelectItem>
-            {referenceData.sizes.map((size) => (
-              <SelectItem key={size.id} value={size.id!}>
-                {size.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell className="max-w-[200px]">
-        <Select
-          value={row.locationId ?? "none"}
-          onValueChange={(value) => {
-            if (value === "none") {
-              onUpdate(row.id, { locationId: undefined, locationName: "" });
-              return;
-            }
-            onUpdate(row.id, { locationId: value, locationName: locationMap.byId.get(value) ?? "" });
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Pick location" />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            <SelectItem value="none">—</SelectItem>
-            {referenceData.locations.map((loc) => (
-              <SelectItem key={loc.id} value={loc.id!}>
-                {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                {loc.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px] p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput
+                  placeholder="Search by batch number or variety…"
+                  value={searchQuery}
+                  onValueChange={handleBatchSearch}
+                />
+                <CommandList>
+                  {batchSearchLoading ? (
+                    <div className="py-6 text-center text-sm text-muted-foreground">
+                      Searching…
+                    </div>
+                  ) : batchSearchResults.length === 0 ? (
+                    <CommandEmpty>
+                      {searchQuery.length < 2
+                        ? "Type at least 2 characters to search"
+                        : "No batches found"}
+                    </CommandEmpty>
+                  ) : (
+                    <CommandGroup>
+                      {batchSearchResults.map((batch) => (
+                        <CommandItem
+                          key={batch.id}
+                          value={batch.id}
+                          onSelect={() => selectBatch(batch)}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <div className="font-medium">{batch.batch_number}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {batch.variety_name ?? "—"} • {batch.quantity?.toLocaleString() ?? 0} units
+                              {batch.location_name ? ` • ${batch.location_name}` : ""}
+                            </div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <p className="text-xs text-muted-foreground">
+            {row.sizeName || "Size—"} · {row.locationName || "Location—"} · {row.plantedAt || "Date—"}
+          </p>
+        </div>
       </TableCell>
       <TableCell>
         <div className="space-y-1">
@@ -815,21 +790,12 @@ function TransplantTableRow({
       </TableCell>
       <TableCell>
         <Input
-          type="date"
-          value={row.plantedAt ?? ""}
-          onChange={(event) =>
-            onUpdate(row.id, { plantedAt: event.target.value || undefined })
-          }
-        />
-      </TableCell>
-      <TableCell>
-        <Input
           placeholder="Notes"
           value={row.notes ?? ""}
           onChange={(event) => onUpdate(row.id, { notes: event.target.value || undefined })}
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="text-center">
         <Checkbox
           checked={row.archiveParentIfEmpty}
           onCheckedChange={(v) => onUpdate(row.id, { archiveParentIfEmpty: Boolean(v) })}
