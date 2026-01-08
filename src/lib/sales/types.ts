@@ -16,18 +16,29 @@ export const CreateOrderLineSchema = z
   .object({
     productId: z.string().uuid().optional(),
     // Product identity fallback (variety + size)
-    plantVariety: z.string().min(1).optional(),
-    size: z.string().min(1).optional(),
+    plantVariety: z.string().optional(),
+    size: z.string().optional(),
+    requiredVarietyId: z.string().uuid().optional(),
+    requiredBatchId: z.string().uuid().optional(),
     description: z.string().optional(),
-    qty: z.number().int().positive(),
-    allowSubstitute: z.boolean().optional().default(false),
-    unitPrice: z.number().nonnegative().optional(), // optional override
-    vatRate: z.number().min(0).max(100).optional(),
+    qty: z.coerce.number().int().positive().default(1),
+    allowSubstitute: z.boolean().optional().default(true),
+    unitPrice: z.coerce.number().nonnegative().optional(), // optional override
+    vatRate: z.coerce.number().min(0).max(100).optional(),
+    // Pre-pricing (RRP printed on pots)
+    rrp: z.coerce.number().nonnegative().optional(),
+    // Multibuy pricing (e.g., "3 for €10")
+    multibuyQty2: z.coerce.number().int().positive().optional(),
+    multibuyPrice2: z.coerce.number().nonnegative().optional(),
+    // Batch-specific ordering
+    specificBatchId: z.string().uuid().optional(), // Request specific batch
+    gradePreference: z.enum(['A', 'B', 'C']).optional(), // Grade preference
+    preferredBatchNumbers: z.array(z.string()).optional(), // List of preferred batch numbers
   })
   .refine(
     (val) => Boolean(val.productId) || (Boolean(val.plantVariety) && Boolean(val.size)),
     {
-      message: "Provide a productId or both plant variety and size",
+      message: "Select a product or provide both plant variety and size",
       path: ["productId"],
     }
   );
@@ -35,8 +46,11 @@ export const CreateOrderLineSchema = z
 export const CreateOrderSchema = z.object({
   customerId: z.string().min(1),
   storeId: z.string().min(1).optional(),
+  shipToAddressId: z.string().uuid().optional(), // The customer_addresses.id for shipping
+  deliveryAddress: z.string().optional(),
+  orderReference: z.string().optional(),
   deliveryDate: z.string().optional(), // ISO
-  shipMethod: z.enum(["van", "haulier"]).optional(),
+  shipMethod: z.enum(["van", "haulier", "collection"]).optional().or(z.literal('')),
   notesCustomer: z.string().optional(),
   notesInternal: z.string().optional(),
   autoPrint: z.boolean().optional().default(true),
@@ -108,3 +122,18 @@ export type SalesOrderItem = Database['public']['Tables']['order_items']['Row'];
 export type PickOrder = Database['public']['Tables']['pick_orders']['Row'];
 export type Invoice = Database['public']['Tables']['invoices']['Row'];
 export type CreditNote = Database['public']['Tables']['credit_notes']['Row'];
+
+// Customer address type for sales order wizard
+export type CustomerAddress = {
+  id: string;
+  label: string;
+  storeName: string | null;
+  line1: string;
+  line2: string | null;
+  city: string | null;
+  county: string | null;
+  eircode: string | null;
+  countryCode: string;
+  isDefaultShipping: boolean;
+  isDefaultBilling: boolean;
+};

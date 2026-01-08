@@ -2,8 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getUserAndOrg } from "@/server/auth/org";
-import { getSupabaseServerClient } from "@/server/db/supabaseServer";
-import { PropagationInputSchema } from "@/lib/production/schemas";
+import { PropagationInputSchema } from "@/lib/domain/batch";
 import { nextBatchNumber } from "@/server/numbering/batches";
 import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 
@@ -69,14 +68,21 @@ export async function POST(req: NextRequest) {
       throw new Error(`Event insert failed: ${eErr.message}`);
     }
 
-    // Create internal passport (defaults)
+    // Get org defaults for passport (dynamic, not hardcoded!)
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("producer_code, country_code")
+      .eq("id", orgId)
+      .single();
+
+    // Create internal passport (uses org's producer code)
     const { error: pErr } = await supabase.from("batch_passports").insert({
       batch_id: batch.id,
       org_id: orgId,
       passport_type: "internal",
-      operator_reg_no: "IE2727",          // default internal operator
+      operator_reg_no: org?.producer_code ?? "UNKNOWN",
       traceability_code: batch.batch_number,
-      origin_country: "IE",
+      origin_country: org?.country_code ?? "IE",
       created_by_user_id: user.id,
       request_id: requestId,
     });
@@ -87,11 +93,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ batch, requestId }, { status: 201 });
-  } catch (e: any) {
-    console.error("[propagate]", { requestId, error: e?.message });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
     const status =
-      /Unauthenticated/i.test(e?.message) ? 401 :
-      /parse|invalid/i.test(e?.message) ? 400 : 500;
-    return NextResponse.json({ error: e?.message ?? "Server error", requestId }, { status });
+      /Unauthenticated/i.test(message) ? 401 :
+      /parse|invalid/i.test(message) ? 400 : 500;
+    return NextResponse.json({ error: message, requestId }, { status });
   }
 }

@@ -12,26 +12,69 @@ function toTs(d: any): number {
   } catch { return 0; }
 }
 
-// ...
-
-export async function allocateForProductLine(params: {
+export interface AllocationOptions {
   plantVariety: string;
   size: string;
   qty: number;
-}): Promise<Allocation[]> {
-  const { plantVariety, size, qty } = params;
+  // Batch-specific options
+  specificBatchId?: string; // Allocate from this exact batch
+  gradePreference?: 'A' | 'B' | 'C'; // Prefer this grade
+  preferredBatchNumbers?: string[]; // Try these batches first
+}
 
-  // 1) Get all saleable batches and filter by variety/size
-  const allSaleable = await getSaleableBatches();
+/**
+ * Enhanced allocation function with support for batch-specific preferences
+ *
+ * @param params - Allocation options (variety, size, qty, preferences)
+ * @param cachedInventory - Optional pre-fetched inventory to avoid N+1 queries.
+ *                          When processing multiple order lines, fetch inventory
+ *                          once and pass it to all allocation calls.
+ */
+export async function allocateForProductLine(
+  params: AllocationOptions,
+  cachedInventory?: InventoryBatch[]
+): Promise<Allocation[]> {
+  const { plantVariety, size, qty, specificBatchId, gradePreference, preferredBatchNumbers } = params;
 
-  const saleable = allSaleable
+  // 1) Use cached inventory if provided, otherwise fetch (backward compatibility)
+  const allSaleable = cachedInventory ?? await getSaleableBatches();
+
+  let saleable = allSaleable
     .filter((b) =>
       b.plantVariety === plantVariety &&
       b.size === size &&
       (b.qcStatus !== "Rejected" && b.qcStatus !== "Quarantined") &&
       !b.hidden
-    )
-    .sort((a, b) => {
+    );
+
+  // 2) If specific batch requested, only use that batch
+  if (specificBatchId) {
+    saleable = saleable.filter(b => b.id === specificBatchId);
+    if (saleable.length === 0) {
+      console.warn(`Specific batch ${specificBatchId} not found or not available`);
+      return [];
+    }
+  }
+
+  // 3) If grade preference specified, prioritize that grade
+  if (gradePreference && !specificBatchId) {
+    const preferredGrade = saleable.filter(b => b.grade === gradePreference);
+    const otherGrades = saleable.filter(b => b.grade !== gradePreference);
+    saleable = [...preferredGrade, ...otherGrades];
+  }
+
+  // 4) If preferred batch numbers specified, prioritize those
+  if (preferredBatchNumbers && preferredBatchNumbers.length > 0 && !specificBatchId) {
+    const preferred = saleable.filter(b =>
+      b.batchNumber && preferredBatchNumbers.includes(b.batchNumber)
+    );
+    const others = saleable.filter(b =>
+      !b.batchNumber || !preferredBatchNumbers.includes(b.batchNumber)
+    );
+    saleable = [...preferred, ...others];
+  } else {
+    // 5) Default sorting: FEFO with grade priority
+    saleable = saleable.sort((a, b) => {
       // Prefer older plantingDate (FEFO-like), then createdAt; then grade; then batchNumber
       const ap = toTs(a.plantingDate);
       const bp = toTs(b.plantingDate);
@@ -50,13 +93,17 @@ export async function allocateForProductLine(params: {
       const bn = String(b.batchNumber || "");
       return an.localeCompare(bn);
     });
+  }
 
-  // 2) Split allocation across saleable batches until qty satisfied
+  // 6) Split allocation across saleable batches until qty satisfied
+  // Use availableQuantity (quantity - reserved) to avoid double-booking
   let remaining = qty;
   const out: Allocation[] = [];
   for (const b of saleable) {
     if (remaining <= 0) break;
-    const take = Math.min(b.quantity || 0, remaining);
+    // Use availableQuantity which accounts for reserved stock
+    const availableQty = b.availableQuantity ?? (b.quantity || 0);
+    const take = Math.min(availableQty, remaining);
     if (take > 0) {
       out.push({
         batchId: b.id,
@@ -68,5 +115,14 @@ export async function allocateForProductLine(params: {
       remaining -= take;
     }
   }
+
+  // Warn if we couldn't fulfill the full quantity
+  if (remaining > 0) {
+    console.warn(
+      `Could not fully allocate ${qty} units of ${plantVariety} ${size}. ` +
+      `${remaining} units short. Available: ${qty - remaining}`
+    );
+  }
+
   return out;
 }

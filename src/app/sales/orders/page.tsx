@@ -1,24 +1,26 @@
-
-import { createClient } from '@/lib/supabase/server';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import OrderCard from '@/components/sales/OrderCard';
-import OrderDetailDialog from '@/components/sales/OrderDetailDialog';
-import { SalesOrder } from '@/lib/sales/types';
 import SalesOrdersClient from './SalesOrdersClient';
+import { listOrders } from '@/server/sales/queries.server';
 
-export default async function SalesOrdersPage() {
-    const supabase = await createClient();
+export default async function SalesOrdersPage(props: {
+    searchParams?: Promise<{ page?: string; status?: string; pageSize?: string }>;
+}) {
+    const searchParams = await props.searchParams;
+    const page = Number(searchParams?.page) || 1;
+    const status = searchParams?.status || undefined;
+    const pageSize = Number(searchParams?.pageSize) || 20;
 
-    const { data: orders } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { orders, total, page: currentPage, pageSize: currentPageSize } = await listOrders({
+        page,
+        pageSize,
+        status,
+    });
 
     return (
-        <PageFrame companyName="Doran Nurseries" moduleKey="sales">
+        <PageFrame moduleKey="sales">
             <div className="space-y-6">
                 <ModulePageHeader
                     title="Sales Orders"
@@ -30,7 +32,13 @@ export default async function SalesOrdersPage() {
                     }
                 />
 
-                <SalesOrdersClient initialOrders={(orders as SalesOrder[]) || []} />
+                <SalesOrdersClient
+                    initialOrders={orders || []}
+                    total={total}
+                    page={currentPage}
+                    pageSize={currentPageSize}
+                    statusFilter={status}
+                />
             </div>
         </PageFrame>
     );

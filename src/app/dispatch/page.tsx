@@ -1,66 +1,44 @@
+import { redirect } from "next/navigation";
+import { getDispatchRoleForUser } from "@/server/dispatch/get-dispatch-role";
 
-'use client';
+/**
+ * Dispatch Module - Role-based Router
+ *
+ * Redirects users to their appropriate view based on their org role:
+ * - Managers (admin, owner, editor, staff, sales) -> /dispatch/manager
+ * - Pickers (picker, grower) -> /dispatch/picker
+ * - Drivers (driver) -> /dispatch/driver
+ */
+export default async function DispatchPage() {
+  try {
+    const { role } = await getDispatchRoleForUser();
 
-import * as React from 'react';
-import { Button } from '@/components/ui/button';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Truck, Calendar, ListChecks } from 'lucide-react';
+    switch (role) {
+      case "manager":
+        redirect("/dispatch/manager");
+      case "picker":
+        redirect("/dispatch/picker");
+      case "driver":
+        redirect("/dispatch/driver");
+      default:
+        // Default to manager view for unknown roles
+        redirect("/dispatch/manager");
+    }
+  } catch (error: any) {
+    if (
+      error.message === "Unauthenticated" ||
+      error.message === "Unauthorized"
+    ) {
+      redirect("/login?next=/dispatch");
+    }
 
-export default function DispatchPage() {
+    // For NEXT_REDIRECT errors, rethrow them
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw error;
+    }
 
-  return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="dispatch">
-      <div className="space-y-6">
-        <ModulePageHeader 
-            title="Dispatch Dashboard"
-            description="Manage order packing, delivery schedules, and logistics."
-            actionsSlot={
-              <>
-                <Button>
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Schedule Delivery
-                </Button>
-              </>
-            }
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <ListChecks className="text-primary" />
-                        Ready for Dispatch
-                    </CardTitle>
-                    <CardDescription>
-                        Orders that have been picked and are ready to be packed and scheduled.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-center text-muted-foreground py-12">
-                        <p>Orders ready for dispatch will appear here.</p>
-                    </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Truck className="text-primary" />
-                        Scheduled Deliveries
-                    </CardTitle>
-                    <CardDescription>
-                        A timeline of upcoming deliveries and their status.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-center text-muted-foreground py-12">
-                        <p>Delivery schedule coming soon.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-      </div>
-    </PageFrame>
-  );
+    console.error("Error determining dispatch role:", error);
+    // Default to manager view on error
+    redirect("/dispatch/manager");
+  }
 }

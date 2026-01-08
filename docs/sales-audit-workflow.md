@@ -42,3 +42,9 @@ This note stitches the new database entities to the day-to-day workflow for sale
 
 These rules ensure pickers stay fast while managers retain oversight and the system captures a tamper-proof audit trail for every divergence from the original order.
 
+
+
+
+
+
+

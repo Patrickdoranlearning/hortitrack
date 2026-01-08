@@ -1,17 +1,44 @@
 import { NextResponse } from "next/server";
-import { searchLocations } from "@/server/refdata/queries"; // Import the Supabase search function
+import { getUserAndOrg } from "@/server/auth/org";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const q = searchParams.get("q") || ""; // Get search query from URL params
+    const q = searchParams.get("q") || searchParams.get("search") || "";
+    const limit = parseInt(searchParams.get("limit") || "25");
 
-    const items = await searchLocations(q); // Call the Supabase search function
+    const { orgId, supabase } = await getUserAndOrg();
+
+    let query = supabase
+      .from("nursery_locations")
+      .select("id, name, type, nursery_site, health_status")
+      .eq("org_id", orgId)
+      .order("name")
+      .limit(limit);
+
+    if (q) {
+      query = query.ilike("name", `%${q}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[api/locations] query error", error);
+      return NextResponse.json({ data: [], error: error.message }, { status: 500 });
+    }
+
+    // Transform to camelCase
+    const items = (data || []).map((loc: any) => ({
+      id: loc.id,
+      name: loc.name,
+      type: loc.type,
+      nurserySite: loc.nursery_site,
+      healthStatus: loc.health_status,
+    }));
     
-    // The searchLocations function already returns camelCase data in the expected format
-    return NextResponse.json({ items }, { status: 200 });
+    return NextResponse.json({ data: items, items }, { status: 200 });
   } catch (e: any) {
     console.error("[api/locations] 500", e);
-    return NextResponse.json({ items: [], error: e?.message || "Failed to fetch locations" }, { status: 500 });
+    return NextResponse.json({ data: [], items: [], error: e?.message || "Failed to fetch locations" }, { status: 500 });
   }
 }

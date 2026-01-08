@@ -1,7 +1,7 @@
 // src/lib/search.ts
 'use client';
 import type { Batch } from '@/lib/types';
-import { parseScanCode, candidateBatchNumbers } from '@/lib/scan/parse';
+import { parseScanCode, candidateBatchNumbers, normalizeForComparison } from '@/lib/scan/parse';
 
 function levenshtein(a: string, b: string) {
   const m = a.length, n = b.length;
@@ -21,16 +21,30 @@ export function queryMatchesBatch(query: string, batch: Batch): boolean {
   const q = (query ?? '').trim();
   if (!q) return true;
 
+  const qLower = q.toLowerCase();
+  const batchId = String(batch.id ?? '').trim().toLowerCase();
+  const batchNumber = String(batch.batchNumber ?? '').trim().toLowerCase();
+
+  // First, check for direct ID match (handles non-UUID IDs like 'abc-123')
+  // This check runs before parseScanCode to catch IDs that might be misidentified
+  if (batchId === qLower || batchId === qLower.replace(/^#/, '')) {
+    return true;
+  }
+
   const parsed = parseScanCode(q);
 
-  // Strong matches first
+  // Strong matches from scan codes
   if (parsed?.by === 'id') {
-    return String(batch.id ?? '').trim().toLowerCase() === parsed.value.toLowerCase();
+    return batchId === parsed.value.toLowerCase();
   }
   if (parsed?.by === 'batchNumber') {
-    const bn = String(batch.batchNumber ?? '').trim().toLowerCase();
+    const bnNormalized = normalizeForComparison(batchNumber);
     const cands = candidateBatchNumbers(parsed.value).map((s) => s.toLowerCase());
-    return cands.some((c) => bn === c);
+    // Match either exact or with leading zeros stripped
+    if (cands.some((c) => batchNumber === c || bnNormalized === normalizeForComparison(c))) {
+      return true;
+    }
+    // If batch number match fails, don't return false yet - fall through to fuzzy
   }
 
   // Fallback fuzzy text

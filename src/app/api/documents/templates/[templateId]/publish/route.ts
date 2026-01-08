@@ -1,0 +1,24 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+import { NextRequest, NextResponse } from "next/server";
+import { publishTemplate } from "@/server/documents";
+import { requireDocumentAccess } from "@/server/documents/access";
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { templateId: string } }
+) {
+  try {
+    await requireDocumentAccess();
+    const body = await req.json().catch(() => ({}));
+    const versionId = body?.versionId as string | undefined;
+    const template = await publishTemplate(params.templateId, versionId);
+    return NextResponse.json({ template });
+  } catch (err: any) {
+    console.error("[documents] publish failed", err);
+    const status = err?.message === "Forbidden" ? 403 : 500;
+    return NextResponse.json({ error: err?.message ?? "Failed to publish template" }, { status });
+  }
+}
+

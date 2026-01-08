@@ -5,8 +5,8 @@ import * as z from 'zod';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2, Edit } from 'lucide-react';
-import { DataPageShell } from '@/components/data-management/DataPageShell';
-import { DataToolbar } from '@/components/data-management/DataToolbar';
+import { DataPageShell } from '@/ui/templates';
+import { DataToolbar } from '@/ui/templates';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,15 +16,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { Haulier } from '@/lib/types';
 import { addHaulierAction, deleteHaulierAction, updateHaulierAction } from '@/app/actions';
+import { invalidateReferenceData } from '@/lib/swr/keys';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { HaulierForm } from '@/components/haulier-form';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 
 const quickHaulierSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')),
 });
 
 type QuickHaulierValues = z.infer<typeof quickHaulierSchema>;
@@ -101,6 +102,7 @@ export default function HauliersPage() {
 
     const result = await addHaulierAction(payload);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Haulier added', description: `"${values.name}" is now available.` });
       quickForm.reset(defaultQuickValues);
     } else {
@@ -167,6 +169,10 @@ export default function HauliersPage() {
       }
     }
 
+    if (created > 0) {
+      invalidateReferenceData();
+    }
+
     toast({
       title: 'Import complete',
       description: `${created} haulier${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
@@ -177,6 +183,7 @@ export default function HauliersPage() {
   const handleDelete = async (id: string, name: string) => {
     const result = await deleteHaulierAction(id);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Haulier deleted', description: `"${name}" removed.` });
     } else {
       toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
@@ -208,7 +215,7 @@ export default function HauliersPage() {
   );
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <DataPageShell
         title="Hauliers"
         description="Maintain approved logistics partners for dispatch screens."
@@ -247,6 +254,7 @@ export default function HauliersPage() {
                   ? updateHaulierAction(values as Haulier)
                   : addHaulierAction(values as Omit<Haulier, 'id'>));
                 if (result.success) {
+                  invalidateReferenceData();
                   toast({
                     title: editingHaulier ? 'Haulier updated' : 'Haulier added',
                     description: `"${result.data?.name ?? values.name}" saved successfully.`,

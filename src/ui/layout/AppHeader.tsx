@@ -1,13 +1,14 @@
-
 "use client"
 
 import * as React from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { ModuleTabs } from "./ModuleTabs"
+import { HorizontalNav } from "./HorizontalNav"
 import { ProfileMenu } from "./ProfileMenu"
+import { CreateButton } from "./CreateButton"
 import { Logo } from "@/components/logo"
-import { APP_NAV } from "@/config/nav";
+import { APP_NAV } from "@/config/nav"
 
 type AppHeaderProps = {
   companyName: string
@@ -18,21 +19,36 @@ type AppHeaderProps = {
 export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps) {
   return (
     <header className={cn(
-      "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      "sticky top-0 z-[999] w-full bg-background",
       className
     )}>
-      {/* Top bar: Burger Menu, Logo, Search, Profile */}
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2">
-        <div className="flex items-center gap-3">
-            <ModuleTabs items={APP_NAV} ariaLabel="Main application navigation" />
-            <Link href="/" className="flex items-center gap-3">
-              <Logo />
-            </Link>
+      {/* Row 1: Brand + company + profile */}
+      <div className="border-b">
+        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2">
+          <Link href="/" className="flex items-center gap-3">
+            <Logo companyName={companyName} />
+          </Link>
+          <div className="flex items-center justify-end gap-2 ml-auto">
+            <ProfileMenu moduleKey={moduleKey} />
+          </div>
         </div>
+      </div>
 
-        <div className="flex items-center justify-end gap-2">
-          {/* SearchInput removed from here */}
-          <ProfileMenu moduleKey={moduleKey} />
+      {/* Row 2: Main navigation (modules) with hover dropdowns + Create button */}
+      <div className="border-b">
+        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2">
+          <span className="sr-only">App navigation</span>
+          {/* Mobile: full module picker */}
+          <div className="md:hidden flex-1">
+            <ModuleTabs items={APP_NAV} ariaLabel="Main application navigation" />
+          </div>
+          {/* Desktop: modules link bar with hover dropdowns */}
+          <HorizontalNav
+            items={APP_NAV}
+            currentModuleKey={moduleKey}
+          />
+          {/* Create button */}
+          <CreateButton />
         </div>
       </div>
     </header>

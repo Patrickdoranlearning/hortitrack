@@ -15,6 +15,7 @@ import * as React from "react";
 import BatchPhotoUploader from "@/components/batches/BatchPhotoUploader";
 import Link from "next/link";
 import { ActionDialog } from "@/components/actions/ActionDialog";
+import type { ActionMode } from "@/components/actions/types";
 import { TransplantIcon } from "../icons";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ export function BatchActionBar({
   const isArchived = Boolean(batch.archived) || String(batch.status).toLowerCase() === "archived";
   const [actionOpen, setActionOpen] = React.useState(false);
   const [locations, setLocations] = React.useState<{id: string; name: string}[]>([]);
+  const [actionMode] = React.useState<ActionMode>("MOVE");
   React.useEffect(() => {
     let canceled = false;
     (async () => {
@@ -156,6 +158,7 @@ export function BatchActionBar({
         onOpenChange={setActionOpen}
        batch={batch}
         locations={locations}
+        mode={actionMode}
       />
     </TooltipProvider>
   );

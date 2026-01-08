@@ -83,7 +83,7 @@ export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps
               <FormField control={form.control} name="name" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Supplier Name</FormLabel>
-                      <FormControl><Input placeholder="e.g., 'Doran Nurseries'" {...field} /></FormControl>
+                      <FormControl><Input placeholder="e.g., 'Greenfield Nursery'" {...field} /></FormControl>
                       <FormMessage />
                   </FormItem>
               )} />
@@ -118,14 +118,14 @@ export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps
               <FormField control={form.control} name="supplierType" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Supplier type</FormLabel>
-                      <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                      <Select value={field.value || 'unspecified'} onValueChange={(val) => field.onChange(val === 'unspecified' ? '' : val)}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Unspecified</SelectItem>
+                          <SelectItem value="unspecified">Unspecified</SelectItem>
                           <SelectItem value="plant">Plant supplier</SelectItem>
                           <SelectItem value="general">General supplier</SelectItem>
                           <SelectItem value="hardware">Hardware supplier</SelectItem>

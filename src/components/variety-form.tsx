@@ -4,6 +4,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -19,6 +20,16 @@ import { type Variety, VarietySchema } from '@/lib/types';
 import { ScrollArea } from './ui/scroll-area';
 import { useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+
+// Lazy load gallery to avoid slowing down form load
+const VarietyGallerySection = dynamic(
+  () => import('@/components/varieties/VarietyGallerySection'),
+  { 
+    loading: () => <div className="text-sm text-muted-foreground py-4">Loading photos...</div>,
+    ssr: false 
+  }
+);
 
 type VarietyFormValues = z.infer<typeof VarietySchema>;
 
@@ -269,6 +280,14 @@ export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
                       </FormItem>
                   )} />
               </div>
+
+              {/* Gallery Section - only show when editing existing variety */}
+              {isEditing && variety?.id && (
+                <>
+                  <Separator className="my-6" />
+                  <VarietyGallerySection varietyId={variety.id} />
+                </>
+              )}
             </div>
           </ScrollArea>
           <DialogFooter className="pt-6">

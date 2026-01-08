@@ -1,9 +1,15 @@
 // src/components/scan-and-act-dialog.tsx
 'use client';
 import React, { useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import ScannerClient from '@/components/Scanner/ScannerClient';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+
+const ScannerClient = dynamic(() => import('@/components/Scanner/ScannerClient'), {
+  ssr: false,
+  loading: () => <Skeleton className="aspect-video w-full" />,
+});
 
 type Props = {
   open: boolean;

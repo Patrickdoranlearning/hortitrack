@@ -4,8 +4,9 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { ActionDialog } from '@/components/actions/ActionDialog';
-import { PageFrame } from '@/ui/templates/PageFrame';
-import { ModulePageHeader } from '@/ui/layout/ModulePageHeader';
+import type { ActionMode } from "@/components/actions/types";
+import { PageFrame } from '@/ui/templates';
+import { ModulePageHeader } from '@/ui/templates';
 import { Plus, ListChecks, Flag, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useCollection } from '@/hooks/useCollection';
@@ -15,6 +16,7 @@ import { Batch } from '@/lib/types';
 
 export default function ActionsPage() {
   const [isActionLogOpen, setIsActionLogOpen] = React.useState(false);
+  const [actionMode] = React.useState<ActionMode>("MOVE");
   const [isFlagBatchOpen, setIsFlagBatchOpen] = React.useState(false);
   const { data: locations, loading: locationsLoading } = useCollection<NurseryLocation>('nursery_locations');
   
@@ -23,7 +25,7 @@ export default function ActionsPage() {
 
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="plantHealth">
+    <PageFrame moduleKey="plantHealth">
       <div className="space-y-6">
         <ModulePageHeader 
             title="Plant Health Dashboard"
@@ -85,6 +87,7 @@ export default function ActionsPage() {
         onOpenChange={setIsActionLogOpen}
         batch={selectedBatch}
         locations={locations || []}
+        mode={actionMode}
       />
       
       {/* A placeholder batch is needed for the dialog to open. 

@@ -5,8 +5,8 @@ import * as z from 'zod';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2, Edit } from 'lucide-react';
-import { DataPageShell } from '@/components/data-management/DataPageShell';
-import { DataToolbar } from '@/components/data-management/DataToolbar';
+import { DataPageShell } from '@/ui/templates';
+import { DataToolbar } from '@/ui/templates';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { NurseryLocation } from '@/lib/types';
 import { addLocationAction, deleteLocationAction, updateLocationAction } from '../actions';
+import { invalidateReferenceData } from '@/lib/swr/keys';
 import { LocationForm } from '@/components/location-form';
-import { PageFrame } from '@/ui/templates/PageFrame';
+import { PageFrame } from '@/ui/templates';
 
 const quickLocationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -119,6 +120,7 @@ export default function LocationsPage() {
 
     const result = await addLocationAction(payload);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Location added', description: `"${values.name}" is now available.` });
       quickForm.reset(defaultQuickValues);
     } else {
@@ -190,6 +192,10 @@ export default function LocationsPage() {
       }
     }
 
+    if (created > 0) {
+      invalidateReferenceData();
+    }
+
     toast({
       title: 'Import complete',
       description: `${created} location${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
@@ -200,6 +206,7 @@ export default function LocationsPage() {
   const handleDelete = async (id: string, name: string) => {
     const result = await deleteLocationAction(id);
     if (result.success) {
+      invalidateReferenceData();
       toast({ title: 'Location deleted', description: `"${name}" removed.` });
     } else {
       toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
@@ -231,7 +238,7 @@ export default function LocationsPage() {
   );
 
   return (
-    <PageFrame companyName="Doran Nurseries" moduleKey="production">
+    <PageFrame moduleKey="production">
       <DataPageShell
         title="Nursery Locations"
         description="Keep tunnels, glasshouses, and sections aligned across propagation forms."
@@ -280,6 +287,7 @@ export default function LocationsPage() {
                   ? updateLocationAction(values as NurseryLocation)
                   : addLocationAction(values as Omit<NurseryLocation, 'id'>);
                 if (result.success) {
+                  invalidateReferenceData();
                   toast({
                     title: (values as any).id ? 'Location updated' : 'Location added',
                     description: `"${result.data?.name ?? values.name}" saved successfully.`,
@@ -543,6 +551,8 @@ function normalizeLocation(row: any): NurseryLocation | undefined {
     area: typeof row.area === 'number' ? row.area : row.area ? Number(row.area) : undefined,
     siteId: row.site_id ?? row.siteId ?? undefined,
     orgId: row.org_id ?? row.orgId ?? '',
+    healthStatus: row.health_status ?? row.healthStatus ?? 'clean',
+    restrictedUntil: row.restricted_until ?? row.restrictedUntil ?? null,
     createdAt: row.created_at ?? row.createdAt,
     updatedAt: row.updated_at ?? row.updatedAt,
   } as NurseryLocation;

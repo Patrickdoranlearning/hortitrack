@@ -19,13 +19,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import type {
-  Batch, ProductionStatus, PlantSize as PlantSizeType,
+  Batch, PlantSize as PlantSizeType,
 } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { cn } from '@/lib/utils';
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
-import { ComboBoxEntity } from './horti/ComboBoxEntity';
-import { useActiveOrg } from '@/server/org/context';
+import { useAttributeOptions } from "@/hooks/useAttributeOptions";
+import { useCompanyName } from "@/lib/org/context";
 
 const PassportFields = {
   passportType: z.enum(["received", "issued"]).optional(),
@@ -44,14 +44,7 @@ const BatchFormSchema = z.object({
   size: z.string().min(1, 'Size is required'),
   trayQuantity: z.coerce.number().int().nonnegative().optional().nullable(),
   quantity: z.coerce.number().int().nonnegative('Quantity must be ≥ 0'),
-  status: z.enum([
-    'Propagation',
-    'Plugs/Liners',
-    'Potted',
-    'Ready for Sale',
-    'Looking Good',
-    'Archived',
-  ] as const),
+  status: z.string().min(1, 'Status is required'),
   plantingDate: z.date({ required_error: 'Planting date is required' }),
   supplier: z.string().optional().nullable(),
   location: z.string().min(1, 'Location is required'),
@@ -108,12 +101,13 @@ export function BatchForm({
 }: Props) {
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSizeType | null>(null);
   const isEdit = !!batch?.id;
-  const activeOrgId = useActiveOrg();
 
   const { data, loading } = React.useContext(ReferenceDataContext);
+  const { options: statusOptions, loading: statusLoading } = useAttributeOptions("production_status");
+  const companyName = useCompanyName();
 
-
-  const doranNurseries = useMemo(() => (data?.suppliers ?? []).find(s => s.name === 'Doran Nurseries'), [data?.suppliers]);
+  // Find the internal/own nursery supplier by matching the organization name
+  const internalSupplier = useMemo(() => (data?.suppliers ?? []).find(s => s.name === companyName), [data?.suppliers, companyName]);
 
   const onSuccess = React.useMemo(() => {
     if (onSubmitSuccess) return onSubmitSuccess;
@@ -138,9 +132,9 @@ export function BatchForm({
       size: batch?.size ?? '',
       trayQuantity: null,
       quantity: batch?.quantity ?? 0,
-      status: (batch?.status as ProductionStatus) ?? 'Potted',
+      status: batch?.status ?? '',
       plantingDate: parseToDate(batch?.plantingDate),
-      supplier: batch?.supplier ?? (doranNurseries?.name || ''),
+      supplier: batch?.supplier ?? (internalSupplier?.name || ''),
       location: batch?.location ?? '',
       growerPhotoUrl: batch?.growerPhotoUrl ?? '',
       salesPhotoUrl: batch?.salesPhotoUrl ?? '',
@@ -155,14 +149,25 @@ export function BatchForm({
   const sourceType = form.watch("sourceType");
 
   useEffect(() => {
-    if (sourceType === "Propagation") {
-      form.setValue('supplier', doranNurseries?.name || '');
+    if (!statusOptions.length) return;
+    const current = form.getValues("status");
+    if (current) return;
+    if (batch?.status) {
+      form.setValue("status", batch.status, { shouldValidate: true });
     } else {
-      if (form.getValues('supplier') === doranNurseries?.name) {
+      form.setValue("status", statusOptions[0].systemCode, { shouldValidate: true });
+    }
+  }, [statusOptions, batch?.status, form]);
+
+  useEffect(() => {
+    if (sourceType === "Propagation") {
+      form.setValue('supplier', internalSupplier?.name || '');
+    } else {
+      if (form.getValues('supplier') === internalSupplier?.name) {
         form.setValue('supplier', '');
       }
     }
-  }, [sourceType, doranNurseries, form]);
+  }, [sourceType, internalSupplier, form]);
 
   const sizeMultiple = selectedSizeInfo?.multiple && selectedSizeInfo.multiple > 1
     ? selectedSizeInfo.multiple
@@ -216,7 +221,7 @@ export function BatchForm({
       size: '',
       trayQuantity: null,
       quantity: 0,
-      status: 'Potted',
+      status: statusOptions[0]?.systemCode ?? '',
       plantingDate: new Date(),
       supplier: '',
       location: '',
@@ -225,7 +230,7 @@ export function BatchForm({
     });
   };
 
-  if (loading) {
+  if (loading || statusLoading) {
     return <p className="text-sm text-muted-foreground">Loading options…</p>;
   }
 
@@ -448,18 +453,17 @@ export function BatchForm({
                 <Select
                   value={field.value}
                   onValueChange={field.onChange}
-                  disabled={form.formState.isSubmitting}
+                  disabled={form.formState.isSubmitting || statusLoading || statusOptions.length === 0}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Propagation">Propagation</SelectItem>
-                    <SelectItem value="Plugs/Liners">Plugs/Liners</SelectItem>
-                    <SelectItem value="Potted">Potted</SelectItem>
-                    <SelectItem value="Ready for Sale">Ready for Sale</SelectItem>
-                    <SelectItem value="Looking Good">Looking Good</SelectItem>
-                    <SelectItem value="Archived">Archived</SelectItem>
+                    {statusOptions.map((opt) => (
+                      <SelectItem key={opt.systemCode} value={opt.systemCode}>
+                        {opt.displayLabel}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />

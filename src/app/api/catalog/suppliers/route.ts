@@ -1,7 +1,7 @@
 // src/app/api/catalog/suppliers/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSupabaseForRequest } from "@/server/db/supabaseServer";
+import { createClient } from "@/lib/supabase/server";
 
 const Query = z.object({
   q: z.string().trim().optional(),
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   if (!parse.success) return NextResponse.json({ error: parse.error.format() }, { status: 400 });
 
   const { q, limit } = parse.data;
-  const supabase = await getSupabaseForRequest();
+  const supabase = await createClient();
 
   let query = supabase.from("suppliers").select("id,name,producer_code,country_code").order("name", { ascending: true }).limit(limit);
   if (q && q.length > 0) query = query.ilike("name", `%${q}%`);

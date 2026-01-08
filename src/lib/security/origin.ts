@@ -44,6 +44,25 @@ export function isAllowedOrigin(req: NextRequest) {
   const xfHost = (req.headers.get("x-forwarded-host") || "").toLowerCase();
   const xfProto = (req.headers.get("x-forwarded-proto") || "").toLowerCase();
 
+  let originHost = "";
+  let originOrigin = "";
+  if (originHeader) {
+    try {
+      const parsed = new URL(originHeader);
+      originHost = parsed.host.toLowerCase();
+      originOrigin = parsed.origin.toLowerCase();
+    } catch {
+      originOrigin = originHeader;
+      originHost = originHeader.replace(/^https?:\/\//, "").split("/")[0];
+    }
+  }
+
+  if (!originHost && hostHeader) {
+    // No Origin header (likely same-origin SSR request); allow if host matches forwarded host/host
+    originHost = hostHeader;
+    originOrigin = toOrigin(hostHeader, xfProto);
+  }
+
   if (!originHost && hostHeader && originHost === hostHeader) return true;
   if (originHost && xfHost && originHost === xfHost) return true;
   if (process.env.NODE_ENV !== "production") return true;

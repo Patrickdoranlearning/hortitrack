@@ -1,113 +1,205 @@
 export const runtime = "nodejs";
-import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/server/db/admin";
+
+import { NextResponse } from "next/server";
 import { parse } from "csv-parse/sync";
-import { FieldValue } from "firebase-admin/firestore";
-import type { Variety } from "@/lib/types";
+import { randomUUID } from "crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/server/db/supabase";
+import { withApiGuard } from "@/server/http/guard";
 
-const normName = (s: any) => (typeof s === "string" ? s.trim().toLowerCase() : "");
+type CsvRow = Record<string, unknown> & { id?: string; name?: string };
 
-type Row = Partial<Variety> & { id?: string };
+type ResultEntry = {
+  index: number;
+  id?: string;
+  name?: string;
+  matchedBy?: "id" | "name";
+  op?: "create" | "update";
+  error?: string;
+};
 
-function normBool(v: any): boolean | null {
-    if (typeof v === "boolean") return v;
-    if (typeof v === "string") {
-      const s = v.trim().toLowerCase();
-      if (["true", "t", "1", "yes", "y"].includes(s)) return true;
-      if (["false", "f", "0", "no", "n"].includes(s)) return false;
-    }
-    return null;
+const TRUE_SET = new Set(["true", "t", "1", "yes", "y"]);
+const FALSE_SET = new Set(["false", "f", "0", "no", "n"]);
+
+const stringOrNull = (value: unknown) => {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  return trimmed.length ? trimmed : null;
+};
+
+const normalizeName = (value: unknown) => stringOrNull(value) ?? "";
+
+const normalizeBool = (value: unknown): boolean | null => {
+  if (typeof value === "boolean") return value;
+  if (value == null) return null;
+  const match = String(value).trim().toLowerCase();
+  if (TRUE_SET.has(match)) return true;
+  if (FALSE_SET.has(match)) return false;
+  return null;
+};
+
+const normalizeRating = (value: unknown): number | null => {
+  if (value == null || value === "") return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  const int = Math.round(num);
+  return int >= 1 && int <= 6 ? int : null;
+};
+
+async function findVarietyByName(
+  supabase: SupabaseClient,
+  name: string
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase
+    .from("plant_varieties")
+    .select("id, name")
+    .ilike("name", name)
+    .limit(2);
+
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  if (data.length > 1) {
+    throw new Error(
+      `Multiple existing varieties match "${name}". Please resolve duplicates before importing.`
+    );
+  }
+  return data[0];
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const form = await req.formData();
-    const file = form.get("file") as File | null;
-    const dryRun = (form.get("dryRun") ?? "false").toString() === "true";
-    const upsertBy = (form.get("upsertBy") ?? "name").toString(); // default: name
+function buildPayload(row: CsvRow, targetId: string | null, name: string) {
+  const payload: Record<string, unknown> = {
+    name,
+    family: stringOrNull(row.family),
+    genus: stringOrNull(row["genus"]),
+    species: stringOrNull(row["species"]),
+    category: stringOrNull(row.category ?? row["Category"]),
+    colour: stringOrNull(row["colour"]),
+    common_name: stringOrNull(row.commonName ?? row["common_name"]),
+    grouping: stringOrNull(row["grouping"]),
+    flowering_period: stringOrNull(row.floweringPeriod ?? row["flowering_period"]),
+    flower_colour: stringOrNull(row.flowerColour ?? row["flower_colour"]),
+    evergreen: normalizeBool(row.evergreen),
+    plant_breeders_rights: normalizeBool(
+      row.plantBreedersRights ?? row["plant_breeders_rights"]
+    ),
+    rating: normalizeRating(row.rating),
+    updated_at: new Date().toISOString(),
+  };
 
-    if (!file) return NextResponse.json({ error: "CSV file is required (form field 'file')" }, { status: 400 });
+  if (targetId) {
+    payload.id = targetId;
+  } else {
+    payload.id = randomUUID();
+  }
 
-    const buf = Buffer.from(await file.arrayBuffer());
-    const text = buf.toString("utf8");
+  return payload;
+}
 
-    const records: Row[] = parse(text, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    });
+export const POST = withApiGuard({
+  method: "POST",
+  requireRole: "user",
+  async handler({ req }) {
+    try {
+      const form = await req.formData();
+      const file = form.get("file");
+      const dryRun = (form.get("dryRun") ?? "false").toString() === "true";
+      const upsertBy = (form.get("upsertBy") ?? "name").toString().toLowerCase();
 
-    const results: Array<{ index: number; id?: string; name?: string; op?: "create" | "update"; error?: string; matchedBy?: "id" | "name" }> = [];
-    const batch = adminDb.batch();
-
-    for (let i = 0; i < records.length; i++) {
-      const r = records[i] || {};
-      const name = (r.name ?? "").toString().trim();
-      const id = (r.id ?? "").toString().trim();
-      
-      if (upsertBy === "name" && !name) {
-        results.push({ index: i, error: "Missing 'name' (required for upsertBy=name)" });
-        continue;
+      if (!(file instanceof File)) {
+        return NextResponse.json(
+          { error: "CSV file is required (form field 'file')" },
+          { status: 400 }
+        );
       }
 
-      let docRef;
-      let matchedBy: "id" | "name" = "name";
+      const text = Buffer.from(await file.arrayBuffer()).toString("utf8");
+      const records = parse(text, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      }) as CsvRow[];
 
-      if (upsertBy === "id") {
-        if (!id) {
-          results.push({ index: i, name, error: "Missing 'id' (upsertBy=id)" });
+      const admin = getSupabaseAdmin();
+      const cacheByName = new Map<string, { id: string; name: string } | null>();
+      const mutations: Record<string, unknown>[] = [];
+      const results: ResultEntry[] = [];
+
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i] ?? {};
+        const name = normalizeName(row.name);
+        const explicitId = stringOrNull(row.id);
+
+        if (upsertBy === "name" && !name) {
+          results.push({
+            index: i,
+            error: "Missing 'name' (required for upsertBy=name)",
+          });
           continue;
         }
-        docRef = adminDb.collection("varieties").doc(id);
-        matchedBy = "id";
-      } else {
-        const lower = normName(name);
-        let qs = await adminDb.collection("varieties").where("nameLower", "==", lower).limit(2).get();
-        if (qs.size > 1) {
-            results.push({ index: i, name, error: "Multiple existing varieties match this name (case-insensitive). Please resolve duplicates." });
-            continue;
+
+        if (upsertBy === "id" && !explicitId) {
+          results.push({
+            index: i,
+            name,
+            error: "Missing 'id' (required for upsertBy=id)",
+          });
+          continue;
         }
-        if (qs.empty) {
-            qs = await adminDb.collection("varieties").where("name", "==", name).limit(1).get();
+
+        let targetId: string | null = null;
+        let matchedBy: "id" | "name" = "name";
+
+        if (upsertBy === "id" && explicitId) {
+          targetId = explicitId;
+          matchedBy = "id";
+        } else if (name) {
+          const cacheKey = name.toLowerCase();
+          let existing = cacheByName.get(cacheKey);
+          if (existing === undefined) {
+            existing = await findVarietyByName(admin, name);
+            cacheByName.set(cacheKey, existing);
+          }
+          if (existing) {
+            targetId = existing.id;
+          }
         }
-        docRef = qs.empty ? adminDb.collection("varieties").doc() : qs.docs[0].ref;
-      }
-      
-      const payload: Omit<Variety, 'id'> & { nameLower: string } = {
+
+        const payload = buildPayload(row, targetId, name);
+        const operation = targetId ? "update" : "create";
+
+        results.push({
+          index: i,
+          id: payload.id as string,
           name,
-          nameLower: normName(name),
-          family: (r.family ?? "").toString().trim() || "",
-          category: (r.category ?? "").toString().trim() || "",
-          commonName: (r.commonName ?? "").toString().trim() || undefined,
-          rating: (r.rating ?? "").toString().trim() || undefined,
-          salesPeriod: (r.salesPeriod ?? "").toString().trim() || undefined,
-          floweringPeriod: (r.floweringPeriod ?? "").toString().trim() || undefined,
-          flowerColour: (r.flowerColour ?? "").toString().trim() || undefined,
-          evergreen: (r.evergreen ?? "").toString().trim() || undefined,
+          matchedBy,
+          op: operation,
+        });
+
+        if (!dryRun) {
+          mutations.push(payload);
+        }
+      }
+
+      if (!dryRun && mutations.length) {
+        const { error } = await admin.from("plant_varieties").upsert(mutations);
+        if (error) throw error;
+      }
+
+      const summary = {
+        total: records.length,
+        created: results.filter((r) => r.op === "create").length,
+        updated: results.filter((r) => r.op === "update").length,
+        errors: results.filter((r) => r.error).length,
       };
 
-      const existing = await docRef.get();
-      if (existing.exists) {
-        results.push({ index: i, id: docRef.id, name, op: "update", matchedBy });
-        if (!dryRun) batch.set(docRef, { ...payload, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      } else {
-        results.push({ index: i, id: docRef.id, name, op: "create", matchedBy });
-        if (!dryRun) batch.set(docRef, { ...payload, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      }
+      return NextResponse.json({ ok: true, summary, results });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[varieties/import] error", message);
+      return NextResponse.json(
+        { error: "Failed to import CSV", details: message },
+        { status: 500 }
+      );
     }
-
-    if (!dryRun) await batch.commit();
-
-    const summary = {
-      total: records.length,
-      created: results.filter(r => r.op === "create").length,
-      updated: results.filter(r => r.op === "update").length,
-      errors: results.filter(r => r.error).length,
-    };
-
-    return NextResponse.json({ ok: true, summary, results });
-  } catch (e: any) {
-    console.error("[varieties/import] error", e);
-    return NextResponse.json({ error: "Failed to import CSV", details: e?.message }, { status: 500 });
-  }
-}
+  },
+});

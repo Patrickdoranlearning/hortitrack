@@ -6,13 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { HortiDialog } from "@/components/horti/HortiDialog";
 import { ComboBoxEntity } from "@/components/horti/ComboBoxEntity";
 import { PropagationStartSchema, PropagationStartInput } from "@/lib/validators/batchSchemas";
-import { useActiveOrg } from "@/server/org/context";
+import { useActiveOrg } from "@/lib/org/context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 
 export function PropagationStartDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void; }) {
-  const orgId = useActiveOrg()!;
+  const { orgId } = useActiveOrg();
   const form = useForm<PropagationStartInput>({
     resolver: zodResolver(PropagationStartSchema),
     defaultValues: { planted_at: new Date(), initial_tray_qty: 1 },

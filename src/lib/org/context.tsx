@@ -6,17 +6,26 @@ import { useToast } from "@/components/ui/use-toast";
 
 export type OrgContextValue = {
   orgId: string | null;
+  companyName: string;
   setOrgId: (id: string | null) => void;
   switchOrg: (id: string) => Promise<void>;
 };
+
+const DEFAULT_COMPANY_NAME = "HortiTrack";
 
 const Ctx = createContext<OrgContextValue | undefined>(undefined);
 
 export function OrgProvider({
   initialOrgId = null,
+  initialCompanyName = DEFAULT_COMPANY_NAME,
   children,
-}: { initialOrgId?: string | null; children: React.ReactNode }) {
+}: {
+  initialOrgId?: string | null;
+  initialCompanyName?: string;
+  children: React.ReactNode;
+}) {
   const [orgId, setOrgId] = useState<string | null>(initialOrgId);
+  const [companyName, setCompanyName] = useState<string>(initialCompanyName);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -48,7 +57,10 @@ export function OrgProvider({
     }
   };
 
-  const value = useMemo(() => ({ orgId, setOrgId, switchOrg }), [orgId, setOrgId]);
+  const value = useMemo(
+    () => ({ orgId, companyName, setOrgId, switchOrg }),
+    [orgId, companyName]
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -59,7 +71,20 @@ export function useActiveOrg(): OrgContextValue {
       console.warn("useActiveOrg called outside of OrgProvider. This is a bug.");
     }
     // Return a safe, non-null object so destructuring never crashes.
-    return { orgId: null, setOrgId: () => { }, switchOrg: async () => { } };
+    return {
+      orgId: null,
+      companyName: DEFAULT_COMPANY_NAME,
+      setOrgId: () => {},
+      switchOrg: async () => {},
+    };
   }
   return ctx;
+}
+
+/**
+ * Hook to get just the company name from org context
+ */
+export function useCompanyName(): string {
+  const { companyName } = useActiveOrg();
+  return companyName;
 }

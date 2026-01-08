@@ -1,13 +1,29 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const STATUS_STYLES: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; className?: string }> = {
+  draft: { variant: "outline", className: "border-gray-300 text-gray-600" },
+  confirmed: { variant: "default", className: "bg-blue-500 hover:bg-blue-600" },
+  picking: { variant: "secondary", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200" },
+  ready: { variant: "default", className: "bg-green-500 hover:bg-green-600" },
+  ready_for_dispatch: { variant: "default", className: "bg-green-500 hover:bg-green-600" },
+  dispatched: { variant: "secondary", className: "bg-purple-100 text-purple-800 hover:bg-purple-200" },
+  delivered: { variant: "default", className: "bg-emerald-600 hover:bg-emerald-700" },
+  void: { variant: "destructive" },
+  cancelled: { variant: "destructive" },
+};
 
 export default function OrderStatusBadge({ status }: { status: string }) {
-  const variant =
-    status === "confirmed" ? "default" :
-    status === "picking" ? "secondary" :
-    status === "ready" ? "outline" :
-    status === "dispatched" ? "default" :
-    status === "delivered" ? "secondary" :
-    status === "void" ? "destructive" : "outline";
-  return <Badge variant={variant as any} className="capitalize">{status}</Badge>;
+  const normalizedStatus = status.toLowerCase();
+  const style = STATUS_STYLES[normalizedStatus] || { variant: "outline" as const };
+  
+  return (
+    <Badge 
+      variant={style.variant} 
+      className={cn("capitalize", style.className)}
+    >
+      {status.replace(/_/g, ' ')}
+    </Badge>
+  );
 }

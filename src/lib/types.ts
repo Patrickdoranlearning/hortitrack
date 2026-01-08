@@ -1,8 +1,15 @@
 import { z } from "zod";
 
+export interface UserSession {
+  uid: string;
+  email?: string;
+  role?: string | null;
+  orgId?: string | null;
+}
+
 // --- Enums (matching DB types) ---
-export const ProductionPhase = z.enum(['propagation', 'growing', 'finished']);
-export const ProductionStatus = z.enum(['Propagation', 'Plugs/Liners', 'Potted', 'Ready for Sale', 'Looking Good', 'Archived']);
+export const ProductionPhase = z.string();
+export const ProductionStatus = z.string();
 export const CreditStatus = z.enum(['draft', 'issued', 'paid', 'void']);
 export const DeliveryStatus = z.enum(['unscheduled', 'scheduled', 'departed', 'delivered', 'cancelled']);
 export const InvoiceStatus = z.enum(['draft', 'issued', 'paid', 'void', 'overdue']);
@@ -34,6 +41,9 @@ export const SiteSchema = z.object({
 export type Site = z.infer<typeof SiteSchema>;
 
 // --- Locations ---
+export const HealthStatus = z.enum(['clean', 'infested', 'restricted']);
+export type HealthStatus = z.infer<typeof HealthStatus>;
+
 export const NurseryLocationSchema = z.object({
   id: z.string().optional(),
   orgId: z.string(),
@@ -43,6 +53,9 @@ export const NurseryLocationSchema = z.object({
   covered: z.boolean().default(false),
   type: z.string().optional(),
   area: z.number().nonnegative().nullable().optional(),
+  // Plant Health fields
+  healthStatus: HealthStatus.default('clean'),
+  restrictedUntil: z.string().nullable().optional(), // ISO timestamp
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -54,7 +67,10 @@ export const PlantSizeSchema = z.object({
   name: z.string().min(1, "Size name is required"),
   containerType: SizeContainerType.default('pot'),
   cellMultiple: z.number().int().min(1).default(1),
-  shelfQuantity: z.number().int().nonnegative().optional(),
+  // Unit hierarchy: Units → Trays → Shelves → Trolleys
+  trayQuantity: z.number().int().nonnegative().optional(),    // Units per tray
+  shelfQuantity: z.number().int().nonnegative().optional(),   // Units per shelf
+  trolleyQuantity: z.number().int().nonnegative().optional(), // Units per trolley
   area: z.number().nonnegative().optional(),
   cellDiameterMm: z.number().optional(),
   cellVolumeL: z.number().optional(),
@@ -123,6 +139,12 @@ export const CustomerSchema = z.object({
   store: z.string().optional(),
   accountsEmail: z.string().email().optional(),
   pricingTier: z.string().optional(),
+  // New fields for multi-country support
+  currency: z.enum(['EUR', 'GBP']).default('EUR'),
+  countryCode: z.enum(['IE', 'GB', 'XI', 'NL']).default('IE'),
+  paymentTermsDays: z.number().int().min(0).default(30),
+  creditLimit: z.number().nonnegative().optional(),
+  accountCode: z.string().optional(),
 });
 export type Customer = z.infer<typeof CustomerSchema>;
 
@@ -138,8 +160,25 @@ export const CustomerAddressSchema = z.object({
   countryCode: z.string().default('IE'),
   isDefaultShipping: z.boolean().default(false),
   isDefaultBilling: z.boolean().default(false),
+  // New fields for store locations
+  storeName: z.string().optional(),
+  contactName: z.string().optional(),
+  contactEmail: z.string().email().optional(),
+  contactPhone: z.string().optional(),
 });
 export type CustomerAddress = z.infer<typeof CustomerAddressSchema>;
+
+export const CustomerContactSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  name: z.string().min(1),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  mobile: z.string().optional(),
+  role: z.string().optional(),
+  isPrimary: z.boolean().default(false),
+});
+export type CustomerContact = z.infer<typeof CustomerContactSchema>;
 
 // --- Batches ---
 export const BatchSchema = z.object({
@@ -153,6 +192,7 @@ export const BatchSchema = z.object({
   locationId: z.string(),
   status: ProductionStatus.default('Propagation'),
   quantity: z.number().int().nonnegative().default(0),
+  reservedQuantity: z.number().int().nonnegative().default(0),
   initialQuantity: z.number().int().nonnegative().optional(),
   quantityProduced: z.number().int().optional(),
   unit: z.string().default('plants'),
@@ -175,6 +215,7 @@ export const BatchSchema = z.object({
   plantVariety: z.any().optional(), // Joined Variety object
   size: z.any().optional(), // Joined Size object
   location: z.any().optional(), // Joined Location object
+  parentBatchId: z.string().nullable().optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 
@@ -268,5 +309,36 @@ export const HaulierSchema = z.object({
   email: z.string().email().optional(),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
+  isInternal: z.boolean().default(true), // true = own fleet, false = external haulier
+  trolleyCapacity: z.number().int().nonnegative().default(20),
 });
 export type Haulier = z.infer<typeof HaulierSchema>;
+
+// --- Truck Layout Configuration ---
+export const TruckLayoutSchema = z.object({
+  type: z.enum(['van', 'truck', 'trailer']).default('van'),
+  rows: z.number().int().min(1).max(10).default(2),
+  columns: z.number().int().min(1).max(10).default(5),
+  trolleySlots: z.number().int().min(1).max(100).default(10),
+});
+export type TruckLayout = z.infer<typeof TruckLayoutSchema>;
+
+// --- Haulier Vehicles ---
+export const HaulierVehicleSchema = z.object({
+  id: z.string().optional(),
+  orgId: z.string(),
+  haulierId: z.string(),
+  name: z.string().min(1),
+  registration: z.string().optional(),
+  vehicleType: z.enum(['van', 'truck', 'trailer', 'other']).optional(),
+  trolleyCapacity: z.number().int().nonnegative().default(10),
+  isActive: z.boolean().default(true),
+  notes: z.string().optional(),
+  truckLayout: TruckLayoutSchema.optional(),
+});
+export type HaulierVehicle = z.infer<typeof HaulierVehicleSchema>;
+
+// Haulier with vehicles (for UI)
+export interface HaulierWithVehicles extends Haulier {
+  vehicles: HaulierVehicle[];
+}

@@ -84,7 +84,11 @@ export default function PropagationClient({
     [nurseryLocations],
   );
 
+  const optionsLoading =
+    varietyOptions.length === 0 && sizeOptions.length === 0 && locationOptions.length === 0;
+
   const defaultValues: PropagationFormValues = {
+    varietyId: "",
     variety: "",
     family: "",
     sizeId: "",
@@ -109,7 +113,11 @@ export default function PropagationClient({
   }, [selectedSizeId, sizeOptions, form]);
 
   const onSubmit = async (values: PropagationFormValues) => {
-    const payload = { ...values, family: values.family || null };
+    const payload = {
+      ...values,
+      varietyId: values.varietyId,
+      family: values.family || null,
+    };
     const result = await createPropagationBatchAction(payload);
 
         if (result.success) {
@@ -128,7 +136,22 @@ export default function PropagationClient({
         }
     };
 
+  if (optionsLoading) {
     return (
+      <div className="container mx-auto max-w-3xl py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-semibold">New Propagation Batch</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Loading reference data…</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
     <div className="container mx-auto max-w-3xl py-10">
       <Card>
         <CardHeader>
@@ -141,10 +164,11 @@ export default function PropagationClient({
                 <div className="col-span-2">
                   <FormLabel>Variety</FormLabel>
                   <Select
-                    value={form.watch("variety")}
+                  value={form.watch("varietyId")}
                     onValueChange={(value) => {
-                      form.setValue("variety", value, { shouldValidate: true });
-                      const match = varietyOptions.find((v) => v.name === value);
+                    form.setValue("varietyId", value, { shouldValidate: true });
+                    const match = varietyOptions.find((v) => v.id === value);
+                    form.setValue("variety", match?.name ?? "", { shouldDirty: true });
                       form.setValue("family", match?.family ?? "", { shouldDirty: true });
                     }}
                   >
@@ -153,13 +177,13 @@ export default function PropagationClient({
                     </SelectTrigger>
                     <SelectContent>
                       {varietyOptions.map((v) => (
-                        <SelectItem key={v.id} value={v.name}>
+                      <SelectItem key={v.id} value={v.id}>
                           {v.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <InlineFieldError msg={form.formState.errors.variety?.message} />
+                <InlineFieldError msg={form.formState.errors.varietyId?.message} />
                 </div>
 
                 <div>

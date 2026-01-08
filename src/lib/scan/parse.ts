@@ -1,6 +1,7 @@
 export type ParsedScan
   = { by: "batchNumber"; value: string; raw: string }
-  | { by: "id"; value: string; raw: string };
+  | { by: "id"; value: string; raw: string }
+  | { by: "locationId"; value: string; raw: string };
 
 const digitsOnly = (s: string) => s.replace(/\D+/g, '');
 
@@ -10,6 +11,12 @@ export function parseScanCode(input: string): ParsedScan | null {
 
   // Normalize common prefixes
   const lower = raw.toLowerCase();
+
+  // ht:loc:<locationId> - Location codes
+  const htLoc = lower.match(/^ht:loc:([a-z0-9-_]+)$/i);
+  if (htLoc) {
+    return { by: 'locationId', value: htLoc[1], raw };
+  }
 
   // ht:batch:<code> (allow letters/digits/dashes/underscores)
   const ht = lower.match(/^ht:batch:([a-z0-9-_]+)$/i);
@@ -44,6 +51,14 @@ export function parseScanCode(input: string): ParsedScan | null {
 export function candidateBatchNumbers(value: string): string[] {
   const v = value.trim();
   const d = digitsOnly(v);
-  const uniq = new Set<string>([v, d]);
+  // Also try stripping leading zeros for numeric-only values
+  const noLeadingZeros = d.replace(/^0+/, '') || d;
+  const uniq = new Set<string>([v, d, noLeadingZeros]);
   return [...uniq].filter(Boolean);
+}
+
+/** Strip leading zeros from a string for comparison purposes. */
+export function normalizeForComparison(value: string): string {
+  const digits = digitsOnly(value);
+  return digits.replace(/^0+/, '') || digits;
 }

@@ -18,31 +18,64 @@ export const NewOrderSchema = z.object({
 });
 export type NewOrder = z.infer<typeof NewOrderSchema>;
 
-export async function listOrders(limit = 100, status?: string): Promise<Order[]> {
+export async function listOrders(params: { page?: number; pageSize?: number; status?: string } = {}): Promise<{
+  orders: Array<Order & { 
+    org_id: string; 
+    order_number: string; 
+    total_inc_vat: number | null; 
+    requested_delivery_date: string | null; 
+    customer?: { name: string | null } | null;
+    ship_to_address?: { county: string | null; city: string | null } | null;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
   const supabase = await createClient();
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.max(1, Math.min(params.pageSize ?? 20, 100));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  // Removed count: "exact" for performance - use estimated count or cursor pagination instead
   let query = supabase
     .from("orders")
-    .select("*, customers(name)")
+    .select("*, customers(name), customer_addresses!orders_ship_to_address_id_fkey(county, city)", { count: "estimated" })
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(from, to);
 
-  if (status) {
-    query = query.eq("status", status);
+  if (params.status) {
+    query = query.eq("status", params.status);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) {
-    console.error("Error listing orders:", error);
-    return [];
+    console.error("Error listing orders:", error.message, error.code, error.details, error.hint);
+    return { orders: [], total: 0, page, pageSize };
   }
 
-  return data.map((d: any) => ({
+  const mapped = (data || []).map((d: any) => ({
     id: d.id,
-    customerName: d.customers?.name || "Unknown",
-    customerId: d.customer_id,
+    org_id: d.org_id,
+    order_number: d.order_number,
+    customer_id: d.customer_id,
     status: d.status,
-    createdAt: d.created_at,
+    created_at: d.created_at,
+    updated_at: d.updated_at,
+    requested_delivery_date: d.requested_delivery_date,
+    subtotal_ex_vat: d.subtotal_ex_vat ?? null,
+    vat_amount: d.vat_amount ?? null,
+    total_inc_vat: d.total_inc_vat ?? null,
+    notes: d.notes ?? null,
+    customerName: d.customers?.name || "Unknown",
+    customer: d.customers ? { name: d.customers.name } : null,
+    ship_to_address: d.customer_addresses ? { 
+      county: d.customer_addresses.county, 
+      city: d.customer_addresses.city 
+    } : null,
   }));
+
+  return { orders: mapped, total: count ?? mapped.length, page, pageSize };
 }
 
 export async function createOrder(input: NewOrder): Promise<string> {
@@ -141,18 +174,54 @@ export interface SaleableProduct {
 }
 
 import { getSaleableBatches } from "@/server/sales/inventory";
+import { getUserAndOrg } from "@/server/auth/org";
 
+/**
+ * Get saleable products with aggregated availability
+ * Uses SQL RPC for aggregation when available, falls back to JS aggregation
+ */
 export async function getSaleableProducts(): Promise<SaleableProduct[]> {
-  // Fetch available batches from shared service
+  const { supabase, orgId } = await getUserAndOrg();
+
+  // Try optimized SQL aggregation first
+  const { data: aggregatedData, error: rpcError } = await supabase.rpc(
+    "get_product_availability",
+    { p_org_id: orgId }
+  );
+
+  if (!rpcError && aggregatedData) {
+    // Use SQL-aggregated data (much faster for large datasets)
+    return (aggregatedData || []).map((row: any) => ({
+      id: row.product_key,
+      plantVariety: row.plant_variety,
+      size: row.size,
+      totalQuantity: Number(row.available_quantity),
+      barcode: `BARCODE-${row.plant_variety?.replace(/\s+/g, "")}`,
+      cost: 1.53,
+      status: "Bud & flower",
+      imageUrl: row.sample_image_url || `https://placehold.co/100x100.png`,
+      availableBatches: [], // Batches not loaded in aggregated view for performance
+    }));
+  }
+
+  // Fallback to JS aggregation if RPC not available
+  console.warn("get_product_availability RPC not available, using fallback");
+  return getSaleableProductsFallback();
+}
+
+/**
+ * Fallback implementation using in-memory aggregation
+ * Used when SQL RPC is not yet deployed
+ */
+async function getSaleableProductsFallback(): Promise<SaleableProduct[]> {
   const batches = await getSaleableBatches();
 
   const productsMap = new Map<string, SaleableProduct>();
 
   batches.forEach((b) => {
-    // Map InventoryBatch to Batch type if needed
     const batch: Batch = {
       id: b.id,
-      orgId: "", // Not needed for display here
+      orgId: "",
       batchNumber: b.batchNumber || "",
       plantVariety: b.plantVariety || "",
       size: b.size || "",
@@ -161,11 +230,10 @@ export async function getSaleableProducts(): Promise<SaleableProduct[]> {
       growerPhotoUrl: b.growerPhotoUrl,
       salesPhotoUrl: b.salesPhotoUrl,
       status: b.status as any,
-      plantVarietyId: "", // Missing from InventoryBatch, maybe add?
+      plantVarietyId: "",
       sizeId: "",
       locationId: "",
-      phase: "finished", // Default
-      // ... map other fields
+      phase: "finished",
     } as Batch;
 
     const productKey = `${batch.plantVariety}-${batch.size}`;
@@ -181,10 +249,13 @@ export async function getSaleableProducts(): Promise<SaleableProduct[]> {
         size: batch.size!,
         category: batch.category,
         totalQuantity: batch.quantity!,
-        barcode: `BARCODE-${batch.plantVariety?.replace(/\s+/g, '')}`,
+        barcode: `BARCODE-${batch.plantVariety?.replace(/\s+/g, "")}`,
         cost: 1.53,
-        status: 'Bud & flower',
-        imageUrl: batch.growerPhotoUrl || batch.salesPhotoUrl || `https://placehold.co/100x100.png`,
+        status: "Bud & flower",
+        imageUrl:
+          batch.growerPhotoUrl ||
+          batch.salesPhotoUrl ||
+          `https://placehold.co/100x100.png`,
         availableBatches: [batch],
       });
     }

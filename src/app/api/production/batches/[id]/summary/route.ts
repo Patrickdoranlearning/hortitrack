@@ -23,11 +23,12 @@ type SummaryResponse = {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const requestId = params.id;
+  const { id } = await params;
+  const requestId = id;
   try {
-    const { supabase, orgId } = await getUserAndOrg();
+    const { supabase } = await getUserAndOrg();
     const { data, error } = await supabase
       .from("batches")
       .select(
@@ -47,8 +48,7 @@ export async function GET(
         variety:plant_variety_id (id, name, family)
       `
       )
-      .eq("org_id", orgId)
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle();
 
     if (error) {
@@ -83,11 +83,12 @@ export async function GET(
     return NextResponse.json({ batch: summary } satisfies SummaryResponse, {
       status: 200,
     });
-  } catch (e: any) {
-    const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Server error";
+    const status = /Unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json(
       {
-        error: e?.message ?? "Server error",
+        error: message,
         requestId,
       },
       { status }

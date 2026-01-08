@@ -7,25 +7,26 @@ import { toMessage } from "@/lib/errors";
 import { getBatchById, getBatchLogs, getBatchPhotos } from "@/server/batches/service";
 import { createClient } from "@/lib/supabase/server"; // Keep this for PATCH/DELETE
 
-type Params = { params: { batchId: string } };
+type Params = { params: Promise<{ batchId: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   try {
-    const batch = await getBatchById(params.batchId);
+    const { batchId } = await params;
+    const batch = await getBatchById(batchId);
 
     if (!batch) {
       return NextResponse.json({ ok: false, error: { code: "NOT_FOUND", message: "Not found" } }, { status: 404 });
     }
 
     // Photos (split by type)
-    const photos = await getBatchPhotos(params.batchId);
+    const photos = await getBatchPhotos(batchId);
     const photosSplit = {
       grower: (photos || []).filter((p: any) => p.type === "GROWER"),
       sales: (photos || []).filter((p: any) => p.type === "SALES")
     };
 
     // Logs
-    const logs = await getBatchLogs(params.batchId);
+    const logs = await getBatchLogs(batchId);
 
     // Ancestry (simplified for now, or reuse buildBatchRoute logic if needed)
     // For now, let's just return empty ancestry or basic parent info
@@ -58,6 +59,7 @@ const PatchBody = z.object({
   plantVariety: z.string().min(1).optional(),
   plantingDate: z.string().optional(), // ISO
   quantity: z.number().int().nonnegative().optional(),
+  saleable_quantity: z.number().int().nonnegative().nullable().optional(),
   status: ProductionStatus.optional(),
   location: z.string().optional(),
   size: z.string().optional(),
@@ -68,6 +70,7 @@ const PatchBody = z.object({
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
+    const { batchId } = await params;
     const updates = PatchBody.parse(await req.json());
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -86,7 +89,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
     if (!activeOrgId) return NextResponse.json({ error: "No active organization found" }, { status: 400 });
 
-    const { data: stored, error: fetchError } = await supabase.from("batches").select("*").eq("id", params.batchId).single();
+    const { data: stored, error: fetchError } = await supabase.from("batches").select("*").eq("id", batchId).single();
 
     if (fetchError || !stored) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -129,6 +132,21 @@ export async function PATCH(req: Request, { params }: Params) {
     }
 
     const shouldArchive = nextQty <= 0 || nextStatus === "Archived";
+    const finalStatus = shouldArchive ? "Archived" : nextStatus;
+
+    // Resolve status_id if status is changing or likely to be updated
+    let statusId = undefined;
+    if (finalStatus) {
+      const { data: sOpt } = await supabase
+        .from("attribute_options")
+        .select("id")
+        .eq("org_id", activeOrgId)
+        .eq("attribute_key", "production_status")
+        .or(`system_code.eq.${finalStatus},display_label.eq.${finalStatus}`)
+        .single();
+      if (sOpt) statusId = sOpt.id;
+    }
+
     const serverUpdate: Record<string, any> = {
       // category: updates.category, // Removed from schema
       // plant_family: updates.plantFamily, // Removed from schema
@@ -140,7 +158,9 @@ export async function PATCH(req: Request, { params }: Params) {
       grower_photo_url: updates.growerPhotoUrl,
       sales_photo_url: updates.salesPhotoUrl,
       quantity: shouldArchive ? 0 : nextQty,
-      status: shouldArchive ? "Archived" : nextStatus,
+      saleable_quantity: updates.saleable_quantity,
+      status: finalStatus,
+      status_id: statusId,
       updated_at: new Date().toISOString(),
     };
 
@@ -150,18 +170,53 @@ export async function PATCH(req: Request, { params }: Params) {
     const { data: updatedBatch, error: updateError } = await supabase
       .from("batches")
       .update(serverUpdate)
-      .eq("id", params.batchId)
+      .eq("id", batchId)
       .select()
       .single();
 
     if (updateError) throw updateError;
+
+    // Log quantity change to batch_events if quantity was modified
+    const qtyChanged = typeof updates.quantity === "number" && updates.quantity !== stored.quantity;
+    if (qtyChanged) {
+      const diff = (updates.quantity ?? 0) - (stored.quantity ?? 0);
+      await supabase.from("batch_events").insert({
+        org_id: activeOrgId,
+        batch_id: batchId,
+        type: "ADJUSTMENT",
+        payload: {
+          previousQuantity: stored.quantity,
+          newQuantity: updates.quantity,
+          diff,
+          reason: "Manual adjustment",
+        },
+        by_user_id: user.id,
+        at: new Date().toISOString(),
+      });
+    }
+
+    // Log status change to batch_events if status was modified
+    const statusChanged = updates.status && updates.status !== stored.status;
+    if (statusChanged || (shouldArchive && stored.status !== "Archived")) {
+      await supabase.from("batch_events").insert({
+        org_id: activeOrgId,
+        batch_id: batchId,
+        type: "STATUS_CHANGE",
+        payload: {
+          previousStatus: stored.status,
+          newStatus: finalStatus,
+        },
+        by_user_id: user.id,
+        at: new Date().toISOString(),
+      });
+    }
 
     // Append auto-archive log if transitioning to Archived now
     const becameArchived = shouldArchive && stored.status !== "Archived";
     if (becameArchived) {
       await supabase.from("logs").insert({
         org_id: activeOrgId, // Added org_id
-        batch_id: params.batchId,
+        batch_id: batchId,
         type: "ARCHIVE",
         note: "Batch quantity reached zero and was automatically archived.",
         date: new Date().toISOString(),
@@ -179,11 +234,42 @@ export async function PATCH(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   try {
+    const { batchId } = await params;
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+    // Get active org
+    let activeOrgId: string | null = null;
+    const { data: profile } = await supabase.from('profiles').select('active_org_id').eq('id', user.id).single();
+    if (profile?.active_org_id) {
+      activeOrgId = profile.active_org_id;
+    } else {
+      const { data: membership } = await supabase.from('org_memberships').select('org_id').eq('user_id', user.id).limit(1).single();
+      if (membership) activeOrgId = membership.org_id;
+    }
+
+    if (!activeOrgId) return NextResponse.json({ error: "No active organization found" }, { status: 400 });
+
+    // Resolve 'Archived' status_id
+    const { data: sOpt } = await supabase
+      .from("attribute_options")
+      .select("id")
+      .eq("org_id", activeOrgId)
+      .eq("attribute_key", "production_status")
+      .or(`system_code.eq.Archived,display_label.eq.Archived`)
+      .single();
+
+    const updatePayload: any = {
+      status: "Archived",
+      updated_at: new Date().toISOString()
+    };
+    if (sOpt) updatePayload.status_id = sOpt.id;
+
     const { error } = await supabase
       .from("batches")
-      .update({ status: "Archived", updated_at: new Date().toISOString() })
-      .eq("id", params.batchId);
+      .update(updatePayload)
+      .eq("id", batchId);
 
     if (error) throw error;
     return NextResponse.json({ ok: true });

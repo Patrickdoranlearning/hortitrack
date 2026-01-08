@@ -21,8 +21,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { auth } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
 import {
   Grid,
   LogOut,
@@ -49,7 +47,7 @@ type Order = {
 export default function SalesPageClient() {
   const router = useRouter();
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut: signOutSupabase } = useAuth();
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [orders, setOrders] = React.useState<Order[] | null>(null);
@@ -96,7 +94,7 @@ export default function SalesPageClient() {
   }, [orders, filters, searchQuery]);
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    await signOutSupabase();
     router.push('/login');
     toast({
       title: 'Signed Out',
@@ -128,11 +126,6 @@ export default function SalesPageClient() {
     return (
         <div className="p-3 rounded-md bg-red-50 text-red-700">
             {error}
-            {error.includes("credentials") && (
-            <div className="text-sm mt-1">
-                Ask admin to set FIREBASE_SERVICE_ACCOUNT_* secret.
-            </div>
-            )}
         </div>
     );
   }

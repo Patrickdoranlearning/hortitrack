@@ -1,10 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
 import ScannerClient from "@/components/Scanner/ScannerClient";
-import { getIdTokenOrNull } from "@/lib/auth/client";
 import { track } from "@/lib/telemetry";
 import { useToast } from "@/hooks/use-toast";
 import { parseScanCode, visualize, type Parsed } from "@/lib/scan/parse.client";
+import { useOfflineBatches } from "@/offline/OfflineProvider";
 
 export default function ScanPage() {
   const [status, setStatus] = useState<"idle" | "found" | "not_found" | "error">("idle");
@@ -15,26 +15,34 @@ export default function ScanPage() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [selfTest, setSelfTest] = useState<"idle"|"pass"|"fail"|"running">("idle");
 
+  const offline = useOfflineBatches();
+
   async function lookup(code: string) {
     if (inflight.current) return;
     inflight.current = true;
     setStatus("idle"); // reset status for new lookup
 
     try {
-        const idToken = await getIdTokenOrNull();
-        console.log("ID Token:", idToken); // LOG ADDED
-        if (!idToken) {
-            setStatus("error");
-            toast({ variant: "destructive", title: "Authentication Error", description: "Please sign in to look up batches." });
+        const parsedCode = parseScanCode(code);
+        if (parsedCode && offline.ready) {
+          const local = await offline.lookupByParsed(parsedCode);
+          if (local) {
+            setStatus("found");
+            track("scan_lookup_result", { result: "offline" });
+            toast({
+              title: "Batch Found (Offline)",
+              description: `#${local.batchNumber ?? local.id} — ${local.variety ?? "Unknown variety"}`,
+            });
             return;
+          }
         }
 
         const res = await fetch("/api/batches/scan", {
             method: "POST",
             headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
             },
+            credentials: "include",
             body: JSON.stringify({ code }),
         });
 
@@ -56,10 +64,15 @@ export default function ScanPage() {
             track("scan_lookup_result", { result: "error", status: res.status });
             toast({ variant: "destructive", title: "API Error", description: `An error occurred (${res.status}).` });
         }
-    } catch (e: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
         setStatus("error");
-        track("scan_lookup_result", { result: "error", message: e?.message });
-        toast({ variant: "destructive", title: "Network Error", description: "Could not connect to the server." });
+      track("scan_lookup_result", { result: "error", message });
+      toast({
+        variant: "destructive",
+        title: "Network Error",
+        description: "Could not connect to the server.",
+      });
     } finally {
         inflight.current = false;
     }
@@ -142,7 +155,7 @@ export default function ScanPage() {
     try {
       const text = await decodeImageFile(f);
       onDecoded(text);
-    } catch (err: any) {
+    } catch {
       setStatus("error");
       toast({ variant: 'destructive', title: 'Decode Failed', description: 'Could not decode the uploaded image.' });
     } finally {
