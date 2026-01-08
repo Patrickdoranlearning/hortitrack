@@ -599,4 +599,3 @@ export async function updateLoadStatus(loadId: string, status: 'planned' | 'load
     return { error: error.message };
   }
 }
-

@@ -1,17 +1,25 @@
 import { NextResponse } from "next/server";
 import { getLightweightAuth } from "@/lib/auth/lightweight";
-import { getCachedLocations } from "@/lib/cache/reference-data";
 
 export async function GET() {
   try {
-    // Lightweight auth - caches org lookup
-    const { orgId } = await getLightweightAuth();
+    // Get authenticated user's session
+    const { orgId, supabase } = await getLightweightAuth();
     
-    // Use in-memory cached locations (service_role, no RLS overhead)
-    const locations = await getCachedLocations(orgId);
+    // Fetch locations using user's authenticated session
+    const { data, error } = await supabase
+      .from("nursery_locations")
+      .select("id, name, covered, area, nursery_site, type, site_id, updated_at, created_at")
+      .eq("org_id", orgId)
+      .order("name");
+
+    if (error) {
+      console.error("[lookups/locations] query error:", error);
+      throw error;
+    }
 
     return NextResponse.json(
-      { items: locations },
+      { items: data ?? [] },
       {
         headers: {
           "Cache-Control": "private, max-age=60, stale-while-revalidate=120",

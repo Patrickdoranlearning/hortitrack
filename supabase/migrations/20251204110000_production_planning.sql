@@ -63,4 +63,3 @@ alter table public.batches
 
 create index if not exists batches_protocol_id_idx
   on public.batches(protocol_id);
-
