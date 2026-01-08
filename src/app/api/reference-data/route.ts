@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLightweightAuth } from "@/lib/auth/lightweight";
-import { getCachedReferenceData } from "@/lib/cache/reference-data";
+import { getCachedReferenceData, type CachedReferenceData } from "@/lib/cache/reference-data";
+import { SUPABASE_SERVICE_ROLE_KEY } from "@/server/db/supabase";
 
 /**
  * Returns reference data for the UI.
  * Optimized: 
  * - Lightweight auth (caches org lookup)
  * - Service_role for data fetching (bypasses RLS overhead)
+ * - Falls back to user session if service_role unavailable
  * - In-memory caching (works in dev mode)
  */
 export async function GET(_req: NextRequest) {
@@ -21,10 +23,28 @@ export async function GET(_req: NextRequest) {
 
   try {
     // Lightweight auth - caches org lookup
-    const { orgId } = await getLightweightAuth();
+    const { orgId, supabase } = await getLightweightAuth();
 
-    // Get cached reference data (uses service_role, in-memory cache)
-    const cachedData = await getCachedReferenceData(orgId);
+    // Check if service_role key is properly configured
+    const serviceRoleAvailable = SUPABASE_SERVICE_ROLE_KEY && SUPABASE_SERVICE_ROLE_KEY !== "placeholder";
+
+    let cachedData: CachedReferenceData | null = null;
+
+    if (serviceRoleAvailable) {
+      // Try service_role path first (faster, bypasses RLS)
+      try {
+        cachedData = await getCachedReferenceData(orgId);
+      } catch (serviceErr: any) {
+        console.warn("[reference-data] service_role failed, falling back to user session:", serviceErr?.message);
+      }
+    }
+
+    // Fall back to user's authenticated session if service_role unavailable or failed
+    if (!cachedData || (cachedData.varieties.length === 0 && cachedData.suppliers.length === 0)) {
+      console.log("[reference-data] Using user session fallback");
+      cachedData = await fetchReferenceDataWithUserSession(supabase, orgId);
+    }
+
     results.varieties = cachedData.varieties;
     results.sizes = cachedData.sizes;
     results.locations = cachedData.locations;
@@ -48,4 +68,84 @@ export async function GET(_req: NextRequest) {
       "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
     },
   });
+}
+
+/**
+ * Fetch reference data using the user's authenticated session
+ * Used as fallback when service_role key is not configured
+ */
+async function fetchReferenceDataWithUserSession(
+  supabase: any,
+  orgId: string
+): Promise<CachedReferenceData> {
+  // Run all queries in parallel using user's session
+  const [varietiesRes, sizesRes, locationsRes, suppliersRes, materialsRes] = await Promise.all([
+    supabase
+      .from("plant_varieties")
+      .select("id, name, family, genus, species, category")
+      .order("name"),
+    supabase
+      .from("plant_sizes")
+      .select("id, name, container_type, cell_multiple")
+      .order("name"),
+    supabase
+      .from("nursery_locations")
+      .select("id, name, covered, area, nursery_site")
+      .eq("org_id", orgId)
+      .order("name"),
+    supabase
+      .from("suppliers")
+      .select("id, name, producer_code, country_code")
+      .eq("org_id", orgId)
+      .order("name"),
+    supabase
+      .from("materials")
+      .select(`
+        id,
+        name,
+        part_number,
+        category_id,
+        base_uom,
+        linked_size_id,
+        is_active,
+        category:material_categories(name, code, parent_group)
+      `)
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("name"),
+  ]);
+
+  // Log any errors for debugging
+  if (varietiesRes.error) console.warn("[reference-data] varieties error:", varietiesRes.error.message);
+  if (sizesRes.error) console.warn("[reference-data] sizes error:", sizesRes.error.message);
+  if (locationsRes.error) console.warn("[reference-data] locations error:", locationsRes.error.message);
+  if (suppliersRes.error) console.warn("[reference-data] suppliers error:", suppliersRes.error.message);
+  if (materialsRes.error) console.warn("[reference-data] materials error:", materialsRes.error.message);
+
+  // Transform materials to flatten category info and filter to Containers + Growing Media
+  const materials = (materialsRes.data ?? [])
+    .filter((m: any) => {
+      const parentGroup = m.category?.parent_group;
+      return parentGroup === "Containers" || parentGroup === "Growing Media";
+    })
+    .map((m: any) => ({
+      id: m.id,
+      name: m.name,
+      part_number: m.part_number,
+      category_id: m.category_id,
+      category_name: m.category?.name ?? null,
+      category_code: m.category?.code ?? null,
+      parent_group: m.category?.parent_group ?? null,
+      base_uom: m.base_uom,
+      linked_size_id: m.linked_size_id ?? null,
+      is_active: m.is_active,
+    }));
+
+  return {
+    varieties: varietiesRes.data ?? [],
+    sizes: sizesRes.data ?? [],
+    locations: locationsRes.data ?? [],
+    suppliers: suppliersRes.data ?? [],
+    materials,
+  };
 }
