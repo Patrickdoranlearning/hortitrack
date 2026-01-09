@@ -4,6 +4,7 @@ import { MultiTransplantInputSchema } from "@/lib/domain/batch";
 import { getUserAndOrg } from "@/server/auth/org";
 import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 import { nextBatchNumber } from "@/server/numbering/batches";
+import { resolveProductionStatus } from "@/server/batches/service";
 
 type Phase = "propagation" | "plug" | "potted";
 const PhaseMapToNumber: Record<Phase, 1 | 2 | 3> = { propagation: 1, plug: 2, potted: 3 };
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
     if (contributedUnits !== requiredUnits) {
       throw new Error("Parent units must match the required output units");
     }
+
+    // Resolve status_id
+    const statusOption = await resolveProductionStatus(supabase, orgId, "Growing");
 
     // Load child size/location + compute phase
     const { data: sizeRow, error: sizeErr } = await supabase
@@ -69,7 +73,8 @@ export async function POST(req: NextRequest) {
         plant_variety_id: payload.child.plant_variety_id,
         size_id: payload.child.size_id,
         location_id: payload.child.location_id,
-        status: "Growing",
+        status: statusOption.system_code,
+        status_id: statusOption.id,
         supplier_id: internalSupplierId,
         quantity: requiredUnits,
         initial_quantity: requiredUnits,

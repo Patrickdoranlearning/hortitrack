@@ -17,6 +17,10 @@ export const ProductionTargetsSchema = z.object({
   ec: z.number().nullable().optional(),
   ph: z.number().nullable().optional(),
   spacing: z.union([z.number(), z.string()]).nullable().optional(),
+  targetFamily: z.string().optional(),
+  totalWeeks: z.number().optional(),
+  seasonalOnly: z.boolean().optional(),
+  seasons: z.array(z.string()).optional(),
 });
 
 export const ProductionProtocolRouteNodeSchema = z.object({
@@ -27,6 +31,23 @@ export const ProductionProtocolRouteNodeSchema = z.object({
   start: z.string().optional(),
   end: z.string().optional(),
   durationDays: z.number().int().nonnegative().optional(),
+  sizeId: z.string().optional(),
+  sizeName: z.string().optional(),
+  fromYear: z.number().optional(),
+  fromWeek: z.number().optional(),
+  toYear: z.number().optional(),
+  toWeek: z.number().optional(),
+  conditions: z.object({
+    media: z.string().optional(),
+    tempDayC: z.number().nullable().optional(),
+    tempNightC: z.number().nullable().optional(),
+    humidityPct: z.number().nullable().optional(),
+    lightHours: z.number().nullable().optional(),
+    feedingWeeks: z.string().optional(),
+    watering: z.string().optional(),
+    spacing: z.string().optional(),
+    notes: z.string().optional(),
+  }).optional(),
 });
 export const ProductionProtocolRouteEdgeSchema = z.object({
   id: z.string(),

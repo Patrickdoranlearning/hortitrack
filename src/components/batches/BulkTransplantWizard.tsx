@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Plus, Trash2, Search, CheckCircle2, AlertCircle, Loader2, ScanLine, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -77,6 +78,9 @@ type Props = {
 export default function BulkTransplantWizard({ onComplete }: Props) {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
   const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   // Wizard state
@@ -421,50 +425,36 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Target Size</Label>
-                <Select
+                <SelectWithCreate
+                  options={referenceData.sizes.map((size) => ({
+                    value: size.id!,
+                    label: size.name + (size.cell_multiple && size.cell_multiple > 1 ? ` (${size.cell_multiple} cells)` : ""),
+                  }))}
                   value={defaults.sizeId ?? ""}
                   onValueChange={(value) =>
                     setDefaults((prev) => ({ ...prev, sizeId: value }))
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {referenceData.sizes.map((size) => (
-                      <SelectItem key={size.id} value={size.id!}>
-                        {size.name}
-                        {size.cell_multiple && size.cell_multiple > 1 && (
-                          <span className="ml-2 text-muted-foreground">
-                            ({size.cell_multiple} cells)
-                          </span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  createHref="/sizes"
+                  placeholder="Select size"
+                  createLabel="Add new size"
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>Target Location</Label>
-                <Select
+                <SelectWithCreate
+                  options={referenceData.locations.map((loc) => ({
+                    value: loc.id!,
+                    label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                  }))}
                   value={defaults.locationId ?? ""}
                   onValueChange={(value) =>
                     setDefaults((prev) => ({ ...prev, locationId: value }))
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {referenceData.locations.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id!}>
-                        {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  createHref="/locations"
+                  placeholder="Select location"
+                  createLabel="Add new location"
+                />
               </div>
 
               <div className="space-y-2">

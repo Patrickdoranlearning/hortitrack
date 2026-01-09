@@ -79,7 +79,7 @@ export function CreateQCFeedbackDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pickListId,
-          pickItemId: selectedItem || undefined,
+          pickItemId: (selectedItem === '__all__' || !selectedItem) ? undefined : selectedItem,
           issueType,
           notes: notes || undefined,
           actionRequired: actionRequired || undefined,
@@ -142,7 +142,7 @@ export function CreateQCFeedbackDialog({
                   <SelectValue placeholder="Select specific item..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">General (All Items)</SelectItem>
+                  <SelectItem value="__all__">General (All Items)</SelectItem>
                   {pickItems.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.variety || item.product_name || item.sku} ×{item.requested_qty}

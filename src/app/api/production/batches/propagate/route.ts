@@ -5,6 +5,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { PropagationInputSchema } from "@/lib/domain/batch";
 import { nextBatchNumber } from "@/server/numbering/batches";
 import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
+import { resolveProductionStatus } from "@/server/batches/service";
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -14,6 +15,9 @@ export async function POST(req: NextRequest) {
 
     const { supabase, orgId, user } = await getUserAndOrg();
     const internalSupplierId = await ensureInternalSupplierId(supabase, orgId);
+
+    // Resolve status_id
+    const statusOption = await resolveProductionStatus(supabase, orgId, "Propagation");
 
     // Fetch size.multiple to compute plant units from container count
     const { data: size, error: sizeErr } = await supabase
@@ -36,7 +40,8 @@ export async function POST(req: NextRequest) {
         plant_variety_id: input.plant_variety_id,
         size_id: input.size_id,
         location_id: input.location_id,
-        status: "Growing",                  // enum production_status
+        status: statusOption.system_code,   // e.g. "Growing"
+        status_id: statusOption.id,
         quantity: units,
         initial_quantity: units,
         unit: "plants",

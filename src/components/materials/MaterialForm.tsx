@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { CreateMaterialSchema, type CreateMaterialSchemaType } from '@/lib/schemas/materials';
@@ -36,8 +38,11 @@ type MaterialFormProps = {
 };
 
 export function MaterialForm({ material, categories, onSubmit, onCancel }: MaterialFormProps) {
-  const { data: refData } = useContext(ReferenceDataContext);
+  const { data: refData, reload } = useContext(ReferenceDataContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
 
   const sizes = refData?.sizes ?? [];
   const suppliers = refData?.suppliers ?? [];
@@ -174,24 +179,19 @@ export function MaterialForm({ material, categories, onSubmit, onCancel }: Mater
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Linked Plant Size</FormLabel>
-                  <Select
+                  <SelectWithCreate
+                    options={sizes.map((size) => ({
+                      value: size.id,
+                      label: size.name,
+                    }))}
                     value={field.value ?? 'none'}
                     onValueChange={(val) => field.onChange(val === 'none' ? null : val)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select size to link" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No linked size</SelectItem>
-                      {sizes.map((size) => (
-                        <SelectItem key={size.id} value={size.id}>
-                          {size.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    createHref="/sizes"
+                    placeholder="Select size to link"
+                    createLabel="Add new size"
+                    emptyLabel="No linked size"
+                    emptyValue="none"
+                  />
                   <FormDescription>
                     Link this material to a plant size for automatic consumption during batch
                     actualization.
@@ -235,24 +235,19 @@ export function MaterialForm({ material, categories, onSubmit, onCancel }: Mater
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Default Supplier</FormLabel>
-                  <Select
+                  <SelectWithCreate
+                    options={suppliers.map((supplier) => ({
+                      value: supplier.id,
+                      label: supplier.name,
+                    }))}
                     value={field.value ?? 'none'}
                     onValueChange={(val) => field.onChange(val === 'none' ? null : val)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select supplier" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No default supplier</SelectItem>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    createHref="/suppliers"
+                    placeholder="Select supplier"
+                    createLabel="Add new supplier"
+                    emptyLabel="No default supplier"
+                    emptyValue="none"
+                  />
                   <FormMessage />
                 </FormItem>
               )}

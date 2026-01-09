@@ -25,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
@@ -72,6 +74,10 @@ const ratingOptions = [
 export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
   const { data: referenceData, loading: refLoading, error: refError, reload } =
     React.useContext(ReferenceDataContext);
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
+  
   const toastImpl = useToast?.();
   const toast =
     toastImpl?.toast ??
@@ -251,22 +257,20 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 control={form.control}
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
-            <FormLabel>Variety</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a variety" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {varieties.map((v) => (
-                <SelectItem key={v.id} value={v.id}>
-                            {v.name}
-                            {v.family ? ` · ${v.family}` : ""}
-                </SelectItem>
-                        ))}
-                      </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
+                    <FormLabel>Variety</FormLabel>
+                    <SelectWithCreate
+                      options={varieties.map((v) => ({
+                        value: v.id,
+                        label: v.name + (v.family ? ` · ${v.family}` : ""),
+                      }))}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      createHref="/varieties"
+                      placeholder="Select a variety"
+                      createLabel="Add new variety"
+                    />
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
 
@@ -274,23 +278,21 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="size_id"
                 control={form.control}
                 render={({ field }) => (
-            <FormItem>
+                  <FormItem>
                     <FormLabel>Size / Container</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sizes.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                            {s.container_type ? ` · ${s.container_type}` : ""}
-                  </SelectItem>
-                        ))}
-                      </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
+                    <SelectWithCreate
+                      options={sizes.map((s) => ({
+                        value: s.id,
+                        label: s.name + (s.container_type ? ` · ${s.container_type}` : ""),
+                      }))}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      createHref="/sizes"
+                      placeholder="Select a size"
+                      createLabel="Add new size"
+                    />
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
 
@@ -321,21 +323,19 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Supplier</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a supplier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                            {s.producer_code ? ` · ${s.producer_code}` : ""}
-                </SelectItem>
-                        ))}
-                      </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
+                    <SelectWithCreate
+                      options={suppliers.map((s) => ({
+                        value: s.id,
+                        label: s.name + (s.producer_code ? ` · ${s.producer_code}` : ""),
+                      }))}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      createHref="/suppliers"
+                      placeholder="Select a supplier"
+                      createLabel="Add new supplier"
+                    />
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
             </div>
@@ -350,23 +350,21 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 name="location_id"
                 control={form.control}
                 render={({ field }) => (
-          <FormItem>
+                  <FormItem>
                     <FormLabel>Nursery location</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                            {loc.name}
-                </SelectItem>
-                        ))}
-                      </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
+                    <SelectWithCreate
+                      options={locations.map((loc) => ({
+                        value: loc.id,
+                        label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                      }))}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      createHref="/locations"
+                      placeholder="Select a location"
+                      createLabel="Add new location"
+                    />
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
 

@@ -7,7 +7,7 @@ import { ProductionAPI } from "@/lib/production/client";
 import { HttpError } from "@/lib/http/fetchJson";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -44,12 +44,14 @@ export default function MoveForm({ batchId, onDone }: { batchId: string; onDone?
         <FormField name="location_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>New location</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-              <SelectContent>
-                {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SelectWithCreate
+              options={locations.map(l => ({ value: l.id, label: l.name }))}
+              value={field.value}
+              onValueChange={field.onChange}
+              createHref="/locations"
+              placeholder="Select location"
+              createLabel="Add new location"
+            />
             <FormMessage />
           </FormItem>
         )} />

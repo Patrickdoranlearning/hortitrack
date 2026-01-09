@@ -20,13 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SelectWithCreate } from '@/components/ui/select-with-create';
 import {
   Table,
   TableBody,
@@ -261,22 +255,20 @@ export function PlanPropagationStep({
                       />
                     </TableCell>
                     <TableCell>
-                      <Select
+                      <SelectWithCreate
+                        className="h-8"
+                        options={locations.map((loc) => ({
+                          value: loc.id,
+                          label: loc.name,
+                        }))}
                         value={batch.locationId ?? ''}
                         onValueChange={(v) => updateBatchLocation(batch.id, v)}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="TBD" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">TBD</SelectItem>
-                          {locations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        createHref="/locations"
+                        placeholder="TBD"
+                        createLabel="Add new location"
+                        emptyLabel="TBD"
+                        emptyValue=""
+                      />
                     </TableCell>
                     <TableCell>
                       <Button

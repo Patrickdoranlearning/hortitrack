@@ -11,7 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, Download, RefreshCw, FileSpreadsheet, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 type UploadStatus = "pending" | "uploading" | "success" | "error";
 
@@ -41,6 +42,9 @@ type Props = {
 export default function BulkPropagationUpload({ onComplete }: Props) {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
   const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [rows, setRows] = React.useState<UploadRow[]>([]);
   const [busy, setBusy] = React.useState<"parsing" | "uploading" | null>(null);
@@ -65,13 +69,32 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
   const sizeMap = React.useMemo(() => {
     const byName = new Map<string, { id: string; name: string }>();
     const byId = new Map<string, string>();
+    const byIdFull = new Map<string, any>();
     referenceData?.sizes?.forEach((item) => {
       if (!item?.id || !item?.name) return;
       const key = normalize(item.name);
       byName.set(key, { id: item.id, name: item.name });
       byId.set(item.id, item.name);
+      byIdFull.set(item.id, item);
     });
-    return { byName, byId };
+    return { byName, byId, byIdFull };
+  }, [referenceData]);
+
+  const sortedSizes = React.useMemo(() => {
+    const s = [...(referenceData?.sizes ?? [])];
+    return s.sort((a, b) => {
+      const isAProp = a.container_type === "prop_tray";
+      const isBProp = b.container_type === "prop_tray";
+      if (isAProp && !isBProp) return -1;
+      if (!isAProp && isBProp) return 1;
+
+      const isAPlug = a.container_type === "plug_tray";
+      const isBPlug = b.container_type === "plug_tray";
+      if (isAPlug && !isBPlug) return -1;
+      if (!isAPlug && isBPlug) return 1;
+
+      return a.name.localeCompare(b.name);
+    });
   }, [referenceData]);
 
   const locationMap = React.useMemo(() => {
@@ -349,44 +372,44 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <Select
+              <SelectWithCreate
+                className="w-48"
+                options={referenceData.locations.map((loc) => ({
+                  value: loc.id!,
+                  label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                }))}
                 value={defaults.locationId ?? "none"}
                 onValueChange={(value) =>
                   setDefaults((prev) => ({ ...prev, locationId: value === "none" ? undefined : value }))
                 }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default location</SelectItem>
-                  {referenceData.locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id!}>
-                      {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                createHref="/locations"
+                placeholder="Default location"
+                createLabel="Add new location"
+                emptyLabel="No default location"
+                emptyValue="none"
+              />
 
-              <Select
+              <SelectWithCreate
+                className="w-48"
+                options={sortedSizes.map((size) => ({
+                  value: size.id!,
+                  label: size.name,
+                  badge: size.container_type === "prop_tray" ? (
+                    <Badge variant="outline" className="ml-2 bg-primary/5 text-[10px] uppercase tracking-wider py-0 px-1 border-primary/20 text-primary">
+                      Prop
+                    </Badge>
+                  ) : undefined,
+                }))}
                 value={defaults.sizeId ?? "none"}
                 onValueChange={(value) =>
                   setDefaults((prev) => ({ ...prev, sizeId: value === "none" ? undefined : value }))
                 }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default size</SelectItem>
-                  {referenceData.sizes.map((size) => (
-                    <SelectItem key={size.id} value={size.id!}>
-                      {size.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                createHref="/sizes"
+                placeholder="Default size"
+                createLabel="Add new size"
+                emptyLabel="No default size"
+                emptyValue="none"
+              />
 
               <Input
                 type="date"
@@ -437,44 +460,44 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <Select
+              <SelectWithCreate
+                className="w-48"
+                options={referenceData.locations.map((loc) => ({
+                  value: loc.id!,
+                  label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                }))}
                 value={defaults.locationId ?? "none"}
                 onValueChange={(value) =>
                   setDefaults((prev) => ({ ...prev, locationId: value === "none" ? undefined : value }))
                 }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default location</SelectItem>
-                  {referenceData.locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id!}>
-                      {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                createHref="/locations"
+                placeholder="Default location"
+                createLabel="Add new location"
+                emptyLabel="No default location"
+                emptyValue="none"
+              />
 
-              <Select
+              <SelectWithCreate
+                className="w-48"
+                options={sortedSizes.map((size) => ({
+                  value: size.id!,
+                  label: size.name,
+                  badge: size.container_type === "prop_tray" ? (
+                    <Badge variant="outline" className="ml-2 bg-primary/5 text-[10px] uppercase tracking-wider py-0 px-1 border-primary/20 text-primary">
+                      Prop
+                    </Badge>
+                  ) : undefined,
+                }))}
                 value={defaults.sizeId ?? "none"}
                 onValueChange={(value) =>
                   setDefaults((prev) => ({ ...prev, sizeId: value === "none" ? undefined : value }))
                 }
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Default size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default size</SelectItem>
-                  {referenceData.sizes.map((size) => (
-                    <SelectItem key={size.id} value={size.id!}>
-                      {size.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                createHref="/sizes"
+                placeholder="Default size"
+                createLabel="Add new size"
+                emptyLabel="No default size"
+                emptyValue="none"
+              />
 
               <Input
                 type="date"
@@ -498,7 +521,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                     <TableHead>Variety</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Location</TableHead>
-                    <TableHead className="w-[140px] text-right">Containers</TableHead>
+                    <TableHead className="w-[150px] text-right">Containers</TableHead>
                     <TableHead className="w-[150px]">Planted date</TableHead>
                     <TableHead>Notes</TableHead>
                     <TableHead>Status</TableHead>
@@ -509,7 +532,11 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                     <TableRow key={row.id} className={row.status === "error" ? "bg-destructive/5" : undefined}>
                       <TableCell className="font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="max-w-[220px]">
-                        <Select
+                        <SelectWithCreate
+                          options={referenceData.varieties.map((variety) => ({
+                            value: variety.id!,
+                            label: variety.name,
+                          }))}
                           value={row.varietyId ?? "none"}
                           onValueChange={(value) => {
                             if (value === "none") {
@@ -518,22 +545,24 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                             }
                             updateRow(row.id, { varietyId: value, varietyName: varietyMap.byId.get(value) ?? "" });
                           }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pick variety" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-80">
-                            <SelectItem value="none">—</SelectItem>
-                            {referenceData.varieties.map((variety) => (
-                              <SelectItem key={variety.id} value={variety.id!}>
-                                {variety.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          createHref="/varieties"
+                          placeholder="Pick variety"
+                          createLabel="Add new variety"
+                          emptyLabel="—"
+                          emptyValue="none"
+                        />
                       </TableCell>
                       <TableCell className="max-w-[180px]">
-                        <Select
+                        <SelectWithCreate
+                          options={sortedSizes.map((size) => ({
+                            value: size.id!,
+                            label: size.name,
+                            badge: size.container_type === "prop_tray" ? (
+                              <Badge variant="outline" className="ml-2 bg-primary/5 text-[10px] uppercase tracking-wider py-0 px-1 border-primary/20 text-primary">
+                                Prop
+                              </Badge>
+                            ) : undefined,
+                          }))}
                           value={row.sizeId ?? "none"}
                           onValueChange={(value) => {
                             if (value === "none") {
@@ -542,22 +571,19 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                             }
                             updateRow(row.id, { sizeId: value, sizeName: sizeMap.byId.get(value) ?? "" });
                           }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pick size" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-80">
-                            <SelectItem value="none">—</SelectItem>
-                            {referenceData.sizes.map((size) => (
-                              <SelectItem key={size.id} value={size.id!}>
-                                {size.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          createHref="/sizes"
+                          placeholder="Pick size"
+                          createLabel="Add new size"
+                          emptyLabel="—"
+                          emptyValue="none"
+                        />
                       </TableCell>
                       <TableCell className="max-w-[200px]">
-                        <Select
+                        <SelectWithCreate
+                          options={referenceData.locations.map((loc) => ({
+                            value: loc.id!,
+                            label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                          }))}
                           value={row.locationId ?? "none"}
                           onValueChange={(value) => {
                             if (value === "none") {
@@ -566,31 +592,30 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                             }
                             updateRow(row.id, { locationId: value, locationName: locationMap.byId.get(value) ?? "" });
                           }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pick location" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-80">
-                            <SelectItem value="none">—</SelectItem>
-                            {referenceData.locations.map((loc) => (
-                              <SelectItem key={loc.id} value={loc.id!}>
-                                {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                                {loc.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          createHref="/locations"
+                          placeholder="Pick location"
+                          createLabel="Add new location"
+                          emptyLabel="—"
+                          emptyValue="none"
+                        />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={row.containers || ""}
-                          onChange={(event) =>
-                            updateRow(row.id, { containers: Number(event.target.value) || 0 })
-                          }
-                          className="text-right"
-                        />
+                        <div className="flex flex-col gap-1 items-end">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={row.containers || ""}
+                            onChange={(event) =>
+                              updateRow(row.id, { containers: Number(event.target.value) || 0 })
+                            }
+                            className="text-right"
+                          />
+                          {row.containers > 0 && row.sizeId && (
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              Total: {(row.containers * (sizeMap.byIdFull.get(row.sizeId)?.cell_multiple ?? 1)).toLocaleString()} plants
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input

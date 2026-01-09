@@ -7,7 +7,7 @@ import { CreateOrderSchema, CreateOrderInput } from '@/lib/sales/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectWithCreate } from '@/components/ui/select-with-create';
 import { createOrder } from '@/app/sales/actions';
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
@@ -60,20 +60,17 @@ export default function CreateOrderForm({ customers }: CreateOrderFormProps) {
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Customer</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a customer" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {customers.map((customer) => (
-                                            <SelectItem key={customer.id} value={customer.id}>
-                                                {customer.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SelectWithCreate
+                                    options={customers.map((customer) => ({
+                                        value: customer.id,
+                                        label: customer.name,
+                                    }))}
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    createHref="/sales/customers"
+                                    placeholder="Select a customer"
+                                    createLabel="Add new customer"
+                                />
                                 <FormMessage />
                             </FormItem>
                         )}

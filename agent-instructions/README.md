@@ -7,6 +7,7 @@ This folder contains instruction guides for AI coding assistants working on the 
 | Guide | Description | When to Use |
 |-------|-------------|-------------|
 | [unit-testing.md](./unit-testing.md) | Comprehensive unit testing guide | When creating tests for any module |
+| [select-with-create.md](./select-with-create.md) | Pattern for dropdowns with "Add new" option | When adding "Add new" to form dropdowns |
 
 ## How to Reference
 

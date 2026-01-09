@@ -20,6 +20,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectWithCreate } from '@/components/ui/select-with-create';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -138,20 +139,17 @@ export function VehicleForm({ vehicle, hauliers, onSubmit, onCancel }: VehicleFo
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Haulier</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select haulier" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {hauliers.map((haulier) => (
-                        <SelectItem key={haulier.id} value={haulier.id!}>
-                          {haulier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SelectWithCreate
+                    options={hauliers.map((haulier) => ({
+                      value: haulier.id!,
+                      label: haulier.name,
+                    }))}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    createHref="/hauliers"
+                    placeholder="Select haulier"
+                    createLabel="Add new haulier"
+                  />
                   <FormMessage />
                 </FormItem>
               )}

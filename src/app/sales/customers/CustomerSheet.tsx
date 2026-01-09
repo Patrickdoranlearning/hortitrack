@@ -550,15 +550,36 @@ function DeliveryAddressesTab({
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<CustomerAddressSummary | null>(null);
+  const [addressType, setAddressType] = useState<'invoice' | 'delivery'>('delivery');
   const [pending, startTransition] = useTransition();
 
-  const handleAddNew = () => {
+  // Separate invoice/company address from delivery addresses
+  const invoiceAddress = addresses.find((a) => a.isDefaultBilling);
+  const deliveryAddresses = addresses.filter((a) => !a.isDefaultBilling || a.isDefaultShipping);
+
+  const handleAddInvoice = () => {
     setEditingAddress(null);
+    setAddressType('invoice');
     setDialogOpen(true);
   };
 
-  const handleEdit = (address: CustomerAddressSummary) => {
+  const handleEditInvoice = () => {
+    if (invoiceAddress) {
+      setEditingAddress(invoiceAddress);
+      setAddressType('invoice');
+      setDialogOpen(true);
+    }
+  };
+
+  const handleAddDelivery = () => {
+    setEditingAddress(null);
+    setAddressType('delivery');
+    setDialogOpen(true);
+  };
+
+  const handleEditDelivery = (address: CustomerAddressSummary) => {
     setEditingAddress(address);
+    setAddressType('delivery');
     setDialogOpen(true);
   };
 
@@ -575,76 +596,149 @@ function DeliveryAddressesTab({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h4 className="font-semibold">Delivery Locations</h4>
-        <Button size="sm" onClick={handleAddNew}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add address
-        </Button>
-      </div>
-
-      {addresses.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">
-          No delivery addresses added yet.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {addresses.map((address) => (
-            <div
-              key={address.id}
-              className="rounded-lg border p-4 space-y-2"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">
-                      {address.storeName || address.label}
-                    </p>
-                    {address.isDefaultShipping && (
-                      <Badge variant="secondary" className="text-xs">Default Shipping</Badge>
-                    )}
-                    {address.isDefaultBilling && (
-                      <Badge variant="outline" className="text-xs">Billing</Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {[address.line1, address.line2, address.city, address.county, address.eircode]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </p>
-                  {address.contactName && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Contact: {address.contactName}
-                      {address.contactPhone && ` • ${address.contactPhone}`}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(address)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive"
-                    onClick={() => handleDelete(address.id)}
-                    disabled={pending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+    <div className="space-y-6">
+      {/* Company / Invoice Address Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Company / Invoice Address</CardTitle>
             </div>
-          ))}
-        </div>
-      )}
+            {!invoiceAddress ? (
+              <Button size="sm" onClick={handleAddInvoice}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={handleEditInvoice}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )}
+          </div>
+          <CardDescription>
+            Head office or registered company address used for invoicing
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {invoiceAddress ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{invoiceAddress.storeName || invoiceAddress.label}</p>
+                {invoiceAddress.isDefaultShipping && (
+                  <Badge variant="secondary" className="text-xs">Also delivery</Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {[invoiceAddress.line1, invoiceAddress.line2].filter(Boolean).join(", ")}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {[invoiceAddress.city, invoiceAddress.county, invoiceAddress.eircode].filter(Boolean).join(", ")}
+              </p>
+              {invoiceAddress.contactName && (
+                <p className="text-sm text-muted-foreground">
+                  Contact: {invoiceAddress.contactName}
+                  {invoiceAddress.contactPhone && ` • ${invoiceAddress.contactPhone}`}
+                  {invoiceAddress.contactEmail && ` • ${invoiceAddress.contactEmail}`}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No invoice address set. Add one to generate invoices.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Store / Delivery Locations Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Store / Delivery Locations</CardTitle>
+            </div>
+            <Button size="sm" onClick={handleAddDelivery}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add store
+            </Button>
+          </div>
+          <CardDescription>
+            Delivery addresses for individual stores or locations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {deliveryAddresses.filter(a => !a.isDefaultBilling || a.isDefaultShipping).length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No store locations added yet. Add delivery addresses for each store.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {deliveryAddresses
+                .filter(a => !(a.isDefaultBilling && !a.isDefaultShipping)) // Don't show invoice-only addresses here
+                .map((address) => (
+                <div
+                  key={address.id}
+                  className="rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium">
+                          {address.storeName || address.label}
+                        </p>
+                        {address.isDefaultShipping && (
+                          <Badge variant="secondary" className="text-xs">Default</Badge>
+                        )}
+                        {address.isDefaultBilling && (
+                          <Badge variant="outline" className="text-xs">Invoice</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {[address.line1, address.line2, address.city, address.county, address.eircode]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                      {address.contactName && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Contact: {address.contactName}
+                          {address.contactPhone && ` • ${address.contactPhone}`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0 ml-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEditDelivery(address)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      {/* Don't allow deleting if it's the only billing address */}
+                      {!(address.isDefaultBilling && !deliveryAddresses.some(a => a.id !== address.id && a.isDefaultBilling)) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => handleDelete(address.id)}
+                          disabled={pending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <AddressDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         customerId={customerId}
         address={editingAddress}
+        addressType={addressType}
         onSaved={onUpdated}
       />
     </div>
@@ -656,12 +750,14 @@ function AddressDialog({
   onOpenChange,
   customerId,
   address,
+  addressType = 'delivery',
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customerId: string;
   address: CustomerAddressSummary | null;
+  addressType?: 'invoice' | 'delivery';
   onSaved: () => void;
 }) {
   const { toast } = useToast();
@@ -682,6 +778,8 @@ function AddressDialog({
     contactPhone: "",
   });
 
+  const isInvoiceMode = addressType === 'invoice';
+
   useEffect(() => {
     if (open) {
       if (address) {
@@ -701,6 +799,7 @@ function AddressDialog({
           contactPhone: address.contactPhone ?? "",
         });
       } else {
+        // Set defaults based on address type
         setForm({
           label: "",
           storeName: "",
@@ -710,15 +809,15 @@ function AddressDialog({
           county: "",
           eircode: "",
           countryCode: "IE",
-          isDefaultShipping: false,
-          isDefaultBilling: false,
+          isDefaultShipping: isInvoiceMode ? true : false, // Invoice address often also used for delivery
+          isDefaultBilling: isInvoiceMode ? true : false,
           contactName: "",
           contactEmail: "",
           contactPhone: "",
         });
       }
     }
-  }, [open, address]);
+  }, [open, address, isInvoiceMode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -730,7 +829,7 @@ function AddressDialog({
       const result = await upsertCustomerAddressAction({
         id: address?.id,
         customerId,
-        label: form.storeName || form.label || "Address",
+        label: form.storeName || form.label || (isInvoiceMode ? "Head Office" : "Address"),
         storeName: form.storeName || null,
         line1: form.line1,
         line2: form.line2 || null,
@@ -739,7 +838,7 @@ function AddressDialog({
         eircode: form.eircode || null,
         countryCode: form.countryCode,
         isDefaultShipping: form.isDefaultShipping,
-        isDefaultBilling: form.isDefaultBilling,
+        isDefaultBilling: isInvoiceMode ? true : form.isDefaultBilling,
         contactName: form.contactName || null,
         contactEmail: form.contactEmail || null,
         contactPhone: form.contactPhone || null,
@@ -758,16 +857,24 @@ function AddressDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{address ? "Edit address" : "Add address"}</DialogTitle>
+          <DialogTitle>
+            {address 
+              ? (isInvoiceMode ? "Edit invoice address" : "Edit store address")
+              : (isInvoiceMode ? "Add invoice address" : "Add store / delivery address")
+            }
+          </DialogTitle>
           <DialogDescription>
-            {address ? "Update the delivery address details." : "Add a new delivery location."}
+            {isInvoiceMode 
+              ? "Company or head office address used for invoicing."
+              : "Store location where deliveries will be made."
+            }
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Store / Location name</Label>
+            <Label>{isInvoiceMode ? "Company / Office name" : "Store / Location name"}</Label>
             <Input
-              placeholder="e.g., Woodies Sandyford"
+              placeholder={isInvoiceMode ? "e.g., Head Office, Registered Office" : "e.g., Woodies Sandyford"}
               value={form.storeName}
               onChange={(e) => setForm((p) => ({ ...p, storeName: e.target.value }))}
             />
@@ -786,7 +893,7 @@ function AddressDialog({
           <div className="space-y-2">
             <Label>Address line 2</Label>
             <Input
-              placeholder="Apartment, suite, etc."
+              placeholder="Building, floor, etc."
               value={form.line2}
               onChange={(e) => setForm((p) => ({ ...p, line2: e.target.value }))}
             />
@@ -813,6 +920,7 @@ function AddressDialog({
             <div className="space-y-2">
               <Label>Eircode / Postcode</Label>
               <Input
+                placeholder="e.g., D02 X285"
                 value={form.eircode}
                 onChange={(e) => setForm((p) => ({ ...p, eircode: e.target.value }))}
               />
@@ -837,35 +945,44 @@ function AddressDialog({
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="defaultShipping"
-                checked={form.isDefaultShipping}
-                onCheckedChange={(checked) =>
-                  setForm((p) => ({ ...p, isDefaultShipping: checked === true }))
-                }
-              />
-              <Label htmlFor="defaultShipping" className="text-sm">
-                Default shipping
-              </Label>
+          {/* Address Type Options */}
+          {isInvoiceMode ? (
+            <div className="rounded-lg border p-3 bg-muted/30">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="alsoDelivery"
+                  checked={form.isDefaultShipping}
+                  onCheckedChange={(checked) =>
+                    setForm((p) => ({ ...p, isDefaultShipping: checked === true }))
+                  }
+                />
+                <Label htmlFor="alsoDelivery" className="text-sm">
+                  Also use this address for deliveries
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 ml-6">
+                Enable if deliveries go to the same address as invoices
+              </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="defaultBilling"
-                checked={form.isDefaultBilling}
-                onCheckedChange={(checked) =>
-                  setForm((p) => ({ ...p, isDefaultBilling: checked === true }))
-                }
-              />
-              <Label htmlFor="defaultBilling" className="text-sm">
-                Default billing
-              </Label>
+          ) : (
+            <div className="flex gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="defaultShipping"
+                  checked={form.isDefaultShipping}
+                  onCheckedChange={(checked) =>
+                    setForm((p) => ({ ...p, isDefaultShipping: checked === true }))
+                  }
+                />
+                <Label htmlFor="defaultShipping" className="text-sm">
+                  Default delivery location
+                </Label>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="border-t pt-4 mt-4">
-            <h5 className="font-medium mb-3">Store Contact</h5>
+            <h5 className="font-medium mb-3">{isInvoiceMode ? "Accounts Contact" : "Store Contact"}</h5>
             <div className="grid gap-4 grid-cols-2">
               <div className="space-y-2">
                 <Label>Contact name</Label>
@@ -900,7 +1017,14 @@ function AddressDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : address ? "Update" : "Add address"}
+              {pending 
+                ? "Saving..." 
+                : address 
+                  ? "Update" 
+                  : isInvoiceMode 
+                    ? "Save invoice address" 
+                    : "Add store"
+              }
             </Button>
           </DialogFooter>
         </form>

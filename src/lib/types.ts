@@ -107,11 +107,50 @@ export const SupplierSchema = z.object({
   countryCode: z.string().default('IE'),
   phone: z.string().optional(),
   email: z.string().email().optional(),
-  address: z.string().optional(),
-  eircode: z.string().optional(),
+  address: z.string().optional(), // Deprecated: use supplier_addresses table
+  eircode: z.string().optional(), // Deprecated: use supplier_addresses table
   supplierType: z.string().optional(),
 });
 export type Supplier = z.infer<typeof SupplierSchema>;
+
+// --- Supplier Addresses ---
+export const SupplierAddressSchema = z.object({
+  id: z.string().uuid().optional(),
+  supplierId: z.string().uuid(),
+  orgId: z.string().uuid().optional(),
+  label: z.string().min(1, 'Address label is required'),
+  line1: z.string().min(1, 'Address line 1 is required'),
+  line2: z.string().max(200).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  county: z.string().max(100).optional().nullable(),
+  eircode: z.string().max(20).optional().nullable(),
+  countryCode: z.string().length(2).default('IE'),
+  isDefault: z.boolean().default(false),
+  contactName: z.string().max(100).optional().nullable(),
+  contactEmail: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
+  contactPhone: z.string().max(30).optional().nullable(),
+});
+export type SupplierAddress = z.infer<typeof SupplierAddressSchema>;
+
+export type SupplierAddressSummary = {
+  id: string;
+  label: string;
+  line1: string;
+  line2: string | null;
+  city: string | null;
+  county: string | null;
+  eircode: string | null;
+  countryCode: string;
+  isDefault: boolean;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+};
+
+// Supplier with addresses (for UI)
+export interface SupplierWithAddresses extends Supplier {
+  addresses: SupplierAddressSummary[];
+}
 
 // --- Price Lists ---
 export const PriceListSchema = z.object({

@@ -39,7 +39,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Plus, Trash2, ArrowDown, Clock, ChevronDown, Thermometer, Droplets, Sun, Leaf, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Trash2, ArrowDown, Clock, ChevronDown, Thermometer, Droplets, Sun, Leaf, AlertCircle, CloudSun } from "lucide-react";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { FieldErrors } from "react-hook-form";
@@ -123,6 +124,8 @@ const schema = z.object({
   name: z.string().min(2, "Name is required"),
   description: z.string().max(500).optional(),
   targetFamily: z.string().min(1, "Family is required"),
+  seasonalOnly: z.boolean().default(false),
+  seasons: z.array(z.string()).default([]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -382,6 +385,8 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
           targets: {
             targetFamily: values.targetFamily,
             totalWeeks: totalDuration.weeks,
+            seasonalOnly: values.seasonalOnly,
+            seasons: values.seasons,
           },
         }),
       });
@@ -484,6 +489,69 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              {/* Seasonality */}
+              <div className="space-y-4 p-4 rounded-lg border bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CloudSun className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Seasonality Restrictions</div>
+                      <div className="text-xs text-muted-foreground">
+                        Limit when this recipe can be started
+                      </div>
+                    </div>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="seasonalOnly"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="text-sm font-normal">Enable</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {form.watch("seasonalOnly") && (
+                  <FormField
+                    control={form.control}
+                    name="seasons"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex flex-wrap gap-2">
+                          {["Spring", "Summer", "Autumn", "Winter"].map((season) => {
+                            const isSelected = field.value?.includes(season);
+                            return (
+                              <Badge
+                                key={season}
+                                variant={isSelected ? "default" : "outline"}
+                                className="cursor-pointer px-3 py-1"
+                                onClick={() => {
+                                  const current = field.value || [];
+                                  const next = isSelected
+                                    ? current.filter((s) => s !== season)
+                                    : [...current, season];
+                                  field.onChange(next);
+                                }}
+                              >
+                                {season}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
               {/* Duration Summary */}

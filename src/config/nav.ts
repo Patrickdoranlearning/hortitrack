@@ -19,7 +19,7 @@ export const APP_NAV: NavItem[] = [
   {
     key: "production",
     label: "Production",
-    href: "/dashboard",
+    href: "/",
     icon: Sprout,
     items: [
       { label: "Dashboard", href: "/dashboard", description: "Production overview and key metrics." },

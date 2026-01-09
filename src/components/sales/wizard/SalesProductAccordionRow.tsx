@@ -236,16 +236,16 @@ export function SalesProductAccordionRow({
   return (
     <div className="border-b last:border-b-0">
       {/* Main Product Row - Excel-like */}
-      <div className="grid grid-cols-12 gap-2 items-center py-2 px-3 hover:bg-muted/30">
-        {/* Product Select - col 1-4 */}
-        <div className="col-span-4">
+      <div className="grid grid-cols-12 gap-1 md:gap-2 items-center py-2 px-2 md:px-3 hover:bg-muted/30">
+        {/* Product Select - col 1-6 mobile, 1-4 desktop */}
+        <div className="col-span-6 md:col-span-4">
           <FormField
             control={form.control}
             name={`lines.${index}.productId`}
             render={({ field }) => (
               <Select value={field.value || ''} onValueChange={handleSelectProduct}>
                 <FormControl>
-                  <SelectTrigger className="h-9 text-sm">
+                  <SelectTrigger className="h-9 text-xs md:text-sm">
                     <SelectValue placeholder="Select product..." />
                   </SelectTrigger>
                 </FormControl>
@@ -262,8 +262,8 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* Quantity - col 5 */}
-        <div className="col-span-1">
+        {/* Quantity - col 7-8 mobile, 5 desktop */}
+        <div className="col-span-2 md:col-span-1">
           <FormField
             control={form.control}
             name={`lines.${index}.qty`}
@@ -273,7 +273,7 @@ export function SalesProductAccordionRow({
                   type="number"
                   min="0"
                   className={cn(
-                    "h-9 text-sm text-center",
+                    "h-9 text-xs md:text-sm text-center px-1",
                     varietiesExpanded && varietyTotal > 0 && "bg-muted text-muted-foreground"
                   )}
                   value={displayQty || ''}
@@ -286,8 +286,8 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* Price - col 6 */}
-        <div className="col-span-1">
+        {/* Price - col 6 desktop, hidden mobile */}
+        <div className="hidden md:block md:col-span-1">
           <FormField
             control={form.control}
             name={`lines.${index}.unitPrice`}
@@ -306,8 +306,8 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* VAT % - col 7 */}
-        <div className="col-span-1">
+        {/* VAT % - col 7 desktop, hidden mobile */}
+        <div className="hidden md:block md:col-span-1">
           <FormField
             control={form.control}
             name={`lines.${index}.vatRate`}
@@ -326,40 +326,40 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* Total - col 8 */}
-        <div className="col-span-1 text-right text-sm font-medium">
+        {/* Total - col 8 desktop, hidden mobile */}
+        <div className="hidden md:block md:col-span-1 text-right text-sm font-medium">
           €{lineTotal.toFixed(2)}
         </div>
 
-        {/* Varieties Dropdown Button - col 9-11 */}
-        <div className="col-span-3 flex items-center justify-end gap-1">
+        {/* Varieties Dropdown Button - col 9-12 mobile, 9-12 desktop */}
+        <div className="col-span-4 md:col-span-4 flex items-center justify-end gap-1">
           {/* Always show varieties selector, disabled when no product or no varieties */}
           <Button
             type="button"
             variant={varietiesExpanded ? "secondary" : "outline"}
             size="sm"
             className={cn(
-              "h-8 px-3 text-xs min-w-[100px] justify-between",
+              "h-8 px-1.5 md:px-3 text-[10px] md:text-xs min-w-[70px] md:min-w-[100px] justify-between",
               (!selectedProduct || varieties.length === 0) && "opacity-50"
             )}
             onClick={() => selectedProduct && varieties.length > 0 && setVarietiesExpanded(!varietiesExpanded)}
             disabled={!selectedProduct || varieties.length === 0}
           >
-            <span>
+            <span className="truncate mr-1">
               {!selectedProduct 
                 ? "Varieties" 
                 : varieties.length === 0 
-                  ? "No varieties" 
+                  ? "None" 
                   : varietiesExpanded 
-                    ? `${varieties.length} varieties`
-                    : "▾ Varieties"
+                    ? `${varieties.length}`
+                    : "▾ Var"
               }
             </span>
             {selectedProduct && varieties.length > 0 && (
               varietiesExpanded ? (
-                <ChevronDown className="h-3 w-3 ml-1" />
+                <ChevronDown className="h-3 w-3 shrink-0" />
               ) : (
-                <ChevronRight className="h-3 w-3 ml-1" />
+                <ChevronRight className="h-3 w-3 shrink-0" />
               )
             )}
           </Button>
@@ -367,7 +367,7 @@ export function SalesProductAccordionRow({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 shrink-0"
             onClick={onRemove}
           >
             <Trash2 className="h-4 w-4 text-destructive" />
@@ -451,56 +451,59 @@ function VarietyRow({
 }) {
   return (
     <div className={cn(
-      "grid grid-cols-12 gap-2 items-center py-1.5 px-3 pl-8",
+      "grid grid-cols-12 gap-1 md:gap-2 items-center py-1.5 px-2 md:px-3 pl-4 md:pl-8",
       !isLast && "border-b border-muted"
     )}>
-      {/* Tree connector + Variety Name + Family - col 1-4 */}
-      <div className="col-span-4 flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">{isLast ? '└' : '├'}</span>
-        <div className="flex flex-col">
+      {/* Tree connector + Variety Name + Family - col 1-6 mobile, 1-4 desktop */}
+      <div className="col-span-6 md:col-span-4 flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+        <span className="text-muted-foreground shrink-0">{isLast ? '└' : '├'}</span>
+        <div className="flex flex-col min-w-0">
           <span className={cn(
+            "truncate",
             qty > 0 ? "font-medium" : "text-muted-foreground"
           )}>
             {displayName}
           </span>
           {family && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[9px] md:text-[10px] text-muted-foreground truncate">
               {family}
             </span>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">
-          ({stockInfo?.totalQty || 0} avail)
+        <span className="text-[10px] md:text-xs text-muted-foreground shrink-0">
+          ({stockInfo?.totalQty || 0})
         </span>
       </div>
 
-      {/* Quantity Input - col 5 */}
-      <div className="col-span-1">
+      {/* Quantity Input - col 7-8 mobile, 5 desktop */}
+      <div className="col-span-2 md:col-span-1">
         <Input
           type="number"
           min="0"
-          className="h-8 text-sm text-center"
+          className="h-8 text-xs md:text-sm text-center px-1"
           value={qty || ''}
           onChange={(e) => onQtyChange(parseInt(e.target.value) || 0)}
           placeholder="0"
         />
       </div>
 
-      {/* Empty cols 6-9 to align with parent */}
-      <div className="col-span-4" />
+      {/* Empty cols hidden on mobile, 6-9 desktop */}
+      <div className="hidden md:block md:col-span-4" />
 
-      {/* Batch Selection - col 10-11 */}
-      <div className="col-span-2 flex justify-end">
+      {/* Batch Selection - col 9-12 mobile, 10-11 desktop */}
+      <div className="col-span-4 md:col-span-3 flex justify-end">
         {qty > 0 && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs"
+            className="h-7 px-1.5 md:px-2 text-[10px] md:text-xs"
             onClick={onBatchClick}
           >
-            <Layers className="h-3 w-3 mr-1" />
-            {allocations.length > 0 ? `${allocations.length} batch` : 'Batch'}
+            <Layers className="h-3 w-3 mr-1 shrink-0" />
+            <span className="truncate">
+              {allocations.length > 0 ? `${allocations.length}b` : 'Batch'}
+            </span>
           </Button>
         )}
       </div>
