@@ -3,12 +3,13 @@
 
 import type { CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import type { BatchChatInput } from '@/ai/flows/batch-chat-flow';
-import type { Batch, Customer, Haulier, HaulierVehicle, NurseryLocation, PlantSize, Supplier, Variety } from '@/lib/types';
+import type { NurseryIntelligenceInput } from '@/ai/flows/nursery-intelligence';
+import type { Batch, Customer, Haulier, HaulierVehicle, NurseryLocation, PlantSize, Supplier, SupplierAddress, SupplierAddressSummary, Variety } from '@/lib/types';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/supabase';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
-import { getUserAndOrg } from '@/server/auth/org';
+import { getOrgDetails, getUserAndOrg } from '@/server/auth/org';
 
 async function getSupabaseForApp() {
   return createClient();
@@ -399,7 +400,11 @@ export async function getProductionProtocolAction(batchId: string) {
 export async function getCareRecommendationsAction(batchId: string) {
   try {
     const { careRecommendations } = await import('@/ai/flows/care-recommendations');
-    const batch = await getBatchById(batchId);
+    const [batch, org] = await Promise.all([
+      getBatchById(batchId),
+      getOrgDetails().catch(() => null)
+    ]);
+
     if (!batch) {
         return { success: false, error: 'Batch not found.' };
     }
@@ -411,14 +416,19 @@ export async function getCareRecommendationsAction(batchId: string) {
         plantingDate: batch.plantedAt ?? batchForCare.plantingDate ?? new Date().toISOString(),
       },
       logHistory: (batch.logHistory || []).map((log: any) => log.note || log.type || log.action || 'Log entry'),
+      location: org?.latitude && org?.longitude ? {
+        latitude: org.latitude,
+        longitude: org.longitude
+      } : undefined
     };
     const recommendations = await careRecommendations(input);
     return { success: true, data: recommendations };
   } catch (error: any) {
     console.error('Error getting care recommendations:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: 'Failed to generate AI care recommendations.',
+      error: `Failed to generate AI care recommendations: ${message}`,
     };
   }
 }
@@ -516,6 +526,104 @@ export async function deleteSupplierAction(supplierId: string) {
     const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
     if (error) return { success: false, error: error.message };
     return { success: true };
+}
+
+// --- Supplier Address Actions ---
+
+const supplierAddressColumnMap = {
+  camel: ['id', 'supplierId', 'orgId', 'label', 'line1', 'line2', 'city', 'county', 'eircode', 'countryCode', 'isDefault', 'contactName', 'contactEmail', 'contactPhone'] as const,
+  snake: ['id', 'supplier_id', 'org_id', 'label', 'line1', 'line2', 'city', 'county', 'eircode', 'country_code', 'is_default', 'contact_name', 'contact_email', 'contact_phone'] as const,
+};
+
+function mapSupplierAddressToDb(address: Partial<SupplierAddress>) {
+  const payload: Record<string, any> = {};
+  supplierAddressColumnMap.camel.forEach((camelKey, index) => {
+    const dbKey = supplierAddressColumnMap.snake[index];
+    const value = (address as any)[camelKey];
+    if (value !== undefined) {
+      payload[dbKey] = value === '' ? null : value;
+    }
+  });
+  return payload;
+}
+
+function normalizeSupplierAddressRow(row?: any): SupplierAddressSummary | undefined {
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    label: row.label,
+    line1: row.line1,
+    line2: row.line2 ?? null,
+    city: row.city ?? null,
+    county: row.county ?? null,
+    eircode: row.eircode ?? null,
+    countryCode: row.country_code ?? 'IE',
+    isDefault: row.is_default ?? false,
+    contactName: row.contact_name ?? null,
+    contactEmail: row.contact_email ?? null,
+    contactPhone: row.contact_phone ?? null,
+  };
+}
+
+export async function listSupplierAddressesAction(supplierId: string) {
+  const supabase = await getSupabaseForApp();
+  const { data, error } = await supabase
+    .from('supplier_addresses')
+    .select('*')
+    .eq('supplier_id', supplierId)
+    .order('is_default', { ascending: false })
+    .order('label');
+  
+  if (error) return { success: false, error: error.message, data: [] };
+  return { 
+    success: true, 
+    data: (data ?? []).map(normalizeSupplierAddressRow).filter(Boolean) as SupplierAddressSummary[] 
+  };
+}
+
+export async function upsertSupplierAddressAction(addressData: Partial<SupplierAddress> & { supplierId: string }) {
+  const [{ orgId }, supabase] = await Promise.all([getUserAndOrg(), getSupabaseForApp()]);
+  
+  const payload = {
+    ...mapSupplierAddressToDb(addressData),
+    org_id: orgId,
+    supplier_id: addressData.supplierId,
+  };
+  
+  // If setting as default, unset other defaults first
+  if (addressData.isDefault) {
+    await supabase
+      .from('supplier_addresses')
+      .update({ is_default: false })
+      .eq('supplier_id', addressData.supplierId)
+      .neq('id', addressData.id ?? '');
+  }
+  
+  if (addressData.id) {
+    // Update existing
+    const { data, error } = await supabase
+      .from('supplier_addresses')
+      .update(payload)
+      .eq('id', addressData.id)
+      .select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: normalizeSupplierAddressRow(data?.[0]) };
+  } else {
+    // Insert new
+    const { data, error } = await supabase
+      .from('supplier_addresses')
+      .insert([payload])
+      .select();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: normalizeSupplierAddressRow(data?.[0]) };
+  }
+}
+
+export async function deleteSupplierAddressAction(addressId: string) {
+  const supabase = await getSupabaseForApp();
+  const { error } = await supabase.from('supplier_addresses').delete().eq('id', addressId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 export async function addCustomerAction(customerData: Omit<Customer, 'id'>) {
@@ -672,4 +780,15 @@ export async function deleteVarietyAction(varietyId: string) {
     const { error } = await supabase.from('plant_varieties').delete().eq('id', varietyId);
     if (error) return { success: false, error: error.message };
     return { success: true };
+}
+
+export async function askIntelligenceAction(query: string) {
+  try {
+    const { askNurseryIntelligence } = await import('@/ai/flows/nursery-intelligence');
+    const response = await askNurseryIntelligence(query);
+    return { success: true, data: response };
+  } catch (error: any) {
+    console.error('Error asking nursery intelligence:', error);
+    return { success: false, error: error.message || 'Failed to get a response from AI.' };
+  }
 }

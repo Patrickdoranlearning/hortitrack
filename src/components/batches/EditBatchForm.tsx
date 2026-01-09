@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection } from "@/hooks/useCollection";
@@ -178,23 +179,18 @@ export default function EditBatchForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <Select
+                      <SelectWithCreate
+                        options={(locationsData ?? []).map((loc) => ({
+                          value: loc.id!,
+                          label: (loc.nurserySite ? `${loc.nurserySite} • ` : "") + loc.name,
+                        }))}
                         value={field.value ?? ""}
                         onValueChange={field.onChange}
+                        createHref="/locations"
+                        placeholder="Select location"
+                        createLabel="Add new location"
                         disabled={!locationsData?.length}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {locationsData?.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id!}>
-                              {loc.nurserySite ? `${loc.nurserySite} • ` : ""}
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -206,22 +202,18 @@ export default function EditBatchForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Supplier</FormLabel>
-                      <Select
+                      <SelectWithCreate
+                        options={(supplierData ?? []).map((sup) => ({
+                          value: sup.id!,
+                          label: sup.name,
+                        }))}
                         value={field.value ?? ""}
                         onValueChange={field.onChange}
+                        createHref="/suppliers"
+                        placeholder="Select supplier"
+                        createLabel="Add new supplier"
                         disabled={!supplierData?.length}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select supplier" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {supplierData?.map((sup) => (
-                            <SelectItem key={sup.id} value={sup.id!}>
-                              {sup.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -240,23 +232,18 @@ export default function EditBatchForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Size</FormLabel>
-                      <Select
+                      <SelectWithCreate
+                        options={(sizeData ?? []).map((size) => ({
+                          value: size.id!,
+                          label: size.name + (size.containerType ? ` · ${size.containerType}` : ""),
+                        }))}
                         value={field.value ?? ""}
                         onValueChange={field.onChange}
+                        createHref="/sizes"
+                        placeholder="Select size"
+                        createLabel="Add new size"
                         disabled={!sizeData?.length}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select size" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sizeData?.map((size) => (
-                            <SelectItem key={size.id} value={size.id!}>
-                              {size.name}
-                              {size.containerType ? ` · ${size.containerType}` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                       <FormMessage />
                     </FormItem>
                   )}

@@ -157,55 +157,55 @@ export default function PlantHealthDashboard() {
 
         {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Link href="/plant-health/products">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <FlaskConical className="h-8 w-8 text-blue-600" />
-              <div>
+        <Link href="/plant-health/products" className="h-full">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3 h-full">
+              <FlaskConical className="h-8 w-8 text-blue-600 shrink-0" />
+              <div className="min-w-0">
                 <p className="font-medium">IPM Products</p>
                 <p className="text-xs text-muted-foreground">Manage database</p>
               </div>
             </CardContent>
           </Card>
         </Link>
-        <Link href="/plant-health/programs">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Repeat className="h-8 w-8 text-purple-600" />
-              <div>
+        <Link href="/plant-health/programs" className="h-full">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3 h-full">
+              <Repeat className="h-8 w-8 text-purple-600 shrink-0" />
+              <div className="min-w-0">
                 <p className="font-medium">IPM Programs</p>
                 <p className="text-xs text-muted-foreground">{programs.length} active</p>
               </div>
             </CardContent>
           </Card>
         </Link>
-        <Link href="/plant-health/trials">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Microscope className="h-8 w-8 text-teal-600" />
-              <div>
+        <Link href="/plant-health/trials" className="h-full">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3 h-full">
+              <Microscope className="h-8 w-8 text-teal-600 shrink-0" />
+              <div className="min-w-0">
                 <p className="font-medium">Trials</p>
                 <p className="text-xs text-muted-foreground">Scientific tests</p>
               </div>
             </CardContent>
           </Card>
         </Link>
-        <Link href="/plant-health/scout">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <ScanLine className="h-8 w-8 text-green-600" />
-              <div>
+        <Link href="/plant-health/scout" className="h-full">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3 h-full">
+              <ScanLine className="h-8 w-8 text-green-600 shrink-0" />
+              <div className="min-w-0">
                 <p className="font-medium">Scout Mode</p>
                 <p className="text-xs text-muted-foreground">Scan & log</p>
               </div>
             </CardContent>
           </Card>
         </Link>
-        <Link href="/locations">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <MapPin className="h-8 w-8 text-amber-600" />
-              <div>
+        <Link href="/locations" className="h-full">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center gap-3 h-full">
+              <MapPin className="h-8 w-8 text-amber-600 shrink-0" />
+              <div className="min-w-0">
                 <p className="font-medium">Locations</p>
                 <p className="text-xs text-muted-foreground">View all</p>
               </div>

@@ -30,7 +30,7 @@ export type BatchNode = {
   // Add other fields as needed
 };
 
-async function resolveProductionStatus(
+export async function resolveProductionStatus(
   supabase: SupabaseClient,
   orgId: string,
   desiredStatus?: string | null
@@ -158,7 +158,7 @@ export async function createPropagationBatch(params: { input: PropagationInput; 
   const { supabase, orgId } = await getUserAndOrg();
   const input = PropagationServiceInputSchema.parse(params.input);
   
-  const statusOption = await resolveProductionStatus(supabase, orgId, input.status);
+  const statusOption = await resolveProductionStatus(supabase, orgId, input.status ?? "Propagation");
 
   // Resolve quantity: prefer explicit quantity/units, fallback to calculation
   let quantity = input.quantity ?? input.units ?? 0;

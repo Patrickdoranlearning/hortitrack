@@ -20,13 +20,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +78,10 @@ export default function TransplantForm({
 }: Props) {
   const { data: referenceData, loading: refLoading, error: refError, reload } =
     React.useContext(ReferenceDataContext);
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
+  
   const toastImpl = (useToast?.() as any) || null;
   const toast =
     toastImpl?.toast ??
@@ -333,23 +332,17 @@ export default function TransplantForm({
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Target size / container</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
+                    <SelectWithCreate
+                      options={sizes.map((s) => ({
+                        value: s.id,
+                        label: `${s.name}${s.container_type ? ` · ${s.container_type}` : ""}${s.cell_multiple ? ` · ${s.cell_multiple}/tray` : ""}`,
+                      }))}
                       value={field.value ?? ""}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sizes.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                            {s.container_type ? ` · ${s.container_type}` : ""}
-                            {s.cell_multiple ? ` · ${s.cell_multiple}/tray` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onValueChange={field.onChange}
+                      createHref="/sizes"
+                      placeholder="Select a size"
+                      createLabel="Add new size"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -361,22 +354,17 @@ export default function TransplantForm({
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Nursery location</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
+                    <SelectWithCreate
+                      options={locations.map((loc) => ({
+                        value: loc.id,
+                        label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                      }))}
                       value={field.value ?? ""}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a bench or tunnel" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                            {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onValueChange={field.onChange}
+                      createHref="/locations"
+                      placeholder="Select a bench or tunnel"
+                      createLabel="Add new location"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

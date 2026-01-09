@@ -13,6 +13,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -102,9 +104,12 @@ export function BatchForm({
   const [selectedSizeInfo, setSelectedSizeInfo] = useState<PlantSizeType | null>(null);
   const isEdit = !!batch?.id;
 
-  const { data, loading } = React.useContext(ReferenceDataContext);
+  const { data, loading, reload } = React.useContext(ReferenceDataContext);
   const { options: statusOptions, loading: statusLoading } = useAttributeOptions("production_status");
   const companyName = useCompanyName();
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
 
   // Find the internal/own nursery supplier by matching the organization name
   const internalSupplier = useMemo(() => (data?.suppliers ?? []).find(s => s.name === companyName), [data?.suppliers, companyName]);
@@ -320,17 +325,19 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Variety</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger data-autofocus="plant-variety"><SelectValue placeholder="Select a variety" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {varietyOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    {field.value && !varietyOptions.some(o => o.value === field.value) && (
-                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <SelectWithCreate
+                  options={[
+                    ...varietyOptions,
+                    ...(field.value && !varietyOptions.some(o => o.value === field.value)
+                      ? [{ value: field.value, label: `${field.value} (retired)` }]
+                      : []),
+                  ]}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  createHref="/varieties"
+                  placeholder="Select a variety"
+                  createLabel="Add new variety"
+                />
 
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <span className="rounded bg-muted px-2 py-1">
@@ -351,17 +358,19 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Location</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {locationOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    {field.value && !locationOptions.some(o => o.value === field.value) && (
-                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <SelectWithCreate
+                  options={[
+                    ...locationOptions,
+                    ...(field.value && !locationOptions.some(o => o.value === field.value)
+                      ? [{ value: field.value, label: `${field.value} (retired)` }]
+                      : []),
+                  ]}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  createHref="/locations"
+                  placeholder="Select a location"
+                  createLabel="Add new location"
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -373,21 +382,23 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Size</FormLabel>
-                <Select onValueChange={(value) => {
-                  field.onChange(value);
-                  const sizeInfo = sizes.find(s => s.name === value);
-                  setSelectedSizeInfo(sizeInfo as PlantSizeType ?? null);
-                }} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Select a size" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {sizeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    {field.value && !sizeOptions.some(o => o.value === field.value) && (
-                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <SelectWithCreate
+                  options={[
+                    ...sizeOptions,
+                    ...(field.value && !sizeOptions.some(o => o.value === field.value)
+                      ? [{ value: field.value, label: `${field.value} (retired)` }]
+                      : []),
+                  ]}
+                  value={field.value}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    const sizeInfo = sizes.find(s => s.name === value);
+                    setSelectedSizeInfo(sizeInfo as PlantSizeType ?? null);
+                  }}
+                  createHref="/sizes"
+                  placeholder="Select a size"
+                  createLabel="Add new size"
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -511,17 +522,19 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Supplier</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {supplierOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    {field.value && !supplierOptions.some(o => o.value === field.value) && (
-                      <SelectItem value={field.value}>{field.value} (retired)</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <SelectWithCreate
+                  options={[
+                    ...supplierOptions,
+                    ...(field.value && !supplierOptions.some(o => o.value === field.value)
+                      ? [{ value: field.value, label: `${field.value} (retired)` }]
+                      : []),
+                  ]}
+                  value={field.value ?? ''}
+                  onValueChange={field.onChange}
+                  createHref="/suppliers"
+                  placeholder="Select a supplier"
+                  createLabel="Add new supplier"
+                />
                 <FormMessage />
               </FormItem>
             )}

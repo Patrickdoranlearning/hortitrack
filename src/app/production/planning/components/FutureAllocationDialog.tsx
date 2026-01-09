@@ -414,7 +414,7 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Source batch (optional)</FormLabel>
-                      <div className="flex gap-2">
+                      <div className="relative">
                         <FormControl>
                           <Combobox
                             options={parentBatchOptions}
@@ -422,12 +422,14 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
                             onChange={(val) => handleParentChange(val)}
                             placeholder="Search by batch # or variety..."
                             emptyMessage="No batches with available stock"
+                            className="pr-10"
                           />
                         </FormControl>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
+                          className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:text-foreground hover:bg-transparent"
                           onClick={() => setIsScanOpen(true)}
                           title="Scan batch QR code"
                         >

@@ -18,13 +18,8 @@ import {
   FormControl,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
@@ -50,6 +45,9 @@ type Props = {
 export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: Props) {
   const { data: referenceData, loading: refLoading, error: refError, reload } =
     React.useContext(ReferenceDataContext);
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
   const toastImpl = useToast?.();
   const toast =
     toastImpl?.toast ??
@@ -71,7 +69,22 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
   const [submitting, setSubmitting] = React.useState(false);
   
   const varieties = React.useMemo(() => referenceData?.varieties ?? [], [referenceData]);
-  const sizes = React.useMemo(() => referenceData?.sizes ?? [], [referenceData]);
+  const sizes = React.useMemo(() => {
+    const s = [...(referenceData?.sizes ?? [])];
+    return s.sort((a, b) => {
+      const isAProp = a.container_type === "prop_tray";
+      const isBProp = b.container_type === "prop_tray";
+      if (isAProp && !isBProp) return -1;
+      if (!isAProp && isBProp) return 1;
+      
+      const isAPlug = a.container_type === "plug_tray";
+      const isBPlug = b.container_type === "plug_tray";
+      if (isAPlug && !isBPlug) return -1;
+      if (!isAPlug && isBPlug) return 1;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [referenceData]);
   const locations = React.useMemo(() => referenceData?.locations ?? [], [referenceData]);
 
   // Defaults once locations exist
@@ -180,38 +193,36 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
             title="Variety & genetics"
             description="Choose the plant line you’re propagating and confirm its family."
           >
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-4">
               <FormField
                 name="plant_variety_id"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-            <FormLabel>Variety</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Search or pick a variety" />
-                      </SelectTrigger>
-              <SelectContent>
-                        {varieties.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                            {v.name}
-                            {v.family ? ` · ${v.family}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
+                  <FormItem className="lg:col-span-2">
+                    <FormLabel>Variety</FormLabel>
+                    <SelectWithCreate
+                      options={varieties.map((v) => ({
+                        value: v.id,
+                        label: v.name + (v.family ? ` · ${v.family}` : ""),
+                      }))}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      createHref="/varieties"
+                      placeholder="Search or pick a variety"
+                      createLabel="Add new variety"
+                    />
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
 
-              <div>
+              <FormItem>
                 <FormLabel>Family (auto)</FormLabel>
-                <Input value={selectedVariety?.family ?? ""} readOnly />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Edit varieties in Data Management → Varieties.
+                <Input value={selectedVariety?.family ?? ""} readOnly className="bg-muted/50" />
+                <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                  From Data Management.
                 </p>
-              </div>
+              </FormItem>
 
               <FormField
                 name="planted_at"
@@ -231,51 +242,62 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
             title="Tray setup"
             description="Pick the tray or pot size and enter the number of containers being started."
           >
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-3">
               <FormField
                 name="size_id"
                 control={form.control}
                 render={({ field }) => (
-          <FormItem>
+                  <FormItem>
                     <FormLabel>Size / Container</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a size" />
-                      </SelectTrigger>
-              <SelectContent>
-                        {sizes.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                            {s.container_type ? ` · ${s.container_type}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
+                    <SelectWithCreate
+                      options={sizes.map((s) => ({
+                        value: s.id,
+                        label: s.name + (s.container_type ? ` · ${s.container_type}` : ""),
+                        badge: s.container_type === "prop_tray" ? (
+                          <Badge variant="outline" className="ml-2 bg-primary/5 text-[10px] uppercase tracking-wider py-0 px-1 border-primary/20 text-primary">
+                            Prop
+                          </Badge>
+                        ) : undefined,
+                      }))}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      createHref="/sizes"
+                      placeholder="Select a size"
+                      createLabel="Add new size"
+                    />
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
 
-              <div>
+              <FormItem>
                 <FormLabel>Cells per container</FormLabel>
                 <Input
                   readOnly
                   value={selectedSize?.cell_multiple ?? "—"}
-                  className="bg-muted text-muted-foreground"
+                  className="bg-muted/50 text-muted-foreground"
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Derived from the selected tray definition.
+                <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                  From size definition.
                 </p>
-              </div>
+              </FormItem>
 
               <FormField
                 name="containers"
                 control={form.control}
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>Containers (trays or pots)</FormLabel>
+                  <FormItem>
+                    <FormLabel>Containers (trays/pots)</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} step={1} {...field} />
+                      <div className="flex items-center gap-3">
+                        <Input type="number" min={1} step={1} {...field} className="flex-1" />
+                        {totalUnits > 0 && (
+                          <div className="flex items-center gap-2 text-sm font-medium text-primary bg-primary/5 px-3 py-2 rounded-md border border-primary/10 shrink-0">
+                            <span className="text-muted-foreground font-normal">Total:</span>
+                            {totalUnits.toLocaleString()}
+                          </div>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -293,23 +315,21 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 name="location_id"
                 control={form.control}
                 render={({ field }) => (
-          <FormItem>
+                  <FormItem>
                     <FormLabel>Nursery location</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a bench or tunnel" />
-                      </SelectTrigger>
-              <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                            {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
+                    <SelectWithCreate
+                      options={locations.map((loc) => ({
+                        value: loc.id,
+                        label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                      }))}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      createHref="/locations"
+                      placeholder="Select a bench or tunnel"
+                      createLabel="Add new location"
+                    />
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
 

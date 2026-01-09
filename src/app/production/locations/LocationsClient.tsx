@@ -214,19 +214,25 @@ export default function LocationsClient() {
           description="View what's growing in each location across the nursery."
           actionsSlot={
             <>
-              <Button variant="outline" onClick={() => setIsScanOpen(true)}>
-                <QrCode className="mr-2 h-4 w-4" />
-                Scan Location
-              </Button>
-              <div className="relative w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="Search locations..."
-                  className="pl-9 w-full sm:w-64"
+                  className="pl-9 pr-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                  onClick={() => setIsScanOpen(true)}
+                  title="Scan location QR code"
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
               </div>
             </>
           }

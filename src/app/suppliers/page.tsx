@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useTransition } from 'react';
 import * as z from 'zod';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2, Edit, MapPin, Building2 } from 'lucide-react';
 import { DataPageShell } from '@/ui/templates';
 import { DataToolbar } from '@/ui/templates';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,15 +13,24 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
-import type { Supplier } from '@/lib/types';
-import { addSupplierAction, deleteSupplierAction, updateSupplierAction } from '../actions';
+import type { Supplier, SupplierAddressSummary } from '@/lib/types';
+import { addSupplierAction, deleteSupplierAction, updateSupplierAction, listSupplierAddressesAction, deleteSupplierAddressAction } from '../actions';
 import { invalidateReferenceData } from '@/lib/swr/keys';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { SupplierForm } from '@/components/supplier-form';
+import { SupplierAddressDialog } from '@/components/supplier-address-dialog';
 import { PageFrame } from '@/ui/templates';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 const supplierTypes = [
   { label: 'Plant supplier', value: 'plant' },
@@ -63,9 +72,68 @@ export default function SuppliersPage() {
     key: 'name',
     direction: 'asc',
   });
+  
+  // Address management state
+  const [addressSheetSupplier, setAddressSheetSupplier] = useState<Supplier | null>(null);
+  const [addresses, setAddresses] = useState<SupplierAddressSummary[]>([]);
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<SupplierAddressSummary | null>(null);
+  const [addressPending, startAddressTransition] = useTransition();
 
   const { data: rawSuppliers, loading } = useCollection<any>('suppliers');
   const suppliers = useMemo<Supplier[]>(() => (rawSuppliers || []).map(normalizeSupplier).filter(Boolean) as Supplier[], [rawSuppliers]);
+  
+  // Fetch addresses when sheet opens
+  const loadAddresses = useCallback(async (supplierId: string) => {
+    const result = await listSupplierAddressesAction(supplierId);
+    if (result.success) {
+      setAddresses(result.data);
+    } else {
+      toast({ variant: 'destructive', title: 'Failed to load addresses', description: result.error });
+    }
+  }, [toast]);
+
+  const handleOpenAddressSheet = useCallback((supplier: Supplier) => {
+    setAddressSheetSupplier(supplier);
+    if (supplier.id) {
+      loadAddresses(supplier.id);
+    }
+  }, [loadAddresses]);
+
+  const handleCloseAddressSheet = useCallback(() => {
+    setAddressSheetSupplier(null);
+    setAddresses([]);
+  }, []);
+
+  const handleAddAddress = useCallback(() => {
+    setEditingAddress(null);
+    setAddressDialogOpen(true);
+  }, []);
+
+  const handleEditAddress = useCallback((address: SupplierAddressSummary) => {
+    setEditingAddress(address);
+    setAddressDialogOpen(true);
+  }, []);
+
+  const handleDeleteAddress = useCallback(async (addressId: string) => {
+    startAddressTransition(async () => {
+      const result = await deleteSupplierAddressAction(addressId);
+      if (result.success) {
+        toast({ title: 'Address deleted' });
+        if (addressSheetSupplier?.id) {
+          loadAddresses(addressSheetSupplier.id);
+        }
+      } else {
+        toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+      }
+    });
+  }, [toast, addressSheetSupplier, loadAddresses]);
+
+  const handleAddressSaved = useCallback(() => {
+    if (addressSheetSupplier?.id) {
+      loadAddresses(addressSheetSupplier.id);
+    }
+  }, [addressSheetSupplier, loadAddresses]);
 
   const quickForm = useForm<QuickSupplierFormValues>({
     resolver: zodResolver(quickSupplierSchema),
@@ -280,6 +348,7 @@ export default function SuppliersPage() {
           setEditingSupplier={setEditingSupplier}
           setIsFormOpen={setIsFormOpen}
           handleDelete={handleDelete}
+          onOpenAddressSheet={handleOpenAddressSheet}
         />
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -309,6 +378,112 @@ export default function SuppliersPage() {
             />
           </DialogContent>
         </Dialog>
+
+        {/* Address Management Sheet */}
+        <Sheet open={!!addressSheetSupplier} onOpenChange={(open) => !open && handleCloseAddressSheet()}>
+          <SheetContent className="w-full sm:max-w-lg">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                {addressSheetSupplier?.name} - Addresses
+              </SheetTitle>
+              <SheetDescription>
+                Manage addresses for this supplier. Each address can have its own contact details.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-6 space-y-4">
+              <Button onClick={handleAddAddress} className="w-full gap-2">
+                <Plus className="h-4 w-4" />
+                Add address
+              </Button>
+
+              {addresses.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MapPin className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                  <p>No addresses yet</p>
+                  <p className="text-sm">Add an address to get started</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {addresses.map((addr) => (
+                    <div
+                      key={addr.id}
+                      className="border rounded-lg p-4 bg-card hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium">{addr.label}</span>
+                            {addr.isDefault && (
+                              <Badge variant="secondary" className="text-xs">Default</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{addr.line1}</p>
+                          {addr.line2 && (
+                            <p className="text-sm text-muted-foreground">{addr.line2}</p>
+                          )}
+                          <p className="text-sm text-muted-foreground">
+                            {[addr.city, addr.county, addr.eircode].filter(Boolean).join(', ')}
+                          </p>
+                          {addr.contactName && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Contact: {addr.contactName}
+                              {addr.contactPhone && ` • ${addr.contactPhone}`}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditAddress(addr)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="ghost" className="text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete "{addr.label}"?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This address will be permanently removed.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteAddress(addr.id)}
+                                  disabled={addressPending}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Address Dialog */}
+        {addressSheetSupplier?.id && (
+          <SupplierAddressDialog
+            open={addressDialogOpen}
+            onOpenChange={setAddressDialogOpen}
+            supplierId={addressSheetSupplier.id}
+            address={editingAddress}
+            onSaved={handleAddressSaved}
+          />
+        )}
       </DataPageShell>
     </PageFrame>
   );
@@ -323,6 +498,7 @@ function SuppliersTable({
   setEditingSupplier,
   setIsFormOpen,
   handleDelete,
+  onOpenAddressSheet,
 }: {
   suppliers: Supplier[];
   loading: boolean;
@@ -332,6 +508,7 @@ function SuppliersTable({
   setEditingSupplier: (supplier: Supplier | null) => void;
   setIsFormOpen: (open: boolean) => void;
   handleDelete: (id: string, name: string) => void;
+  onOpenAddressSheet: (supplier: Supplier) => void;
 }) {
   return (
     <div className="rounded-lg border bg-card">
@@ -497,7 +674,17 @@ function SuppliersTable({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="gap-2"
+                        className="gap-1.5"
+                        onClick={() => onOpenAddressSheet(supplier)}
+                      >
+                        <MapPin className="h-4 w-4" />
+                        Addresses
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
                         onClick={() => {
                           setEditingSupplier(supplier);
                           setIsFormOpen(true);
@@ -508,7 +695,7 @@ function SuppliersTable({
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button type="button" size="sm" variant="destructive" className="gap-2">
+                          <Button type="button" size="sm" variant="destructive" className="gap-1.5">
                             <Trash2 className="h-4 w-4" />
                             Delete
                           </Button>

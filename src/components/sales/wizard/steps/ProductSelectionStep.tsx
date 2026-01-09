@@ -220,13 +220,13 @@ export function ProductSelectionStep({
       {/* Table-like container */}
       <div className="border rounded-lg overflow-hidden">
         {/* Table Header */}
-        <div className="grid grid-cols-12 gap-2 items-center py-2 px-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          <div className="col-span-4">Product</div>
-          <div className="col-span-1 text-center">Qty</div>
-          <div className="col-span-1 text-right">Price</div>
-          <div className="col-span-1 text-right">VAT %</div>
-          <div className="col-span-1 text-right">Total</div>
-          <div className="col-span-3 text-right pr-10">Varieties</div>
+        <div className="grid grid-cols-12 gap-1 md:gap-2 items-center py-2 px-2 md:px-3 bg-muted/50 border-b text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="col-span-6 md:col-span-4">Product</div>
+          <div className="col-span-2 md:col-span-1 text-center">Qty</div>
+          <div className="hidden md:block md:col-span-1 text-right">Price</div>
+          <div className="hidden md:block md:col-span-1 text-right">VAT %</div>
+          <div className="hidden md:block md:col-span-1 text-right">Total</div>
+          <div className="col-span-4 md:col-span-4 text-right pr-2 md:pr-10">Varieties</div>
         </div>
 
         {/* Table Body */}

@@ -60,6 +60,7 @@ import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
 import { ProductionProtocolDialog } from '../components/production-protocol-dialog';
+import { IntelligenceDialog } from '../components/ai/IntelligenceDialog';
 import ScannerDialog from '../components/scan-and-act-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { FeatureGate } from '@/components/FeatureGate';
@@ -603,33 +604,34 @@ export default function HomePageView({
             description="A real-time overview of all plant batches currently in production."
             actionsSlot={
                 <>
-                    <Button
-                        variant="outline"
-                        onClick={() => setIsScanOpen(true)}
-                        className="w-full sm:w-auto"
-                    >
-                        <QrCode />
-                        Scan
-                    </Button>
-                    <div className="relative w-full sm:w-auto">
+                    <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                        type="search"
-                        placeholder="Search..."
-                        className="pl-9"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                          type="search"
+                          placeholder="Search..."
+                          className="pl-9 pr-10"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
                         />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                          onClick={() => setIsScanOpen(true)}
+                          title="Scan QR code"
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
                     </div>
                     <FeatureGate name="aiCare">
-                    <Button
-                        onClick={handleAiCareClick}
-                        variant="outline"
-                        disabled={!batches || batches.length === 0}
-                        className="w-full sm:w-auto"
-                    >
-                        <Sparkles /> AI Care
-                    </Button>
+                    <IntelligenceDialog 
+                        trigger={
+                            <Button variant="outline" className="w-full sm:w-auto">
+                                <Sparkles /> AI Assistant
+                            </Button>
+                        }
+                    />
                     </FeatureGate>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>

@@ -40,7 +40,7 @@ const batchChatPrompt = ai.definePrompt(
 
     Your Answer:
     `,
-    model: 'googleai/gemini-2.0-flash-preview',
+    model: 'googleai/gemini-2.0-flash',
     context: [
       {
         role: 'system',

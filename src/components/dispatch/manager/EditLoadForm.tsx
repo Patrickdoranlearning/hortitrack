@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SelectWithCreate } from '@/components/ui/select-with-create';
 import {
   Popover,
   PopoverContent,
@@ -57,24 +58,19 @@ export function EditLoadForm({
         </div>
         <div className="space-y-2">
           <Label>Haulier</Label>
-          <Select
+          <SelectWithCreate
+            options={hauliers.map((h) => ({
+              value: h.id!,
+              label: h.name + (h.vehicles.length > 0 ? ` (${h.vehicles.length} vehicles)` : ''),
+            }))}
             value={load.haulierId || ''}
             onValueChange={(v) =>
               onUpdate({ ...load, haulierId: v, vehicleId: undefined })
             }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select haulier..." />
-            </SelectTrigger>
-            <SelectContent>
-              {hauliers.map((h) => (
-                <SelectItem key={h.id} value={h.id!}>
-                  {h.name}
-                  {h.vehicles.length > 0 && ` (${h.vehicles.length} vehicles)`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            createHref="/hauliers"
+            placeholder="Select haulier..."
+            createLabel="Add new haulier"
+          />
         </div>
         {selectedHaulierVehicles.length > 0 && (
           <div className="space-y-2">

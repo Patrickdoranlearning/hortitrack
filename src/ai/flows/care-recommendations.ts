@@ -78,6 +78,7 @@ const getContextualWeatherInfo = ai.defineTool({
 // Define the Genkit prompt
 const careRecommendationsPrompt = ai.definePrompt({
   name: 'careRecommendationsPrompt',
+  model: 'googleai/gemini-2.0-flash',
   input: {schema: CareRecommendationsInputSchema},
   output: {schema: CareRecommendationsOutputSchema},
   tools: [getContextualWeatherInfo],

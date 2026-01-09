@@ -7,6 +7,7 @@ import { withIdempotency } from "@/server/utils/idempotency";
 import { ok, fail } from "@/server/utils/envelope";
 import { withApiGuard } from "@/server/http/guard";
 import { getUserAndOrg } from "@/server/auth/org";
+import { resolveProductionStatus } from "@/server/batches/service";
 
 // GET - Search batches
 export async function GET(request: Request) {
@@ -164,11 +165,12 @@ export const POST = withApiGuard({
       const data = body;
 
       // Resolve IDs
-      const [varietyRes, sizeRes, locationRes, supplierRes] = await Promise.all([
+      const [varietyRes, sizeRes, locationRes, supplierRes, statusOption] = await Promise.all([
         supabase.from('plant_varieties').select('id').eq('name', data.plantVariety).single(),
         supabase.from('plant_sizes').select('id').eq('name', data.size ?? '').single(), // Handle null size?
         data.location ? supabase.from('nursery_locations').select('id').eq('name', data.location).eq('org_id', orgId).single() : Promise.resolve({ data: null }),
         data.supplier ? supabase.from('suppliers').select('id').eq('name', data.supplier).eq('org_id', orgId).single() : Promise.resolve({ data: null }),
+        resolveProductionStatus(supabase, orgId, data.status),
       ]);
 
       if (!varietyRes.data) return fail(400, "INVALID_VARIETY", `Variety '${data.plantVariety}' not found`);
@@ -189,7 +191,8 @@ export const POST = withApiGuard({
             planting_date: data.plantingDate,
             initial_quantity: data.initialQuantity,
             quantity: data.quantity,
-            status: data.status,
+            status: statusOption.system_code,
+            status_id: statusOption.id,
             location_id: locationRes.data?.id,
             size_id: sizeRes.data?.id,
             supplier_id: supplierRes.data?.id,

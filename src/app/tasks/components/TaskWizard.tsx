@@ -410,13 +410,18 @@ export function TaskWizard({
                     {staff.length > 0 && (
                       <Select
                         value=""
-                        onValueChange={handleAssign}
+                        onValueChange={(val) => {
+                          if (val && val !== "__none__") {
+                            handleAssign(val);
+                          }
+                        }}
                         disabled={isAssigning}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select staff member..." />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="__none__">Select staff member...</SelectItem>
                           {staff.map((member) => (
                             <SelectItem key={member.id} value={member.id}>
                               {member.name}

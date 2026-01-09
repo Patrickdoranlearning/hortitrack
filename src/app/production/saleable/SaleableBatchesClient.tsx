@@ -579,10 +579,6 @@ export default function SaleableBatchesClient({
               Wizard
             </Link>
           </Button>
-          <Button variant="outline" onClick={() => setIsScanOpen(true)}>
-            <QrCode className="h-4 w-4 mr-2" />
-            Scanner
-          </Button>
           <Button variant="outline" onClick={downloadCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
@@ -799,8 +795,18 @@ export default function SaleableBatchesClient({
                 placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 pr-10"
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                onClick={() => setIsScanOpen(true)}
+                title="Scan QR code"
+              >
+                <QrCode className="h-4 w-4" />
+              </Button>
             </div>
 
             {/* Behavior Filter */}

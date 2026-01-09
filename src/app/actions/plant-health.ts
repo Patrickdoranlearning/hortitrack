@@ -362,6 +362,124 @@ export async function clearLocation(
 // Query Actions
 // ============================================================================
 
+// Scout Log Type for listing
+export type ScoutLogEntry = {
+  id: string;
+  locationId: string | null;
+  locationName: string | null;
+  batchId: string | null;
+  batchNumber: string | null;
+  eventType: string;
+  logType: 'issue' | 'reading';
+  issueReason: string | null;
+  severity: 'low' | 'medium' | 'critical' | null;
+  ecReading: number | null;
+  phReading: number | null;
+  notes: string | null;
+  photoUrl: string | null;
+  affectedBatchIds: string[] | null;
+  recordedBy: string;
+  recordedByName: string | null;
+  eventAt: string;
+  createdAt: string;
+};
+
+/**
+ * List all scout logs (issues and measurements) with pagination
+ */
+export async function listScoutLogs(options?: {
+  limit?: number;
+  offset?: number;
+  locationId?: string;
+  logType?: 'issue' | 'reading' | 'all';
+}): Promise<PlantHealthResult<{ logs: ScoutLogEntry[]; total: number }>> {
+  try {
+    const { orgId, supabase } = await getUserAndOrg();
+    const limit = options?.limit || 50;
+    const offset = options?.offset || 0;
+
+    // Build query for scout-related logs (scout_flag = issue, measurement = reading)
+    let query = supabase
+      .from('plant_health_logs')
+      .select(`
+        id,
+        location_id,
+        batch_id,
+        event_type,
+        issue_reason,
+        severity,
+        ec_reading,
+        ph_reading,
+        notes,
+        photo_url,
+        affected_batch_ids,
+        recorded_by,
+        event_at,
+        created_at,
+        nursery_locations!plant_health_logs_location_id_fkey(name),
+        batches!plant_health_logs_batch_id_fkey(batch_number),
+        profiles!plant_health_logs_recorded_by_fkey(display_name)
+      `, { count: 'exact' })
+      .eq('org_id', orgId)
+      .in('event_type', ['scout_flag', 'measurement'])
+      .order('event_at', { ascending: false });
+
+    // Filter by location if provided
+    if (options?.locationId) {
+      query = query.eq('location_id', options.locationId);
+    }
+
+    // Filter by log type
+    if (options?.logType && options.logType !== 'all') {
+      if (options.logType === 'issue') {
+        query = query.eq('event_type', 'scout_flag');
+      } else if (options.logType === 'reading') {
+        query = query.eq('event_type', 'measurement');
+      }
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error('[listScoutLogs] query failed', error);
+      return { success: false, error: error.message };
+    }
+
+    // Transform to ScoutLogEntry format
+    const logs: ScoutLogEntry[] = (data || []).map((row: any) => ({
+      id: row.id,
+      locationId: row.location_id,
+      locationName: row.nursery_locations?.name || null,
+      batchId: row.batch_id,
+      batchNumber: row.batches?.batch_number || null,
+      eventType: row.event_type,
+      logType: row.event_type === 'scout_flag' ? 'issue' : 'reading',
+      issueReason: row.issue_reason,
+      severity: row.severity,
+      ecReading: row.ec_reading,
+      phReading: row.ph_reading,
+      notes: row.notes,
+      photoUrl: row.photo_url,
+      affectedBatchIds: row.affected_batch_ids,
+      recordedBy: row.recorded_by,
+      recordedByName: row.profiles?.display_name || null,
+      eventAt: row.event_at,
+      createdAt: row.created_at,
+    }));
+
+    return { success: true, data: { logs, total: count || 0 } };
+  } catch (error) {
+    console.error('[listScoutLogs] error', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error listing scout logs',
+    };
+  }
+}
+
 /**
  * Get plant health logs for a location
  */

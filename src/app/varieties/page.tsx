@@ -739,10 +739,6 @@ export default function VarietiesPage() {
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{editingVariety ? "Edit Variety" : "Add Variety"}</DialogTitle>
-              <DialogDescription>Family/category is used to prefill batch info.</DialogDescription>
-            </DialogHeader>
             <VarietyForm
               variety={editingVariety}
               onSubmit={handleFormSubmit}

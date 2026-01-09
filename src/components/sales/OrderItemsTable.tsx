@@ -151,136 +151,142 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange 
               No items in this order
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right w-[100px]">Qty</TableHead>
-                  <TableHead className="text-right w-[120px]">Unit Price</TableHead>
-                  <TableHead className="text-right w-[80px]">VAT %</TableHead>
-                  <TableHead className="text-right w-[120px]">Line Total</TableHead>
-                  {canEdit && <TableHead className="w-[100px]"></TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{getItemDescription(item)}</p>
-                        {item.sku?.code && (
-                          <p className="text-xs text-muted-foreground">SKU: {item.sku.code}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingItemId === item.id ? (
-                        <Input
-                          type="number"
-                          min="1"
-                          value={editQuantity}
-                          onChange={(e) => setEditQuantity(parseInt(e.target.value) || 0)}
-                          className="w-20 text-right"
-                        />
-                      ) : (
-                        item.quantity
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingItemId === item.id ? (
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
-                          className="w-24 text-right"
-                        />
-                      ) : (
-                        `€${item.unit_price_ex_vat.toFixed(2)}`
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {item.vat_rate}%
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      €{item.line_total_ex_vat.toFixed(2)}
-                    </TableCell>
-                    {canEdit && (
+            <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">Description</TableHead>
+                    <TableHead className="text-right w-[80px] md:w-[100px]">Qty</TableHead>
+                    <TableHead className="text-right w-[100px] md:w-[120px]">Unit Price</TableHead>
+                    <TableHead className="text-right w-[60px] md:w-[80px]">VAT %</TableHead>
+                    <TableHead className="text-right w-[100px] md:w-[120px]">Line Total</TableHead>
+                    {canEdit && <TableHead className="w-[80px] md:w-[100px]"></TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
                       <TableCell>
-                        <div className="flex justify-end gap-1">
-                          {editingItemId === item.id ? (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleSaveEdit(item)}
-                                disabled={isUpdating}
-                              >
-                                <Save className="h-4 w-4 text-green-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleCancelEdit}
-                                disabled={isUpdating}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleStartEdit(item)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setItemToDelete(item);
-                                  setDeleteDialogOpen(true);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </>
+                        <div className="min-w-[150px]">
+                          <p className="font-medium">{getItemDescription(item)}</p>
+                          {item.sku?.code && (
+                            <p className="text-xs text-muted-foreground">SKU: {item.sku.code}</p>
                           )}
                         </div>
                       </TableCell>
-                    )}
+                      <TableCell className="text-right">
+                        {editingItemId === item.id ? (
+                          <Input
+                            type="number"
+                            min="1"
+                            value={editQuantity}
+                            onChange={(e) => setEditQuantity(parseInt(e.target.value) || 0)}
+                            className="w-16 md:w-20 text-right ml-auto"
+                          />
+                        ) : (
+                          item.quantity
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {editingItemId === item.id ? (
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editPrice}
+                            onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
+                            className="w-20 md:w-24 text-right ml-auto"
+                          />
+                        ) : (
+                          `€${item.unit_price_ex_vat.toFixed(2)}`
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {item.vat_rate}%
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        €{item.line_total_ex_vat.toFixed(2)}
+                      </TableCell>
+                      {canEdit && (
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            {editingItemId === item.id ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleSaveEdit(item)}
+                                  disabled={isUpdating}
+                                  className="h-8 w-8"
+                                >
+                                  <Save className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={handleCancelEdit}
+                                  disabled={isUpdating}
+                                  className="h-8 w-8"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleStartEdit(item)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setItemToDelete(item);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={canEdit ? 4 : 3} className="text-right">
+                      Subtotal (ex VAT)
+                    </TableCell>
+                    <TableCell className="text-right">€{subtotal.toFixed(2)}</TableCell>
+                    {canEdit && <TableCell />}
                   </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={canEdit ? 4 : 3} className="text-right">
-                    Subtotal (ex VAT)
-                  </TableCell>
-                  <TableCell className="text-right">€{subtotal.toFixed(2)}</TableCell>
-                  {canEdit && <TableCell />}
-                </TableRow>
-                <TableRow>
-                  <TableCell colSpan={canEdit ? 4 : 3} className="text-right text-muted-foreground">
-                    VAT
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    €{totalVat.toFixed(2)}
-                  </TableCell>
-                  {canEdit && <TableCell />}
-                </TableRow>
-                <TableRow>
-                  <TableCell colSpan={canEdit ? 4 : 3} className="text-right font-semibold">
-                    Total (inc VAT)
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">€{total.toFixed(2)}</TableCell>
-                  {canEdit && <TableCell />}
-                </TableRow>
-              </TableFooter>
-            </Table>
+                  <TableRow>
+                    <TableCell colSpan={canEdit ? 4 : 3} className="text-right text-muted-foreground">
+                      VAT
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      €{totalVat.toFixed(2)}
+                    </TableCell>
+                    {canEdit && <TableCell />}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={canEdit ? 4 : 3} className="text-right font-semibold">
+                      Total (inc VAT)
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">€{total.toFixed(2)}</TableCell>
+                    {canEdit && <TableCell />}
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

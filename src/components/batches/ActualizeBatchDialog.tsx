@@ -29,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -59,8 +61,11 @@ type Props = {
 };
 
 export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: Props) {
-  const { data: refData } = React.useContext(ReferenceDataContext);
+  const { data: refData, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
+  
+  // Auto-refresh reference data when user returns from creating a new entity in another tab
+  useRefreshOnFocus(reload);
   const [submitting, setSubmitting] = React.useState(false);
 
   const isIncoming = batch.status === "Incoming";
@@ -213,21 +218,17 @@ export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: P
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assign to location</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select production location" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {realLocations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id!}>
-                              {loc.nursery_site ? `${loc.nursery_site} · ` : ""}
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SelectWithCreate
+                        options={realLocations.map((loc) => ({
+                          value: loc.id!,
+                          label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                        }))}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        createHref="/locations"
+                        placeholder="Select production location"
+                        createLabel="Add new location"
+                      />
                       <FormMessage />
                     </FormItem>
                   )}

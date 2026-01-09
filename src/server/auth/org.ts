@@ -28,6 +28,18 @@ export async function getUserAndOrg() {
   return { user, orgId, supabase };
 }
 
+export async function getOrgDetails() {
+  const { supabase, orgId } = await getUserAndOrg();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, latitude, longitude")
+    .eq("id", orgId)
+    .single();
+
+  if (error || !data) throw new Error("Organization not found");
+  return data;
+}
+
 export async function getActiveOrgId(existingClient?: SupabaseClient) {
   const supabase = existingClient ?? (await createClient());
   const admin = getSupabaseAdmin();

@@ -4,6 +4,7 @@ import { UseFormReturn, Controller } from 'react-hook-form';
 import { CreateOrderInput, CustomerAddress } from '@/lib/sales/types';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectWithCreate } from '@/components/ui/select-with-create';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CalendarIcon, Copy } from 'lucide-react';
@@ -50,26 +51,20 @@ export function CustomerDeliveryStep({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Customer *</FormLabel>
-              <Select
+              <SelectWithCreate
+                options={customers.map((c) => ({
+                  value: c.id,
+                  label: c.name,
+                }))}
                 value={field.value}
                 onValueChange={(val) => {
                   field.onChange(val);
                   form.setValue('customerId', val, { shouldValidate: true });
                 }}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                createHref="/sales/customers"
+                placeholder="Select customer"
+                createLabel="Add new customer"
+              />
               <FormMessage />
             </FormItem>
           )}

@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { getUserAndOrg } from "@/server/auth/org";
 import { CheckInInputSchema } from "@/lib/domain/batch";
 import { nextBatchNumber } from "@/server/numbering/batches";
+import { resolveProductionStatus } from "@/server/batches/service";
 
 const PhaseMap = { propagation: 1, plug: 2, potted: 3 } as const;
 
@@ -12,6 +13,9 @@ export async function POST(req: NextRequest) {
   try {
     const input = CheckInInputSchema.parse(await req.json());
     const { supabase, orgId, user } = await getUserAndOrg();
+
+    // Resolve status_id
+    const statusOption = await resolveProductionStatus(supabase, orgId, "Growing");
 
     // derive units
     const { data: size, error: sizeErr } = await supabase
@@ -35,7 +39,8 @@ export async function POST(req: NextRequest) {
         size_id: input.size_id,
         location_id: input.location_id,
         supplier_id: input.supplier_id,
-        status: "Growing",
+        status: statusOption.system_code,
+        status_id: statusOption.id,
         quantity: units,
         initial_quantity: units,
         planted_at: input.incoming_date,

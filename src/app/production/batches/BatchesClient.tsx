@@ -40,6 +40,9 @@ import ScannerDialog from '@/components/scan-and-act-dialog';
 import { ActionDialog } from '@/components/actions/ActionDialog';
 import { ActionMenuButton } from '@/components/actions/ActionMenuButton';
 import type { ActionMode } from "@/components/actions/types";
+import { ProductionProtocolDialog } from "@/components/production-protocol-dialog";
+import { CareRecommendationsDialog } from "@/components/care-recommendations-dialog";
+import { IntelligenceDialog } from "@/components/ai/IntelligenceDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +93,8 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const [logActionMode, setLogActionMode] = useState<ActionMode>("MOVE");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isTransplantOpen, setIsTransplantOpen] = useState(false);
+  const [isProtocolOpen, setIsProtocolOpen] = useState(false);
+  const [isCareOpen, setIsCareOpen] = useState(false);
 
   // UseSWR for fetching batches from Supabase, with initialData from SSR
   const { data: batchesResult, error: batchesError, isLoading: isDataLoading, mutate: mutateBatches } = useSWR(
@@ -281,6 +286,16 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     setIsPreviewOpen(true);
   }
 
+  const handleGenerateProtocol = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsProtocolOpen(true);
+  };
+
+  const handleCareRecommendations = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsCareOpen(true);
+  };
+
   const handleScanDetected = React.useCallback(
     async (text: string) => {
       if (!text) return;
@@ -315,32 +330,34 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
             description="View, search, and manage all batch records."
             actionsSlot={
                 <>
-                    <Button
-                        variant="outline"
-                        onClick={() => setIsScanOpen(true)}
-                        className="w-full sm:w-auto"
-                    >
-                        <QrCode className="mr-2 h-4 w-4" />
-                        Scan
-                    </Button>
-                    <div className="relative w-full sm:w-auto">
+                    <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                        type="search"
-                        placeholder="Search..."
-                        className="pl-9"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                          type="search"
+                          placeholder="Search..."
+                          className="pl-9 pr-10"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
                         />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                          onClick={() => setIsScanOpen(true)}
+                          title="Scan QR code"
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
                     </div>
                     <FeatureGate name="aiCare">
-                    <Button
-                        variant="outline"
-                        disabled={!batches || batches.length === 0}
-                        className="w-full sm:w-auto"
-                    >
-                        <Sparkles className="mr-2 h-4 w-4" /> AI Care
-                    </Button>
+                    <IntelligenceDialog 
+                        trigger={
+                            <Button variant="outline" className="w-full sm:w-auto">
+                                <Sparkles className="mr-2 h-4 w-4" /> AI Assistant
+                            </Button>
+                        }
+                    />
                     </FeatureGate>
                     <NewBatchButton />
                     <TransplantMenuButton />
@@ -705,8 +722,18 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         onEdit={handleEditBatch}
         onTransplant={handleTransplantOpen}
         onLogAction={handleLogAction}
-        onGenerateProtocol={() => {}}
-        onCareRecommendations={() => {}}
+        onGenerateProtocol={handleGenerateProtocol}
+        onCareRecommendations={handleCareRecommendations}
+      />
+      <ProductionProtocolDialog
+        open={isProtocolOpen}
+        onOpenChange={setIsProtocolOpen}
+        batchId={selectedBatch?.id}
+      />
+      <CareRecommendationsDialog
+        open={isCareOpen}
+        onOpenChange={setIsCareOpen}
+        batchId={selectedBatch?.id}
       />
       <ScannerDialog 
         open={isScanOpen} 

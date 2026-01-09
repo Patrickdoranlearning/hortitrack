@@ -17,6 +17,7 @@ import { ProductionProtocolOutputSchema, type ProductionProtocolOutput } from '@
 // Define the Genkit prompt
 const productionProtocolPrompt = ai.definePrompt({
   name: 'productionProtocolPrompt',
+  model: 'googleai/gemini-2.0-flash',
   input: { schema: BatchSchema },
   output: { schema: ProductionProtocolOutputSchema },
   prompt: `You are an expert horticultural consultant tasked with creating a standardized production protocol based on a highly successful plant batch. Analyze the provided batch data to extract key timings, actions, and insights.
