@@ -2,6 +2,11 @@
 
 # dependencies
 /node_modules
+**/node_modules
+
+# print-agent build artifacts
+print-agent/release/
+print-agent/out/
 /.pnp
 .pnp.*
 .yarn/*
