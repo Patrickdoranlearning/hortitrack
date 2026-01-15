@@ -199,7 +199,7 @@ export function DispatchKanban() {
             Dispatch Manager
           </Button>
         </Link>
-        <Link href="/dispatch/picking">
+        <Link href="/dispatch/picker">
           <Button variant="outline">
             <Package className="mr-2 h-4 w-4" />
             Picking Queue

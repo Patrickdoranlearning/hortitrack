@@ -8,6 +8,8 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from './ui/progress';
+import { SimpleDistributionBar } from "./InteractiveDistributionBar";
+import type { SimpleDistribution } from "@/lib/history-types";
 import { cn } from "@/lib/utils";
 import type { Batch } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,8 @@ type BatchCardBatch = Batch & {
   supplier?: string;
   supplierName?: string;
   locationName?: string;
+  // Distribution data from v_batch_search view
+  distribution?: SimpleDistribution;
 };
 
 type BatchCardProps = {
@@ -73,6 +77,7 @@ export function BatchCard({
 }: BatchCardProps) {
   const [open, setOpen] = useState(false);
   const [actualizeOpen, setActualizeOpen] = useState(false);
+
   const parentSummary = {
     id: batch.id,
     batch_number: batch.batchNumber,
@@ -81,15 +86,32 @@ export function BatchCard({
     supplier_id: batch.supplier_id ?? batch.supplierId ?? null,
   };
 
-  const stockPercentage =
-    (batch.initialQuantity ?? 0) > 0
-      ? ((batch.quantity ?? 0) / (batch.initialQuantity ?? 0)) * 100
-      : 0;
-
   // Check if this is a planned or incoming batch
   const isPlanned = batch.status === "Planned";
   const isIncoming = batch.status === "Incoming";
   const isGhostBatch = isPlanned || isIncoming;
+
+  // Use inline distribution from batch data (no API call needed!)
+  // Fallback for ghost batches or if distribution is not available
+  const distribution: SimpleDistribution = React.useMemo(() => {
+    // Use inline distribution data if available (from v_batch_search view)
+    if (batch.distribution) {
+      return batch.distribution;
+    }
+
+    // Fallback for ghost batches or legacy data without distribution
+    const qty = batch.quantity ?? 0;
+    const reservedForPotting = batch.reservedQuantity ?? 0;
+    return {
+      available: Math.max(0, qty - reservedForPotting),
+      allocatedPotting: reservedForPotting,
+      allocatedSales: 0,
+      sold: 0,
+      dumped: 0,
+      transplanted: 0,
+      totalAccounted: qty,
+    };
+  }, [batch.distribution, batch.quantity, batch.reservedQuantity]);
 
   const familyLabel =
     batch.plantFamily ||
@@ -255,21 +277,21 @@ export function BatchCard({
         </div>
 
         <div>
-          <div className="flex justify-between text-xs font-semibold">
+          <div className="flex justify-between text-xs font-semibold mb-1">
             <span>Stock</span>
             <span>
               {(batch.quantity ?? 0).toLocaleString()} / {(batch.initialQuantity ?? 0).toLocaleString()}
             </span>
           </div>
-          <Progress value={stockPercentage} className="mt-1" />
-          {/* Show reserved quantity if any */}
-          {!isGhostBatch && (batch.reservedQuantity ?? 0) > 0 && (
+          <SimpleDistributionBar distribution={distribution} />
+          {/* Show reserved quantity if any (potting plans) */}
+          {!isGhostBatch && distribution.allocatedPotting > 0 && (
             <div className="flex justify-between text-xs text-amber-600 mt-1">
               <span>Reserved for plans</span>
               <span>
-                {(batch.reservedQuantity ?? 0).toLocaleString()} · 
+                {distribution.allocatedPotting.toLocaleString()} ·
                 <span className="text-muted-foreground ml-1">
-                  {((batch.quantity ?? 0) - (batch.reservedQuantity ?? 0)).toLocaleString()} available
+                  {distribution.available.toLocaleString()} available
                 </span>
               </span>
             </div>

@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
+import { useAttributeOptions } from "@/lib/swr/keys";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Schema = z.object({
   units: z.coerce.number().int().positive(),
@@ -25,6 +27,9 @@ export default function DumpForm({ batchId, available, onDone }: { batchId: stri
   const [loading, setLoading] = React.useState(false);
   const units = Number(form.watch("units") || 0);
   const tooMuch = units > (available ?? 0);
+
+  // Fetch configurable waste reasons from dropdown manager
+  const { options: wasteReasons, isLoading: reasonsLoading } = useAttributeOptions('waste_reason');
 
   async function onSubmit(values: z.infer<typeof Schema>) {
     setLoading(true);
@@ -54,15 +59,29 @@ export default function DumpForm({ batchId, available, onDone }: { batchId: stri
           <FormField name="reason" control={form.control} render={({ field }) => (
             <FormItem>
               <FormLabel>Reason</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mortality">Mortality</SelectItem>
-                  <SelectItem value="Quality Reject">Quality Reject</SelectItem>
-                  <SelectItem value="Lost/Breakage">Lost/Breakage</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              {reasonsLoading ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                  <SelectContent>
+                    {wasteReasons.length > 0 ? (
+                      wasteReasons.map((opt) => (
+                        <SelectItem key={opt.systemCode} value={opt.displayLabel}>
+                          {opt.displayLabel}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="Mortality">Mortality</SelectItem>
+                        <SelectItem value="Quality Reject">Quality Reject</SelectItem>
+                        <SelectItem value="Lost/Breakage">Lost/Breakage</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
               <FormMessage />
             </FormItem>
           )} />

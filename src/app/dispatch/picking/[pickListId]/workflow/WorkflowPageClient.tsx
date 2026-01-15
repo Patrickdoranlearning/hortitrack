@@ -16,11 +16,11 @@ export default function WorkflowPageClient({
   const router = useRouter();
 
   const handleComplete = () => {
-    router.push('/dispatch/picking');
+    router.push('/dispatch/picker');
   };
 
   const handleExit = () => {
-    router.push('/dispatch/picking');
+    router.push('/dispatch/picker');
   };
 
   return (

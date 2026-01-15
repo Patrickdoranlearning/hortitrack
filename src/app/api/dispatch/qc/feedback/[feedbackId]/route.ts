@@ -68,7 +68,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const { feedbackId } = await params;
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const supabase = await createClient();
 
     const body = await req.json();

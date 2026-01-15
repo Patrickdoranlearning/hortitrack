@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Variety, VARIETIES } from "@/lib/varieties";
+import { useTodayDate } from "@/lib/date-sync";
 
 type CheckinFormProps = {
   onSubmit: (data: CheckinFormInput) => Promise<void>;
@@ -33,6 +34,8 @@ type CheckinFormProps = {
 export function CheckinForm({ onSubmit, onCancel, isLoading, error }: CheckinFormProps) {
   const [varieties, setVarieties] = useState<Variety[]>(VARIETIES);
   const [open, setOpen] = useState(false);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
 
   const form = useForm<CheckinFormInput>({
     resolver: zodResolver(CheckinFormSchema),
@@ -45,7 +48,7 @@ export function CheckinForm({ onSubmit, onCancel, isLoading, error }: CheckinFor
       totalUnits: 0,
       overrideTotal: false,
       locationId: "T21", // This will be set by the dialog/parent
-      incomingDate: new Date().toISOString().slice(0, 10),
+      incomingDate: "", // Empty initially, set after hydration
       supplierId: "", // This will be set by the dialog/parent
       passportA: "",
       passportB: "",
@@ -55,6 +58,13 @@ export function CheckinForm({ onSubmit, onCancel, isLoading, error }: CheckinFor
     },
     mode: "onChange",
   });
+
+  // Set date after hydration to avoid mismatch
+  useEffect(() => {
+    if (today && !form.getValues("incomingDate")) {
+      form.setValue("incomingDate", today);
+    }
+  }, [today, form]);
 
   const w = form.watch();
   const computedTotal = calcUnitsFromContainers(w.containers || 0, w.sizeMultiple || 1);

@@ -1,14 +1,14 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
-import net from "net";
-import { 
-  buildSaleLabelZpl, 
+import {
+  buildSaleLabelZpl,
   buildSaleLabelZplWithTemplate,
   type SaleLabelInput,
   type SaleLabelTemplate,
 } from "@/server/labels/build-sale-label";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { sendToPrinter } from "@/server/labels/send-to-printer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -125,53 +125,30 @@ export async function POST(req: NextRequest) {
       zpl = buildSaleLabelZpl({ ...labelInput, qty: copies });
     }
 
-    // Check connection type and send to printer
-    if (printer.connection_type === "network" || !printer.connection_type) {
-      if (!printer.host) {
-        return NextResponse.json({ 
-          ok: false, 
-          error: "Printer host is not configured" 
-        }, { status: 400 });
-      }
-      await sendRawToPrinter(printer.host, printer.port || 9100, zpl);
-    } else {
-      return NextResponse.json({ 
-        ok: false, 
-        error: `Connection type '${printer.connection_type}' not yet supported` 
+    // Get current user for tracking
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Send to printer (handles both network and agent-connected printers)
+    const result = await sendToPrinter(printer, zpl, {
+      jobType: "sale",
+      orgId,
+      userId: user?.id,
+      copies,
+    });
+
+    if (!result.success) {
+      return NextResponse.json({
+        ok: false,
+        error: result.error || "Print failed"
       }, { status: 400 });
     }
 
-    return NextResponse.json({ ok: true, copies });
-  } catch (e: any) {
+    return NextResponse.json({ ok: true, copies, jobId: result.jobId });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Print failed";
     console.error("[api/labels/print-sale] error:", e);
-    return NextResponse.json({ ok: false, error: e?.message || "Print failed" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
-}
-
-function sendRawToPrinter(host: string, port: number, data: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const client = new net.Socket();
-    
-    client.setTimeout(5000);
-
-    client.connect(port, host, () => {
-      client.write(data, "utf8", () => {
-        client.end();
-      });
-    });
-    
-    client.on("error", (err) => {
-      client.destroy();
-      reject(err);
-    });
-
-    client.on('timeout', () => {
-      client.destroy();
-      reject(new Error('Printer connection timed out.'));
-    });
-
-    client.on("close", () => resolve());
-  });
 }
 
 

@@ -7,13 +7,14 @@ import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     await requireDocumentAccess();
     const body = await req.json().catch(() => ({}));
     const versionId = body?.versionId as string | undefined;
-    const template = await publishTemplate(params.templateId, versionId);
+    const template = await publishTemplate(templateId, versionId);
     return NextResponse.json({ template });
   } catch (err: any) {
     console.error("[documents] publish failed", err);

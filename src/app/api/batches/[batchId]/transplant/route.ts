@@ -33,9 +33,10 @@ export async function OPTIONS() {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { batchId: string } }
+  { params }: { params: Promise<{ batchId: string }> }
 ) {
   try {
+    const { batchId } = await params;
     const { userId } = await getUserIdAndOrgId();
     if (!userId) {
        return NextResponse.json(
@@ -71,7 +72,7 @@ export async function POST(
         notes: input.notes,
     };
 
-    const result = await transplantBatch(params.batchId, transplantInput, userId);
+    const result = await transplantBatch(batchId, transplantInput, userId);
 
     return NextResponse.json(
       { ok: true, newBatch: result },

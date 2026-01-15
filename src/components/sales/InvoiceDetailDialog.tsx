@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Mail, Printer, FileText } from 'lucide-react';
+import { Mail, Printer, FileText, Loader2 } from 'lucide-react';
 import { useCompanyName } from '@/lib/org/context';
+import { useToast } from '@/hooks/use-toast';
 import type { InvoiceWithCustomer } from '@/app/sales/invoices/InvoicesClient';
 
 interface InvoiceDetailDialogProps {
@@ -16,21 +18,50 @@ interface InvoiceDetailDialogProps {
 
 export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDetailDialogProps) {
   const companyName = useCompanyName();
+  const { toast } = useToast();
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   if (!invoice) return null;
 
   const customerEmail = invoice.customer?.email;
   const customerName = invoice.customer?.name || 'Customer';
 
-  const handleEmailInvoice = () => {
-    const subject = encodeURIComponent(`Invoice ${invoice.invoice_number} from ${companyName}`);
-    const body = encodeURIComponent(
-      `Dear ${customerName},\n\nPlease find attached invoice ${invoice.invoice_number}.\n\nInvoice Details:\n- Invoice Number: ${invoice.invoice_number}\n- Issue Date: ${invoice.issue_date ? format(new Date(invoice.issue_date), 'PPP') : 'N/A'}\n- Due Date: ${invoice.due_date ? format(new Date(invoice.due_date), 'PPP') : 'N/A'}\n- Total: €${invoice.total_inc_vat.toFixed(2)}\n\nThank you for your business.\n\nKind regards,\n${companyName}`
-    );
-    const mailto = customerEmail
-      ? `mailto:${customerEmail}?subject=${subject}&body=${body}`
-      : `mailto:?subject=${subject}&body=${body}`;
-    window.open(mailto, '_blank');
+  const handleEmailInvoice = async () => {
+    if (!customerEmail) {
+      toast({
+        variant: 'destructive',
+        title: 'No email address',
+        description: 'Please add an email address for this customer first.',
+      });
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const response = await fetch(`/api/sales/invoices/${invoice.id}/send-email`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+
+      toast({
+        title: 'Invoice sent',
+        description: `Invoice emailed to ${customerEmail}`,
+      });
+    } catch (err) {
+      console.error('Failed to send invoice email:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to send email',
+        description: err instanceof Error ? err.message : 'An error occurred',
+      });
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const getStatusVariant = (status: string) => {
@@ -125,24 +156,30 @@ export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: Inv
 
           {/* Actions */}
           <div className="border-t pt-4 flex gap-3">
-            <Button onClick={handleEmailInvoice} className="flex-1">
-              <Mail className="h-4 w-4 mr-2" />
-              Email Invoice
+            <Button
+              onClick={handleEmailInvoice}
+              className="flex-1"
+              disabled={sendingEmail || !customerEmail}
+            >
+              {sendingEmail ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4 mr-2" />
+              )}
+              {sendingEmail ? 'Sending...' : 'Email Invoice'}
             </Button>
             <Button variant="outline" onClick={() => window.print()}>
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
           </div>
+          {!customerEmail && (
+            <p className="text-sm text-muted-foreground text-center">
+              Add an email address to this customer to enable email sending.
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-
-
-
-
-
-
-

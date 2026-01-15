@@ -9,7 +9,8 @@ import { generateId } from '@/server/utils/ids';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const supabase = await createClient();
 
     const body = await req.json();
@@ -108,7 +109,7 @@ export async function POST(req: NextRequest) {
         deliveryItemId: existingItem.id,
         orderId,
         loadId,
-        loadName: deliveryRun.load_name,
+        loadCode: deliveryRun.load_name,
       });
     } else {
       // Create new delivery item with retry logic to handle sequence number race condition
@@ -174,7 +175,7 @@ export async function POST(req: NextRequest) {
         deliveryItemId,
         orderId,
         loadId,
-        loadName: deliveryRun.load_name,
+        loadCode: deliveryRun.load_name,
         created: true,
       });
     }

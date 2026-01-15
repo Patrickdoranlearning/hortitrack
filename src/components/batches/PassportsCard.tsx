@@ -1,6 +1,8 @@
 "use client";
 import * as React from "react";
+import useSWR from "swr";
 import { Card } from "@/components/ui/card";
+import { fetchJson } from "@/lib/http";
 
 type PassportRow = {
   id: string;
@@ -12,24 +14,18 @@ type PassportRow = {
   images?: any;
 };
 
-export default function PassportsCard({ batchId }: { batchId: string }) {
-  const [items, setItems] = React.useState<PassportRow[]>([]);
-  const [err, setErr] = React.useState<string | null>(null);
+const fetcher = async (url: string) => {
+  const { data } = await fetchJson<{ items: PassportRow[] }>(url);
+  return data?.items || [];
+};
 
-  React.useEffect(() => {
-    let cancel = false;
-    (async () => {
-      try {
-        const r = await fetch(`/api/production/batches/${batchId}/passports`);
-        const j = await r.json();
-        if (!cancel) {
-          if (!r.ok) throw new Error(j?.error || r.statusText);
-          setItems(j.items || []);
-        }
-      } catch (e: any) { if (!cancel) setErr(e?.message ?? String(e)); }
-    })();
-    return () => { cancel = true; };
-  }, [batchId]);
+export default function PassportsCard({ batchId }: { batchId: string }) {
+  const { data: items = [], error } = useSWR(
+    batchId ? `/api/production/batches/${batchId}/passports` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+  const err = error?.message || null;
 
   const currentIdx = 0; // newest first
 

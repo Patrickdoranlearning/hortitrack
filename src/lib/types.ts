@@ -14,11 +14,12 @@ export const CreditStatus = z.enum(['draft', 'issued', 'paid', 'void']);
 export const DeliveryStatus = z.enum(['unscheduled', 'scheduled', 'departed', 'delivered', 'cancelled']);
 export const InvoiceStatus = z.enum(['draft', 'issued', 'paid', 'void', 'overdue']);
 export const SubstitutionStatus = z.enum(['requested', 'approved', 'rejected', 'applied']);
-export const OrderStatus = z.enum(['draft', 'confirmed', 'processing', 'ready_for_dispatch', 'dispatched', 'delivered', 'cancelled']);
+// Order status enum from database: draft, confirmed, picking, ready, packed, dispatched, delivered, cancelled, void
+export const OrderStatus = z.enum(['draft', 'confirmed', 'picking', 'ready', 'packed', 'dispatched', 'delivered', 'cancelled', 'void']);
 export const OrgRole = z.enum(['owner', 'admin', 'grower', 'sales', 'viewer']);
 export const FeedbackSeverity = z.enum(['info', 'warning', 'critical']);
 export const ResolutionStatus = z.enum(['open', 'in_progress', 'resolved', 'wont_fix']);
-export const SizeContainerType = z.enum(['pot', 'tray', 'bareroot']);
+export const SizeContainerType = z.string(); // Now configurable via dropdown manager
 export const VehicleType = z.enum(['van', 'truck', 'trailer']);
 
 // --- Organizations ---
@@ -254,7 +255,23 @@ export const BatchSchema = z.object({
   plantVariety: z.any().optional(), // Joined Variety object
   size: z.any().optional(), // Joined Size object
   location: z.any().optional(), // Joined Location object
+  supplier: z.any().optional(), // Joined Supplier object
   parentBatchId: z.string().nullable().optional(),
+  // Additional UI/view fields
+  plantFamily: z.string().optional(),
+  category: z.string().optional(),
+  salesStatus: z.string().optional(),
+  salesPhotoUrl: z.string().nullable().optional(),
+  // Distribution data (inline from v_batch_search view)
+  distribution: z.object({
+    available: z.number(),
+    allocatedPotting: z.number(),
+    allocatedSales: z.number(),
+    sold: z.number(),
+    dumped: z.number(),
+    transplanted: z.number(),
+    totalAccounted: z.number(),
+  }).optional(),
 });
 export type Batch = z.infer<typeof BatchSchema>;
 

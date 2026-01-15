@@ -1,6 +1,5 @@
 // Pages Router / API Routes server client (no next/headers, no server-only)
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import type { Database } from "@/types/supabase";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { GetServerSidePropsContext } from "next";
 import { serialize } from "cookie";
@@ -22,7 +21,8 @@ type Ctx =
 export function getSupabaseServerPages(ctx: Ctx) {
   const req = "req" in ctx ? ctx.req : (ctx as GetServerSidePropsContext).req;
   const res = "res" in ctx ? ctx.res : (ctx as GetServerSidePropsContext).res!;
-  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  // Intentionally untyped: keep API routes resilient to schema/type drift.
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       get(name: string) {
         // @ts-ignore - next types differ slightly between runtimes

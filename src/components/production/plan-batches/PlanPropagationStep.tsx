@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReferenceData } from '@/contexts/ReferenceDataContext';
+import { useTodayDate } from '@/lib/date-sync';
 
 export type PlannedPropagationEntry = {
   id: string;
@@ -74,10 +75,17 @@ export function PlanPropagationStep({
   onComplete,
   onBack,
 }: PlanPropagationStepProps) {
-  const [plannedDate, setPlannedDate] = useState(
-    initialData?.plannedDate ?? new Date().toISOString().slice(0, 10)
-  );
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
+  const [plannedDate, setPlannedDate] = useState(initialData?.plannedDate ?? '');
   const [batches, setBatches] = useState<PlannedPropagationEntry[]>(initialData?.batches ?? []);
+
+  // Set date after hydration if not provided
+  useEffect(() => {
+    if (today && !plannedDate && !initialData?.plannedDate) {
+      setPlannedDate(today);
+    }
+  }, [today, plannedDate, initialData?.plannedDate]);
 
   // New batch form state
   const [showAddForm, setShowAddForm] = useState(batches.length === 0);
@@ -120,6 +128,9 @@ export function PlanPropagationStep({
     const size = sizes.find((s) => s.id === newSizeId);
     const location = newLocationId ? locations.find((l) => l.id === newLocationId) : null;
 
+    // Calculate total plants from trays × cells
+    const totalPlants = size?.cell_multiple ? newQuantity * size.cell_multiple : newQuantity;
+
     const entry: PlannedPropagationEntry = {
       id: `prop-${Date.now()}`,
       varietyId: newVarietyId,
@@ -127,7 +138,7 @@ export function PlanPropagationStep({
       varietyFamily: variety?.family ?? null,
       sizeId: newSizeId,
       sizeName: size?.name ?? 'Unknown',
-      expectedQuantity: newQuantity,
+      expectedQuantity: totalPlants,
       locationId: newLocationId || undefined,
       locationName: location?.name,
       notes: newNotes || undefined,
@@ -419,14 +430,20 @@ export function PlanPropagationStep({
 
               {/* Quantity */}
               <div className="space-y-2">
-                <Label>Quantity *</Label>
+                <Label>Quantity (trays) *</Label>
                 <Input
                   type="number"
                   min={1}
                   value={newQuantity || ''}
                   onChange={(e) => setNewQuantity(parseInt(e.target.value) || 0)}
-                  placeholder="Enter quantity"
+                  placeholder="Enter number of trays"
                 />
+                {selectedSize && newQuantity > 0 && selectedSize.cell_multiple && (
+                  <p className="text-sm text-muted-foreground">
+                    = <span className="font-medium text-foreground">{(newQuantity * selectedSize.cell_multiple).toLocaleString()}</span> plants
+                    <span className="text-xs ml-1">({newQuantity} × {selectedSize.cell_multiple} cells)</span>
+                  </p>
+                )}
               </div>
 
               {/* Location (Optional) */}

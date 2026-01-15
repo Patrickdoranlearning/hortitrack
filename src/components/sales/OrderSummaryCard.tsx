@@ -18,13 +18,13 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
-import { 
-  User, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Calendar, 
-  Truck, 
+import {
+  User,
+  MapPin,
+  Phone,
+  Mail,
+  Calendar,
+  Truck,
   ChevronRight,
   Ban,
   CheckCircle2,
@@ -35,17 +35,21 @@ import {
 } from 'lucide-react';
 import { updateOrderStatus, voidOrder } from '@/app/sales/orders/[orderId]/actions';
 import type { OrderDetails } from './OrderDetailPage';
+import { TrolleyReconciliationCard } from '@/components/shared/TrolleyReconciliationCard';
+import { CustomerTrolleyBadge } from '@/components/shared/CustomerTrolleyBadge';
 
 interface OrderSummaryCardProps {
   order: OrderDetails;
   onStatusChange: () => void;
 }
 
+// Order status enum: draft, confirmed, picking, ready, packed, dispatched, delivered, cancelled, void
+// Note: 'ready' and 'packed' both exist - 'packed' is set when picking completes, 'ready' is manual
 const STATUS_FLOW = [
   { status: 'draft', label: 'Draft', icon: Clock },
   { status: 'confirmed', label: 'Confirmed', icon: CheckCircle2 },
   { status: 'picking', label: 'Picking', icon: Package },
-  { status: 'ready', label: 'Ready', icon: Check },
+  { status: 'packed', label: 'Ready', icon: Check }, // 'packed' status, displayed as 'Ready'
   { status: 'dispatched', label: 'Dispatched', icon: Send },
   { status: 'delivered', label: 'Delivered', icon: Truck },
 ];
@@ -53,10 +57,12 @@ const STATUS_FLOW = [
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   draft: ['confirmed', 'void'],
   confirmed: ['picking', 'void'],
-  picking: ['ready', 'void'],
-  ready: ['dispatched', 'void'],
+  picking: ['packed', 'void'],
+  ready: ['dispatched', 'void'], // legacy - redirect to packed behavior
+  packed: ['dispatched', 'void'],
   dispatched: ['delivered'],
   delivered: [],
+  cancelled: [],
   void: [],
 };
 
@@ -148,8 +154,9 @@ export default function OrderSummaryCard({ order, onStatusChange }: OrderSummary
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
+          <div className="flex items-center justify-between">
             <p className="font-semibold text-lg">{customer?.name || 'Unknown Customer'}</p>
+            {customer?.id && <CustomerTrolleyBadge customerId={customer.id} size="sm" />}
           </div>
 
           {customer?.email && (
@@ -205,10 +212,15 @@ export default function OrderSummaryCard({ order, onStatusChange }: OrderSummary
             </div>
           </div>
 
-          {order.trolleys_estimated && (
+          {/* Trolley Reconciliation - show estimated vs actual */}
+          {(order.trolleys_estimated || order.pick_lists.some(p => p.trolleys_used)) && (
             <div>
-              <p className="text-sm text-muted-foreground">Estimated Trolleys</p>
-              <p className="font-medium">{order.trolleys_estimated}</p>
+              <p className="text-sm text-muted-foreground mb-2">Trolleys</p>
+              <TrolleyReconciliationCard
+                estimated={order.trolleys_estimated}
+                actual={order.pick_lists[0]?.trolleys_used ?? null}
+                compact
+              />
             </div>
           )}
 

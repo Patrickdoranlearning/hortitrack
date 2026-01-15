@@ -206,7 +206,7 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
   // Revalidate paths
   revalidatePath('/b2b/orders');
   revalidatePath('/b2b/dashboard');
-  revalidatePath('/dispatch/picking');
+  revalidatePath('/dispatch/picker');
 
   return { orderId: order.id };
 }

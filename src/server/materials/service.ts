@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { generatePartNumber, generateInternalBarcode } from "@/server/numbering/materials";
+import { receiveStock } from "./stock";
 import type {
   Material,
   MaterialCategory,
@@ -172,7 +173,8 @@ export async function getMaterialByPartNumber(
 export async function createMaterial(
   supabase: SupabaseClient,
   orgId: string,
-  input: CreateMaterialInput
+  input: CreateMaterialInput & { initialStock?: number | null },
+  userId?: string
 ): Promise<Material> {
   // Get category code for part number generation
   const { data: category, error: catError } = await supabase
@@ -222,7 +224,27 @@ export async function createMaterial(
 
   if (error) throw new Error(`Failed to create material: ${error.message}`);
 
-  return mapMaterial(data);
+  const material = mapMaterial(data);
+
+  // If initial stock is provided and > 0, create a receive transaction
+  if (input.initialStock && input.initialStock > 0 && userId) {
+    try {
+      await receiveStock(
+        supabase,
+        orgId,
+        userId,
+        material.id,
+        null, // General stock (no specific location)
+        input.initialStock,
+        "Initial stock on creation"
+      );
+    } catch (stockError) {
+      console.error("Failed to set initial stock:", stockError);
+      // Don't fail the entire create - material was created successfully
+    }
+  }
+
+  return material;
 }
 
 export async function updateMaterial(

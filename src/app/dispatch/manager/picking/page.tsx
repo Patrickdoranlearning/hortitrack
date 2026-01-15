@@ -3,7 +3,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, ClipboardList, Plus, Calendar, User } from "lucide-react";
+import { Package, ClipboardList, Plus, Calendar, User } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 
@@ -111,20 +111,12 @@ export default async function DispatchPickingPage() {
             Manage picking teams, create bulk pick tasks, and track progress
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/dispatch/pick-management">
-            <Button variant="outline" className="gap-2">
-              <Users className="h-4 w-4" />
-              Manage Teams
-            </Button>
-          </Link>
-          <Link href="/dispatch/bulk-picking">
-            <Button className="gap-2 bg-green-600 hover:bg-green-700">
-              <Plus className="h-4 w-4" />
-              Create Bulk Pick
-            </Button>
-          </Link>
-        </div>
+        <Link href="/dispatch/bulk-picking">
+          <Button className="gap-2 bg-green-600 hover:bg-green-700">
+            <Plus className="h-4 w-4" />
+            Create Bulk Pick
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

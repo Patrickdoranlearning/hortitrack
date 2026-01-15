@@ -7,7 +7,8 @@ export const OrderSchema = z.object({
   id: z.string(),
   customerName: z.string().min(1).default(""),
   customerId: z.string().optional(),
-  status: z.enum(["draft", "confirmed", "processing", "ready_for_dispatch", "dispatched", "delivered", "cancelled"]),
+  // Order status enum from database: draft, confirmed, picking, ready, packed, dispatched, delivered, cancelled, void
+  status: z.enum(["draft", "confirmed", "picking", "ready", "packed", "dispatched", "delivered", "cancelled", "void"]),
   createdAt: z.string(),
 });
 export type Order = z.infer<typeof OrderSchema>;

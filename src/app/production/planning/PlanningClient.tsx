@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { Check, Briefcase, PackageCheck } from "lucide-react";
+import Link from "next/link";
+import { Check, Briefcase, PackageCheck, Target, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ModulePageHeader } from '@/ui/templates';
 import { PlanningTimeline } from "./components/PlanningTimeline";
-import { IncomingBatchDialog } from "./components/IncomingBatchDialog";
+import { PlanIncomingWizardDialog } from "@/components/production/plan-incoming/PlanIncomingWizardDialog";
 import { FutureAllocationDialog } from "./components/FutureAllocationDialog";
 import { ProtocolDrawer } from "./components/ProtocolDrawer";
 import { CreateJobFromPlanningDialog } from "./components/CreateJobFromPlanningDialog";
@@ -102,6 +103,12 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
           description="Look ahead, assign protocols, and stage incoming stock."
           actionsSlot={
             <>
+              <Link href="/production/planning/guide-plans">
+                <Button variant="outline">
+                  <Target className="mr-1.5 h-4 w-4" />
+                  Guide Plans
+                </Button>
+              </Link>
               <Button variant="outline" onClick={() => setIncomingOpen(true)}>
                 Plan incoming batch
               </Button>
@@ -112,6 +119,28 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
             </>
           }
         />
+
+        {/* Guide Plans Summary Card */}
+        <Link href="/production/planning/guide-plans" className="block">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Target className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Guide Plans</h3>
+                    <p className="text-sm text-muted-foreground">
+                      High-level production targets for plant families
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
           <Card>
@@ -274,7 +303,7 @@ export default function PlanningClient({ initialSnapshot, initialProtocols }: Pr
         </Card>
       </div>
 
-      <IncomingBatchDialog
+      <PlanIncomingWizardDialog
         open={incomingOpen}
         onOpenChange={setIncomingOpen}
         onSuccess={() => {

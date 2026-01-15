@@ -7,19 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,8 +15,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Check,
-  ChevronsUpDown,
   ChevronRight,
   ChevronLeft,
   Plus,
@@ -42,9 +27,10 @@ import { cn } from '@/lib/utils';
 import type { ReferenceData } from '@/contexts/ReferenceDataContext';
 import type { PlannedPropagationEntry } from './PlanPropagationStep';
 import type { PlannedTransplantEntry } from './ConfigureTransplantsStep';
-
-// Material from reference data
-type MaterialRef = NonNullable<ReferenceData['materials']>[number];
+import {
+  MaterialSearchCombobox,
+  type MaterialSearchResult,
+} from '@/components/materials/MaterialSearchCombobox';
 
 export type PlannedMaterialEntry = {
   id: string;          // temp ID for UI
@@ -74,7 +60,6 @@ type ConfigureMaterialsStepProps = {
 };
 
 export function ConfigureMaterialsStep({
-  referenceData,
   propagationBatches,
   transplantBatches,
   initialData,
@@ -110,31 +95,10 @@ export function ConfigureMaterialsStep({
     return [];
   }, [propagationBatches, transplantBatches]);
 
-  // Get available materials from reference data
-  const availableMaterials = useMemo(() => {
-    return referenceData.materials ?? [];
-  }, [referenceData.materials]);
-
-  // Group materials by parent group
-  const materialsByGroup = useMemo(() => {
-    const groups: Record<string, MaterialRef[]> = {
-      Containers: [],
-      'Growing Media': [],
-    };
-    availableMaterials.forEach((m) => {
-      const group = m.parent_group ?? 'Other';
-      if (groups[group]) {
-        groups[group].push(m);
-      }
-    });
-    return groups;
-  }, [availableMaterials]);
-
   // State for adding new material
   const [addingForBatchId, setAddingForBatchId] = useState<string | null>(null);
-  const [selectedMaterialId, setSelectedMaterialId] = useState('');
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialSearchResult | null>(null);
   const [materialQuantity, setMaterialQuantity] = useState<number>(1);
-  const [materialPopoverOpen, setMaterialPopoverOpen] = useState(false);
 
   // Get materials already added for a batch
   const getMaterialsForBatch = useCallback(
@@ -142,24 +106,20 @@ export function ConfigureMaterialsStep({
     [materials]
   );
 
-  // Get suggested materials based on batch size (using linked_size_id)
-  const getSuggestedMaterials = useCallback(
-    (sizeId: string) => {
-      return availableMaterials.filter((m) => m.linked_size_id === sizeId);
-    },
-    [availableMaterials]
-  );
+  // Get the sizeId for the batch currently being edited
+  const currentBatchSizeId = useMemo(() => {
+    if (!addingForBatchId) return undefined;
+    const batch = batches.find((b) => b.id === addingForBatchId);
+    return batch?.sizeId;
+  }, [addingForBatchId, batches]);
 
   // Add material to a batch
   const handleAddMaterial = useCallback(() => {
-    if (!addingForBatchId || !selectedMaterialId || materialQuantity <= 0) return;
-
-    const material = availableMaterials.find((m) => m.id === selectedMaterialId);
-    if (!material) return;
+    if (!addingForBatchId || !selectedMaterial || materialQuantity <= 0) return;
 
     // Check if this material already exists for this batch
     const existing = materials.find(
-      (m) => m.batchTempId === addingForBatchId && m.materialId === selectedMaterialId
+      (m) => m.batchTempId === addingForBatchId && m.materialId === selectedMaterial.id
     );
     if (existing) {
       // Update quantity instead
@@ -174,21 +134,21 @@ export function ConfigureMaterialsStep({
       const entry: PlannedMaterialEntry = {
         id: `mat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         batchTempId: addingForBatchId,
-        materialId: material.id,
-        materialName: material.name,
-        categoryName: material.category_name ?? 'Unknown',
-        parentGroup: material.parent_group ?? 'Other',
+        materialId: selectedMaterial.id,
+        materialName: selectedMaterial.name,
+        categoryName: selectedMaterial.category_name ?? 'Unknown',
+        parentGroup: selectedMaterial.parent_group ?? 'Other',
         quantity: materialQuantity,
-        uom: material.base_uom,
+        uom: selectedMaterial.base_uom,
       };
       setMaterials((prev) => [...prev, entry]);
     }
 
     // Reset form
-    setSelectedMaterialId('');
+    setSelectedMaterial(null);
     setMaterialQuantity(1);
     setAddingForBatchId(null);
-  }, [addingForBatchId, selectedMaterialId, materialQuantity, availableMaterials, materials]);
+  }, [addingForBatchId, selectedMaterial, materialQuantity, materials]);
 
   // Remove material
   const removeMaterial = useCallback((materialEntryId: string) => {
@@ -257,7 +217,6 @@ export function ConfigureMaterialsStep({
       <div className="space-y-4">
         {batches.map((batch) => {
           const batchMaterials = getMaterialsForBatch(batch.id);
-          const suggestedMaterials = getSuggestedMaterials(batch.sizeId);
           const isAddingForThisBatch = addingForBatchId === batch.id;
 
           return (
@@ -332,112 +291,15 @@ export function ConfigureMaterialsStep({
                 {/* Add Material Form */}
                 {isAddingForThisBatch ? (
                   <div className="flex items-end gap-3 p-3 bg-muted/30 rounded-lg">
-                    {/* Material Selector */}
+                    {/* Material Selector with Search and Scan */}
                     <div className="flex-1 space-y-2">
                       <Label>Material</Label>
-                      <Popover open={materialPopoverOpen} onOpenChange={setMaterialPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              'w-full justify-between',
-                              !selectedMaterialId && 'text-muted-foreground'
-                            )}
-                          >
-                            {selectedMaterialId
-                              ? availableMaterials.find((m) => m.id === selectedMaterialId)?.name
-                              : 'Select material...'}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-0 w-[300px]" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search materials..." />
-                            <CommandList>
-                              <CommandEmpty>No material found.</CommandEmpty>
-                              {/* Suggested Materials */}
-                              {suggestedMaterials.length > 0 && (
-                                <CommandGroup heading="Suggested (linked to size)">
-                                  {suggestedMaterials.map((m) => (
-                                    <CommandItem
-                                      key={`suggested-${m.id}`}
-                                      value={`${m.name}-suggested`}
-                                      onSelect={() => {
-                                        setSelectedMaterialId(m.id);
-                                        setMaterialPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          'mr-2 h-4 w-4',
-                                          selectedMaterialId === m.id ? 'opacity-100' : 'opacity-0'
-                                        )}
-                                      />
-                                      <span className="font-medium">{m.name}</span>
-                                      <span className="ml-2 text-muted-foreground text-xs">
-                                        {m.category_name}
-                                      </span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
-                              {/* Containers */}
-                              {materialsByGroup.Containers.length > 0 && (
-                                <CommandGroup heading="Containers">
-                                  {materialsByGroup.Containers.map((m) => (
-                                    <CommandItem
-                                      key={m.id}
-                                      value={m.name}
-                                      onSelect={() => {
-                                        setSelectedMaterialId(m.id);
-                                        setMaterialPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          'mr-2 h-4 w-4',
-                                          selectedMaterialId === m.id ? 'opacity-100' : 'opacity-0'
-                                        )}
-                                      />
-                                      {m.name}
-                                      <span className="ml-2 text-muted-foreground text-xs">
-                                        {m.category_name}
-                                      </span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
-                              {/* Growing Media */}
-                              {materialsByGroup['Growing Media'].length > 0 && (
-                                <CommandGroup heading="Growing Media">
-                                  {materialsByGroup['Growing Media'].map((m) => (
-                                    <CommandItem
-                                      key={m.id}
-                                      value={m.name}
-                                      onSelect={() => {
-                                        setSelectedMaterialId(m.id);
-                                        setMaterialPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          'mr-2 h-4 w-4',
-                                          selectedMaterialId === m.id ? 'opacity-100' : 'opacity-0'
-                                        )}
-                                      />
-                                      {m.name}
-                                      <span className="ml-2 text-muted-foreground text-xs">
-                                        {m.category_name}
-                                      </span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <MaterialSearchCombobox
+                        sizeId={currentBatchSizeId}
+                        value={selectedMaterial?.id ?? null}
+                        onChange={setSelectedMaterial}
+                        placeholder="Search or scan material..."
+                      />
                     </div>
 
                     {/* Quantity */}
@@ -457,13 +319,13 @@ export function ConfigureMaterialsStep({
                         variant="outline"
                         onClick={() => {
                           setAddingForBatchId(null);
-                          setSelectedMaterialId('');
+                          setSelectedMaterial(null);
                           setMaterialQuantity(1);
                         }}
                       >
                         Cancel
                       </Button>
-                      <Button onClick={handleAddMaterial} disabled={!selectedMaterialId}>
+                      <Button onClick={handleAddMaterial} disabled={!selectedMaterial}>
                         Add
                       </Button>
                     </div>

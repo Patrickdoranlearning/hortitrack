@@ -8,11 +8,14 @@ import { buildSaleLabelZpl } from "@/server/labels/build-sale-label";
 const PRINTER_HOST = process.env.PRINTER_HOST!;
 const PRINTER_PORT = Number(process.env.PRINTER_PORT || 9100);
 
-export async function POST(_: NextRequest, { params }: { params: { orderId: string } }) {
+export async function POST(
+  _: NextRequest,
+  { params }: { params: Promise<{ orderId: string }> }
+) {
   try {
     if (!PRINTER_HOST) return fail(500, "printer_not_configured", "PRINTER_HOST is missing.");
 
-    const orderId = params.orderId;
+    const { orderId } = await params;
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("orders")
       .select("id")

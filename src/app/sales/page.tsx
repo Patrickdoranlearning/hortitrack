@@ -121,11 +121,11 @@ export default async function SalesDashboardPage() {
       .lte('created_at', lastYearSameDay.toISOString())
       .not('status', 'in', '("cancelled","draft")'),
 
-    // Open pipeline (confirmed, processing, ready_for_dispatch)
+    // Open pipeline (confirmed, picking, packed)
     supabase
       .from('orders')
       .select('total_inc_vat')
-      .in('status', ['confirmed', 'processing', 'ready_for_dispatch']),
+      .in('status', ['confirmed', 'picking', 'packed']),
 
     // Trolleys shipped this week (from pick_lists)
     supabase

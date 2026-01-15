@@ -49,11 +49,11 @@ export function EditLoadForm({
     <>
       <div className="space-y-4 py-4">
         <div className="space-y-2">
-          <Label>Load Name</Label>
+          <Label>Load Code</Label>
           <Input
-            value={load.loadName || ''}
-            onChange={(e) => onUpdate({ ...load, loadName: e.target.value })}
-            placeholder="e.g., Cork Load 1"
+            value={load.loadCode || ''}
+            onChange={(e) => onUpdate({ ...load, loadCode: e.target.value })}
+            placeholder="e.g., 4L (Thursday Liam)"
           />
         </div>
         <div className="space-y-2">

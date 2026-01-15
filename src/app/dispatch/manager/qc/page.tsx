@@ -81,7 +81,7 @@ export default async function DispatchQCPage() {
   }
 
   // Also try to get qc_status if column exists, but don't fail if it doesn't
-  let pickListsWithQC = (pickLists || []).map((pl: any) => ({
+  const pickListsWithQC = (pickLists || []).map((pl: any) => ({
     ...pl,
     qc_status: null, // Default to null, column may not exist yet
   }));

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getUserAndOrg } from "@/server/auth/org";
 import { Card } from "@/components/ui/card";
 import DispatchOrdersClient from "@/components/dispatch/manager/DispatchOrdersClient";
+import { format } from "date-fns";
+import { getHauliersWithVehicles } from "@/server/dispatch/queries.server";
 
 // Disable caching to ensure fresh data on every request
 export const dynamic = 'force-dynamic';
@@ -113,20 +115,71 @@ export default async function DispatchOrdersPage() {
     pickerMap[p.id] = p.name;
   });
 
-  // Fetch available delivery runs (loads) for assignment
+  // Fetch available delivery runs (loads) for assignment with order details
   const { data: deliveryRuns } = await supabase
     .from("delivery_runs")
-    .select("id, load_name, run_date, status")
+    .select(`
+      id,
+      load_name,
+      run_date,
+      status,
+      haulier_id,
+      vehicle_id,
+      haulier:hauliers(id, name),
+      vehicle:haulier_vehicles(id, name, trolley_capacity),
+      delivery_items(
+        id,
+        orders(
+          id,
+          status,
+          trolleys_estimated,
+          pick_lists:pick_lists!pick_lists_order_id_fkey(status)
+        )
+      )
+    `)
     .eq("org_id", orgId)
     .in("status", ["planned", "loading"])
     .order("run_date", { ascending: true })
     .limit(50);
 
-  const availableLoads: Array<{ id: string; name: string; date: string | null }> = (deliveryRuns || []).map((r: any) => ({
-    id: r.id,
-    name: r.load_name || `Load ${r.id.slice(0, 8)}`,
-    date: r.run_date,
-  }));
+  // Fetch hauliers with vehicles for the load cards
+  const hauliers = await getHauliersWithVehicles();
+
+  // Process loads with order statistics
+  const availableLoads = (deliveryRuns || []).map((r: any) => {
+    const orderItems = r.delivery_items || [];
+    const totalOrders = orderItems.length;
+    const totalTrolleys = orderItems.reduce((sum: number, item: any) =>
+      sum + (item.orders?.trolleys_estimated || 0), 0);
+
+    // Count orders by readiness (packed = ready to load)
+    const readyOrders = orderItems.filter((item: any) =>
+      item.orders?.status === 'packed'
+    ).length;
+
+    // Count orders still being picked
+    const pickingOrders = orderItems.filter((item: any) => {
+      const pickList = item.orders?.pick_lists;
+      const plStatus = Array.isArray(pickList) ? pickList[0]?.status : pickList?.status;
+      return plStatus === 'in_progress' || plStatus === 'pending';
+    }).length;
+
+    return {
+      id: r.id,
+      name: r.load_name || (r.run_date ? format(new Date(r.run_date), "EEE MMM d") : `Load #${r.id.slice(0, 4)}`),
+      date: r.run_date,
+      status: r.status,
+      haulierId: r.haulier_id || null,
+      vehicleId: r.vehicle_id || null,
+      haulierName: r.haulier?.name || null,
+      vehicleName: r.vehicle?.name || null,
+      vehicleCapacity: r.vehicle?.trolley_capacity || 0,
+      totalOrders,
+      totalTrolleys,
+      readyOrders,
+      pickingOrders,
+    };
+  });
 
   return (
     <div className="p-6 space-y-6">
@@ -144,6 +197,7 @@ export default async function DispatchOrdersPage() {
         pickerMap={pickerMap}
         availablePickers={availablePickers}
         availableLoads={availableLoads}
+        hauliers={hauliers}
       />
     </div>
   );

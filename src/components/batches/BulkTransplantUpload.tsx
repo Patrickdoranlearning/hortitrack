@@ -29,6 +29,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 
 type UploadStatus = "pending" | "uploading" | "success" | "error";
 
@@ -71,7 +72,8 @@ type Props = {
 export default function BulkTransplantUpload({ onComplete }: Props) {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
   const [rows, setRows] = React.useState<TransplantRow[]>([]);
   const [busy, setBusy] = React.useState<"parsing" | "uploading" | null>(null);
   const [defaults, setDefaults] = React.useState<{
@@ -79,7 +81,14 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
     sizeId?: string;
     plantedAt?: string;
     archiveParentIfEmpty: boolean;
-  }>({ plantedAt: today, archiveParentIfEmpty: true });
+  }>({ plantedAt: "", archiveParentIfEmpty: true });
+
+  // Set date default after hydration
+  React.useEffect(() => {
+    if (today && !defaults.plantedAt) {
+      setDefaults((prev) => ({ ...prev, plantedAt: today }));
+    }
+  }, [today, defaults.plantedAt]);
 
   // Batch search state
   const [batchSearchResults, setBatchSearchResults] = React.useState<ParentBatch[]>([]);
@@ -898,7 +907,7 @@ async function parseTransplantCsv(text: string, helpers: LookupHelpers): Promise
     throw new Error(`Missing required column: parent_batch`);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayISO();
   const parsed: TransplantRow[] = [];
 
   for (let i = 1; i < lines.length; i++) {

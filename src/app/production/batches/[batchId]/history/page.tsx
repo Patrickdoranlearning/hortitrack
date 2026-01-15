@@ -12,8 +12,13 @@ function normalizeId(raw: unknown): string | null {
   return s;
 }
 
-export default async function BatchHistoryPage({ params }: { params: { batchId: string } }) {
-  const id = normalizeId(params?.batchId);
+export default async function BatchHistoryPage({
+  params,
+}: {
+  params: Promise<{ batchId: string }>;
+}) {
+  const { batchId } = await params;
+  const id = normalizeId(batchId);
   if (!id) notFound();
 
   const data = await buildBatchHistory(id!).catch(() => null);

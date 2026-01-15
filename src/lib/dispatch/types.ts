@@ -52,7 +52,7 @@ export const DeliveryRunSchema = z.object({
   // Route Identification
   runNumber: z.string(),
   runDate: z.string(), // ISO date string
-  loadName: z.string().optional(), // Custom name like "Cork Load 1"
+  loadCode: z.string().optional(), // Quick reference code (e.g., "4L" = Thursday Liam)
   weekNumber: z.number().int().optional(), // ISO week number
 
   // Haulier & Vehicle
@@ -97,7 +97,7 @@ export type DeliveryRun = z.infer<typeof DeliveryRunSchema>;
 // Input schema for creating a delivery run
 export const CreateDeliveryRunSchema = z.object({
   runDate: z.string(),
-  loadName: z.string().optional(), // Custom name for the load
+  loadCode: z.string().optional(), // Quick reference code (e.g., "4L" = Thursday Liam)
   haulierId: z.string().optional(),
   vehicleId: z.string().optional(), // Reference to haulier_vehicles
   driverName: z.string().optional(),
@@ -406,7 +406,7 @@ export interface OrderReadyForDispatch {
 export interface ActiveDeliveryRunSummary {
   id: string;
   runNumber: string;
-  loadName?: string;
+  loadCode?: string;
   weekNumber?: number;
   orgId: string;
   runDate: string;
@@ -449,6 +449,7 @@ export interface DeliveryItemWithDetails extends DeliveryItem {
     customerName: string;
     totalIncVat: number;
     requestedDeliveryDate?: string;
+    orderStatus?: string; // Order status (confirmed, picking, packed, dispatched, etc.)
     shipToAddress?: {
       line1: string;
       line2?: string;
@@ -480,10 +481,12 @@ export interface DispatchBoardOrder {
   id: string;
   orderNumber: string;
   customerName: string;
+  customerId?: string;
   county?: string;
   eircode?: string;
   requestedDeliveryDate?: string;
   trolleysEstimated: number;
+  trolleysActual?: number | null; // Actual trolleys used (from pick_list)
   // Stage (computed from pick_list + packing + delivery_item status)
   stage: DispatchStage;
   status: string; // Order status (e.g., "confirmed")
@@ -631,6 +634,15 @@ export type CreateTrolleyLabel = z.infer<typeof CreateTrolleyLabelSchema>;
 // PICKER TASK VIEW
 // ================================================
 
+export interface PickerTaskItem {
+  id: string;
+  skuCode: string;
+  description: string;
+  varietyName: string;
+  sizeName: string;
+  quantity: number;
+}
+
 export interface PickerTask {
   id: string;
   orgId: string;
@@ -662,6 +674,9 @@ export interface PickerTask {
   // Feedback
   pendingFeedbackCount: number;
   unacknowledgedFeedbackCount: number;
+
+  // Order line items (for display)
+  items?: PickerTaskItem[];
 }
 
 // ================================================

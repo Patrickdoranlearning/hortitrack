@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { getCustomerTrolleyBalance } from "@/server/dispatch/trolley-balance.server";
 import { z } from "zod";
 
 const createMovementSchema = z.object({
@@ -15,8 +15,7 @@ const createMovementSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const { orgId } = await getUserAndOrg();
-    const supabase = await createClient();
+    const { orgId, supabase } = await getUserAndOrg();
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50");
     const customerId = searchParams.get("customerId");
@@ -87,8 +86,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { orgId, userId } = await getUserAndOrg();
-    const supabase = await createClient();
+    const { orgId, user, supabase } = await getUserAndOrg();
     const body = await request.json();
 
     // Validate
@@ -114,7 +112,7 @@ export async function POST(request: NextRequest) {
         notes: data.notes || null,
         delivery_run_id: data.deliveryRunId || null,
         signed_docket_url: data.signedDocketUrl || null,
-        recorded_by: userId,
+        recorded_by: user.id,
         movement_date: new Date().toISOString(),
       })
       .select()
@@ -125,7 +123,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ transaction: movement }, { status: 201 });
+    // The database trigger automatically updates customer_trolley_balance
+    // Fetch the updated balance to return to the client
+    const updatedBalance = await getCustomerTrolleyBalance(data.customerId);
+
+    return NextResponse.json(
+      {
+        transaction: movement,
+        updatedBalance: updatedBalance
+          ? {
+              trolleysOut: updatedBalance.trolleysOut,
+              shelvesOut: updatedBalance.shelvesOut,
+              lastDeliveryDate: updatedBalance.lastDeliveryDate,
+              lastReturnDate: updatedBalance.lastReturnDate,
+            }
+          : null,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error in create movement:", error);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

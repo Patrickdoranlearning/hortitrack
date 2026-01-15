@@ -12,7 +12,8 @@ export const runtime = "nodejs";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const body = await req.json();
 
     const parsed = StockTransferSchema.safeParse(body);

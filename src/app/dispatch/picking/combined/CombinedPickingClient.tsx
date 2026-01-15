@@ -240,7 +240,7 @@ export default function CombinedPickingClient({
   }, [selectedAggregation, confirmQty, toast]);
 
   const handleFinish = () => {
-    router.push('/dispatch/picking');
+    router.push('/dispatch/picker');
   };
 
   const allComplete = progress.picked === progress.total;
@@ -250,7 +250,7 @@ export default function CombinedPickingClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/dispatch/picking')}>
+          <Button variant="ghost" size="icon" onClick={() => router.push('/dispatch/picker')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

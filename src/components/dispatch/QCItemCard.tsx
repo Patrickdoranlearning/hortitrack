@@ -107,8 +107,8 @@ export default function QCItemCard({ item, issue, onIssueChange }: QCItemCardPro
       )}
     >
       {/* Main Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-4">
+      <div className="p-3 sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               {hasIssue ? (
@@ -118,10 +118,10 @@ export default function QCItemCard({ item, issue, onIssueChange }: QCItemCardPro
               ) : (
                 <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
               )}
-              <h3 className="font-medium truncate">{displayName}</h3>
+              <h3 className="font-medium text-sm sm:text-base truncate">{displayName}</h3>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-muted-foreground">
               {item.batchNumber && (
                 <div className="flex items-center gap-1">
                   <Hash className="h-3.5 w-3.5" />
@@ -137,21 +137,21 @@ export default function QCItemCard({ item, issue, onIssueChange }: QCItemCardPro
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
             {/* Quantity Display */}
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground" />
                 <span className={cn(
-                  'font-bold text-lg',
+                  'font-bold text-base sm:text-lg',
                   !qtyMatch && !hasIssue && 'text-amber-600'
                 )}>
                   {item.pickedQty}
                 </span>
-                <span className="text-muted-foreground">/ {item.targetQty}</span>
+                <span className="text-muted-foreground text-sm">/ {item.targetQty}</span>
               </div>
               {!qtyMatch && (
-                <Badge variant="outline" className="text-xs bg-amber-100 border-amber-300 text-amber-700">
+                <Badge variant="outline" className="text-xs bg-amber-100 border-amber-300 text-amber-700 mt-0.5">
                   {item.pickedQty > item.targetQty ? 'Over' : 'Short'}
                 </Badge>
               )}
@@ -159,11 +159,12 @@ export default function QCItemCard({ item, issue, onIssueChange }: QCItemCardPro
 
             {/* Status Badge */}
             {hasIssue ? (
-              <Badge variant="destructive">Issue Flagged</Badge>
+              <Badge variant="destructive" className="text-xs">Issue Flagged</Badge>
             ) : (
               <Badge
                 variant="outline"
                 className={cn(
+                  'text-xs',
                   qtyMatch
                     ? 'bg-green-100 border-green-300 text-green-700'
                     : 'bg-amber-100 border-amber-300 text-amber-700'

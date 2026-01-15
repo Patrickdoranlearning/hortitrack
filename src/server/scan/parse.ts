@@ -19,7 +19,7 @@ function parseGS1(text: string): Record<string, string> {
   const out: Record<string, string> = {};
 
   // Normalize AIM prefix like "]d2" or "]Q3"
-  let t = text.replace(/^\]([A-Za-z][0-9])/, "");
+  const t = text.replace(/^\]([A-Za-z][0-9])/, "");
 
   // Parentheses patterns: (AI)value(next "(" or end)
   const paren = (ai: string) =>
@@ -44,7 +44,7 @@ function parseGS1(text: string): Record<string, string> {
   // GTIN is fixed 14 chars.
   // We need to consume the string to properly find the next AI if no GS is present.
 
-  let remaining = t;
+  const remaining = t;
 
   // Try to find 01
   // Regex: Find 01 followed by 14 digits.

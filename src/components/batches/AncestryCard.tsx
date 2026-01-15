@@ -1,29 +1,27 @@
 "use client";
 import * as React from "react";
+import useSWR from "swr";
 import { Card } from "@/components/ui/card";
+import { fetchJson } from "@/lib/http";
 
 type Link = { id: string; batch_number: string; proportion: number };
 
-export default function AncestryCard({ batchId }: { batchId: string }) {
-  const [parents, setParents] = React.useState<Link[]>([]);
-  const [children, setChildren] = React.useState<Link[]>([]);
-  const [err, setErr] = React.useState<string | null>(null);
+type AncestryData = { parents: Link[]; children: Link[] };
 
-  React.useEffect(() => {
-    let cancel = false;
-    (async () => {
-      try {
-        const r = await fetch(`/api/production/batches/${batchId}/ancestry`);
-        const j = await r.json();
-        if (!cancel) {
-          if (!r.ok) throw new Error(j?.error || r.statusText);
-          setParents(j.parents || []);
-          setChildren(j.children || []);
-        }
-      } catch (e: any) { if (!cancel) setErr(e?.message ?? String(e)); }
-    })();
-    return () => { cancel = true; };
-  }, [batchId]);
+const fetcher = async (url: string): Promise<AncestryData> => {
+  const { data } = await fetchJson<AncestryData>(url);
+  return { parents: data?.parents || [], children: data?.children || [] };
+};
+
+export default function AncestryCard({ batchId }: { batchId: string }) {
+  const { data, error } = useSWR(
+    batchId ? `/api/production/batches/${batchId}/ancestry` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+  const parents = data?.parents || [];
+  const children = data?.children || [];
+  const err = error?.message || null;
 
   return (
     <Card className="p-4 space-y-3">

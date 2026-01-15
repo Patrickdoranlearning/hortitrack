@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { SelectWithCreate } from '../ui/select-with-create';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
@@ -255,8 +255,38 @@ export function MaterialForm({ material, categories, onSubmit, onCancel }: Mater
           </div>
 
           {/* Stock Management */}
-          <div className="space-y-2">
+          <div className="space-y-4">
             <h4 className="text-sm font-medium">Stock Management</h4>
+
+            {/* Initial Stock - only show when creating new material */}
+            {!material && (
+              <FormField
+                control={form.control}
+                name="initialStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Initial Stock Quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value ? parseInt(e.target.value) : undefined)
+                        }
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Enter current stock on hand. Leave empty or 0 if none.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="grid gap-4 md:grid-cols-3">
               <FormField
                 control={form.control}

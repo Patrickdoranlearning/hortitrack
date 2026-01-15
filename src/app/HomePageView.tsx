@@ -211,7 +211,10 @@ export default function HomePageView({
   const varietyOptions = React.useMemo(() => {
     const set = new Set<string>();
     (batches || []).forEach((batch) => {
-      if (batch.plantVariety) set.add(batch.plantVariety);
+      const v = typeof batch.plantVariety === 'string' 
+        ? batch.plantVariety 
+        : (batch.plantVariety as any)?.name;
+      if (v) set.add(v);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [batches]);
@@ -219,7 +222,10 @@ export default function HomePageView({
   const locationOptions = React.useMemo(() => {
     const set = new Set<string>();
     (batches || []).forEach((batch) => {
-      if (batch.location) set.add(batch.location);
+      const loc = typeof batch.location === 'string' 
+        ? batch.location 
+        : (batch.location as any)?.name;
+      if (loc) set.add(loc);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [batches]);
@@ -235,12 +241,20 @@ export default function HomePageView({
       .filter((batch) =>
         filters.category === 'all' || batch.category === filters.category
       )
-      .filter((batch) => (
-        filters.variety === 'all' || (batch.plantVariety ?? '') === filters.variety
-      ))
-      .filter((batch) => (
-        filters.location === 'all' || (batch.location ?? '') === filters.location
-      ))
+      .filter((batch) => {
+        if (filters.variety === 'all') return true;
+        const v = typeof batch.plantVariety === 'string' 
+          ? batch.plantVariety 
+          : (batch.plantVariety as any)?.name;
+        return v === filters.variety;
+      })
+      .filter((batch) => {
+        if (filters.location === 'all') return true;
+        const loc = typeof batch.location === 'string' 
+          ? batch.location 
+          : (batch.location as any)?.name;
+        return loc === filters.location;
+      })
       .filter((batch) => {
         if (filters.status === 'all') return true;
         if (filters.status === 'Active') return batch.status !== 'Archived';
@@ -383,6 +397,8 @@ export default function HomePageView({
         locationId: node.locationId ?? node.location_id ?? "",
         status: (node.status ?? "Propagation") as Batch["status"],
         quantity: node.quantity ?? 0,
+        reservedQuantity: node.reservedQuantity ?? 0,
+        saleableQuantity: node.saleableQuantity ?? null,
         initialQuantity: node.initialQuantity ?? node.quantity ?? 0,
         quantityProduced: node.quantityProduced ?? undefined,
         unit: node.unit ?? "plants",

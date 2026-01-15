@@ -23,6 +23,7 @@ import { Check, ChevronsUpDown, ChevronLeft, ChevronRight, MapPin, Calendar, Pac
 import { cn } from '@/lib/utils';
 import type { ReferenceData } from '@/contexts/ReferenceDataContext';
 import type { MaterialSupplierData } from './MaterialSupplierStep';
+import { useTodayDate } from '@/lib/date-sync';
 
 export type LocationQuantityData = {
   locationId: string;
@@ -48,14 +49,21 @@ export function LocationQuantityStep({
   onComplete,
   onBack,
 }: LocationQuantityStepProps) {
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
   const [locationId, setLocationId] = useState(initialData?.locationId ?? '');
-  const [incomingDate, setIncomingDate] = useState(
-    initialData?.incomingDate ?? new Date().toISOString().slice(0, 10)
-  );
+  const [incomingDate, setIncomingDate] = useState(initialData?.incomingDate ?? '');
   const [containers, setContainers] = useState(initialData?.containers ?? 1);
   const [supplierBatchNumber, setSupplierBatchNumber] = useState(
     initialData?.supplierBatchNumber ?? ''
   );
+
+  // Set date after hydration if not provided
+  useEffect(() => {
+    if (today && !incomingDate && !initialData?.incomingDate) {
+      setIncomingDate(today);
+    }
+  }, [today, incomingDate, initialData?.incomingDate]);
 
   const [locationOpen, setLocationOpen] = useState(false);
 

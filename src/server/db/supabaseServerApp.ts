@@ -7,7 +7,6 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/supabase";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
 // Minimal cookie bridge interface to avoid next/headers dependency here.
@@ -24,13 +23,15 @@ export type CookieBridge = {
  */
 export function createSupabaseServerWithCookies(
   cookieBridge: CookieBridge
-): SupabaseClient<Database> {
-  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+): SupabaseClient {
+  // Intentionally untyped: this repo evolves DB schema quickly and many routes
+  // target tables/views that may not yet exist in generated types.
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: cookieBridge,
   });
 }
 
-export async function getSupabaseServerApp(): Promise<SupabaseClient<Database>> {
+export async function getSupabaseServerApp(): Promise<SupabaseClient> {
   const store = await cookies();
   const bridge: CookieBridge = {
     get: (name) => store.get(name)?.value,

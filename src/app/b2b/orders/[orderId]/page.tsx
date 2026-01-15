@@ -5,14 +5,15 @@ import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 
 type PageProps = {
-  params: { orderId: string };
+  params: Promise<{ orderId: string }>;
 };
 
 export default async function B2BOrderDetailPage({ params }: PageProps) {
+  const { orderId } = await params;
   const authContext = await requireCustomerAuth();
   const supabase = await createClient();
 
-  // Fetch order with items
+  // Fetch order with items and pick list info for trolley reconciliation
   const { data: order } = await supabase
     .from('orders')
     .select(`
@@ -26,6 +27,7 @@ export default async function B2BOrderDetailPage({ params }: PageProps) {
       notes,
       created_at,
       updated_at,
+      trolleys_estimated,
       customer_addresses (
         label,
         store_name,
@@ -35,9 +37,13 @@ export default async function B2BOrderDetailPage({ params }: PageProps) {
         county,
         eircode,
         country_code
+      ),
+      pick_lists (
+        id,
+        trolleys_used
       )
     `)
-    .eq('id', params.orderId)
+    .eq('id', orderId)
     .eq('customer_id', authContext.customerId)
     .single();
 
@@ -64,7 +70,7 @@ export default async function B2BOrderDetailPage({ params }: PageProps) {
       multibuy_price_3,
       multibuy_qty_3
     `)
-    .eq('order_id', params.orderId)
+    .eq('order_id', orderId)
     .order('created_at');
 
   // Check if order can be edited

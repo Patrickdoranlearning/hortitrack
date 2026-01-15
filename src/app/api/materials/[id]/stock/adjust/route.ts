@@ -15,7 +15,8 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { id: materialId } = await params;
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const body = await req.json();
 
     const parsed = StockAdjustmentSchema.safeParse(body);

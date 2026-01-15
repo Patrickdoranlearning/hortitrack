@@ -21,6 +21,11 @@ import {
 
 export function ProfileMenu({ moduleKey, className }: { moduleKey: string; className?: string }) {
   const { companyName } = useActiveOrg()
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Get initials from company name
   const getInitials = () => {
@@ -28,6 +33,12 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
       return companyName.substring(0, 2).toUpperCase()
     }
     return "HT"
+  }
+
+  if (!mounted) {
+    return (
+      <div className={cn("h-8 w-8 rounded-full bg-primary/10", className)} />
+    )
   }
 
   return (

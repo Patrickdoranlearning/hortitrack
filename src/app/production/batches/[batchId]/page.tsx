@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import EventsCard from "@/components/batches/EventsCard";
 import PassportsCard from "@/components/batches/PassportsCard";
 import AncestryCard from "@/components/batches/AncestryCard";
 import BatchGalleryCard from "@/components/batches/BatchGalleryCard.lazy";
 import { BatchPageActions } from "@/components/batches/BatchPageActions";
+import { StockLedgerCard } from "@/components/batches/StockLedgerCard";
+import { PlantHealthCard } from "@/components/batches/PlantHealthCard";
 import { ModulePageHeader } from '@/ui/templates';
 import { PageFrame } from '@/ui/templates';
 import type { Batch } from "@/lib/types";
@@ -14,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { InteractiveDistributionBarServer } from "./InteractiveDistributionBarServer";
 
 type PageProps = {
   params: Promise<{ batchId: string }>;
@@ -87,34 +89,39 @@ export default async function Page(props: PageProps) {
               <Badge>{batch.status}</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <h3 className="font-semibold">Variety</h3>
+                <h3 className="font-semibold text-sm text-muted-foreground">Variety</h3>
                 <p>{(batch as any).plant_varieties?.name}</p>
               </div>
               <div>
-                <h3 className="font-semibold">Size</h3>
+                <h3 className="font-semibold text-sm text-muted-foreground">Size</h3>
                 <p>{(batch as any).plant_sizes?.name}</p>
               </div>
               <div>
-                <h3 className="font-semibold">Location</h3>
+                <h3 className="font-semibold text-sm text-muted-foreground">Location</h3>
                 <p>{(batch as any).nursery_locations?.name}</p>
               </div>
               <div>
-                <h3 className="font-semibold">Quantity</h3>
-                <p>{batch.quantity}</p>
+                <h3 className="font-semibold text-sm text-muted-foreground">Quantity</h3>
+                <p className="font-semibold text-lg">{batch.quantity?.toLocaleString()}</p>
               </div>
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm text-muted-foreground mb-2">Stock Distribution</h3>
+              <InteractiveDistributionBarServer batchId={batch.id} />
             </div>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="xl:col-span-2 space-y-4">
-            <EventsCard batchId={batch.id} />
+            <StockLedgerCard batchId={batch.id} />
             <AncestryCard batchId={batch.id} />
           </div>
           <div className="space-y-4">
+            <PlantHealthCard batchId={batch.id} />
             <BatchGalleryCard
               batchId={batch.id}
               varietyId={batch.plant_variety_id}

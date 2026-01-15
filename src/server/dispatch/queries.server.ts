@@ -6,6 +6,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import type { AttributeOption } from "@/lib/attributeOptions";
 import type {
   DeliveryRun,
+  DeliveryRunStatusType,
   DeliveryItem,
   OrderPacking,
   Trolley,
@@ -73,11 +74,15 @@ export async function listDeliveryRuns(
  * Get active delivery runs with item counts and fill status
  * Optimized: Single query with JOINs instead of 4 separate queries
  */
-export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[]> {
+export async function getActiveDeliveryRuns(options?: {
+  statuses?: DeliveryRunStatusType[];
+  runDateWindow?: { start: string; end: string };
+}): Promise<ActiveDeliveryRunSummary[]> {
   const { orgId, supabase } = await getUserAndOrg();
+  const statuses = options?.statuses?.length ? options.statuses : ["planned", "loading"];
 
   // Single query with all related data using Supabase's nested select
-  const { data: runsData, error: runsError } = await supabase
+  let runsQuery = supabase
     .from("delivery_runs")
     .select(`
       *,
@@ -90,8 +95,16 @@ export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[
       )
     `)
     .eq("org_id", orgId)
-    .in("status", ["planned", "loading"]) // Exclude in_transit (dispatched) loads from board
+    .in("status", statuses)
     .order("run_date", { ascending: true });
+
+  if (options?.runDateWindow) {
+    runsQuery = runsQuery
+      .gte("run_date", options.runDateWindow.start)
+      .lte("run_date", options.runDateWindow.end);
+  }
+
+  const { data: runsData, error: runsError } = await runsQuery;
 
   if (runsError) {
     console.error("Error fetching delivery runs:", runsError);
@@ -158,7 +171,7 @@ export async function getActiveDeliveryRuns(): Promise<ActiveDeliveryRunSummary[
     return {
       id: d.id,
       runNumber: d.run_number,
-      loadName: d.load_name,
+      loadCode: d.load_name,
       weekNumber,
       orgId: d.org_id,
       runDate: d.run_date,
@@ -198,7 +211,7 @@ export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRu
     .single();
 
   if (runError || !runData) {
-    console.error("Error fetching delivery run:", runError);
+    console.error("Error fetching delivery run:", runError?.message, runError?.code, "runId:", runId, "orgId:", orgId);
     return null;
   }
 
@@ -210,6 +223,7 @@ export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRu
       orders (
         order_number,
         customer_id,
+        status,
         total_inc_vat,
         requested_delivery_date,
         customers (name),
@@ -238,6 +252,7 @@ export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRu
       customerName: item.orders?.customers?.name || "Unknown",
       totalIncVat: item.orders?.total_inc_vat || 0,
       requestedDeliveryDate: item.orders?.requested_delivery_date,
+      orderStatus: item.orders?.status,
       shipToAddress: item.orders?.customer_addresses
         ? {
             line1: item.orders.customer_addresses.line1,
@@ -287,7 +302,7 @@ export async function createDeliveryRun(input: CreateDeliveryRun): Promise<strin
       org_id: orgId,
       run_number: runNumber,
       run_date: input.runDate,
-      load_name: input.loadName,
+      load_name: input.loadCode,
       haulier_id: input.haulierId,
       vehicle_id: input.vehicleId,
       driver_name: input.driverName,
@@ -449,10 +464,10 @@ export async function addOrderToDeliveryRun(input: AddToDeliveryRun): Promise<st
     throw error;
   }
 
-  // Mark order ready for dispatch (final dispatch happens when run goes in transit)
+  // Mark order packed (ready for dispatch - final dispatch happens when run goes in transit)
   await supabase
     .from("orders")
-    .update({ status: "ready_for_dispatch" })
+    .update({ status: "packed" })
     .eq("id", input.orderId);
 
   return data.id;
@@ -619,7 +634,7 @@ export async function updateOrderPacking(
   if (updates.status === "completed" || updates.status === "verified") {
     await supabase
       .from("orders")
-      .update({ status: "ready_for_dispatch" })
+      .update({ status: "packed" })
       .eq("id", orderId);
   }
 }
@@ -1018,7 +1033,11 @@ async function getHauliersWithVehiclesLegacy(): Promise<HaulierWithVehicles[]> {
   }));
 }
 
-export async function getDispatchBoardData(): Promise<{
+export async function getDispatchBoardData(options?: {
+  dateWindowDays?: number;
+  includeRunStatuses?: DeliveryRunStatusType[];
+  includeOrderStatuses?: string[];
+}): Promise<{
   orders: DispatchBoardOrder[];
   hauliers: HaulierWithVehicles[];
   growers: GrowerMember[];
@@ -1026,13 +1045,18 @@ export async function getDispatchBoardData(): Promise<{
   deliveryRuns: ActiveDeliveryRunSummary[];
 }> {
   const { user, orgId, supabase } = await getUserAndOrg();
+  const dateWindowDays = options?.dateWindowDays ?? 7;
+  // Valid order_status enum: draft, confirmed, picking, packed, dispatched, delivered, cancelled
+  const orderStatuses = options?.includeOrderStatuses?.length
+    ? options.includeOrderStatuses
+    : ["confirmed", "picking", "packed", "dispatched"];
 
-  // Limit board to a 7-day window around today to keep payload small
+  // Limit board to a window around today to keep payload small
   const today = new Date();
   const startDate = new Date(today);
   const endDate = new Date(today);
-  startDate.setDate(today.getDate() - 7);
-  endDate.setDate(today.getDate() + 7);
+  startDate.setDate(today.getDate() - dateWindowDays);
+  endDate.setDate(today.getDate() + dateWindowDays);
   const startDateStr = startDate.toISOString().split("T")[0];
   const endDateStr = endDate.toISOString().split("T")[0];
 
@@ -1041,7 +1065,10 @@ export async function getDispatchBoardData(): Promise<{
     getHauliersWithVehicles(),
     getGrowerMembers(orgId),
     listAttributeOptions({ orgId, attributeKey: "delivery_route" }),
-    getActiveDeliveryRuns(), // Use active runs instead of just planned
+    getActiveDeliveryRuns({
+      statuses: options?.includeRunStatuses,
+      runDateWindow: { start: startDateStr, end: endDateStr },
+    }),
     supabase
       .from("orders")
       .select(`
@@ -1056,12 +1083,12 @@ export async function getDispatchBoardData(): Promise<{
         customer_addresses(
           line1, city, county, eircode
         ),
-        pick_lists(id, assigned_team_id, assigned_user_id, status),
+        pick_lists(id, assigned_team_id, assigned_user_id, status, trolleys_used),
         order_packing(status),
-        delivery_items(id, delivery_run_id, status, delivery_runs(run_number, haulier_id))
+        delivery_items(id, delivery_run_id, status, delivery_runs(run_number, haulier_id, status))
       `)
       .eq("org_id", orgId)
-      .in("status", ["confirmed", "picking", "packed", "dispatched"])
+      .in("status", orderStatuses)
       .gte("requested_delivery_date", startDateStr)
       .lte("requested_delivery_date", endDateStr)
       .order("requested_delivery_date", { ascending: true })
@@ -1098,9 +1125,10 @@ export async function getDispatchBoardData(): Promise<{
 
     // Compute Stage (simplified workflow: To Pick -> Picking -> Ready to Load -> On Route)
     let stage: DispatchStage = "to_pick";
+    const runStatus = (deliveryItem as any)?.delivery_runs?.status;
 
-    if (deliveryItem?.delivery_run_id) {
-      // Assigned to a delivery run
+    if (deliveryItem?.delivery_run_id && ["in_transit", "completed"].includes(runStatus)) {
+      // Actively out for delivery
       stage = "on_route";
     } else if (pickList?.status === "completed" || packingRecord?.status === "completed" || packingRecord?.status === "verified") {
       // Picking done (or packing done) = Ready to load onto truck
@@ -1115,20 +1143,22 @@ export async function getDispatchBoardData(): Promise<{
       id: o.id,
       orderNumber: o.order_number,
       customerName: o.customers?.name || "Unknown",
+      customerId: o.customer_id,
       county: o.customer_addresses?.county,
       eircode: o.customer_addresses?.eircode,
       requestedDeliveryDate: o.requested_delivery_date,
       trolleysEstimated: o.trolleys_estimated || 0,
+      trolleysActual: pickList?.trolleys_used ?? null,
       totalIncVat: o.total_inc_vat,
       status: o.status,
       stage,
-      
+
       // Picking - now uses individual picker (grower) instead of team
       pickListId: pickList?.id,
       pickerId,
       pickerName,
       pickListStatus: pickList?.status,
-      
+
       // Delivery
       deliveryItemId: deliveryItem?.id,
       deliveryRunId: deliveryItem?.delivery_run_id,
@@ -1157,7 +1187,7 @@ function mapDeliveryRunFromDb(d: any): DeliveryRun {
     orgId: d.org_id,
     runNumber: d.run_number,
     runDate: d.run_date,
-    loadName: d.load_name,
+    loadCode: d.load_name,
     weekNumber: d.week_number,
     haulierId: d.haulier_id,
     vehicleId: d.vehicle_id,

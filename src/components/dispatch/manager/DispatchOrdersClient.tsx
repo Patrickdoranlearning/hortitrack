@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { format, getISOWeek } from 'date-fns';
 import {
   Table,
@@ -57,11 +58,18 @@ import {
   Plus,
   Users,
   Tag,
+  SlidersHorizontal,
+  ChevronRight,
+  Send,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import OrderStatusBadge from '@/components/sales/OrderStatusBadge';
 import { toast } from 'sonner';
 import TrolleyLabelPrintDialog from '@/components/dispatch/TrolleyLabelPrintDialog';
+import { useTodayDate, getTodayISO } from '@/lib/date-sync';
+import { dispatchLoad } from '@/server/dispatch/board-actions';
 
 // Types
 // pick_lists can be a single object (due to UNIQUE constraint) or an array
@@ -115,6 +123,31 @@ interface AvailableLoad {
   id: string;
   name: string;
   date: string | null;
+  status: string;
+  haulierId: string | null;
+  vehicleId: string | null;
+  haulierName: string | null;
+  vehicleName: string | null;
+  vehicleCapacity: number;
+  totalOrders: number;
+  totalTrolleys: number;
+  readyOrders: number;
+  pickingOrders: number;
+}
+
+interface HaulierVehicle {
+  id: string;
+  name: string;
+  trolleyCapacity: number;
+  registration?: string;
+}
+
+interface HaulierWithVehicles {
+  id: string;
+  name: string;
+  isInternal?: boolean;
+  trolleyCapacity?: number;
+  vehicles: HaulierVehicle[];
 }
 
 interface DispatchOrdersClientProps {
@@ -122,6 +155,7 @@ interface DispatchOrdersClientProps {
   pickerMap: Record<string, string>;
   availablePickers: AvailablePicker[];
   availableLoads: AvailableLoad[];
+  hauliers: HaulierWithVehicles[];
 }
 
 // Column configuration
@@ -152,10 +186,8 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Active' },
   { value: 'confirmed', label: 'Confirmed' },
-  { value: 'processing', label: 'Processing' },
   { value: 'picking', label: 'Picking' },
-  { value: 'ready', label: 'Ready' },
-  { value: 'ready_for_dispatch', label: 'Ready for Dispatch' },
+  { value: 'packed', label: 'Ready' },
 ];
 
 // Load colors for row highlighting
@@ -179,6 +211,7 @@ export default function DispatchOrdersClient({
   pickerMap,
   availablePickers,
   availableLoads,
+  hauliers,
 }: DispatchOrdersClientProps) {
   const router = useRouter();
 
@@ -202,14 +235,29 @@ export default function DispatchOrdersClient({
   const [updatingLoad, setUpdatingLoad] = useState<string | null>(null);
   const [showCreateLoadDialog, setShowCreateLoadDialog] = useState(false);
   const [createLoadForOrderId, setCreateLoadForOrderId] = useState<string | null>(null);
-  const [newLoadName, setNewLoadName] = useState('');
-  const [newLoadDate, setNewLoadDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [newLoadCode, setNewLoadCode] = useState('');
+  // Use hydration-safe date - initialize empty, set after hydration
+  const [newLoadDate, setNewLoadDate] = useState('');
+  const today = useTodayDate();
   const [creatingLoad, setCreatingLoad] = useState(false);
   const [loads, setLoads] = useState<AvailableLoad[]>(availableLoads);
 
   // Trolley label dialog state
   const [showLabelDialog, setShowLabelDialog] = useState(false);
   const [selectedOrderForLabel, setSelectedOrderForLabel] = useState<DispatchOrder | null>(null);
+
+  // Mobile UI state
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // Load haulier/vehicle update state
+  const [updatingLoadHaulier, setUpdatingLoadHaulier] = useState<string | null>(null);
+
+  // Set date after hydration to avoid mismatch
+  useEffect(() => {
+    if (today && !newLoadDate) {
+      setNewLoadDate(today);
+    }
+  }, [today, newLoadDate]);
 
   // Create load color map
   const loadColorMap = useMemo(() => {
@@ -298,6 +346,14 @@ export default function DispatchOrdersClient({
 
       const data = await response.json();
 
+      console.log('[Assign Picker] Response:', {
+        ok: data.ok,
+        pickListId: data.pickListId,
+        pickerId: data.pickerId,
+        created: data.created,
+        requestedPickerId: pickerId === 'unassign' ? null : pickerId,
+      });
+
       if (!response.ok || !data.ok) {
         console.error('[Assign Picker] Error:', data);
         throw new Error(data.error || 'Failed to assign picker');
@@ -373,10 +429,54 @@ export default function DispatchOrdersClient({
     }
   };
 
+  // Update load haulier/vehicle
+  const handleUpdateLoadHaulier = async (loadId: string, haulierId: string | null, vehicleId: string | null) => {
+    setUpdatingLoadHaulier(loadId);
+    try {
+      const response = await fetch(`/api/dispatch/runs/${loadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          haulierId: haulierId || null,
+          vehicleId: vehicleId || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update load');
+      }
+
+      // Find haulier and vehicle info for local state update
+      const selectedHaulier = hauliers.find(h => h.id === haulierId);
+      const selectedVehicle = selectedHaulier?.vehicles.find(v => v.id === vehicleId);
+
+      // Update local state
+      setLoads(prev => prev.map(load => {
+        if (load.id === loadId) {
+          return {
+            ...load,
+            haulierId,
+            vehicleId,
+            haulierName: selectedHaulier?.name || null,
+            vehicleName: selectedVehicle?.name || null,
+            vehicleCapacity: selectedVehicle?.trolleyCapacity || selectedHaulier?.trolleyCapacity || 0,
+          };
+        }
+        return load;
+      }));
+
+      toast.success('Load updated');
+    } catch (error) {
+      toast.error('Failed to update load');
+    } finally {
+      setUpdatingLoadHaulier(null);
+    }
+  };
+
   // Create a new load
   const handleCreateLoad = async () => {
-    if (!newLoadName.trim()) {
-      toast.error('Please enter a load name');
+    if (!newLoadCode.trim()) {
+      toast.error('Please enter a load code');
       return;
     }
 
@@ -386,7 +486,7 @@ export default function DispatchOrdersClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          loadName: newLoadName.trim(),
+          loadCode: newLoadCode.trim(),
           runDate: newLoadDate,
         }),
       });
@@ -398,7 +498,7 @@ export default function DispatchOrdersClient({
       const data = await response.json();
       const newLoad: AvailableLoad = {
         id: data.id,
-        name: newLoadName.trim(),
+        name: newLoadCode.trim(),
         date: newLoadDate,
       };
 
@@ -416,8 +516,8 @@ export default function DispatchOrdersClient({
       }
 
       // Reset form
-      setNewLoadName('');
-      setNewLoadDate(format(new Date(), 'yyyy-MM-dd'));
+      setNewLoadCode('');
+      setNewLoadDate(getTodayISO());
       setCreateLoadForOrderId(null);
     } catch (error) {
       toast.error('Failed to create load');
@@ -791,8 +891,85 @@ export default function DispatchOrdersClient({
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-4">
-        {/* Filters Bar */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {/* Filters Bar - Mobile */}
+        <div className="md:hidden space-y-3">
+          {/* Search + Filter Toggle Row */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant={hasActiveFilters ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+              className="relative"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                  {(statusFilter !== 'all' ? 1 : 0) + (loadFilter !== 'all' ? 1 : 0) + (weekFilter ? 1 : 0)}
+                </span>
+              )}
+            </Button>
+          </div>
+
+          {/* Collapsible Filters */}
+          {mobileFiltersOpen && (
+            <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={loadFilter} onValueChange={setLoadFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Load" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Loads</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {loads.map(load => (
+                      <SelectItem key={load.id} value={load.id}>
+                        {load.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Week #"
+                  value={weekFilter}
+                  onChange={(e) => setWeekFilter(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  className="w-20"
+                />
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+                    <X className="h-4 w-4" />
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Filters Bar - Desktop */}
+        <div className="hidden md:flex flex-row items-center justify-between gap-3">
           <div className="flex flex-1 flex-wrap gap-2 items-center">
             {/* Search */}
             <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -889,28 +1066,181 @@ export default function DispatchOrdersClient({
           )}
         </div>
 
-        {/* Load Color Legend */}
-        {Object.keys(loadColorMap).length > 0 && (
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="text-muted-foreground">Loads:</span>
-            {loads
-              .filter(load => loadColorMap[load.id])
-              .map(load => {
+        {/* Load Status Cards */}
+        {loads.length > 0 && (
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-muted-foreground">Active Loads</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {loads.map(load => {
                 const colorClass = loadColorMap[load.id];
-                const bgColor = colorClass.split(' ')[0]; // Get just the bg-* class
+                const bgColor = colorClass?.split(' ')[0] || 'bg-gray-100';
+                const isReady = load.totalOrders > 0 && load.readyOrders === load.totalOrders;
+                const hasBlocked = load.pickingOrders > 0;
+                const fillPercent = load.vehicleCapacity > 0
+                  ? Math.round((load.totalTrolleys / load.vehicleCapacity) * 100)
+                  : 0;
+
                 return (
-                  <Badge key={load.id} variant="outline" className={cn(bgColor, 'border-0')}>
-                    {load.name}
-                  </Badge>
+                  <Card
+                    key={load.id}
+                    className={cn(
+                      'overflow-hidden transition-all hover:shadow-md',
+                      colorClass ? `border-l-4 ${bgColor.replace('bg-', 'border-l-')}` : ''
+                    )}
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <Link href={`/dispatch/manager/loads/${load.id}`} className="hover:underline">
+                          <h4 className="font-semibold text-sm truncate">{load.name}</h4>
+                        </Link>
+                        {isReady ? (
+                          <Badge variant="default" className="bg-green-600 text-xs shrink-0">
+                            Ready
+                          </Badge>
+                        ) : hasBlocked ? (
+                          <Badge variant="secondary" className="bg-amber-500 text-white text-xs shrink-0">
+                            Picking
+                          </Badge>
+                        ) : load.totalOrders === 0 ? (
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            Empty
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      {/* Haulier/Vehicle Selectors */}
+                      <div className="space-y-1.5 text-xs">
+                        <Select
+                          value={load.haulierId || ''}
+                          onValueChange={(value) => {
+                            handleUpdateLoadHaulier(load.id, value || null, null);
+                          }}
+                          disabled={updatingLoadHaulier === load.id}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue placeholder="Select haulier...">
+                              {load.haulierName ? (
+                                <div className="flex items-center gap-1">
+                                  <Truck className="h-3 w-3" />
+                                  <span className="truncate">{load.haulierName}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">Select haulier...</span>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">
+                              <span className="text-muted-foreground">No haulier</span>
+                            </SelectItem>
+                            {hauliers.map(h => (
+                              <SelectItem key={h.id} value={h.id}>
+                                {h.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {/* Vehicle selector - only show when haulier is selected and has vehicles */}
+                        {load.haulierId && (() => {
+                          const selectedHaulier = hauliers.find(h => h.id === load.haulierId);
+                          const vehicles = selectedHaulier?.vehicles || [];
+                          if (vehicles.length === 0) return null;
+                          return (
+                            <Select
+                              value={load.vehicleId || ''}
+                              onValueChange={(value) => {
+                                handleUpdateLoadHaulier(load.id, load.haulierId, value || null);
+                              }}
+                              disabled={updatingLoadHaulier === load.id}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Select vehicle...">
+                                  {load.vehicleName || <span className="text-muted-foreground">Select vehicle...</span>}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">
+                                  <span className="text-muted-foreground">No vehicle</span>
+                                </SelectItem>
+                                {vehicles.map(v => (
+                                  <SelectItem key={v.id} value={v.id}>
+                                    {v.name} ({v.trolleyCapacity}t)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })()}
+
+                        {/* Stats row */}
+                        <div className="flex items-center justify-between text-muted-foreground pt-1">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-green-600" />
+                              {load.readyOrders} ready
+                            </span>
+                            {load.pickingOrders > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3 text-amber-500" />
+                                {load.pickingOrders} picking
+                              </span>
+                            )}
+                          </div>
+                          <span className={cn(
+                            'font-medium',
+                            fillPercent > 100 ? 'text-red-600' :
+                            fillPercent > 80 ? 'text-amber-600' : ''
+                          )}>
+                            {load.totalTrolleys}/{load.vehicleCapacity || '?'}t
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quick Dispatch Button */}
+                      {load.totalOrders > 0 && (
+                        <Button
+                          size="sm"
+                          variant={isReady ? 'default' : 'outline'}
+                          className={cn(
+                            'w-full mt-2 h-7 text-xs',
+                            isReady ? 'bg-green-600 hover:bg-green-700' : ''
+                          )}
+                          disabled={!isReady}
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            if (isReady) {
+                              toast.loading(`Dispatching ${load.name}...`, { id: `dispatch-${load.id}` });
+                              try {
+                                const result = await dispatchLoad(load.id);
+                                if (result.error) {
+                                  toast.error(result.error, { id: `dispatch-${load.id}` });
+                                } else {
+                                  toast.success(`${load.name} dispatched with ${result.ordersDispatched} orders`, { id: `dispatch-${load.id}` });
+                                  router.refresh();
+                                }
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Failed to dispatch load', { id: `dispatch-${load.id}` });
+                              }
+                            }
+                          }}
+                        >
+                          <Send className="h-3 w-3 mr-1" />
+                          {isReady ? 'Dispatch' : `${load.readyOrders}/${load.totalOrders} Ready`}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               })}
+            </div>
           </div>
         )}
 
-        {/* Table */}
-        <Card>
-          <CardContent className="p-0">
-            {filteredOrders.length === 0 ? (
+        {/* Empty State */}
+        {filteredOrders.length === 0 && (
+          <Card>
+            <CardContent className="p-0">
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="font-semibold text-lg mb-2">No Orders</h3>
@@ -925,7 +1255,163 @@ export default function DispatchOrdersClient({
                   </Button>
                 )}
               </div>
-            ) : (
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Mobile Card View */}
+        {filteredOrders.length > 0 && (
+          <div className="md:hidden space-y-3">
+            {filteredOrders.map((order) => {
+              const pickList = getPickList(order);
+              const pickerName = pickList?.assigned_user_id ? pickerMap[pickList.assigned_user_id] : null;
+              const deliveryItem = order.delivery_items?.[0];
+              const loadId = deliveryItem?.delivery_run_id;
+              const loadInfo = loadId ? loads.find(l => l.id === loadId) : null;
+              const loadColor = loadId ? loadColorMap[loadId]?.split(' ')[0] : '';
+
+              return (
+                <Card
+                  key={order.id}
+                  className={cn('overflow-hidden', loadColor && `${loadColor} border-l-4`)}
+                >
+                  <CardContent className="p-0">
+                    {/* Tappable header */}
+                    <button
+                      className="w-full p-3 text-left hover:bg-muted/50 active:bg-muted transition-colors"
+                      onClick={() => handleOpenOrder(order.id)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-primary">#{order.order_number}</span>
+                            <OrderStatusBadge status={order.status} />
+                          </div>
+                          <p className="font-medium truncate mt-0.5">
+                            {order.customer?.name || 'Unknown Customer'}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      </div>
+                      <div className="flex items-center flex-wrap gap-2 mt-2 text-sm text-muted-foreground">
+                        {order.requested_delivery_date && (
+                          <>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {format(new Date(order.requested_delivery_date), 'EEE, MMM d')}
+                            </span>
+                            <Badge variant="outline" className="text-xs px-1.5 py-0">
+                              W{getISOWeek(new Date(order.requested_delivery_date))}
+                            </Badge>
+                          </>
+                        )}
+                        {order.ship_to_address?.county && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {order.ship_to_address.county}
+                            {order.ship_to_address.eircode && (
+                              <span className="text-xs">({order.ship_to_address.eircode})</span>
+                            )}
+                          </span>
+                        )}
+                        {order.trolleys_estimated != null && (
+                          <span className="flex items-center gap-1">
+                            <Package className="h-3.5 w-3.5" />
+                            {order.trolleys_estimated}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Assignment Row */}
+                    <div className="border-t px-3 py-2 bg-muted/30 grid grid-cols-2 gap-2">
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Picker</Label>
+                        <Select
+                          value={pickList?.assigned_user_id || 'unassign'}
+                          onValueChange={(value) => {
+                            if (value === 'manage_team') {
+                              router.push('/settings/team');
+                              return;
+                            }
+                            handleAssignPicker(order.id, value);
+                          }}
+                          disabled={updatingPicker === order.id}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Assign">
+                              {updatingPicker === order.id ? (
+                                <span className="text-muted-foreground">...</span>
+                              ) : pickerName ? (
+                                <span className="truncate">{pickerName}</span>
+                              ) : (
+                                <span className="text-muted-foreground">Unassigned</span>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassign">
+                              <span className="text-muted-foreground">Unassigned</span>
+                            </SelectItem>
+                            {availablePickers.map(picker => (
+                              <SelectItem key={picker.id} value={picker.id}>
+                                {picker.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Load</Label>
+                        <Select
+                          value={loadId || 'unassign'}
+                          onValueChange={(value) => handleAssignLoad(order.id, value)}
+                          disabled={updatingLoad === order.id}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Assign">
+                              {updatingLoad === order.id ? (
+                                <span className="text-muted-foreground">...</span>
+                              ) : loadInfo ? (
+                                <div className="flex items-center gap-1 truncate">
+                                  <Truck className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate">{loadInfo.name}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">Unassigned</span>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassign">
+                              <span className="text-muted-foreground">Unassigned</span>
+                            </SelectItem>
+                            {loads.map(load => (
+                              <SelectItem key={load.id} value={load.id}>
+                                {load.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="create_new" className="text-primary border-t mt-1 pt-1">
+                              <div className="flex items-center gap-2">
+                                <Plus className="h-3 w-3" />
+                                <span>Create New Load</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Desktop Table View */}
+        {filteredOrders.length > 0 && (
+          <Card className="hidden md:block">
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table ref={tableRef}>
                   <TableHeader>
@@ -990,9 +1476,9 @@ export default function DispatchOrdersClient({
                   </TableBody>
                 </Table>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Create Load Dialog */}
         <Dialog open={showCreateLoadDialog} onOpenChange={setShowCreateLoadDialog}>
@@ -1005,12 +1491,12 @@ export default function DispatchOrdersClient({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="loadName">Load Name</Label>
+                <Label htmlFor="loadCode">Load Code</Label>
                 <Input
-                  id="loadName"
-                  placeholder="e.g., Cork Load 1, Dublin AM"
-                  value={newLoadName}
-                  onChange={(e) => setNewLoadName(e.target.value)}
+                  id="loadCode"
+                  placeholder="e.g., 4L (Thursday Liam)"
+                  value={newLoadCode}
+                  onChange={(e) => setNewLoadCode(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -1029,7 +1515,7 @@ export default function DispatchOrdersClient({
                 onClick={() => {
                   setShowCreateLoadDialog(false);
                   setCreateLoadForOrderId(null);
-                  setNewLoadName('');
+                  setNewLoadCode('');
                 }}
                 disabled={creatingLoad}
               >

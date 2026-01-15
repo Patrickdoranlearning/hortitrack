@@ -4,9 +4,10 @@ import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { printerId: string } }
+  { params }: { params: Promise<{ printerId: string }> }
 ) {
   try {
+    const { printerId } = await params;
     const supabase = await getSupabaseServerApp();
     const orgId = await resolveActiveOrgId();
 
@@ -17,7 +18,7 @@ export async function GET(
     const { data, error } = await supabase
       .from("printers")
       .select("*")
-      .eq("id", params.printerId)
+      .eq("id", printerId)
       .eq("org_id", orgId)
       .single();
 
@@ -32,9 +33,10 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { printerId: string } }
+  { params }: { params: Promise<{ printerId: string }> }
 ) {
   try {
+    const { printerId } = await params;
     const supabase = await getSupabaseServerApp();
     const orgId = await resolveActiveOrgId();
 
@@ -59,7 +61,7 @@ export async function PUT(
     const { data, error } = await supabase
       .from("printers")
       .update(updateData)
-      .eq("id", params.printerId)
+      .eq("id", printerId)
       .eq("org_id", orgId)
       .select()
       .single();
@@ -75,9 +77,10 @@ export async function PUT(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { printerId: string } }
+  { params }: { params: Promise<{ printerId: string }> }
 ) {
   try {
+    const { printerId } = await params;
     const supabase = await getSupabaseServerApp();
     const orgId = await resolveActiveOrgId();
 
@@ -88,7 +91,7 @@ export async function DELETE(
     const { error } = await supabase
       .from("printers")
       .delete()
-      .eq("id", params.printerId)
+      .eq("id", printerId)
       .eq("org_id", orgId);
 
     if (error) throw error;

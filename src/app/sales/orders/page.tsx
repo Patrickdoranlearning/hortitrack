@@ -5,6 +5,9 @@ import Link from 'next/link';
 import SalesOrdersClient from './SalesOrdersClient';
 import { listOrders } from '@/server/sales/queries.server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function SalesOrdersPage(props: {
     searchParams?: Promise<{ page?: string; status?: string; pageSize?: string }>;
 }) {

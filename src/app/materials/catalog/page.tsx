@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import useSWR from 'swr';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Plus, Search, Package, Edit, Trash2, RefreshCw, Filter, ChevronDown } from 'lucide-react';
+import { Plus, Search, Package, Edit, Trash2, RefreshCw, Filter, ChevronDown, PackagePlus } from 'lucide-react';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,6 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { fetchJson } from '@/lib/http/fetchJson';
 import { MaterialForm } from '@/components/materials/MaterialForm';
+import { StockAdjustDialog } from '@/components/materials/StockAdjustDialog';
 import type { Material, MaterialCategory } from '@/lib/types/materials';
 
 type MaterialsResponse = {
@@ -69,6 +70,7 @@ export default function MaterialsCatalogPage() {
   const [isFormOpen, setIsFormOpen] = useState(showNewForm);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [deletingMaterial, setDeletingMaterial] = useState<Material | null>(null);
+  const [adjustingMaterial, setAdjustingMaterial] = useState<Material | null>(null);
 
   // Fetch categories
   const { data: categoriesData } = useSWR<CategoriesResponse>(
@@ -300,95 +302,191 @@ export default function MaterialsCatalogPage() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[120px]">Part Number</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Linked Size</TableHead>
-                      <TableHead>UOM</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead className="text-right">Reorder Point</TableHead>
-                      <TableHead className="w-[80px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {materials.map((material) => (
-                      <TableRow
-                        key={material.id}
-                        className={!material.isActive ? 'opacity-50' : ''}
-                      >
-                        <TableCell className="font-mono text-sm">
-                          {material.partNumber}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {material.name}
-                          {!material.isActive && (
-                            <Badge variant="secondary" className="ml-2">
-                              Inactive
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {material.category && (
-                            <Badge
-                              variant="outline"
-                              className={getCategoryColor(material.category.parentGroup)}
+              <>
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {materials.map((material) => (
+                    <div
+                      key={material.id}
+                      className={`p-4 rounded-lg border bg-card ${!material.isActive ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{material.name}</p>
+                          <p className="text-sm font-mono text-muted-foreground">
+                            {material.partNumber}
+                          </p>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="shrink-0">
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => setAdjustingMaterial(material)}
                             >
-                              {material.category.name}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {material.linkedSize?.name ?? (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="capitalize">{material.baseUom}</TableCell>
-                        <TableCell>
-                          {material.defaultSupplier?.name ?? (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {material.reorderPoint ?? (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setEditingMaterial(material);
-                                  setIsFormOpen(true);
-                                }}
-                              >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => setDeletingMaterial(material)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                              <PackagePlus className="mr-2 h-4 w-4" />
+                              Adjust Stock
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingMaterial(material);
+                                setIsFormOpen(true);
+                              }}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setDeletingMaterial(material)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {material.category && (
+                          <Badge
+                            variant="outline"
+                            className={getCategoryColor(material.category.parentGroup)}
+                          >
+                            {material.category.name}
+                          </Badge>
+                        )}
+                        {!material.isActive && (
+                          <Badge variant="secondary">Inactive</Badge>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                        {material.linkedSize?.name && (
+                          <div>
+                            <span className="text-muted-foreground">Size: </span>
+                            <span>{material.linkedSize.name}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-muted-foreground">UOM: </span>
+                          <span className="capitalize">{material.baseUom}</span>
+                        </div>
+                        {material.defaultSupplier?.name && (
+                          <div>
+                            <span className="text-muted-foreground">Supplier: </span>
+                            <span>{material.defaultSupplier.name}</span>
+                          </div>
+                        )}
+                        {material.reorderPoint != null && (
+                          <div>
+                            <span className="text-muted-foreground">Reorder: </span>
+                            <span>{material.reorderPoint}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">Part Number</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Linked Size</TableHead>
+                        <TableHead>UOM</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead className="text-right">Reorder Point</TableHead>
+                        <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {materials.map((material) => (
+                        <TableRow
+                          key={material.id}
+                          className={!material.isActive ? 'opacity-50' : ''}
+                        >
+                          <TableCell className="font-mono text-sm">
+                            {material.partNumber}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {material.name}
+                            {!material.isActive && (
+                              <Badge variant="secondary" className="ml-2">
+                                Inactive
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {material.category && (
+                              <Badge
+                                variant="outline"
+                                className={getCategoryColor(material.category.parentGroup)}
+                              >
+                                {material.category.name}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {material.linkedSize?.name ?? (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="capitalize">{material.baseUom}</TableCell>
+                          <TableCell>
+                            {material.defaultSupplier?.name ?? (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {material.reorderPoint ?? (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => setAdjustingMaterial(material)}
+                                >
+                                  <PackagePlus className="mr-2 h-4 w-4" />
+                                  Adjust Stock
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditingMaterial(material);
+                                    setIsFormOpen(true);
+                                  }}
+                                >
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => setDeletingMaterial(material)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -438,6 +536,14 @@ export default function MaterialsCatalogPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Stock Adjust Dialog */}
+      <StockAdjustDialog
+        open={!!adjustingMaterial}
+        onOpenChange={(open) => !open && setAdjustingMaterial(null)}
+        material={adjustingMaterial}
+        onSuccess={() => mutateMaterials()}
+      />
     </PageFrame>
   );
 }

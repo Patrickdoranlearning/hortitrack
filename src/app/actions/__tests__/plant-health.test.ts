@@ -10,7 +10,7 @@ import {
 } from '@/lib/__tests__/test-utils';
 
 // Mock the dependencies before importing the module under test
-const mockSupabase = createMockSupabaseClient();
+const mockSupabase = createMockSupabaseClient() as any;
 const mockUser = createMockUser();
 const mockOrgId = 'test-org-id';
 
@@ -72,7 +72,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await applyLocationTreatment({
+      const result: any = await applyLocationTreatment({
         locationId: 'loc-1',
         productName: 'Neem Oil',
         rate: 5,
@@ -94,7 +94,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await applyLocationTreatment({
+      const result: any = await applyLocationTreatment({
         locationId: 'loc-1',
         productName: 'Neem Oil',
         rate: 5,
@@ -118,7 +118,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await applyLocationTreatment({
+      const result: any = await applyLocationTreatment({
         locationId: 'loc-1',
         productName: 'Neem Oil',
         rate: 5,
@@ -150,7 +150,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await logMeasurement({
+      const result: any = await logMeasurement({
         locationId: 'loc-1',
         ec: 2.5,
       });
@@ -173,7 +173,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await logMeasurement({
+      const result: any = await logMeasurement({
         locationId: 'loc-1',
         ph: 6.5,
       });
@@ -183,7 +183,7 @@ describe('plant-health actions', () => {
     });
 
     it('should return error when no measurement provided', async () => {
-      const result = await logMeasurement({
+      const result: any = await logMeasurement({
         locationId: 'loc-1',
       });
 
@@ -202,7 +202,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await logMeasurement({
+      const result: any = await logMeasurement({
         locationId: 'loc-1',
         ec: 2.5,
       });
@@ -234,7 +234,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await flagLocation({
+      const result: any = await flagLocation({
         locationId: 'loc-1',
         issueReason: 'aphids',
         severity: 'medium',
@@ -262,7 +262,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await flagLocation({
+      const result: any = await flagLocation({
         locationId: 'loc-1',
         issueReason: 'botrytis',
         severity: 'critical',
@@ -281,7 +281,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await clearLocation({
+      const result: any = await clearLocation({
         locationId: 'loc-1',
         notes: 'All clear after treatment',
       });
@@ -300,7 +300,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await clearLocation({
+      const result: any = await clearLocation({
         locationId: 'loc-1',
       });
 
@@ -326,7 +326,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await getLocationHealthLogs('loc-1');
+      const result: any = await getLocationHealthLogs('loc-1');
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(2);
@@ -343,7 +343,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await getLocationHealthLogs('loc-1');
+      const result: any = await getLocationHealthLogs('loc-1');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Query failed');
@@ -366,7 +366,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await getBatchHealthLogs('batch-1');
+      const result: any = await getBatchHealthLogs('batch-1');
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(1);
@@ -393,7 +393,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await createScoutLog({
+      const result: any = await createScoutLog({
         locationId: 'loc-1',
         logType: 'issue',
         issueReason: 'thrips',
@@ -417,7 +417,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await createScoutLog({
+      const result: any = await createScoutLog({
         locationId: 'loc-1',
         logType: 'reading',
         ec: 2.5,
@@ -429,7 +429,7 @@ describe('plant-health actions', () => {
     });
 
     it('should return error when issue type is missing reason', async () => {
-      const result = await createScoutLog({
+      const result: any = await createScoutLog({
         locationId: 'loc-1',
         logType: 'issue',
         severity: 'medium',
@@ -440,7 +440,7 @@ describe('plant-health actions', () => {
     });
 
     it('should return error when reading type has no measurements', async () => {
-      const result = await createScoutLog({
+      const result: any = await createScoutLog({
         locationId: 'loc-1',
         logType: 'reading',
       });
@@ -450,7 +450,7 @@ describe('plant-health actions', () => {
     });
 
     it('should return error when neither location nor batch is provided', async () => {
-      const result = await createScoutLog({
+      const result: any = await createScoutLog({
         logType: 'issue',
         issueReason: 'aphids',
         severity: 'low',
@@ -475,7 +475,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await scheduleTreatment({
+      const result: any = await scheduleTreatment({
         locationId: 'loc-1',
         treatmentType: 'chemical',
         productId: 'product-1',
@@ -502,7 +502,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await scheduleTreatment({
+      const result: any = await scheduleTreatment({
         locationId: 'loc-1',
         treatmentType: 'mechanical',
         mechanicalAction: 'trimming',
@@ -523,7 +523,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await scheduleTreatment({
+      const result: any = await scheduleTreatment({
         locationId: 'loc-1',
         treatmentType: 'feeding',
         fertilizerName: '20-20-20',
@@ -547,7 +547,7 @@ describe('plant-health actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await scheduleTreatment({
+      const result: any = await scheduleTreatment({
         locationId: 'loc-1',
         treatmentType: 'chemical',
         scheduledDate: '2024-01-20',

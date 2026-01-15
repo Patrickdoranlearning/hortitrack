@@ -38,9 +38,10 @@ async function getProtocol(id: string) {
 export default async function RecipeDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const protocol = await getProtocol(params.id);
+  const { id } = await params;
+  const protocol = await getProtocol(id);
 
   if (!protocol) {
     notFound();

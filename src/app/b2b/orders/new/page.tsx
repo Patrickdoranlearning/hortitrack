@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { CustomerCatalogProduct, CustomerCatalogProductWithVarieties, VarietyInfo, VarietyBatchInfo, BatchImage } from '@/lib/b2b/types';
 import { calculateVarietyStatus } from '@/lib/b2b/varietyStatus';
 import { getLastUsedPricing } from '@/server/b2b/pricing-history';
+import { findCapacityConfig, TROLLEY_CONSTANTS, type TrolleyCapacityConfig } from '@/lib/dispatch/trolley-calculation';
 
 export default async function B2BNewOrderPage() {
   const authContext = await requireCustomerAuth();
@@ -42,7 +43,8 @@ export default async function B2BNewOrderPage() {
         plant_sizes (
           id,
           name,
-          container_type
+          container_type,
+          shelf_quantity
         )
       ),
       product_batches (
@@ -84,6 +86,18 @@ export default async function B2BNewOrderPage() {
     .eq('is_active', true)
     .eq('product_prices.price_list_id', authContext.customer.default_price_list_id || '')
     .order('name');
+
+  // Fetch trolley capacity configs for quantity preset buttons
+  const { data: trolleyCapacityRows } = await supabase
+    .from('trolley_capacity')
+    .select('family, size_id, shelves_per_trolley')
+    .eq('org_id', authContext.customer.org_id);
+
+  const trolleyCapacityConfigs: TrolleyCapacityConfig[] = (trolleyCapacityRows || []).map((row: any) => ({
+    family: row.family,
+    sizeId: row.size_id,
+    shelvesPerTrolley: row.shelves_per_trolley,
+  }));
 
   // Transform to catalog format with batch availability and variety aggregation
   const catalogProducts: CustomerCatalogProductWithVarieties[] = (productRows || []).map((row) => {
@@ -197,6 +211,12 @@ export default async function B2BNewOrderPage() {
       sizeName: size?.name || null,
       category: variety?.category || null,
       containerType: size?.container_type || null,
+      // Trolley capacity for quantity presets
+      shelfQuantity: (size as any)?.shelf_quantity || null,
+      shelvesPerTrolley: size?.id
+        ? (findCapacityConfig(trolleyCapacityConfigs, variety?.family || null, size.id)?.shelvesPerTrolley
+           ?? TROLLEY_CONSTANTS.DEFAULT_SHELVES_PER_TROLLEY)
+        : null,
       heroImageUrl: row.hero_image_url,
       isActive: row.is_active ?? true,
       availableBatches: availableBatches.map((b) => ({
@@ -220,9 +240,10 @@ export default async function B2BNewOrderPage() {
     };
   }).filter((p) => p.totalAvailableQty > 0); // Only show products with stock
 
-  // Extract unique categories and sizes for filters
+  // Extract unique categories, sizes, and families for filters
   const categories = Array.from(new Set(catalogProducts.map((p) => p.category).filter(Boolean))) as string[];
   const sizes = Array.from(new Set(catalogProducts.map((p) => p.sizeName).filter(Boolean))) as string[];
+  const families = Array.from(new Set(catalogProducts.map((p) => p.family).filter(Boolean))).sort() as string[];
   const pricingHints = await getLastUsedPricing(
     supabase,
     authContext.customerId,
@@ -236,6 +257,7 @@ export default async function B2BNewOrderPage() {
         addresses={addresses || []}
         categories={categories}
         sizes={sizes}
+        families={families}
         customerId={authContext.customerId}
         pricingHints={pricingHints}
       />

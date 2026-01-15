@@ -12,11 +12,12 @@ import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     await requireDocumentAccess();
-    const template = await getDocumentTemplate(params.templateId);
+    const template = await getDocumentTemplate(templateId);
     if (!template) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -30,12 +31,13 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     await requireDocumentAccess();
     const body = await req.json().catch(() => ({}));
-    const parsed = TemplateInputSchema.safeParse({ ...body, id: params.templateId });
+    const parsed = TemplateInputSchema.safeParse({ ...body, id: templateId });
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid input", issues: parsed.error.flatten() }, { status: 422 });
     }
@@ -50,11 +52,12 @@ export async function PUT(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     await requireDocumentAccess();
-    await deleteTemplate(params.templateId);
+    await deleteTemplate(templateId);
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     console.error("[documents] delete failed", err);

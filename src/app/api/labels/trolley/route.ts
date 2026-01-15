@@ -1,7 +1,6 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import net from 'net';
 import {
   buildTrolleyLabelZpl,
   generateTrolleyLabelCode,
@@ -9,6 +8,7 @@ import {
 } from '@/server/labels/build-trolley-label';
 import { getSupabaseServerApp } from '@/server/db/supabase';
 import { resolveActiveOrgId } from '@/server/org/getActiveOrg';
+import { sendToPrinter } from '@/server/labels/send-to-printer';
 
 /**
  * POST /api/labels/trolley
@@ -138,23 +138,22 @@ export async function POST(req: NextRequest) {
       // Continue with printing even if DB save fails
     }
 
-    // Send to printer
-    if (printer.connection_type === 'network' || !printer.connection_type) {
-      if (!printer.host) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: 'Printer host is not configured',
-          },
-          { status: 400 }
-        );
-      }
-      await sendRawToPrinter(printer.host, printer.port || 9100, zpl);
-    } else {
+    // Get current user for tracking
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Send to printer (handles both network and agent-connected printers)
+    const result = await sendToPrinter(printer, zpl, {
+      jobType: 'trolley',
+      orgId,
+      userId: user?.id,
+      copies,
+    });
+
+    if (!result.success) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Connection type '${printer.connection_type}' not yet supported`,
+          error: result.error || 'Print failed',
         },
         { status: 400 }
       );
@@ -165,11 +164,13 @@ export async function POST(req: NextRequest) {
       copies,
       labelCode,
       labelId: trolleyLabel?.id,
+      jobId: result.jobId,
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Print failed';
     console.error('[api/labels/trolley] error:', e);
     return NextResponse.json(
-      { ok: false, error: e?.message || 'Print failed' },
+      { ok: false, error: message },
       { status: 500 }
     );
   }
@@ -254,28 +255,3 @@ export async function GET(req: NextRequest) {
   }
 }
 
-function sendRawToPrinter(host: string, port: number, data: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const client = new net.Socket();
-
-    client.setTimeout(5000);
-
-    client.connect(port, host, () => {
-      client.write(data, 'utf8', () => {
-        client.end();
-      });
-    });
-
-    client.on('error', (err) => {
-      client.destroy();
-      reject(err);
-    });
-
-    client.on('timeout', () => {
-      client.destroy();
-      reject(new Error('Printer connection timed out.'));
-    });
-
-    client.on('close', () => resolve());
-  });
-}

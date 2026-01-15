@@ -1,12 +1,15 @@
 import { z } from "zod";
 
+// Order status enum from database: draft, confirmed, picking, ready, packed, dispatched, delivered, cancelled, void
 export const OrderStatus = z.enum([
   "draft",
   "confirmed",
   "picking",
   "ready",
+  "packed",
   "dispatched",
   "delivered",
+  "cancelled",
   "void",
 ]);
 export type OrderStatus = z.infer<typeof OrderStatus>;
@@ -14,10 +17,12 @@ export type OrderStatus = z.infer<typeof OrderStatus>;
 const NEXT: Record<OrderStatus, OrderStatus[]> = {
   draft: ["confirmed", "void"],
   confirmed: ["picking", "void"],
-  picking: ["ready", "void"],
-  ready: ["dispatched", "void"],
+  picking: ["packed", "void"],
+  ready: ["dispatched", "void"], // legacy status
+  packed: ["dispatched", "void"],
   dispatched: ["delivered"],
   delivered: [],
+  cancelled: [],
   void: [],
 };
 

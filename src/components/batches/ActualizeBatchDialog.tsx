@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { SelectWithCreate } from "../ui/select-with-create";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,8 +37,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateBatches } from "@/lib/swr/keys";
 import type { Batch } from "@/lib/types";
 import { Info, AlertTriangle } from "lucide-react";
+import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 
 const schema = z.object({
   quantity: z.preprocess(
@@ -63,10 +65,13 @@ type Props = {
 export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: Props) {
   const { data: refData, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
-  
+
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
   const [submitting, setSubmitting] = React.useState(false);
+
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
 
   const isIncoming = batch.status === "Incoming";
   const isPlanned = batch.status === "Planned";
@@ -91,23 +96,30 @@ export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: P
       quantity: batch.quantity ?? 0,
       locationId: "",
       status: getDefaultStatus(),
-      plantedAt: new Date().toISOString().slice(0, 10),
+      plantedAt: "", // Empty initially, set after hydration
       notes: "",
     },
   });
 
-  // Reset form when batch changes
+  // Reset form when batch changes or dialog opens
   React.useEffect(() => {
     if (open) {
       form.reset({
         quantity: batch.quantity ?? 0,
         locationId: "",
         status: getDefaultStatus(),
-        plantedAt: new Date().toISOString().slice(0, 10),
+        plantedAt: getTodayISO(),
         notes: "",
       });
     }
   }, [batch.id, open]);
+
+  // Set date after hydration when dialog first opens
+  React.useEffect(() => {
+    if (today && !form.getValues("plantedAt")) {
+      form.setValue("plantedAt", today);
+    }
+  }, [today, form]);
 
   const locations = refData?.locations ?? [];
   // Filter out virtual locations
@@ -145,6 +157,8 @@ export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: P
         title: isIncoming ? "Stock received" : "Batch actualized",
         description: `${batch.batchNumber} is now in active production.`,
       });
+      // Invalidate batch caches to trigger refresh across all components
+      invalidateBatches();
       onSuccess?.();
       onOpenChange(false);
     } catch (error: any) {

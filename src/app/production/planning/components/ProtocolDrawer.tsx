@@ -95,15 +95,14 @@ function getWeekOptions(): number[] {
   return Array.from({ length: 52 }, (_, i) => i + 1);
 }
 
-// Generate year options (current year - 1 to current year + 6)
+// Generate relative year options (Year 1 to Year 5)
 function getYearOptions(): number[] {
-  const currentYear = new Date().getFullYear();
-  return Array.from({ length: 8 }, (_, i) => currentYear - 1 + i);
+  return Array.from({ length: 5 }, (_, i) => i + 1);
 }
 
-// Format year/week as readable string
+// Format year/week as readable string (relative years)
 function formatYearWeek(year: number, week: number): string {
-  return `${year} W${week.toString().padStart(2, '0')}`;
+  return `Year ${year} W${week.toString().padStart(2, '0')}`;
 }
 
 // Calculate weeks between two year/week points
@@ -142,28 +141,27 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
   const [saving, setSaving] = React.useState(false);
   const [expandedConditions, setExpandedConditions] = React.useState<Set<string>>(new Set());
 
-  const currentYear = new Date().getFullYear();
-
   // Size flow state - TOP DOWN: Ready first, Propagation last
+  // Uses relative years (Year 1, Year 2, etc.) since recipes are templates
   const [sizeFlow, setSizeFlow] = React.useState<SizeFlowStep[]>([
-    { 
-      id: crypto.randomUUID(), 
-      sizeId: "", 
-      sizeName: "", 
-      stageName: "Ready", 
-      fromYear: currentYear + 2, 
+    {
+      id: crypto.randomUUID(),
+      sizeId: "",
+      sizeName: "",
+      stageName: "Ready",
+      fromYear: 3,
       fromWeek: 38,
-      toYear: currentYear + 2,
+      toYear: 3,
       toWeek: 44,
     },
-    { 
-      id: crypto.randomUUID(), 
-      sizeId: "", 
-      sizeName: "", 
-      stageName: "Propagation", 
-      fromYear: currentYear, 
+    {
+      id: crypto.randomUUID(),
+      sizeId: "",
+      sizeName: "",
+      stageName: "Propagation",
+      fromYear: 1,
       fromWeek: 1,
-      toYear: currentYear,
+      toYear: 1,
       toWeek: 6,
     },
   ]);
@@ -397,8 +395,8 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
       
       form.reset();
       setSizeFlow([
-        { id: crypto.randomUUID(), sizeId: "", sizeName: "", stageName: "Ready", fromYear: currentYear + 2, fromWeek: 38, toYear: currentYear + 2, toWeek: 44 },
-        { id: crypto.randomUUID(), sizeId: "", sizeName: "", stageName: "Propagation", fromYear: currentYear, fromWeek: 1, toYear: currentYear, toWeek: 6 },
+        { id: crypto.randomUUID(), sizeId: "", sizeName: "", stageName: "Ready", fromYear: 3, fromWeek: 38, toYear: 3, toWeek: 44 },
+        { id: crypto.randomUUID(), sizeId: "", sizeName: "", stageName: "Propagation", fromYear: 1, fromWeek: 1, toYear: 1, toWeek: 6 },
       ]);
       setExpandedConditions(new Set());
     } catch (error: any) {
@@ -635,12 +633,12 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
                                   value={step.fromYear.toString()}
                                   onValueChange={(v) => updateSizeStep(index, { fromYear: Number(v) })}
                                 >
-                                  <SelectTrigger className="w-[80px]">
+                                  <SelectTrigger className="w-[90px]">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {getYearOptions().map((year) => (
-                                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                      <SelectItem key={year} value={year.toString()}>Year {year}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -670,12 +668,12 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
                                   value={step.toYear.toString()}
                                   onValueChange={(v) => updateSizeStep(index, { toYear: Number(v) })}
                                 >
-                                  <SelectTrigger className="w-[80px]">
+                                  <SelectTrigger className="w-[90px]">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {getYearOptions().map((year) => (
-                                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                      <SelectItem key={year} value={year.toString()}>Year {year}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>

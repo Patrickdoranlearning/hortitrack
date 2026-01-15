@@ -572,18 +572,18 @@ export default function SaleableBatchesClient({
             Manage batch production status. Scan batches or use bulk actions to update status.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
+        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/production/saleable/wizard">
               <Camera className="h-4 w-4 mr-2" />
               Wizard
             </Link>
           </Button>
-          <Button variant="outline" onClick={downloadCSV}>
+          <Button variant="outline" onClick={downloadCSV} className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="w-full sm:w-auto">
             <Link href="/settings/dropdowns">
               <Settings2 className="h-4 w-4 mr-2" />
               Configure Statuses
@@ -913,25 +913,26 @@ export default function SaleableBatchesClient({
 
       {/* Batch Table */}
       <div className="rounded-lg border bg-white overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40">
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={toggleSelectAll}
-                  aria-label="Select all"
-                />
-              </TableHead>
-              <TableHead>Batch</TableHead>
-              <TableHead>Variety / Size</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Units</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Photo</TableHead>
-              <TableHead>Updated</TableHead>
-            </TableRow>
-          </TableHeader>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
+                <TableHead>Batch</TableHead>
+                <TableHead>Variety / Size</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Units</TableHead>
+                <TableHead className="hidden md:table-cell">Location</TableHead>
+                <TableHead>Photo</TableHead>
+                <TableHead className="hidden md:table-cell">Updated</TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {filteredBatches.length === 0 ? (
               <TableRow>
@@ -991,7 +992,7 @@ export default function SaleableBatchesClient({
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-medium">{(batch.quantity ?? 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-muted-foreground">{batch.location ?? "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">{batch.location ?? "—"}</TableCell>
                     <TableCell>
                       <Button
                         variant={batch.salesPhotoUrl ? "ghost" : "outline"}
@@ -1014,13 +1015,14 @@ export default function SaleableBatchesClient({
                         )}
                       </Button>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(batch.updatedAt)}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{formatDate(batch.updatedAt)}</TableCell>
                   </TableRow>
                 );
               })
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </div>
 
       {/* Hidden file input for photo upload */}

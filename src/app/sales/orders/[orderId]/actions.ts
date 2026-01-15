@@ -28,18 +28,49 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
   }
 
   // Validate status transition
+  // Order status enum: draft, confirmed, picking, ready, packed, dispatched, delivered, cancelled, void
   const validTransitions: Record<string, string[]> = {
     draft: ['confirmed', 'void'],
     confirmed: ['picking', 'void'],
-    picking: ['ready', 'void'],
-    ready: ['dispatched', 'void'],
+    picking: ['packed', 'void'],
+    ready: ['dispatched', 'void'], // legacy status - still allow transition
+    packed: ['dispatched', 'void'],
     dispatched: ['delivered'],
     delivered: [],
+    cancelled: [],
     void: [],
   };
 
   if (!validTransitions[order.status]?.includes(newStatus)) {
     return { error: `Cannot transition from ${order.status} to ${newStatus}` };
+  }
+
+  // Check pick list status for certain transitions
+  // Cannot move to 'dispatched' unless pick list is completed
+  if (newStatus === 'dispatched') {
+    const { data: pickList } = await supabase
+      .from('pick_lists')
+      .select('id, status')
+      .eq('order_id', orderId)
+      .maybeSingle();
+
+    if (pickList && pickList.status !== 'completed') {
+      return { error: 'Cannot dispatch order - picking has not been completed. Complete the pick list first.' };
+    }
+  }
+
+  // Cannot move to 'packed' manually - this should only happen when pick list is completed
+  // Allow it if no pick list exists (manual workflow) or if pick list is completed
+  if (newStatus === 'packed' && order.status === 'picking') {
+    const { data: pickList } = await supabase
+      .from('pick_lists')
+      .select('id, status')
+      .eq('order_id', orderId)
+      .maybeSingle();
+
+    if (pickList && pickList.status !== 'completed') {
+      return { error: 'Cannot mark as ready - picking has not been completed. Complete the pick list first.' };
+    }
   }
 
   // Update status
@@ -80,7 +111,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
 
   revalidatePath(`/sales/orders/${orderId}`);
   revalidatePath('/sales/orders');
-  revalidatePath('/dispatch/picking');
+  revalidatePath('/dispatch/picker');
   return { success: true };
 }
 

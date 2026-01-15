@@ -202,26 +202,28 @@ export function calculateTrolleysNeeded(
     totalHolesUsed / TROLLEY_CONSTANTS.STANDARD_HOLES
   );
 
-  // Calculate remaining capacity on the current trolley
+  // Calculate holes used on the current (last) trolley
+  // When totalHolesUsed is an exact multiple of STANDARD_HOLES (e.g., 33, 66),
+  // the trolley is full, so currentTrolleyHolesUsed should be STANDARD_HOLES
+  const moduloHoles = totalHolesUsed % TROLLEY_CONSTANTS.STANDARD_HOLES;
   const currentTrolleyHolesUsed =
-    totalHolesUsed % TROLLEY_CONSTANTS.STANDARD_HOLES ||
-    (totalHolesUsed > 0 ? TROLLEY_CONSTANTS.STANDARD_HOLES : 0);
+    moduloHoles === 0 && totalHolesUsed > 0
+      ? TROLLEY_CONSTANTS.STANDARD_HOLES // Trolley is exactly full
+      : moduloHoles;
+
+  // Calculate remaining holes on the current trolley
   const holesRemaining =
-    totalHolesUsed > 0
-      ? TROLLEY_CONSTANTS.STANDARD_HOLES - (totalHolesUsed % TROLLEY_CONSTANTS.STANDARD_HOLES) ||
-        0
-      : TROLLEY_CONSTANTS.STANDARD_HOLES;
+    totalHolesUsed === 0
+      ? TROLLEY_CONSTANTS.STANDARD_HOLES // Empty - full trolley available
+      : currentTrolleyHolesUsed === TROLLEY_CONSTANTS.STANDARD_HOLES
+        ? 0 // Trolley is full, no remaining holes
+        : TROLLEY_CONSTANTS.STANDARD_HOLES - currentTrolleyHolesUsed;
 
   return {
     totalTrolleys,
     totalHolesUsed,
-    currentTrolleyHolesUsed:
-      totalHolesUsed % TROLLEY_CONSTANTS.STANDARD_HOLES ||
-      (totalTrolleys > 0 ? TROLLEY_CONSTANTS.STANDARD_HOLES : 0),
-    holesRemaining:
-      holesRemaining === TROLLEY_CONSTANTS.STANDARD_HOLES && totalTrolleys > 0
-        ? 0
-        : holesRemaining,
+    currentTrolleyHolesUsed,
+    holesRemaining,
     breakdown,
   };
 }

@@ -4,9 +4,10 @@ import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     const supabase = await getSupabaseServerApp();
     const orgId = await resolveActiveOrgId();
 
@@ -17,7 +18,7 @@ export async function GET(
     const { data, error } = await supabase
       .from("label_templates")
       .select("*")
-      .eq("id", params.templateId)
+      .eq("id", templateId)
       .eq("org_id", orgId)
       .single();
 
@@ -32,9 +33,10 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     const supabase = await getSupabaseServerApp();
     const orgId = await resolveActiveOrgId();
 
@@ -73,7 +75,7 @@ export async function PUT(
     const { data, error } = await supabase
       .from("label_templates")
       .update(updateData)
-      .eq("id", params.templateId)
+      .eq("id", templateId)
       .eq("org_id", orgId)
       .select()
       .single();
@@ -89,9 +91,10 @@ export async function PUT(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     const supabase = await getSupabaseServerApp();
     const orgId = await resolveActiveOrgId();
 
@@ -102,7 +105,7 @@ export async function DELETE(
     const { error } = await supabase
       .from("label_templates")
       .delete()
-      .eq("id", params.templateId)
+      .eq("id", templateId)
       .eq("org_id", orgId);
 
     if (error) throw error;

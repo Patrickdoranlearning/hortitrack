@@ -51,6 +51,7 @@ import {
 import type { ProductManagementPayload, ProductSummary, ProductSkuOption } from "./types";
 import dynamic from "next/dynamic";
 import SkuManagementSheet from "./SkuManagementSheet";
+import { HeroImageUploader } from "@/components/products/HeroImageUploader";
 
 // Lazy load gallery to avoid slowing down initial page load
 const ProductGallerySection = dynamic(
@@ -185,6 +186,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
         mode={sheetMode}
         onOpenChange={setSheetOpen}
         product={selectedProduct}
+        products={props.products}
         skus={skuOptions}
         batches={props.batches}
         priceLists={props.priceLists}
@@ -212,6 +214,7 @@ type ComposerProps = {
   mode: "create" | "edit";
   onOpenChange: (open: boolean) => void;
   product: ProductSummary | null;
+  products: ProductSummary[]; // Added to check if SKU is already linked
   skus: ProductManagementPayload["skus"];
   batches: ProductManagementPayload["batches"];
   priceLists: ProductManagementPayload["priceLists"];
@@ -219,7 +222,7 @@ type ComposerProps = {
   onProductSaved: (productId: string | null) => void;
 };
 
-function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches, priceLists, customers, onProductSaved }: ComposerProps) {
+function ProductComposerSheet({ open, onOpenChange, mode, product, products, skus, batches, priceLists, customers, onProductSaved }: ComposerProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
@@ -272,6 +275,7 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, skus, batches
           <TabsContent value="details">
             <ProductDetailsSection
               product={product}
+              products={products}
               skus={skus}
               mode={mode}
               onSaved={(id) => {
@@ -365,6 +369,7 @@ function EmptyTabState({ label }: { label: string }) {
 type ProductDetailsSectionProps = {
   product: ProductSummary | null;
   skus: ProductManagementPayload["skus"];
+  products?: ProductSummary[]; // Added to check if SKU is already linked
   mode: "create" | "edit";
   onSaved: (productId: string | null) => void;
   onCreateSku?: () => void;
@@ -377,6 +382,7 @@ type ProductDetailsSectionProps = {
 export function ProductDetailsSection({
   product,
   skus,
+  products = [],
   mode,
   onSaved,
   onCreateSku,
@@ -422,10 +428,33 @@ export function ProductDetailsSection({
     }
   }, [forcedSkuId, onForcedSkuApplied]);
 
+  // Build a map of which SKUs are linked to which products (excluding current product if editing)
+  const skuToProductMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of products) {
+      // Skip the current product being edited
+      if (p.id === product?.id) continue;
+      map.set(p.skuId, p.name);
+    }
+    return map;
+  }, [products, product?.id]);
+
+  // Check if currently selected SKU is already linked to another product
+  const selectedSkuLinkedProduct = skuToProductMap.get(formState.skuId);
+
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formState.name.trim() || !formState.skuId) {
       toast({ variant: "destructive", title: "Missing fields", description: "Name and SKU are required." });
+      return;
+    }
+    // Prevent saving with an already-linked SKU
+    if (selectedSkuLinkedProduct) {
+      toast({
+        variant: "destructive",
+        title: "SKU already in use",
+        description: `This SKU is linked to "${selectedSkuLinkedProduct}". Please select a different SKU or create a new one.`
+      });
       return;
     }
     startTransition(async () => {
@@ -470,15 +499,29 @@ export function ProductDetailsSection({
               value={formState.skuId}
               onValueChange={(value) => setFormState((prev) => ({ ...prev, skuId: value }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className={selectedSkuLinkedProduct ? "border-red-300" : ""}>
                 <SelectValue placeholder="Select SKU" />
               </SelectTrigger>
               <SelectContent>
-                {skus.map((sku) => (
-                  <SelectItem key={sku.id} value={sku.id}>
-                    {sku.label}
-                  </SelectItem>
-                ))}
+                {skus.map((sku) => {
+                  const linkedTo = skuToProductMap.get(sku.id);
+                  return (
+                    <SelectItem
+                      key={sku.id}
+                      value={sku.id}
+                      className={linkedTo ? "text-muted-foreground" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{sku.label}</span>
+                        {linkedTo && (
+                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
+                            In use
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             {onCreateSku && (
@@ -487,6 +530,11 @@ export function ProductDetailsSection({
               </Button>
             )}
           </div>
+          {selectedSkuLinkedProduct && (
+            <p className="text-sm text-red-600">
+              This SKU is already linked to "{selectedSkuLinkedProduct}". Select a different SKU or create a new one.
+            </p>
+          )}
         </div>
       </div>
       {/* SKU Configuration - Variety and Size for trolley calculation */}
@@ -609,23 +657,21 @@ export function ProductDetailsSection({
           onChange={(event) => setFormState((prev) => ({ ...prev, description: event.target.value }))}
         />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Default status</Label>
-          <Input
-            placeholder="e.g., Bud & flower"
-            value={formState.defaultStatus ?? ""}
-            onChange={(event) => setFormState((prev) => ({ ...prev, defaultStatus: event.target.value }))}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Hero image URL</Label>
-          <Input
-            placeholder="https://…"
-            value={formState.heroImageUrl ?? ""}
-            onChange={(event) => setFormState((prev) => ({ ...prev, heroImageUrl: event.target.value }))}
-          />
-        </div>
+      <div className="space-y-2">
+        <Label>Default status</Label>
+        <Input
+          placeholder="e.g., Bud & flower"
+          value={formState.defaultStatus ?? ""}
+          onChange={(event) => setFormState((prev) => ({ ...prev, defaultStatus: event.target.value }))}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Hero image</Label>
+        <HeroImageUploader
+          value={formState.heroImageUrl || null}
+          onChange={(url) => setFormState((prev) => ({ ...prev, heroImageUrl: url ?? "" }))}
+          disabled={pending}
+        />
       </div>
       <div className="flex items-center justify-between rounded-lg border p-3">
         <div className="space-y-0.5">

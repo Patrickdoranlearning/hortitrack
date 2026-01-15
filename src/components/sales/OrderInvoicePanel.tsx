@@ -53,7 +53,7 @@ export default function OrderInvoicePanel({
 
   const hasInvoice = invoices.length > 0;
   const latestInvoice = invoices[0];
-  const canGenerateInvoice = !hasInvoice && ['confirmed', 'picking', 'ready', 'dispatched', 'delivered'].includes(orderStatus);
+  const canGenerateInvoice = !hasInvoice && ['confirmed', 'picking', 'ready', 'packed', 'dispatched', 'delivered'].includes(orderStatus);
 
   const handleGenerateInvoice = async () => {
     setIsGenerating(true);

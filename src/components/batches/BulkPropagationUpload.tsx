@@ -11,8 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, Download, RefreshCw, FileSpreadsheet, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { SelectWithCreate } from "../ui/select-with-create";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
+import { invalidateBatches } from "@/lib/swr/keys";
+import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 
 type UploadStatus = "pending" | "uploading" | "success" | "error";
 
@@ -42,17 +44,25 @@ type Props = {
 export default function BulkPropagationUpload({ onComplete }: Props) {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
-  
+
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
   const [rows, setRows] = React.useState<UploadRow[]>([]);
   const [busy, setBusy] = React.useState<"parsing" | "uploading" | null>(null);
   const [defaults, setDefaults] = React.useState<{
     locationId?: string;
     sizeId?: string;
     plantedAt?: string;
-  }>({ plantedAt: today });
+  }>({ plantedAt: "" });
+
+  // Set date default after hydration
+  React.useEffect(() => {
+    if (today && !defaults.plantedAt) {
+      setDefaults((prev) => ({ ...prev, plantedAt: today }));
+    }
+  }, [today, defaults.plantedAt]);
 
   const varietyMap = React.useMemo(() => {
     const byName = new Map<string, { id: string; name: string }>();
@@ -264,6 +274,8 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
 
     setBusy(null);
     if (created > 0) {
+      // Invalidate batch caches to trigger refresh across all components
+      invalidateBatches();
       onComplete?.();
     }
   }
@@ -721,7 +733,7 @@ function parsePropagationCsv(text: string, helpers: LookupHelpers): UploadRow[] 
     throw new Error(`Missing required columns: ${missing.join(", ")}`);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayISO();
   const parsed: UploadRow[] = [];
 
   for (let i = 1; i < lines.length; i++) {

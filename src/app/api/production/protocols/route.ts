@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ProductionProtocolRouteSchema, ProductionProtocolStepSchema, ProductionTargetsSchema } from "@/lib/protocol-types";
 import { getUserAndOrg } from "@/server/auth/org";
+import { getSupabaseAdmin } from "@/server/db/supabase";
 import { listProtocols, rowToProtocolSummary, type ProtocolRow } from "@/server/planning/service";
 
 const ProtocolPayloadSchema = z.object({
   name: z.string().min(2),
   description: z.string().max(1000).optional(),
-  targetVarietyId: z.string().uuid(),
+  targetVarietyId: z.string().uuid().nullable(),
   targetSizeId: z.string().uuid().optional(),
   summary: z.string().optional(),
   steps: z.array(ProductionProtocolStepSchema).default([]),
@@ -33,7 +34,27 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const payload = ProtocolPayloadSchema.parse(await req.json());
-    const { supabase, orgId } = await getUserAndOrg();
+    const { supabase, orgId, user } = await getUserAndOrg();
+
+    // Verify user has org membership (for authorization)
+    const { data: membership, error: membershipError } = await supabase
+      .from("org_memberships")
+      .select("org_id")
+      .eq("user_id", user.id)
+      .eq("org_id", orgId)
+      .maybeSingle();
+
+    if (membershipError) {
+      console.error("[protocols POST] membership check failed:", membershipError);
+    }
+
+    if (!membership) {
+      console.error("[protocols POST] user has no membership for org:", { userId: user.id, orgId });
+      return NextResponse.json(
+        { error: "You don't have permission to create protocols in this organization" },
+        { status: 403 }
+      );
+    }
 
     const definition = {
       summary: payload.summary ?? null,
@@ -41,7 +62,9 @@ export async function POST(req: Request) {
       targets: payload.targets ?? null,
     };
 
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS for insert (user is already authorized via membership check)
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
       .from("protocols")
       .insert({
         org_id: orgId,
@@ -73,16 +96,18 @@ export async function POST(req: Request) {
       .single();
 
     if (error || !data) {
+      console.error("[protocols POST] insert failed:", error);
       throw new Error(error?.message ?? "Failed to create protocol");
     }
 
     const protocol = rowToProtocolSummary(data as ProtocolRow);
     return NextResponse.json({ protocol }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json({ error: "Invalid payload", issues: (error as any).issues }, { status: 400 });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
     }
     const message = error instanceof Error ? error.message : "Failed to create protocol";
+    console.error("[protocols POST] error:", message);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

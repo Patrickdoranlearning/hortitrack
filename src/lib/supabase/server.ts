@@ -13,10 +13,10 @@ export async function createClient() {
                 getAll() {
                     return cookieStore.getAll()
                 },
-                setAll(cookiesToSet) {
-                    console.log("createClient setAll called with", cookiesToSet.map(c => c.name));
+                setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+                    console.log("createClient setAll called with", cookiesToSet.map((c: { name: string }) => c.name));
                     try {
-                        cookiesToSet.forEach(({ name, value, options }) =>
+                        cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options?: Record<string, unknown> }) =>
                             cookieStore.set(name, value, options)
                         )
                     } catch (e) {

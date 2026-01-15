@@ -5,13 +5,14 @@ import { addOrderToDeliveryRun } from "@/server/dispatch/queries.server";
 
 export async function POST(
   req: Request,
-  { params }: { params: { runId: string } }
+  { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
+    const { runId } = await params;
     const json = await req.json();
     const parsed = AddToDeliveryRunSchema.safeParse({
       ...json,
-      deliveryRunId: params.runId,
+      deliveryRunId: runId,
     });
 
     if (!parsed.success) {

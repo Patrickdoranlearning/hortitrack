@@ -29,6 +29,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { useTodayDate } from "@/lib/date-sync";
 
 type Status = "pending" | "uploading" | "success" | "error";
 
@@ -57,16 +58,24 @@ export default function MultiParentTransplantBuilder() {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
 
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
   const [child, setChild] = React.useState({
     varietyId: "",
     sizeId: "",
     locationId: "",
     packs: 1,
     unitsPerPack: 6,
-    plantedAt: today,
+    plantedAt: "", // Empty initially, set after hydration
     notes: "",
   });
+
+  // Set date after hydration
+  React.useEffect(() => {
+    if (today && !child.plantedAt) {
+      setChild((prev) => ({ ...prev, plantedAt: today }));
+    }
+  }, [today, child.plantedAt]);
   const [rows, setRows] = React.useState<ParentRow[]>([]);
   const [busy, setBusy] = React.useState<"submitting" | null>(null);
   const [searchResults, setSearchResults] = React.useState<ParentBatch[]>([]);

@@ -7,7 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 const Query = z.object({
   q: z.string().trim().min(0).max(100).optional(),
   status: z.enum(["Growing","Ready","Archived"]).optional(),
+  behavior: z.enum(["growing", "available", "waste", "archived"]).optional(),
   phase: z.string().optional(), // keep free-form if your enum differs
+  varietyId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -19,7 +21,7 @@ export async function GET(req: Request) {
     if (!parse.success) {
       return NextResponse.json({ error: parse.error.flatten() }, { status: 400 });
     }
-    const { q, status, phase, page, pageSize } = parse.data;
+    const { q, status, behavior, phase, varietyId, page, pageSize } = parse.data;
 
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
@@ -42,7 +44,9 @@ export async function GET(req: Request) {
       .range(from, to);
 
     if (status) query = query.eq("status", status);
+    if (behavior) query = query.eq("behavior", behavior);
     if (phase)  query = query.eq("phase", phase);
+    if (varietyId) query = query.eq("plant_variety_id", varietyId);
     if (q && q.length) {
       const like = `%${q.toLowerCase()}%`;
       query = query.or([

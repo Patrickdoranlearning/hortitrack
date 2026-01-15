@@ -53,12 +53,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 import {
   assignOrderToPicker,
   assignOrderToRun,
   createEmptyRoute,
+  createLoadWithOrders,
   updateLoad,
   deleteLoad,
   removeOrderFromLoad,
@@ -129,9 +139,16 @@ export default function DispatchBoard({
   const [selectedOrder, setSelectedOrder] = useState<DispatchBoardOrder | null>(null);
   const [newLoadDialogOpen, setNewLoadDialogOpen] = useState(false);
   const [newLoadDate, setNewLoadDate] = useState<Date | undefined>(new Date());
-  const [newLoadName, setNewLoadName] = useState('');
+  const [newLoadCode, setNewLoadCode] = useState('');
   const [newLoadHaulier, setNewLoadHaulier] = useState<string>('');
   const [newLoadVehicle, setNewLoadVehicle] = useState<string>('');
+  const [pendingDispatch, setPendingDispatch] = useState<{
+    loadId: string;
+    loadCode: string;
+    orderCount: number;
+    blockedCount: number;
+  } | null>(null);
+  const [dispatchOverrideReason, setDispatchOverrideReason] = useState('');
 
   // Split pane resize
   const [leftPanelWidth, setLeftPanelWidth] = useState(380);
@@ -378,7 +395,7 @@ export default function DispatchBoard({
         dateStr,
         newLoadHaulier || undefined,
         newLoadVehicle || undefined,
-        newLoadName || undefined
+        newLoadCode || undefined
       ),
       {
         loading: 'Creating load...',
@@ -388,6 +405,40 @@ export default function DispatchBoard({
           setNewLoadHaulier('');
           setNewLoadVehicle('');
           return 'Load created';
+        },
+        error: 'Failed to create load',
+      }
+    );
+  };
+
+  const handleCreateLoadFromSelected = async () => {
+    if (!newLoadDate) return;
+    const selectedOrderIds = Array.from(selectedIds);
+
+    if (selectedOrderIds.length === 0) {
+      toast.error('Select orders to create a load');
+      return;
+    }
+
+    const dateStr = format(newLoadDate, 'yyyy-MM-dd');
+
+    toast.promise(
+      createLoadWithOrders(
+        dateStr,
+        selectedOrderIds,
+        newLoadHaulier || undefined,
+        newLoadVehicle || undefined,
+        newLoadCode || undefined
+      ),
+      {
+        loading: 'Creating load...',
+        success: () => {
+          setNewLoadDialogOpen(false);
+          setNewLoadName('');
+          setNewLoadHaulier('');
+          setNewLoadVehicle('');
+          setSelectedIds(new Set());
+          return `Load created with ${selectedOrderIds.length} orders`;
         },
         error: 'Failed to create load',
       }
@@ -406,7 +457,7 @@ export default function DispatchBoard({
 
     toast.promise(
       updateLoad(editingLoad.id, {
-        loadName: editingLoad.loadName,
+        loadCode: editingLoad.loadCode,
         haulierId: editingLoad.haulierId,
         vehicleId: editingLoad.vehicleId,
         runDate: editingLoad.runDate,
@@ -443,28 +494,63 @@ export default function DispatchBoard({
     }
   };
 
-  const handleDispatchLoad = async (loadId: string, loadName: string, orderCount: number) => {
+  const handleDispatchLoad = async (
+    loadId: string,
+    loadCode: string,
+    orderCount: number,
+    blockedCount: number
+  ) => {
     if (orderCount === 0) {
       toast.error('No orders in this load to dispatch');
       return;
     }
 
+    if (blockedCount > 0) {
+      setPendingDispatch({ loadId, loadCode, orderCount, blockedCount });
+      setDispatchOverrideReason('');
+      return;
+    }
+
     toast.promise(dispatchLoad(loadId), {
-      loading: `Dispatching ${loadName}...`,
+      loading: `Dispatching ${loadCode}...`,
       success: (result) => {
         if (result.error) throw new Error(result.error);
-        return `${loadName} dispatched with ${result.ordersDispatched} orders`;
+        return `${loadCode} dispatched with ${result.ordersDispatched} orders`;
       },
       error: (err) => err.message || 'Failed to dispatch load',
     });
   };
 
-  const handleRecallLoad = async (loadId: string, loadName: string) => {
-    toast.promise(recallLoad(loadId), {
-      loading: `Recalling ${loadName}...`,
+  const handleConfirmDispatch = async () => {
+    if (!pendingDispatch) return;
+    const reason = dispatchOverrideReason.trim();
+
+    if (!reason) {
+      toast.error('Override reason is required');
+      return;
+    }
+
+    const { loadId, loadCode } = pendingDispatch;
+
+    toast.promise(dispatchLoad(loadId), {
+      loading: `Dispatching ${loadCode}...`,
       success: (result) => {
         if (result.error) throw new Error(result.error);
-        return `${loadName} recalled - ${result.ordersRecalled} orders reverted`;
+        return `${loadCode} dispatched with ${result.ordersDispatched} orders. Override: ${reason}`;
+      },
+      error: (err) => err.message || 'Failed to dispatch load',
+    });
+
+    setPendingDispatch(null);
+    setDispatchOverrideReason('');
+  };
+
+  const handleRecallLoad = async (loadId: string, loadCode: string) => {
+    toast.promise(recallLoad(loadId), {
+      loading: `Recalling ${loadCode}...`,
+      success: (result) => {
+        if (result.error) throw new Error(result.error);
+        return `${loadCode} recalled - ${result.ordersRecalled} orders reverted`;
       },
       error: (err) => err.message || 'Failed to recall load',
     });
@@ -792,6 +878,8 @@ export default function DispatchBoard({
           onRecallLoad={handleRecallLoad}
           onViewOrder={setSelectedOrder}
           onFilterByCounty={(county) => setColumnFilters((prev) => ({ ...prev, county }))}
+          onFilterByStatus={(status) => setColumnFilters((prev) => ({ ...prev, status }))}
+          activeStatusFilter={columnFilters.status}
           startResize={startResize}
           getStatusColor={getStatusColor}
           getStageLabel={getStageLabel}
@@ -821,20 +909,31 @@ export default function DispatchBoard({
         />
       )}
 
-      {/* New Load Dialog */}
-      <Dialog open={newLoadDialogOpen} onOpenChange={setNewLoadDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Load</DialogTitle>
-            <DialogDescription>Create a new delivery load for dispatching orders.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+      {/* New Load Sheet */}
+      <Sheet open={newLoadDialogOpen} onOpenChange={setNewLoadDialogOpen}>
+        <SheetContent side="right" className="sm:max-w-lg flex flex-col h-full">
+          <SheetHeader>
+            <SheetTitle>Create Load</SheetTitle>
+            <SheetDescription>
+              Build a flexible load and assign orders now or later.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto space-y-5 py-4">
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">Selected orders</span>
+                <Badge variant="secondary">{selectedIds.size}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Create a load from selected orders or start empty and drag orders in.
+              </p>
+            </div>
             <div className="space-y-2">
-              <Label>Load Name (optional)</Label>
+              <Label>Load Code</Label>
               <Input
-                placeholder="e.g., Cork Load 1"
-                value={newLoadName}
-                onChange={(e) => setNewLoadName(e.target.value)}
+                placeholder="e.g., 4L (Thursday Liam)"
+                value={newLoadCode}
+                onChange={(e) => setNewLoadCode(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -908,14 +1007,16 @@ export default function DispatchBoard({
               </Popover>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewLoadDialogOpen(false)}>
-              Cancel
+          <SheetFooter className="gap-2 pt-4 border-t mt-auto">
+            <Button variant="outline" onClick={handleCreateNewLoad}>
+              Create Empty Load
             </Button>
-            <Button onClick={handleCreateNewLoad}>Create Load</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button onClick={handleCreateLoadFromSelected}>
+              Create With {selectedIds.size} Orders
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Edit Load Dialog */}
       <Dialog open={!!editingLoad} onOpenChange={(open) => !open && setEditingLoad(null)}>
@@ -932,6 +1033,50 @@ export default function DispatchBoard({
               onCancel={() => setEditingLoad(null)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dispatch Override Dialog */}
+      <Dialog
+        open={!!pendingDispatch}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDispatch(null);
+            setDispatchOverrideReason('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dispatch with unresolved picking?</DialogTitle>
+            <DialogDescription>
+              {pendingDispatch?.loadCode} has {pendingDispatch?.blockedCount} orders not ready to load.
+              Provide an override reason to dispatch anyway.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Override reason</Label>
+            <Textarea
+              placeholder="Explain why this load is dispatching early..."
+              value={dispatchOverrideReason}
+              onChange={(e) => setDispatchOverrideReason(e.target.value)}
+              className="min-h-[90px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingDispatch(null);
+                setDispatchOverrideReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmDispatch} disabled={!dispatchOverrideReason.trim()}>
+              Dispatch Anyway
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

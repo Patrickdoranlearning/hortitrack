@@ -159,10 +159,10 @@ export default function TrolleyManagementClient() {
       }
 
       // Fetch customers for dropdown
-      const customersRes = await fetch("/api/customers?limit=500");
+      const customersRes = await fetch("/api/lookups/customers");
       const customersData = await customersRes.json();
-      if (customersData.customers) {
-        setCustomers(customersData.customers.map((c: any) => ({ id: c.id, name: c.name })));
+      if (customersData.data) {
+        setCustomers(customersData.data.map((c: any) => ({ id: c.id, name: c.name })));
       }
     } catch (error) {
       console.error("Failed to fetch data:", error);

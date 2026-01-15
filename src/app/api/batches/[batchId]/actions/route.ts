@@ -77,7 +77,10 @@ type BatchRow = {
 };
 
 function corsHeaders() {
-  const allow = process.env.NODE_ENV === "development" ? "*" : "";
+  const allow =
+    process.env.NODE_ENV === "development"
+      ? "*"
+      : process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || "";
   return {
     "access-control-allow-origin": allow,
     "access-control-allow-methods": "POST,OPTIONS",
@@ -92,11 +95,12 @@ export async function OPTIONS() {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { batchId: string } }
+  { params }: { params: Promise<{ batchId: string }> }
 ) {
   const requestId = req.headers.get("idempotency-key") ?? randomUUID();
 
   try {
+    const { batchId } = await params;
     const raw = await req.json();
     const parsed = Input.safeParse(raw);
     if (!parsed.success) {
@@ -115,7 +119,7 @@ export async function POST(
     const input = parsed.data;
     const { supabase, orgId, user } = await getUserAndOrg();
 
-    const batch = await loadBatch(supabase, orgId, params.batchId);
+    const batch = await loadBatch(supabase, orgId, batchId);
     if (!batch) {
       return NextResponse.json(
         { error: "batch not found" },
@@ -420,7 +424,8 @@ async function handleDump(ctx: HandlerArgs): Promise<HandlerResult> {
     by_user_id: userId,
     at: occurredAt,
     payload: {
-      units_dumped: qty,
+      units: qty,
+      units_dumped: qty,  // Keep for backwards compatibility
       reason: input.reason,
       notes: normalizeText(input.notes),
     },

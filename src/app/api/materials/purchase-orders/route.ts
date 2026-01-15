@@ -47,7 +47,8 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const body = await req.json();
 
     const parsed = CreatePurchaseOrderSchema.safeParse(body);

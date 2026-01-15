@@ -185,7 +185,7 @@ export function ListView({
                           <SelectItem value="none">— None —</SelectItem>
                           {loads.map((load) => (
                             <SelectItem key={load.id} value={load.id}>
-                              {load.loadName || load.runNumber}
+                              {load.loadCode || load.runNumber}
                             </SelectItem>
                           ))}
                         </SelectContent>

@@ -324,7 +324,7 @@ describe('dispatch board-actions', () => {
         runDate: '2024-01-15',
         haulierId: 'haulier-1',
         vehicleId: 'vehicle-1',
-        loadName: 'Cork Load',
+        loadCode: '4L',
       });
     });
 
@@ -338,7 +338,7 @@ describe('dispatch board-actions', () => {
         runDate: '2024-01-15',
         haulierId: undefined,
         vehicleId: undefined,
-        loadName: undefined,
+        loadCode: undefined,
       });
     });
   });
@@ -352,7 +352,7 @@ describe('dispatch board-actions', () => {
         new MockSupabaseQueryBuilder({ data: null, error: null })
       );
 
-      const result = await updateLoad('load-1', { loadName: 'Dublin AM' });
+      const result = await updateLoad('load-1', { loadCode: '2S' });
 
       expect(result.success).toBe(true);
       expect(mockSupabase.from).toHaveBeenCalledWith('delivery_runs');
@@ -364,7 +364,7 @@ describe('dispatch board-actions', () => {
       );
 
       const result = await updateLoad('load-1', {
-        loadName: 'Cork PM',
+        loadCode: '3H',
         haulierId: 'haulier-2',
         vehicleId: 'vehicle-2',
         runDate: '2024-01-16',
@@ -394,7 +394,7 @@ describe('dispatch board-actions', () => {
         })
       );
 
-      const result = await updateLoad('load-1', { loadName: 'Test' });
+      const result = await updateLoad('load-1', { loadCode: '1T' });
 
       expect(result.error).toBe('Update failed');
     });

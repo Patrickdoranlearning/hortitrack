@@ -9,7 +9,9 @@ export type AttributeKey =
   | "plant_category"
   | "delivery_route"
   | "plant_health_issue"
-  | "sprayer_used";
+  | "sprayer_used"
+  | "trolley_type"
+  | "size_container_type";
 
 export type AttributeBehavior = "growing" | "available" | "waste" | "archived";
 
@@ -80,6 +82,14 @@ export const ATTRIBUTE_META: Record<
   sprayer_used: {
     label: "Sprayers",
     description: "Spray equipment used for IPM applications.",
+  },
+  trolley_type: {
+    label: "Trolley Types",
+    description: "Types of trolleys used for dispatch and delivery.",
+  },
+  size_container_type: {
+    label: "Container Types",
+    description: "Container types for plant sizes (pots, trays, bareroot, etc).",
   },
 };
 
@@ -161,6 +171,21 @@ const DEFAULTS: Record<AttributeKey, DefaultOption[]> = {
     { systemCode: "MIST_BLOWER", displayLabel: "Mist Blower", sortOrder: 50, isActive: true },
     { systemCode: "HAND_PUMP", displayLabel: "Hand Pump Sprayer", sortOrder: 60, isActive: true },
     { systemCode: "FOGGING_MACHINE", displayLabel: "Fogging Machine", sortOrder: 70, isActive: true },
+  ],
+  trolley_type: [
+    { systemCode: "tag6", displayLabel: "Tag 6 (Yellow)", sortOrder: 10, isActive: true },
+    { systemCode: "dc", displayLabel: "DC (No Tag)", sortOrder: 20, isActive: true },
+    { systemCode: "danish", displayLabel: "Danish Trolley", sortOrder: 30, isActive: true },
+    { systemCode: "dutch", displayLabel: "Dutch Trolley", sortOrder: 40, isActive: true },
+    { systemCode: "half_trolley", displayLabel: "Half Trolley", sortOrder: 50, isActive: true },
+    { systemCode: "pallet", displayLabel: "Pallet", sortOrder: 60, isActive: true },
+  ],
+  size_container_type: [
+    { systemCode: "pot", displayLabel: "Pot", sortOrder: 10, isActive: true },
+    { systemCode: "tray", displayLabel: "Tray", sortOrder: 20, isActive: true },
+    { systemCode: "plug_tray", displayLabel: "Plug Tray", sortOrder: 30, isActive: true },
+    { systemCode: "prop_tray", displayLabel: "Propagation Tray", sortOrder: 40, isActive: true },
+    { systemCode: "bareroot", displayLabel: "Bareroot", sortOrder: 50, isActive: true },
   ],
 };
 

@@ -104,7 +104,7 @@ export function CardsView({
                 onDrop={(e) => onDrop(e, load.id)}
               >
                 <p className="font-medium text-sm">
-                  {load.loadName || load.runNumber}
+                  {load.loadCode || load.runNumber}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {load.totalTrolleysAssigned}/{load.vehicleCapacity || 20}{' '}

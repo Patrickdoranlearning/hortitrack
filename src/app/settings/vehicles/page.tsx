@@ -221,83 +221,165 @@ export default function VehiclesPage() {
                 </Button>
               </div>
             ) : (
-              <Table className="text-sm">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="px-4 py-2">{renderSortHeader('Name', 'name')}</TableHead>
-                    <TableHead className="px-4 py-2">{renderSortHeader('Haulier', 'haulierName')}</TableHead>
-                    <TableHead className="px-4 py-2">{renderSortHeader('Registration', 'registration')}</TableHead>
-                    <TableHead className="px-4 py-2">{renderSortHeader('Type', 'vehicleType')}</TableHead>
-                    <TableHead className="px-4 py-2">{renderSortHeader('Capacity', 'trolleyCapacity')}</TableHead>
-                    <TableHead className="px-4 py-2">Layout</TableHead>
-                    <TableHead className="px-4 py-2">Status</TableHead>
-                    <TableHead className="px-4 py-2 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
                   {sortedVehicles.map((vehicle) => (
-                    <TableRow key={vehicle.id}>
-                      <TableCell className="px-4 py-2 font-medium">{vehicle.name}</TableCell>
-                      <TableCell className="px-4 py-2">{vehicle.haulierName || '—'}</TableCell>
-                      <TableCell className="px-4 py-2">{vehicle.registration || '—'}</TableCell>
-                      <TableCell className="px-4 py-2">{formatVehicleType(vehicle.vehicleType)}</TableCell>
-                      <TableCell className="px-4 py-2">{vehicle.trolleyCapacity} trolleys</TableCell>
-                      <TableCell className="px-4 py-2">
-                        {vehicle.truckLayout ? (
-                          <span className="text-xs text-muted-foreground">
-                            {vehicle.truckLayout.rows}×{vehicle.truckLayout.columns} grid
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell className="px-4 py-2">
+                    <div key={vehicle.id} className="p-4 rounded-lg border bg-card">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{vehicle.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {vehicle.haulierName || 'No haulier'}
+                          </p>
+                        </div>
                         <Badge variant={vehicle.isActive ? 'default' : 'secondary'}>
                           {vehicle.isActive ? 'Active' : 'Inactive'}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="px-4 py-2 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingVehicle(vehicle);
-                              setIsFormOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button type="button" size="sm" variant="destructive">
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete &quot;{vehicle.name}&quot;?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This vehicle will be removed from the fleet. Existing delivery runs may be affected.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(vehicle.id!, vehicle.name)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Type: </span>
+                          <span>{formatVehicleType(vehicle.vehicleType)}</span>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                        <div>
+                          <span className="text-muted-foreground">Capacity: </span>
+                          <span>{vehicle.trolleyCapacity} trolleys</span>
+                        </div>
+                        {vehicle.registration && (
+                          <div>
+                            <span className="text-muted-foreground">Reg: </span>
+                            <span>{vehicle.registration}</span>
+                          </div>
+                        )}
+                        {vehicle.truckLayout && (
+                          <div>
+                            <span className="text-muted-foreground">Layout: </span>
+                            <span>{vehicle.truckLayout.rows}×{vehicle.truckLayout.columns}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setEditingVehicle(vehicle);
+                            setIsFormOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button type="button" size="sm" variant="destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete &quot;{vehicle.name}&quot;?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This vehicle will be removed from the fleet. Existing delivery runs may be affected.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(vehicle.id!, vehicle.name)}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <Table className="text-sm">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="px-4 py-2">{renderSortHeader('Name', 'name')}</TableHead>
+                        <TableHead className="px-4 py-2">{renderSortHeader('Haulier', 'haulierName')}</TableHead>
+                        <TableHead className="px-4 py-2">{renderSortHeader('Registration', 'registration')}</TableHead>
+                        <TableHead className="px-4 py-2">{renderSortHeader('Type', 'vehicleType')}</TableHead>
+                        <TableHead className="px-4 py-2">{renderSortHeader('Capacity', 'trolleyCapacity')}</TableHead>
+                        <TableHead className="px-4 py-2">Layout</TableHead>
+                        <TableHead className="px-4 py-2">Status</TableHead>
+                        <TableHead className="px-4 py-2 text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedVehicles.map((vehicle) => (
+                        <TableRow key={vehicle.id}>
+                          <TableCell className="px-4 py-2 font-medium">{vehicle.name}</TableCell>
+                          <TableCell className="px-4 py-2">{vehicle.haulierName || '—'}</TableCell>
+                          <TableCell className="px-4 py-2">{vehicle.registration || '—'}</TableCell>
+                          <TableCell className="px-4 py-2">{formatVehicleType(vehicle.vehicleType)}</TableCell>
+                          <TableCell className="px-4 py-2">{vehicle.trolleyCapacity} trolleys</TableCell>
+                          <TableCell className="px-4 py-2">
+                            {vehicle.truckLayout ? (
+                              <span className="text-xs text-muted-foreground">
+                                {vehicle.truckLayout.rows}×{vehicle.truckLayout.columns} grid
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </TableCell>
+                          <TableCell className="px-4 py-2">
+                            <Badge variant={vehicle.isActive ? 'default' : 'secondary'}>
+                              {vehicle.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="px-4 py-2 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingVehicle(vehicle);
+                                  setIsFormOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button type="button" size="sm" variant="destructive">
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete &quot;{vehicle.name}&quot;?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This vehicle will be removed from the fleet. Existing delivery runs may be affected.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(vehicle.id!, vehicle.name)}>
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -230,17 +230,18 @@ export default function ProductionDashboard() {
     <PageFrame moduleKey="production">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-headline tracking-tight">Production Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl sm:text-3xl font-headline tracking-tight">Production Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Real-time snapshot of your production pipeline
             </p>
           </div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => mutate()}
+            className="self-start sm:self-center"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -294,7 +295,7 @@ export default function ProductionDashboard() {
         )}
 
         {/* KPI Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Plants</CardTitle>
@@ -366,14 +367,14 @@ export default function ProductionDashboard() {
         <div className="grid gap-4 md:grid-cols-2">
           {/* Pipeline Funnel */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Package className="h-4 w-4" />
                 Production Pipeline
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[280px]">
+              <div className="h-[220px] sm:h-[280px]">
                 {data?.byStatus && data.byStatus.length > 0 ? (
                   <PipelineFunnel
                     data={data.byStatus}
@@ -389,14 +390,14 @@ export default function ProductionDashboard() {
 
           {/* Variety Treemap */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Leaf className="h-4 w-4" />
                 Variety Distribution
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[280px]">
+              <div className="h-[220px] sm:h-[280px]">
                 {data?.byVariety && data.byVariety.length > 0 ? (
                   <VarietyTreemap
                     data={data.byVariety}
@@ -415,14 +416,14 @@ export default function ProductionDashboard() {
         <div className="grid gap-4 md:grid-cols-2">
           {/* Location Grid */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <MapPin className="h-4 w-4" />
                 Location Overview
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[280px]">
+              <div className="h-[220px] sm:h-[280px]">
                 {data?.byLocation && data.byLocation.length > 0 ? (
                   <LocationGrid
                     data={data.byLocation}
@@ -438,14 +439,14 @@ export default function ProductionDashboard() {
 
           {/* Loss Trend */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingDown className="h-4 w-4" />
                 Loss Trend (30 days)
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[280px]">
+              <div className="h-[220px] sm:h-[280px]">
                 <LossTrendChart data={data?.lossTimeline ?? []} days={30} />
               </div>
             </CardContent>
@@ -456,14 +457,14 @@ export default function ProductionDashboard() {
         <div className="grid gap-4 md:grid-cols-2">
           {/* Batch Age Histogram */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Calendar className="h-4 w-4" />
                 Batch Age Distribution
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[260px]">
+              <div className="h-[200px] sm:h-[260px]">
                 {data?.byAge && data.byAge.length > 0 ? (
                   <BatchAgeHistogram data={data.byAge} />
                 ) : (
@@ -475,23 +476,23 @@ export default function ProductionDashboard() {
 
           {/* Availability Donut */}
           <Card>
-                <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShoppingCart className="h-4 w-4" />
                 Availability Breakdown
-                  </CardTitle>
-                </CardHeader>
+              </CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className="h-[260px]">
+              <div className="h-[200px] sm:h-[260px]">
                 <AvailabilityDonut
                   available={filteredTotals.availablePlants}
                   reserved={filteredTotals.reservedPlants}
                   growing={filteredTotals.growingPlants - filteredTotals.reservedPlants}
                 />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Batch Table */}
             <Card>

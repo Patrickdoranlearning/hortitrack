@@ -8,7 +8,8 @@ import { getUserAndOrg } from '@/server/auth/org';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const supabase = await createClient();
 
     const formData = await req.formData();

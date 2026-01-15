@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Package,
-  Truck,
   Users,
   ClipboardCheck,
   UserCircle,
@@ -25,11 +24,6 @@ const managerTabs = [
     name: "Orders",
     href: "/dispatch/manager/orders",
     icon: Package,
-  },
-  {
-    name: "Loads",
-    href: "/dispatch/manager/loads",
-    icon: Truck,
   },
   {
     name: "Picking",

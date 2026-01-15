@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ViewToggle, useViewToggle } from '@/components/ui/view-toggle';
 import InvoiceDetailDialog from '@/components/sales/InvoiceDetailDialog';
+import { useToast } from '@/hooks/use-toast';
 import {
   MoreHorizontal,
   Printer,
@@ -30,7 +31,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 
 export interface InvoiceWithCustomer {
@@ -88,9 +90,11 @@ function InvoiceStatusBadge({ status }: { status: string }) {
 
 export default function InvoicesClient({ initialInvoices }: InvoicesClientProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithCustomer | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const { value: viewMode, setValue: setViewMode } = useViewToggle('sales-invoices-view', 'table');
 
   const handleOpenInvoice = (invoice: InvoiceWithCustomer) => {
@@ -102,6 +106,46 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
     e.stopPropagation();
     if (invoice.order_id) {
       router.push(`/sales/orders/${invoice.order_id}/invoice`);
+    }
+  };
+
+  const handleEmailInvoice = async (invoice: InvoiceWithCustomer, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!invoice.customer?.email) {
+      toast({
+        variant: 'destructive',
+        title: 'No email address',
+        description: 'Please add an email address for this customer first.',
+      });
+      return;
+    }
+
+    setSendingEmailId(invoice.id);
+    try {
+      const response = await fetch(`/api/sales/invoices/${invoice.id}/send-email`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+
+      toast({
+        title: 'Invoice sent',
+        description: `Invoice emailed to ${invoice.customer.email}`,
+      });
+    } catch (err) {
+      console.error('Failed to send invoice email:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to send email',
+        description: err instanceof Error ? err.message : 'An error occurred',
+      });
+    } finally {
+      setSendingEmailId(null);
     }
   };
 
@@ -226,12 +270,14 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
                         variant="ghost"
                         size="sm"
                         className="h-8 px-2"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log('Email invoice to', invoice.customer?.email);
-                        }}
+                        onClick={(e) => handleEmailInvoice(invoice, e)}
+                        disabled={sendingEmailId === invoice.id}
                       >
-                        <Mail className="h-4 w-4" />
+                        {sendingEmailId === invoice.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Mail className="h-4 w-4" />
+                        )}
                       </Button>
                     )}
                   </div>
@@ -335,13 +381,16 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
                             </DropdownMenuItem>
                           )}
                           {invoice.customer?.email && (
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              // TODO: Implement email sending
-                              console.log('Email invoice to', invoice.customer?.email);
-                            }}>
-                              <Mail className="mr-2 h-4 w-4" />
-                              Email Invoice
+                            <DropdownMenuItem
+                              onClick={(e) => handleEmailInvoice(invoice, e)}
+                              disabled={sendingEmailId === invoice.id}
+                            >
+                              {sendingEmailId === invoice.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="mr-2 h-4 w-4" />
+                              )}
+                              {sendingEmailId === invoice.id ? 'Sending...' : 'Email Invoice'}
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>

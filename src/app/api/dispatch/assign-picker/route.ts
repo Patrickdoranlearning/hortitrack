@@ -9,13 +9,20 @@ import { generateId } from '@/server/utils/ids';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const supabase = await createClient();
 
     const body = await req.json();
     const { orderId, pickerId } = body;
 
-    console.log('[Assign Picker] Request:', { orderId, pickerId, orgId });
+    console.log('[Assign Picker] Request:', {
+      orderId,
+      pickerId,
+      pickerIdType: typeof pickerId,
+      orgId,
+      userId
+    });
 
     if (!orderId) {
       return NextResponse.json(
@@ -40,54 +47,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use upsert to handle race conditions - if another request created the pick list
-    // between our check and insert, the upsert will update instead of failing
-    const pickListId = generateId();
     const now = new Date().toISOString();
 
-    const { data: result, error: upsertError } = await supabase
+    // Check if pick list already exists for this order
+    // Use explicit check + update/insert to avoid FK constraint issues with upsert
+    const { data: existing, error: checkError } = await supabase
       .from('pick_lists')
-      .upsert(
-        {
-          id: pickListId,
-          org_id: orgId,
-          order_id: orderId,
-          assigned_user_id: pickerId || null,
-          status: 'pending',
-          sequence: 1,
-          is_partial: false,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          onConflict: 'order_id',
-          ignoreDuplicates: false,
-        }
-      )
-      .select()
-      .single();
+      .select('id')
+      .eq('order_id', orderId)
+      .maybeSingle();
 
-    if (upsertError) {
-      console.error('[Assign Picker] Upsert error:', upsertError);
+    if (checkError) {
+      console.error('[Assign Picker] Check error:', checkError);
       return NextResponse.json(
-        { ok: false, error: 'Failed to assign picker: ' + upsertError.message },
+        { ok: false, error: 'Failed to check existing pick list: ' + checkError.message },
         { status: 500 }
       );
     }
 
-    // If the returned ID matches our generated one, we created a new record
-    const wasCreated = result.id === pickListId;
+    let pickListId: string;
+    let wasCreated: boolean;
 
-    // If we updated an existing record, we need to update the assigned_user_id
-    // since upsert with onConflict may not update all fields as expected
-    if (!wasCreated) {
+    if (existing) {
+      // Update existing pick list - just change the assigned_user_id
       const { error: updateError } = await supabase
         .from('pick_lists')
         .update({
           assigned_user_id: pickerId || null,
           updated_at: now,
         })
-        .eq('id', result.id);
+        .eq('id', existing.id);
 
       if (updateError) {
         console.error('[Assign Picker] Update error:', updateError);
@@ -96,13 +85,61 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
+
+      pickListId = existing.id;
+      wasCreated = false;
+
+      // Verify the update was successful by re-fetching
+      const { data: verifyUpdate } = await supabase
+        .from('pick_lists')
+        .select('id, assigned_user_id, status')
+        .eq('id', existing.id)
+        .single();
+      console.log('[Assign Picker] Verified after update:', verifyUpdate);
+    } else {
+      // Create new pick list
+      const newId = generateId();
+      const { data: inserted, error: insertError } = await supabase
+        .from('pick_lists')
+        .insert({
+          id: newId,
+          org_id: orgId,
+          order_id: orderId,
+          assigned_user_id: pickerId || null,
+          status: 'pending',
+          sequence: 1,
+          is_partial: false,
+          created_at: now,
+          updated_at: now,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('[Assign Picker] Insert error:', insertError);
+        return NextResponse.json(
+          { ok: false, error: 'Failed to create pick list: ' + insertError.message },
+          { status: 500 }
+        );
+      }
+
+      pickListId = inserted.id;
+      wasCreated = true;
+
+      // Verify the insert was successful by re-fetching
+      const { data: verifyInsert } = await supabase
+        .from('pick_lists')
+        .select('id, assigned_user_id, status')
+        .eq('id', inserted.id)
+        .single();
+      console.log('[Assign Picker] Verified after insert:', verifyInsert);
     }
 
-    console.log('[Assign Picker] Pick list result:', { id: result.id, wasCreated });
+    console.log('[Assign Picker] Pick list result:', { id: pickListId, wasCreated, assignedTo: pickerId });
 
     return NextResponse.json({
       ok: true,
-      pickListId: result.id,
+      pickListId,
       pickerId,
       created: wasCreated,
     });

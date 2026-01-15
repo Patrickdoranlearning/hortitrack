@@ -1,11 +1,11 @@
 // app/api/lookups/[resource]/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { type SupabaseClient } from "@supabase/supabase-js";
 
-const Resource = z.enum(["varieties", "sizes", "locations", "suppliers"]);
+const Resource = z.enum(["varieties", "sizes", "locations", "suppliers", "customers"]);
 
 function cache(resp: NextResponse) {
   // CDN cache; instant feel for users; background revalidate
@@ -29,8 +29,12 @@ async function getOrgId(supabase: SupabaseClient) {
   return profile?.active_org_id ?? null;
 }
 
-export async function GET(_: Request, ctx: { params: { resource: string } }) {
-  const parse = Resource.safeParse(ctx.params.resource);
+export async function GET(
+  _: NextRequest,
+  { params }: { params: Promise<{ resource: string }> }
+) {
+  const { resource: rawResource } = await params;
+  const parse = Resource.safeParse(rawResource);
   if (!parse.success) {
     return NextResponse.json({ error: "Invalid resource" }, { status: 400 });
   }
@@ -78,6 +82,19 @@ export async function GET(_: Request, ctx: { params: { resource: string } }) {
         const { data: rows, error } = await supabase
           .from("lookup_suppliers")
           .select("id, name, producer_code, country_code")
+          .eq("org_id", orgId)
+          .order("name", { ascending: true })
+          .limit(1000);
+        if (error) throw error;
+        data = rows ?? [];
+        break;
+      }
+      case "customers": {
+        const orgId = await getOrgId(supabase);
+        if (!orgId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+        const { data: rows, error } = await supabase
+          .from("customers")
+          .select("id, name")
           .eq("org_id", orgId)
           .order("name", { ascending: true })
           .limit(1000);

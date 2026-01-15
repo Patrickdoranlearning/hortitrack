@@ -29,6 +29,7 @@ const TYPE_META: Record<string, { label: string; variant: "default" | "secondary
   // Quantity-related events
   picked:     { label: "Picked (Sale)", variant: "destructive" },
   loss:       { label: "Loss", variant: "destructive" },
+  dump:       { label: "Dumped", variant: "destructive" },
   transplant_to: { label: "Transplant Out", variant: "secondary" },
   transplant_from: { label: "Transplant In", variant: "default" },
   transplant_out: { label: "Transplant Out", variant: "secondary" },
@@ -54,6 +55,7 @@ export function HistoryLog({ logs }: { logs: HistoryLog[] }) {
       <div className="flex flex-wrap gap-2 items-center">
         <input
           placeholder="Search notes..."
+          aria-label="Search history notes"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="px-3 py-2 rounded-lg border text-sm flex-1 min-w-[150px]"
@@ -61,6 +63,7 @@ export function HistoryLog({ logs }: { logs: HistoryLog[] }) {
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
+          aria-label="Filter by event type"
           className="px-3 py-2 rounded-lg border text-sm"
         >
           <option value="">All types</option>
@@ -69,17 +72,18 @@ export function HistoryLog({ logs }: { logs: HistoryLog[] }) {
         <div className="text-xs text-muted-foreground">{filtered.length} of {logs.length}</div>
       </div>
 
-      <div className="rounded-lg border bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[90px]">Date</TableHead>
-              <TableHead className="w-[110px]">Type</TableHead>
-              <TableHead className="w-[70px] text-right">Qty</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="w-[80px] text-right">By</TableHead>
-            </TableRow>
-          </TableHeader>
+      <div className="rounded-lg border bg-white overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[80px] md:w-[90px]">Date</TableHead>
+                <TableHead className="w-[90px] md:w-[110px]">Type</TableHead>
+                <TableHead className="w-[60px] md:w-[70px] text-right">Qty</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="hidden sm:table-cell w-[80px] text-right">By</TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
@@ -134,7 +138,7 @@ export function HistoryLog({ logs }: { logs: HistoryLog[] }) {
                         ) : null}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
+                    <TableCell className="hidden sm:table-cell text-right text-xs text-muted-foreground">
                       {l.userName ?? l.userId ?? "—"}
                     </TableCell>
                   </TableRow>
@@ -142,7 +146,8 @@ export function HistoryLog({ logs }: { logs: HistoryLog[] }) {
               })
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </div>
     </div>
   );

@@ -4,8 +4,12 @@ import { renderHistoryPdf } from "@/server/history/pdf";
 
 export const runtime = "nodejs";
 
-export async function POST(_req: NextRequest, { params }: { params: { batchId: string } }) {
-  const id = decodeURIComponent(params.batchId || "").trim();
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ batchId: string }> }
+) {
+  const { batchId } = await params;
+  const id = decodeURIComponent(batchId || "").trim();
   if (!id || id.includes("/")) return NextResponse.json({ error: "Invalid id" }, { status: 422 });
   try {
     const data = await buildBatchHistory(id);

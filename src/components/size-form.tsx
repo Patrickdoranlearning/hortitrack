@@ -17,6 +17,7 @@ import type { PlantSize } from '@/lib/types';
 import { PlantSizeSchema as FormSchema } from '@/lib/types'; // Rename to avoid conflict
 import { useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useAttributeOptions } from '@/hooks/useAttributeOptions';
 
 const PlantSizeFormSchema = FormSchema.omit({ id: true });
 type SizeFormValues = Omit<PlantSize, 'id'>;
@@ -29,6 +30,9 @@ interface SizeFormProps {
 
 export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
   const isEditing = !!size;
+
+  // Fetch container types from dropdown manager (configurable per tenant)
+  const { options: containerTypeOptions } = useAttributeOptions('size_container_type');
 
   // Helper to ensure numeric fields are numbers or undefined (not strings/null)
   const toNumberOrUndefined = (val: unknown): number | undefined => {
@@ -181,9 +185,11 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="pot">Pot</SelectItem>
-                      <SelectItem value="tray">Tray</SelectItem>
-                      <SelectItem value="bareroot">Bareroot</SelectItem>
+                      {containerTypeOptions.map((opt) => (
+                        <SelectItem key={opt.systemCode} value={opt.systemCode}>
+                          {opt.displayLabel}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

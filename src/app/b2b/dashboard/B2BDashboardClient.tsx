@@ -44,13 +44,17 @@ type B2BDashboardClientProps = {
   favorites: FavoriteProduct[];
 };
 
+// Order status enum: draft, confirmed, picking, ready (legacy), packed, dispatched, delivered, cancelled, void
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'outline' },
   confirmed: { label: 'Confirmed', variant: 'secondary' },
-  processing: { label: 'Processing', variant: 'default' },
-  ready_for_dispatch: { label: 'Ready', variant: 'default' },
+  picking: { label: 'Picking', variant: 'default' },
+  ready: { label: 'Ready', variant: 'default' }, // legacy
+  packed: { label: 'Ready', variant: 'default' }, // current status
+  ready_for_dispatch: { label: 'Ready', variant: 'default' }, // legacy
   dispatched: { label: 'Dispatched', variant: 'default' },
   delivered: { label: 'Delivered', variant: 'default' },
+  void: { label: 'Void', variant: 'destructive' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
 

@@ -21,7 +21,7 @@ export async function getDispatchRoleForUser(): Promise<{
     error: userError,
   } = await supabase.auth.getUser();
 
-  let user = fetchedUser;
+  const user = fetchedUser;
 
   // DEV BYPASS
   if (IS_DEV && (!user || userError)) {

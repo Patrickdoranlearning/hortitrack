@@ -208,39 +208,21 @@ export function TeamManagement() {
           ) : members.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No members found</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
                 {members.map((member) => (
-                  <TableRow key={member.user_id}>
-                    <TableCell>{member.profiles?.full_name || "—"}</TableCell>
-                    <TableCell>{member.profiles?.email || "—"}</TableCell>
-                    <TableCell>
-                      <Select
-                        value={member.role || "viewer"}
-                        onValueChange={(value) => handleRoleChange(member.user_id, value)}
-                      >
-                        <SelectTrigger className="w-[130px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="owner">Owner</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="grower">Grower</SelectItem>
-                          <SelectItem value="sales">Sales</SelectItem>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
+                  <div key={member.user_id} className="p-4 rounded-lg border bg-card">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">
+                          {member.profiles?.full_name || "—"}
+                        </p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {member.profiles?.email || "—"}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -258,11 +240,88 @@ export function TeamManagement() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                    <div className="mt-3">
+                      <Label className="text-xs text-muted-foreground">Role</Label>
+                      <Select
+                        value={member.role || "viewer"}
+                        onValueChange={(value) => handleRoleChange(member.user_id, value)}
+                      >
+                        <SelectTrigger className="w-full mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="grower">Grower</SelectItem>
+                          <SelectItem value="sales">Sales</SelectItem>
+                          <SelectItem value="viewer">Viewer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {members.map((member) => (
+                      <TableRow key={member.user_id}>
+                        <TableCell>{member.profiles?.full_name || "—"}</TableCell>
+                        <TableCell>{member.profiles?.email || "—"}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={member.role || "viewer"}
+                            onValueChange={(value) => handleRoleChange(member.user_id, value)}
+                          >
+                            <SelectTrigger className="w-[130px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="owner">Owner</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="grower">Grower</SelectItem>
+                              <SelectItem value="sales">Sales</SelectItem>
+                              <SelectItem value="viewer">Viewer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(member)}
+                              title="Edit member"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteUserId(member.user_id)}
+                              title="Remove member"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

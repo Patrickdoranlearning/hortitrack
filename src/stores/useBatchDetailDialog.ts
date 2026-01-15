@@ -2,6 +2,9 @@ import { create } from "zustand";
 
 type TabKey = "summary" | "log" | "photos" | "ancestry" | "ai";
 
+// Maximum history size to prevent memory leaks
+const MAX_HISTORY = 20;
+
 type State = {
   isOpen: boolean;
   batchId?: string;
@@ -27,7 +30,10 @@ export const useBatchDetailDialog = create<State>((set, get) => ({
       isOpen: true,
       batchId,
       initialTab,
-      history: prev ? [...s.history, prev] : s.history,
+      // Bound history to prevent memory leak from unbounded growth
+      history: prev
+        ? [...s.history.slice(-(MAX_HISTORY - 1)), prev]
+        : s.history,
     }));
   },
   close: () => set({ isOpen: false, batchId: undefined, history: [] }),

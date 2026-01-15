@@ -12,13 +12,17 @@ function bad(status: number, code: string, message: string) {
   return NextResponse.json({ ok: false, error: { code, message } }, { status });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { batchId: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ batchId: string }> }
+) {
+  const { batchId } = await params;
   try {
     const supabase = await createClient();
     const { data: photos, error } = await supabase
       .from("batch_photos")
       .select("*")
-      .eq("batch_id", params.batchId)
+      .eq("batch_id", batchId)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -29,7 +33,11 @@ export async function GET(_req: NextRequest, { params }: { params: { batchId: st
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { batchId: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ batchId: string }> }
+) {
+  const { batchId } = await params;
   try {
     const supabase = await createClient();
 
@@ -52,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { batchId: st
     const { data: batch, error: batchError } = await supabase
       .from("batches") // Assuming 'batches' table exists
       .select("*")
-      .eq("id", params.batchId)
+      .eq("id", batchId)
       .single();
 
     if (batchError || !batch) throw new Error("Batch not found");
@@ -63,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: { batchId: st
     const { count, error: countError } = await supabase
       .from("batch_photos")
       .select("*", { count: 'exact', head: true })
-      .eq("batch_id", params.batchId)
+      .eq("batch_id", batchId)
       .eq("type", type);
 
     if (countError) throw countError;
@@ -78,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: { batchId: st
 
     // Upload to Supabase Storage
     const ext = (file.type?.split("/")?.[1] ?? "bin").replace(/[^a-z0-9]/gi, "");
-    const filePath = `${params.batchId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const filePath = `${batchId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
     const { data: uploadData, error: uploadError } = await supabase
       .storage
@@ -95,7 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: { batchId: st
       .from("batch_photos")
       .insert({
         org_id: batch.org_id,
-        batch_id: params.batchId,
+        batch_id: batchId,
         url: publicUrl,
         type,
         storage_path: filePath,
@@ -109,7 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: { batchId: st
 
     // Log the photo upload as a batch event
     await supabase.from("batch_events").insert({
-      batch_id: params.batchId,
+      batch_id: batchId,
       org_id: batch.org_id,
       type: "PHOTO_UPLOAD",
       by_user_id: user.id,

@@ -7,7 +7,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { ReferenceDataProvider } from '@/contexts/ReferenceDataContext';
 import { CheckInWizard, type IncomingBatchData } from './CheckInWizard';
 
 type CheckInWizardDialogProps = {
@@ -46,13 +45,11 @@ export function CheckInWizardDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-1 -mr-1">
-          <ReferenceDataProvider>
-            <CheckInWizard
-              incomingBatch={incomingBatch}
-              onComplete={handleComplete}
-              onCancel={handleCancel}
-            />
-          </ReferenceDataProvider>
+          <CheckInWizard
+            incomingBatch={incomingBatch}
+            onComplete={handleComplete}
+            onCancel={handleCancel}
+          />
         </div>
       </DialogContent>
     </Dialog>

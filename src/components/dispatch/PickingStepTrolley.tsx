@@ -1,17 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   ShoppingCart,
   Plus,
@@ -23,14 +17,17 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePickingWizardStore, type TrolleyInfo } from '@/stores/use-picking-wizard-store';
+import { useAttributeOptions } from '@/hooks/useAttributeOptions';
 
-const TROLLEY_TYPES = [
-  { value: 'tag6', label: 'Tag 6 (Yellow)', description: 'Standard yellow tagged trolley' },
-  { value: 'dc', label: 'DC (No Tag)', description: 'Distribution center trolley' },
-  { value: 'danish', label: 'Danish Trolley', description: 'Standard danish trolley' },
-  { value: 'dutch', label: 'Dutch Trolley', description: 'Dutch style trolley' },
-  { value: 'pallet', label: 'Pallet', description: 'Full pallet' },
-] as const;
+// Default trolley types if attribute options not loaded
+const DEFAULT_TROLLEY_TYPES = [
+  { systemCode: 'tag6', displayLabel: 'Tag 6 (Yellow)' },
+  { systemCode: 'dc', displayLabel: 'DC (No Tag)' },
+  { systemCode: 'danish', displayLabel: 'Danish Trolley' },
+  { systemCode: 'dutch', displayLabel: 'Dutch Trolley' },
+  { systemCode: 'half_trolley', displayLabel: 'Half Trolley' },
+  { systemCode: 'pallet', displayLabel: 'Pallet' },
+];
 
 export default function PickingStepTrolley() {
   const {
@@ -42,26 +39,55 @@ export default function PickingStepTrolley() {
     canProceed,
   } = usePickingWizardStore();
 
+  // Load trolley types from attribute options
+  const { options: trolleyTypeOptions, loading: loadingOptions } = useAttributeOptions('trolley_type');
+
+  // Use attribute options if available, otherwise use defaults
+  const trolleyTypes = trolleyTypeOptions.length > 0
+    ? trolleyTypeOptions.filter(o => o.isActive)
+    : DEFAULT_TROLLEY_TYPES;
+
+  // Initialize trolleyCounts from trolleyTypes if not set
+  useEffect(() => {
+    if (!trolleyInfo.trolleyCounts && trolleyTypes.length > 0) {
+      const initialCounts: Record<string, number> = {};
+      trolleyTypes.forEach(type => {
+        initialCounts[type.systemCode] = 0;
+      });
+      setTrolleyInfo({ trolleyCounts: initialCounts });
+    }
+  }, [trolleyTypes, trolleyInfo.trolleyCounts, setTrolleyInfo]);
+
   const totalUnits = items.reduce((sum, item) => sum + item.pickedQty, 0);
 
-  const handleTrolleyTypeChange = (value: TrolleyInfo['trolleyType']) => {
-    setTrolleyInfo({ trolleyType: value });
+  // Calculate total trolley count from all types
+  const totalTrolleys = trolleyInfo.trolleyCounts
+    ? Object.values(trolleyInfo.trolleyCounts).reduce((sum, count) => sum + count, 0)
+    : trolleyInfo.count;
+
+  const handleTrolleyCountChange = (typeCode: string, value: number) => {
+    const newCount = Math.max(0, value);
+    const counts = { ...(trolleyInfo.trolleyCounts || {}) };
+    counts[typeCode] = newCount;
+
+    // Also update legacy count and trolleyType for backward compatibility
+    const total = Object.values(counts).reduce((sum, c) => sum + c, 0);
+    const primaryType = Object.entries(counts).find(([_, c]) => c > 0)?.[0] as TrolleyInfo['trolleyType'] || 'tag6';
+
+    setTrolleyInfo({
+      trolleyCounts: counts,
+      count: total,
+      trolleyType: primaryType,
+    });
   };
 
-  const handleCountChange = (delta: number) => {
-    const newCount = Math.max(0, trolleyInfo.count + delta);
-    setTrolleyInfo({ count: newCount });
-  };
-
-  const handleShelvesChange = (delta: number) => {
-    const current = trolleyInfo.shelves || 0;
-    const newShelves = Math.max(0, Math.min(10, current + delta));
+  const handleShelvesChange = (value: number) => {
+    const newShelves = Math.max(0, value);
     setTrolleyInfo({ shelves: newShelves });
   };
 
   const handleTrolleyNumberAdd = () => {
     const numbers = trolleyInfo.trolleyNumbers || [];
-    // Add a placeholder for a new trolley number
     setTrolleyInfo({ trolleyNumbers: [...numbers, ''] });
   };
 
@@ -77,7 +103,15 @@ export default function PickingStepTrolley() {
     setTrolleyInfo({ trolleyNumbers: numbers });
   };
 
-  const selectedType = TROLLEY_TYPES.find((t) => t.value === trolleyInfo.trolleyType);
+  // Build summary of trolleys being used
+  const trolleySummary = trolleyInfo.trolleyCounts
+    ? Object.entries(trolleyInfo.trolleyCounts)
+        .filter(([_, count]) => count > 0)
+        .map(([code, count]) => {
+          const type = trolleyTypes.find(t => t.systemCode === code);
+          return { label: type?.displayLabel || code, count };
+        })
+    : [];
 
   return (
     <div className="space-y-4 pb-24">
@@ -93,79 +127,56 @@ export default function PickingStepTrolley() {
         </CardContent>
       </Card>
 
-      {/* Trolley Type Selection */}
+      {/* Trolley Type Quantities */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-primary" />
-            Trolley Type
+            Trolleys Used
           </CardTitle>
           <CardDescription>
-            Select the type of trolley used for this order
+            Enter the quantity for each trolley type
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Select
-            value={trolleyInfo.trolleyType}
-            onValueChange={handleTrolleyTypeChange}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select trolley type" />
-            </SelectTrigger>
-            <SelectContent>
-              {TROLLEY_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  <div className="flex flex-col">
-                    <span>{type.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {type.description}
-                    </span>
+        <CardContent className="space-y-4">
+          {loadingOptions ? (
+            <div className="py-4 text-center text-muted-foreground">Loading trolley types...</div>
+          ) : (
+            trolleyTypes.map((type) => {
+              const count = trolleyInfo.trolleyCounts?.[type.systemCode] || 0;
+              return (
+                <div key={type.systemCode} className="flex items-center justify-between gap-4">
+                  <Label className="flex-1 text-base">{type.displayLabel}</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleTrolleyCountChange(type.systemCode, count - 1)}
+                      disabled={count <= 0}
+                      className="h-10 w-10"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={count}
+                      onChange={(e) => handleTrolleyCountChange(type.systemCode, parseInt(e.target.value) || 0)}
+                      className="w-16 text-center text-lg font-semibold"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleTrolleyCountChange(type.systemCode, count + 1)}
+                      className="h-10 w-10"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {selectedType && (
-            <p className="text-sm text-muted-foreground mt-2">
-              {selectedType.description}
-            </p>
+                </div>
+              );
+            })
           )}
-        </CardContent>
-      </Card>
-
-      {/* Trolley Count */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Tag className="h-5 w-5" />
-            Number of Trolleys
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleCountChange(-1)}
-              disabled={trolleyInfo.count <= 0}
-              className="h-12 w-12"
-            >
-              <Minus className="h-6 w-6" />
-            </Button>
-            <div className="text-center min-w-[80px]">
-              <span className="text-4xl font-bold">{trolleyInfo.count}</span>
-              <p className="text-sm text-muted-foreground">trolleys</p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleCountChange(1)}
-              className="h-12 w-12"
-            >
-              <Plus className="h-6 w-6" />
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
@@ -185,20 +196,23 @@ export default function PickingStepTrolley() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => handleShelvesChange(-1)}
+              onClick={() => handleShelvesChange((trolleyInfo.shelves || 0) - 1)}
               disabled={(trolleyInfo.shelves || 0) <= 0}
               className="h-10 w-10"
             >
               <Minus className="h-5 w-5" />
             </Button>
-            <div className="text-center min-w-[60px]">
-              <span className="text-3xl font-bold">{trolleyInfo.shelves || 0}</span>
-              <p className="text-xs text-muted-foreground">shelves</p>
-            </div>
+            <Input
+              type="number"
+              min={0}
+              value={trolleyInfo.shelves || 0}
+              onChange={(e) => handleShelvesChange(parseInt(e.target.value) || 0)}
+              className="w-20 text-center text-2xl font-bold"
+            />
             <Button
               variant="outline"
               size="icon"
-              onClick={() => handleShelvesChange(1)}
+              onClick={() => handleShelvesChange((trolleyInfo.shelves || 0) + 1)}
               className="h-10 w-10"
             >
               <Plus className="h-5 w-5" />
@@ -246,23 +260,36 @@ export default function PickingStepTrolley() {
       </Card>
 
       {/* Summary */}
-      <Card className={cn(trolleyInfo.count > 0 && 'bg-green-50 border-green-200')}>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">
-                {trolleyInfo.count} × {selectedType?.label || 'Trolley'}
-              </p>
+      <Card className={cn(totalTrolleys > 0 && 'bg-green-50 border-green-200')}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Tag className="h-4 w-4" />
+            Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {trolleySummary.length > 0 ? (
+            <>
+              {trolleySummary.map(({ label, count }) => (
+                <div key={label} className="flex items-center justify-between text-sm">
+                  <span>{label}</span>
+                  <span className="font-semibold">{count}</span>
+                </div>
+              ))}
+              <div className="border-t pt-2 flex items-center justify-between">
+                <span className="font-medium">Total Trolleys</span>
+                <Badge className="bg-green-600">{totalTrolleys}</Badge>
+              </div>
               {(trolleyInfo.shelves || 0) > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {trolleyInfo.shelves} shelves
-                </p>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Shelves</span>
+                  <span>{trolleyInfo.shelves}</span>
+                </div>
               )}
-            </div>
-            {trolleyInfo.count > 0 && (
-              <Badge className="bg-green-600">Ready</Badge>
-            )}
-          </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">No trolleys selected</p>
+          )}
         </CardContent>
       </Card>
 
@@ -289,10 +316,3 @@ export default function PickingStepTrolley() {
     </div>
   );
 }
-
-
-
-
-
-
-

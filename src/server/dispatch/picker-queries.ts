@@ -1,13 +1,211 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
-import type { PickerTask } from "@/lib/dispatch/types";
+import type { PickerTask, PickerTaskItem } from "@/lib/dispatch/types";
+
+/**
+ * Helper to sort tasks by delivery date (soonest first), then by sequence
+ */
+function sortByDeliveryDate(tasks: PickerTask[]): PickerTask[] {
+  return [...tasks].sort((a, b) => {
+    // First sort by delivery date (nulls last)
+    const dateA = a.requestedDeliveryDate ? new Date(a.requestedDeliveryDate).getTime() : Infinity;
+    const dateB = b.requestedDeliveryDate ? new Date(b.requestedDeliveryDate).getTime() : Infinity;
+    if (dateA !== dateB) return dateA - dateB;
+    // Then by sequence
+    return a.sequence - b.sequence;
+  });
+}
+
+/**
+ * Helper to aggregate item counts and feedback for pick lists
+ */
+async function aggregatePickListData(
+  supabase: any,
+  pickListIds: string[]
+): Promise<{
+  itemCountsMap: Map<string, { totalItems: number; pickedItems: number; totalQty: number; pickedQty: number }>;
+  feedbackCountsMap: Map<string, { pendingFeedbackCount: number; unacknowledgedFeedbackCount: number }>;
+}> {
+  if (pickListIds.length === 0) {
+    return {
+      itemCountsMap: new Map(),
+      feedbackCountsMap: new Map(),
+    };
+  }
+
+  const [itemResult, feedbackResult] = await Promise.all([
+    supabase
+      .from("pick_items")
+      .select("pick_list_id, status, target_qty, picked_qty")
+      .in("pick_list_id", pickListIds),
+    supabase
+      .from("qc_feedback")
+      .select("pick_list_id, resolved_at, picker_acknowledged_at, picker_notified_at")
+      .in("pick_list_id", pickListIds),
+  ]);
+
+  const itemCounts = itemResult.data || [];
+  const feedbackCounts = feedbackResult.data || [];
+
+  // Aggregate item counts
+  const itemCountsMap = new Map<string, {
+    totalItems: number;
+    pickedItems: number;
+    totalQty: number;
+    pickedQty: number;
+  }>();
+
+  for (const item of itemCounts) {
+    const existing = itemCountsMap.get(item.pick_list_id) || {
+      totalItems: 0,
+      pickedItems: 0,
+      totalQty: 0,
+      pickedQty: 0,
+    };
+    existing.totalItems += 1;
+    if (item.status === "picked" || item.status === "substituted") {
+      existing.pickedItems += 1;
+    }
+    existing.totalQty += item.target_qty || 0;
+    existing.pickedQty += item.picked_qty || 0;
+    itemCountsMap.set(item.pick_list_id, existing);
+  }
+
+  // Aggregate feedback counts
+  const feedbackCountsMap = new Map<string, {
+    pendingFeedbackCount: number;
+    unacknowledgedFeedbackCount: number;
+  }>();
+
+  for (const feedback of feedbackCounts) {
+    const existing = feedbackCountsMap.get(feedback.pick_list_id) || {
+      pendingFeedbackCount: 0,
+      unacknowledgedFeedbackCount: 0,
+    };
+    if (!feedback.resolved_at) {
+      existing.pendingFeedbackCount += 1;
+    }
+    if (!feedback.picker_acknowledged_at && feedback.picker_notified_at) {
+      existing.unacknowledgedFeedbackCount += 1;
+    }
+    feedbackCountsMap.set(feedback.pick_list_id, existing);
+  }
+
+  return { itemCountsMap, feedbackCountsMap };
+}
+
+/**
+ * Fetch order items for a list of order IDs
+ */
+async function fetchOrderItems(
+  supabase: any,
+  orderIds: string[]
+): Promise<Map<string, PickerTaskItem[]>> {
+  if (orderIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("order_items")
+    .select(`
+      id,
+      order_id,
+      quantity,
+      description,
+      skus(
+        code,
+        plant_varieties(name),
+        plant_sizes(name)
+      )
+    `)
+    .in("order_id", orderIds)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching order items:", error);
+    return new Map();
+  }
+
+  const itemsMap = new Map<string, PickerTaskItem[]>();
+  
+  for (const item of data || []) {
+    const orderId = item.order_id;
+    const sku = item.skus as any;
+    
+    const taskItem: PickerTaskItem = {
+      id: item.id,
+      skuCode: sku?.code || "",
+      description: item.description || sku?.code || "Unknown",
+      varietyName: sku?.plant_varieties?.name || "",
+      sizeName: sku?.plant_sizes?.name || "",
+      quantity: item.quantity || 0,
+    };
+
+    if (!itemsMap.has(orderId)) {
+      itemsMap.set(orderId, []);
+    }
+    itemsMap.get(orderId)!.push(taskItem);
+  }
+
+  return itemsMap;
+}
+
+/**
+ * Map raw pick list data to PickerTask format
+ */
+function mapToPickerTask(
+  pl: any,
+  itemCountsMap: Map<string, { totalItems: number; pickedItems: number; totalQty: number; pickedQty: number }>,
+  feedbackCountsMap: Map<string, { pendingFeedbackCount: number; unacknowledgedFeedbackCount: number }>,
+  orderItemsMap?: Map<string, PickerTaskItem[]>
+): PickerTask {
+  const order = pl.orders as any;
+  const customer = order?.customers as any;
+  const counts = itemCountsMap.get(pl.id) || {
+    totalItems: 0,
+    pickedItems: 0,
+    totalQty: 0,
+    pickedQty: 0,
+  };
+  const feedback = feedbackCountsMap.get(pl.id) || {
+    pendingFeedbackCount: 0,
+    unacknowledgedFeedbackCount: 0,
+  };
+
+  return {
+    id: pl.id,
+    orgId: pl.org_id,
+    orderId: pl.order_id,
+    assignedUserId: pl.assigned_user_id || undefined,
+    assignedTeamId: pl.assigned_team_id || undefined,
+    sequence: pl.sequence,
+    status: pl.status,
+    qcStatus: pl.qc_status || undefined,
+    isPartial: pl.is_partial ?? false,
+    mergeStatus: pl.merge_status || undefined,
+    startedAt: pl.started_at || undefined,
+    completedAt: pl.completed_at || undefined,
+    notes: pl.notes || undefined,
+    createdAt: pl.created_at,
+    orderNumber: order?.order_number || "Unknown",
+    orderStatus: order?.status || "unknown",
+    requestedDeliveryDate: order?.requested_delivery_date || undefined,
+    customerName: customer?.name || "Unknown Customer",
+    ...counts,
+    ...feedback,
+    items: orderItemsMap?.get(pl.order_id) || [],
+  };
+}
 
 /**
  * Get all picking tasks assigned to the current user
+ * Sorted by delivery date (soonest first)
  */
 export async function getPickerTasks(): Promise<PickerTask[]> {
   const { user, orgId, supabase } = await getUserAndOrg();
+
+  console.log('[getPickerTasks] Fetching tasks for user:', user.id, 'org:', orgId);
 
   // Fetch pick lists assigned to the current user
   const { data, error } = await supabase
@@ -37,146 +235,50 @@ export async function getPickerTasks(): Promise<PickerTask[]> {
     .eq("org_id", orgId)
     .eq("assigned_user_id", user.id)
     .in("status", ["pending", "in_progress"])
-    .order("sequence", { ascending: true })
-    .order("created_at", { ascending: true });
+    .order("sequence", { ascending: true });
 
   if (error) {
-    console.error("Error fetching picker tasks:", error.message || JSON.stringify(error));
+    console.error("[getPickerTasks] Error fetching picker tasks:", error.message || JSON.stringify(error));
     throw new Error(error.message || "Failed to fetch picker tasks");
   }
 
-  // Get item counts for each pick list
+  console.log('[getPickerTasks] Found', data?.length || 0, 'pick lists assigned to user');
+  if (data && data.length > 0) {
+    console.log('[getPickerTasks] Sample pick lists:', data.slice(0, 3).map((pl: any) => ({
+      id: pl.id,
+      assigned_user_id: pl.assigned_user_id,
+      status: pl.status,
+      order_number: pl.orders?.order_number,
+    })));
+  }
+
   const pickListIds = data.map((pl) => pl.id);
+  const orderIds = data.map((pl) => pl.order_id);
+  
+  const [aggregateData, orderItemsMap] = await Promise.all([
+    aggregatePickListData(supabase, pickListIds),
+    fetchOrderItems(supabase, orderIds),
+  ]);
+  
+  const { itemCountsMap, feedbackCountsMap } = aggregateData;
 
-  const { data: itemCounts, error: itemError } = await supabase
-    .from("pick_items")
-    .select("pick_list_id, status, target_qty, picked_qty")
-    .in("pick_list_id", pickListIds);
+  const tasks = data
+    .filter((pl) => pl.orders)
+    .map((pl) => mapToPickerTask(pl, itemCountsMap, feedbackCountsMap, orderItemsMap));
 
-  if (itemError) {
-    console.error("Error fetching item counts:", itemError);
-  }
-
-  // Get QC feedback counts
-  const { data: feedbackCounts, error: feedbackError } = await supabase
-    .from("qc_feedback")
-    .select("pick_list_id, resolved_at, picker_acknowledged_at, picker_notified_at")
-    .in("pick_list_id", pickListIds);
-
-  if (feedbackError) {
-    console.error("Error fetching feedback counts:", feedbackError);
-  }
-
-  // Aggregate counts by pick_list_id
-  const itemCountsMap = new Map<string, {
-    totalItems: number;
-    pickedItems: number;
-    totalQty: number;
-    pickedQty: number;
-  }>();
-
-  for (const item of itemCounts || []) {
-    const existing = itemCountsMap.get(item.pick_list_id) || {
-      totalItems: 0,
-      pickedItems: 0,
-      totalQty: 0,
-      pickedQty: 0,
-    };
-    existing.totalItems += 1;
-    if (item.status === "picked" || item.status === "substituted") {
-      existing.pickedItems += 1;
-    }
-    existing.totalQty += item.target_qty || 0;
-    existing.pickedQty += item.picked_qty || 0;
-    itemCountsMap.set(item.pick_list_id, existing);
-  }
-
-  const feedbackCountsMap = new Map<string, {
-    pendingFeedbackCount: number;
-    unacknowledgedFeedbackCount: number;
-  }>();
-
-  for (const feedback of feedbackCounts || []) {
-    const existing = feedbackCountsMap.get(feedback.pick_list_id) || {
-      pendingFeedbackCount: 0,
-      unacknowledgedFeedbackCount: 0,
-    };
-    if (!feedback.resolved_at) {
-      existing.pendingFeedbackCount += 1;
-    }
-    if (!feedback.picker_acknowledged_at && feedback.picker_notified_at) {
-      existing.unacknowledgedFeedbackCount += 1;
-    }
-    feedbackCountsMap.set(feedback.pick_list_id, existing);
-  }
-
-  // Map to PickerTask format
-  return data
-    .filter((pl) => pl.orders) // Filter out pick lists with no order (shouldn't happen but handle gracefully)
-    .map((pl): PickerTask => {
-      const order = pl.orders as any;
-      const customer = order?.customers as any;
-      const counts = itemCountsMap.get(pl.id) || {
-        totalItems: 0,
-        pickedItems: 0,
-        totalQty: 0,
-        pickedQty: 0,
-      };
-      const feedback = feedbackCountsMap.get(pl.id) || {
-        pendingFeedbackCount: 0,
-        unacknowledgedFeedbackCount: 0,
-      };
-
-      return {
-        id: pl.id,
-        orgId: pl.org_id,
-        orderId: pl.order_id,
-        assignedUserId: pl.assigned_user_id || undefined,
-        assignedTeamId: pl.assigned_team_id || undefined,
-        sequence: pl.sequence,
-        status: pl.status,
-        qcStatus: pl.qc_status || undefined,
-        isPartial: pl.is_partial ?? false,
-        mergeStatus: pl.merge_status || undefined,
-        startedAt: pl.started_at || undefined,
-        completedAt: pl.completed_at || undefined,
-        notes: pl.notes || undefined,
-        createdAt: pl.created_at,
-        orderNumber: order?.order_number || "Unknown",
-        orderStatus: order?.status || "unknown",
-        requestedDeliveryDate: order?.requested_delivery_date || undefined,
-        customerName: customer?.name || "Unknown Customer",
-        ...counts,
-        ...feedback,
-      };
-    });
+  return sortByDeliveryDate(tasks);
 }
 
 /**
- * Get tasks assigned to the current user's team (for team-based picking)
+ * Get all unassigned pick lists that any picker can work on
+ * These are pending orders not yet assigned to anyone
+ * Sorted by delivery date (soonest first) for priority
  */
-export async function getTeamPickerTasks(): Promise<PickerTask[]> {
-  const { user, orgId, supabase } = await getUserAndOrg();
+export async function getUnassignedPickerTasks(): Promise<PickerTask[]> {
+  const { orgId, supabase } = await getUserAndOrg();
 
-  // First, get the user's team memberships
-  const { data: memberships, error: membershipError } = await supabase
-    .from("picking_team_members")
-    .select("team_id")
-    .eq("user_id", user.id);
-
-  if (membershipError) {
-    console.error("Error fetching team memberships:", membershipError);
-    return [];
-  }
-
-  if (!memberships || memberships.length === 0) {
-    return [];
-  }
-
-  const teamIds = memberships.map((m) => m.team_id);
-
-  // Fetch pick lists assigned to these teams (but not specifically to another user)
-  const { data, error } = await supabase
+  // Fetch pick lists with no assigned user (available for anyone to pick up)
+  const { data: pickListData, error: pickListError } = await supabase
     .from("pick_lists")
     .select(`
       id,
@@ -201,96 +303,111 @@ export async function getTeamPickerTasks(): Promise<PickerTask[]> {
       )
     `)
     .eq("org_id", orgId)
-    .in("assigned_team_id", teamIds)
-    .is("assigned_user_id", null) // Only unassigned to individual
-    .in("status", ["pending", "in_progress"])
+    .is("assigned_user_id", null) // Not assigned to anyone
+    .eq("status", "pending") // Only pending (not in_progress)
     .order("sequence", { ascending: true });
 
-  if (error) {
-    console.error("Error fetching team picker tasks:", error.message || JSON.stringify(error));
-    throw new Error(error.message || "Failed to fetch team picker tasks");
+  if (pickListError) {
+    console.error("Error fetching unassigned picker tasks:", pickListError.message || JSON.stringify(pickListError));
+    throw new Error(pickListError.message || "Failed to fetch unassigned picker tasks");
   }
 
-  // Similar aggregation as above
-  const pickListIds = data.map((pl) => pl.id);
+  // Also fetch orders that are confirmed/picking but don't have a pick list yet
+  // First get ALL pick list order IDs (not just unassigned) to exclude
+  const { data: allPickLists } = await supabase
+    .from("pick_lists")
+    .select("order_id")
+    .eq("org_id", orgId);
+  
+  const allPickListOrderIds = new Set((allPickLists || []).map((pl) => pl.order_id));
+  
+  const { data: ordersData, error: ordersError } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      order_number,
+      status,
+      requested_delivery_date,
+      customers(name)
+    `)
+    .eq("org_id", orgId)
+    .in("status", ["confirmed", "picking"])
+    .order("requested_delivery_date", { ascending: true, nullsFirst: false });
 
-  const { data: itemCounts } = await supabase
-    .from("pick_items")
-    .select("pick_list_id, status, target_qty, picked_qty")
-    .in("pick_list_id", pickListIds);
+  if (ordersError) {
+    console.error("Error fetching orders without pick list:", ordersError.message || JSON.stringify(ordersError));
+    // Don't throw - just log and continue with pick lists only
+  }
 
-  const itemCountsMap = new Map<string, {
-    totalItems: number;
-    pickedItems: number;
-    totalQty: number;
-    pickedQty: number;
-  }>();
+  // Filter to only orders that don't have a pick list
+  const ordersWithoutPickList = (ordersData || []).filter(
+    (order) => !allPickListOrderIds.has(order.id)
+  );
 
-  for (const item of itemCounts || []) {
-    const existing = itemCountsMap.get(item.pick_list_id) || {
+  const pickListIds = (pickListData || []).map((pl) => pl.id);
+  const pickListOrderIds = (pickListData || []).map((pl) => pl.order_id);
+  const orderWithoutPickListIds = ordersWithoutPickList.map((o) => o.id);
+  const allOrderIds = [...pickListOrderIds, ...orderWithoutPickListIds];
+  
+  const [aggregateData, orderItemsMap] = await Promise.all([
+    aggregatePickListData(supabase, pickListIds),
+    fetchOrderItems(supabase, allOrderIds),
+  ]);
+  
+  const { itemCountsMap, feedbackCountsMap } = aggregateData;
+
+  // Map pick lists to tasks
+  const pickListTasks = (pickListData || [])
+    .filter((pl) => pl.orders)
+    .map((pl) => mapToPickerTask(pl, itemCountsMap, feedbackCountsMap, orderItemsMap));
+
+  // Map orders without pick lists to tasks (these need pick lists created when started)
+  const orderTasks: PickerTask[] = (ordersWithoutPickList || []).map((order): PickerTask => {
+    const customer = order.customers as any;
+    return {
+      id: `order-${order.id}`, // Prefix to indicate this is an order without pick list
+      orgId: orgId,
+      orderId: order.id,
+      assignedUserId: undefined,
+      assignedTeamId: undefined,
+      sequence: 999, // Put at end of sequence since no explicit sequence
+      status: "pending",
+      qcStatus: undefined,
+      isPartial: false,
+      mergeStatus: undefined,
+      startedAt: undefined,
+      completedAt: undefined,
+      notes: undefined,
+      createdAt: new Date().toISOString(),
+      orderNumber: order.order_number || "Unknown",
+      orderStatus: order.status || "unknown",
+      requestedDeliveryDate: order.requested_delivery_date || undefined,
+      customerName: customer?.name || "Unknown Customer",
       totalItems: 0,
       pickedItems: 0,
       totalQty: 0,
       pickedQty: 0,
+      pendingFeedbackCount: 0,
+      unacknowledgedFeedbackCount: 0,
+      items: orderItemsMap.get(order.id) || [],
     };
-    existing.totalItems += 1;
-    if (item.status === "picked" || item.status === "substituted") {
-      existing.pickedItems += 1;
-    }
-    existing.totalQty += item.target_qty || 0;
-    existing.pickedQty += item.picked_qty || 0;
-    itemCountsMap.set(item.pick_list_id, existing);
-  }
+  });
 
-  return data
-    .filter((pl) => pl.orders) // Filter out pick lists with no order
-    .map((pl): PickerTask => {
-      const order = pl.orders as any;
-      const customer = order?.customers as any;
-      const counts = itemCountsMap.get(pl.id) || {
-        totalItems: 0,
-        pickedItems: 0,
-        totalQty: 0,
-        pickedQty: 0,
-      };
-
-      return {
-        id: pl.id,
-        orgId: pl.org_id,
-        orderId: pl.order_id,
-        assignedUserId: pl.assigned_user_id || undefined,
-        assignedTeamId: pl.assigned_team_id || undefined,
-        sequence: pl.sequence,
-        status: pl.status,
-        qcStatus: pl.qc_status || undefined,
-        isPartial: pl.is_partial ?? false,
-        mergeStatus: pl.merge_status || undefined,
-        startedAt: pl.started_at || undefined,
-        completedAt: pl.completed_at || undefined,
-        notes: pl.notes || undefined,
-        createdAt: pl.created_at,
-        orderNumber: order?.order_number || "Unknown",
-        orderStatus: order?.status || "unknown",
-        requestedDeliveryDate: order?.requested_delivery_date || undefined,
-        customerName: customer?.name || "Unknown Customer",
-        ...counts,
-        pendingFeedbackCount: 0,
-        unacknowledgedFeedbackCount: 0,
-      };
-    });
+  return sortByDeliveryDate([...pickListTasks, ...orderTasks]);
 }
 
 /**
- * Get combined picker tasks (personal + team)
+ * Get combined picker tasks (personal + available unassigned)
+ * All sorted by delivery date for priority
  */
 export async function getAllPickerTasks(): Promise<{
   myTasks: PickerTask[];
-  teamTasks: PickerTask[];
+  availableTasks: PickerTask[];
 }> {
-  const [myTasks, teamTasks] = await Promise.all([
+  const [myTasks, availableTasks] = await Promise.all([
     getPickerTasks(),
-    getTeamPickerTasks(),
+    getUnassignedPickerTasks(),
   ]);
 
-  return { myTasks, teamTasks };
+  return { myTasks, availableTasks };
 }

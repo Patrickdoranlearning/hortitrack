@@ -10,7 +10,7 @@ import {
 } from '@/lib/__tests__/test-utils';
 
 // Mock the dependencies
-const mockSupabase = createMockSupabaseClient();
+const mockSupabase = createMockSupabaseClient() as any;
 const mockUser = createMockUser();
 const mockOrgId = 'test-org-id';
 
@@ -97,7 +97,7 @@ describe('ipm-tasks actions', () => {
         },
       ];
 
-      let tableCallCount = 0;
+      const tableCallCount = 0;
       mockSupabase.from = jest.fn((table: string) => {
         if (table === 'batches') {
           return new MockSupabaseQueryBuilder({ data: mockBatch, error: null });
@@ -111,7 +111,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await generateTasksForBatch('batch-1', '2024-01-01');
+      const result: any = await generateTasksForBatch('batch-1', '2024-01-01');
 
       expect(result.success).toBe(true);
       expect(result.data?.tasksCreated).toBe(2); // Two products in tank mix
@@ -136,7 +136,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await generateTasksForBatch('batch-1', '2024-01-01');
+      const result: any = await generateTasksForBatch('batch-1', '2024-01-01');
 
       expect(result.success).toBe(true);
       expect(result.data?.tasksCreated).toBe(0);
@@ -164,7 +164,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await generateTasksForBatch('batch-1', '2024-01-01');
+      const result: any = await generateTasksForBatch('batch-1', '2024-01-01');
 
       expect(result.success).toBe(true);
       expect(result.data?.tasksCreated).toBe(0);
@@ -181,7 +181,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await generateTasksForBatch('nonexistent', '2024-01-01');
+      const result: any = await generateTasksForBatch('nonexistent', '2024-01-01');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
@@ -220,7 +220,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await generateTasksForSpotTreatment('spot-1');
+      const result: any = await generateTasksForSpotTreatment('spot-1');
 
       expect(result.success).toBe(true);
       expect(result.data?.tasksCreated).toBe(3);
@@ -234,7 +234,7 @@ describe('ipm-tasks actions', () => {
         });
       });
 
-      const result = await generateTasksForSpotTreatment('nonexistent');
+      const result: any = await generateTasksForSpotTreatment('nonexistent');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
@@ -271,12 +271,12 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: mockTasks, error: null });
       });
 
-      const result = await getGroupedTasks({ status: 'pending' });
+      const result: any = await getGroupedTasks({ status: 'pending' });
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(2); // Two groups: p1/week3 and p2/week3
       
-      const neemOilGroup = result.data!.find(g => g.productName === 'Neem Oil');
+      const neemOilGroup = result.data!.find((g: any) => g.productName === 'Neem Oil');
       expect(neemOilGroup?.totalBatches).toBe(2);
       expect(neemOilGroup?.locations).toHaveLength(1);
     });
@@ -316,7 +316,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: mockTasks, error: null });
       });
 
-      const result = await getGroupedTasks();
+      const result: any = await getGroupedTasks();
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(1); // One tank mix group
@@ -330,7 +330,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: [], error: null });
       });
 
-      const result = await getGroupedTasks({
+      const result: any = await getGroupedTasks({
         fromDate: '2024-01-01',
         toDate: '2024-01-31',
       });
@@ -343,7 +343,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: [], error: null });
       });
 
-      const result = await getGroupedTasks({ productId: 'p1' });
+      const result: any = await getGroupedTasks({ productId: 'p1' });
 
       expect(result.success).toBe(true);
     });
@@ -367,7 +367,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: mockTasks, error: null });
       });
 
-      const result = await getTasks({
+      const result: any = await getTasks({
         status: 'pending',
         fromDate: '2024-01-01',
         toDate: '2024-01-31',
@@ -408,7 +408,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await completeTasks(['t1'], {
+      const result: any = await completeTasks(['t1'], {
         notes: 'Applied in good conditions',
         weatherConditions: 'Sunny, 20°C',
       });
@@ -433,7 +433,7 @@ describe('ipm-tasks actions', () => {
 
       const { recordUsage } = require('../ipm-stock');
 
-      const result = await completeTasks(['t1'], {
+      const result: any = await completeTasks(['t1'], {
         bottleId: 'bottle-1',
         quantityUsedMl: 50,
       });
@@ -456,7 +456,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: mockTasks, error: null });
       });
 
-      const result = await completeTasks(['t1', 't2']);
+      const result: any = await completeTasks(['t1', 't2']);
 
       expect(result.success).toBe(true);
     });
@@ -472,7 +472,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await completeTasks(['t1']);
+      const result: any = await completeTasks(['t1']);
 
       expect(result.success).toBe(false);
     });
@@ -487,7 +487,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await skipTask('t1', 'Batch was shipped');
+      const result: any = await skipTask('t1', 'Batch was shipped');
 
       expect(result.success).toBe(true);
     });
@@ -500,7 +500,7 @@ describe('ipm-tasks actions', () => {
         });
       });
 
-      const result = await skipTask('t1', 'Reason');
+      const result: any = await skipTask('t1', 'Reason');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Update failed');
@@ -518,7 +518,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: mockUpdated, error: null });
       });
 
-      const result = await markOverdueTasks();
+      const result: any = await markOverdueTasks();
 
       expect(result.success).toBe(true);
       expect(result.data?.count).toBe(2);
@@ -529,7 +529,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: [], error: null });
       });
 
-      const result = await markOverdueTasks();
+      const result: any = await markOverdueTasks();
 
       expect(result.success).toBe(true);
       expect(result.data?.count).toBe(0);
@@ -592,7 +592,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await bulkGenerateTasks();
+      const result: any = await bulkGenerateTasks();
 
       expect(result.success).toBe(true);
       expect(result.data?.batchesProcessed).toBeGreaterThanOrEqual(0);
@@ -612,7 +612,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await bulkGenerateTasks({ clearExisting: true });
+      const result: any = await bulkGenerateTasks({ clearExisting: true });
 
       expect(result.success).toBe(true);
     });
@@ -625,7 +625,7 @@ describe('ipm-tasks actions', () => {
         return new MockSupabaseQueryBuilder({ data: null, error: null });
       });
 
-      const result = await bulkGenerateTasks();
+      const result: any = await bulkGenerateTasks();
 
       expect(result.success).toBe(true);
       expect(result.data?.batchesProcessed).toBe(0);

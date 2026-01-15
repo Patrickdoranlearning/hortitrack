@@ -92,7 +92,7 @@ export async function fetchCustomerDetail(
     .map((plc: any) => plc.price_list_id)
     .filter(Boolean);
 
-  let priceListNames: Record<string, string> = {};
+  const priceListNames: Record<string, string> = {};
   if (priceListIds.length > 0) {
     const { data: priceLists } = await supabase
       .from("price_lists")
@@ -192,7 +192,7 @@ export async function fetchCustomerOrders(
 
   // Fetch item counts for each order
   const orderIds = orders?.map((o) => o.id) ?? [];
-  let itemCounts: Record<string, number> = {};
+  const itemCounts: Record<string, number> = {};
 
   if (orderIds.length > 0) {
     const { data: items } = await supabase

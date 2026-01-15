@@ -105,15 +105,14 @@ function getWeekOptions(): number[] {
   return Array.from({ length: 52 }, (_, i) => i + 1);
 }
 
-// Generate year options (current year - 1 to current year + 6)
+// Generate relative year options (Year 1 to Year 5)
 function getYearOptions(): number[] {
-  const currentYear = new Date().getFullYear();
-  return Array.from({ length: 8 }, (_, i) => currentYear - 1 + i);
+  return Array.from({ length: 5 }, (_, i) => i + 1);
 }
 
-// Format year/week as readable string
+// Format year/week as readable string (relative years)
 function formatYearWeek(year: number, week: number): string {
-  return `${year} W${week.toString().padStart(2, '0')}`;
+  return `Year ${year} W${week.toString().padStart(2, '0')}`;
 }
 
 // Calculate weeks between two year/week points
@@ -155,14 +154,13 @@ export default function RecipeDetailClient({ protocol }: Props) {
   const [saving, setSaving] = React.useState(false);
   const [expandedStages, setExpandedStages] = React.useState<Set<string>>(new Set());
 
-  const currentYear = new Date().getFullYear();
-
   // Initialize nodes from protocol route - reversed for TOP-DOWN display (Ready first)
+  // Uses relative years (Year 1, Year 2, etc.) since recipes are templates
   const [nodes, setNodes] = React.useState<RouteNode[]>(() => {
     if (protocol.route?.nodes?.length) {
       // Check if existing nodes are already in the new format (fromYear/fromWeek exist)
       const hasPhase2Data = protocol.route.nodes.some(n => 'fromYear' in n);
-      
+
       if (hasPhase2Data) {
         // Already Phase 2, keep as is but ensure order is correct (Ready first)
         const sorted = [...protocol.route.nodes].sort((a, b) => {
@@ -173,14 +171,14 @@ export default function RecipeDetailClient({ protocol }: Props) {
         return sorted as RouteNode[];
       }
 
-      // Upgrade Phase 1 nodes to Phase 2
-      // We'll estimate years/weeks backwards from a default "Ready" point
-      let currentEndTotal = (currentYear + 2) * 52 + 44; // Default Ready Week 44
-      
+      // Upgrade Phase 1 nodes to Phase 2 using relative years
+      // We'll estimate years/weeks backwards from a default "Ready" point (Year 3, Week 44)
+      let currentEndTotal = 3 * 52 + 44; // Default Ready at Year 3 Week 44
+
       const upgraded = [...protocol.route.nodes].reverse().map((n) => {
         const durationWeeks = Math.ceil((n.durationDays ?? 30) / 7);
         const startTotal = currentEndTotal - durationWeeks;
-        
+
         const node: RouteNode = {
           id: n.id,
           label: n.label || n.stageName || "Stage",
@@ -189,7 +187,7 @@ export default function RecipeDetailClient({ protocol }: Props) {
           locationName: n.locationName,
           sizeId: (n as any).sizeId,
           sizeName: (n as any).sizeName,
-          fromYear: Math.floor(startTotal / 52),
+          fromYear: Math.max(1, Math.floor(startTotal / 52)),
           fromWeek: (startTotal % 52) || 52,
           toYear: Math.floor(currentEndTotal / 52),
           toWeek: (currentEndTotal % 52) || 52,
@@ -201,33 +199,33 @@ export default function RecipeDetailClient({ protocol }: Props) {
             notes: n.notes,
           }
         };
-        
+
         currentEndTotal = startTotal; // Next stage ends when this one starts
         return node;
       });
       return upgraded;
     }
-    
-    // Default nodes if none exist
+
+    // Default nodes if none exist - using relative years
     return [
-      { 
-        id: crypto.randomUUID(), 
-        label: "Ready", 
-        stageName: "Ready", 
+      {
+        id: crypto.randomUUID(),
+        label: "Ready",
+        stageName: "Ready",
         durationDays: 0,
-        fromYear: currentYear + 2, 
+        fromYear: 3,
         fromWeek: 38,
-        toYear: currentYear + 2,
+        toYear: 3,
         toWeek: 44,
       },
-      { 
-        id: crypto.randomUUID(), 
-        label: "Propagation", 
-        stageName: "Propagation", 
+      {
+        id: crypto.randomUUID(),
+        label: "Propagation",
+        stageName: "Propagation",
         durationDays: 30,
-        fromYear: currentYear, 
+        fromYear: 1,
         fromWeek: 1,
-        toYear: currentYear,
+        toYear: 1,
         toWeek: 6,
       },
     ];
@@ -666,6 +664,7 @@ export default function RecipeDetailClient({ protocol }: Props) {
                     
                     return (
                       <React.Fragment key={node.id}>
+                        <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(node.id)}>
                         <div className="rounded-lg border bg-card overflow-hidden">
                           {/* Main Stage Row */}
                           <div className="p-4 space-y-3">
@@ -733,12 +732,12 @@ export default function RecipeDetailClient({ protocol }: Props) {
                                     value={node.fromYear.toString()}
                                     onValueChange={(v) => updateNode(index, { fromYear: Number(v) })}
                                   >
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className="w-[90px]">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {getYearOptions().map((year) => (
-                                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                        <SelectItem key={year} value={year.toString()}>Year {year}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
@@ -768,12 +767,12 @@ export default function RecipeDetailClient({ protocol }: Props) {
                                     value={node.toYear.toString()}
                                     onValueChange={(v) => updateNode(index, { toYear: Number(v) })}
                                   >
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className="w-[90px]">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {getYearOptions().map((year) => (
-                                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                        <SelectItem key={year} value={year.toString()}>Year {year}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
@@ -817,7 +816,6 @@ export default function RecipeDetailClient({ protocol }: Props) {
                           </div>
 
                           {/* Growing Conditions (Collapsible) */}
-                          <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(node.id)}>
                             <CollapsibleContent>
                               <div className="p-4 border-t bg-muted/20 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                                 {/* Media/Soil */}
@@ -933,8 +931,8 @@ export default function RecipeDetailClient({ protocol }: Props) {
                                 </div>
                               </div>
                             </CollapsibleContent>
-                          </Collapsible>
                         </div>
+                        </Collapsible>
 
                         {/* Add Stage Button */}
                         {index < nodes.length - 1 && (

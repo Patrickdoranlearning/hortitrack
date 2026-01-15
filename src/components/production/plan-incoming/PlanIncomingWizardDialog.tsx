@@ -7,7 +7,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { ReferenceDataProvider } from '@/contexts/ReferenceDataContext';
 import { PlanIncomingWizard } from './PlanIncomingWizard';
 
 type PlanIncomingWizardDialogProps = {
@@ -42,12 +41,10 @@ export function PlanIncomingWizardDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-1 -mr-1">
-          <ReferenceDataProvider>
-            <PlanIncomingWizard
-              onComplete={handleComplete}
-              onCancel={handleCancel}
-            />
-          </ReferenceDataProvider>
+          <PlanIncomingWizard
+            onComplete={handleComplete}
+            onCancel={handleCancel}
+          />
         </div>
       </DialogContent>
     </Dialog>

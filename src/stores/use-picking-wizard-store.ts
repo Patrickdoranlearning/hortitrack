@@ -12,8 +12,11 @@ export interface QCChecklistState {
 }
 
 export interface TrolleyInfo {
-  trolleyType: 'tag6' | 'dc' | 'danish' | 'dutch' | 'pallet';
+  // Legacy: single trolley type (kept for backward compatibility)
+  trolleyType: 'tag6' | 'dc' | 'danish' | 'dutch' | 'pallet' | 'half_trolley';
   count: number;
+  // New: counts per trolley type for multi-type support
+  trolleyCounts?: Record<string, number>;
   shelves?: number;
   trolleyNumbers?: string[];
 }

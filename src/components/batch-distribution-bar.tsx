@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -11,25 +10,35 @@ import { cn } from '@/lib/utils';
   
 interface BatchDistributionBarProps {
     distribution: {
-      inStock: number;
-      transplanted: number;
-      lost: number;
+      available: number;        // Green
+      allocatedPotting: number; // Gold - reserved for production plans
+      allocatedSales: number;   // Gold - reserved for sales orders
+      sold: number;             // Blue
+      dumped: number;           // Red
+      transplanted: number;     // Grey
     };
     initialQuantity: number;
 }
   
 export function BatchDistributionBar({ distribution, initialQuantity }: BatchDistributionBarProps) {
     if (initialQuantity === 0) return null;
-  
-    const inStockPercent = (distribution.inStock / initialQuantity) * 100;
+
+    // Combine both allocation types into a single "Allocated" segment
+    const allocatedTotal = (distribution.allocatedPotting ?? 0) + (distribution.allocatedSales ?? 0);
+
+    const availablePercent = (distribution.available / initialQuantity) * 100;
+    const allocatedPercent = (allocatedTotal / initialQuantity) * 100;
+    const soldPercent = (distribution.sold / initialQuantity) * 100;
+    const dumpedPercent = (distribution.dumped / initialQuantity) * 100;
     const transplantedPercent = (distribution.transplanted / initialQuantity) * 100;
-    const lostPercent = (distribution.lost / initialQuantity) * 100;
 
     const sections = [
-        { name: 'In Stock', value: distribution.inStock, percent: inStockPercent, color: 'bg-chart-1' },
-        { name: 'Transplanted', value: distribution.transplanted, percent: transplantedPercent, color: 'bg-chart-2' },
-        { name: 'Lost', value: distribution.lost, percent: lostPercent, color: 'bg-chart-5' },
-    ];
+        { name: 'Available', value: distribution.available, percent: availablePercent, color: 'bg-green-600' },
+        { name: 'Allocated', value: allocatedTotal, percent: allocatedPercent, color: 'bg-amber-400' },
+        { name: 'Sold', value: distribution.sold, percent: soldPercent, color: 'bg-blue-600' },
+        { name: 'Dumped', value: distribution.dumped, percent: dumpedPercent, color: 'bg-red-600' },
+        { name: 'Transplanted', value: distribution.transplanted, percent: transplantedPercent, color: 'bg-slate-400' },
+    ].filter(s => s.value > 0);
   
     return (
       <TooltipProvider>
@@ -37,16 +46,29 @@ export function BatchDistributionBar({ distribution, initialQuantity }: BatchDis
           <TooltipTrigger className="w-full">
             <div className="flex h-4 w-full overflow-hidden rounded-full bg-secondary">
               <div
-                className="bg-chart-1 transition-all"
-                style={{ width: `${inStockPercent}%` }}
+                className="bg-green-600 transition-all"
+                style={{ width: `${availablePercent}%` }}
+                title="Available"
               />
               <div
-                className="bg-chart-2 transition-all"
+                className="bg-amber-400 transition-all"
+                style={{ width: `${allocatedPercent}%` }}
+                title="Allocated"
+              />
+              <div
+                className="bg-blue-600 transition-all"
+                style={{ width: `${soldPercent}%` }}
+                title="Sold"
+              />
+              <div
+                className="bg-red-600 transition-all"
+                style={{ width: `${dumpedPercent}%` }}
+                title="Dumped"
+              />
+              <div
+                className="bg-slate-400 transition-all"
                 style={{ width: `${transplantedPercent}%` }}
-              />
-              <div
-                className="bg-chart-5 transition-all"
-                style={{ width: `${lostPercent}%` }}
+                title="Transplanted"
               />
             </div>
           </TooltipTrigger>
@@ -60,7 +82,7 @@ export function BatchDistributionBar({ distribution, initialQuantity }: BatchDis
                                 <span className={cn("h-3 w-3 rounded-sm", section.color)} />
                                 <span>{section.name}:</span>
                             </div>
-                            <span className="font-mono font-semibold">{section.value}</span>
+                            <span className="font-mono font-semibold">{section.value.toLocaleString()}</span>
                         </li>
                     ))}
                 </ul>

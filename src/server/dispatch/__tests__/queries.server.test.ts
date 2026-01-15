@@ -300,7 +300,7 @@ describe('dispatch queries.server', () => {
       const result = await createDeliveryRun({
         runDate: '2024-01-15',
         haulierId: 'haulier-1',
-        loadName: 'Cork Load',
+        loadCode: '4L',
       });
 
       expect(result).toBe('new-run-1');

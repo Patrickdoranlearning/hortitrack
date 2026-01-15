@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { getPickItemsForMultipleLists, startPickList } from "@/server/sales/picking";
 import CombinedPickingClient from "./CombinedPickingClient";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface PageProps {
   searchParams: Promise<{ ids?: string }>;
 }
@@ -11,13 +14,13 @@ export default async function CombinedPickingPage({ searchParams }: PageProps) {
   const idsParam = params.ids;
 
   if (!idsParam) {
-    redirect("/dispatch/picking");
+    redirect("/dispatch/picker");
   }
 
   const pickListIds = idsParam.split(",").filter(Boolean);
 
   if (pickListIds.length < 2) {
-    redirect("/dispatch/picking");
+    redirect("/dispatch/picker");
   }
 
   // Start all pick lists that aren't already started

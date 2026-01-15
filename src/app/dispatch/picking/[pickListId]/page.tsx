@@ -18,7 +18,7 @@ export default async function PickingWorkflowPage({ params }: PageProps) {
 
   // If the pick list is completed, redirect back to queue
   if (pickList.status === 'completed') {
-    redirect('/dispatch/picking');
+    redirect('/dispatch/picker');
   }
 
   const items = await getPickItems(pickListId);

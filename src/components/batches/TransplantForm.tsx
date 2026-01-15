@@ -20,8 +20,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { SelectWithCreate } from "@/components/ui/select-with-create";
-import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
+import { SelectWithCreate } from "../ui/select-with-create";
+import { useRefreshOnFocus } from "../../hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
+import { invalidateBatches } from "@/lib/swr/keys";
+import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
@@ -89,17 +91,25 @@ export default function TransplantForm({
       alert(v?.title || v?.description || "OK");
     });
 
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
 
   const form = useForm<z.infer<typeof Schema>>({
     resolver: zodResolver(Schema),
     defaultValues: {
       parent_batch_id: parentBatchId,
       containers: undefined,
-      planted_at: today,
+      planted_at: "", // Empty initially, set after hydration
       archive_parent_if_empty: true,
     },
   });
+
+  // Set date after hydration to avoid mismatch
+  React.useEffect(() => {
+    if (today && !form.getValues("planted_at")) {
+      form.setValue("planted_at", today);
+    }
+  }, [today, form]);
 
   const [parentState, setParentState] = React.useState<ParentState>({
     loading: true,
@@ -246,12 +256,14 @@ export default function TransplantForm({
             ? `Batch ${child_batch.batchNumber} created. ${remainderToWriteOff.toLocaleString()} remaining units written off.`
             : `Batch ${child_batch.batchNumber} created.`,
       });
+      // Invalidate batch caches to trigger refresh across all components
+      invalidateBatches();
       form.reset({
         parent_batch_id: parentBatchId,
         size_id: values.size_id,
         location_id: values.location_id,
         containers: undefined,
-        planted_at: today,
+        planted_at: getTodayISO(),
         archive_parent_if_empty: true,
         notes: "",
       });

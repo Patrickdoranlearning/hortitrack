@@ -10,7 +10,7 @@ import {
 } from '@/lib/__tests__/test-utils';
 
 // Mock the dependencies
-const mockSupabase = createMockSupabaseClient();
+const mockSupabase = createMockSupabaseClient() as any;
 const mockUser = createMockUser();
 const mockOrgId = 'test-org-id';
 
@@ -68,7 +68,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockBottles, error: null });
         });
 
-        const result = await listBottles();
+        const result: any = await listBottles();
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(2);
@@ -87,7 +87,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockBottles, error: null });
         });
 
-        const result = await listBottles({ productId: 'p1' });
+        const result: any = await listBottles({ productId: 'p1' });
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(1);
@@ -105,7 +105,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockBottles, error: null });
         });
 
-        const result = await listBottles({ status: 'open' });
+        const result: any = await listBottles({ status: 'open' });
 
         expect(result.success).toBe(true);
       });
@@ -118,7 +118,7 @@ describe('ipm-stock actions', () => {
           });
         });
 
-        const result = await listBottles();
+        const result: any = await listBottles();
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('Query failed');
@@ -136,7 +136,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockBottle, error: null });
         });
 
-        const result = await getBottleByCode('BTL-001');
+        const result: any = await getBottleByCode('BTL-001');
 
         expect(result.success).toBe(true);
         expect(result.data?.bottleCode).toBe('BTL-001');
@@ -150,7 +150,7 @@ describe('ipm-stock actions', () => {
           });
         });
 
-        const result = await getBottleByCode('NONEXISTENT');
+        const result: any = await getBottleByCode('NONEXISTENT');
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('not found');
@@ -172,7 +172,7 @@ describe('ipm-stock actions', () => {
           Promise.resolve({ data: 'BTL-002', error: null })
         );
 
-        const result = await createBottles({
+        const result: any = await createBottles({
           productId: 'p1',
           volumeMl: 1000,
           batchNumber: 'BATCH-001',
@@ -207,7 +207,7 @@ describe('ipm-stock actions', () => {
           Promise.resolve({ data: `BTL-00${codeCounter++}`, error: null })
         );
 
-        const result = await createBottles(
+        const result: any = await createBottles(
           {
             productId: 'p1',
             volumeMl: 1000,
@@ -224,7 +224,7 @@ describe('ipm-stock actions', () => {
           Promise.resolve({ data: null, error: { message: 'RPC failed' } })
         );
 
-        const result = await createBottles({
+        const result: any = await createBottles({
           productId: 'p1',
           volumeMl: 1000,
         });
@@ -256,7 +256,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await disposeBottle('b1', 'Expired');
+        const result: any = await disposeBottle('b1', 'Expired');
 
         expect(result.success).toBe(true);
       });
@@ -269,7 +269,7 @@ describe('ipm-stock actions', () => {
           });
         });
 
-        const result = await disposeBottle('nonexistent');
+        const result: any = await disposeBottle('nonexistent');
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('not found');
@@ -312,7 +312,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await recordUsage({
+        const result: any = await recordUsage({
           bottleId: 'b1',
           quantityMl: 50,
           locationId: 'loc-1',
@@ -350,7 +350,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await recordUsage({
+        const result: any = await recordUsage({
           bottleId: 'b1',
           quantityMl: 100,
         });
@@ -367,7 +367,7 @@ describe('ipm-stock actions', () => {
           });
         });
 
-        const result = await recordUsage({
+        const result: any = await recordUsage({
           bottleId: 'nonexistent',
           quantityMl: 50,
         });
@@ -394,7 +394,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await adjustBottleLevel('b1', 450, 'Spillage');
+        const result: any = await adjustBottleLevel('b1', 450, 'Spillage');
 
         expect(result.success).toBe(true);
       });
@@ -415,7 +415,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await adjustBottleLevel('b1', 600, 'Measurement correction');
+        const result: any = await adjustBottleLevel('b1', 600, 'Measurement correction');
 
         expect(result.success).toBe(true);
       });
@@ -452,7 +452,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockMovements, error: null });
         });
 
-        const result = await getMovementsForBottle('b1');
+        const result: any = await getMovementsForBottle('b1');
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(2);
@@ -487,7 +487,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockSummary, error: null });
         });
 
-        const result = await getStockSummary();
+        const result: any = await getStockSummary();
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(1);
@@ -508,7 +508,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockSummary, error: null });
         });
 
-        const result = await getProductStockSummary('p1');
+        const result: any = await getProductStockSummary('p1');
 
         expect(result.success).toBe(true);
         expect(result.data?.productId).toBe('p1');
@@ -522,7 +522,7 @@ describe('ipm-stock actions', () => {
           });
         });
 
-        const result = await getProductStockSummary('nonexistent');
+        const result: any = await getProductStockSummary('nonexistent');
 
         expect(result.success).toBe(true);
         expect(result.data?.bottlesInStock).toBe(0);
@@ -545,7 +545,7 @@ describe('ipm-stock actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockSummary, error: null });
         });
 
-        const result = await getLowStockProducts();
+        const result: any = await getLowStockProducts();
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(1);
@@ -574,7 +574,7 @@ describe('ipm-stock actions', () => {
         return new MockSupabaseQueryBuilder({ data: mockBottles, error: null });
       });
 
-      const result = await getAvailableBottles('p1');
+      const result: any = await getAvailableBottles('p1');
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(2);
@@ -594,7 +594,7 @@ describe('ipm-stock actions', () => {
         return new MockSupabaseQueryBuilder({ data: mockBottles, error: null });
       });
 
-      const result = await getAvailableBottles('p1');
+      const result: any = await getAvailableBottles('p1');
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(1);

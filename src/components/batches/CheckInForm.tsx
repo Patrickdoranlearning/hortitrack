@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { SelectWithCreate } from "../ui/select-with-create";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +34,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
+import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
@@ -85,18 +86,26 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
       alert(v?.title || v?.description || "OK");
     });
 
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
 
   const form = useForm<CheckInInput>({
     resolver: zodResolver(Schema),
     defaultValues: {
       phase: "propagation",
       containers: 1,
-      incoming_date: today,
+      incoming_date: "", // Empty initially, set after hydration
       quality_rating: 5,
       pest_or_disease: false,
     },
   });
+
+  // Set date after hydration to avoid mismatch
+  React.useEffect(() => {
+    if (today && !form.getValues("incoming_date")) {
+      form.setValue("incoming_date", today);
+    }
+  }, [today, form]);
 
   const [submitting, setSubmitting] = React.useState(false);
   const [overrideOn, setOverrideOn] = React.useState(false);
@@ -199,7 +208,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
       form.reset({
         phase: "propagation",
         containers: 1,
-        incoming_date: today,
+        incoming_date: getTodayISO(),
         quality_rating: 5,
         pest_or_disease: false,
       });

@@ -447,24 +447,25 @@ export default function CustomerManagementClient({ customers, priceLists, produc
             {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? "s" : ""}
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           {filteredCustomers.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               <p>No customers found. Use the import tools or click "Add customer".</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Currency</TableHead>
-                  <TableHead>Addresses</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto -mx-6 px-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden sm:table-cell">Code</TableHead>
+                    <TableHead className="hidden md:table-cell">Contact</TableHead>
+                    <TableHead>Country</TableHead>
+                    <TableHead className="hidden lg:table-cell">Currency</TableHead>
+                    <TableHead className="hidden md:table-cell">Addresses</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {filteredCustomers.map((customer) => (
                   <TableRow key={customer.id}>
@@ -476,8 +477,8 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                         {customer.name}
                       </Link>
                     </TableCell>
-                    <TableCell>{customer.code || "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">{customer.code || "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex flex-col gap-1 text-sm">
                         {customer.email && (
                           <a
@@ -505,8 +506,8 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                         {COUNTRY_OPTIONS.find((c) => c.code === customer.countryCode)?.name ?? customer.countryCode}
                       </Badge>
                     </TableCell>
-                    <TableCell>{customer.currency}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">{customer.currency}</TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {customer.addresses.length > 0 ? (
                         <span className="text-sm text-muted-foreground">
                           {customer.addresses.length} location{customer.addresses.length !== 1 ? "s" : ""}
@@ -524,7 +525,8 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

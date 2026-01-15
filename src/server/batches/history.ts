@@ -245,14 +245,15 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
         payload.units ??
         payload.units_moved ??      // TRANSPLANT_OUT uses this
         payload.units_received ??   // TRANSPLANT_IN uses this
+        payload.computed_units ??    // Some transplants use this
         payload.diff ??
         null;
       if (typeof rawQty === "number") {
         // Determine sign based on event type
         const upperType = evt.type?.toUpperCase() ?? "";
-        if (["PICKED", "LOSS", "TRANSPLANT_OUT"].includes(upperType)) {
+        if (["PICKED", "LOSS", "TRANSPLANT_OUT", "SALE", "DISPATCH"].includes(upperType)) {
           quantity = -Math.abs(rawQty);
-        } else if (["TRANSPLANT_IN", "CREATE", "CHECKIN", "PROPAGATION_IN"].includes(upperType)) {
+        } else if (["TRANSPLANT_IN", "CREATE", "CHECKIN", "PROPAGATION_IN", "TRANSPLANT_FROM"].includes(upperType)) {
           quantity = Math.abs(rawQty);
         } else {
           quantity = rawQty;
@@ -270,12 +271,16 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
 
     // Improve title for specific event types
     const upperType = evt.type?.toUpperCase() ?? "";
-    if (upperType === "PICKED" && quantity) {
-      title = `${Math.abs(quantity)} units picked for sale`;
-    } else if (upperType === "TRANSPLANT_TO" && quantity) {
-      title = `${Math.abs(quantity)} units transplanted out`;
-    } else if (upperType === "TRANSPLANT_FROM" && quantity) {
-      title = `${Math.abs(quantity)} units transplanted in`;
+    if (["PICKED", "SALE", "DISPATCH"].includes(upperType)) {
+      title = `${Math.abs(quantity ?? 0)} units sold / dispatched`;
+    } else if (upperType === "TRANSPLANT_TO" || upperType === "TRANSPLANT_OUT") {
+      title = `${Math.abs(quantity ?? 0)} units transplanted out`;
+      const toBatch = getString(payload, "to_batch_number");
+      if (toBatch) title += ` to batch ${toBatch}`;
+    } else if (upperType === "TRANSPLANT_FROM" || upperType === "TRANSPLANT_IN") {
+      title = `${Math.abs(quantity ?? 0)} units transplanted in`;
+      const fromBatch = getString(payload, "from_batch_number");
+      if (fromBatch) title += ` from batch ${fromBatch}`;
     } else if (upperType === "LOSS" && quantity) {
       title = `${Math.abs(quantity)} units lost${getString(payload, "reason") ? `: ${getString(payload, "reason")}` : ""}`;
     } else if (upperType === "STATUS_CHANGE") {

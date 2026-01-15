@@ -129,6 +129,44 @@ export async function getStockAtLocation(
 // Stock Movements
 // ============================================================================
 
+/**
+ * Receive stock for a material (e.g., initial stock, manual check-in)
+ */
+export async function receiveStock(
+  supabase: SupabaseClient,
+  orgId: string,
+  userId: string,
+  materialId: string,
+  locationId: string | null,
+  quantity: number,
+  reference?: string,
+  notes?: string
+): Promise<MaterialTransaction> {
+  if (quantity <= 0) {
+    throw new Error("Receive quantity must be positive");
+  }
+
+  const { data, error } = await supabase
+    .from("material_transactions")
+    .insert({
+      org_id: orgId,
+      material_id: materialId,
+      transaction_type: "receive",
+      quantity: Math.abs(quantity),
+      uom: "each",
+      to_location_id: locationId,
+      reference: reference ?? "Stock received",
+      notes,
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to receive stock: ${error.message}`);
+
+  return mapTransaction(data);
+}
+
 export async function adjustStock(
   supabase: SupabaseClient,
   orgId: string,

@@ -12,7 +12,7 @@ export async function getUserIdAndOrgId(): Promise<{ userId: string | null; orgI
 
   const { data: { user: fetchedUser }, error: userError } = await supabase.auth.getUser();
 
-  let user = fetchedUser;
+  const user = fetchedUser;
   if (IS_DEV && (!user || userError)) {
     return { userId: DEV_USER_ID, orgId: DEV_ORG_ID };
   }

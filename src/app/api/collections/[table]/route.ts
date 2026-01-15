@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/server/db/supabaseAdmin';
 import { getOrgForUserByEmail } from '@/server/org/getOrgForUser';
+import { z } from "zod";
 
-type Table = 'nursery_locations' | 'suppliers' | 'plant_varieties' | 'plant_sizes';
+const TableParam = z.enum(['nursery_locations', 'suppliers', 'plant_varieties', 'plant_sizes']);
+type Table = z.infer<typeof TableParam>;
 
-export async function GET(req: NextRequest, { params }: { params: { table: Table } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ table: string }> }
+) {
   try {
-    const table = params.table;
+    const { table: rawTable } = await params;
+    const parsedTable = TableParam.safeParse(rawTable);
+    if (!parsedTable.success) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    const table: Table = parsedTable.data;
     // Verify Firebase token (Authorization: Bearer <idToken>)
     const authHeader = req.headers.get('authorization') || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -18,17 +28,15 @@ export async function GET(req: NextRequest, { params }: { params: { table: Table
     }
     const email = user.email;
 
-    // org-scoped only where needed
+    // All tables require org scoping for proper tenant isolation
     let orgId: string | null = null;
-    if (table === 'nursery_locations' || table === 'suppliers') {
-      try {
-        orgId = await getOrgForUserByEmail(email);
-      } catch (e: any) {
-        const msg = e?.message === 'NO_ACTIVE_ORG'
-          ? 'No active org for user. Set profiles.active_org_id.'
-          : e?.message || 'Org resolution failed';
-        return NextResponse.json({ error: msg }, { status: 403 });
-      }
+    try {
+      orgId = await getOrgForUserByEmail(email);
+    } catch (e: any) {
+      const msg = e?.message === 'NO_ACTIVE_ORG'
+        ? 'No active org for user. Set profiles.active_org_id.'
+        : e?.message || 'Org resolution failed';
+      return NextResponse.json({ error: msg }, { status: 403 });
     }
 
     if (table === 'nursery_locations') {
@@ -55,6 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: { table: Table
       const { data, error } = await supabaseAdmin
         .from('plant_varieties')
         .select('id,name,family,genus,species')
+        .eq('org_id', orgId!)
         .order('name', { ascending: true });
       if (error) throw new Error(error.message);
       return NextResponse.json({ rows: data ?? [] }, { status: 200 });
@@ -64,6 +73,7 @@ export async function GET(req: NextRequest, { params }: { params: { table: Table
       const { data, error } = await supabaseAdmin
         .from('plant_sizes')
         .select('id,name,container_type,cell_multiple')
+        .eq('org_id', orgId!)
         .order('name', { ascending: true });
       if (error) throw new Error(error.message);
       return NextResponse.json({ rows: data ?? [] }, { status: 200 });

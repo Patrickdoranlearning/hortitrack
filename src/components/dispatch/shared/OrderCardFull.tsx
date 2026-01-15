@@ -15,6 +15,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { DispatchBoardOrder, ActiveDeliveryRunSummary } from '@/lib/dispatch/types';
 import type { GrowerMember } from '@/server/dispatch/queries.server';
+import { TrolleyReconciliationCard } from '@/components/shared/TrolleyReconciliationCard';
+import { CustomerTrolleyBadge } from '@/components/shared/CustomerTrolleyBadge';
 
 interface OrderCardFullProps {
   order: DispatchBoardOrder;
@@ -82,7 +84,10 @@ export function OrderCardFull({
       </CardHeader>
       <CardContent className="space-y-3">
         <button className="text-left w-full" onClick={onClick}>
-          <p className="font-semibold">{order.customerName}</p>
+          <div className="flex items-center justify-between">
+            <p className="font-semibold">{order.customerName}</p>
+            {order.customerId && <CustomerTrolleyBadge customerId={order.customerId} size="sm" />}
+          </div>
           <p className="text-sm text-muted-foreground">{order.orderNumber}</p>
         </button>
 
@@ -93,7 +98,12 @@ export function OrderCardFull({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Trolleys</p>
-            <p>{order.trolleysEstimated || 0}</p>
+            <TrolleyReconciliationCard
+              estimated={order.trolleysEstimated}
+              actual={order.trolleysActual ?? null}
+              compact
+              showVariance={false}
+            />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">County</p>
@@ -117,7 +127,7 @@ export function OrderCardFull({
               <SelectItem value="none">— No Load —</SelectItem>
               {loads.map((load) => (
                 <SelectItem key={load.id} value={load.id}>
-                  {load.loadName || load.runNumber}
+                  {load.loadCode || load.runNumber}
                 </SelectItem>
               ))}
             </SelectContent>

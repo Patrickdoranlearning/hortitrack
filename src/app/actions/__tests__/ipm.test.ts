@@ -10,7 +10,7 @@ import {
 } from '@/lib/__tests__/test-utils';
 
 // Mock the dependencies
-const mockSupabase = createMockSupabaseClient();
+const mockSupabase = createMockSupabaseClient() as any;
 const mockUser = createMockUser();
 const mockOrgId = 'test-org-id';
 
@@ -74,7 +74,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await listIpmProducts();
+        const result: any = await listIpmProducts();
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(2);
@@ -89,7 +89,7 @@ describe('ipm actions', () => {
           });
         });
 
-        const result = await listIpmProducts();
+        const result: any = await listIpmProducts();
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('Query failed');
@@ -104,7 +104,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockProduct, error: null });
         });
 
-        const result = await getIpmProduct('p1');
+        const result: any = await getIpmProduct('p1');
 
         expect(result.success).toBe(true);
         expect(result.data?.name).toBe('Neem Oil');
@@ -119,7 +119,7 @@ describe('ipm actions', () => {
           });
         });
 
-        const result = await getIpmProduct('nonexistent');
+        const result: any = await getIpmProduct('nonexistent');
 
         expect(result.success).toBe(false);
       });
@@ -133,7 +133,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockProduct, error: null });
         });
 
-        const result = await createIpmProduct({
+        const result: any = await createIpmProduct({
           name: 'New Product',
           pcsNumber: 'PCS-123',
           activeIngredient: 'Spinosad',
@@ -155,7 +155,7 @@ describe('ipm actions', () => {
           });
         });
 
-        const result = await createIpmProduct({
+        const result: any = await createIpmProduct({
           name: 'Existing Product',
         });
 
@@ -172,7 +172,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockProduct, error: null });
         });
 
-        const result = await updateIpmProduct('p1', { name: 'Updated Name' });
+        const result: any = await updateIpmProduct('p1', { name: 'Updated Name' });
 
         expect(result.success).toBe(true);
         expect(result.data?.name).toBe('Updated Name');
@@ -185,7 +185,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await deleteIpmProduct('p1');
+        const result: any = await deleteIpmProduct('p1');
 
         expect(result.success).toBe(true);
       });
@@ -198,7 +198,7 @@ describe('ipm actions', () => {
           });
         });
 
-        const result = await deleteIpmProduct('p1');
+        const result: any = await deleteIpmProduct('p1');
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('foreign key');
@@ -235,7 +235,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await listIpmPrograms();
+        const result: any = await listIpmPrograms();
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(1);
@@ -254,7 +254,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockProgram, error: null });
         });
 
-        const result = await getIpmProgram('prog1');
+        const result: any = await getIpmProgram('prog1');
 
         expect(result.success).toBe(true);
         expect(result.data?.id).toBe('prog1');
@@ -285,7 +285,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await createIpmProgram({
+        const result: any = await createIpmProgram({
           name: 'New Program',
           description: 'Test program',
           intervalDays: 7,
@@ -319,7 +319,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await createIpmProgram({
+        const result: any = await createIpmProgram({
           name: 'New Program',
           steps: [{ productId: 'p1' }],
         });
@@ -340,7 +340,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockProgram, error: null });
         });
 
-        const result = await updateIpmProgram('prog1', {
+        const result: any = await updateIpmProgram('prog1', {
           name: 'Updated Program',
           steps: [{ productId: 'p2', weekNumber: 2 }],
         });
@@ -355,7 +355,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await deleteIpmProgram('prog1');
+        const result: any = await deleteIpmProgram('prog1');
 
         expect(result.success).toBe(true);
       });
@@ -386,7 +386,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockAssignments, error: null });
         });
 
-        const result = await listIpmAssignments({ activeOnly: true });
+        const result: any = await listIpmAssignments({ activeOnly: true });
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(1);
@@ -410,7 +410,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockAssignment, error: null });
         });
 
-        const result = await createIpmAssignment({
+        const result: any = await createIpmAssignment({
           programId: 'prog1',
           targetType: 'family',
           targetFamily: 'Bedding',
@@ -441,7 +441,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockAssignment, error: null });
         });
 
-        const result = await createIpmAssignment({
+        const result: any = await createIpmAssignment({
           programId: 'prog1',
           targetType: 'location',
           targetLocationId: 'loc-1',
@@ -458,7 +458,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await deactivateIpmAssignment('assign1');
+        const result: any = await deactivateIpmAssignment('assign1');
 
         expect(result.success).toBe(true);
       });
@@ -491,7 +491,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockTreatments, error: null });
         });
 
-        const result = await listIpmSpotTreatments({ locationId: 'loc-1' });
+        const result: any = await listIpmSpotTreatments({ locationId: 'loc-1' });
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(1);
@@ -519,7 +519,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockTreatment, error: null });
         });
 
-        const result = await createIpmSpotTreatment({
+        const result: any = await createIpmSpotTreatment({
           productId: 'p1',
           targetType: 'location',
           targetLocationId: 'loc-1',
@@ -570,7 +570,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await recordSpotTreatmentApplication('spot1', 'Application 2');
+        const result: any = await recordSpotTreatmentApplication('spot1', 'Application 2');
 
         expect(result.success).toBe(true);
         expect(result.data?.applicationsCompleted).toBe(2);
@@ -609,7 +609,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await recordSpotTreatmentApplication('spot1');
+        const result: any = await recordSpotTreatmentApplication('spot1');
 
         expect(result.success).toBe(true);
         expect(result.data?.status).toBe('completed');
@@ -623,7 +623,7 @@ describe('ipm actions', () => {
           });
         });
 
-        const result = await recordSpotTreatmentApplication('nonexistent');
+        const result: any = await recordSpotTreatmentApplication('nonexistent');
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('not found');
@@ -636,7 +636,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         });
 
-        const result = await cancelSpotTreatment('spot1');
+        const result: any = await cancelSpotTreatment('spot1');
 
         expect(result.success).toBe(true);
       });
@@ -667,7 +667,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockTreatments, error: null });
         });
 
-        const result = await getUpcomingTreatments(7);
+        const result: any = await getUpcomingTreatments(7);
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(1);
@@ -687,7 +687,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockVarieties, error: null });
         });
 
-        const result = await getPlantFamilies();
+        const result: any = await getPlantFamilies();
 
         expect(result.success).toBe(true);
         expect(result.data).toContain('Bedding');
@@ -717,7 +717,7 @@ describe('ipm actions', () => {
           return new MockSupabaseQueryBuilder({ data: mockLocations, error: null });
         });
 
-        const result = await listLocations();
+        const result: any = await listLocations();
 
         expect(result.success).toBe(true);
         expect(result.data).toHaveLength(2);

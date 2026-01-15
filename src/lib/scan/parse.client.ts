@@ -47,7 +47,7 @@ export function parseScanCode(raw: string): Parsed | null {
   if (!raw) return null;
 
   // Keep GS (FNC1), drop other control chars
-  let text = raw.replace(/[\u0000-\u001F\u007F]/g, (c) => (c === GS ? GS : "")).trim();
+  const text = raw.replace(/[\u0000-\u001F\u007F]/g, (c) => (c === GS ? GS : "")).trim();
   if (!text) return null;
 
   // Check for HortiTrack location code format: ht:loc:<id>

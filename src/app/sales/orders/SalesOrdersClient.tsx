@@ -81,10 +81,10 @@ const STATUS_TABS = [
     statuses: ['confirmed', 'picking'],
     description: 'In progress'
   },
-  { 
-    id: 'ready', 
-    label: 'Ready to Ship', 
-    statuses: ['ready', 'ready_for_dispatch'],
+  {
+    id: 'ready',
+    label: 'Ready to Ship',
+    statuses: ['ready', 'packed', 'ready_for_dispatch'],
     description: 'Packed & waiting'
   },
   { 

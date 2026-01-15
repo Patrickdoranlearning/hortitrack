@@ -2,10 +2,20 @@
 -- This prevents duplicate tasks being created for the same source record
 -- e.g., prevents two tasks for the same pick list
 
+-- First, remove duplicates keeping the most recent one
+DELETE FROM public.tasks t1
+WHERE t1.source_ref_id IS NOT NULL
+  AND t1.id NOT IN (
+    SELECT DISTINCT ON (org_id, source_module, source_ref_type, source_ref_id) id
+    FROM public.tasks
+    WHERE source_ref_id IS NOT NULL
+    ORDER BY org_id, source_module, source_ref_type, source_ref_id, created_at DESC
+  );
+
 -- Create unique index on source references (partial index - only when source_ref_id is not null)
 -- This allows multiple tasks with NULL source_ref_id (standalone tasks)
-CREATE UNIQUE INDEX IF NOT EXISTS tasks_source_ref_unique_idx 
-  ON public.tasks(org_id, source_module, source_ref_type, source_ref_id) 
+CREATE UNIQUE INDEX IF NOT EXISTS tasks_source_ref_unique_idx
+  ON public.tasks(org_id, source_module, source_ref_type, source_ref_id)
   WHERE source_ref_id IS NOT NULL;
 
 -- Add comment explaining the constraint

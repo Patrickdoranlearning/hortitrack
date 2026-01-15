@@ -23,17 +23,19 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { Batch } from '@/lib/types';
-import type { HistoryLog as HistoryLogType } from "@/server/batches/history";
+import type { StockMovement, PlantHealthEvent, DetailedDistribution, SimpleDistribution } from "@/lib/history-types";
 import { ProductionProtocolDialog } from "./production-protocol-dialog";
 import { CareRecommendationsDialog } from "./care-recommendations-dialog";
 import { Badge } from "./ui/badge";
 import { BatchChatDialog } from "./batch-chat-dialog";
-import { BatchDistributionBar } from "./batch-distribution-bar";
+import { InteractiveDistributionBar } from "./InteractiveDistributionBar";
 import AncestryStrip from "./ancestry-strip";
 import { PlantPassportCard } from "./batches/PlantPassportCard";
 import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
 import type { ActionMode } from "@/components/actions/types";
-import { HistoryLog } from "@/components/history/HistoryLog";
+import { StockMovementLog } from "@/components/history/StockMovementLog";
+import { PlantHealthLog } from "@/components/history/PlantHealthLog";
+import { Package, Heart } from "lucide-react";
 
 // Lazy load gallery to avoid slowing down dialog open
 const BatchGallerySection = dynamic(
@@ -75,22 +77,32 @@ export function BatchDetailDialog({
 }: BatchDetailDialogProps) {
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
-  const [historyLogs, setHistoryLogs] = React.useState<HistoryLogType[]>([]);
-  const [historyLoading, setHistoryLoading] = React.useState(false);
-  const [historyError, setHistoryError] = React.useState<string | null>(null);
 
-  // Fetch combined history (events + plant health logs) when dialog opens or batch changes
+  // Stock movements state
+  const [stockMovements, setStockMovements] = React.useState<StockMovement[]>([]);
+  const [stockLoading, setStockLoading] = React.useState(false);
+  const [stockError, setStockError] = React.useState<string | null>(null);
+
+  // Plant health state
+  const [healthLogs, setHealthLogs] = React.useState<PlantHealthEvent[]>([]);
+  const [healthLoading, setHealthLoading] = React.useState(false);
+  const [healthError, setHealthError] = React.useState<string | null>(null);
+
+  // Distribution is now included inline with batch data from v_batch_search view
+  // The detailed distribution API is only called when user clicks on a distribution bar segment
+
+  // Fetch stock movements when dialog opens
   React.useEffect(() => {
     if (!open || !batch?.id) {
-      setHistoryLogs([]);
+      setStockMovements([]);
       return;
     }
 
     let cancelled = false;
-    setHistoryLoading(true);
-    setHistoryError(null);
+    setStockLoading(true);
+    setStockError(null);
 
-    fetch(`/api/production/batches/${batch.id}/history`)
+    fetch(`/api/production/batches/${batch.id}/stock-movements`)
       .then(async (res) => {
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
@@ -100,17 +112,17 @@ export function BatchDetailDialog({
       })
       .then((data) => {
         if (!cancelled) {
-          setHistoryLogs(data.logs || []);
+          setStockMovements(data.movements || []);
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setHistoryError(err?.message || String(err));
+          setStockError(err?.message || String(err));
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setHistoryLoading(false);
+          setStockLoading(false);
         }
       });
 
@@ -118,6 +130,53 @@ export function BatchDetailDialog({
       cancelled = true;
     };
   }, [open, batch?.id]);
+
+  // Fetch plant health logs when dialog opens
+  React.useEffect(() => {
+    if (!open || !batch?.id) {
+      setHealthLogs([]);
+      return;
+    }
+
+    let cancelled = false;
+    setHealthLoading(true);
+    setHealthError(null);
+
+    fetch(`/api/production/batches/${batch.id}/plant-health`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j?.error || res.statusText);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setHealthLogs(data.logs || []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setHealthError(err?.message || String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setHealthLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, batch?.id]);
+
+  // Callback for fetching detailed distribution
+  const fetchDetailedDistribution = React.useCallback(async (batchId: string): Promise<DetailedDistribution> => {
+    const res = await fetch(`/api/production/batches/${batchId}/distribution`);
+    if (!res.ok) throw new Error('Failed to fetch distribution');
+    return res.json();
+  }, []);
 
   const getStatusVariant = (status: Batch['status']): 'default' | 'secondary' | 'destructive' | 'outline' | 'accent' | 'info' => {
      switch (status) {
@@ -136,31 +195,26 @@ export function BatchDetailDialog({
     }
   };
 
-  const distribution = React.useMemo(() => {
-    if (!batch) return { inStock: 0, transplanted: 0, lost: 0 };
-
-    let transplanted = 0;
-    let lost = 0;
-
-    (batch.logHistory ?? []).forEach(log => {
-      if (log.type === 'TRANSPLANT_TO') {
-        transplanted += log.qty || 0;
-      }
-      if (log.type === 'LOSS') {
-        lost += Math.abs(log.qty || 0);
-      }
-    });
-    
-    // Ensure consistency: inStock should be what's left
-    const inStock = (batch.initialQuantity ?? 0) - transplanted - lost;
-    
-    // Adjust if current quantity doesn't match calculation (e.g. from manual adjustments)
-    if (inStock !== (batch.quantity ?? 0)) {
-        lost += (inStock - (batch.quantity ?? 0));
+  // Use inline distribution from batch data (no API call needed for simple display!)
+  // Only fetch detailed distribution when user clicks on a segment
+  const currentDistribution: SimpleDistribution = React.useMemo(() => {
+    // Use inline distribution data if available (from v_batch_search view)
+    if ((batch as any)?.distribution) {
+      return (batch as any).distribution;
     }
-    
-    return { inStock: (batch.quantity ?? 0), transplanted, lost };
-  }, [batch]);
+
+    // Fallback for legacy data without distribution
+    const qty = batch?.quantity ?? 0;
+    return {
+      available: qty,
+      allocatedPotting: 0,
+      allocatedSales: 0,
+      sold: 0,
+      dumped: 0,
+      transplanted: 0,
+      totalAccounted: qty,
+    };
+  }, [(batch as any)?.distribution, batch?.quantity]);
 
 
   if (!batch) return null;
@@ -184,15 +238,24 @@ export function BatchDetailDialog({
           <div className="grid md:grid-cols-3 gap-6 overflow-y-auto pr-2 -mr-2">
             <div className="md:col-span-2 space-y-6">
               <Tabs defaultValue="summary">
-                <TabsList>
+                <TabsList className="flex-wrap h-auto gap-1">
                   <TabsTrigger value="summary">Summary</TabsTrigger>
-                  <TabsTrigger value="history">Log History</TabsTrigger>
+                  <TabsTrigger value="stock" className="flex items-center gap-1">
+                    <Package className="h-3.5 w-3.5" />
+                    Stock
+                  </TabsTrigger>
+                  <TabsTrigger value="health" className="flex items-center gap-1">
+                    <Heart className="h-3.5 w-3.5" />
+                    Health
+                  </TabsTrigger>
                   <TabsTrigger value="photos">
                     <ImageIcon className="h-4 w-4 mr-1" />
                     Photos
                   </TabsTrigger>
                   <TabsTrigger value="ancestry">Ancestry</TabsTrigger>
                 </TabsList>
+
+                {/* Summary Tab */}
                 <TabsContent value="summary" className="pt-4 space-y-4">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                     <div>
@@ -217,40 +280,71 @@ export function BatchDetailDialog({
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Stock Distribution</p>
-                    <BatchDistributionBar distribution={distribution} initialQuantity={batch.initialQuantity ?? 0} />
+                    <p className="text-sm text-muted-foreground mb-2">Stock Distribution</p>
+                    <InteractiveDistributionBar
+                      distribution={currentDistribution}
+                      batchId={batch.id}
+                      onFetchDetails={fetchDetailedDistribution}
+                    />
                   </div>
                   {batch.id && (
                     <PlantPassportCard batchId={batch.id} />
                   )}
                 </TabsContent>
-                <TabsContent value="history">
-                  <div className="max-h-80 overflow-y-auto mt-4">
-                    {historyLoading && (
+
+                {/* Stock Movement Tab */}
+                <TabsContent value="stock">
+                  <div className="max-h-96 overflow-y-auto mt-4">
+                    {stockLoading && (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        Loading history...
+                        Loading stock movements...
                       </div>
                     )}
-                    {historyError && (
-                      <div className="text-sm text-red-600 py-4">{historyError}</div>
+                    {stockError && (
+                      <div className="text-sm text-red-600 py-4">{stockError}</div>
                     )}
-                    {!historyLoading && !historyError && historyLogs.length === 0 && (
-                      <div className="text-muted-foreground py-4 text-center">No history logged yet.</div>
+                    {!stockLoading && !stockError && stockMovements.length === 0 && (
+                      <div className="text-muted-foreground py-4 text-center">No stock movements recorded yet.</div>
                     )}
-                    {!historyLoading && historyLogs.length > 0 && (
-                      <HistoryLog logs={historyLogs} />
+                    {!stockLoading && stockMovements.length > 0 && (
+                      <StockMovementLog movements={stockMovements} />
                     )}
                   </div>
                 </TabsContent>
+
+                {/* Plant Health Tab */}
+                <TabsContent value="health">
+                  <div className="max-h-96 overflow-y-auto mt-4">
+                    {healthLoading && (
+                      <div className="flex items-center justify-center py-8 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Loading health logs...
+                      </div>
+                    )}
+                    {healthError && (
+                      <div className="text-sm text-red-600 py-4">{healthError}</div>
+                    )}
+                    {!healthLoading && !healthError && healthLogs.length === 0 && (
+                      <div className="text-muted-foreground py-4 text-center">No plant health logs recorded yet.</div>
+                    )}
+                    {!healthLoading && healthLogs.length > 0 && (
+                      <PlantHealthLog logs={healthLogs} />
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* Photos Tab */}
                 <TabsContent value="photos" className="pt-4">
                   {batch.id && (
-                    <BatchGallerySection 
-                      batchId={batch.id} 
+                    <BatchGallerySection
+                      batchId={batch.id}
                       varietyId={batch.plantVarietyId}
                     />
                   )}
                 </TabsContent>
+
+                {/* Ancestry Tab */}
                 <TabsContent value="ancestry">
                     <AncestryStrip
                       currentId={batch.id!}

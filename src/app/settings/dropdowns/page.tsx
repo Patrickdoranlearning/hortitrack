@@ -122,11 +122,18 @@ export default function DropdownManagerPage() {
     try {
       // UUID regex to validate real database IDs vs default placeholders
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const payload = items.map((opt, idx) => ({
+
+      // Filter out options with empty display labels and validate
+      const validItems = items.filter((opt) => opt.displayLabel && opt.displayLabel.trim().length > 0);
+      if (validItems.length === 0) {
+        throw new Error("At least one option with a display label is required");
+      }
+
+      const payload = validItems.map((opt, idx) => ({
         // Only send id if it's a valid UUID (not default placeholder IDs like "default-delivery_route-DUBLIN")
         id: opt.id && UUID_RE.test(opt.id) ? opt.id : undefined,
-        systemCode: opt.systemCode,
-        displayLabel: opt.displayLabel,
+        systemCode: opt.systemCode?.trim() || undefined,
+        displayLabel: opt.displayLabel.trim(),
         isActive: opt.isActive,
         behavior: opt.behavior,
         color: opt.color,

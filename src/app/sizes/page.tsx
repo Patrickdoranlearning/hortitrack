@@ -35,10 +35,11 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Edit } from 'lucide-react';
+import { useAttributeOptions } from '@/hooks/useAttributeOptions';
 
 const quickSizeSchema = z.object({
   name: z.string().min(1, 'Size name is required'),
-  containerType: z.enum(['pot', 'tray', 'bareroot']),
+  containerType: z.string().min(1, 'Container type is required'),
   cellMultiple: z.coerce.number().int().min(1).default(1),
   trayQuantity: z.coerce.number().int().min(0).optional(),
   shelfQuantity: z.coerce.number().int().min(0).default(0),
@@ -91,11 +92,14 @@ export default function SizesPage() {
     direction: 'asc',
   });
 
+  // Fetch container types from dropdown manager (configurable per tenant)
+  const { options: containerTypeOptions, isLoading: containerTypesLoading } = useAttributeOptions('size_container_type');
+
   const { data: sizesData, loading: sizesLoading } = useCollection<any>('plant_sizes', INITIAL_PLANT_SIZES);
   const sizes = useMemo<PlantSize[]>(() => {
     return (sizesData || []).map(normalizeSizeRow);
   }, [sizesData]);
-  const isLoading = authLoading || sizesLoading;
+  const isLoading = authLoading || sizesLoading || containerTypesLoading;
 
   const quickForm = useForm<QuickSizeFormValues>({
     resolver: zodResolver(quickSizeSchema),
@@ -487,9 +491,11 @@ export default function SizesPage() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="pot">Pot</SelectItem>
-                                  <SelectItem value="tray">Tray</SelectItem>
-                                  <SelectItem value="bareroot">Bareroot</SelectItem>
+                                  {containerTypeOptions.map((opt) => (
+                                    <SelectItem key={opt.systemCode} value={opt.systemCode}>
+                                      {opt.displayLabel}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                               <FormMessage className="text-xs" />

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
+import { recordTrolleyMovement, getCustomerTrolleyBalance } from '@/server/dispatch/trolley-balance.server';
 
 /**
  * POST /api/dispatch/complete-delivery
@@ -8,7 +9,8 @@ import { getUserAndOrg } from '@/server/auth/org';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const supabase = await createClient();
 
     const formData = await req.formData();
@@ -119,36 +121,31 @@ export async function POST(req: NextRequest) {
       console.error('[Complete Delivery] Error fetching order data:', orderError);
     }
 
-    // Record equipment movement for trolleys delivered
+    // Record equipment movements using centralized function
+    // The database trigger will automatically update customer_trolley_balance
     const trolleysDelivered = deliveryItem.trolleys_delivered || 0;
+
     if (trolleysDelivered > 0 && orderData?.customer_id) {
-      const { error: deliveredError } = await supabase.from('equipment_movement_log').insert({
-        org_id: orgId,
-        movement_type: 'delivered',
-        customer_id: orderData.customer_id,
+      const result = await recordTrolleyMovement({
+        type: 'delivered',
+        customerId: orderData.customer_id,
         trolleys: trolleysDelivered,
-        delivery_run_id: deliveryItem.delivery_run_id,
-        recorded_by: userId,
-        movement_date: new Date().toISOString(),
+        deliveryRunId: deliveryItem.delivery_run_id,
       });
-      if (deliveredError) {
-        console.error('[Complete Delivery] Error logging delivered equipment:', deliveredError);
+      if (!result.success) {
+        console.error('[Complete Delivery] Error logging delivered equipment:', result.error);
       }
     }
 
-    // Record equipment movement for trolleys returned
     if (trolleysReturned > 0 && orderData?.customer_id) {
-      const { error: returnedError } = await supabase.from('equipment_movement_log').insert({
-        org_id: orgId,
-        movement_type: 'returned',
-        customer_id: orderData.customer_id,
+      const result = await recordTrolleyMovement({
+        type: 'returned',
+        customerId: orderData.customer_id,
         trolleys: trolleysReturned,
-        delivery_run_id: deliveryItem.delivery_run_id,
-        recorded_by: userId,
-        movement_date: new Date().toISOString(),
+        deliveryRunId: deliveryItem.delivery_run_id,
       });
-      if (returnedError) {
-        console.error('[Complete Delivery] Error logging returned equipment:', returnedError);
+      if (!result.success) {
+        console.error('[Complete Delivery] Error logging returned equipment:', result.error);
       }
     }
 
@@ -175,12 +172,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Get updated customer balance to return
+    let customerBalance = null;
+    if (orderData?.customer_id) {
+      const balance = await getCustomerTrolleyBalance(orderData.customer_id);
+      if (balance) {
+        customerBalance = {
+          trolleysOut: balance.trolleysOut,
+          shelvesOut: balance.shelvesOut,
+        };
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       photoUrl,
       deliveryItemId,
       trolleysReturned,
       trolleysOutstanding: trolleysDelivered - trolleysReturned,
+      customerBalance,
     });
   } catch (error: any) {
     console.error('[Complete Delivery] Error:', error);

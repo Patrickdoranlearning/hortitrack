@@ -42,13 +42,17 @@ type B2BOrdersClientProps = {
   customerId: string;
 };
 
+// Order status enum: draft, confirmed, picking, ready (legacy), packed, dispatched, delivered, cancelled, void
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'outline' },
   confirmed: { label: 'Confirmed', variant: 'secondary' },
-  processing: { label: 'Processing', variant: 'default' },
-  ready_for_dispatch: { label: 'Ready', variant: 'default' },
+  picking: { label: 'Picking', variant: 'default' },
+  ready: { label: 'Ready', variant: 'default' }, // legacy
+  packed: { label: 'Ready', variant: 'default' }, // current status for "ready"
+  ready_for_dispatch: { label: 'Ready', variant: 'default' }, // legacy
   dispatched: { label: 'Dispatched', variant: 'default' },
   delivered: { label: 'Delivered', variant: 'default' },
+  void: { label: 'Void', variant: 'destructive' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
 
@@ -124,8 +128,8 @@ export function B2BOrdersClient({ orders, customerId }: B2BOrdersClientProps) {
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="ready_for_dispatch">Ready</SelectItem>
+                  <SelectItem value="picking">Picking</SelectItem>
+                  <SelectItem value="packed">Ready</SelectItem>
                   <SelectItem value="dispatched">Dispatched</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -199,13 +203,12 @@ export function B2BOrdersClient({ orders, customerId }: B2BOrdersClientProps) {
                         <Link href={`/b2b/orders/${order.id}`}>View Details</Link>
                       </Button>
                       <Button
-                        variant="ghost"
-                        size="icon"
+                        variant="outline"
                         onClick={() => handleReorder(order.id)}
                         disabled={reorderingId === order.id}
-                        title="Reorder"
                       >
-                        <RefreshCw className={`h-4 w-4 ${reorderingId === order.id ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`h-4 w-4 mr-2 ${reorderingId === order.id ? 'animate-spin' : ''}`} />
+                        Re-order
                       </Button>
                     </div>
                   </div>

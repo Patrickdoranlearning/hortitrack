@@ -10,7 +10,11 @@ const Schema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
   const requestId = randomUUID();
   try {
     const input = Schema.parse(await req.json());
@@ -19,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { data: batch, error: bErr } = await supabase
       .from("batches")
       .select("id, batch_number, status")
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("org_id", orgId)
       .single();
     if (bErr || !batch) return NextResponse.json({ error: "Batch not found", requestId }, { status: 404 });

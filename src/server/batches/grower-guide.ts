@@ -813,7 +813,7 @@ function buildTimelineActions(
     const batchInfo = batchLookup.get(log.batch_id);
 
     const eventType = log.event_type?.toUpperCase() ?? "HEALTH";
-    let title = log.title ?? log.product_name ?? "Treatment";
+    const title = log.title ?? log.product_name ?? "Treatment";
 
     // Build details
     const detailParts: string[] = [];

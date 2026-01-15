@@ -1,7 +1,9 @@
 export type ParsedScan
   = { by: "batchNumber"; value: string; raw: string }
   | { by: "id"; value: string; raw: string }
-  | { by: "locationId"; value: string; raw: string };
+  | { by: "locationId"; value: string; raw: string }
+  | { by: "materialPartNumber"; value: string; raw: string }
+  | { by: "materialBarcode"; value: string; raw: string };
 
 const digitsOnly = (s: string) => s.replace(/\D+/g, '');
 
@@ -16,6 +18,19 @@ export function parseScanCode(input: string): ParsedScan | null {
   const htLoc = lower.match(/^ht:loc:([a-z0-9-_]+)$/i);
   if (htLoc) {
     return { by: 'locationId', value: htLoc[1], raw };
+  }
+
+  // ht:mat:<partNumber> - Material short format (e.g., ht:mat:M-POT-001)
+  const htMat = lower.match(/^ht:mat:([a-z0-9-_]+)$/i);
+  if (htMat) {
+    return { by: 'materialPartNumber', value: htMat[1].toUpperCase(), raw };
+  }
+
+  // HT:<orgPrefix>:<partNumber> - Full internal material barcode (e.g., HT:abc12345:M-POT-001)
+  // This format is used for internal material barcodes
+  const htFull = raw.match(/^HT:([a-z0-9]+):(M-[A-Z]{3}-\d+)$/i);
+  if (htFull) {
+    return { by: 'materialPartNumber', value: htFull[2].toUpperCase(), raw };
   }
 
   // ht:batch:<code> (allow letters/digits/dashes/underscores)
@@ -61,4 +76,43 @@ export function candidateBatchNumbers(value: string): string[] {
 export function normalizeForComparison(value: string): string {
   const digits = digitsOnly(value);
   return digits.replace(/^0+/, '') || digits;
+}
+
+/**
+ * Parse a scanned code specifically for material lookup.
+ * Returns the search strategy and value to use.
+ */
+export function parseMaterialScanCode(input: string):
+  | { by: "partNumber"; value: string }
+  | { by: "barcode"; value: string }
+  | null {
+  if (!input) return null;
+  const raw = String(input).trim();
+  if (!raw) return null;
+
+  // ht:mat:<partNumber> - Material short format
+  const htMat = raw.match(/^ht:mat:([a-z0-9-_]+)$/i);
+  if (htMat) {
+    return { by: 'partNumber', value: htMat[1].toUpperCase() };
+  }
+
+  // HT:<orgPrefix>:<partNumber> - Full internal barcode format
+  const htFull = raw.match(/^HT:([a-z0-9]+):(M-[A-Z]{3}-\d+)$/i);
+  if (htFull) {
+    return { by: 'partNumber', value: htFull[2].toUpperCase() };
+  }
+
+  // M-XXX-NNN pattern - Direct part number
+  const partNum = raw.match(/^(M-[A-Z]{3}-\d+)$/i);
+  if (partNum) {
+    return { by: 'partNumber', value: partNum[1].toUpperCase() };
+  }
+
+  // Any other non-empty string is treated as an external barcode
+  // (EAN, UPC, supplier barcode, etc.)
+  if (raw.length >= 3) {
+    return { by: 'barcode', value: raw };
+  }
+
+  return null;
 }

@@ -7,15 +7,19 @@ import { ok, fail } from "@/server/utils/envelope";
 import { requireRoles } from "@/server/auth/roles";
 import { OrderStatus, canTransition } from "@/server/sales/status";
 
-export async function GET(_: NextRequest, { params }: { params: { orderId: string } }) {
+export async function GET(
+  _: NextRequest,
+  { params }: { params: Promise<{ orderId: string }> }
+) {
   try {
+    const { orderId } = await params;
     const authz = await requireRoles(["sales:read"]);
     if (!authz.ok) return fail(authz.reason === "unauthenticated" ? 401 : 403, authz.reason, "Not allowed.");
 
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("orders")
       .select("*")
-      .eq("id", params.orderId)
+      .eq("id", orderId)
       .single();
 
     if (orderErr || !order) return fail(404, "not_found", "Order not found.");
@@ -23,7 +27,7 @@ export async function GET(_: NextRequest, { params }: { params: { orderId: strin
     const { data: lines, error: linesErr } = await supabaseAdmin
       .from("order_items")
       .select("*")
-      .eq("order_id", params.orderId);
+      .eq("order_id", orderId);
 
     if (linesErr) console.error("Error fetching lines:", linesErr);
 
@@ -39,8 +43,12 @@ const PatchSchema = z.object({
   status: OrderStatus,
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { orderId: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ orderId: string }> }
+) {
   try {
+    const { orderId } = await params;
     const authz = await requireRoles(["sales:update", "sales:read"]);
     if (!authz.ok) return fail(authz.reason === "unauthenticated" ? 401 : 403, authz.reason, "Not allowed.");
 
@@ -51,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { orderId: s
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("orders")
       .select("status")
-      .eq("id", params.orderId)
+      .eq("id", orderId)
       .single();
 
     if (orderErr || !order) return fail(404, "not_found", "Order not found.");
@@ -66,12 +74,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { orderId: s
     const { error: updateErr } = await supabaseAdmin
       .from("orders")
       .update({ status: target, updated_at: new Date().toISOString() })
-      .eq("id", params.orderId);
+      .eq("id", orderId);
 
     if (updateErr) throw new Error(updateErr.message);
 
-    console.info("[sales:order:PATCH] status", { id: params.orderId, from: current, to: target });
-    return ok({ id: params.orderId, status: target });
+    console.info("[sales:order:PATCH] status", { id: orderId, from: current, to: target });
+    return ok({ id: orderId, status: target });
   } catch (e: any) {
     console.error("[sales:order:PATCH]", e);
     return fail(500, "server_error", e?.message || "Unexpected");

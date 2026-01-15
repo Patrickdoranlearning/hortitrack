@@ -48,7 +48,7 @@ const CREATE_MENU: CreateCategory[] = [
     label: "Dispatch",
     icon: Truck,
     actions: [
-      { label: "Start Picking", href: "/dispatch/picking" },
+      { label: "Start Picking", href: "/dispatch/picker" },
       { label: "Bulk Picking", href: "/dispatch/bulk-picking" },
       { label: "QC Review", href: "/dispatch/qc" },
     ],
@@ -261,6 +261,26 @@ function MobileCreateButton() {
 }
 
 export function CreateButton() {
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div className="flex gap-2">
+        <Button className="hidden md:flex gap-2 font-semibold px-6" disabled>
+          <Plus className="h-4 w-4" />
+          Create
+        </Button>
+        <Button className="md:hidden" size="icon" disabled>
+          <Plus className="h-5 w-5" />
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <>
       <DesktopCreateButton />

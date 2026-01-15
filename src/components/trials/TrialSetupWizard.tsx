@@ -259,15 +259,15 @@ export function TrialSetupWizard() {
   return (
     <div className="max-w-3xl mx-auto">
       {/* Stepper */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
+      <div className="mb-8 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex items-center justify-between min-w-[400px] sm:min-w-0">
           {STEPS.map((s, i) => {
             const Icon = s.icon;
             return (
               <div key={s.id} className="flex items-center">
                 <div
                   className={cn(
-                    'flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors',
+                    'flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-colors shrink-0',
                     i < step
                       ? 'bg-primary border-primary text-primary-foreground'
                       : i === step
@@ -276,15 +276,15 @@ export function TrialSetupWizard() {
                   )}
                 >
                   {i < step ? (
-                    <CheckCircle2 className="h-5 w-5" />
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
                   ) : (
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                   )}
                 </div>
                 {i < STEPS.length - 1 && (
                   <div
                     className={cn(
-                      'w-12 md:w-24 h-0.5 mx-2',
+                      'w-8 sm:w-12 md:w-24 h-0.5 mx-1 sm:mx-2',
                       i < step ? 'bg-primary' : 'bg-muted-foreground/30'
                     )}
                   />
@@ -293,7 +293,7 @@ export function TrialSetupWizard() {
             );
           })}
         </div>
-        <div className="flex justify-between mt-2">
+        <div className="flex justify-between mt-2 min-w-[400px] sm:min-w-0">
           {STEPS.map((s, i) => (
             <span
               key={s.id}

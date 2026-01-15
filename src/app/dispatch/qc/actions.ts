@@ -60,8 +60,15 @@ export async function submitQCCheck(input: SubmitQCCheckInput) {
       .single();
 
     if (qcError) {
-      console.error('Error creating QC check:', qcError);
-      return { error: 'Failed to save QC check' };
+      console.error('Error creating QC check:', qcError.message, qcError.details, qcError.hint, qcError.code);
+      // Provide more specific error messages based on error type
+      if (qcError.code === '23503') {
+        return { error: 'Invalid order or pick list reference. The order may have been deleted.' };
+      }
+      if (qcError.code === '42501') {
+        return { error: 'Permission denied. You may not have access to save QC checks.' };
+      }
+      return { error: `Failed to save QC check: ${qcError.message}` };
     }
 
     // Update pick list status
@@ -143,8 +150,14 @@ export async function rejectForRepick(input: RejectForRepickInput) {
       .single();
 
     if (qcError) {
-      console.error('Error creating QC check:', qcError);
-      return { error: 'Failed to save QC check' };
+      console.error('Error creating QC check (reject):', qcError.message, qcError.details, qcError.hint, qcError.code);
+      if (qcError.code === '23503') {
+        return { error: 'Invalid order or pick list reference. The order may have been deleted.' };
+      }
+      if (qcError.code === '42501') {
+        return { error: 'Permission denied. You may not have access to save QC checks.' };
+      }
+      return { error: `Failed to save QC check: ${qcError.message}` };
     }
 
     // Reset pick list status back to pending for re-pick
@@ -164,6 +177,57 @@ export async function rejectForRepick(input: RejectForRepickInput) {
     if (pickListError) {
       console.error('Error updating pick list status:', pickListError);
       return { error: 'Failed to reset pick list status' };
+    }
+
+    // First, get picked items that need stock restored BEFORE resetting them
+    const { data: pickItemsData } = await supabase
+      .from('pick_items')
+      .select('id, picked_qty, picked_batch_id, order_item_id')
+      .eq('pick_list_id', input.pickListId)
+      .gt('picked_qty', 0);
+
+    // Restore stock for each picked item
+    if (pickItemsData && pickItemsData.length > 0) {
+      for (const item of pickItemsData) {
+        if (item.picked_batch_id && item.picked_qty > 0) {
+          // Restore quantity to batch
+          const { error: restoreError } = await supabase.rpc("increment_batch_quantity", {
+            p_org_id: orgId,
+            p_batch_id: item.picked_batch_id,
+            p_units: item.picked_qty,
+          });
+
+          if (restoreError) {
+            console.error(`Failed to restore quantity for batch ${item.picked_batch_id}:`, restoreError);
+            // Continue with other items, don't fail the whole operation
+          }
+
+          // Log restoration event to batch history
+          await supabase.from("batch_events").insert({
+            org_id: orgId,
+            batch_id: item.picked_batch_id,
+            type: "QC_REJECTED",
+            payload: {
+              units_restored: item.picked_qty,
+              pick_item_id: item.id,
+              pick_list_id: input.pickListId,
+              reason: input.failureReason,
+            },
+            by_user_id: userId,
+            at: new Date().toISOString(),
+          });
+
+          // Revert allocation status back to 'allocated' so it can be picked again
+          if (item.order_item_id) {
+            await supabase
+              .from("batch_allocations")
+              .update({ status: "allocated", updated_at: new Date().toISOString() })
+              .eq("batch_id", item.picked_batch_id)
+              .eq("order_item_id", item.order_item_id)
+              .eq("status", "picked");
+          }
+        }
+      }
     }
 
     // Reset pick items back to pending
@@ -205,7 +269,7 @@ export async function rejectForRepick(input: RejectForRepickInput) {
     });
 
     revalidatePath('/dispatch/qc');
-    revalidatePath('/dispatch/picking');
+    revalidatePath('/dispatch/picker');
     revalidatePath(`/dispatch/qc/${input.pickListId}`);
     revalidatePath(`/sales/orders/${input.orderId}`);
 

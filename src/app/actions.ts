@@ -20,6 +20,8 @@ type VBatchSearchRow = Database['public']['Views']['v_batch_search']['Row'];
 
 function transformVBatchSearchData(data: VBatchSearchRow): Batch {
     const camelCaseData = snakeToCamel(data);
+    // Distribution comes as JSONB from the view, already in camelCase
+    const distribution = (data as any).distribution ?? null;
     return {
         ...camelCaseData,
         batchNumber: camelCaseData.batchNumber,
@@ -30,12 +32,16 @@ function transformVBatchSearchData(data: VBatchSearchRow): Batch {
         location: camelCaseData.locationName ?? null,
         supplier: camelCaseData.supplierName ?? null,
         initialQuantity: camelCaseData.initialQuantity ?? camelCaseData.quantity ?? 0,
-        plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
-        plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt, 
+        reservedQuantity: camelCaseData.reservedQuantity ?? 0,
+        saleableQuantity: camelCaseData.saleableQuantity ?? null,
+        plantedAt: camelCaseData.plantedAt ?? camelCaseData.createdAt,
+        plantingDate: camelCaseData.plantedAt ?? camelCaseData.createdAt,
         category: camelCaseData.category ?? camelCaseData.varietyCategory ?? '',
         createdAt: camelCaseData.createdAt,
         updatedAt: camelCaseData.updatedAt,
-        logHistory: [], 
+        logHistory: (data as any).log_history ?? [],
+        // Include distribution data inline (no more separate API calls!)
+        distribution: distribution ?? undefined,
     };
 }
 
@@ -369,7 +375,7 @@ export async function getBatchesAction(options: GetBatchesOptions = {}) {
         
         return { 
             success: true, 
-            data: declassify(transformedBatches) as Batch[],
+            data: declassify(transformedBatches) as unknown as Batch[],
             total: count ?? 0,
         };
     } catch (error: unknown) {

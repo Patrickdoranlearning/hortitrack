@@ -24,8 +24,21 @@ export function BatchPageActions({ batch }: Props) {
   const [isLogActionOpen, setIsLogActionOpen] = React.useState(false);
   const [logMode, setLogMode] = React.useState<ActionMode>('MOVE');
   const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { data: locations = [] } = useCollection<NurseryLocation>('nursery_locations');
+
+  if (!mounted) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled className="w-full sm:w-auto">Action</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap gap-2">

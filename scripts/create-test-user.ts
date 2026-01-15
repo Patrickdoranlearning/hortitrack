@@ -28,14 +28,17 @@ async function createTestUser() {
         .ilike('name', 'Doran Nurseries')
         .single();
 
+    let orgId: string;
     if (orgErr || !org) {
         console.error('Org verification failed', orgErr);
         // Fallback to any org
         const { data: anyOrg } = await supabase.from('organizations').select('id').limit(1).single();
         if (!anyOrg) throw new Error("No orgs found");
-        console.log("Using fallback org", anyOrg.id);
+        orgId = anyOrg.id;
+        console.log("Using fallback org", orgId);
     } else {
-        console.log("Found Org:", org.id);
+        orgId = org.id;
+        console.log("Found Org:", orgId);
     }
 
     // 2. Create User
@@ -67,7 +70,7 @@ async function createTestUser() {
         .upsert({
             id: user.id,
             email: email,
-            active_org_id: org.id,
+            active_org_id: orgId,
             display_name: 'Test Manager'
         });
     if (profileErr) console.error('Profile upsert error', profileErr);
@@ -75,7 +78,7 @@ async function createTestUser() {
     const { error: memberErr } = await supabase
         .from('org_memberships')
         .upsert({
-            org_id: org.id,
+            org_id: orgId,
             user_id: user.id,
             role: 'admin'
         });

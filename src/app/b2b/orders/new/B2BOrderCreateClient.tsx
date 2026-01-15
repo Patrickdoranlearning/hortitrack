@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { B2BProductAccordionCard } from '@/components/b2b/B2BProductAccordionCard';
-import { B2BProductFilters } from '@/components/b2b/B2BProductFilters';
+import { B2BProductFilters, type ProductFilters } from '@/components/b2b/B2BProductFilters';
 import { B2BCheckoutWizard } from '@/components/b2b/checkout/B2BCheckoutWizard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ type B2BOrderCreateClientProps = {
   addresses: CustomerAddress[];
   categories: string[];
   sizes: string[];
+  families: string[];
   customerId: string;
   pricingHints?: Record<string, PricingHistoryHint>;
 };
@@ -29,15 +30,18 @@ export function B2BOrderCreateClient({
   addresses,
   categories,
   sizes,
+  families,
   customerId,
   pricingHints,
 }: B2BOrderCreateClientProps) {
   const router = useRouter();
   const [trolley, setTrolley] = useState<CartItem[]>([]);
-  const [filters, setFilters] = useState({
-    category: null as string | null,
-    size: null as string | null,
+  const [filters, setFilters] = useState<ProductFilters>({
+    category: null,
+    size: null,
+    family: null,
     search: '',
+    lookingGood: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
@@ -65,6 +69,11 @@ export function B2BOrderCreateClient({
   // Filter products based on current filters
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
+      // Family filter
+      if (filters.family && product.family !== filters.family) {
+        return false;
+      }
+
       // Category filter
       if (filters.category && product.category !== filters.category) {
         return false;
@@ -75,6 +84,16 @@ export function B2BOrderCreateClient({
         return false;
       }
 
+      // Looking Good filter - show only products with "plenty" status varieties
+      if (filters.lookingGood) {
+        const hasLookingGoodVariety = product.varieties?.some(
+          (v) => v.status === 'plenty' && v.totalAvailableQty > 0
+        );
+        if (!hasLookingGoodVariety) {
+          return false;
+        }
+      }
+
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -83,8 +102,9 @@ export function B2BOrderCreateClient({
         const matchesVarietyAlias = product.varietyAliases?.some((a) => a.toLowerCase().includes(searchLower));
         const matchesAlias = product.aliasName?.toLowerCase().includes(searchLower);
         const matchesSku = product.skuCode?.toLowerCase().includes(searchLower);
+        const matchesFamily = product.family?.toLowerCase().includes(searchLower);
 
-        if (!matchesName && !matchesVariety && !matchesVarietyAlias && !matchesAlias && !matchesSku) {
+        if (!matchesName && !matchesVariety && !matchesVarietyAlias && !matchesAlias && !matchesSku && !matchesFamily) {
           return false;
         }
       }
@@ -186,6 +206,7 @@ export function B2BOrderCreateClient({
                 <B2BProductFilters
                   categories={categories}
                   sizes={sizes}
+                  families={families}
                   filters={filters}
                   onFilterChange={setFilters}
                 />

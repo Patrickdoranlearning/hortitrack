@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { PlannedBatch } from './SelectPlannedBatchesStep';
 import type { ReferenceData } from '@/lib/referenceData/service';
+import { useTodayDate, getTodayISO } from '@/lib/date-sync';
 
 export type ActualizedBatchEntry = {
   batchId: string;
@@ -79,7 +80,8 @@ export function ActualizeByLocationStep({
   onComplete,
   onBack,
 }: ActualizeByLocationStepProps) {
-  const today = new Date().toISOString().slice(0, 10);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
 
   // Initialize entries from selected batches or initial data
   const [entries, setEntries] = useState<ActualizedBatchEntry[]>(() => {
@@ -97,11 +99,22 @@ export function ActualizeByLocationStep({
       actualQuantity: batch.quantity, // Default to planned
       actualLocationId: batch.locationId,
       actualLocationName: batch.locationName,
-      actualDate: today,
+      actualDate: '', // Empty initially, set after hydration
       notes: null,
       isActualized: false,
     }));
   });
+
+  // Set date after hydration for entries without dates
+  useEffect(() => {
+    if (today) {
+      setEntries((prev) =>
+        prev.map((entry) =>
+          entry.actualDate ? entry : { ...entry, actualDate: today }
+        )
+      );
+    }
+  }, [today]);
 
   // Group entries by location for the accordion view
   const locationGroups = useMemo(() => {

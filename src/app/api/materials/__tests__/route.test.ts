@@ -13,13 +13,29 @@ import {
 const mockSupabase = createMockSupabaseClient();
 const mockUser = createMockUser();
 const mockOrgId = 'test-org-id';
+const mockUserId = 'test-user-id';
 
 jest.mock('@/server/auth/org', () => ({
   getUserAndOrg: jest.fn(() =>
     Promise.resolve({
-      user: mockUser,
-      orgId: mockOrgId,
-      supabase: mockSupabase,
+      user: { id: 'test-user-id', email: 'test@test.com' },
+      orgId: 'test-org-id',
+      supabase: {
+        auth: {
+          getUser: jest.fn(),
+          admin: { getUserById: jest.fn() },
+        },
+        from: jest.fn(() => ({
+          select: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({ data: null, error: null }),
+          eq: jest.fn().mockReturnThis(),
+          insert: jest.fn().mockReturnThis(),
+          update: jest.fn().mockReturnThis(),
+          delete: jest.fn().mockReturnThis(),
+        })),
+        rpc: jest.fn(),
+        storage: { from: jest.fn() },
+      },
     })
   ),
 }));
@@ -201,9 +217,10 @@ describe('/api/materials', () => {
       expect(response.status).toBe(201);
       expect(data.material.partNumber).toBe('M-POT-001');
       expect(mockCreateMaterial).toHaveBeenCalledWith(
-        mockSupabase,
+        expect.anything(), // supabase client
         mockOrgId,
-        validMaterialData
+        validMaterialData,
+        mockUserId
       );
     });
 
@@ -308,9 +325,10 @@ describe('/api/materials', () => {
 
       expect(response.status).toBe(201);
       expect(mockCreateMaterial).toHaveBeenCalledWith(
-        mockSupabase,
+        expect.anything(), // supabase client
         mockOrgId,
-        fullMaterialData
+        fullMaterialData,
+        mockUserId
       );
     });
   });

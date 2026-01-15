@@ -13,8 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, AlertCircle, Phone } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Phone, Truck } from 'lucide-react';
 import { format } from 'date-fns';
+import { TrolleyReconciliationCard } from '@/components/shared/TrolleyReconciliationCard';
 
 type Order = {
   id: string;
@@ -27,6 +28,7 @@ type Order = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  trolleys_estimated: number | null;
   customer_addresses: {
     label: string | null;
     store_name: string | null;
@@ -37,6 +39,10 @@ type Order = {
     eircode: string | null;
     country_code: string | null;
   } | null;
+  pick_lists: Array<{
+    id: string;
+    trolleys_used: number | null;
+  }>;
 };
 
 type OrderItem = {
@@ -62,13 +68,17 @@ type B2BOrderDetailClientProps = {
   canEdit: boolean;
 };
 
+// Order status enum: draft, confirmed, picking, ready (legacy), packed, dispatched, delivered, cancelled, void
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'outline' },
   confirmed: { label: 'Confirmed', variant: 'secondary' },
-  processing: { label: 'Processing', variant: 'default' },
-  ready_for_dispatch: { label: 'Ready for Dispatch', variant: 'default' },
+  picking: { label: 'Picking', variant: 'default' },
+  ready: { label: 'Ready for Dispatch', variant: 'default' }, // legacy
+  packed: { label: 'Ready for Dispatch', variant: 'default' }, // current status
+  ready_for_dispatch: { label: 'Ready for Dispatch', variant: 'default' }, // legacy
   dispatched: { label: 'Dispatched', variant: 'default' },
   delivered: { label: 'Delivered', variant: 'default' },
+  void: { label: 'Void', variant: 'destructive' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
 
@@ -173,6 +183,21 @@ export function B2BOrderDetailClient({ order, items, canEdit }: B2BOrderDetailCl
               <span>Total (inc VAT):</span>
               <span>€{order.total_inc_vat.toFixed(2)}</span>
             </div>
+
+            {/* Trolley Info */}
+            {(order.trolleys_estimated || order.pick_lists?.some(p => p.trolleys_used)) && (
+              <div className="pt-3 border-t">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <Truck className="h-4 w-4" />
+                  <span>Trolleys</span>
+                </div>
+                <TrolleyReconciliationCard
+                  estimated={order.trolleys_estimated}
+                  actual={order.pick_lists?.[0]?.trolleys_used ?? null}
+                  compact
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -196,40 +221,42 @@ export function B2BOrderDetailClient({ order, items, canEdit }: B2BOrderDetailCl
           <CardDescription>{items.length} items</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">Unit Price</TableHead>
-                <TableHead className="text-right">RRP</TableHead>
-                <TableHead className="text-right">Multi-buy</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.description}</TableCell>
-                  <TableCell className="text-right">{item.quantity}</TableCell>
-                  <TableCell className="text-right">
-                    €{item.unit_price_ex_vat.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {item.rrp ? `€${item.rrp.toFixed(2)}` : '-'}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {item.multibuy_qty_2 && item.multibuy_price_2
-                      ? `${item.multibuy_qty_2} for €${item.multibuy_price_2.toFixed(2)}`
-                      : '-'}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    €{item.line_total_ex_vat.toFixed(2)}
-                  </TableCell>
+          <div className="overflow-x-auto -mx-6 px-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Unit Price</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">RRP</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">Multi-buy</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.description}</TableCell>
+                    <TableCell className="text-right">{item.quantity}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-right">
+                      €{item.unit_price_ex_vat.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-right text-sm text-muted-foreground">
+                      {item.rrp ? `€${item.rrp.toFixed(2)}` : '-'}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-right text-sm text-muted-foreground">
+                      {item.multibuy_qty_2 && item.multibuy_price_2
+                        ? `${item.multibuy_qty_2} for €${item.multibuy_price_2.toFixed(2)}`
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      €{item.line_total_ex_vat.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

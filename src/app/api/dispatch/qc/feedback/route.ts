@@ -17,7 +17,8 @@ const CreateFeedbackSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const supabase = await createClient();
 
     const body = await req.json();
@@ -113,13 +114,26 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const { userId, orgId } = await getUserAndOrg();
+    const { user, orgId } = await getUserAndOrg();
+    const userId = user.id;
     const supabase = await createClient();
 
     const { searchParams } = new URL(req.url);
-    const pickerId = searchParams.get('pickerId');
+    const pickerIdParam = searchParams.get('pickerId');
     const unacknowledged = searchParams.get('unacknowledged') === 'true';
-    const targetPickerId = pickerId || userId;
+
+    // Validate pickerId is a valid UUID or use current user's ID
+    // This fixes the bug where "undefined" string was being sent to Supabase
+    let targetPickerId = userId;
+    if (pickerIdParam && pickerIdParam !== 'undefined' && pickerIdParam !== 'null') {
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(pickerIdParam)) {
+        targetPickerId = pickerIdParam;
+      } else {
+        console.warn('[QC Feedback] Invalid pickerId format, using current user:', pickerIdParam);
+      }
+    }
 
     // First, get the pick_list IDs assigned to this picker
     const { data: pickerLists, error: pickerListsError } = await supabase

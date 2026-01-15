@@ -10,12 +10,16 @@ const LogCreate = z.object({
   photoId: z.string().optional(),
 });
 
-export async function GET(_req: NextRequest, { params }: { params: { batchId: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ batchId: string }> }
+) {
+  const { batchId } = await params;
   const supabase = await createClient();
   const { data: logs, error } = await supabase
     .from("logs")
     .select("*")
-    .eq("batch_id", params.batchId)
+    .eq("batch_id", batchId)
     .order("date", { ascending: false })
     .limit(100);
 
@@ -23,7 +27,11 @@ export async function GET(_req: NextRequest, { params }: { params: { batchId: st
   return ok({ logs }, 200);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { batchId: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ batchId: string }> }
+) {
+  const { batchId } = await params;
   try {
     const payload = LogCreate.parse(await req.json());
     const result = await withIdempotency(req.headers.get("x-request-id"), async () => {
@@ -33,14 +41,14 @@ export async function POST(req: NextRequest, { params }: { params: { batchId: st
       const { data: batch, error: batchError } = await supabase
         .from("batches")
         .select("id")
-        .eq("id", params.batchId)
+        .eq("id", batchId)
         .single();
 
       if (batchError || !batch) return { status: 404, body: { ok: false, error: "Batch not found" } };
 
       // Insert log
       const { error: insertError } = await supabase.from("logs").insert({
-        batch_id: params.batchId,
+        batch_id: batchId,
         action: payload.action,
         note: payload.notes,
         photo_id: payload.photoId,
@@ -51,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: { batchId: st
       if (insertError) throw insertError;
 
       // Update batch updatedAt
-      await supabase.from("batches").update({ updated_at: new Date().toISOString() }).eq("id", params.batchId);
+      await supabase.from("batches").update({ updated_at: new Date().toISOString() }).eq("id", batchId);
 
       return { status: 201, body: { ok: true } };
     });

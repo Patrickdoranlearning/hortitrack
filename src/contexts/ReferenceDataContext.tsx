@@ -15,9 +15,7 @@ export const ReferenceDataContext = React.createContext<Ctx>({
 });
 
 const fetcher = async (): Promise<RefData> => {
-  console.log("[ReferenceDataContext] fetcher called");
   const res = await fetchReferenceData();
-  console.log("[ReferenceDataContext] fetcher result:", res);
   return {
     varieties: res.varieties,
     sizes: res.sizes,

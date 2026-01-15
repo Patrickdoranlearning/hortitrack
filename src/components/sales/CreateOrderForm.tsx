@@ -7,7 +7,7 @@ import { CreateOrderSchema, CreateOrderInput } from '@/lib/sales/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { SelectWithCreate } from '../ui/select-with-create';
 import { createOrder } from '@/app/sales/actions';
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';

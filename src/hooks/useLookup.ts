@@ -49,7 +49,7 @@ export function useLookup(resource: LookupResource, orgId?: string | null) {
     const c = readCache(resource, orgId);
     if (c) setCached(c);
     bootstrapDone.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [resource, orgId]);
 
   // SWR fetch (deduped, background)

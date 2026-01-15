@@ -7,9 +7,11 @@ export async function GET(request: NextRequest) {
   try {
     const { orgId } = await getUserAndOrg();
     const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const customerId = searchParams.get("customerId");
 
-    // Get all customer equipment balances with customer names
-    const { data: balances, error } = await supabase
+    // Build query - optionally filter by single customer
+    let query = supabase
       .from("customer_trolley_balance")
       .select(`
         customer_id,
@@ -22,8 +24,17 @@ export async function GET(request: NextRequest) {
           name
         )
       `)
-      .eq("org_id", orgId)
-      .or("trolleys_out.gt.0,shelves_out.gt.0");
+      .eq("org_id", orgId);
+
+    if (customerId) {
+      // Single customer lookup
+      query = query.eq("customer_id", customerId);
+    } else {
+      // All customers with outstanding balances
+      query = query.or("trolleys_out.gt.0,shelves_out.gt.0");
+    }
+
+    const { data: balances, error } = await query;
 
     if (error) {
       console.error("Error fetching balances:", error);
@@ -67,6 +78,21 @@ export async function GET(request: NextRequest) {
       }
       return (b.daysOutstanding || 0) - (a.daysOutstanding || 0);
     });
+
+    // If single customer requested, return single balance object
+    if (customerId) {
+      const balance = formattedBalances[0] ?? {
+        customerId,
+        customerName: "Unknown",
+        trolleysOut: 0,
+        shelvesOut: 0,
+        lastDeliveryDate: null,
+        lastReturnDate: null,
+        daysOutstanding: null,
+        hasOverdueItems: false,
+      };
+      return NextResponse.json({ balance });
+    }
 
     return NextResponse.json({ balances: formattedBalances });
   } catch (error) {

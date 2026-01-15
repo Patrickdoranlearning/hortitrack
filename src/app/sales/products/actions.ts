@@ -94,6 +94,13 @@ export async function upsertProductAction(input: z.infer<typeof productDetailsSc
 
   if (error) {
     console.error('[upsertProductAction] error', error);
+    // Check for duplicate SKU constraint violation
+    if (error.code === '23505' && error.message.includes('products_sku_id_key')) {
+      return {
+        success: false,
+        error: 'This SKU is already linked to another product. Please select a different SKU or create a new one.'
+      };
+    }
     return { success: false, error: error.message };
   }
 
@@ -102,8 +109,13 @@ export async function upsertProductAction(input: z.infer<typeof productDetailsSc
 }
 
 export async function deleteProductAction(productId: string) {
+  const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
-  const { error } = await supabase.from('products').delete().eq('id', productId);
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', productId)
+    .eq('org_id', orgId);
   if (error) {
     console.error('[deleteProductAction]', error);
     return { success: false, error: error.message };

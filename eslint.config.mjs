@@ -21,7 +21,19 @@ export default [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "scripts/**",
+      "print-agent/**",
     ],
+  },
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-require-imports": "warn",
+      "@typescript-eslint/ban-ts-comment": "warn",
+      "@typescript-eslint/no-empty-object-type": "warn",
+      "react/no-unescaped-entities": "warn",
+    },
   },
   ...storybook.configs["flat/recommended"]
 ];

@@ -57,7 +57,7 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
-    const { supabase, orgId } = await getUserAndOrg();
+    const { supabase, orgId, user } = await getUserAndOrg();
     const body = await req.json();
 
     const parsed = CreateMaterialSchema.safeParse(body);
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const material = await createMaterial(supabase, orgId, parsed.data);
+    const material = await createMaterial(supabase, orgId, parsed.data, user.id);
 
     return NextResponse.json({ material }, { status: 201 });
   } catch (error: unknown) {

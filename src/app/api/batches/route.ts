@@ -26,8 +26,13 @@ export async function GET(request: Request) {
           id, 
           batch_number, 
           quantity,
+          reserved_quantity,
+          initial_quantity,
+          saleable_quantity,
+          log_history,
           status,
           location_id,
+          phase,
           plant_variety:plant_varieties(id, name, family),
           location:nursery_locations(id, name)
         `)
@@ -41,17 +46,22 @@ export async function GET(request: Request) {
         return NextResponse.json({ data: [], error: error.message }, { status: 500 });
       }
 
-      const items = (data || []).map((b: any) => ({
+    const items = (data || []).map((b: any) => ({
         id: b.id,
         batchNumber: b.batch_number,
         quantity: b.quantity,
+        reservedQuantity: b.reserved_quantity,
+        initialQuantity: b.initial_quantity,
+        saleableQuantity: b.saleable_quantity,
+        logHistory: b.log_history,
         status: b.status,
+        phase: b.phase,
         locationId: b.location_id,
         plantVariety: b.plant_variety?.name,
         variety: b.plant_variety?.name,
         family: b.plant_variety?.family,
         locationName: b.location?.name,
-      }));
+    }));
 
       return NextResponse.json({ data: items }, { status: 200 });
     }
@@ -94,8 +104,13 @@ export async function GET(request: Request) {
           id, 
           batch_number, 
           quantity,
+          reserved_quantity,
+          initial_quantity,
+          saleable_quantity,
+          log_history,
           status,
           location_id,
+          phase,
           plant_variety:plant_varieties(id, name, family),
           location:nursery_locations(id, name)
         `)
@@ -121,7 +136,12 @@ export async function GET(request: Request) {
       id: b.id,
       batchNumber: b.batch_number,
       quantity: b.quantity,
+      reservedQuantity: b.reserved_quantity,
+      initialQuantity: b.initial_quantity,
+      saleableQuantity: b.saleable_quantity,
+      logHistory: b.log_history,
       status: b.status,
+      phase: b.phase,
       locationId: b.location_id,
       plantVariety: b.plant_variety?.name,
       variety: b.plant_variety?.name,

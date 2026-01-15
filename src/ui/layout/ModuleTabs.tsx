@@ -15,6 +15,19 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 export function ModuleTabs({ items, ariaLabel }: { items: NavItem[]; ariaLabel?: string }) {
   const pathname = usePathname()
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <Button variant="ghost" size="icon" disabled>
+        <Menu className="h-6 w-6" />
+      </Button>
+    )
+  }
 
   return (
     <Sheet>

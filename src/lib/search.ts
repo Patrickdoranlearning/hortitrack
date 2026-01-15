@@ -51,10 +51,17 @@ export function queryMatchesBatch(query: string, batch: Batch): boolean {
   const hay = [
     batch.batchNumber,
     batch.plantFamily,
-    batch.plantVariety,
+    typeof batch.plantVariety === 'string' ? batch.plantVariety : (batch.plantVariety as any)?.name,
     batch.category,
     batch.supplier ?? '',
-    batch.location ?? '',
+    typeof batch.location === 'string' 
+      ? batch.location 
+      : `${(batch.location as any)?.nurserySite ?? ''} ${(batch.location as any)?.name ?? ''}`.trim(),
+    batch.status,
+    batch.phase,
+    typeof batch.size === 'string' 
+      ? batch.size 
+      : (batch.size as any)?.name,
     batch.id ?? '',
   ]
     .map((s) => String(s ?? '').toLowerCase())

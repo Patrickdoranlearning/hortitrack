@@ -18,6 +18,8 @@ export const CreateMaterialSchema = z.object({
   targetStock: z.number().int().min(0).optional().nullable(),
   standardCost: z.number().min(0).optional().nullable(),
   barcode: z.string().max(100).optional().nullable(),
+  // Initial stock quantity when creating a new material
+  initialStock: z.number().int().min(0).optional().nullable(),
 });
 
 export const UpdateMaterialSchema = CreateMaterialSchema.partial().extend({

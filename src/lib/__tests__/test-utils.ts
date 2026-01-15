@@ -637,7 +637,7 @@ export const factories = {
     org_id: 'test-org-id',
     run_number: 'DR-20240115-001',
     run_date: '2024-01-15',
-    load_name: 'Cork Load 1',
+    load_name: '4L',
     week_number: 3,
     haulier_id: 'haulier-1',
     vehicle_id: 'vehicle-1',

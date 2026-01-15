@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-globals */
+ 
 import { readBarcodes, type ReaderOptions, setZXingModuleOverrides } from "zxing-wasm/reader";
 
 // Load wasm from /public/zxing; copy script runs on postinstall

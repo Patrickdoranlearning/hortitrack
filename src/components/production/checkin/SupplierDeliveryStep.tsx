@@ -22,6 +22,7 @@ import {
 import { Check, ChevronsUpDown, ChevronRight, Truck, Calendar, FileText, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReferenceData } from '@/contexts/ReferenceDataContext';
+import { useTodayDate } from '@/lib/date-sync';
 
 export type SupplierDeliveryData = {
   supplierId: string;
@@ -45,12 +46,19 @@ export function SupplierDeliveryStep({
   onComplete,
   onCancel,
 }: SupplierDeliveryStepProps) {
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
   const [supplierId, setSupplierId] = useState(initialData?.supplierId ?? '');
-  const [deliveryDate, setDeliveryDate] = useState(
-    initialData?.deliveryDate ?? new Date().toISOString().slice(0, 10)
-  );
+  const [deliveryDate, setDeliveryDate] = useState(initialData?.deliveryDate ?? '');
   const [supplierReference, setSupplierReference] = useState(initialData?.supplierReference ?? '');
   const [supplierOpen, setSupplierOpen] = useState(false);
+
+  // Set date after hydration if not provided
+  useEffect(() => {
+    if (today && !deliveryDate && !initialData?.deliveryDate) {
+      setDeliveryDate(today);
+    }
+  }, [today, deliveryDate, initialData?.deliveryDate]);
 
   const suppliers = referenceData.suppliers ?? [];
 

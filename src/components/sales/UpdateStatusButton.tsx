@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-const FLOW = ["confirmed", "picking", "ready", "dispatched", "delivered"] as const;
+// Order status flow - 'packed' replaces 'ready' in the main flow
+const FLOW = ["confirmed", "picking", "packed", "dispatched", "delivered"] as const;
 
 export function UpdateStatusButton({ orderId, current }: { orderId: string; current: string }) {
   const { toast } = useToast();

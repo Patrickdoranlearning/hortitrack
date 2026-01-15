@@ -7,9 +7,10 @@ import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
+    const { templateId } = await params;
     await requireDocumentAccess();
     const body = await req.json().catch(() => ({}));
     if (!body?.to) {
@@ -19,7 +20,7 @@ export async function POST(
       to: body.to,
       subject: body.subject,
       message: body.message,
-      templateId: params.templateId,
+      templateId,
       layoutOverride: body?.layout,
       documentType: body?.documentType,
       dataContext: body?.dataContext,

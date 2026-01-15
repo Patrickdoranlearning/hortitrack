@@ -428,9 +428,9 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
                         <Truck className="h-7 w-7 text-primary" />
                       </div>
                       <div>
-                        {/* Driver/Load name is the main element */}
+                        {/* Driver/Load code is the main element */}
                         <div className="text-lg font-bold">
-                          {run.driverName || run.loadName || 'Unassigned Route'}
+                          {run.driverName || run.loadCode || 'Unassigned Route'}
                         </div>
                         {/* Run number is smaller */}
                         <div className="text-sm text-muted-foreground font-mono">

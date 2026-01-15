@@ -65,6 +65,7 @@ export interface OrderPickList {
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
+  trolleys_used: number | null;
 }
 
 export interface OrderEvent {
@@ -126,7 +127,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   };
 
   // Show dispatch documents button for orders that are ready for dispatch or later
-  const showDispatchDocs = ['ready_for_dispatch', 'dispatched', 'delivered'].includes(order.status);
+  const showDispatchDocs = ['ready', 'packed', 'dispatched', 'delivered'].includes(order.status);
 
   return (
     <div className="space-y-6">

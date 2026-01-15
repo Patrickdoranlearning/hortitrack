@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Plus, Trash2, Search, CheckCircle2, AlertCircle, Loader2, ScanLine, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { SelectWithCreate } from "../ui/select-with-create";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dialog";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 import dynamic from "next/dynamic";
+import { invalidateBatches } from "@/lib/swr/keys";
+import { useTodayDate } from "@/lib/date-sync";
 
 const ScannerClient = dynamic(() => import("@/components/Scanner/ScannerClient"), {
   ssr: false,
@@ -78,10 +80,11 @@ type Props = {
 export default function BulkTransplantWizard({ onComplete }: Props) {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
   const { toast } = useToast();
-  
+
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
 
   // Wizard state
   const [step, setStep] = React.useState<WizardStep>("setup");
@@ -92,7 +95,14 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
     sizeId?: string;
     plantedAt?: string;
     archiveParentIfEmpty: boolean;
-  }>({ plantedAt: today, archiveParentIfEmpty: true });
+  }>({ plantedAt: "", archiveParentIfEmpty: true });
+
+  // Set date default after hydration
+  React.useEffect(() => {
+    if (today && !defaults.plantedAt) {
+      setDefaults((prev) => ({ ...prev, plantedAt: today }));
+    }
+  }, [today, defaults.plantedAt]);
 
   // Rows state
   const [rows, setRows] = React.useState<TransplantRow[]>([]);
@@ -105,6 +115,11 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
   // Scanner state - lifted up from row component
   const [scannerOpen, setScannerOpen] = React.useState(false);
   const [scanningRowId, setScanningRowId] = React.useState<string | null>(null);
+  // Ref to capture current scanningRowId for use in async callbacks (prevents stale closure)
+  const scanningRowIdRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    scanningRowIdRef.current = scanningRowId;
+  }, [scanningRowId]);
 
   const sizeMap = React.useMemo(() => {
     const byId = new Map<string, { name: string; cell_multiple?: number }>();
@@ -214,7 +229,9 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
 
   const handleScanResult = React.useCallback(async (scannedText: string) => {
     setScannerOpen(false);
-    if (!scanningRowId) return;
+    // Use ref to get current value, preventing stale closure during async operations
+    const currentRowId = scanningRowIdRef.current;
+    if (!currentRowId) return;
 
     // Search for batch by scanned batch number
     try {
@@ -225,12 +242,12 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
       // Prefer exact match
       const exactMatch = items.find((b) => b.batch_number === scannedText);
       if (exactMatch) {
-        updateRow(scanningRowId, {
+        updateRow(currentRowId, {
           parentBatchId: exactMatch.id,
           parentBatch: exactMatch,
         });
       } else if (items.length === 1) {
-        updateRow(scanningRowId, {
+        updateRow(currentRowId, {
           parentBatchId: items[0].id,
           parentBatch: items[0],
         });
@@ -256,7 +273,7 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
       });
     }
     setScanningRowId(null);
-  }, [scanningRowId, updateRow, toast]);
+  }, [updateRow, toast]);
 
   const addRow = React.useCallback(() => {
     const newRow: TransplantRow = {
@@ -350,6 +367,8 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
 
     setBusy(null);
     if (created > 0) {
+      // Invalidate batch caches to trigger refresh across all components
+      invalidateBatches();
       onComplete?.();
     }
   }

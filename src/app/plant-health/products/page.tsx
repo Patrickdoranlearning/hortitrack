@@ -193,18 +193,19 @@ export default function IpmProductsPage() {
 
       {/* Table */}
       <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead>Stock</TableHead>
-              <TableHead>Target Pests</TableHead>
-              <TableHead>Rate</TableHead>
-              <TableHead>Restrictions</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Stock</TableHead>
+                <TableHead className="hidden md:table-cell">Target Pests</TableHead>
+                <TableHead className="hidden lg:table-cell">Rate</TableHead>
+                <TableHead className="hidden lg:table-cell">Restrictions</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
@@ -277,7 +278,7 @@ export default function IpmProductsPage() {
                       </div>
                     </Button>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <div className="flex flex-wrap gap-1 max-w-[200px]">
                       {product.targetPests.length > 0 ? (
                         product.targetPests.slice(0, 3).map((pest) => (
@@ -296,7 +297,7 @@ export default function IpmProductsPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {product.suggestedRate ? (
                       <span className="text-sm">
                         {product.suggestedRate} {product.suggestedRateUnit}
@@ -310,7 +311,7 @@ export default function IpmProductsPage() {
                       <span className="text-muted-foreground text-sm">—</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {product.useRestriction !== 'both' && (
                         <Badge
@@ -369,7 +370,8 @@ export default function IpmProductsPage() {
               );})
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </div>
 
       {/* Product Dialog */}

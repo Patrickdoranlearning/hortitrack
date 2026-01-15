@@ -127,6 +127,16 @@ export async function PATCH(req: Request, { params }: Params) {
     const nextQty: number = (typeof updates.quantity === "number") ? updates.quantity : stored.quantity ?? 0;
     const nextStatus: typeof stored.status = updates.status ?? stored.status;
 
+    // Validate status is a known production status if provided
+    if (updates.status) {
+      const VALID_STATUSES = ['Active', 'Saleable', 'Growing', 'Archived', 'Hold', 'Propagation', 'Quarantine', 'Rejected'];
+      if (!VALID_STATUSES.includes(updates.status)) {
+        return NextResponse.json({
+          error: `Invalid status: '${updates.status}'. Valid values: ${VALID_STATUSES.join(', ')}`
+        }, { status: 400 });
+      }
+    }
+
     if (nextQty > initialQty) {
       return NextResponse.json({ error: "Quantity cannot exceed initial quantity." }, { status: 400 });
     }

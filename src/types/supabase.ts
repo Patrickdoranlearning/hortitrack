@@ -1,2 +1,12 @@
-failed to inspect service: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
-Docker Desktop is a prerequisite for local development. Follow the official docs to install: https://docs.docker.com/desktop
+/**
+ * Supabase database types (re-export).
+ *
+ * NOTE:
+ * This file exists because many parts of the app import `Database` from `@/types/supabase`.
+ * The source of truth for generated Supabase types is `src/lib/database.types.ts`.
+ *
+ * Keeping this file as a lightweight re-export prevents accidental overwrites with
+ * CLI error output (which would break `tsc` immediately).
+ */
+
+export type { Database, Json } from "@/lib/database.types";

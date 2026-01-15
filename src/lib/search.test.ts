@@ -97,6 +97,25 @@ describe('queryMatchesBatch', () => {
     expect(queryMatchesBatch('gReEn ThUmBs', mockBatch)).toBe(true);
   });
 
+  it('should match by status and phase', () => {
+    const batchWithPhase = { ...mockBatch, phase: 'propagation' };
+    expect(queryMatchesBatch('active', mockBatch)).toBe(true);
+    expect(queryMatchesBatch('propagation', batchWithPhase)).toBe(true);
+  });
+
+  it('should handle location, variety, and size as objects', () => {
+    const batchWithObjectLocation = {
+      ...mockBatch,
+      location: { name: 'Tunnel 1', nurserySite: 'North Field' },
+      plantVariety: { name: 'Lavender' },
+      size: { name: '9cm' }
+    };
+    expect(queryMatchesBatch('tunnel 1', batchWithObjectLocation)).toBe(true);
+    expect(queryMatchesBatch('north field', batchWithObjectLocation)).toBe(true);
+    expect(queryMatchesBatch('lavender', batchWithObjectLocation)).toBe(true);
+    expect(queryMatchesBatch('9cm', batchWithObjectLocation)).toBe(true);
+  });
+
   // Mocking parseScanCode for GS1 DM/QR test (as it's an external dependency)
   it('should match by GS1 DM/QR (assuming parseScanCode handles it)', () => {
     // This is a conceptual test. In a real scenario, you'd mock '@/lib/scan/parse.client'

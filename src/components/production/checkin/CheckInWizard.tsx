@@ -3,6 +3,7 @@
 import { useState, useCallback, useContext, useEffect } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { getTodayISO } from '@/lib/date-sync';
 import {
   Truck,
   Package,
@@ -135,7 +136,7 @@ export function CheckInWizard({ incomingBatch, onComplete, onCancel }: CheckInWi
             supplierName: supplier.name,
             supplierProducerCode: supplier.producer_code ?? null,
             supplierCountryCode: supplier.country_code ?? null,
-            deliveryDate: incomingBatch.expectedDate ?? new Date().toISOString().slice(0, 10),
+            deliveryDate: incomingBatch.expectedDate ?? getTodayISO(),
             supplierReference: incomingBatch.reference ?? '',
           },
         }));

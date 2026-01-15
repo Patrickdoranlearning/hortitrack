@@ -18,14 +18,27 @@ import {
   FormControl,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { SelectWithCreate } from "@/components/ui/select-with-create";
+import { SelectWithCreate } from "../ui/select-with-create";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
+import { invalidateBatches } from "@/lib/swr/keys";
+import { useTodayDate, getTodayISO } from "@/lib/date-sync";
+import { CheckCircle2, Plus, Eye } from "lucide-react";
+import Link from "next/link";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const Schema = z.object({
@@ -55,19 +68,37 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
       alert(v?.title || v?.description || "OK");
     });
 
-  const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Use hydration-safe date to prevent server/client mismatch
+  const today = useTodayDate();
 
   const form = useForm<PropagationInput>({
     resolver: zodResolver(Schema),
     defaultValues: {
-      planted_at: today,
+      plant_variety_id: "",
+      size_id: "",
+      location_id: "",
+      planted_at: "", // Empty initially, set after hydration
       containers: 1,
       notes: "",
     },
   });
 
+  // Set date after hydration to avoid mismatch
+  React.useEffect(() => {
+    if (today && !form.getValues("planted_at")) {
+      form.setValue("planted_at", today);
+    }
+  }, [today, form]);
+
   const [submitting, setSubmitting] = React.useState(false);
-  
+  const [successData, setSuccessData] = React.useState<{
+    batchNumber: string;
+    batchId: string;
+    varietyName: string;
+    sizeName: string;
+    quantity: number;
+  } | null>(null);
+
   const varieties = React.useMemo(() => referenceData?.varieties ?? [], [referenceData]);
   const sizes = React.useMemo(() => {
     const s = [...(referenceData?.sizes ?? [])];
@@ -134,11 +165,26 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
     setSubmitting(true);
     try {
       const { batch } = await ProductionAPI.propagate(values);
-      toast({
-        title: "Propagation created",
-        description: `Batch ${batch?.batch_number ?? ""} created`,
+      // Invalidate batch caches to trigger refresh across all components
+      invalidateBatches();
+
+      // Show success modal instead of toast
+      setSuccessData({
+        batchNumber: batch?.batch_number ?? "",
+        batchId: batch?.id ?? "",
+        varietyName: selectedVariety?.name ?? "Unknown",
+        sizeName: selectedSize?.name ?? "Unknown",
+        quantity: totalUnits,
       });
-      form.reset({ planted_at: today, containers: 1, notes: "" });
+
+      form.reset({
+        plant_variety_id: "",
+        size_id: "",
+        location_id: locations.length > 0 ? locations[0].id : "",
+        planted_at: getTodayISO(),
+        containers: 1,
+        notes: "",
+      });
       onSubmitSuccess?.(batch);
     } catch (err) {
       const e = err as HttpError;
@@ -355,7 +401,14 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
             <Button
               type="button"
               variant="outline"
-              onClick={() => form.reset({ planted_at: today, containers: 1, notes: "" })}
+              onClick={() => form.reset({
+                plant_variety_id: "",
+                size_id: "",
+                location_id: locations.length > 0 ? locations[0].id : "",
+                planted_at: getTodayISO(),
+                containers: 1,
+                notes: "",
+              })}
               disabled={submitting}
             >
               Reset
@@ -414,6 +467,55 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
           )}
         </aside>
       </form>
+
+      {/* Success Modal */}
+      <AlertDialog open={!!successData} onOpenChange={(open) => !open && setSuccessData(null)}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            </div>
+            <AlertDialogTitle className="text-center">Propagation Created!</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-center space-y-3">
+                <p>Your batch has been successfully created.</p>
+                <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Batch Number:</span>
+                    <span className="font-mono font-medium">{successData?.batchNumber}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Variety:</span>
+                    <span className="font-medium">{successData?.varietyName}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Size:</span>
+                    <span>{successData?.sizeName}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Plants:</span>
+                    <span className="font-medium text-green-600">{successData?.quantity.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setSuccessData(null)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Another
+            </Button>
+            {successData?.batchId && (
+              <Button asChild className="w-full sm:w-auto">
+                <Link href={`/production/batches/${successData.batchId}`}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Batch
+                </Link>
+              </Button>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Form>
   );
 }

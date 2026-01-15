@@ -24,6 +24,9 @@ export type CustomerCatalogProduct = {
   sizeName: string | null;
   category: string | null;
   containerType: string | null;
+  // Trolley capacity fields for quantity presets
+  shelfQuantity: number | null; // Units per shelf from plant_sizes
+  shelvesPerTrolley: number | null; // From trolley_capacity config
   heroImageUrl: string | null;
   galleryImages?: Array<{ url: string; badge?: string }> | null;
   isActive: boolean;

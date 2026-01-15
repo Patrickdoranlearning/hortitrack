@@ -79,12 +79,12 @@ export async function GET() {
         .in("type", ["LOSS", "DUMP"])
         .gte("at", sevenDaysAgo.toISOString()),
 
-      // Pending orders (confirmed, processing)
+      // Pending orders (confirmed, picking, packed)
       supabase
         .from("orders")
         .select("id", { count: "exact" })
         .eq("org_id", orgId)
-        .in("status", ["confirmed", "processing", "ready_for_dispatch"]),
+        .in("status", ["confirmed", "picking", "packed"]),
 
       // Deliveries scheduled for today
       supabase

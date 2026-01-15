@@ -48,9 +48,12 @@ export default function PickingStepLabels() {
         method: 'POST',
       });
       
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to print labels');
+        const errorMessage = typeof data.error === 'object'
+          ? data.error?.message || JSON.stringify(data.error)
+          : data.error || 'Failed to print labels';
+        throw new Error(errorMessage);
       }
 
       setPriceLabelsPrinted(true);
@@ -82,9 +85,12 @@ export default function PickingStepLabels() {
         body: JSON.stringify({ type: 'plant' }),
       });
       
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to print labels');
+        const errorMessage = typeof data.error === 'object'
+          ? data.error?.message || JSON.stringify(data.error)
+          : data.error || 'Failed to print labels';
+        throw new Error(errorMessage);
       }
 
       setPlantLabelsPrinted(true);

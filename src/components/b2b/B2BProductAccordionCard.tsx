@@ -33,6 +33,23 @@ type B2BProductAccordionCardProps = {
 };
 
 /**
+ * Calculate quantity presets for shelf/trolley buttons
+ * Returns null if shelf quantity is not configured
+ */
+function getQuantityPresets(product: CustomerCatalogProductWithVarieties) {
+  const shelfQty = product.shelfQuantity;
+  const shelvesPerTrolley = product.shelvesPerTrolley ?? 6;
+
+  if (!shelfQty || shelfQty <= 0) return null;
+
+  const halfShelf = Math.floor(shelfQty / 2);
+  const fullShelf = shelfQty;
+  const fullTrolley = shelfQty * shelvesPerTrolley;
+
+  return { halfShelf, fullShelf, fullTrolley };
+}
+
+/**
  * Multi-level accordion product card for B2B orders
  * Level 1: Product row with generic quantity input + Quick Add
  * Level 2: Variety allocation table (accordion content)
@@ -61,11 +78,17 @@ export function B2BProductAccordionCard({
 
   const isLowStock = product.totalAvailableQty < LOW_STOCK_THRESHOLD;
   const hasVarieties = product.varieties && product.varieties.length > 0;
+  const presets = getQuantityPresets(product);
 
   const handleGenericQuantityChange = (value: string) => {
     const qty = parseInt(value) || 0;
     const clamped = Math.min(Math.max(0, qty), product.totalAvailableQty);
     setGenericQuantity(clamped);
+  };
+
+  const handlePresetAdd = (amount: number) => {
+    const newQty = Math.min(genericQuantity + amount, product.totalAvailableQty);
+    setGenericQuantity(newQty);
   };
 
   const handleQuickAdd = () => {
@@ -325,6 +348,40 @@ export function B2BProductAccordionCard({
 
             <AccordionContent className="px-4 pb-4">
               <div className="space-y-3 pt-3">
+                {/* Quick Add Preset Buttons */}
+                {mode === 'generic' && presets && (
+                  <div className="flex flex-wrap items-center gap-2 pb-2 border-b">
+                    <span className="text-sm text-muted-foreground mr-1">Quick add:</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetAdd(presets.halfShelf)}
+                      disabled={presets.halfShelf > product.totalAvailableQty - genericQuantity}
+                      className="h-8 text-xs"
+                    >
+                      +½ Shelf ({presets.halfShelf})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetAdd(presets.fullShelf)}
+                      disabled={presets.fullShelf > product.totalAvailableQty - genericQuantity}
+                      className="h-8 text-xs"
+                    >
+                      +1 Shelf ({presets.fullShelf})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetAdd(presets.fullTrolley)}
+                      disabled={presets.fullTrolley > product.totalAvailableQty - genericQuantity}
+                      className="h-8 text-xs"
+                    >
+                      +1 Trolley ({presets.fullTrolley})
+                    </Button>
+                  </div>
+                )}
+
                 {/* Variety Allocation Table (Level 2) */}
                 {hasVarieties && (
                   <VarietyAllocationTable
@@ -452,6 +509,40 @@ export function B2BProductAccordionCard({
 
             <AccordionContent className="pb-0">
               <CardContent className="flex flex-col gap-3 text-sm pt-0">
+                {/* Quick Add Preset Buttons */}
+                {mode === 'generic' && presets && (
+                  <div className="flex flex-wrap items-center gap-2 pb-2 border-b">
+                    <span className="text-xs text-muted-foreground">Quick add:</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetAdd(presets.halfShelf)}
+                      disabled={presets.halfShelf > product.totalAvailableQty - genericQuantity}
+                      className="h-7 text-xs px-2"
+                    >
+                      +½ Shelf ({presets.halfShelf})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetAdd(presets.fullShelf)}
+                      disabled={presets.fullShelf > product.totalAvailableQty - genericQuantity}
+                      className="h-7 text-xs px-2"
+                    >
+                      +1 Shelf ({presets.fullShelf})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetAdd(presets.fullTrolley)}
+                      disabled={presets.fullTrolley > product.totalAvailableQty - genericQuantity}
+                      className="h-7 text-xs px-2"
+                    >
+                      +1 Trolley ({presets.fullTrolley})
+                    </Button>
+                  </div>
+                )}
+
                 {/* Variety Allocation Table (Level 2) */}
                 {hasVarieties && (
                   <VarietyAllocationTable

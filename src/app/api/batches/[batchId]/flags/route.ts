@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFlags, setFlag, type FlagKey } from "@/server/batches/flags";
 
 // GET /api/batches/:id/flags?history=1
-export async function GET(req: NextRequest, { params }: { params: { batchId: string } }) {
-  const id = params.batchId;
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ batchId: string }> }
+) {
+  const { batchId } = await params;
+  const id = batchId;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   try {
@@ -21,8 +25,12 @@ export async function GET(req: NextRequest, { params }: { params: { batchId: str
 import { getUserIdAndOrgId } from "@/server/auth/getUser";
 
 // PATCH /api/batches/:id/flags  { key, value, reason?, notes? }
-export async function PATCH(req: NextRequest, { params }: { params: { batchId: string } }) {
-  const id = params.batchId;
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ batchId: string }> }
+) {
+  const { batchId } = await params;
+  const id = batchId;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   let body: any = null;

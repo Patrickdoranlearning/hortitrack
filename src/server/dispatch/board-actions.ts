@@ -29,7 +29,7 @@ export async function assignOrderToTeam(orderId: string, teamId: string | null) 
     
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
-    revalidatePath("/dispatch/picking");
+    revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
   } catch (error: any) {
@@ -87,7 +87,7 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
     
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
-    revalidatePath("/dispatch/picking");
+    revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
   } catch (error: any) {
@@ -125,7 +125,7 @@ export async function assignOrderToRun(orderId: string, runId: string) {
 
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
-    revalidatePath("/dispatch/picking");
+    revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
   } catch (error: any) {
@@ -163,16 +163,44 @@ export async function createEmptyRoute(
   date: string, 
   haulierId?: string, 
   vehicleId?: string,
-  loadName?: string
+  loadCode?: string
 ) {
   try {
     const runId = await createDeliveryRun({
       runDate: date,
       haulierId: haulierId === 'default' ? undefined : haulierId,
       vehicleId: vehicleId === 'default' ? undefined : vehicleId,
-      loadName,
+      loadCode,
     });
     
+    revalidatePath("/dispatch");
+    revalidatePath("/dispatch/deliveries");
+    revalidatePath("/dispatch/driver");
+    return { success: true, runId };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Create a new delivery load and assign orders immediately
+ */
+export async function createLoadWithOrders(
+  date: string,
+  orderIds: string[],
+  haulierId?: string,
+  vehicleId?: string,
+  loadCode?: string
+) {
+  try {
+    const runId = await createDeliveryRun({
+      runDate: date,
+      haulierId: haulierId === "default" ? undefined : haulierId,
+      vehicleId: vehicleId === "default" ? undefined : vehicleId,
+      loadCode,
+      orderIds,
+    });
+
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
@@ -187,13 +215,13 @@ export async function createEmptyRoute(
  */
 export async function updateLoad(
   loadId: string, 
-  updates: { loadName?: string; haulierId?: string; vehicleId?: string; runDate?: string }
+  updates: { loadCode?: string; haulierId?: string; vehicleId?: string; runDate?: string }
 ) {
   try {
     const supabase = await createClient();
     
     const dbUpdates: Record<string, any> = {};
-    if (updates.loadName !== undefined) dbUpdates.load_name = updates.loadName;
+    if (updates.loadCode !== undefined) dbUpdates.load_name = updates.loadCode;
     if (updates.haulierId !== undefined) dbUpdates.haulier_id = updates.haulierId || null;
     if (updates.vehicleId !== undefined) dbUpdates.vehicle_id = updates.vehicleId || null;
     if (updates.runDate !== undefined) dbUpdates.run_date = updates.runDate;
@@ -308,12 +336,12 @@ export async function removeOrderFromLoad(orderId: string) {
       
     if (error) throw error;
     
-    // Reset order status back to confirmed if it was ready_for_dispatch
+    // Reset order status back to confirmed if it was packed (ready for dispatch)
     await supabase
       .from("orders")
       .update({ status: "confirmed" })
       .eq("id", orderId)
-      .eq("status", "ready_for_dispatch");
+      .eq("status", "packed");
     
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
@@ -336,7 +364,7 @@ export async function updateOrderDate(orderId: string, date: string) {
     
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
-    revalidatePath("/dispatch/picking");
+    revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
   } catch (error: any) {
@@ -392,10 +420,10 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
           deliveryRunId: targetRouteId,
           orderId: orderId,
         });
-        // Keep status at ready_for_dispatch until the run goes in_transit
+        // Keep status at packed until the run goes in_transit
         await supabase
           .from("orders")
-          .update({ status: "ready_for_dispatch" })
+          .update({ status: "packed" })
           .eq("id", orderId);
       })
     );
@@ -442,6 +470,22 @@ export async function dispatchLoad(loadId: string) {
 
     const orderIds = deliveryItems.map(item => item.order_id);
     console.log(`[dispatchLoad] Found ${orderIds.length} orders to dispatch`);
+
+    // Check that all orders have completed pick lists (or no pick list for manual orders)
+    const { data: incompletePicks } = await supabaseAdmin
+      .from("pick_lists")
+      .select("id, order_id, status, orders(order_number)")
+      .in("order_id", orderIds)
+      .neq("status", "completed");
+
+    if (incompletePicks && incompletePicks.length > 0) {
+      const orderNumbers = incompletePicks
+        .map((p: any) => p.orders?.order_number || p.order_id)
+        .join(", ");
+      return {
+        error: `Cannot dispatch - ${incompletePicks.length} order(s) have incomplete picking: ${orderNumbers}. Complete all pick lists first.`
+      };
+    }
 
     // Update delivery run status to in_transit
     const { error: runError } = await supabaseAdmin
@@ -541,11 +585,11 @@ export async function recallLoad(loadId: string) {
 
     if (itemsError) throw itemsError;
 
-    // Reset order status back to ready_for_dispatch (or confirmed if picking isn't done)
+    // Reset order status back to packed (or confirmed if picking isn't done)
     if (orderIds.length > 0) {
       const { error: ordersError } = await supabaseAdmin
         .from("orders")
-        .update({ status: "ready_for_dispatch" })
+        .update({ status: "packed" })
         .in("id", orderIds);
 
       if (ordersError) throw ordersError;

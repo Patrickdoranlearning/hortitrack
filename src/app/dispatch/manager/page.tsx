@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { getUserAndOrg } from "@/server/auth/org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { Button } from "@/components/ui/button";
 import {
   Package,
@@ -13,7 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 
 export default async function DispatchManagerPage() {
   let orgId: string;
@@ -49,7 +52,7 @@ export default async function DispatchManagerPage() {
     .from("orders")
     .select("id", { count: "exact", head: true })
     .eq("org_id", orgId)
-    .in("status", ["confirmed", "processing"]);
+    .in("status", ["confirmed"]);
 
   // Fetch orders being picked today
   const { data: pickingOrders, count: pickingCount } = await supabase
@@ -171,7 +174,7 @@ export default async function DispatchManagerPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Link href="/dispatch/manager/orders">
           <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
             <CardContent className="pt-6">
@@ -183,24 +186,6 @@ export default async function DispatchManagerPage() {
                   <h3 className="font-semibold">Manage Orders</h3>
                   <p className="text-sm text-muted-foreground">
                     View orders, assign pickers
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dispatch/manager/loads">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Truck className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Manage Loads</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Assign orders to vehicles
                   </p>
                 </div>
               </div>
@@ -251,7 +236,7 @@ export default async function DispatchManagerPage() {
                   >
                     <div>
                       <p className="font-medium text-sm">
-                        {run.load_name || `Load ${run.id.slice(0, 8)}`}
+                        {run.load_name || (run.run_date ? format(new Date(run.run_date), "EEE MMM d") : "Unnamed Load")}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {run.haulier?.name || "No haulier"}
@@ -272,11 +257,6 @@ export default async function DispatchManagerPage() {
                 ))}
               </div>
             )}
-            <Link href="/dispatch/manager/loads">
-              <Button variant="outline" size="sm" className="w-full mt-4">
-                View All Loads
-              </Button>
-            </Link>
           </CardContent>
         </Card>
 

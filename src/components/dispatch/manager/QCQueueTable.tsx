@@ -76,12 +76,12 @@ export function QCQueueTable({ items }: QCQueueTableProps) {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5" />
               QC Review Queue
             </CardTitle>
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search orders..."
@@ -93,89 +93,162 @@ export function QCQueueTable({ items }: QCQueueTableProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="text-center">Items</TableHead>
-                <TableHead>Picker</TableHead>
-                <TableHead>Waiting</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredItems.length === 0 ? (
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
-                    <p className="text-muted-foreground">No items found</p>
-                  </TableCell>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="text-center">Items</TableHead>
+                  <TableHead>Picker</TableHead>
+                  <TableHead>Waiting</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                filteredItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.orderNumber}</TableCell>
-                    <TableCell>{item.customerName}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span>{item.totalQty}</span>
-                        <span className="text-muted-foreground text-xs">
-                          ({item.itemCount} lines)
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {item.pickerName ? (
-                        <div className="flex items-center gap-1">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span>{item.pickerName}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {item.pickCompletedAt ? (
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            {formatDistanceToNow(new Date(item.pickCompletedAt), {
-                              addSuffix: true,
-                            })}
-                          </span>
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(item.status, item.qcStatus)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setFeedbackItem(item)}
-                          title="Add Feedback"
-                        >
-                          <MessageSquarePlus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleStartQC(item.id)}
-                          className="gap-1"
-                        >
-                          Review
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-32 text-center">
+                      <p className="text-muted-foreground">No items found</p>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.orderNumber}</TableCell>
+                      <TableCell>{item.customerName}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <span>{item.totalQty}</span>
+                          <span className="text-muted-foreground text-xs">
+                            ({item.itemCount} lines)
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {item.pickerName ? (
+                          <div className="flex items-center gap-1">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span>{item.pickerName}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {item.pickCompletedAt ? (
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span>
+                              {formatDistanceToNow(new Date(item.pickCompletedAt), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(item.status, item.qcStatus)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setFeedbackItem(item)}
+                            title="Add Feedback"
+                          >
+                            <MessageSquarePlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleStartQC(item.id)}
+                            className="gap-1"
+                          >
+                            Review
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3">
+            {filteredItems.length === 0 ? (
+              <div className="h-32 flex items-center justify-center">
+                <p className="text-muted-foreground">No items found</p>
+              </div>
+            ) : (
+              filteredItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="border rounded-lg p-4 space-y-3"
+                >
+                  {/* Header row: Order + Status */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{item.orderNumber}</span>
+                    {getStatusBadge(item.status, item.qcStatus)}
+                  </div>
+
+                  {/* Customer */}
+                  <p className="text-sm">{item.customerName}</p>
+
+                  {/* Details row */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Package className="h-4 w-4" />
+                      <span>{item.totalQty} units ({item.itemCount} lines)</span>
+                    </div>
+                    {item.pickerName && (
+                      <div className="flex items-center gap-1">
+                        <User className="h-4 w-4" />
+                        <span>{item.pickerName}</span>
+                      </div>
+                    )}
+                    {item.pickCompletedAt && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          {formatDistanceToNow(new Date(item.pickCompletedAt), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setFeedbackItem(item)}
+                      className="flex-1"
+                    >
+                      <MessageSquarePlus className="h-4 w-4 mr-1" />
+                      Feedback
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleStartQC(item.id)}
+                      className="flex-1"
+                    >
+                      Start QC
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 

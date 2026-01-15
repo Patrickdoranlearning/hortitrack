@@ -8,10 +8,11 @@ import {
 
 export async function GET(
   req: Request,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const updates = await getOrderStatusUpdates(params.orderId);
+    const { orderId } = await params;
+    const updates = await getOrderStatusUpdates(orderId);
     return NextResponse.json({ ok: true, updates });
   } catch (err) {
     console.error("[api:dispatch/orders/[orderId]/status][GET]", err);
@@ -24,13 +25,14 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
+    const { orderId } = await params;
     const json = await req.json();
     const parsed = CreateOrderStatusUpdateSchema.safeParse({
       ...json,
-      orderId: params.orderId,
+      orderId,
     });
 
     if (!parsed.success) {

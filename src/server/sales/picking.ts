@@ -557,12 +557,49 @@ export async function createPickList(
   const totalQty = orderItems?.reduce((sum, oi: any) => sum + (oi.quantity || 0), 0) ?? 0;
 
   if (orderItems && orderItems.length > 0) {
-    const pickItems = orderItems.map((oi: any) => ({
-      pick_list_id: data.id,
-      order_item_id: oi.id,
-      target_qty: oi.quantity,
-      status: "pending",
-    }));
+    // Fetch batch allocations for all order items to populate original_batch_id
+    const orderItemIds = orderItems.map((oi: any) => oi.id);
+    const { data: allocations } = await supabase
+      .from("batch_allocations")
+      .select("order_item_id, batch_id, quantity")
+      .in("order_item_id", orderItemIds)
+      .eq("status", "allocated");
+
+    // Build allocation map: order_item_id -> batch_id (first allocation if multiple)
+    const allocationMap = new Map<string, string>();
+    for (const alloc of allocations || []) {
+      if (!allocationMap.has(alloc.order_item_id)) {
+        allocationMap.set(alloc.order_item_id, alloc.batch_id);
+      }
+    }
+
+    // Fetch batch locations for location hints
+    const batchIds = [...new Set(allocations?.map(a => a.batch_id) || [])];
+    const batchLocationMap = new Map<string, string>();
+    if (batchIds.length > 0) {
+      const { data: batches } = await supabase
+        .from("batches")
+        .select("id, nursery_locations(name)")
+        .in("id", batchIds);
+
+      for (const b of batches || []) {
+        const locationName = (b.nursery_locations as { name?: string })?.name || "";
+        batchLocationMap.set(b.id, locationName);
+      }
+    }
+
+    // Create pick items with original_batch_id populated from allocations
+    const pickItems = orderItems.map((oi: any) => {
+      const batchId = allocationMap.get(oi.id);
+      return {
+        pick_list_id: data.id,
+        order_item_id: oi.id,
+        target_qty: oi.quantity,
+        status: "pending",
+        original_batch_id: batchId || null,
+        location_hint: batchId ? batchLocationMap.get(batchId) || null : null,
+      };
+    });
 
     const { error: itemsError } = await supabase
       .from("pick_items")
@@ -949,10 +986,16 @@ export async function completePickList(
     .single();
 
   if (pickList?.order_id) {
-    await supabase
+    // Update order status to 'packed' (picking complete, ready for dispatch)
+    // Valid order_status enum: draft, confirmed, picking, ready, packed, dispatched, delivered, cancelled, void
+    const { error: orderUpdateError } = await supabase
       .from("orders")
-      .update({ status: "ready_for_dispatch" })
+      .update({ status: "packed" })
       .eq("id", pickList.order_id);
+
+    if (orderUpdateError) {
+      console.error(`[completePickList] Failed to update order status for ${pickList.order_id}:`, orderUpdateError);
+    }
 
     // Auto-generate invoice after picking is complete
     try {
@@ -1213,13 +1256,20 @@ export async function updatePickItem(
   const { user, orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
-  // Get current pick item
+  // Get current pick item with order details for event logging
   const { data: current } = await supabase
     .from("pick_items")
     .select(
       `
         *,
-        pick_lists(org_id),
+        pick_lists(
+          org_id,
+          orders(
+            id,
+            order_number,
+            customers(name)
+          )
+        ),
         order_items(
           id,
           product_id,
@@ -1271,9 +1321,12 @@ export async function updatePickItem(
     }
   }
 
-  // Determine status
+  // Determine status - respect explicit status if passed (e.g., 'short' for unavailable items)
   let status: PickItemStatus = input.status || "picked";
-  if (input.pickedQty === 0) {
+  if (input.status === "short") {
+    // Explicit short status takes priority (e.g., marking item as unavailable)
+    status = "short";
+  } else if (input.pickedQty === 0) {
     status = "skipped";
   } else if (input.pickedQty < current.target_qty) {
     status = "short";
@@ -1300,10 +1353,12 @@ export async function updatePickItem(
   }
 
   // Deduct from batch inventory
-  if (input.pickedQty > 0 && input.pickedBatchId) {
+  // Use provided batch ID or fall back to pre-allocated original batch
+  const effectiveBatchId = input.pickedBatchId || current.original_batch_id;
+  if (input.pickedQty > 0 && effectiveBatchId) {
     const { error: rpcError } = await supabase.rpc("decrement_batch_quantity", {
       p_org_id: orgId,
-      p_batch_id: input.pickedBatchId,
+      p_batch_id: effectiveBatchId,
       p_units: input.pickedQty,
     });
     if (rpcError) {
@@ -1312,24 +1367,49 @@ export async function updatePickItem(
     }
 
     // Log to batch_events so it shows in batch's Log History
+    // Include order details for stock ledger display
+    const orderInfo = (current.pick_lists as any)?.orders;
     await supabase.from("batch_events").insert({
       org_id: orgId,
-      batch_id: input.pickedBatchId,
+      batch_id: effectiveBatchId,
       type: "PICKED",
       payload: {
         units_picked: input.pickedQty,
         pick_item_id: input.pickItemId,
         pick_list_id: current.pick_list_id,
+        order_id: orderInfo?.id,
+        order_number: orderInfo?.order_number,
+        customer_name: orderInfo?.customers?.name,
         notes: input.notes,
         substitution_reason: input.substitutionReason,
       },
       by_user_id: user.id,
       at: new Date().toISOString(),
     });
+
+    // Update batch_allocations status from 'allocated' to 'picked'
+    // This tracks the allocation lifecycle for distribution/stock reporting
+    // Note: current.order_item_id comes from pick_items table (the * select)
+    if (current.order_item_id) {
+      const { error: allocUpdateError } = await supabase
+        .from("batch_allocations")
+        .update({
+          status: "picked",
+          updated_at: new Date().toISOString()
+        })
+        .eq("batch_id", effectiveBatchId)
+        .eq("order_item_id", current.order_item_id)
+        .eq("status", "allocated");
+
+      if (allocUpdateError) {
+        console.warn("Failed to update batch_allocation status:", allocUpdateError.message);
+        // Don't fail the pick - allocation might not exist or already updated
+      }
+    }
   }
 
   await logPickListEvent(
-    current.pick_lists.org_id,
+    (current.pick_lists as any).org_id,
     current.pick_list_id,
     input.pickItemId,
     status === "substituted" ? "item_substituted" : "item_picked",
@@ -1337,7 +1417,7 @@ export async function updatePickItem(
     {
       pickedQty: input.pickedQty,
       targetQty: current.target_qty,
-      batchId: input.pickedBatchId,
+      batchId: effectiveBatchId,
       substitutionReason: input.substitutionReason,
     }
   );
