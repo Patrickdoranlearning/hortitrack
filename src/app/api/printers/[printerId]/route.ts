@@ -45,18 +45,51 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { name, type, connection_type, host, port, is_default, is_active, dpi, notes } = body;
+    const {
+      name,
+      type,
+      connection_type,
+      host,
+      port,
+      is_default,
+      is_active,
+      dpi,
+      notes,
+      agent_id,
+      usb_device_id,
+      usb_device_name,
+    } = body;
 
-    const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (name !== undefined) updateData.name = name;
     if (type !== undefined) updateData.type = type;
     if (connection_type !== undefined) updateData.connection_type = connection_type;
-    if (host !== undefined) updateData.host = host;
-    if (port !== undefined) updateData.port = port;
     if (is_default !== undefined) updateData.is_default = is_default;
     if (is_active !== undefined) updateData.is_active = is_active;
     if (dpi !== undefined) updateData.dpi = dpi;
     if (notes !== undefined) updateData.notes = notes;
+
+    // Handle connection-type specific fields
+    if (connection_type === "agent") {
+      updateData.agent_id = agent_id;
+      updateData.usb_device_id = usb_device_id ?? null;
+      updateData.usb_device_name = usb_device_name ?? null;
+      updateData.host = null;
+      updateData.port = null;
+    } else if (connection_type === "network") {
+      updateData.host = host;
+      updateData.port = port;
+      updateData.agent_id = null;
+      updateData.usb_device_id = null;
+      updateData.usb_device_name = null;
+    } else {
+      // Partial update without changing connection type
+      if (host !== undefined) updateData.host = host;
+      if (port !== undefined) updateData.port = port;
+      if (agent_id !== undefined) updateData.agent_id = agent_id;
+      if (usb_device_id !== undefined) updateData.usb_device_id = usb_device_id;
+      if (usb_device_name !== undefined) updateData.usb_device_name = usb_device_name;
+    }
 
     const { data, error } = await supabase
       .from("printers")

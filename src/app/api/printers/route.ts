@@ -38,34 +38,62 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, type, connection_type, host, port, is_default, dpi, notes } = body;
+    const {
+      name,
+      type,
+      connection_type,
+      host,
+      port,
+      is_default,
+      dpi,
+      notes,
+      agent_id,
+      usb_device_id,
+      usb_device_name,
+    } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Printer name is required" }, { status: 400 });
     }
 
+    const insertData: Record<string, unknown> = {
+      org_id: orgId,
+      name,
+      type: type || "zebra",
+      connection_type: connection_type || "network",
+      is_default: is_default || false,
+      dpi: dpi || 203,
+      notes,
+    };
+
+    // Set connection-specific fields
+    if (connection_type === "agent") {
+      insertData.agent_id = agent_id;
+      insertData.usb_device_id = usb_device_id || null;
+      insertData.usb_device_name = usb_device_name || null;
+      insertData.host = null;
+      insertData.port = null;
+    } else {
+      insertData.host = host;
+      insertData.port = port || 9100;
+      insertData.agent_id = null;
+      insertData.usb_device_id = null;
+      insertData.usb_device_name = null;
+    }
+
     const { data, error } = await supabase
       .from("printers")
-      .insert({
-        org_id: orgId,
-        name,
-        type: type || "zebra",
-        connection_type: connection_type || "network",
-        host,
-        port: port || 9100,
-        is_default: is_default || false,
-        dpi: dpi || 203,
-        notes,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) throw error;
 
     return NextResponse.json({ data });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed to create printer";
     console.error("[api/printers] POST error:", e);
-    return NextResponse.json({ error: e?.message || "Failed to create printer" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

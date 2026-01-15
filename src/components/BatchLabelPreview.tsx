@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescriptionHidden } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogDescriptionHidden } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -361,47 +361,117 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
   );
 }
 
-// Printer Settings Component
-function PrinterSettings({ 
-  printers, 
-  onRefresh 
-}: { 
-  printers: Printer[]; 
+// Types for print agents
+type PrintAgent = {
+  id: string;
+  name: string;
+  status: "online" | "offline";
+};
+
+// Printer Settings Component with full add printer dialog
+function PrinterSettings({
+  printers,
+  onRefresh
+}: {
+  printers: Printer[];
   onRefresh: () => void;
 }) {
   const { toast } = useToast();
-  const [isAdding, setIsAdding] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [isTesting, setIsTesting] = useState<string | null>(null);
-  const [newPrinter, setNewPrinter] = useState({
+  const [isSaving, setIsSaving] = useState(false);
+  const [agents, setAgents] = useState<PrintAgent[]>([]);
+  const [formData, setFormData] = useState({
     name: "",
     type: "zebra",
+    connection_type: "network",
     host: "",
     port: "9100",
+    dpi: "203",
     is_default: false,
+    agent_id: "",
+    usb_device_name: "",
   });
 
+  // Fetch agents when dialog opens
+  const fetchAgents = async () => {
+    try {
+      const res = await fetch("/api/print-agents");
+      const json = await res.json();
+      if (json.data) {
+        setAgents(json.data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch agents:", e);
+    }
+  };
+
+  const handleOpenAddDialog = () => {
+    setFormData({
+      name: "",
+      type: "zebra",
+      connection_type: "network",
+      host: "",
+      port: "9100",
+      dpi: "203",
+      is_default: false,
+      agent_id: "",
+      usb_device_name: "",
+    });
+    fetchAgents();
+    setAddDialogOpen(true);
+  };
+
   const handleAddPrinter = async () => {
-    if (!newPrinter.name || !newPrinter.host) {
+    if (!formData.name) {
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please enter a name and IP address for the printer.",
+        description: "Please enter a name for the printer.",
       });
       return;
     }
 
+    if (formData.connection_type === "network" && !formData.host) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please enter an IP address for the printer.",
+      });
+      return;
+    }
+
+    if (formData.connection_type === "agent" && !formData.agent_id) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please select a print agent.",
+      });
+      return;
+    }
+
+    setIsSaving(true);
     try {
+      const payload: Record<string, unknown> = {
+        name: formData.name,
+        type: formData.type,
+        connection_type: formData.connection_type,
+        dpi: parseInt(formData.dpi) || 203,
+        is_default: formData.is_default,
+      };
+
+      if (formData.connection_type === "network") {
+        payload.host = formData.host;
+        payload.port = parseInt(formData.port) || 9100;
+      } else if (formData.connection_type === "agent") {
+        payload.agent_id = formData.agent_id;
+        payload.usb_device_name = formData.usb_device_name || null;
+      }
+
       const res = await fetch("/api/printers", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: newPrinter.name,
-          type: newPrinter.type,
-          connection_type: "network",
-          host: newPrinter.host,
-          port: parseInt(newPrinter.port) || 9100,
-          is_default: newPrinter.is_default,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -411,18 +481,20 @@ function PrinterSettings({
 
       toast({
         title: "Printer Added",
-        description: `${newPrinter.name} has been added successfully.`,
+        description: `${formData.name} has been added successfully.`,
       });
 
-      setNewPrinter({ name: "", type: "zebra", host: "", port: "9100", is_default: false });
-      setIsAdding(false);
+      setAddDialogOpen(false);
       onRefresh();
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to add printer";
       toast({
         variant: "destructive",
         title: "Failed to Add Printer",
-        description: e.message,
+        description: message,
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -442,11 +514,12 @@ function PrinterSettings({
         title: "Test Successful",
         description: "A test label has been sent to the printer.",
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Could not connect to the printer.";
       toast({
         variant: "destructive",
         title: "Test Failed",
-        description: e.message || "Could not connect to the printer.",
+        description: message,
       });
     } finally {
       setIsTesting(null);
@@ -470,11 +543,12 @@ function PrinterSettings({
         title: "Default Updated",
         description: "Default printer has been changed.",
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to update printer";
       toast({
         variant: "destructive",
         title: "Update Failed",
-        description: e.message,
+        description: message,
       });
     }
   };
@@ -496,11 +570,12 @@ function PrinterSettings({
         title: "Printer Deleted",
         description: `${printerName} has been removed.`,
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to delete printer";
       toast({
         variant: "destructive",
         title: "Delete Failed",
-        description: e.message,
+        description: message,
       });
     }
   };
@@ -509,93 +584,194 @@ function PrinterSettings({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Configured Printers</h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setIsAdding(!isAdding)}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleOpenAddDialog}
         >
           <Plus className="h-4 w-4 mr-1" />
           Add Printer
         </Button>
       </div>
 
-      {/* Add Printer Form */}
-      {isAdding && (
-        <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Printer Name</Label>
-              <Input
-                placeholder="e.g., Tunnel 1 Zebra"
-                value={newPrinter.name}
-                onChange={(e) => setNewPrinter({ ...newPrinter, name: e.target.value })}
-              />
+      {/* Add Printer Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Printer</DialogTitle>
+            <DialogDescription>Configure a thermal label printer</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Printer Name</Label>
+                <Input
+                  placeholder="e.g., Tunnel 1 Zebra"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Printer Type</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(v) => setFormData({ ...formData, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="zebra">Zebra</SelectItem>
+                    <SelectItem value="toshiba">Toshiba</SelectItem>
+                    <SelectItem value="dymo">Dymo</SelectItem>
+                    <SelectItem value="brother">Brother</SelectItem>
+                    <SelectItem value="generic">Generic ZPL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
             <div className="space-y-1">
-              <Label className="text-xs">Printer Type</Label>
-              <Select 
-                value={newPrinter.type} 
-                onValueChange={(v) => setNewPrinter({ ...newPrinter, type: v })}
+              <Label className="text-xs">Connection Type</Label>
+              <Select
+                value={formData.connection_type}
+                onValueChange={(v) => setFormData({ ...formData, connection_type: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="zebra">Zebra</SelectItem>
-                  <SelectItem value="dymo">Dymo</SelectItem>
-                  <SelectItem value="brother">Brother</SelectItem>
-                  <SelectItem value="generic">Generic ZPL</SelectItem>
+                  <SelectItem value="network">Network (TCP/IP)</SelectItem>
+                  <SelectItem value="agent">USB via Print Agent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1">
-              <Label className="text-xs">IP Address</Label>
-              <Input
-                placeholder="192.168.1.100"
-                value={newPrinter.host}
-                onChange={(e) => setNewPrinter({ ...newPrinter, host: e.target.value })}
-              />
-            </div>
+
+            {formData.connection_type === "network" && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">IP Address</Label>
+                  <Input
+                    placeholder="192.168.1.100"
+                    value={formData.host}
+                    onChange={(e) => setFormData({ ...formData, host: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Port</Label>
+                  <Input
+                    placeholder="9100"
+                    value={formData.port}
+                    onChange={(e) => setFormData({ ...formData, port: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {formData.connection_type === "agent" && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Print Agent</Label>
+                  <Select
+                    value={formData.agent_id}
+                    onValueChange={(v) => setFormData({ ...formData, agent_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an agent..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agents.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground text-center">
+                          No agents configured. Add one in Settings.
+                        </div>
+                      ) : (
+                        agents.map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            <div className="flex items-center gap-2">
+                              {agent.name}
+                              <Badge
+                                variant={agent.status === "online" ? "default" : "secondary"}
+                                className="text-xs px-1.5 py-0"
+                              >
+                                {agent.status}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">USB Printer Name (Optional)</Label>
+                  <Input
+                    placeholder="e.g., Zebra ZD420"
+                    value={formData.usb_device_name}
+                    onChange={(e) => setFormData({ ...formData, usb_device_name: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the printer name as it appears on the workstation.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1">
-              <Label className="text-xs">Port</Label>
-              <Input
-                placeholder="9100"
-                value={newPrinter.port}
-                onChange={(e) => setNewPrinter({ ...newPrinter, port: e.target.value })}
+              <Label className="text-xs">Printer DPI</Label>
+              <Select
+                value={formData.dpi}
+                onValueChange={(v) => setFormData({ ...formData, dpi: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="203">203 DPI (Standard)</SelectItem>
+                  <SelectItem value="300">300 DPI (High)</SelectItem>
+                  <SelectItem value="600">600 DPI (Ultra High)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="is_default_quick"
+                checked={formData.is_default}
+                onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
+                className="rounded"
               />
+              <Label htmlFor="is_default_quick" className="text-xs cursor-pointer">
+                Set as default printer
+              </Label>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="is_default"
-              checked={newPrinter.is_default}
-              onChange={(e) => setNewPrinter({ ...newPrinter, is_default: e.target.checked })}
-              className="rounded"
-            />
-            <Label htmlFor="is_default" className="text-xs cursor-pointer">
-              Set as default printer
-            </Label>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleAddPrinter}>
-              Add Printer
+            <Button onClick={handleAddPrinter} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Printer"
+              )}
             </Button>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Printer List */}
       {printers.length > 0 ? (
         <div className="space-y-2">
           {printers.map((printer) => (
-            <div 
-              key={printer.id} 
+            <div
+              key={printer.id}
               className="flex items-center justify-between p-3 border rounded-lg bg-background"
             >
               <div className="flex items-center gap-3">
@@ -608,7 +784,7 @@ function PrinterSettings({
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {printer.type} • {printer.host}:{printer.port}
+                    {printer.type} • {printer.connection_type === "agent" ? "USB via Agent" : `${printer.host}:${printer.port}`}
                   </p>
                 </div>
               </div>
