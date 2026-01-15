@@ -45,10 +45,19 @@ import {
   Loader2,
   Plus,
   Ruler,
+  Syringe,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { getTrial, updateTrialStatus, deleteTrial, getMeasurementsForTrial } from '@/app/actions/trials';
 import type { TrialWithRelations, TrialStatus, TrialGroupWithSubjects, TrialMeasurement } from '@/types/trial';
 import { GROUP_COLORS, SCORE_LABELS } from '@/types/trial';
+import { TreatmentLogDialog } from '@/components/trials/TreatmentLogDialog';
+
+// Dynamic import with SSR disabled for recharts component to avoid hydration issues
+const TrialComparisonChart = dynamic(
+  () => import('@/components/trials/TrialComparisonChart').then((mod) => mod.TrialComparisonChart),
+  { ssr: false }
+);
 
 const STATUS_CONFIG: Record<TrialStatus, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive'; color: string }> = {
   draft: { label: 'Draft', variant: 'secondary', color: 'text-gray-500' },
@@ -67,6 +76,7 @@ export default function TrialDetailPage() {
   const [measurements, setMeasurements] = useState<TrialMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [treatmentDialogOpen, setTreatmentDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -433,10 +443,23 @@ export default function TrialDetailPage() {
           <TabsContent value="groups" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Trial Groups</CardTitle>
-                <CardDescription>
-                  View and manage trial groups and their subjects
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Trial Groups</CardTitle>
+                    <CardDescription>
+                      View and manage trial groups and their subjects
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTreatmentDialogOpen(true)}
+                    disabled={trial.status !== 'active'}
+                  >
+                    <Syringe className="h-4 w-4 mr-1" />
+                    Log Treatment
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {trial.groups?.map((group) => (
@@ -466,6 +489,14 @@ export default function TrialDetailPage() {
 
               {measurements.length > 0 ? (
                 <>
+                  {/* Comparison Chart */}
+                  {trial.groups && (
+                    <TrialComparisonChart
+                      groups={trial.groups}
+                      measurements={measurements}
+                    />
+                  )}
+
                   {/* Side-by-side group comparison cards */}
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {trial.groups?.map((group) => {
@@ -806,6 +837,16 @@ export default function TrialDetailPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Treatment Log Dialog */}
+        {trial.groups && (
+          <TreatmentLogDialog
+            open={treatmentDialogOpen}
+            onOpenChange={setTreatmentDialogOpen}
+            groups={trial.groups}
+            onSuccess={fetchTrial}
+          />
+        )}
       </div>
     </PageFrame>
   );

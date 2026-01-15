@@ -3,8 +3,8 @@ import { getSupabaseServerApp } from "@/server/db/supabase";
 import { listCategories } from "@/server/materials/service";
 
 export const runtime = "nodejs";
-// Categories are shared (no org filtering), can be cached
-export const revalidate = 3600; // Cache for 1 hour
+// Must be dynamic because getSupabaseServerApp uses cookies
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/materials/categories

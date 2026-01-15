@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { getDispatchRoleForUser } from "@/server/dispatch/get-dispatch-role";
 
+// Must be dynamic because getDispatchRoleForUser uses cookies
+export const dynamic = "force-dynamic";
+
 /**
  * Dispatch Module - Role-based Router
  *
