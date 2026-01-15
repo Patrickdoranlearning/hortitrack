@@ -221,11 +221,64 @@
         padding: 16px;
       }
 
+      .update-banner {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+        display: none;
+      }
+
+      .update-banner.downloaded {
+        background: #dcfce7;
+        border-color: #16a34a;
+      }
+
+      .update-banner.error {
+        background: #fee2e2;
+        border-color: #dc2626;
+      }
+
+      .update-text {
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+
+      .update-progress {
+        width: 100%;
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 8px;
+      }
+
+      .update-progress-bar {
+        height: 100%;
+        background: #16a34a;
+        transition: width 0.3s;
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+
       .footer {
         text-align: center;
         font-size: 11px;
         color: #999;
         margin-top: 16px;
+      }
+
+      .footer a {
+        color: #16a34a;
+        text-decoration: none;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
       }
     </style>
   </head>
@@ -234,6 +287,15 @@
       <div class="header">
         <h1>Hortitrack Print Agent</h1>
         <p>Local USB printer support for Hortitrack</p>
+      </div>
+
+      <!-- Update Banner -->
+      <div id="update-banner" class="update-banner">
+        <div id="update-text" class="update-text"></div>
+        <div id="update-progress" class="update-progress" style="display: none;">
+          <div id="update-progress-bar" class="update-progress-bar" style="width: 0%"></div>
+        </div>
+        <button id="update-btn" class="btn btn-primary btn-sm" style="display: none;">Install Update</button>
       </div>
 
       <div class="status-card">
@@ -262,6 +324,10 @@
             <input type="checkbox" id="autoStart" checked />
             <label for="autoStart">Start automatically on login</label>
           </div>
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="autoUpdate" checked />
+            <label for="autoUpdate">Automatically check for updates</label>
+          </div>
           <button type="submit" id="save-btn" class="btn btn-primary">
             Save & Connect
           </button>
@@ -276,7 +342,8 @@
       </div>
 
       <div class="footer">
-        <p>v1.0.0 | Runs in system tray when minimized</p>
+        <p>v<span id="app-version">1.0.0</span> | Runs in system tray when minimized</p>
+        <p><a href="#" id="check-updates-link">Check for updates</a></p>
       </div>
     </div>
 
@@ -292,8 +359,16 @@
       const serverUrlInput = document.getElementById("serverUrl");
       const agentKeyInput = document.getElementById("agentKey");
       const autoStartInput = document.getElementById("autoStart");
+      const autoUpdateInput = document.getElementById("autoUpdate");
       const saveBtn = document.getElementById("save-btn");
       const printersList = document.getElementById("printers-list");
+      const updateBanner = document.getElementById("update-banner");
+      const updateText = document.getElementById("update-text");
+      const updateProgress = document.getElementById("update-progress");
+      const updateProgressBar = document.getElementById("update-progress-bar");
+      const updateBtn = document.getElementById("update-btn");
+      const appVersion = document.getElementById("app-version");
+      const checkUpdatesLink = document.getElementById("check-updates-link");
 
       // Load config
       async function loadConfig() {
@@ -302,6 +377,11 @@
           serverUrlInput.value = currentConfig.serverUrl || "";
           agentKeyInput.value = currentConfig.agentKey || "";
           autoStartInput.checked = currentConfig.autoStart !== false;
+
+          // Load update settings
+          const updateStatus = await window.electronAPI.getUpdateStatus();
+          autoUpdateInput.checked = updateStatus.autoUpdate !== false;
+          appVersion.textContent = updateStatus.currentVersion;
         } catch (error) {
           console.error("Failed to load config:", error);
         }
@@ -388,6 +468,62 @@
       // Listen for print jobs (for logging/display)
       window.electronAPI.onPrintJob((job) => {
         console.log("Print job received:", job);
+      });
+
+      // Update status handler
+      function handleUpdateStatus(status) {
+        updateBanner.style.display = "block";
+        updateBanner.classList.remove("downloaded", "error");
+        updateProgress.style.display = "none";
+        updateBtn.style.display = "none";
+
+        switch (status.status) {
+          case "checking":
+            updateText.textContent = "Checking for updates...";
+            break;
+          case "available":
+            updateText.textContent = `Update v${status.version} is available. Downloading...`;
+            break;
+          case "not-available":
+            updateText.textContent = "You're running the latest version.";
+            setTimeout(() => {
+              updateBanner.style.display = "none";
+            }, 3000);
+            break;
+          case "downloading":
+            updateText.textContent = `Downloading update... ${Math.round(status.percent || 0)}%`;
+            updateProgress.style.display = "block";
+            updateProgressBar.style.width = `${status.percent || 0}%`;
+            break;
+          case "downloaded":
+            updateBanner.classList.add("downloaded");
+            updateText.textContent = `Update v${status.version} is ready to install.`;
+            updateBtn.style.display = "inline-flex";
+            break;
+          case "error":
+            updateBanner.classList.add("error");
+            updateText.textContent = `Update error: ${status.error}`;
+            break;
+        }
+      }
+
+      // Listen for update status
+      window.electronAPI.onUpdateStatus(handleUpdateStatus);
+
+      // Install update button
+      updateBtn.addEventListener("click", () => {
+        window.electronAPI.installUpdate();
+      });
+
+      // Check for updates link
+      checkUpdatesLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.electronAPI.checkForUpdates();
+      });
+
+      // Auto-update checkbox
+      autoUpdateInput.addEventListener("change", () => {
+        window.electronAPI.setAutoUpdate(autoUpdateInput.checked);
       });
 
       // Initial load

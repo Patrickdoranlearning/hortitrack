@@ -1,6 +1,6 @@
 {
   "name": "hortitrack-print-agent",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Desktop print agent for Hortitrack - enables local USB printer support",
   "main": "out/main/index.js",
   "author": "Hortitrack",
@@ -15,7 +15,8 @@
     "package:linux": "electron-builder --linux"
   },
   "dependencies": {
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.1.7"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",
@@ -35,6 +36,11 @@
     "files": [
       "out/**/*"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "Patrickdoranlearning",
+      "repo": "hortitrack"
+    },
     "mac": {
       "target": ["dmg", "zip"],
       "icon": "build/icon.icns"

@@ -1,6 +1,7 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, shell } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog } from "electron";
 import path from "path";
 import Store from "electron-store";
+import { autoUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
 import { PrintAgentClient } from "./agent-client";
 import { PrinterDiscovery } from "./printer-discovery";
 
@@ -9,6 +10,7 @@ const store = new Store<{
   serverUrl: string;
   agentKey: string;
   autoStart: boolean;
+  autoUpdate: boolean;
 }>();
 
 // Global references
@@ -20,6 +22,9 @@ let printerDiscovery: PrinterDiscovery | null = null;
 // App state
 let isConnected = false;
 let lastError: string | null = null;
+let updateAvailable = false;
+let updateDownloaded = false;
+let updateInfo: UpdateInfo | null = null;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -80,8 +85,9 @@ function updateTrayMenu(): void {
   const statusText = isConnected ? "Connected" : lastError ? `Error: ${lastError}` : "Disconnected";
   const statusIcon = isConnected ? "🟢" : "🔴";
 
-  const contextMenu = Menu.buildFromTemplate([
+  const menuItems: Electron.MenuItemConstructorOptions[] = [
     { label: `${statusIcon} ${statusText}`, enabled: false },
+    { label: `Version ${app.getVersion()}`, enabled: false },
     { type: "separator" },
     {
       label: "Open Settings",
@@ -92,6 +98,28 @@ function updateTrayMenu(): void {
       enabled: !isConnected,
       click: () => startAgent(),
     },
+    { type: "separator" },
+  ];
+
+  // Add update menu items
+  if (updateDownloaded && updateInfo) {
+    menuItems.push({
+      label: `Install Update (v${updateInfo.version})`,
+      click: () => autoUpdater.quitAndInstall(),
+    });
+  } else if (updateAvailable && updateInfo) {
+    menuItems.push({
+      label: `Downloading v${updateInfo.version}...`,
+      enabled: false,
+    });
+  } else {
+    menuItems.push({
+      label: "Check for Updates",
+      click: () => checkForUpdates(),
+    });
+  }
+
+  menuItems.push(
     { type: "separator" },
     {
       label: "View Logs",
@@ -104,9 +132,10 @@ function updateTrayMenu(): void {
         agentClient?.disconnect();
         app.exit(0);
       },
-    },
-  ]);
+    }
+  );
 
+  const contextMenu = Menu.buildFromTemplate(menuItems);
   tray.setContextMenu(contextMenu);
 }
 
@@ -118,6 +147,83 @@ function updateTrayIcon(connected: boolean): void {
   tray?.setToolTip(
     connected ? "Hortitrack Print Agent - Connected" : "Hortitrack Print Agent - Disconnected"
   );
+}
+
+// Auto-update functions
+function setupAutoUpdater(): void {
+  // Configure auto-updater
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    console.log("[AutoUpdater] Checking for updates...");
+    mainWindow?.webContents.send("update-status", { status: "checking" });
+  });
+
+  autoUpdater.on("update-available", (info: UpdateInfo) => {
+    console.log("[AutoUpdater] Update available:", info.version);
+    updateAvailable = true;
+    updateInfo = info;
+    mainWindow?.webContents.send("update-status", {
+      status: "available",
+      version: info.version,
+    });
+    updateTrayMenu();
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    console.log("[AutoUpdater] No updates available");
+    mainWindow?.webContents.send("update-status", { status: "not-available" });
+  });
+
+  autoUpdater.on("download-progress", (progress: ProgressInfo) => {
+    console.log(`[AutoUpdater] Download progress: ${progress.percent.toFixed(1)}%`);
+    mainWindow?.webContents.send("update-status", {
+      status: "downloading",
+      percent: progress.percent,
+    });
+  });
+
+  autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
+    console.log("[AutoUpdater] Update downloaded:", info.version);
+    updateDownloaded = true;
+    updateInfo = info;
+    mainWindow?.webContents.send("update-status", {
+      status: "downloaded",
+      version: info.version,
+    });
+    updateTrayMenu();
+
+    // Show notification to user
+    dialog.showMessageBox({
+      type: "info",
+      title: "Update Ready",
+      message: `Version ${info.version} has been downloaded.`,
+      detail: "The update will be installed when you quit the application. Would you like to restart now?",
+      buttons: ["Restart Now", "Later"],
+      defaultId: 0,
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on("error", (error: Error) => {
+    console.error("[AutoUpdater] Error:", error);
+    mainWindow?.webContents.send("update-status", {
+      status: "error",
+      error: error.message,
+    });
+  });
+}
+
+function checkForUpdates(): void {
+  if (store.get("autoUpdate", true)) {
+    autoUpdater.checkForUpdates().catch((err: Error) => {
+      console.error("[AutoUpdater] Failed to check for updates:", err);
+    });
+  }
 }
 
 async function startAgent(): Promise<void> {
@@ -173,6 +279,14 @@ async function startAgent(): Promise<void> {
 app.whenReady().then(() => {
   createWindow();
   createTray();
+
+  // Setup auto-updater
+  setupAutoUpdater();
+
+  // Check for updates on startup (after a short delay to not slow down launch)
+  setTimeout(() => {
+    checkForUpdates();
+  }, 3000);
 
   // Start agent if configured
   const serverUrl = store.get("serverUrl");
@@ -241,4 +355,32 @@ ipcMain.handle("reconnect", async () => {
 
 ipcMain.handle("get-printers", () => {
   return printerDiscovery?.getDiscoveredPrinters() || [];
+});
+
+// Auto-update IPC handlers
+ipcMain.handle("get-update-status", () => {
+  return {
+    updateAvailable,
+    updateDownloaded,
+    version: updateInfo?.version || null,
+    currentVersion: app.getVersion(),
+    autoUpdate: store.get("autoUpdate", true),
+  };
+});
+
+ipcMain.handle("check-for-updates", () => {
+  checkForUpdates();
+  return { success: true };
+});
+
+ipcMain.handle("install-update", () => {
+  if (updateDownloaded) {
+    autoUpdater.quitAndInstall();
+  }
+  return { success: updateDownloaded };
+});
+
+ipcMain.handle("set-auto-update", (_event, enabled: boolean) => {
+  store.set("autoUpdate", enabled);
+  return { success: true };
 });
