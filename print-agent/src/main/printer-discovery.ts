@@ -85,18 +85,43 @@ export class PrinterDiscovery {
    */
   private async discoverWindowsPrinters(): Promise<DiscoveredPrinter[]> {
     try {
-      const { stdout } = await execAsync(
-        'powershell -Command "Get-Printer | Select-Object Name, Default, PrinterStatus | ConvertTo-Json"'
+      // Use -NoProfile and -ExecutionPolicy Bypass to avoid policy issues
+      const { stdout, stderr } = await execAsync(
+        'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Printer | Select-Object Name, Default, PrinterStatus | ConvertTo-Json -Compress"',
+        { timeout: 10000 }
       );
 
-      const printers = JSON.parse(stdout || "[]");
-      const printerArray = Array.isArray(printers) ? printers : [printers];
+      if (stderr) {
+        console.warn("[PrinterDiscovery] Windows discovery stderr:", stderr);
+      }
 
-      return printerArray.map((p: { Name: string; Default: boolean; PrinterStatus: number }) => ({
-        name: p.Name,
-        isDefault: p.Default,
-        status: p.PrinterStatus === 0 ? "ready" : "offline",
-      }));
+      const trimmedOutput = (stdout || "").trim();
+      if (!trimmedOutput) {
+        console.log("[PrinterDiscovery] No printers returned from Get-Printer");
+        return [];
+      }
+
+      // Handle case where PowerShell returns nothing or just whitespace
+      let printers;
+      try {
+        printers = JSON.parse(trimmedOutput);
+      } catch (parseError) {
+        console.error("[PrinterDiscovery] Failed to parse JSON:", trimmedOutput);
+        return [];
+      }
+
+      // Ensure we always have an array (single printer returns object, not array)
+      const printerArray = Array.isArray(printers) ? printers : (printers ? [printers] : []);
+
+      console.log(`[PrinterDiscovery] Raw printer data:`, JSON.stringify(printerArray));
+
+      return printerArray
+        .filter((p: { Name?: string }) => p && p.Name) // Filter out any null/undefined entries
+        .map((p: { Name: string; Default: boolean; PrinterStatus: number }) => ({
+          name: p.Name,
+          isDefault: p.Default === true,
+          status: p.PrinterStatus === 0 ? "ready" as const : "offline" as const,
+        }));
     } catch (error) {
       console.error("[PrinterDiscovery] Windows discovery error:", error);
       return [];
