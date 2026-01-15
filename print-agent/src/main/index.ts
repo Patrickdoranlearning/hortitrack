@@ -151,6 +151,12 @@ function updateTrayIcon(connected: boolean): void {
 
 // Auto-update functions
 function setupAutoUpdater(): void {
+  // Skip auto-updater in development mode
+  if (!app.isPackaged) {
+    console.log("[AutoUpdater] Skipping setup - running in development mode");
+    return;
+  }
+
   // Configure auto-updater
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -219,6 +225,12 @@ function setupAutoUpdater(): void {
 }
 
 function checkForUpdates(): void {
+  // Skip in development mode
+  if (!app.isPackaged) {
+    console.log("[AutoUpdater] Skipping update check - running in development mode");
+    return;
+  }
+
   if (store.get("autoUpdate", true)) {
     autoUpdater.checkForUpdates().catch((err: Error) => {
       console.error("[AutoUpdater] Failed to check for updates:", err);

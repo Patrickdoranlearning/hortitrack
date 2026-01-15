@@ -1,6 +1,6 @@
 {
   "name": "hortitrack-print-agent",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Desktop print agent for Hortitrack - enables local USB printer support",
   "main": "out/main/index.js",
   "author": "Hortitrack",
