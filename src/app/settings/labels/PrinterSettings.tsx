@@ -707,13 +707,19 @@ export default function PrinterSettings() {
             <CardContent className="pt-0">
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" asChild>
-                  <a href="https://github.com/Patrickdoranlearning/hortitrack/releases/download/v1.0.0/Hortitrack.Print.Agent.Setup.1.0.0.exe">
+                  <a
+                    href="https://github.com/Patrickdoranlearning/hortitrack/releases/download/v1.0.0/Hortitrack.Print.Agent.Setup.1.0.0.exe"
+                    download="Hortitrack.Print.Agent.Setup.1.0.0.exe"
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     Windows (.exe)
                   </a>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <a href="https://github.com/Patrickdoranlearning/hortitrack/releases/download/v1.0.0/Hortitrack.Print.Agent-1.0.0-arm64.dmg">
+                  <a
+                    href="https://github.com/Patrickdoranlearning/hortitrack/releases/download/v1.0.0/Hortitrack.Print.Agent-1.0.0-arm64.dmg"
+                    download="Hortitrack.Print.Agent-1.0.0-arm64.dmg"
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     macOS (.dmg)
                   </a>
