@@ -325,13 +325,17 @@ export type GetBatchesOptions = {
 
 export async function getBatchesAction(options: GetBatchesOptions = {}) {
     try {
+        // Get the user's org_id for RLS filtering
+        // This explicit filter is required for server-side queries and improves query performance
+        const { orgId } = await getUserAndOrg();
         const supabase = await getSupabaseForApp();
-        
+
         // Build query with server-side filtering
         // Using estimated count for better performance (avoids full table scan)
         let query = supabase
             .from("v_batch_search")
-            .select("*", { count: 'estimated' });
+            .select("*", { count: 'estimated' })
+            .eq("org_id", orgId); // Required: explicit org filter for RLS + performance
 
         // Apply text search filter
         if (options.query && options.query.trim()) {
