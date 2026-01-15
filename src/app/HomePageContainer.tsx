@@ -1,13 +1,26 @@
+import { redirect } from 'next/navigation';
 import HomePageView from '@/app/HomePageView';
 import type { Batch } from '@/lib/types';
-import { getBatchesAction } from '@/app/actions'; 
+import { getBatchesAction } from '@/app/actions';
 
 export default async function HomePageContainer() {
   const { success, data, error } = await getBatchesAction();
 
   if (!success) {
     console.error("[HomePageContainer] Error from getBatchesAction:", error);
-    throw new Error(`Failed to load initial batches: ${error || "unknown error"}`);
+    // If auth-related error, redirect to login
+    if (error?.includes('Unauthenticated') || error?.includes('No active org')) {
+      redirect('/login');
+    }
+    // For other errors, show empty state instead of crashing
+    return (
+      <HomePageView
+        initialBatches={[]}
+        plantFamilies={['all']}
+        categories={['all']}
+        actions={{}}
+      />
+    );
   }
   
   const batches: Batch[] = Array.isArray(data) ? data : [];

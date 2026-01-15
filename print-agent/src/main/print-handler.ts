@@ -36,7 +36,8 @@ export async function printZpl(
 }
 
 /**
- * Print on Windows using raw printing.
+ * Print on Windows using raw printing via PowerShell.
+ * Uses the Windows printing API to send raw data directly to the printer.
  */
 async function printWindows(printerName: string | undefined, zpl: string): Promise<void> {
   // Create temp file with ZPL data
@@ -45,34 +46,103 @@ async function printWindows(printerName: string | undefined, zpl: string): Promi
   try {
     await writeFile(tempFile, zpl, "utf8");
 
-    // Use PowerShell to send raw data to printer
-    const printer = printerName ? `-PrinterName "${printerName}"` : "";
-    const command = `
-      $content = Get-Content -Path "${tempFile}" -Raw
-      $bytes = [System.Text.Encoding]::UTF8.GetBytes($content)
+    // Use PowerShell to send raw data to printer using .NET printing API
+    // This approach works reliably on Windows without needing lpr or shared printers
+    const escapedPath = tempFile.replace(/\\/g, "\\\\");
+    const escapedPrinterName = printerName ? printerName.replace(/"/g, '`"') : "";
 
-      Add-Type -AssemblyName System.Drawing
-      $printerSettings = New-Object System.Drawing.Printing.PrinterSettings
-      ${printerName ? `$printerSettings.PrinterName = "${printerName}"` : ""}
+    const psScript = `
+$ErrorActionPreference = "Stop"
 
-      # Open raw print job
-      $docInfo = New-Object System.Drawing.Printing.PrintDocument
-      ${printerName ? `$docInfo.PrinterSettings.PrinterName = "${printerName}"` : ""}
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
 
-      # Alternative: Use copy command for raw printing
-      copy /b "${tempFile}" "\\\\localhost\\${printerName || '$null'}" 2>$null
-      if ($LASTEXITCODE -ne 0) {
-        # Fallback to lpr if available
-        lpr -S localhost ${printerName ? `-P "${printerName}"` : ""} "${tempFile}"
-      }
-    `.trim();
+public class RawPrinter {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DOCINFO {
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+    }
 
-    // Simpler approach: use raw copy or lpr
-    const simplePrint = printerName
-      ? `copy /b "${tempFile}" "\\\\%COMPUTERNAME%\\${printerName}"`
-      : `type "${tempFile}" | lpr`;
+    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
 
-    await execAsync(simplePrint, { shell: "cmd.exe" });
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool StartDocPrinter(IntPtr hPrinter, int Level, ref DOCINFO pDocInfo);
+
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.drv", SetLastError = true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, byte[] pBytes, int dwCount, out int dwWritten);
+
+    public static void SendRawData(string printerName, byte[] data) {
+        IntPtr hPrinter;
+        if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) {
+            throw new Exception("Failed to open printer: " + printerName);
+        }
+        try {
+            DOCINFO di = new DOCINFO();
+            di.pDocName = "Hortitrack Label";
+            di.pDataType = "RAW";
+            if (!StartDocPrinter(hPrinter, 1, ref di)) {
+                throw new Exception("StartDocPrinter failed");
+            }
+            try {
+                if (!StartPagePrinter(hPrinter)) {
+                    throw new Exception("StartPagePrinter failed");
+                }
+                try {
+                    int written;
+                    if (!WritePrinter(hPrinter, data, data.Length, out written)) {
+                        throw new Exception("WritePrinter failed");
+                    }
+                } finally {
+                    EndPagePrinter(hPrinter);
+                }
+            } finally {
+                EndDocPrinter(hPrinter);
+            }
+        } finally {
+            ClosePrinter(hPrinter);
+        }
+    }
+}
+"@
+
+$content = [System.IO.File]::ReadAllBytes("${escapedPath}")
+$printerName = "${escapedPrinterName}"
+
+if ([string]::IsNullOrEmpty($printerName)) {
+    # Get default printer
+    $printerName = (Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Default=$true").Name
+    if ([string]::IsNullOrEmpty($printerName)) {
+        throw "No default printer found"
+    }
+}
+
+[RawPrinter]::SendRawData($printerName, $content)
+Write-Host "Print job sent successfully to $printerName"
+`;
+
+    // Execute PowerShell script
+    await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, " ")}"`, {
+      shell: "cmd.exe",
+      timeout: 30000,
+    });
+
+    console.log(`[PrintHandler] Successfully sent print job to ${printerName || "default printer"}`);
   } finally {
     // Clean up temp file
     try {
