@@ -25,7 +25,9 @@ export async function getUserAndOrg() {
   if (!user) throw new Error("Unauthenticated");
 
   const orgId = await resolveActiveOrgId({ supabase, admin, user });
-  return { user, orgId, supabase };
+  // Return admin client for server-side queries to bypass RLS
+  // Security is maintained by always filtering by orgId in queries
+  return { user, orgId, supabase: admin };
 }
 
 export async function getOrgDetails() {

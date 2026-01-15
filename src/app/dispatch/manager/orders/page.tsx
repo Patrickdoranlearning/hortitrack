@@ -94,7 +94,7 @@ export default async function DispatchOrdersPage() {
   // Valid org_role enum values: owner, admin, grower, sales, viewer
   const { data: orgMembers, error: membersError } = await supabase
     .from("org_memberships")
-    .select("user_id, role, profiles:profiles!org_memberships_user_id_profiles_fkey(id, display_name, full_name, email)")
+    .select("user_id, role, profiles:profiles!org_memberships_user_id_profiles_fkey(id, display_name, full_name)")
     .eq("org_id", orgId)
     .in("role", ["grower", "admin", "owner", "sales"]);
 
@@ -106,7 +106,7 @@ export default async function DispatchOrdersPage() {
     .filter((m: any) => m.profiles) // Filter out members without profiles
     .map((m: any) => ({
       id: m.user_id,
-      name: m.profiles?.display_name || m.profiles?.full_name || m.profiles?.email || "Unknown",
+      name: m.profiles?.display_name || m.profiles?.full_name || "Unknown",
     }));
 
   // Create picker map for display

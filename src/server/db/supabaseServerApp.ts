@@ -35,8 +35,20 @@ export async function getSupabaseServerApp(): Promise<SupabaseClient> {
   const store = await cookies();
   const bridge: CookieBridge = {
     get: (name) => store.get(name)?.value,
-    set: (name, value, options) => store.set(name, value, options),
-    remove: (name, options) => store.set(name, "", { ...options, maxAge: 0 }),
+    set: (name, value, options) => {
+      try {
+        store.set(name, value, options);
+      } catch {
+        // Server Components cannot set cookies - middleware handles session refresh
+      }
+    },
+    remove: (name, options) => {
+      try {
+        store.set(name, "", { ...options, maxAge: 0 });
+      } catch {
+        // Server Components cannot set cookies - middleware handles session refresh
+      }
+    },
   };
 
   return createSupabaseServerWithCookies(bridge);
