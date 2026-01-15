@@ -1004,7 +1004,7 @@ export default function DispatchOrdersClient({
               <SelectContent>
                 <SelectItem value="all">All Loads</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                {loads.map(load => (
+                {loads.filter(load => load.id).map(load => (
                   <SelectItem key={load.id} value={load.id}>
                     {load.name}
                   </SelectItem>
@@ -1133,7 +1133,7 @@ export default function DispatchOrdersClient({
                             <SelectItem value="__none__">
                               <span className="text-muted-foreground">No haulier</span>
                             </SelectItem>
-                            {hauliers.map(h => (
+                            {hauliers.filter(h => h.id).map(h => (
                               <SelectItem key={h.id} value={h.id}>
                                 {h.name}
                               </SelectItem>
@@ -1163,7 +1163,7 @@ export default function DispatchOrdersClient({
                                 <SelectItem value="__none__">
                                   <span className="text-muted-foreground">No vehicle</span>
                                 </SelectItem>
-                                {vehicles.map(v => (
+                                {vehicles.filter(v => v.id).map(v => (
                                   <SelectItem key={v.id} value={v.id}>
                                     {v.name} ({v.trolleyCapacity}t)
                                   </SelectItem>
@@ -1353,7 +1353,7 @@ export default function DispatchOrdersClient({
                             <SelectItem value="unassign">
                               <span className="text-muted-foreground">Unassigned</span>
                             </SelectItem>
-                            {availablePickers.map(picker => (
+                            {availablePickers.filter(picker => picker.id).map(picker => (
                               <SelectItem key={picker.id} value={picker.id}>
                                 {picker.name}
                               </SelectItem>
@@ -1386,7 +1386,7 @@ export default function DispatchOrdersClient({
                             <SelectItem value="unassign">
                               <span className="text-muted-foreground">Unassigned</span>
                             </SelectItem>
-                            {loads.map(load => (
+                            {loads.filter(load => load.id).map(load => (
                               <SelectItem key={load.id} value={load.id}>
                                 {load.name}
                               </SelectItem>
