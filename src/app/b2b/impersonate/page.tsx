@@ -39,7 +39,7 @@ export default async function ImpersonatePage() {
   // Fetch all customers in org
   const { data: customers } = await supabase
     .from("customers")
-    .select("id, name, code, email, store")
+    .select("id, name, code, accounts_email, store")
     .eq("org_id", profile.active_org_id)
     .order("name");
 

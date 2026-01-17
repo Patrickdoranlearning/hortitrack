@@ -23,7 +23,7 @@ type Customer = {
   id: string;
   name: string;
   code: string | null;
-  email: string | null;
+  accounts_email: string | null;
   store: string | null;
 };
 
