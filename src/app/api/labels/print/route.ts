@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
-import { buildZpl, buildZplWithTemplate } from "@/server/labels/build-batch-label";
+import { buildZpl, buildZplWithTemplate, buildZplRow } from "@/server/labels/build-batch-label";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 import { sendToPrinter } from "@/server/labels/send-to-printer";
@@ -86,7 +86,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build ZPL
+    // Build ZPL - use printer's DPI setting (default to 300 for modern Zebras)
+    const printerDpi = printer.dpi || 300;
+    const labelColumns = printer.label_columns || 1;
+
     const labelInput = {
       batchNumber,
       variety,
@@ -98,10 +101,18 @@ export async function POST(req: NextRequest) {
     };
 
     let zpl: string;
-    if (template) {
-      zpl = buildZplWithTemplate(labelInput, template, copies);
+    if (labelColumns > 1) {
+      // Multi-column printing (e.g., 2-across labels)
+      zpl = buildZplRow(labelInput, {
+        dpi: printerDpi,
+        label_columns: labelColumns,
+        label_width_mm: printer.label_width_mm || 50,
+        label_gap_mm: printer.label_gap_mm || 3,
+      }, copies);
+    } else if (template) {
+      zpl = buildZplWithTemplate(labelInput, { ...template, dpi: printerDpi }, copies);
     } else {
-      zpl = buildZpl(labelInput, copies);
+      zpl = buildZpl(labelInput, copies, printerDpi);
     }
 
     // Get current user for tracking

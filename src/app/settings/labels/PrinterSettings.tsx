@@ -58,6 +58,9 @@ type PrinterType = {
   is_default: boolean;
   is_active: boolean;
   dpi: number;
+  label_columns: number;
+  label_width_mm?: number;
+  label_gap_mm?: number;
   created_at: string;
 };
 
@@ -113,6 +116,9 @@ export default function PrinterSettings() {
     agent_id: "",
     usb_device_id: "",
     usb_device_name: "",
+    label_columns: "1",
+    label_width_mm: "50",
+    label_gap_mm: "3",
   });
   const [isSavingPrinter, setIsSavingPrinter] = useState(false);
 
@@ -181,6 +187,9 @@ export default function PrinterSettings() {
       agent_id: "",
       usb_device_id: "",
       usb_device_name: "",
+      label_columns: "1",
+      label_width_mm: "50",
+      label_gap_mm: "3",
     });
     setAddDialogOpen(true);
   };
@@ -198,6 +207,9 @@ export default function PrinterSettings() {
       agent_id: printer.agent_id || "",
       usb_device_id: printer.usb_device_id || "",
       usb_device_name: printer.usb_device_name || "",
+      label_columns: String(printer.label_columns || 1),
+      label_width_mm: String(printer.label_width_mm || 50),
+      label_gap_mm: String(printer.label_gap_mm || 3),
     });
     setAddDialogOpen(true);
   };
@@ -238,6 +250,9 @@ export default function PrinterSettings() {
         connection_type: formData.connection_type,
         dpi: parseInt(formData.dpi) || 203,
         is_default: formData.is_default,
+        label_columns: parseInt(formData.label_columns) || 1,
+        label_width_mm: parseInt(formData.label_width_mm) || 50,
+        label_gap_mm: parseInt(formData.label_gap_mm) || 3,
       };
 
       if (formData.connection_type === "network") {
@@ -995,6 +1010,54 @@ export default function PrinterSettings() {
                   <SelectItem value="600">600 DPI (Ultra High)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Label Layout Settings */}
+            <div className="space-y-4 pt-2 border-t">
+              <h4 className="text-sm font-medium">Label Layout</h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Columns</Label>
+                  <Select
+                    value={formData.label_columns}
+                    onValueChange={(v) => setFormData({ ...formData, label_columns: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 (Single)</SelectItem>
+                      <SelectItem value="2">2 (Side by Side)</SelectItem>
+                      <SelectItem value="3">3 Across</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Label Width (mm)</Label>
+                  <Input
+                    type="number"
+                    placeholder="50"
+                    value={formData.label_width_mm}
+                    onChange={(e) =>
+                      setFormData({ ...formData, label_width_mm: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Gap (mm)</Label>
+                  <Input
+                    type="number"
+                    placeholder="3"
+                    value={formData.label_gap_mm}
+                    onChange={(e) =>
+                      setFormData({ ...formData, label_gap_mm: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                For label rolls with multiple labels across (e.g., 2-across), set the number of columns and the width of each individual label.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">

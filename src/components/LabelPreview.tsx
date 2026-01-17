@@ -38,13 +38,18 @@ export default function LabelPreview({
     }
   }, [batchNumber, dataMatrixPayload]);
 
+  // Build compact info line (matches ZPL layout)
+  const infoItems = [size, `Qty ${quantity}`];
+  if (location) infoItems.push(location);
+  const infoLine = infoItems.join("  /  ");
+
   return (
     <div
       style={{
         width: "70mm",
         height: "50mm",
         boxSizing: "border-box",
-        padding: "3mm",
+        padding: "2mm",
         background: "white",
         border: "1px solid rgba(0,0,0,.08)",
         borderRadius: 6,
@@ -55,19 +60,19 @@ export default function LabelPreview({
         flexDirection: "column",
       }}
     >
-      {/* Top section: DM + Text content */}
-      <div style={{ display: "flex", gap: "2mm", flexGrow: 1 }}>
+      {/* Top section: DM + Variety/Family */}
+      <div style={{ display: "flex", gap: "3mm" }}>
         {/* Left: DataMatrix */}
         <div style={{ flexShrink: 0 }}>
-          <canvas ref={dmRef} style={{ width: "24mm", height: "24mm" }} />
+          <canvas ref={dmRef} style={{ width: "18mm", height: "18mm" }} />
         </div>
 
-        {/* Right: Text details */}
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", overflow: "hidden" }}>
+        {/* Right: Variety and Family */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", overflow: "hidden", paddingTop: "1mm" }}>
           <div
             style={{
               fontWeight: 700,
-              fontSize: "6.5mm",
+              fontSize: "7mm",
               lineHeight: 1.1,
               letterSpacing: "-0.06mm",
               wordBreak: "break-word",
@@ -77,7 +82,7 @@ export default function LabelPreview({
           </div>
           <div
             style={{
-              fontSize: "4mm",
+              fontSize: "5mm",
               lineHeight: 1.2,
               opacity: 0.9,
               marginTop: '1mm',
@@ -85,35 +90,30 @@ export default function LabelPreview({
           >
             {family}
           </div>
-          <div
-            style={{
-              fontSize: "3.8mm",
-              lineHeight: 1.3,
-              opacity: 0.8,
-              marginTop: '2mm',
-              display: 'flex',
-              gap: '1.5mm',
-              flexWrap: 'wrap',
-            }}
-          >
-            <span>Size: <strong>{size}</strong></span>
-            {location && <span>Loc: <strong>{location}</strong></span>}
-            <span>Qty: <strong>{quantity}</strong></span>
-          </div>
         </div>
       </div>
 
-      {/* Bottom section: Batch Number */}
+      {/* Middle section: Size | Qty | Location */}
+      <div
+        style={{
+          fontSize: "5mm",
+          lineHeight: 1.3,
+          opacity: 0.8,
+          marginTop: '2mm',
+        }}
+      >
+        {infoLine}
+      </div>
+
+      {/* Bottom section: Batch Number - LARGE, right-aligned */}
       <div
         style={{
           fontWeight: 800,
-          fontSize: "7mm",
+          fontSize: "9mm",
           lineHeight: 1,
           letterSpacing: "-0.2mm",
           textAlign: "right",
-          marginTop: "auto", // Pushes to the bottom
-          paddingTop: '2mm',
-          borderTop: '1px solid rgba(0,0,0,.1)',
+          marginTop: "auto",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",

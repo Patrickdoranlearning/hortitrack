@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +39,6 @@ import {
   MapPin,
   Loader2,
 } from "lucide-react";
-import TemplateEditor from "./TemplateEditor";
 
 type LabelTemplate = {
   id: string;
@@ -62,12 +62,11 @@ const LABEL_TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType
 };
 
 export default function TemplateList() {
+  const router = useRouter();
   const { toast } = useToast();
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<LabelTemplate | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<LabelTemplate | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -100,13 +99,11 @@ export default function TemplateList() {
   }, [fetchTemplates]);
 
   const handleCreateNew = () => {
-    setEditingTemplate(null);
-    setEditorOpen(true);
+    router.push("/settings/labels/editor");
   };
 
   const handleEdit = (template: LabelTemplate) => {
-    setEditingTemplate(template);
-    setEditorOpen(true);
+    router.push(`/settings/labels/editor?id=${template.id}`);
   };
 
   const handleDuplicate = async (template: LabelTemplate) => {
@@ -200,14 +197,6 @@ export default function TemplateList() {
       });
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const handleEditorClose = (saved?: boolean) => {
-    setEditorOpen(false);
-    setEditingTemplate(null);
-    if (saved) {
-      fetchTemplates();
     }
   };
 
@@ -345,13 +334,6 @@ export default function TemplateList() {
           })}
         </div>
       )}
-
-      {/* Template Editor Dialog */}
-      <TemplateEditor
-        open={editorOpen}
-        onOpenChange={handleEditorClose}
-        template={editingTemplate}
-      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

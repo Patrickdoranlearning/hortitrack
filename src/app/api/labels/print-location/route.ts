@@ -76,7 +76,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build ZPL for location label
+    // Build ZPL for location label - use printer's DPI setting (default to 300 for modern Zebras)
+    const printerDpi = printer.dpi || 300;
+
     const labelInput = {
       locationId,
       locationName,
@@ -94,7 +96,7 @@ export async function POST(req: NextRequest) {
       payload: payload ?? `ht:loc:${locationId}`,
     };
 
-    const zpl = buildLocationZpl(labelInput, copies);
+    const zpl = buildLocationZpl(labelInput, copies, printerDpi);
 
     // Get current user for tracking
     const { data: { user } } = await supabase.auth.getUser();

@@ -24,7 +24,7 @@ export default function MoveForm({ batchId, onDone }: { batchId: string; onDone?
   const [locations, setLocations] = React.useState<Location[]>([]);
   const [loading, setLoading] = React.useState(false);
 
-  React.useEffect(() => { fetch("/api/lookups/locations").then(r=>r.json()).then(j=>setLocations(j.items||[])); }, []);
+  React.useEffect(() => { fetch("/api/lookups/locations").then(r=>r.json()).then(j=>setLocations(j.data||[])); }, []);
 
   async function onSubmit(values: z.infer<typeof Schema>) {
     setLoading(true);

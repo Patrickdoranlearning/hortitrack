@@ -30,15 +30,25 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Printer not found" }, { status: 404 });
     }
 
-    // Build test label ZPL
+    // Build test label ZPL - scale fonts based on printer DPI
+    const dpi = printer.dpi || 300;
+    const scale = dpi === 300 ? 1.5 : dpi === 600 ? 3 : 1;
+    const fontLarge = Math.round(40 * scale);
+    const fontMedium = Math.round(30 * scale);
+    const x = Math.round(50 * scale);
+    const y1 = Math.round(50 * scale);
+    const y2 = Math.round(100 * scale);
+    const y3 = Math.round(140 * scale);
+    const y4 = Math.round(190 * scale);
+
     const testZpl = [
       "^XA",
-      "^CF0,40",
-      "^FO50,50^FDPrinter Test^FS",
-      "^CF0,30",
-      `^FO50,100^FD${printer.name}^FS`,
-      `^FO50,140^FD${new Date().toLocaleString()}^FS`,
-      "^FO50,190^FDIf you see this, the printer is working!^FS",
+      `^A0N,${fontLarge},${fontLarge}`,
+      `^FO${x},${y1}^FDPrinter Test^FS`,
+      `^A0N,${fontMedium},${fontMedium}`,
+      `^FO${x},${y2}^FD${printer.name}^FS`,
+      `^FO${x},${y3}^FD${new Date().toLocaleString()}^FS`,
+      `^FO${x},${y4}^FDIf you see this, the printer is working!^FS`,
       "^XZ",
     ].join("\n");
 

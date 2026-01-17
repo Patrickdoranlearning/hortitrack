@@ -58,6 +58,9 @@ export async function PUT(
       agent_id,
       usb_device_id,
       usb_device_name,
+      label_columns,
+      label_width_mm,
+      label_gap_mm,
     } = body;
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -68,6 +71,9 @@ export async function PUT(
     if (is_active !== undefined) updateData.is_active = is_active;
     if (dpi !== undefined) updateData.dpi = dpi;
     if (notes !== undefined) updateData.notes = notes;
+    if (label_columns !== undefined) updateData.label_columns = label_columns;
+    if (label_width_mm !== undefined) updateData.label_width_mm = label_width_mm;
+    if (label_gap_mm !== undefined) updateData.label_gap_mm = label_gap_mm;
 
     // Handle connection-type specific fields
     if (connection_type === "agent") {

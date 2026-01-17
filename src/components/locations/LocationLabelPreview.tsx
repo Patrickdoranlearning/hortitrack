@@ -18,7 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Printer, Loader2, Plus, Minus, MapPin } from 'lucide-react';
+import { Printer, Loader2, Plus, Minus, MapPin, Edit3, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 import type { NurseryLocation, Batch } from '@/lib/types';
 
 type LocationWithBatches = NurseryLocation & {
@@ -154,6 +155,20 @@ export function LocationLabelPreview({ open, onOpenChange, location }: LocationL
 
           {/* Print Options */}
           <div className="grid gap-4">
+            {/* Label Layout Link */}
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 rounded-lg">
+              <span className="text-sm text-muted-foreground">Label Template</span>
+              <Link
+                href="/settings/labels/editor?type=location"
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+                target="_blank"
+              >
+                <Edit3 className="h-3 w-3" />
+                Edit Layout
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+
             {/* Printer Selection */}
             <div className="space-y-2">
               <Label htmlFor="printer" className="text-sm font-medium">

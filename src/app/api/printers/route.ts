@@ -50,6 +50,9 @@ export async function POST(req: NextRequest) {
       agent_id,
       usb_device_id,
       usb_device_name,
+      label_columns,
+      label_width_mm,
+      label_gap_mm,
     } = body;
 
     if (!name) {
@@ -64,6 +67,9 @@ export async function POST(req: NextRequest) {
       is_default: is_default || false,
       dpi: dpi || 203,
       notes,
+      label_columns: label_columns || 1,
+      label_width_mm: label_width_mm || 50,
+      label_gap_mm: label_gap_mm || 3,
     };
 
     // Set connection-specific fields

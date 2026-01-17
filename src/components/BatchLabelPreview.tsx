@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import LabelPreview from "./LabelPreview";
 import { useToast } from "@/hooks/use-toast";
-import { Printer, Settings2, Loader2, CheckCircle2, AlertCircle, Plus, Minus } from "lucide-react";
+import { Printer, Settings2, Loader2, CheckCircle2, AlertCircle, Plus, Minus, Edit3, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 type Printer = {
   id: string;
@@ -247,16 +248,29 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
                 )}
                 {selectedPrinterData && (
                   <p className="text-xs text-muted-foreground">
-                    {selectedPrinterData.type} • {selectedPrinterData.host}:{selectedPrinterData.port}
+                    {selectedPrinterData.type} • {selectedPrinterData.connection_type === "agent"
+                      ? "USB via Agent"
+                      : `${selectedPrinterData.host}:${selectedPrinterData.port}`}
                   </p>
                 )}
               </div>
 
               {/* Template Selection */}
               <div className="space-y-2">
-                <Label htmlFor="template" className="text-sm font-medium">
-                  Label Size
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="template" className="text-sm font-medium">
+                    Label Template
+                  </Label>
+                  <Link
+                    href={selectedTemplate ? `/settings/labels/editor?id=${selectedTemplate}` : "/settings/labels/editor"}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                    target="_blank"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    Edit Layout
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
                 {templates.length > 0 ? (
                   <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                     <SelectTrigger id="template">

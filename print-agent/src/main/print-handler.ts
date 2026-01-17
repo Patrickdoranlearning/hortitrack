@@ -42,6 +42,8 @@ export async function printZpl(
 async function printWindows(printerName: string | undefined, zpl: string): Promise<void> {
   // Create temp file with ZPL data
   const tempFile = path.join(tmpdir(), `hortitrack-print-${Date.now()}.zpl`);
+  // Create temp file for PowerShell script (here-strings require newlines, can't be passed inline)
+  const psFile = path.join(tmpdir(), `hortitrack-print-${Date.now()}.ps1`);
 
   try {
     await writeFile(tempFile, zpl, "utf8");
@@ -136,17 +138,25 @@ if ([string]::IsNullOrEmpty($printerName)) {
 Write-Host "Print job sent successfully to $printerName"
 `;
 
-    // Execute PowerShell script
-    await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, " ")}"`, {
+    // Write the PowerShell script to a temp file (required because here-strings need newlines)
+    await writeFile(psFile, psScript, "utf8");
+
+    // Execute PowerShell script from file
+    await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psFile}"`, {
       shell: "cmd.exe",
       timeout: 30000,
     });
 
     console.log(`[PrintHandler] Successfully sent print job to ${printerName || "default printer"}`);
   } finally {
-    // Clean up temp file
+    // Clean up temp files
     try {
       await unlink(tempFile);
+    } catch {
+      // Ignore cleanup errors
+    }
+    try {
+      await unlink(psFile);
     } catch {
       // Ignore cleanup errors
     }
