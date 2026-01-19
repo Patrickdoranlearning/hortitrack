@@ -6,6 +6,7 @@ import { PropagationInputSchema } from "@/lib/domain/batch";
 import { nextBatchNumber } from "@/server/numbering/batches";
 import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 import { resolveProductionStatus } from "@/server/batches/service";
+import { consumeMaterialsForBatch } from "@/server/materials/consumption";
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -97,7 +98,30 @@ export async function POST(req: NextRequest) {
       throw new Error(`Passport insert failed: ${pErr.message}`);
     }
 
-    return NextResponse.json({ batch, requestId }, { status: 201 });
+    // Consume materials for propagation
+    let materialConsumption = null;
+    try {
+      const consumptionResult = await consumeMaterialsForBatch(
+        supabase,
+        orgId,
+        user.id,
+        batch.id,
+        batch.batch_number,
+        input.size_id,
+        units,
+        input.location_id,
+        true // allowPartial
+      );
+      materialConsumption = {
+        success: consumptionResult.success,
+        transactionCount: consumptionResult.transactions.length,
+        shortages: consumptionResult.shortages,
+      };
+    } catch (consumeErr) {
+      console.error("[propagate] Material consumption failed:", consumeErr);
+    }
+
+    return NextResponse.json({ batch, requestId, materialConsumption }, { status: 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Server error";
     const status =

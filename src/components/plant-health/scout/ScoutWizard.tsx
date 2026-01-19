@@ -78,6 +78,13 @@ function needsTreatment(logData: LogData | null): boolean {
         return true;
       }
     }
+
+    // EC reading outside optimal range
+    if (logData.reading.ec !== undefined) {
+      if (logData.reading.ec < 0.5 || logData.reading.ec > 3.0) {
+        return true;
+      }
+    }
   }
 
   return false;
@@ -125,7 +132,7 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
 
   const handleLogComplete = useCallback(async (logData: LogData) => {
     setIsSaving(true);
-    
+
     try {
       // Save the scout log to the database
       const result = await createScoutLog({
@@ -153,8 +160,8 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
         setCurrentStep('treatment');
       } else {
         // Skip treatment step - complete
-        toast.success('Scout log saved', {
-          description: 'No immediate treatment required',
+        toast.success('Scout complete', {
+          description: 'Log saved. No immediate treatment required.',
         });
         onComplete?.();
         resetWizard();
@@ -178,7 +185,7 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
     setIsSaving(true);
     try {
       const targetLocation = wizardState.target?.location;
-      
+
       if (!targetLocation) {
         toast.error('No location selected - cannot schedule treatment for batch-only scans');
         setIsSaving(false);
@@ -248,7 +255,7 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
   // Priority: explicit location > batch's parent location
   const effectiveLocation = wizardState.target?.location || null;
   const effectiveBatch = wizardState.target?.batch || null;
-  
+
   // Get the location ID for logging - must be a valid location
   const locationForLogging = effectiveLocation?.id || null;
   const locationNameForDisplay = effectiveLocation?.name || effectiveBatch?.batchNumber || 'Unknown';

@@ -44,7 +44,7 @@ export function PlantHealthHistoryClient() {
 
   // Filters
   const [search, setSearch] = React.useState("");
-  const [eventType, setEventType] = React.useState<string>("");
+  const [eventType, setEventType] = React.useState<string>("all");
   const [fromDate, setFromDate] = React.useState("");
   const [toDate, setToDate] = React.useState("");
   const [offset, setOffset] = React.useState(0);
@@ -68,7 +68,7 @@ export function PlantHealthHistoryClient() {
 
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('search', debouncedSearch);
-    if (eventType) params.set('eventType', eventType);
+    if (eventType && eventType !== "all") params.set('eventType', eventType);
     if (fromDate) params.set('fromDate', fromDate);
     if (toDate) params.set('toDate', toDate);
     params.set('limit', String(PAGE_SIZE));
@@ -171,7 +171,7 @@ export function PlantHealthHistoryClient() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="all">All types</SelectItem>
                   {EVENT_TYPES.map(t => (
                     <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                   ))}

@@ -153,7 +153,7 @@ export async function getOrgPlantHealthHistory(params: {
       ph_reading,
       ec_reading,
       photos,
-      batches!inner(
+      batches(
         batch_number,
         plant_varieties(name)
       )
@@ -205,11 +205,15 @@ export async function getOrgPlantHealthHistory(params: {
     if (log.weather_conditions) detailParts.push(`Weather: ${log.weather_conditions}`);
     if (log.notes && !detailParts.includes(log.notes)) detailParts.push(log.notes);
 
+    const batchData = Array.isArray(log.batches) ? log.batches[0] : log.batches;
+    const varietyData = batchData?.plant_varieties;
+    const variety = Array.isArray(varietyData) ? varietyData[0] : varietyData;
+
     return {
       id: log.id,
       batchId: log.batch_id,
-      batchNumber: log.batches?.batch_number,
-      varietyName: log.batches?.plant_varieties?.name,
+      batchNumber: batchData?.batch_number,
+      varietyName: variety?.name,
       at: toDate(log.event_at)?.toISOString() ?? new Date().toISOString(),
       type: (log.event_type ?? 'health') as PlantHealthEvent['type'],
       title: log.title ?? log.product_name ?? log.event_type ?? 'Health Log',

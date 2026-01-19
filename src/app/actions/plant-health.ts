@@ -85,7 +85,7 @@ export type ClearLocationInput = {
   notes?: string;
 };
 
-export type PlantHealthResult<T = void> = 
+export type PlantHealthResult<T = void> =
   | { success: true; data?: T; count?: number }
   | { success: false; error: string };
 
@@ -583,6 +583,10 @@ export async function createScoutLog(
         return { success: false, error: error.message };
       }
 
+      if (!data) {
+        return { success: false, error: 'Failed to retrieve created log ID' };
+      }
+
       // Update location health status if medium or critical (only if location provided)
       if (input.locationId && (input.severity === 'medium' || input.severity === 'critical')) {
         await supabase
@@ -617,6 +621,10 @@ export async function createScoutLog(
       if (error) {
         console.error('[createScoutLog] measurement insert failed', error);
         return { success: false, error: error.message };
+      }
+
+      if (!data) {
+        return { success: false, error: 'Failed to retrieve created log ID' };
       }
 
       revalidatePath('/locations');
@@ -679,6 +687,10 @@ export async function scheduleTreatment(
     if (error) {
       console.error('[scheduleTreatment] insert failed', error);
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Failed to retrieve created treatment ID' };
     }
 
     revalidatePath('/plant-health');

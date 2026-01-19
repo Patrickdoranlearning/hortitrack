@@ -5,14 +5,7 @@ import { getOrgPlantHealthHistory } from "@/server/batches/plant-health-history"
 export async function GET(req: NextRequest) {
   try {
     // Validate user is authenticated
-    let org;
-    try {
-      const auth = await getUserAndOrg();
-      org = auth.org;
-    } catch (authError) {
-      const message = authError instanceof Error ? authError.message : "Authentication failed";
-      return NextResponse.json({ error: message }, { status: 401 });
-    }
+    const auth = await getUserAndOrg();
 
     const { searchParams } = new URL(req.url);
     const batchId = searchParams.get('batchId') || undefined;
@@ -24,7 +17,7 @@ export async function GET(req: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     const result = await getOrgPlantHealthHistory({
-      orgId: org.id,
+      orgId: auth.orgId,
       batchId,
       eventType,
       fromDate,
@@ -36,6 +29,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (e) {
+    console.error("[api/plant-health/history] error", e);
     const message = e instanceof Error ? e.message : "Server error";
     const status = /Unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

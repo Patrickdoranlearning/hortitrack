@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { nextBatchNumber } from "@/server/numbering/batches";
 import { inferPhase } from "@/lib/production/phase";
+import { consumeMaterialsForBatch } from "@/server/materials/consumption";
 
 const DateOnly = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -193,7 +194,30 @@ export async function POST(req: Request) {
             },
           });
 
-          results.push(updatedBatch);
+          // Consume materials if size_id is provided
+          let materialConsumption = null;
+          try {
+            const consumptionResult = await consumeMaterialsForBatch(
+              supabase,
+              orgId,
+              user.id,
+              batchItem.incoming_batch_id,
+              incomingBatch.batch_number,
+              batchItem.size_id,
+              batchItem.quantity,
+              batchItem.location_id,
+              true // allowPartial
+            );
+            materialConsumption = {
+              success: consumptionResult.success,
+              transactionCount: consumptionResult.transactions.length,
+              shortages: consumptionResult.shortages,
+            };
+          } catch (consumeErr) {
+            console.error("[check-in-multi] Material consumption failed for existing batch:", consumeErr);
+          }
+
+          results.push({ ...updatedBatch, materialConsumption });
         } else {
           // Create new batch
           // Note: quality_rating and pest_or_disease are stored in log_history, not as columns
@@ -245,7 +269,30 @@ export async function POST(req: Request) {
             },
           });
 
-          results.push(batch);
+          // Consume materials for new batch
+          let materialConsumption = null;
+          try {
+            const consumptionResult = await consumeMaterialsForBatch(
+              supabase,
+              orgId,
+              user.id,
+              batch.id,
+              batch.batch_number,
+              batchItem.size_id,
+              batchItem.quantity,
+              batchItem.location_id,
+              true // allowPartial
+            );
+            materialConsumption = {
+              success: consumptionResult.success,
+              transactionCount: consumptionResult.transactions.length,
+              shortages: consumptionResult.shortages,
+            };
+          } catch (consumeErr) {
+            console.error("[check-in-multi] Material consumption failed for new batch:", consumeErr);
+          }
+
+          results.push({ ...batch, materialConsumption });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";

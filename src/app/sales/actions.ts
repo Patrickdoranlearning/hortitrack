@@ -153,12 +153,18 @@ export async function createOrder(data: CreateOrderInput) {
         }
 
         // Map any explicit batch request into an allocation to leverage locking
-        const allocations =
-            line.requiredBatchId
-                ? [{ batch_id: line.requiredBatchId, qty: line.quantity }]
-                : line.batchPreferences?.specificBatchId
-                    ? [{ batch_id: line.batchPreferences.specificBatchId, qty: line.quantity }]
-                    : [];
+        let allocations = line.allocations?.map(a => ({
+            batch_id: a.batchId,
+            qty: a.qty
+        })) || [];
+
+        // Fallback to single batch ID if no allocations list provided
+        if (allocations.length === 0) {
+            const fallbackBatchId = line.requiredBatchId || line.batchPreferences?.specificBatchId;
+            if (fallbackBatchId) {
+                allocations = [{ batch_id: fallbackBatchId, qty: line.quantity }];
+            }
+        }
 
         return {
             sku_id: line.skuId,

@@ -336,7 +336,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                     <FormLabel>Containers (trays/pots)</FormLabel>
                     <FormControl>
                       <div className="flex items-center gap-3">
-                        <Input type="number" min={1} step={1} {...field} className="flex-1" />
+                        <Input type="number" min={1} step={1} {...field} className="w-24" />
                         {totalUnits > 0 && (
                           <div className="flex items-center gap-2 text-sm font-medium text-primary bg-primary/5 px-3 py-2 rounded-md border border-primary/10 shrink-0">
                             <span className="text-muted-foreground font-normal">Total:</span>

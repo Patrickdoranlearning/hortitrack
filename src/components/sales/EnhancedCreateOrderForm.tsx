@@ -220,6 +220,11 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
       form.setValue(`lines.${batchDialogLineIndex}.qty`, totalQty);
       // Store batch preferences
       form.setValue(`lines.${batchDialogLineIndex}.preferredBatchNumbers`, allocations.map(a => a.batchNumber));
+      // Set the specific allocations for the RPC
+      form.setValue(`lines.${batchDialogLineIndex}.allocations`, allocations.map(a => ({
+        batchId: a.batchId,
+        qty: a.qty
+      })));
       // If a single batch is selected, set required batch id; otherwise clear
       if (allocations.length === 1) {
         form.setValue(`lines.${batchDialogLineIndex}.requiredBatchId`, allocations[0].batchId);

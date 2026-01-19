@@ -3,6 +3,7 @@
 import { TransplantInputSchema, type TransplantInput } from "@/lib/domain/batch";
 import { getUserAndOrg } from "@/server/auth/org";
 import { revalidatePath } from "next/cache";
+import { consumeMaterialsForBatch } from "@/server/materials/consumption";
 
 export type TransplantResult = {
   success: true;
@@ -85,6 +86,23 @@ export async function transplantBatchAction(input: TransplantInput): Promise<Tra
       };
       parent_new_quantity: number;
     };
+
+    // Consume materials for the new child batch
+    try {
+      await consumeMaterialsForBatch(
+        supabase,
+        orgId,
+        user.id,
+        result.child_batch.id,
+        result.child_batch.batch_number,
+        validated.size_id,
+        result.child_batch.quantity,
+        validated.location_id,
+        true // allowPartial
+      );
+    } catch (consumeErr) {
+      console.error("[transplantBatchAction] Material consumption failed:", consumeErr);
+    }
 
     return {
       success: true,

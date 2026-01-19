@@ -34,6 +34,10 @@ export const CreateOrderLineSchema = z
     specificBatchId: z.string().uuid().optional(), // Request specific batch
     gradePreference: z.enum(['A', 'B', 'C']).optional(), // Grade preference
     preferredBatchNumbers: z.array(z.string()).optional(), // List of preferred batch numbers
+    allocations: z.array(z.object({
+      batchId: z.string().uuid(),
+      qty: z.number().int().positive(),
+    })).optional(),
   })
   .refine(
     (val) => Boolean(val.productId) || (Boolean(val.plantVariety) && Boolean(val.size)),
