@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -47,27 +47,27 @@ type ImpersonateClientProps = {
 export function ImpersonateClient({ customers, activeSession }: ImpersonateClientProps) {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [notes, setNotes] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  const handleStartImpersonation = async () => {
+  const handleStartImpersonation = () => {
     if (!selectedCustomerId) return;
 
-    setIsLoading(true);
     const formData = new FormData();
     formData.append('customerId', selectedCustomerId);
     formData.append('notes', notes);
 
-    const result = await startImpersonation(formData);
-
-    if (result?.error) {
-      toast.error(result.error);
-      setIsLoading(false);
-    }
+    startTransition(async () => {
+      const result = await startImpersonation(formData);
+      if (result?.error) {
+        toast.error(result.error);
+      }
+    });
   };
 
-  const handleEndImpersonation = async () => {
-    setIsLoading(true);
-    await endImpersonation();
+  const handleEndImpersonation = () => {
+    startTransition(async () => {
+      await endImpersonation();
+    });
   };
 
   return (
@@ -88,7 +88,7 @@ export function ImpersonateClient({ customers, activeSession }: ImpersonateClien
               variant="outline"
               size="sm"
               onClick={handleEndImpersonation}
-              disabled={isLoading}
+              disabled={isPending}
             >
               <LogOut className="mr-2 h-4 w-4" />
               End Session
@@ -111,7 +111,7 @@ export function ImpersonateClient({ customers, activeSession }: ImpersonateClien
               <Select
                 value={selectedCustomerId}
                 onValueChange={setSelectedCustomerId}
-                disabled={isLoading}
+                disabled={isPending}
               >
                 <SelectTrigger id="customer">
                   <SelectValue placeholder="Choose a customer..." />
@@ -135,13 +135,13 @@ export function ImpersonateClient({ customers, activeSession }: ImpersonateClien
                 placeholder="e.g., Phone order with John"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                disabled={isLoading}
+                disabled={isPending}
               />
             </div>
 
             <Button
               onClick={handleStartImpersonation}
-              disabled={!selectedCustomerId || isLoading}
+              disabled={!selectedCustomerId || isPending}
               className="w-full"
             >
               Start Session

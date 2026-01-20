@@ -19,6 +19,7 @@ export async function GET(_req: NextRequest) {
   try {
     // Get authenticated user and their org
     const { orgId, supabase } = await getLightweightAuth();
+    console.log("[reference-data] authenticated with orgId:", orgId);
 
     // Fetch reference data using user's authenticated session
     const cachedData = await fetchReferenceDataWithUserSession(supabase, orgId);
@@ -99,6 +100,14 @@ async function fetchReferenceDataWithUserSession(
   if (locationsRes.error) console.warn("[reference-data] locations error:", locationsRes.error.message);
   if (suppliersRes.error) console.warn("[reference-data] suppliers error:", suppliersRes.error.message);
   if (materialsRes.error) console.warn("[reference-data] materials error:", materialsRes.error.message);
+
+  // Debug: Log suppliers query result
+  console.log("[reference-data] suppliers query:", {
+    orgId,
+    count: suppliersRes.data?.length ?? 0,
+    error: suppliersRes.error?.message ?? null,
+    data: suppliersRes.data,
+  });
 
   // Transform materials to flatten category info and filter to Containers + Growing Media
   const materials = (materialsRes.data ?? [])

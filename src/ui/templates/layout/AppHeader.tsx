@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ModuleTabs } from "@/ui/layout/ModuleTabs"
 import { HorizontalNav } from "@/ui/layout/HorizontalNav"
@@ -9,6 +10,8 @@ import { ProfileMenu } from "@/ui/layout/ProfileMenu"
 import { CreateButton } from "@/ui/layout/CreateButton"
 import { Logo } from "@/components/logo"
 import { APP_NAV } from "@/config/nav"
+import { IntelligenceDialog } from "@/components/ai/IntelligenceDialog"
+import { Button } from "@/components/ui/button"
 
 type AppHeaderProps = {
   companyName: string
@@ -29,6 +32,14 @@ export function AppHeader({ companyName, moduleKey, className }: AppHeaderProps)
             <Logo companyName={companyName} />
           </Link>
           <div className="flex items-center justify-end gap-2 ml-auto">
+            <IntelligenceDialog
+              trigger={
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                  <MessageCircle className="h-5 w-5" />
+                  <span className="sr-only">AI Assistant</span>
+                </Button>
+              }
+            />
             <ProfileMenu moduleKey={moduleKey} />
           </div>
         </div>

@@ -68,6 +68,40 @@ async function main() {
       }
     }
 
+    // 2.5. Select Store/Address (optional for store-level access)
+    let customerAddressId: string | null = null;
+
+    const { data: addresses, error: addrError } = await supabase
+      .from('customer_addresses')
+      .select('id, label, store_name, line1, city')
+      .eq('customer_id', customerId)
+      .order('label');
+
+    if (addrError) {
+      console.warn(`Warning: Could not fetch addresses: ${addrError.message}`);
+    } else if (addresses && addresses.length > 0) {
+      console.log('\nAvailable Stores/Addresses:');
+      console.log('0. Head Office (access to ALL stores)');
+      addresses.forEach((a, idx) => {
+        const name = a.label || a.store_name || `${a.line1}, ${a.city}`;
+        console.log(`${idx + 1}. ${name}`);
+      });
+      console.log('');
+
+      const addrAnswer = await askQuestion('Select store (0 for head office, or number): ');
+      const addrIndex = parseInt(addrAnswer);
+
+      if (addrIndex > 0 && addrIndex <= addresses.length) {
+        customerAddressId = addresses[addrIndex - 1].id;
+        const addrName = addresses[addrIndex - 1].label || addresses[addrIndex - 1].store_name || 'Address';
+        console.log(`Selected: ${addrName} (store-level access)\n`);
+      } else {
+        console.log('Selected: Head Office (full access to all stores)\n');
+      }
+    } else {
+      console.log('\nNo addresses found for this customer (user will have full access).\n');
+    }
+
     // 3. Enter User Email
     const email = await askQuestion('Enter user email address: ');
     if (!email) {
@@ -123,23 +157,37 @@ async function main() {
         id: user.id,
         email: email,
         portal_role: 'customer',
-        customer_id: customerId
+        customer_id: customerId,
+        customer_address_id: customerAddressId,
       });
       if (insertError) throw new Error(`Failed to create profile: ${insertError.message}`);
     } else {
       console.log('Profile exists. Updating role and customer link...');
       const { error: updateError } = await supabase.from('profiles').update({
         portal_role: 'customer',
-        customer_id: customerId
+        customer_id: customerId,
+        customer_address_id: customerAddressId,
       }).eq('id', user.id);
-      
+
       if (updateError) throw new Error(`Failed to update profile: ${updateError.message}`);
     }
+
+    // Get selected address name for display
+    const selectedAddressName = customerAddressId
+      ? addresses?.find(a => a.id === customerAddressId)?.label ||
+        addresses?.find(a => a.id === customerAddressId)?.store_name ||
+        'Store'
+      : null;
 
     console.log('\n✅ Success! User linked to customer.');
     console.log(`Email: ${email}`);
     console.log(`Role: customer`);
     console.log(`Customer: ${customers.find(c => c.id === customerId)?.name}`);
+    if (selectedAddressName) {
+      console.log(`Store: ${selectedAddressName} (store-level access)`);
+    } else {
+      console.log(`Access: Head Office (full access to all stores)`);
+    }
     console.log('\nYou can now log in at /b2b/login with this user.');
 
   } catch (err: any) {

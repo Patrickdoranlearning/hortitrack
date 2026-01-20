@@ -198,13 +198,11 @@ export async function getProductsWithBatches(orgId: string): Promise<ProductWith
   let qcData: { batch_id: string; grade: string | null; status: string | null }[] = [];
   
   if (locationIds.length > 0) {
-    // @ts-expect-error - Supabase types incomplete for locations table
     const { data } = await supabase.from('locations').select('id, name').in('id', locationIds);
     locations = (data as unknown as { id: string; name: string }[]) ?? [];
   }
-  
+
   if (batchIds.length > 0) {
-    // @ts-expect-error - Supabase types incomplete for batch_qc table
     const { data } = await supabase.from('batch_qc').select('batch_id, grade, status').in('batch_id', batchIds);
     qcData = (data as unknown as { batch_id: string; grade: string | null; status: string | null }[]) ?? [];
   }
@@ -339,12 +337,10 @@ export async function getVarietiesWithBatches(orgId: string) {
     sizes = (data as unknown as { id: string; name: string }[]) ?? [];
   }
   if (locationIds.length > 0) {
-    // @ts-expect-error - Supabase types incomplete for locations table
     const { data } = await supabase.from('locations').select('id, name').in('id', locationIds);
     locations = (data as unknown as { id: string; name: string }[]) ?? [];
   }
   if (batchIds.length > 0) {
-    // @ts-expect-error - Supabase types incomplete for batch_qc table
     const { data } = await supabase.from('batch_qc').select('batch_id, grade, status').in('batch_id', batchIds);
     qcData = (data as unknown as { batch_id: string; grade: string | null; status: string | null }[]) ?? [];
   }

@@ -16,13 +16,19 @@ type LabelInput = {
   payload?: string; // DataMatrix content
 };
 
+type LabelLayout = {
+  datamatrix?: { size?: number };
+  variety?: { fontSize?: number };
+  batchNumber?: { fontSize?: number };
+};
+
 type LabelTemplate = {
   width_mm: number;
   height_mm: number;
   margin_mm: number;
   dpi: number;
   zpl_template?: string;
-  layout?: Record<string, unknown>;
+  layout?: LabelLayout;
 };
 
 type PrinterConfig = {

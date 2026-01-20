@@ -23,6 +23,7 @@ type B2BOrderCreateClientProps = {
   families: string[];
   customerId: string;
   pricingHints?: Record<string, PricingHistoryHint>;
+  isAddressRestricted?: boolean;
 };
 
 export function B2BOrderCreateClient({
@@ -33,6 +34,7 @@ export function B2BOrderCreateClient({
   families,
   customerId,
   pricingHints,
+  isAddressRestricted = false,
 }: B2BOrderCreateClientProps) {
   const router = useRouter();
   const [trolley, setTrolley] = useState<CartItem[]>([]);
@@ -275,6 +277,7 @@ export function B2BOrderCreateClient({
             onSubmit={handleSubmitOrder}
             onStepChange={(_, stepId) => setCheckoutStep(stepId)}
             error={error}
+            isAddressRestricted={isAddressRestricted}
           />
         </div>
       </div>

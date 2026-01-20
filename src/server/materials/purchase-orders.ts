@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { generatePONumber } from "@/server/numbering/materials";
 import type {
+  Material,
   PurchaseOrder,
   PurchaseOrderLine,
   PurchaseOrderStatus,
@@ -520,20 +521,24 @@ function mapPurchaseOrderLine(row: Record<string, unknown>): PurchaseOrderLine {
     id: row.id as string,
     purchaseOrderId: row.purchase_order_id as string,
     materialId: row.material_id as string,
+    // Only partial material data is loaded for display - cast to satisfy type
     material: material
-      ? {
+      ? ({
           id: material.id as string,
           name: material.name as string,
           partNumber: material.part_number as string,
           baseUom: material.base_uom as string | undefined,
-        }
+        } as Material)
       : undefined,
     lineNumber: row.line_number as number,
     quantityOrdered: Number(row.quantity_ordered) || 0,
     quantityReceived: Number(row.quantity_received) || 0,
+    uom: (material?.base_uom as string) ?? "each",
     unitPrice: Number(row.unit_price) || 0,
     discountPct: Number(row.discount_pct) || 0,
     lineTotal: Number(row.line_total) || 0,
     notes: row.notes as string | null,
+    createdAt: row.created_at as string ?? new Date().toISOString(),
+    updatedAt: row.updated_at as string ?? new Date().toISOString(),
   };
 }

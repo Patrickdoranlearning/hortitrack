@@ -4,6 +4,8 @@ import { receiveStock } from "./stock";
 import type {
   Material,
   MaterialCategory,
+  MaterialCategoryCode,
+  MaterialParentGroup,
   MaterialWithStock,
   CreateMaterialInput,
   UpdateMaterialInput,
@@ -338,9 +340,9 @@ export async function getMaterialsForSize(
 function mapCategory(row: Record<string, unknown>): MaterialCategory {
   return {
     id: row.id as string,
-    code: row.code as string,
+    code: row.code as MaterialCategoryCode,
     name: row.name as string,
-    parentGroup: row.parent_group as string,
+    parentGroup: row.parent_group as MaterialParentGroup,
     consumptionType: row.consumption_type as "per_unit" | "proportional" | "fixed",
     sortOrder: row.sort_order as number,
     createdAt: row.created_at as string,

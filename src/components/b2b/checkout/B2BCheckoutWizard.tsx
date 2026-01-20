@@ -23,6 +23,7 @@ type Props = {
   onSubmit: (deliveryAddressId: string, deliveryDate?: string, notes?: string) => Promise<void>;
   onStepChange?: (stepIndex: number, stepId: string) => void;
   error?: string | null;
+  isAddressRestricted?: boolean;
 };
 
 const steps = [
@@ -40,6 +41,7 @@ export function B2BCheckoutWizard({
   onSubmit,
   onStepChange,
   error,
+  isAddressRestricted = false,
 }: Props) {
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -122,6 +124,7 @@ export function B2BCheckoutWizard({
               if (updates.deliveryDate !== undefined) setDeliveryDate(updates.deliveryDate);
               if (updates.notes !== undefined) setNotes(updates.notes);
             }}
+            isAddressRestricted={isAddressRestricted}
           />
         );
       case 'review':

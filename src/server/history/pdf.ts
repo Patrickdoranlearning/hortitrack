@@ -25,18 +25,21 @@ export async function renderHistoryPdf(data: BatchHistory): Promise<Uint8Array> 
   // Flowchart layout (server)
   const nodes = data.graph.nodes.map(n => ({ id: n.id, width: 200, height: 80, labels: [{ text: n.label }] }));
   const edges = data.graph.edges.map(e => ({ id: e.id, sources: [e.from], targets: [e.to], labels: e.label ? [{ text: e.label }] : [] }));
-  const layout = await layoutGraph(nodes, edges, "RIGHT");
+  // Build graph object for ELK
+  const graphInput = { id: "root", children: nodes, edges };
+  const layout = await layoutGraph(graphInput);
+  const children = layout.children ?? [];
 
   // Draw flowchart
-  const ox = margin - Math.min(...layout.children.map((c:any)=>c.x||0)) + 0;
-  let oy = y - 20 - Math.min(...layout.children.map((c:any)=>c.y||0));
+  const ox = margin - Math.min(...children.map((c:any)=>c.x||0)) + 0;
+  let oy = y - 20 - Math.min(...children.map((c:any)=>c.y||0));
 
   // reserve approx height
-  const flowH = Math.max(...layout.children.map((c:any)=>(c.y||0)+(c.height||0))) + 20;
+  const flowH = Math.max(...children.map((c:any)=>(c.y||0)+(c.height||0))) + 20;
   if (y - flowH < margin + 200) { page = pdf.addPage([PAGE.w, PAGE.h]); y = PAGE.h - margin; oy = y - 20; }
 
   // edges
-  for (const e of layout.edges || []) {
+  for (const e of (layout.edges ?? []) as any[]) {
     for (const s of e.sections || []) {
       page.drawLine({ start: { x: ox + s.startPoint.x, y: oy - s.startPoint.y }, end: { x: ox + s.endPoint.x, y: oy - s.endPoint.y }, thickness: 1, color: rgb(0.5,0.5,0.5) });
       if (e.labels?.[0]?.text) {
@@ -45,9 +48,9 @@ export async function renderHistoryPdf(data: BatchHistory): Promise<Uint8Array> 
     }
   }
   // nodes
-  for (const n of layout.children) {
+  for (const n of children as any[]) {
     const x = ox + (n.x||0), yy = oy - (n.y||0);
-    page.drawRectangle({ x, y: yy - n.height, width: n.width, height: n.height, borderColor: rgb(0.35,0.35,0.35), borderWidth: 1, color: rgb(1,1,1) });
+    page.drawRectangle({ x, y: yy - (n.height ?? 0), width: n.width ?? 0, height: n.height ?? 0, borderColor: rgb(0.35,0.35,0.35), borderWidth: 1, color: rgb(1,1,1) });
     const node = data.graph.nodes.find(z => z.id === n.id)!;
     page.drawText(n.labels?.[0]?.text || node.label, { x: x+8, y: yy - 18, size: 11, font: bold });
     let line = yy - 32;

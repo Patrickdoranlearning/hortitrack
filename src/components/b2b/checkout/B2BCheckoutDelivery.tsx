@@ -14,6 +14,7 @@ type Props = {
   deliveryDate?: string;
   notes?: string;
   onChange: (updates: { deliveryAddressId?: string; deliveryDate?: string; notes?: string }) => void;
+  isAddressRestricted?: boolean;
 };
 
 export function B2BCheckoutDelivery({
@@ -22,23 +23,40 @@ export function B2BCheckoutDelivery({
   deliveryDate,
   notes,
   onChange,
+  isAddressRestricted = false,
 }: Props) {
+  const selectedAddress = addresses.find((a) => a.id === deliveryAddressId) || addresses[0];
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="delivery-address">Delivery Address</Label>
-        <Select value={deliveryAddressId} onValueChange={(val) => onChange({ deliveryAddressId: val })}>
-          <SelectTrigger id="delivery-address">
-            <SelectValue placeholder="Select address..." />
-          </SelectTrigger>
-          <SelectContent>
-            {addresses.map((address) => (
-              <SelectItem key={address.id} value={address.id}>
-                {address.label || address.store_name || `${address.line1}, ${address.city}`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isAddressRestricted ? (
+          // Read-only display for store-level users
+          <div className="p-3 border rounded-md bg-muted/50">
+            <p className="font-medium">
+              {selectedAddress?.label || selectedAddress?.store_name ||
+               `${selectedAddress?.line1}, ${selectedAddress?.city}`}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Your orders will be delivered to this location
+            </p>
+          </div>
+        ) : (
+          // Address selector for head office users
+          <Select value={deliveryAddressId} onValueChange={(val) => onChange({ deliveryAddressId: val })}>
+            <SelectTrigger id="delivery-address">
+              <SelectValue placeholder="Select address..." />
+            </SelectTrigger>
+            <SelectContent>
+              {addresses.map((address) => (
+                <SelectItem key={address.id} value={address.id}>
+                  {address.label || address.store_name || `${address.line1}, ${address.city}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="space-y-2">

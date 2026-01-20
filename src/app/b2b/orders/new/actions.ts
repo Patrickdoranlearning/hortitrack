@@ -26,6 +26,13 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
     return { error: 'Access denied' };
   }
 
+  // Validate address restriction: store-level users can only order to their assigned store
+  if (authContext.isAddressRestricted && authContext.addressId) {
+    if (deliveryAddressId !== authContext.addressId) {
+      return { error: 'You can only place orders for your assigned store location' };
+    }
+  }
+
   if (cart.length === 0) {
     return { error: 'Cart is empty' };
   }
@@ -99,6 +106,7 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
       total_inc_vat: totalIncVat,
       trolleys_estimated: trolleysEstimated > 0 ? trolleysEstimated : null,
       created_by_staff_id: authContext.isImpersonating ? authContext.staffUserId : null,
+      created_by_user_id: authContext.user.id, // Track which B2B user created this order
     })
     .select()
     .single();

@@ -110,5 +110,5 @@ async function getSaleableBatchesFallback(supabase: any): Promise<InventoryBatch
                 salesPhotoUrl: d.sales_photo_url,
             };
         })
-        .filter((b) => b.availableQuantity > 0);
+        .filter((b: { availableQuantity: number }) => b.availableQuantity > 0);
 }

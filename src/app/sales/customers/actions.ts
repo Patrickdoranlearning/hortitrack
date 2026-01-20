@@ -70,6 +70,24 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
   return { success: true, data };
 }
 
+export async function updateCustomerDefaultPriceListAction(customerId: string, priceListId: string | null) {
+  const supabase = await getSupabaseServerApp();
+
+  const { error } = await supabase
+    .from("customers")
+    .update({ default_price_list_id: priceListId })
+    .eq("id", customerId);
+
+  if (error) {
+    console.error("[updateCustomerDefaultPriceListAction]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/sales/customers");
+  revalidatePath(`/sales/customers/${customerId}`);
+  return { success: true };
+}
+
 export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typeof deliveryPreferencesSchema>) {
   const parsed = deliveryPreferencesSchema.parse(input);
   const supabase = await getSupabaseServerApp();

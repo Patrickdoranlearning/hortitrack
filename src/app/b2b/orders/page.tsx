@@ -7,8 +7,8 @@ export default async function B2BOrdersPage() {
   const authContext = await requireCustomerAuth();
   const supabase = await createClient();
 
-  // Fetch customer's orders
-  const { data: orders } = await supabase
+  // Build base query for customer's orders
+  let ordersQuery = supabase
     .from('orders')
     .select(`
       id,
@@ -30,6 +30,15 @@ export default async function B2BOrdersPage() {
     `)
     .eq('customer_id', authContext.customerId)
     .order('created_at', { ascending: false });
+
+  // Apply store-level filtering: users only see orders they created for their store
+  if (authContext.isAddressRestricted && authContext.addressId) {
+    ordersQuery = ordersQuery
+      .eq('ship_to_address_id', authContext.addressId)
+      .eq('created_by_user_id', authContext.user.id);
+  }
+
+  const { data: orders } = await ordersQuery;
 
   return (
     <B2BPortalLayout authContext={authContext}>

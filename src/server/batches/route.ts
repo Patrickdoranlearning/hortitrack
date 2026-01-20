@@ -119,13 +119,15 @@ export async function buildBatchRoute(batchId: string, maxDepth = 3): Promise<Ba
     }
 
     const parentId = findParentCandidate(node, logs);
+    const transplantLogData = (logs.docs.find((d) => (d.data() as any)?.action === "transplant")?.data() as any);
+    const transplantAt = transplantLogData?.at || null;
     const viaEdge: BatchEdge | null = parentId
       ? {
         from: parentId,
         to: currentId,
         action: "transplant",
-        at: batchDoc?.transplantedAt || (logs.docs.find((d) => (d.data() as any)?.action === "transplant")?.data() as any)?.at || null,
-        week: weekLabel(batchDoc?.transplantedAt || (logs.docs.find((d) => (d.data() as any)?.action === "transplant")?.data() as any)?.at || null),
+        at: transplantAt,
+        week: weekLabel(transplantAt),
         notes: null,
       }
       : null;

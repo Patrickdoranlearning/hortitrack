@@ -71,19 +71,19 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
 
         {/* Account Section */}
         <DropdownMenuGroup className="py-1">
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
             <Link href="/settings/account" className="flex items-center gap-3 cursor-pointer">
               <User className="h-4 w-4 text-muted-foreground" />
               <span>My Account</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
             <Link href="/settings/organization" className="flex items-center gap-3 cursor-pointer">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <span>Organization</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
             <Link href="/settings/team" className="flex items-center gap-3 cursor-pointer">
               <Users className="h-4 w-4 text-muted-foreground" />
               <span>Team Members</span>
@@ -95,13 +95,13 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
 
         {/* Tools Section */}
         <DropdownMenuGroup className="py-1">
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
             <Link href="/settings" className="flex items-center gap-3 cursor-pointer">
               <Settings className="h-4 w-4 text-muted-foreground" />
               <span>Settings & Data</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
             <Link href="/documents/designer" className="flex items-center gap-3 cursor-pointer">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <span>Document Designer</span>
@@ -113,7 +113,7 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
 
         {/* Logout */}
         <DropdownMenuGroup className="py-1">
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
             <Link href="/logout" className="flex items-center gap-3 cursor-pointer text-destructive focus:text-destructive">
               <LogOut className="h-4 w-4" />
               <span>Log out</span>

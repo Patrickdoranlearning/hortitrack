@@ -90,11 +90,14 @@ export async function getPlanningSnapshot(horizonMonths = 12): Promise<PlanningS
     throw new Error(batchesResult.error.message);
   }
 
+  // Cast batch data to proper type (Supabase generic types can be imprecise)
+  const batchData = batchesResult.data as unknown as BatchRow[] | null;
+
   // Prefer SQL RPC buckets, but fall back to JS aggregation when the function
   // is missing (e.g. migration not applied yet).
   const buckets: PlanningBucket[] =
-    bucketsResult.error && batchesResult.data
-      ? buildBucketsFromBatches(batchesResult.data, startDate, horizonMonths)
+    bucketsResult.error && batchData
+      ? buildBucketsFromBatches(batchData, startDate, horizonMonths)
       : (bucketsResult.data ?? []).map((row: any) => ({
           month: row.bucket_month,
           label: row.bucket_label,
@@ -103,19 +106,19 @@ export async function getPlanningSnapshot(horizonMonths = 12): Promise<PlanningS
           planned: Number(row.planned),
         }));
 
-  if (bucketsResult.error && batchesResult.data) {
+  if (bucketsResult.error && batchData) {
     console.warn(
       "[planning] get_planning_buckets RPC unavailable; using JS fallback:",
       bucketsResult.error.message
     );
   }
 
-  if (bucketsResult.error && !batchesResult.data) {
+  if (bucketsResult.error && !batchData) {
     // If both the RPC failed and we have no batch data, surface the RPC error.
     throw new Error(bucketsResult.error.message);
   }
 
-  const batches = (batchesResult.data ?? []).map(mapBatchRow).sort(sortByReadyDate);
+  const batches = (batchData ?? []).map(mapBatchRow).sort(sortByReadyDate);
 
   return {
     buckets,
@@ -151,7 +154,9 @@ export async function listProtocols(): Promise<ProtocolSummary[]> {
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map(rowToProtocolSummary);
+  // Cast to proper type (Supabase generic types can be imprecise)
+  const protocols = data as unknown as ProtocolRow[] | null;
+  return (protocols ?? []).map(rowToProtocolSummary);
 }
 
 function mapBatchRow(row: BatchRow): PlanningBatch {

@@ -15,11 +15,12 @@ import { getSaleableProducts } from '@/server/sales/queries.server';
 const searchAllBatches = ai.defineTool(
   {
     name: 'searchAllBatches',
-    description: 'Searches ALL plant batches including those still growing, propagating, or ready for sale. Use this to find total quantities of plants.',
+    description: 'Searches ALL plant batches including those still growing, propagating, or ready for sale. Use this to find total quantities of plants or batches in a specific location.',
     inputSchema: z.object({
       variety: z.string().optional().describe('Part of the plant variety name (e.g., "Kramers Red", "Erica", "Lavender")'),
       size: z.string().optional().describe('The pot size (e.g., "1.5L", "3L")'),
-      status: z.string().optional().describe('Filter by status: propagating, growing, hardening, ready, saleable'),
+      status: z.string().optional().describe('Filter by status: Propagation, Growing, Looking Good, Ready for Sale, Planned, Archived'),
+      location: z.string().optional().describe('Filter by location name (e.g., "Tunnel 1", "Greenhouse 2", "Outside")'),
     }),
     outputSchema: z.array(z.object({
       batchNumber: z.string(),
@@ -48,7 +49,10 @@ const searchAllBatches = ai.defineTool(
         query = query.ilike('size_name', `%${input.size}%`);
       }
       if (input.status) {
-        query = query.eq('status', input.status);
+        query = query.ilike('status', `%${input.status}%`);
+      }
+      if (input.location) {
+        query = query.ilike('location_name', `%${input.location}%`);
       }
 
       const { data, error } = await query;
@@ -127,45 +131,63 @@ const getCustomerOrders = ai.defineTool(
       customerName: z.string().describe('The name of the customer (e.g., "Windyridge")'),
       limit: z.number().optional().default(5).describe('Number of orders to return'),
     }),
-    outputSchema: z.array(z.object({
-      orderNumber: z.string(),
-      status: z.string(),
-      createdAt: z.string(),
-      totalIncVat: z.number().nullable(),
-      requestedDeliveryDate: z.string().nullable(),
-    })),
+    outputSchema: z.object({
+      customerName: z.string().nullable(),
+      orders: z.array(z.object({
+        orderNumber: z.string(),
+        status: z.string(),
+        createdAt: z.string(),
+        totalIncVat: z.number().nullable(),
+        requestedDeliveryDate: z.string().nullable(),
+      })),
+    }),
   },
   async (input) => {
     try {
       const { supabase } = await getUserAndOrg();
-      
-      const { data: customers } = await supabase
-        .from('customers')
-        .select('id, name')
-        .ilike('name', `%${input.customerName}%`)
-        .limit(1);
 
-      if (!customers || customers.length === 0) return [];
-
-      const customerId = customers[0].id;
-
-      const { data: orders } = await supabase
+      // Query orders directly with customer join to handle duplicate customer names
+      const { data: orders, error } = await supabase
         .from('orders')
-        .select('*')
-        .eq('customer_id', customerId)
+        .select('order_number, status, created_at, total_inc_vat, requested_delivery_date, customers!inner(name)')
+        .ilike('customers.name', `%${input.customerName}%`)
         .order('created_at', { ascending: false })
         .limit(input.limit || 5);
 
-      return (orders || []).map(o => ({
-        orderNumber: o.order_number || 'N/A',
-        status: o.status || 'unknown',
-        createdAt: o.created_at || '',
-        totalIncVat: o.total_inc_vat ?? null,
-        requestedDeliveryDate: o.requested_delivery_date ?? null,
-      }));
+      if (error) {
+        console.error('getCustomerOrders error:', error);
+        return { customerName: null, orders: [] };
+      }
+
+      if (!orders || orders.length === 0) {
+        // Check if customer exists but has no orders
+        const { data: customers } = await supabase
+          .from('customers')
+          .select('name')
+          .ilike('name', `%${input.customerName}%`)
+          .limit(1);
+
+        if (customers && customers.length > 0) {
+          return { customerName: customers[0].name, orders: [] };
+        }
+        return { customerName: null, orders: [] };
+      }
+
+      const customerName = (orders[0].customers as any)?.name || null;
+
+      return {
+        customerName,
+        orders: orders.map(o => ({
+          orderNumber: o.order_number || 'N/A',
+          status: o.status || 'unknown',
+          createdAt: o.created_at || '',
+          totalIncVat: o.total_inc_vat ?? null,
+          requestedDeliveryDate: o.requested_delivery_date ?? null,
+        })),
+      };
     } catch (error) {
       console.error('getCustomerOrders error:', error);
-      return [];
+      return { customerName: null, orders: [] };
     }
   }
 );
@@ -178,13 +200,18 @@ export async function askNurseryIntelligence(query: string): Promise<{ response:
       prompt: `You are "HortiTrack Intelligence", an AI assistant for a plant nursery.
 
 You have access to these tools:
-1. searchAllBatches - Search for specific plant varieties (by name, size, or status)
+1. searchAllBatches - Search batches by variety name, size, status, or location
+   - Valid statuses: Propagation, Growing, Looking Good, Ready for Sale, Planned, Archived
+   - Location examples: "Tunnel 1", "Greenhouse 2", "Outside"
 2. getStockSummary - Get an overview of all varieties and quantities
-3. getCustomerOrders - Look up a customer's recent orders
+3. getCustomerOrders - Look up a customer's recent orders (partial name matching works)
 
-IMPORTANT: Always use the tools to look up real data. Never make up numbers.
-
-For stock questions, use searchAllBatches with the variety name. For a general overview, use getStockSummary.
+IMPORTANT RULES:
+- Always use tools to look up real data. Never make up numbers.
+- When users ask about "saleable" plants, search for status "Ready for Sale"
+- When searching by location/tunnel, use the location parameter
+- If a search returns no results, tell the user what you searched for and suggest alternatives
+- For customer lookups, partial names work (e.g., "Windyridge" matches "Windyridge Nurseries")
 
 User's question: "${query}"
 

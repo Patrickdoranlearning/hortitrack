@@ -28,6 +28,8 @@ export default async function B2BOrderDetailPage({ params }: PageProps) {
       created_at,
       updated_at,
       trolleys_estimated,
+      ship_to_address_id,
+      created_by_user_id,
       customer_addresses (
         label,
         store_name,
@@ -49,6 +51,15 @@ export default async function B2BOrderDetailPage({ params }: PageProps) {
 
   if (!order) {
     notFound();
+  }
+
+  // Verify store-level users can only view their own orders for their store
+  if (authContext.isAddressRestricted && authContext.addressId) {
+    const isOwnOrder = order.created_by_user_id === authContext.user.id;
+    const isOwnStore = order.ship_to_address_id === authContext.addressId;
+    if (!isOwnOrder || !isOwnStore) {
+      notFound();
+    }
   }
 
   // Fetch order items

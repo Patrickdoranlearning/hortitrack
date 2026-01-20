@@ -23,7 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
-import { addVarietyAction, updateVarietyAction, deleteVarietyAction } from "../actions";
+import { addVarietyAction, updateVarietyAction, deleteVarietyAction, archiveVarietyAction, unarchiveVarietyAction } from "../actions";
 import { invalidateReferenceData } from "@/lib/swr/keys";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCollection } from "@/hooks/use-collection";
@@ -33,7 +33,7 @@ import { DataToolbar } from '@/ui/templates';
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Edit } from "lucide-react";
+import { Plus, Trash2, Edit, Archive, ArchiveRestore } from "lucide-react";
 
 const quickVarietySchema = z.object({
   name: z.string().min(1, "Variety name is required"),
@@ -92,9 +92,12 @@ export default function VarietiesPage() {
     key: "name",
     direction: "asc",
   });
+  const [showArchived, setShowArchived] = useState(false);
+  const [deleteFailedVariety, setDeleteFailedVariety] = useState<{ id: string; name: string; error: string } | null>(null);
 
   const { data: varietiesData, loading: varietiesLoading } = useCollection<any>("plant_varieties");
-  const varieties = useMemo<Variety[]>(() => (varietiesData || []).map(normalizeVariety), [varietiesData]);
+  const allVarieties = useMemo<Variety[]>(() => (varietiesData || []).map(normalizeVariety), [varietiesData]);
+  const varieties = useMemo(() => allVarieties.filter(v => showArchived ? (v as any).isArchived : !(v as any).isArchived), [allVarieties, showArchived]);
   const isLoading = authLoading || varietiesLoading;
 
   const quickForm = useForm<QuickVarietyFormValues>({
@@ -144,15 +147,44 @@ export default function VarietiesPage() {
   };
 
   const handleDeleteVariety = async (varietyId: string) => {
-    const varietyToDelete = varieties.find((v) => v.id === varietyId);
+    const varietyToDelete = allVarieties.find((v) => v.id === varietyId);
     if (!varietyToDelete) return;
 
     const result = await deleteVarietyAction(varietyId);
     if (result.success) {
       invalidateReferenceData();
       toast({ title: "Variety deleted", description: `Successfully removed "${varietyToDelete.name}".` });
+    } else if ((result as any).canArchive) {
+      setDeleteFailedVariety({ id: varietyId, name: varietyToDelete.name, error: result.error || "Cannot delete" });
     } else {
       toast({ variant: "destructive", title: "Delete failed", description: result.error });
+    }
+  };
+
+  const handleArchiveVariety = async (varietyId: string) => {
+    const varietyToArchive = allVarieties.find((v) => v.id === varietyId);
+    if (!varietyToArchive) return;
+
+    const result = await archiveVarietyAction(varietyId);
+    if (result.success) {
+      invalidateReferenceData();
+      toast({ title: "Variety archived", description: `"${varietyToArchive.name}" has been archived.` });
+      setDeleteFailedVariety(null);
+    } else {
+      toast({ variant: "destructive", title: "Archive failed", description: result.error });
+    }
+  };
+
+  const handleUnarchiveVariety = async (varietyId: string) => {
+    const varietyToRestore = allVarieties.find((v) => v.id === varietyId);
+    if (!varietyToRestore) return;
+
+    const result = await unarchiveVarietyAction(varietyId);
+    if (result.success) {
+      invalidateReferenceData();
+      toast({ title: "Variety restored", description: `"${varietyToRestore.name}" has been restored.` });
+    } else {
+      toast({ variant: "destructive", title: "Restore failed", description: result.error });
     }
   };
 
@@ -403,12 +435,22 @@ export default function VarietiesPage() {
             onUploadCsv={handleUploadCsv}
             onAddRow={focusQuickRow}
             filters={
-              <Input
-                className="w-full max-w-xs"
-                placeholder="Filter by name, family, genus…"
-                value={filterText}
-                onChange={(event) => setFilterText(event.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  className="w-full max-w-xs"
+                  placeholder="Filter by name, family, genus…"
+                  value={filterText}
+                  onChange={(event) => setFilterText(event.target.value)}
+                />
+                <Button
+                  size="sm"
+                  variant={showArchived ? "secondary" : "outline"}
+                  onClick={() => setShowArchived(!showArchived)}
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  {showArchived ? "Show Active" : "Show Archived"}
+                </Button>
+              </div>
             }
             extraActions={
               <Button size="sm" onClick={handleAddVariety}>
@@ -706,27 +748,33 @@ export default function VarietiesPage() {
                           <Button type="button" size="icon" variant="outline" onClick={() => handleEditVariety(variety)}>
                             <Edit />
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button type="button" size="icon" variant="destructive">
-                                <Trash2 />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete variety?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete "{variety.name}". This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteVariety(variety.id!)}>
-                                  Yes, delete it
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {showArchived ? (
+                            <Button type="button" size="icon" variant="outline" onClick={() => handleUnarchiveVariety(variety.id!)}>
+                              <ArchiveRestore />
+                            </Button>
+                          ) : (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button type="button" size="icon" variant="destructive">
+                                  <Trash2 />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete variety?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete "{variety.name}". This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteVariety(variety.id!)}>
+                                    Yes, delete it
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -749,6 +797,27 @@ export default function VarietiesPage() {
             />
           </DialogContent>
         </Dialog>
+
+        {/* Archive option dialog - shown when delete fails */}
+        <AlertDialog open={!!deleteFailedVariety} onOpenChange={(open) => !open && setDeleteFailedVariety(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cannot delete "{deleteFailedVariety?.name}"</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteFailedVariety?.error}
+                <br /><br />
+                Would you like to archive this variety instead? Archived varieties are hidden from lists but preserved for historical records.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteFailedVariety && handleArchiveVariety(deleteFailedVariety.id)}>
+                <Archive className="mr-2 h-4 w-4" />
+                Archive instead
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DataPageShell>
     </PageFrame>
   );
@@ -765,7 +834,7 @@ function downloadCsv(headers: string[], rows: string[], filename: string) {
   document.body.removeChild(link);
 }
 
-function normalizeVariety(row: any): Variety {
+function normalizeVariety(row: any): Variety & { isArchived?: boolean } {
   if (!row) return row;
   return {
     ...row,
@@ -789,5 +858,6 @@ function normalizeVariety(row: any): Variety {
         : typeof row.evergreen === "string"
         ? ["true", "1", "yes"].includes(row.evergreen.toLowerCase())
         : undefined,
+    isArchived: row.isArchived ?? row.is_archived ?? false,
   };
 }

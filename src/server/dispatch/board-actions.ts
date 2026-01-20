@@ -50,13 +50,13 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
       // Create pick list first if it doesn't exist
       const result = await createPickListFromOrder(orderId);
       if (result.error) throw new Error(result.error);
-      
+
       // Now update with the picker (column may not exist yet)
-      if (result.pickListId && pickerId) {
+      if (result.pickList?.id && pickerId) {
         const { error } = await supabase
           .from("pick_lists")
           .update({ assigned_user_id: pickerId } as any)
-          .eq("id", result.pickListId);
+          .eq("id", result.pickList.id);
         
         if (error) {
           // If column doesn't exist, log warning but don't fail
@@ -120,6 +120,7 @@ export async function assignOrderToRun(orderId: string, runId: string) {
         await addOrderToDeliveryRun({
             deliveryRunId: runId,
             orderId: orderId,
+            trolleysDelivered: 0,
         });
     }
 
@@ -136,10 +137,10 @@ export async function assignOrderToRun(orderId: string, runId: string) {
 export async function createRunAndAssign(orderId: string, haulierId: string, date: string) {
   try {
     // Create run (haulierId might be 'default' if no hauliers exist)
+    // Status defaults to 'planned' in the database
     const runId = await createDeliveryRun({
       runDate: date,
       haulierId: haulierId === 'default' ? undefined : haulierId,
-      status: "planned"
     });
     
     // Assign order if provided
@@ -419,6 +420,7 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
         await addOrderToDeliveryRun({
           deliveryRunId: targetRouteId,
           orderId: orderId,
+          trolleysDelivered: 0,
         });
         // Keep status at packed until the run goes in_transit
         await supabase

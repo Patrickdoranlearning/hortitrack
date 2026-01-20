@@ -129,6 +129,8 @@ export async function createOrder(data: CreateOrderInput) {
             },
             requiredVarietyId: line.requiredVarietyId ?? product.skus?.plant_variety_id ?? null,
             requiredBatchId: line.requiredBatchId ?? line.specificBatchId ?? null,
+            // Preserve allocations from input
+            allocations: line.allocations,
         });
     }
 

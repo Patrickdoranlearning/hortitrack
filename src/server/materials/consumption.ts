@@ -1,5 +1,23 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { MaterialConsumptionPreview, MaterialTransaction } from "@/lib/types/materials";
+import type { MaterialTransaction } from "@/lib/types/materials";
+
+// Local type for consumption preview - uses different property names than shared types
+type LocalConsumptionPreview = {
+  materialId: string;
+  materialName: string;
+  partNumber: string;
+  baseUom: string;
+  quantityRequired: number;
+  quantityAvailable: number;
+  isShortage: boolean;
+};
+
+// Helper to extract joined record (Supabase may return array or object)
+function extractJoin<T extends Record<string, unknown>>(joined: unknown): T | null {
+  if (!joined) return null;
+  if (Array.isArray(joined)) return joined[0] as T ?? null;
+  return joined as T;
+}
 
 // ============================================================================
 // Consumption Rules
@@ -35,7 +53,7 @@ export async function getConsumptionRules(
   if (error) throw new Error(`Failed to fetch consumption rules: ${error.message}`);
 
   return (data ?? []).map((row) => {
-    const material = row.material as Record<string, unknown>;
+    const material = extractJoin<Record<string, unknown>>(row.material);
     return {
       id: row.id,
       materialId: row.material_id,
@@ -112,7 +130,7 @@ export async function getMaterialsForSize(
   if (error) throw new Error(`Failed to fetch linked materials: ${error.message}`);
 
   return (data ?? []).map((row) => {
-    const category = row.category as Record<string, unknown> | null;
+    const category = extractJoin<Record<string, unknown>>(row.category);
     return {
       id: row.id,
       name: row.name,
@@ -133,7 +151,7 @@ export async function previewConsumption(
   orgId: string,
   sizeId: string,
   quantity: number
-): Promise<MaterialConsumptionPreview[]> {
+): Promise<LocalConsumptionPreview[]> {
   // Get materials linked to this size
   const linkedMaterials = await getMaterialsForSize(supabase, orgId, sizeId);
 
@@ -167,7 +185,7 @@ export async function previewConsumption(
   });
 
   // Build preview
-  const previews: MaterialConsumptionPreview[] = [];
+  const previews: LocalConsumptionPreview[] = [];
 
   // Add linked materials (per_unit consumption)
   for (const material of linkedMaterials) {

@@ -914,6 +914,7 @@ export async function getHauliers(): Promise<Haulier[]> {
     email: d.email,
     notes: d.notes,
     isActive: d.is_active,
+    isInternal: d.is_internal ?? true,
     trolleyCapacity: d.trolley_capacity ?? 20,
   }));
 }
@@ -964,6 +965,7 @@ export async function getHauliersWithVehicles(): Promise<HaulierWithVehicles[]> 
       notes: h.notes,
       trolleyCapacity: h.trolley_capacity ?? 20,
       isActive: h.is_active ?? true,
+      isInternal: h.is_internal ?? true,
       createdAt: h.created_at,
       updatedAt: h.updated_at,
       vehicles,
@@ -1028,6 +1030,7 @@ async function getHauliersWithVehiclesLegacy(): Promise<HaulierWithVehicles[]> {
     email: d.email,
     notes: d.notes,
     isActive: d.is_active,
+    isInternal: d.is_internal ?? true,
     trolleyCapacity: d.trolley_capacity ?? 20,
     vehicles: vehiclesByHaulier[d.id] || [],
   }));

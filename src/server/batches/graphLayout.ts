@@ -1,5 +1,8 @@
 // Graph layout helper used by HistoryFlowchart.
-import type Elk, { ElkNode, ElkEdge, ElkGraph } from 'elkjs';
+import type { ElkNode, ElkExtendedEdge } from 'elkjs';
+
+// ElkGraph is the root element (an ElkNode with children and edges)
+type ElkGraph = ElkNode;
 
 /**
  * Computes layout using ELK in the browser.
@@ -9,7 +12,7 @@ export async function layoutGraph(
   graph: ElkGraph,
 ): Promise<ElkGraph> {
   // Dynamically import elkjs on the client
-  const ELK = (await import("elkjs/lib/elk.bundled.js")).default as typeof Elk;
+  const ELK = (await import("elkjs/lib/elk.bundled.js")).default;
   const elk = new ELK({
     defaultLayoutOptions: {
         "elk.algorithm": "layered",

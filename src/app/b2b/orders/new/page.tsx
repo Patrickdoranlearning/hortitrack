@@ -12,11 +12,21 @@ export default async function B2BNewOrderPage() {
   const supabase = await createClient();
 
   // Fetch customer addresses for delivery selection
-  const { data: addresses } = await supabase
+  // Store-level users only see their assigned address
+  let addressesQuery = supabase
     .from('customer_addresses')
     .select('*')
-    .eq('customer_id', authContext.customerId)
-    .order('is_default_shipping', { ascending: false });
+    .eq('customer_id', authContext.customerId);
+
+  if (authContext.isAddressRestricted && authContext.addressId) {
+    // Restricted to single store address
+    addressesQuery = addressesQuery.eq('id', authContext.addressId);
+  } else {
+    // Head office users see all addresses, default first
+    addressesQuery = addressesQuery.order('is_default_shipping', { ascending: false });
+  }
+
+  const { data: addresses } = await addressesQuery;
 
   // Fetch products filtered by customer's price list
   const { data: productRows } = await supabase
@@ -260,6 +270,7 @@ export default async function B2BNewOrderPage() {
         families={families}
         customerId={authContext.customerId}
         pricingHints={pricingHints}
+        isAddressRestricted={authContext.isAddressRestricted}
       />
     </B2BPortalLayout>
   );

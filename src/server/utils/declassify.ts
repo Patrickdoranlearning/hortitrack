@@ -10,7 +10,9 @@ function isTimestampLike(value: unknown): value is TimestampLike {
   );
 }
 
-export function declassify<T>(value: T): Primitive | Primitive[] | Record<string, unknown> | null {
+type DeclassifyResult = Primitive | Primitive[] | Record<string, unknown> | DeclassifyResult[] | null;
+
+export function declassify<T>(value: T): DeclassifyResult {
   if (value === undefined || value === null) return null;
 
   if (value instanceof Date) {

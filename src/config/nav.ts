@@ -22,13 +22,13 @@ export const APP_NAV: NavItem[] = [
     href: "/",
     icon: Sprout,
     items: [
-      { label: "Dashboard", href: "/dashboard", description: "Production overview and key metrics." },
       { label: "Batches", href: "/", description: "View and manage all batches." },
       { label: "Locations", href: "/production/locations", description: "View what's growing in each location." },
       { label: "Planning", href: "/production/planning", description: "Plan future production cycles." },
       { label: "Jobs", href: "/production/jobs", description: "Create and manage production jobs." },
       { label: "Recipes", href: "/production/recipes", description: "Production recipes and timelines." },
       { label: "Saleable", href: "/production/saleable", description: "Release-ready batches and quick approvals." },
+      { label: "Dashboard", href: "/dashboard", description: "Production overview and key metrics." },
     ]
   },
   {

@@ -7,8 +7,30 @@ export default async function B2BInvoicesPage() {
   const authContext = await requireCustomerAuth();
   const supabase = await createClient();
 
-  // Fetch customer invoices with order details
-  const { data: invoices } = await supabase
+  // For store-level users, first get their accessible order IDs
+  let accessibleOrderIds: string[] | null = null;
+  if (authContext.isAddressRestricted && authContext.addressId) {
+    const { data: accessibleOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('customer_id', authContext.customerId)
+      .eq('ship_to_address_id', authContext.addressId)
+      .eq('created_by_user_id', authContext.user.id);
+
+    accessibleOrderIds = accessibleOrders?.map(o => o.id) || [];
+
+    // If no accessible orders, return empty invoices
+    if (accessibleOrderIds.length === 0) {
+      return (
+        <B2BPortalLayout authContext={authContext}>
+          <B2BInvoicesClient invoices={[]} />
+        </B2BPortalLayout>
+      );
+    }
+  }
+
+  // Build invoices query
+  let invoicesQuery = supabase
     .from('invoices')
     .select(`
       id,
@@ -30,6 +52,13 @@ export default async function B2BInvoicesPage() {
     `)
     .eq('customer_id', authContext.customerId)
     .order('issue_date', { ascending: false });
+
+  // Apply store-level filtering via order_ids
+  if (accessibleOrderIds !== null) {
+    invoicesQuery = invoicesQuery.in('order_id', accessibleOrderIds);
+  }
+
+  const { data: invoices } = await invoicesQuery;
 
   return (
     <B2BPortalLayout authContext={authContext}>

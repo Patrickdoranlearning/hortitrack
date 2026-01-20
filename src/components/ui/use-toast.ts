@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { create } from "zustand";
+import { toast as newToast } from "@/lib/toast";
 
 export type ToastItem = {
   id: string;
@@ -30,6 +31,10 @@ export const useToastStore = create<ToastState>((set, get) => ({
   },
 }));
 
+/**
+ * @deprecated Use `import { toast } from "@/lib/toast"` instead.
+ * This hook is kept for backwards compatibility.
+ */
 export function useToast() {
   const store = useToastStore();
   return React.useMemo(
@@ -41,6 +46,26 @@ export function useToast() {
   );
 }
 
+/**
+ * @deprecated Use `import { toast } from "@/lib/toast"` instead.
+ * This function forwards to the new toast system for backwards compatibility.
+ */
 export function toast(t: Omit<ToastItem, "id">) {
+  if (process.env.NODE_ENV === "development") {
+    console.warn(
+      '[Deprecation] toast() from use-toast.ts is deprecated. Use `import { toast } from "@/lib/toast"` instead.'
+    );
+  }
+
+  // Forward to new toast system
+  if (t.variant === "destructive") {
+    newToast.error(t.description || t.title || "Error");
+  } else {
+    newToast.success(t.title || "Success", {
+      description: t.description,
+    });
+  }
+
+  // Also add to legacy store for components still using Toaster from toaster.tsx
   return useToastStore.getState().add(t);
 }

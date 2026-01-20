@@ -73,11 +73,19 @@ export type BatchHistory = {
 type BatchRow = {
   id: string;
   batch_number: string | null;
-  plant_varieties?: { name: string | null };
+  plant_varieties?: { name: string | null } | Array<{ name: string | null }>;
   quantity: number | null;
   created_at: string | null;
   parent_batch_id: string | null;
 };
+
+function getVarietyName(batch: BatchRow | null): string | null {
+  if (!batch?.plant_varieties) return null;
+  if (Array.isArray(batch.plant_varieties)) {
+    return batch.plant_varieties[0]?.name ?? null;
+  }
+  return batch.plant_varieties.name ?? null;
+}
 
 async function readBatch(id: string): Promise<BatchRow | null> {
   const supabase = getSupabaseAdmin();
@@ -167,7 +175,7 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
     kind: "batch",
     batchId: batch.id,
     label: `Batch ${batch.batch_number ?? batch.id}`,
-    meta: { variety: batch.plant_varieties?.name ?? null },
+    meta: { variety: getVarietyName(batch) },
   });
 
   if (batch.parent_batch_id) {
@@ -179,7 +187,7 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
         kind: "batch",
         batchId: parent.id,
         label: `Batch ${parent.batch_number ?? parent.id}`,
-        meta: { variety: parent.plant_varieties?.name ?? null },
+        meta: { variety: getVarietyName(parent) },
       });
       edges.push({
         id: `e:${parentId}->batch:${batch.id}`,
@@ -302,8 +310,8 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
       userId: evt.by_user_id ?? null,
       userName: getString(payload, "by_user"),
       media: photos
-        .map((photo) => normalizePhoto(photo))
-        .filter((photo): photo is { url: string; caption?: string } => !!photo?.url)
+        .map((photo) => normalizePhoto(photo as PhotoCandidate))
+        .filter((photo): photo is { url: string; caption: string | undefined } => photo !== null && !!photo.url)
         .map((photo) => ({
           url: photo.url,
           name: photo.caption ?? null,
@@ -412,8 +420,8 @@ export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
     batch: {
       id: batch.id,
       batchNumber: batch.batch_number,
-      plantName: batch.plant_varieties?.name ?? null,
-      variety: batch.plant_varieties?.name ?? null,
+      plantName: getVarietyName(batch),
+      variety: getVarietyName(batch),
       quantity: batch.quantity,
       createdAt: batch.created_at,
     },

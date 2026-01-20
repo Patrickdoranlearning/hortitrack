@@ -61,6 +61,7 @@ export async function listOrders(params: { page?: number; pageSize?: number; sta
     order_number: d.order_number,
     customer_id: d.customer_id,
     status: d.status,
+    createdAt: d.created_at,
     created_at: d.created_at,
     updated_at: d.updated_at,
     requested_delivery_date: d.requested_delivery_date,
@@ -70,9 +71,9 @@ export async function listOrders(params: { page?: number; pageSize?: number; sta
     notes: d.notes ?? null,
     customerName: d.customers?.name || "Unknown",
     customer: d.customers ? { name: d.customers.name } : null,
-    ship_to_address: d.customer_addresses ? { 
-      county: d.customer_addresses.county, 
-      city: d.customer_addresses.city 
+    ship_to_address: d.customer_addresses ? {
+      county: d.customer_addresses.county,
+      city: d.customer_addresses.city
     } : null,
   }));
 
@@ -220,7 +221,9 @@ async function getSaleableProductsFallback(): Promise<SaleableProduct[]> {
   const productsMap = new Map<string, SaleableProduct>();
 
   batches.forEach((b) => {
-    const batch: Batch = {
+    // Create a minimal batch-like object for aggregation
+    // Using Partial<Batch> since we only have limited data from getSaleableBatches
+    const batch: Partial<Batch> & { id: string; plantVariety?: string; size?: string; quantity?: number; category?: string; growerPhotoUrl?: string; salesPhotoUrl?: string; status?: string } = {
       id: b.id,
       orgId: "",
       batchNumber: b.batchNumber || "",
@@ -230,26 +233,30 @@ async function getSaleableProductsFallback(): Promise<SaleableProduct[]> {
       quantity: b.quantity || 0,
       growerPhotoUrl: b.growerPhotoUrl,
       salesPhotoUrl: b.salesPhotoUrl,
-      status: b.status as any,
+      status: b.status,
       plantVarietyId: "",
       sizeId: "",
       locationId: "",
       phase: "finished",
-    } as Batch;
+      reservedQuantity: 0,
+      unit: "each",
+      logHistory: [],
+      supplierBatchNumber: "",
+    };
 
     const productKey = `${batch.plantVariety}-${batch.size}`;
 
     if (productsMap.has(productKey)) {
       const existingProduct = productsMap.get(productKey)!;
-      existingProduct.totalQuantity += batch.quantity!;
-      existingProduct.availableBatches.push(batch);
+      existingProduct.totalQuantity += batch.quantity ?? 0;
+      existingProduct.availableBatches.push(batch as Batch);
     } else {
       productsMap.set(productKey, {
         id: productKey,
-        plantVariety: batch.plantVariety!,
-        size: batch.size!,
+        plantVariety: batch.plantVariety ?? "",
+        size: batch.size ?? "",
         category: batch.category,
-        totalQuantity: batch.quantity!,
+        totalQuantity: batch.quantity ?? 0,
         barcode: `BARCODE-${batch.plantVariety?.replace(/\s+/g, "")}`,
         cost: 1.53,
         status: "Bud & flower",
@@ -257,7 +264,7 @@ async function getSaleableProductsFallback(): Promise<SaleableProduct[]> {
           batch.growerPhotoUrl ||
           batch.salesPhotoUrl ||
           `https://placehold.co/100x100.png`,
-        availableBatches: [batch],
+        availableBatches: [batch as Batch],
       });
     }
   });

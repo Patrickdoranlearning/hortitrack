@@ -194,7 +194,7 @@ export async function getAllTrolleyBalances(): Promise<TrolleyBalance[]> {
 export async function recordTrolleyMovement(
   input: TrolleyMovementInput
 ): Promise<{ success: boolean; movementId?: string; error?: string }> {
-  const { orgId, userId, supabase } = await getUserAndOrg();
+  const { orgId, user, supabase } = await getUserAndOrg();
 
   const { data, error } = await supabase
     .from("equipment_movement_log")
@@ -207,7 +207,7 @@ export async function recordTrolleyMovement(
       notes: input.notes || null,
       delivery_run_id: input.deliveryRunId || null,
       signed_docket_url: input.signedDocketUrl || null,
-      recorded_by: userId,
+      recorded_by: user.id,
       movement_date: new Date().toISOString(),
     })
     .select("id")

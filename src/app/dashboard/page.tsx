@@ -228,12 +228,12 @@ export default function ProductionDashboard() {
 
   return (
     <PageFrame moduleKey="production">
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-headline tracking-tight">Production Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-headline tracking-tight truncate">Production Dashboard</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 hidden sm:block">
               Real-time snapshot of your production pipeline
             </p>
           </div>
@@ -241,10 +241,10 @@ export default function ProductionDashboard() {
             variant="outline"
             size="sm"
             onClick={() => mutate()}
-            className="self-start sm:self-center"
+            className="shrink-0"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
 
@@ -295,86 +295,86 @@ export default function ProductionDashboard() {
         )}
 
         {/* KPI Cards */}
-            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Plants</CardTitle>
-              <Sprout className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
+        <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+          <Card className="p-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Total Plants</CardTitle>
+              <Sprout className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold">
                 {filteredTotals.totalPlants.toLocaleString()}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
+              </div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {filteredBatches.length} active batches
-                  </p>
-                </CardContent>
-              </Card>
+              </p>
+            </CardContent>
+          </Card>
 
-          <Card className="border-green-200 dark:border-green-800">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">
-                Available for Sale
-                  </CardTitle>
-              <ShoppingCart className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-              <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+          <Card className="border-green-200 dark:border-green-800 p-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-400">
+                Available
+              </CardTitle>
+              <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+            </CardHeader>
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-400">
                 {filteredTotals.availablePlants.toLocaleString()}
               </div>
-                  <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 Ready to ship
-                  </p>
-                </CardContent>
-              </Card>
+              </p>
+            </CardContent>
+          </Card>
 
-          <Card className="border-blue-200 dark:border-blue-800">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">
+          <Card className="border-blue-200 dark:border-blue-800 p-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-400">
                 In Production
-                  </CardTitle>
-              <Leaf className="h-4 w-4 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+              </CardTitle>
+              <Leaf className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold text-blue-700 dark:text-blue-400">
                 {filteredTotals.growingPlants.toLocaleString()}
               </div>
-                  <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {filteredTotals.reservedPlants.toLocaleString()} reserved
-                  </p>
-                </CardContent>
-              </Card>
+              </p>
+            </CardContent>
+          </Card>
 
-          <Card className="border-red-200 dark:border-red-800">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">
-                Loss (30 days)
+          <Card className="border-red-200 dark:border-red-800 p-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-red-700 dark:text-red-400">
+                Loss (30d)
               </CardTitle>
-              <TrendingDown className="h-4 w-4 text-red-600" />
+              <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-700 dark:text-red-400">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold text-red-700 dark:text-red-400">
                 {(data?.totals?.lossLast30Days ?? 0).toLocaleString()}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {data?.totals?.lossPercentage ?? 0}% of production
               </p>
             </CardContent>
           </Card>
-            </div>
+        </div>
 
         {/* Charts Row 1 */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
           {/* Pipeline Funnel */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="h-4 w-4" />
-                Production Pipeline
+            <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <Package className="h-3 w-3 sm:h-4 sm:w-4" />
+                Pipeline
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-[220px] sm:h-[280px]">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="h-[180px] sm:h-[280px]">
                 {data?.byStatus && data.byStatus.length > 0 ? (
                   <PipelineFunnel
                     data={data.byStatus}
@@ -382,7 +382,7 @@ export default function ProductionDashboard() {
                     onSegmentClick={(status) => toggleFilter('statuses', status)}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
                 )}
               </div>
             </CardContent>
@@ -390,14 +390,14 @@ export default function ProductionDashboard() {
 
           {/* Variety Treemap */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Leaf className="h-4 w-4" />
-                Variety Distribution
+            <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <Leaf className="h-3 w-3 sm:h-4 sm:w-4" />
+                Varieties
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-[220px] sm:h-[280px]">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="h-[180px] sm:h-[280px]">
                 {data?.byVariety && data.byVariety.length > 0 ? (
                   <VarietyTreemap
                     data={data.byVariety}
@@ -405,7 +405,7 @@ export default function ProductionDashboard() {
                     onFamilyClick={(family) => toggleFilter('families', family)}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
                 )}
               </div>
             </CardContent>
@@ -413,17 +413,17 @@ export default function ProductionDashboard() {
         </div>
 
         {/* Charts Row 2 */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
           {/* Location Grid */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MapPin className="h-4 w-4" />
-                Location Overview
+            <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
+                Locations
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-[220px] sm:h-[280px]">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="h-[180px] sm:h-[280px]">
                 {data?.byLocation && data.byLocation.length > 0 ? (
                   <LocationGrid
                     data={data.byLocation}
@@ -431,7 +431,7 @@ export default function ProductionDashboard() {
                     onLocationClick={(locId) => toggleFilter('locations', locId)}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
                 )}
               </div>
             </CardContent>
@@ -439,14 +439,14 @@ export default function ProductionDashboard() {
 
           {/* Loss Trend */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <TrendingDown className="h-4 w-4" />
-                Loss Trend (30 days)
+            <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                Loss Trend
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-[220px] sm:h-[280px]">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="h-[180px] sm:h-[280px]">
                 <LossTrendChart data={data?.lossTimeline ?? []} days={30} />
               </div>
             </CardContent>
@@ -454,21 +454,21 @@ export default function ProductionDashboard() {
         </div>
 
         {/* Charts Row 3 */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
           {/* Batch Age Histogram */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Calendar className="h-4 w-4" />
-                Batch Age Distribution
+            <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                Batch Age
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-[200px] sm:h-[260px]">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="h-[160px] sm:h-[260px]">
                 {data?.byAge && data.byAge.length > 0 ? (
                   <BatchAgeHistogram data={data.byAge} />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
                 )}
               </div>
             </CardContent>
@@ -476,14 +476,14 @@ export default function ProductionDashboard() {
 
           {/* Availability Donut */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShoppingCart className="h-4 w-4" />
-                Availability Breakdown
+            <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4" />
+                Availability
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-[200px] sm:h-[260px]">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="h-[160px] sm:h-[260px]">
                 <AvailabilityDonut
                   available={filteredTotals.availablePlants}
                   reserved={filteredTotals.reservedPlants}
@@ -495,24 +495,24 @@ export default function ProductionDashboard() {
         </div>
 
         {/* Batch Table */}
-            <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
+        <Card>
+          <CardHeader className="p-3 sm:p-4 pb-2">
+            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+              <span className="flex items-center gap-2 text-sm sm:text-base">
+                <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
                 Batch Details
               </span>
               {hasActiveFilters && (
-                <span className="text-sm font-normal text-muted-foreground">
+                <span className="text-xs sm:text-sm font-normal text-muted-foreground">
                   Showing {filteredBatches.length} of {data?.batches?.length ?? 0} batches
                 </span>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-4 pt-0">
             <BatchTable data={filteredBatches} pageSize={15} />
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
       </div>
     </PageFrame>
   );

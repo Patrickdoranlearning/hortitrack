@@ -1,5 +1,13 @@
 import { getSupabaseServerApp } from "@/server/db/supabase";
 
+// Helper to extract joined record (Supabase may return array or object)
+type MediaLibraryJoin = { id: string; file_path: string; uploaded_at: string | null } | null;
+function extractMediaLibrary(joined: unknown): MediaLibraryJoin {
+  if (!joined) return null;
+  if (Array.isArray(joined)) return joined[0] as MediaLibraryJoin ?? null;
+  return joined as MediaLibraryJoin;
+}
+
 export type GalleryImage = {
   id: string; // media_library id (used for delete)
   attachmentId?: string; // media_attachments id (for debugging/audit)
@@ -88,8 +96,10 @@ export async function getSmartGallery(
 
   // Transform and sort by priority
   const images: GalleryImage[] = attachments
-    .filter((a) => a.media_library?.file_path)
+    .map((a) => ({ ...a, media: extractMediaLibrary(a.media_library) }))
+    .filter((a) => a.media?.file_path)
     .map((a) => {
+      const media = a.media!;
       // Determine priority based on entity type
       let priority: number;
       switch (a.entity_type) {
@@ -138,9 +148,9 @@ export async function getSmartGallery(
       }
 
       return {
-        id: a.media_library!.id, // use media id so delete works
+        id: media.id, // use media id so delete works
         attachmentId: a.id,
-        url: a.media_library!.file_path,
+        url: media.file_path,
         badge,
         caption: a.caption ?? undefined,
         isHero: a.is_hero ?? false,
@@ -148,7 +158,7 @@ export async function getSmartGallery(
         displayOrder: a.display_order ?? 0,
         entityType: a.entity_type as "batch" | "variety" | "product",
         entityId: a.entity_id,
-        uploadedAt: a.media_library!.uploaded_at || a.created_at || "",
+        uploadedAt: media.uploaded_at || a.created_at || "",
       };
     });
 

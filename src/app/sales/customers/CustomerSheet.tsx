@@ -85,6 +85,7 @@ import {
   deleteCustomerProductPricingAction,
   fetchCustomerProductPricingAction,
   updateCustomerDeliveryPreferencesAction,
+  updateCustomerDefaultPriceListAction,
 } from "./actions";
 
 // =============================================================================
@@ -1308,14 +1309,10 @@ function PricingTab({
 
   const handleSaveDefaultPriceList = () => {
     startTransition(async () => {
-      const result = await upsertCustomerAction({
-        id: customerId,
-        name: "", // Will be ignored for update
-        defaultPriceListId: defaultPriceListId || null,
-        currency: "EUR",
-        countryCode: "IE",
-        paymentTermsDays: 30,
-      });
+      const result = await updateCustomerDefaultPriceListAction(
+        customerId,
+        defaultPriceListId || null
+      );
       if (!result.success) {
         toast({ variant: "destructive", title: "Save failed" });
         return;

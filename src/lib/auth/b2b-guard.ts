@@ -3,6 +3,25 @@ import { redirect } from 'next/navigation';
 import type { Database } from '@/types/supabase';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
+type CustomerAddress = Database['public']['Tables']['customer_addresses']['Row'];
+
+// Helper to extract customer from Supabase join result (may be array or object)
+function extractCustomer(customers: unknown): Customer | null {
+  if (!customers) return null;
+  if (Array.isArray(customers)) {
+    return customers[0] as Customer ?? null;
+  }
+  return customers as Customer;
+}
+
+// Helper to extract address from Supabase join result (may be array or object)
+function extractAddress(addresses: unknown): CustomerAddress | null {
+  if (!addresses) return null;
+  if (Array.isArray(addresses)) {
+    return addresses[0] as CustomerAddress ?? null;
+  }
+  return addresses as CustomerAddress;
+}
 
 export type B2BAuthContext = {
   user: {
@@ -13,6 +32,10 @@ export type B2BAuthContext = {
   customer: Customer;
   isImpersonating: boolean;
   staffUserId?: string; // Only populated when impersonating
+  // Store-level access fields
+  addressId: string | null; // null = head office (all addresses)
+  address: CustomerAddress | null; // The specific address if restricted
+  isAddressRestricted: boolean; // Helper flag for store-level users
 };
 
 /**
@@ -41,16 +64,21 @@ export async function requireCustomerAuth(): Promise<B2BAuthContext> {
     .is('ended_at', null)
     .single();
 
-  if (impersonation && impersonation.customers) {
+  const impersonatedCustomer = extractCustomer(impersonation?.customers);
+  if (impersonation && impersonatedCustomer) {
+    // Staff impersonating customers always have full access (no address restriction)
     return {
       user: {
         id: user.id,
         email: user.email,
       },
       customerId: impersonation.customer_id,
-      customer: impersonation.customers as Customer,
+      customer: impersonatedCustomer,
       isImpersonating: true,
       staffUserId: user.id,
+      addressId: null,
+      address: null,
+      isAddressRestricted: false,
     };
   }
 
@@ -60,15 +88,28 @@ export async function requireCustomerAuth(): Promise<B2BAuthContext> {
     .select(`
       customer_id,
       portal_role,
-      customers (*)
+      customer_address_id,
+      customers (*),
+      customer_addresses (*)
     `)
     .eq('id', user.id)
     .single();
 
+  const profileCustomer = extractCustomer(profile?.customers);
+  const profileAddress = extractAddress(profile?.customer_addresses);
+
+  // Validate address belongs to customer if set (extra safety check)
+  if (profile?.customer_address_id && profileAddress) {
+    if (profileAddress.customer_id !== profile.customer_id) {
+      console.error('Profile address does not belong to customer');
+      redirect('/b2b/login');
+    }
+  }
+
   if (
     profile?.portal_role === 'customer' &&
     profile.customer_id &&
-    profile.customers
+    profileCustomer
   ) {
     return {
       user: {
@@ -76,8 +117,11 @@ export async function requireCustomerAuth(): Promise<B2BAuthContext> {
         email: user.email,
       },
       customerId: profile.customer_id,
-      customer: profile.customers as Customer,
+      customer: profileCustomer,
       isImpersonating: false,
+      addressId: profile.customer_address_id || null,
+      address: profileAddress || null,
+      isAddressRestricted: Boolean(profile.customer_address_id),
     };
   }
 

@@ -10,7 +10,8 @@ import type {
 import { defaultLayoutFor, getDocumentData } from "./data";
 import { renderDocumentHtml, renderDocumentPdf } from "./render";
 
-const LayoutSchema: z.ZodType<TemplateLayout> = z.lazy(() =>
+// LayoutSchema handles the DocumentComponent[] variant of TemplateLayout
+const LayoutSchema: z.ZodType<unknown[]> = z.lazy(() =>
   z.array(
     z.object({
       id: z.string(),

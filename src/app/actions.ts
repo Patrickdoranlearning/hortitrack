@@ -787,7 +787,57 @@ export async function updateVarietyAction(varietyData: Variety) {
 
 export async function deleteVarietyAction(varietyId: string) {
     const supabase = await getSupabaseForApp();
+
+    // First, try to delete any SKUs associated with this variety
+    const { error: skuError } = await supabase.from('skus').delete().eq('plant_variety_id', varietyId);
+    if (skuError) {
+        if (skuError.message.includes('foreign key constraint')) {
+            // Extract the constraint name to give a better error message
+            const constraintMatch = skuError.message.match(/"([^"]+)"/);
+            const constraint = constraintMatch?.[1] || '';
+            let reason = 'This variety has SKUs that are in use.';
+            if (constraint.includes('order')) reason = 'This variety has SKUs used in orders.';
+            else if (constraint.includes('invoice')) reason = 'This variety has SKUs used in invoices.';
+            else if (constraint.includes('product')) reason = 'This variety has SKUs linked to products.';
+            return { success: false, error: reason, canArchive: true };
+        }
+        return { success: false, error: skuError.message };
+    }
+
+    // Now delete the variety
     const { error } = await supabase.from('plant_varieties').delete().eq('id', varietyId);
+    if (error) {
+        if (error.message.includes('foreign key constraint')) {
+            const constraintMatch = error.message.match(/"([^"]+)"/);
+            const constraint = constraintMatch?.[1] || '';
+            let reason = 'This variety is in use elsewhere.';
+            if (constraint.includes('batch')) reason = 'This variety is used in batches.';
+            else if (constraint.includes('trial')) reason = 'This variety is used in trials.';
+            else if (constraint.includes('sku')) reason = 'This variety has SKUs.';
+            else if (constraint.includes('plan')) reason = 'This variety is used in production plans.';
+            return { success: false, error: reason, canArchive: true };
+        }
+        return { success: false, error: error.message };
+    }
+    return { success: true };
+}
+
+export async function archiveVarietyAction(varietyId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase
+        .from('plant_varieties')
+        .update({ is_archived: true })
+        .eq('id', varietyId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+}
+
+export async function unarchiveVarietyAction(varietyId: string) {
+    const supabase = await getSupabaseForApp();
+    const { error } = await supabase
+        .from('plant_varieties')
+        .update({ is_archived: false })
+        .eq('id', varietyId);
     if (error) return { success: false, error: error.message };
     return { success: true };
 }

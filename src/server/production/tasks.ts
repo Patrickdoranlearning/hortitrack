@@ -115,7 +115,9 @@ export async function getProductionTasks(filter: TasksFilter = {}): Promise<Prod
     throw new Error(error.message);
   }
 
-  return (data as BatchRow[] ?? []).map(mapBatchToTask);
+  // Cast to proper type (Supabase generic types can be imprecise)
+  const batches = (data ?? []) as unknown as BatchRow[];
+  return batches.map(mapBatchToTask);
 }
 
 function mapBatchToTask(row: BatchRow): ProductionTask {

@@ -2,8 +2,12 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { GetServerSidePropsContext } from "next";
+import type { ServerResponse, IncomingMessage } from "http";
 import { serialize } from "cookie";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
+
+// Common response type that works for both API routes and getServerSideProps
+type ResponseLike = NextApiResponse | ServerResponse<IncomingMessage>;
 
 type Ctx =
   | { req: NextApiRequest; res: NextApiResponse }
@@ -49,7 +53,7 @@ function cookieOpts(options: CookieOptions): CookieOptions {
   };
 }
 
-function appendSetCookie(res: NextApiResponse, header: string) {
+function appendSetCookie(res: ResponseLike, header: string) {
   const prev = res.getHeader("Set-Cookie");
   if (!prev) {
     res.setHeader("Set-Cookie", header);

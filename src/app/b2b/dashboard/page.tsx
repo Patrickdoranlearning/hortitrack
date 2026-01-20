@@ -7,8 +7,8 @@ export default async function B2BDashboardPage() {
   const authContext = await requireCustomerAuth();
   const supabase = await createClient();
 
-  // Fetch recent orders
-  const { data: recentOrders } = await supabase
+  // Build base query for recent orders
+  let recentOrdersQuery = supabase
     .from('orders')
     .select(`
       id,
@@ -25,6 +25,15 @@ export default async function B2BDashboardPage() {
     .eq('customer_id', authContext.customerId)
     .order('created_at', { ascending: false })
     .limit(5);
+
+  // Apply store-level filtering: users only see orders they created for their store
+  if (authContext.isAddressRestricted && authContext.addressId) {
+    recentOrdersQuery = recentOrdersQuery
+      .eq('ship_to_address_id', authContext.addressId)
+      .eq('created_by_user_id', authContext.user.id);
+  }
+
+  const { data: recentOrders } = await recentOrdersQuery;
 
   // Fetch favorite products
   const { data: favorites } = await supabase

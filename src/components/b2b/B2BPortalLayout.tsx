@@ -36,7 +36,7 @@ export function B2BPortalLayout({ authContext, children }: B2BPortalLayoutProps)
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
-  const { customer, isImpersonating } = authContext;
+  const { customer, isImpersonating, isAddressRestricted, address } = authContext;
 
   return (
     <div className="min-h-dvh">
@@ -68,7 +68,14 @@ export function B2BPortalLayout({ authContext, children }: B2BPortalLayoutProps)
                 <span className="text-primary font-bold font-headline">hortitrack</span>
                 <span className="text-muted-foreground font-normal ml-1.5">Customer Portal</span>
               </div>
-              <div className="text-xs text-muted-foreground truncate">{customer.name}</div>
+              <div className="text-xs text-muted-foreground truncate">
+                {customer.name}
+                {isAddressRestricted && address && (
+                  <span className="ml-1">
+                    - {address.store_name || address.label || address.city}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

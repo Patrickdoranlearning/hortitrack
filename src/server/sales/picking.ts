@@ -10,6 +10,13 @@ import {
   getTaskBySourceRef,
 } from "@/server/tasks/service";
 
+// Helper to extract name from Supabase joined data (may be array or object)
+function extractName(joined: unknown): string | undefined {
+  if (!joined) return undefined;
+  if (Array.isArray(joined)) return (joined[0] as { name?: string })?.name;
+  return (joined as { name?: string })?.name;
+}
+
 // ================================================
 // TYPES
 // ================================================
@@ -811,9 +818,9 @@ export async function getOrdersForPicking(orgId: string): Promise<PickList[]> {
               createdAt: pl.created_at,
               orderNumber: order.order_number,
               orderStatus: order.status,
-              customerName: order.customers?.name,
+              customerName: extractName(order.customers),
               requestedDeliveryDate: order.requested_delivery_date,
-              teamName: pl.picking_teams?.name,
+              teamName: extractName(pl.picking_teams),
               county: address?.county,
             });
           }
@@ -830,7 +837,7 @@ export async function getOrdersForPicking(orgId: string): Promise<PickList[]> {
           createdAt: new Date().toISOString(),
           orderNumber: order.order_number,
           orderStatus: order.status,
-          customerName: order.customers?.name,
+          customerName: extractName(order.customers),
           requestedDeliveryDate: order.requested_delivery_date,
           county: address?.county,
         });
