@@ -86,6 +86,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
   }, [today, form]);
 
   const [submitting, setSubmitting] = React.useState(false);
+  const submittingRef = React.useRef(false); // Ref to prevent double-submission on rapid clicks
   const [successData, setSuccessData] = React.useState<{
     batchNumber: string;
     batchId: string;
@@ -157,6 +158,9 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
   }, [watchSize, selectedSize, totalUnits]);
 
   async function onSubmit(values: PropagationInput) {
+    // Prevent double-submission using ref (faster than state check)
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const { batch } = await ProductionAPI.propagate(values);
@@ -198,6 +202,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
       });
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   }
 

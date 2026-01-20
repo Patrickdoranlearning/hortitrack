@@ -26,21 +26,33 @@ export async function POST(req: NextRequest) {
         { status: 429 }
       );
     }
-    const internalSupplierId = await ensureInternalSupplierId(supabase, orgId);
+    // Parallelize independent lookups for better performance
+    const [
+      internalSupplierId,
+      statusOption,
+      sizeResult,
+      batchNumber,
+      orgResult,
+    ] = await Promise.all([
+      ensureInternalSupplierId(supabase, orgId),
+      resolveProductionStatus(supabase, orgId, "Propagation"),
+      supabase
+        .from("plant_sizes")
+        .select("id, cell_multiple")
+        .eq("id", input.size_id)
+        .single(),
+      nextBatchNumber(1, supabase, orgId), // 1 = propagation, pass client to avoid re-auth
+      supabase
+        .from("organizations")
+        .select("producer_code, country_code")
+        .eq("id", orgId)
+        .single(),
+    ]);
 
-    // Resolve status_id
-    const statusOption = await resolveProductionStatus(supabase, orgId, "Propagation");
-
-    // Fetch size.multiple to compute plant units from container count
-    const { data: size, error: sizeErr } = await supabase
-      .from("plant_sizes")
-      .select("id, cell_multiple")
-      .eq("id", input.size_id)
-      .single();
+    const { data: size, error: sizeErr } = sizeResult;
     if (sizeErr || !size) throw new Error("Invalid size selection");
 
     const units = input.containers * (size.cell_multiple ?? 1);
-    const batchNumber = await nextBatchNumber(1); // 1 = propagation
 
     // Insert batch
     const { data: batch, error: bErr } = await supabase
@@ -66,47 +78,45 @@ export async function POST(req: NextRequest) {
 
     if (bErr || !batch) throw new Error(bErr?.message ?? "Batch insert failed");
 
-    // Log event
-    const { error: eErr } = await supabase.from("batch_events").insert({
-      batch_id: batch.id,
-      org_id: orgId,
-      type: "PROPAGATE",
-      by_user_id: user.id,
-      payload: {
-        containers: input.containers,
-        computed_units: units,
-        notes: input.notes ?? null,
-      },
-      request_id: requestId,
-    });
-    if (eErr) {
-      // cleanup to avoid orphan
-      await supabase.from("batches").delete().eq("id", batch.id);
-      throw new Error(`Event insert failed: ${eErr.message}`);
-    }
+    // Use org data from parallel fetch above
+    const org = orgResult.data;
 
-    // Get org defaults for passport (dynamic, not hardcoded!)
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("producer_code, country_code")
-      .eq("id", orgId)
-      .single();
+    // Parallelize event and passport inserts (both only need batch.id)
+    const [eventResult, passportResult] = await Promise.all([
+      supabase.from("batch_events").insert({
+        batch_id: batch.id,
+        org_id: orgId,
+        type: "PROPAGATE",
+        by_user_id: user.id,
+        payload: {
+          containers: input.containers,
+          computed_units: units,
+          notes: input.notes ?? null,
+        },
+        request_id: requestId,
+      }),
+      supabase.from("batch_passports").insert({
+        batch_id: batch.id,
+        org_id: orgId,
+        passport_type: "internal",
+        operator_reg_no: org?.producer_code ?? "UNKNOWN",
+        traceability_code: batch.batch_number,
+        origin_country: org?.country_code ?? "IE",
+        created_by_user_id: user.id,
+        request_id: requestId,
+      }),
+    ]);
 
-    // Create internal passport (uses org's producer code)
-    const { error: pErr } = await supabase.from("batch_passports").insert({
-      batch_id: batch.id,
-      org_id: orgId,
-      passport_type: "internal",
-      operator_reg_no: org?.producer_code ?? "UNKNOWN",
-      traceability_code: batch.batch_number,
-      origin_country: org?.country_code ?? "IE",
-      created_by_user_id: user.id,
-      request_id: requestId,
-    });
-    if (pErr) {
-      await supabase.from("batch_events").delete().eq("batch_id", batch.id);
-      await supabase.from("batches").delete().eq("id", batch.id);
-      throw new Error(`Passport insert failed: ${pErr.message}`);
+    // Handle errors with cleanup
+    if (eventResult.error || passportResult.error) {
+      // Cleanup on failure
+      await Promise.all([
+        supabase.from("batch_events").delete().eq("batch_id", batch.id),
+        supabase.from("batch_passports").delete().eq("batch_id", batch.id),
+        supabase.from("batches").delete().eq("id", batch.id),
+      ]);
+      const errMsg = eventResult.error?.message || passportResult.error?.message;
+      throw new Error(`Failed to create batch records: ${errMsg}`);
     }
 
     // Consume materials for propagation

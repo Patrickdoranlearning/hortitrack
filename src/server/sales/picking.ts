@@ -1328,106 +1328,28 @@ export async function updatePickItem(
     }
   }
 
-  // Determine status - respect explicit status if passed (e.g., 'short' for unavailable items)
-  let status: PickItemStatus = input.status || "picked";
-  if (input.status === "short") {
-    // Explicit short status takes priority (e.g., marking item as unavailable)
-    status = "short";
-  } else if (input.pickedQty === 0) {
-    status = "skipped";
-  } else if (input.pickedQty < current.target_qty) {
-    status = "short";
-  } else if (input.pickedBatchId && input.pickedBatchId !== current.original_batch_id) {
-    status = "substituted";
+  // Use atomic RPC to ensure all operations succeed or fail together
+  // This prevents inconsistent state if any step fails (e.g., stock deducted but allocation not updated)
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("pick_item_atomic", {
+    p_org_id: orgId,
+    p_pick_item_id: input.pickItemId,
+    p_picked_qty: input.pickedQty,
+    p_picked_batch_id: input.pickedBatchId || null,
+    p_user_id: user.id,
+    p_status: input.status || null,
+    p_substitution_reason: input.substitutionReason || null,
+    p_notes: input.notes || null,
+  });
+
+  if (rpcError) {
+    console.error("Error in pick_item_atomic:", rpcError);
+    return { error: rpcError.message };
   }
 
-  const { error } = await supabase
-    .from("pick_items")
-    .update({
-      picked_qty: input.pickedQty,
-      picked_batch_id: input.pickedBatchId || current.original_batch_id,
-      substitution_reason: input.substitutionReason,
-      notes: input.notes,
-      status,
-      picked_at: new Date().toISOString(),
-      picked_by: user.id,
-    })
-    .eq("id", input.pickItemId);
-
-  if (error) {
-    console.error("Error updating pick item:", error);
-    return { error: error.message };
+  if (!rpcResult?.success) {
+    console.error("pick_item_atomic failed:", rpcResult?.error);
+    return { error: rpcResult?.error || "Failed to pick item" };
   }
-
-  // Deduct from batch inventory
-  // Use provided batch ID or fall back to pre-allocated original batch
-  const effectiveBatchId = input.pickedBatchId || current.original_batch_id;
-  if (input.pickedQty > 0 && effectiveBatchId) {
-    const { error: rpcError } = await supabase.rpc("decrement_batch_quantity", {
-      p_org_id: orgId,
-      p_batch_id: effectiveBatchId,
-      p_units: input.pickedQty,
-    });
-    if (rpcError) {
-      console.error("Error decrementing batch quantity:", rpcError);
-      return { error: rpcError.message };
-    }
-
-    // Log to batch_events so it shows in batch's Log History
-    // Include order details for stock ledger display
-    const orderInfo = (current.pick_lists as any)?.orders;
-    await supabase.from("batch_events").insert({
-      org_id: orgId,
-      batch_id: effectiveBatchId,
-      type: "PICKED",
-      payload: {
-        units_picked: input.pickedQty,
-        pick_item_id: input.pickItemId,
-        pick_list_id: current.pick_list_id,
-        order_id: orderInfo?.id,
-        order_number: orderInfo?.order_number,
-        customer_name: orderInfo?.customers?.name,
-        notes: input.notes,
-        substitution_reason: input.substitutionReason,
-      },
-      by_user_id: user.id,
-      at: new Date().toISOString(),
-    });
-
-    // Update batch_allocations status from 'allocated' to 'picked'
-    // This tracks the allocation lifecycle for distribution/stock reporting
-    // Note: current.order_item_id comes from pick_items table (the * select)
-    if (current.order_item_id) {
-      const { error: allocUpdateError } = await supabase
-        .from("batch_allocations")
-        .update({
-          status: "picked",
-          updated_at: new Date().toISOString()
-        })
-        .eq("batch_id", effectiveBatchId)
-        .eq("order_item_id", current.order_item_id)
-        .eq("status", "allocated");
-
-      if (allocUpdateError) {
-        console.warn("Failed to update batch_allocation status:", allocUpdateError.message);
-        // Don't fail the pick - allocation might not exist or already updated
-      }
-    }
-  }
-
-  await logPickListEvent(
-    (current.pick_lists as any).org_id,
-    current.pick_list_id,
-    input.pickItemId,
-    status === "substituted" ? "item_substituted" : "item_picked",
-    `Picked ${input.pickedQty} of ${current.target_qty}`,
-    {
-      pickedQty: input.pickedQty,
-      targetQty: current.target_qty,
-      batchId: effectiveBatchId,
-      substitutionReason: input.substitutionReason,
-    }
-  );
 
   return {};
 }

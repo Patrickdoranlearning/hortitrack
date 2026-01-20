@@ -1,4 +1,4 @@
-
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUserAndOrg } from "@/server/auth/org";
 
 function yyww(now = new Date()) {
@@ -10,8 +10,18 @@ function yyww(now = new Date()) {
   return `${year}${ww}`;
 }
 
-export async function nextBatchNumber(phase: 1|2|3) {
-  const { supabase, orgId } = await getUserAndOrg();
+/**
+ * Get next batch number. Accepts optional supabase/orgId to avoid re-authenticating.
+ */
+export async function nextBatchNumber(
+  phase: 1|2|3,
+  supabaseClient?: SupabaseClient,
+  orgIdParam?: string
+) {
+  const { supabase, orgId } = supabaseClient && orgIdParam
+    ? { supabase: supabaseClient, orgId: orgIdParam }
+    : await getUserAndOrg();
+
   const key = `batch-${phase}-${yyww()}`;
 
   const { data, error } = await supabase.rpc("increment_counter", {

@@ -237,8 +237,20 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
     let created = 0;
     let failed = 0;
 
+    // Process rows with throttling to avoid rate limits (max 30/min = 2000ms between requests for safety)
+    const THROTTLE_MS = 100; // Slight delay between requests to be safe
+    let requestCount = 0;
+    const BATCH_SIZE = 25; // Pause after this many requests
+    const BATCH_PAUSE_MS = 3000; // Pause duration after batch
+
     for (const row of rows) {
       if (row.errors.length || row.status === "success") continue;
+
+      // Add pause after every BATCH_SIZE requests to avoid rate limits
+      if (requestCount > 0 && requestCount % BATCH_SIZE === 0) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_PAUSE_MS));
+      }
+
       updateRow(row.id, { status: "uploading", message: undefined });
       try {
         await ProductionAPI.propagate({
@@ -250,13 +262,27 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
           notes: row.notes || undefined,
         });
         created += 1;
+        requestCount += 1;
         updateRow(row.id, { status: "success", message: "Created" });
+
+        // Small delay between requests
+        if (THROTTLE_MS > 0) {
+          await new Promise((resolve) => setTimeout(resolve, THROTTLE_MS));
+        }
       } catch (err: any) {
         failed += 1;
+        requestCount += 1;
         const description =
           err?.message ??
           err?.response?.data?.error ??
           "Failed to create batch";
+
+        // If rate limited, pause longer before continuing
+        if (err?.status === 429 || description?.includes("Too many requests")) {
+          const resetMs = err?.resetMs ?? 5000;
+          await new Promise((resolve) => setTimeout(resolve, resetMs));
+        }
+
         updateRow(row.id, {
           status: "error",
           message: description,

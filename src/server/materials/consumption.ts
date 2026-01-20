@@ -147,11 +147,11 @@ export async function previewConsumption(
   sizeId: string,
   quantity: number
 ): Promise<LocalConsumptionPreview[]> {
-  // Get materials linked to this size
-  const linkedMaterials = await getMaterialsForSize(supabase, orgId, sizeId);
-
-  // Get consumption rules for this size
-  const rules = await getConsumptionRules(supabase, orgId, sizeId);
+  // Parallelize the two independent lookups
+  const [linkedMaterials, rules] = await Promise.all([
+    getMaterialsForSize(supabase, orgId, sizeId),
+    getConsumptionRules(supabase, orgId, sizeId),
+  ]);
 
   // Get current stock for these materials
   const materialIds = [...new Set([

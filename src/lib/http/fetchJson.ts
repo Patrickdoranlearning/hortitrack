@@ -2,11 +2,13 @@ export class HttpError extends Error {
   status: number;
   requestId?: string;
   body?: unknown;
-  constructor(message: string, status: number, requestId?: string, body?: unknown) {
+  resetMs?: number; // For 429 rate limit responses
+  constructor(message: string, status: number, requestId?: string, body?: unknown, resetMs?: number) {
     super(message);
     this.status = status;
     this.requestId = requestId;
     this.body = body;
+    this.resetMs = resetMs;
   }
 }
 
@@ -71,7 +73,8 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
   if (!res.ok) {
     const reqId = (data && typeof data === 'object' && ((data as Record<string, unknown>).requestId || (data as Record<string, unknown>).request_id)) || res.headers.get("x-request-id") || undefined;
     const message = (data && typeof data === 'object' && ((data as Record<string, unknown>).error || (data as Record<string, unknown>).message)) || `Request failed (${res.status})`;
-    throw new HttpError(String(message), res.status, reqId as string | undefined, data);
+    const resetMs = (data && typeof data === 'object' && (data as Record<string, unknown>).resetMs) as number | undefined;
+    throw new HttpError(String(message), res.status, reqId as string | undefined, data, resetMs);
   }
   return data as T;
 }

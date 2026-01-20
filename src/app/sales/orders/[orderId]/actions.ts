@@ -132,7 +132,47 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
 }
 
 export async function voidOrder(orderId: string) {
-  return updateOrderStatus(orderId, 'void');
+  let user, orgId, supabase;
+  try {
+    const auth = await getUserAndOrg();
+    user = auth.user;
+    orgId = auth.orgId;
+    supabase = auth.supabase;
+  } catch {
+    return { error: 'Not authenticated' };
+  }
+
+  // Use atomic RPC to void order and release allocations in single transaction
+  // This prevents orphaned allocations that block stock
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("void_order_with_allocations", {
+    p_org_id: orgId,
+    p_order_id: orderId,
+    p_user_id: user.id,
+  });
+
+  if (rpcError) {
+    console.error('Error in void_order_with_allocations:', rpcError);
+    return { error: rpcError.message || 'Failed to void order' };
+  }
+
+  if (!rpcResult?.success) {
+    console.error('void_order_with_allocations failed:', rpcResult?.error);
+    return { error: rpcResult?.error || 'Failed to void order' };
+  }
+
+  revalidatePath(`/sales/orders/${orderId}`);
+  revalidatePath('/sales/orders');
+  revalidatePath('/dispatch/picker');
+
+  return {
+    success: true,
+    allocationsReleased: rpcResult.allocationsReleased,
+    _mutated: {
+      resource: 'orders' as const,
+      action: 'update' as const,
+      id: orderId,
+    },
+  };
 }
 
 // ================================================

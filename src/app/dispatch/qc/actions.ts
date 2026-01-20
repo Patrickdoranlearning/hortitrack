@@ -160,113 +160,34 @@ export async function rejectForRepick(input: RejectForRepickInput) {
       return { error: `Failed to save QC check: ${qcError.message}` };
     }
 
-    // Reset pick list status back to pending for re-pick
-    const { error: pickListError } = await supabase
+    // Use atomic RPC to restore stock and reset pick list in single transaction
+    // This prevents partial state if any step fails (e.g., stock restored but pick items not reset)
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("reject_pick_list_atomic", {
+      p_org_id: orgId,
+      p_pick_list_id: input.pickListId,
+      p_user_id: userId,
+      p_failure_reason: input.failureReason,
+      p_failed_items: input.failedItems,
+    });
+
+    if (rpcError) {
+      console.error('Error in reject_pick_list_atomic:', rpcError);
+      return { error: rpcError.message || 'Failed to reject pick list' };
+    }
+
+    if (!rpcResult?.success) {
+      console.error('reject_pick_list_atomic failed:', rpcResult?.error);
+      return { error: rpcResult?.error || 'Failed to reject pick list' };
+    }
+
+    // Update pick list notes with rejection details (not part of RPC)
+    await supabase
       .from('pick_lists')
       .update({
-        status: 'pending',
-        started_at: null,
-        completed_at: null,
-        started_by: null,
-        completed_by: null,
-        notes: `QC REJECTED: ${input.failureReason}\n\nItem Issues:\n${input.failedItems.map(i => `- ${i.issue}: ${i.notes}`).join('\n')}`,
+        notes: `QC REJECTED: ${input.failureReason}\n\nItem Issues:\n${input.failedItems.map((i: { issue: string; notes: string }) => `- ${i.issue}: ${i.notes}`).join('\n')}`,
         updated_at: new Date().toISOString(),
       })
       .eq('id', input.pickListId);
-
-    if (pickListError) {
-      console.error('Error updating pick list status:', pickListError);
-      return { error: 'Failed to reset pick list status' };
-    }
-
-    // First, get picked items that need stock restored BEFORE resetting them
-    const { data: pickItemsData } = await supabase
-      .from('pick_items')
-      .select('id, picked_qty, picked_batch_id, order_item_id')
-      .eq('pick_list_id', input.pickListId)
-      .gt('picked_qty', 0);
-
-    // Restore stock for each picked item
-    if (pickItemsData && pickItemsData.length > 0) {
-      for (const item of pickItemsData) {
-        if (item.picked_batch_id && item.picked_qty > 0) {
-          // Restore quantity to batch
-          const { error: restoreError } = await supabase.rpc("increment_batch_quantity", {
-            p_org_id: orgId,
-            p_batch_id: item.picked_batch_id,
-            p_units: item.picked_qty,
-          });
-
-          if (restoreError) {
-            console.error(`Failed to restore quantity for batch ${item.picked_batch_id}:`, restoreError);
-            // Continue with other items, don't fail the whole operation
-          }
-
-          // Log restoration event to batch history
-          await supabase.from("batch_events").insert({
-            org_id: orgId,
-            batch_id: item.picked_batch_id,
-            type: "QC_REJECTED",
-            payload: {
-              units_restored: item.picked_qty,
-              pick_item_id: item.id,
-              pick_list_id: input.pickListId,
-              reason: input.failureReason,
-            },
-            by_user_id: userId,
-            at: new Date().toISOString(),
-          });
-
-          // Revert allocation status back to 'allocated' so it can be picked again
-          if (item.order_item_id) {
-            await supabase
-              .from("batch_allocations")
-              .update({ status: "allocated", updated_at: new Date().toISOString() })
-              .eq("batch_id", item.picked_batch_id)
-              .eq("order_item_id", item.order_item_id)
-              .eq("status", "picked");
-          }
-        }
-      }
-    }
-
-    // Reset pick items back to pending
-    const { error: itemsError } = await supabase
-      .from('pick_items')
-      .update({
-        status: 'pending',
-        picked_qty: 0,
-        picked_batch_id: null,
-        picked_by: null,
-        picked_at: null,
-      })
-      .eq('pick_list_id', input.pickListId);
-
-    if (itemsError) {
-      console.error('Error resetting pick items:', itemsError);
-    }
-
-    // Log the event
-    await supabase.from('pick_list_events').insert({
-      org_id: orgId,
-      pick_list_id: input.pickListId,
-      event_type: 'qc_rejected',
-      description: `Returned for re-pick: ${input.failureReason}`,
-      metadata: {
-        failedItems: input.failedItems,
-        reason: input.failureReason,
-      },
-      created_by: userId,
-    });
-
-    // Log to order_events
-    await supabase.from('order_events').insert({
-      org_id: orgId,
-      order_id: input.orderId,
-      event_type: 'qc_rejected',
-      description: `QC rejected - returned for re-pick. Reason: ${input.failureReason}`,
-      created_by: userId,
-    });
 
     revalidatePath('/dispatch/qc');
     revalidatePath('/dispatch/picker');
