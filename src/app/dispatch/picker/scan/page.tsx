@@ -64,8 +64,7 @@ export default function ScanToPickPage() {
 
       // Navigate to the picking workflow
       router.push(`/dispatch/picking/${data.pickListId}/workflow`);
-    } catch (error) {
-      console.error("Error looking up order:", error);
+    } catch {
       toast.error("Order not found. Please check the order number.");
     } finally {
       setIsLoading(false);
@@ -74,8 +73,6 @@ export default function ScanToPickPage() {
 
   const handleScanResult = async (code: string) => {
     if (isLoading) return; // Prevent double-processing
-
-    console.log("[Picker Scan] Received code:", code);
 
     // Check if it's a valid trolley label code
     // Expected format: HT:orgId:orderId:timestamp
@@ -123,8 +120,7 @@ export default function ScanToPickPage() {
         toast.error("Order not found for this label");
       }
     } catch (error: any) {
-      console.error("Error looking up order:", error);
-      toast.error(error.message || "Order not found. Please try again.");
+      toast.error(error?.message || "Order not found. Please try again.");
     } finally {
       setIsLoading(false);
     }

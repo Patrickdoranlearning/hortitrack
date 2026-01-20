@@ -276,6 +276,7 @@ export function DataMatrixScanner({ onScan, onError, className }: DataMatrixScan
           playsInline
           muted
           autoPlay
+          aria-label="Camera feed for scanning barcodes and QR codes"
         />
 
         {/* Hidden canvas for processing */}
@@ -310,6 +311,7 @@ export function DataMatrixScanner({ onScan, onError, className }: DataMatrixScan
               size="icon"
               onClick={toggleTorch}
               className="bg-black/40 hover:bg-black/60"
+              aria-label={torchOn ? 'Turn off flashlight' : 'Turn on flashlight'}
             >
               <Flashlight className={cn('h-4 w-4', torchOn && 'text-yellow-400')} />
             </Button>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserIdAndOrgId } from "@/server/auth/getUser";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 export async function GET() {
   try {
@@ -102,6 +103,16 @@ export async function POST(request: NextRequest) {
 
     if (!userId || !orgId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit: 10 user creations per minute per user (prevents spam accounts)
+    const rlKey = `org:members:create:${requestKey(request, userId)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 10 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests, please try again later", resetMs: rl.resetMs },
+        { status: 429 }
+      );
     }
 
     const supabase = await getSupabaseServerApp();

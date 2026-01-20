@@ -8,7 +8,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -27,29 +26,21 @@ import {
   ActionLogFormValues,
   Batch,
   NurseryLocation,
-  PlantSize,
-  Supplier,
   Variety,
 } from '@/lib/types';
 import {
   Grid,
   LayoutGrid,
   List,
-  LogOut,
   Plus,
   QrCode,
   Search,
   Sparkles,
-  Users,
   Printer,
-  MoreHorizontal,
-  ShoppingCart,
-  ClipboardList,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 import dynamic from 'next/dynamic';
@@ -66,7 +57,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { FeatureGate } from '@/components/FeatureGate';
 import { queryMatchesBatch } from '@/lib/search';
 import BatchLabelPreview from '@/components/BatchLabelPreview';
-import { TransplantIcon, CareIcon } from '@/components/icons';
+import { TransplantIcon } from '@/components/icons';
 import { TransplantMenuButton } from "@/components/horti/TransplantMenuButton";
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CheckInWizardDialog } from '@/components/production/checkin';
@@ -114,7 +105,7 @@ interface HomePageViewProps {
 export default function HomePageView({
   initialBatches,
   plantFamilies,
-  categories,
+  categories: _categories, // eslint-disable-line @typescript-eslint/no-unused-vars
   actions,
 }: HomePageViewProps) {
   const router = useRouter();
@@ -312,7 +303,8 @@ export default function HomePageView({
     }));
   };
 
-  const handleSignOut = async () => {
+  // Sign out handler - kept for potential future use
+  const _handleSignOut = async () => {
     const supabase = supabaseClient();
     await supabase.auth.signOut();
     router.push('/login');
@@ -320,7 +312,7 @@ export default function HomePageView({
       title: 'Signed Out',
       description: 'You have been successfully signed out.',
     });
-  };
+  }; void _handleSignOut; // eslint-disable-line @typescript-eslint/no-unused-expressions
 
   React.useEffect(() => {
     if (!authLoading && !user) {
@@ -438,12 +430,13 @@ export default function HomePageView({
     [normalizeBatchNode]
   );
 
-  const handleAiCareClick = async () => {
+  // AI care click handler - kept for potential future use
+  const _handleAiCareClick = async () => {
     if (!batches || batches.length === 0) return;
     const batchForRecs = batches[0];
     setSelectedBatch(batchForRecs);
     setIsRecommendationsOpen(true);
-  };
+  }; void _handleAiCareClick; // eslint-disable-line @typescript-eslint/no-unused-expressions
 
   const handleScanDetected = React.useCallback(
     async (text: string) => {
@@ -1231,6 +1224,7 @@ export default function HomePageView({
             >
               <PropagationForm
                 onSubmitSuccess={() => {
+                  setIsNewPropagationOpen(false);
                   forceRefresh();
                 }}
               />

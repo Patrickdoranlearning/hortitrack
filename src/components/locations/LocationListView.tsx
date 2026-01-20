@@ -73,7 +73,15 @@ export function LocationListView({ locations, onView, onPrint }: LocationListVie
               >
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">
+                    <span
+                      className="text-lg"
+                      role="img"
+                      aria-label={
+                        location.type?.toLowerCase() === 'tunnel' ? 'Tunnel' :
+                        location.type?.toLowerCase() === 'glasshouse' ? 'Glasshouse' :
+                        location.type?.toLowerCase() === 'outdoor' ? 'Outdoor area' : 'Location'
+                      }
+                    >
                       {location.type?.toLowerCase() === 'tunnel' ? '🏕️' :
                        location.type?.toLowerCase() === 'glasshouse' ? '🏠' :
                        location.type?.toLowerCase() === 'outdoor' ? '🌳' : '📍'}
@@ -130,6 +138,7 @@ export function LocationListView({ locations, onView, onPrint }: LocationListVie
                         e.stopPropagation();
                         onPrint(location);
                       }}
+                      aria-label={`Print labels for ${location.name}`}
                     >
                       <Printer className="h-4 w-4" />
                     </Button>
@@ -141,6 +150,7 @@ export function LocationListView({ locations, onView, onPrint }: LocationListVie
                         e.stopPropagation();
                         onView(location);
                       }}
+                      aria-label={`View details for ${location.name}`}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>

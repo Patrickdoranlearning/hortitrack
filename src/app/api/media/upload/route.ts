@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 const MEDIA_BUCKET = "batch-photos"; // existing public bucket for images
 
@@ -21,6 +22,16 @@ export async function POST(req: NextRequest) {
   try {
     const { user, orgId } = await getUserAndOrg();
     const supabase = await getSupabaseServerApp();
+
+    // Rate limit: 60 uploads per minute per user (prevents storage abuse)
+    const rlKey = `media:upload:${requestKey(req, user.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many uploads, please try again later", resetMs: rl.resetMs },
+        { status: 429 }
+      );
+    }
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;

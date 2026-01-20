@@ -7,6 +7,7 @@ import { nextBatchNumber } from "@/server/numbering/batches";
 import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 import { resolveProductionStatus } from "@/server/batches/service";
 import { consumeMaterialsForBatch } from "@/server/materials/consumption";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -15,6 +16,16 @@ export async function POST(req: NextRequest) {
     const input = PropagationInputSchema.parse(body);
 
     const { supabase, orgId, user } = await getUserAndOrg();
+
+    // Rate limit: 30 propagations per minute per user (heavy operation)
+    const rlKey = `batch:propagate:${requestKey(req, user.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 30 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests, please try again later", resetMs: rl.resetMs, requestId },
+        { status: 429 }
+      );
+    }
     const internalSupplierId = await ensureInternalSupplierId(supabase, orgId);
 
     // Resolve status_id

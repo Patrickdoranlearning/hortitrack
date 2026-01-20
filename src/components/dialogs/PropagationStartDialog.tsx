@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/use-toast";
 
 export function PropagationStartDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void; }) {
   const { orgId } = useActiveOrg();
+  const [submitting, setSubmitting] = React.useState(false);
   const form = useForm<PropagationStartInput>({
     resolver: zodResolver(PropagationStartSchema),
     defaultValues: { planted_at: new Date(), initial_tray_qty: 1 },
@@ -25,19 +26,26 @@ export function PropagationStartDialog({ open, onOpenChange }: { open: boolean; 
   const totalPreview = cellMultiple ? trayQty * cellMultiple : trayQty;
 
   async function submit() {
-    const values = form.getValues();
-    const res = await fetch("/api/batches/propagation-start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, orgId }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      toast({ variant: "destructive", title: "Failed to create batch", description: data.error || "Unknown error" });
-      return;
+    setSubmitting(true);
+    try {
+      const values = form.getValues();
+      const res = await fetch("/api/batches/propagation-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, orgId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ variant: "destructive", title: "Failed to create batch", description: data.error || "Unknown error" });
+        return;
+      }
+      toast({ title: "Batch created", description: `#${data.newBatch.batch_number} (${data.newBatch.quantity} plants)` });
+      onOpenChange(false);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to create batch" });
+    } finally {
+      setSubmitting(false);
     }
-    toast({ title: "Batch created", description: `#${data.batch_number} (${data.quantity} plants)` });
-    onOpenChange(false);
   }
 
   return (
@@ -47,7 +55,7 @@ export function PropagationStartDialog({ open, onOpenChange }: { open: boolean; 
       open={open}
       onOpenChange={onOpenChange}
       onSubmit={submit}
-      disablePrimary={!form.formState.isValid}
+      disablePrimary={!form.formState.isValid || submitting}
     >
       <div className="col-span-12 md:col-span-6">
         <ComboBoxEntity

@@ -7,6 +7,7 @@ import { createPickListFromOrder } from "@/server/sales/picking";
 import { allocateForProductLine } from "@/server/sales/allocation";
 import { getSaleableBatches } from "@/server/sales/inventory";
 import { calculateTrolleysNeeded, type OrderLineForCalculation } from "@/lib/dispatch/trolley-calculation";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 export async function GET(req: Request) {
   try {
@@ -47,6 +48,16 @@ export async function POST(req: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return fail(401, "unauthenticated", "You must be signed in.");
+
+    // Rate limit: 20 orders per minute per user (this is a heavy operation)
+    const rlKey = `orders:create:${requestKey(req, user.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 20 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, error: "Too many requests", resetMs: rl.resetMs },
+        { status: 429 }
+      );
+    }
 
     // Get active org
     let activeOrgId: string | null = null;

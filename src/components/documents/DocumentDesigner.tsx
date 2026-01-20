@@ -202,6 +202,21 @@ export function DocumentDesigner() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [activeComponentId, setActiveComponentId] = useState<string | null>(null);
   const [emailTo, setEmailTo] = useState<string>("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Warn about unsaved changes when navigating away
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Canvas view state
   const [editorMode, setEditorMode] = useState<"visual" | "list">("visual");
@@ -254,6 +269,7 @@ export function DocumentDesigner() {
       });
       setActiveComponentId(null);
       setPreviewHtml("");
+      setHasUnsavedChanges(false);
     } catch (err: any) {
       toast({
         variant: "destructive",
@@ -294,6 +310,7 @@ export function DocumentDesigner() {
 
   const updateLayout = (updater: (layout: DocumentComponent[]) => DocumentComponent[]) => {
     setState((prev) => ({ ...prev, layout: updater(prev.layout) }));
+    setHasUnsavedChanges(true);
   };
 
   const handleAddComponent = (type: DocumentComponent["type"]) => {
@@ -394,6 +411,7 @@ export function DocumentDesigner() {
         const others = prev.filter((t) => t.id !== tpl.id);
         return [tpl, ...others];
       });
+      setHasUnsavedChanges(false);
       toast({ title: "Draft saved" });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Save failed", description: err?.message });
@@ -420,6 +438,7 @@ export function DocumentDesigner() {
         const others = prev.filter((t) => t.id !== tpl.id);
         return [tpl, ...others];
       });
+      setHasUnsavedChanges(false);
       toast({ title: "Template published" });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Publish failed", description: err?.message });

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   getTasks,
@@ -7,6 +7,8 @@ import {
   type SourceModule,
   type TaskStatus,
 } from "@/server/tasks/service";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,8 +63,21 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Rate limit: 60 task creations per minute per user
+    const rlKey = `tasks:create:${requestKey(req, user?.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests, please try again later", resetMs: rl.resetMs },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const input = CreateTaskSchema.parse(body);
 

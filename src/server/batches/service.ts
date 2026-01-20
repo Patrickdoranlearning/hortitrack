@@ -157,7 +157,53 @@ export type PropagationInput = z.infer<typeof PropagationServiceInputSchema>;
 export async function createPropagationBatch(params: { input: PropagationInput; userId: string }) {
   const { supabase, orgId } = await getUserAndOrg();
   const input = PropagationServiceInputSchema.parse(params.input);
-  
+
+  // Validate foreign key references exist before insert
+  const varietyId = input.varietyId ?? input.plant_variety_id;
+  const sizeId = input.sizeId ?? input.size_id;
+  const locationId = input.locationId ?? input.location_id;
+
+  const validationErrors: string[] = [];
+
+  // Validate variety exists
+  if (varietyId) {
+    const { data: variety } = await supabase
+      .from("plant_varieties")
+      .select("id")
+      .eq("id", varietyId)
+      .maybeSingle();
+    if (!variety) validationErrors.push(`Plant variety not found: ${varietyId}`);
+  } else {
+    validationErrors.push("Plant variety ID is required");
+  }
+
+  // Validate size exists
+  if (sizeId) {
+    const { data: size } = await supabase
+      .from("plant_sizes")
+      .select("id")
+      .eq("id", sizeId)
+      .maybeSingle();
+    if (!size) validationErrors.push(`Plant size not found: ${sizeId}`);
+  } else {
+    validationErrors.push("Plant size ID is required");
+  }
+
+  // Validate location exists (if provided - location can be optional)
+  if (locationId) {
+    const { data: location } = await supabase
+      .from("nursery_locations")
+      .select("id")
+      .eq("id", locationId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (!location) validationErrors.push(`Nursery location not found or does not belong to this organization: ${locationId}`);
+  }
+
+  if (validationErrors.length > 0) {
+    throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+  }
+
   const statusOption = await resolveProductionStatus(supabase, orgId, input.status ?? "Propagation");
 
   // Resolve quantity: prefer explicit quantity/units, fallback to calculation
@@ -217,9 +263,67 @@ export type CheckinInput = z.infer<typeof CheckinServiceInputSchema>;
 export async function createCheckinBatch(params: { input: CheckinInput; userId: string }) {
   const { supabase, orgId } = await getUserAndOrg();
   const input = CheckinServiceInputSchema.parse(params.input);
-  
+
+  // Validate foreign key references exist before insert
+  const varietyId = input.varietyId ?? input.plant_variety_id;
+  const sizeId = input.sizeId ?? input.size_id;
+  const locationId = input.locationId ?? input.location_id;
+  const supplierId = input.supplierId ?? input.supplier_id;
+
+  const validationErrors: string[] = [];
+
+  // Validate variety exists (required)
+  if (varietyId) {
+    const { data: variety } = await supabase
+      .from("plant_varieties")
+      .select("id")
+      .eq("id", varietyId)
+      .maybeSingle();
+    if (!variety) validationErrors.push(`Plant variety not found: ${varietyId}`);
+  } else {
+    validationErrors.push("Plant variety ID is required");
+  }
+
+  // Validate size exists (required)
+  if (sizeId) {
+    const { data: size } = await supabase
+      .from("plant_sizes")
+      .select("id")
+      .eq("id", sizeId)
+      .maybeSingle();
+    if (!size) validationErrors.push(`Plant size not found: ${sizeId}`);
+  } else {
+    validationErrors.push("Plant size ID is required");
+  }
+
+  // Validate location exists (optional but must be valid if provided)
+  if (locationId) {
+    const { data: location } = await supabase
+      .from("nursery_locations")
+      .select("id")
+      .eq("id", locationId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (!location) validationErrors.push(`Nursery location not found or does not belong to this organization: ${locationId}`);
+  }
+
+  // Validate supplier exists (optional but must be valid if provided)
+  if (supplierId) {
+    const { data: supplier } = await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("id", supplierId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (!supplier) validationErrors.push(`Supplier not found or does not belong to this organization: ${supplierId}`);
+  }
+
+  if (validationErrors.length > 0) {
+    throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+  }
+
   const statusOption = await resolveProductionStatus(supabase, orgId, input.status ?? "Incoming");
-  
+
   const { data, error } = await supabase
     .from("batches")
     .insert({

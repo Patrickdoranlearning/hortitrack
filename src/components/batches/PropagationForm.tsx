@@ -61,12 +61,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
   
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
-  const toastImpl = useToast?.();
-  const toast =
-    toastImpl?.toast ??
-    ((v: any) => {
-      alert(v?.title || v?.description || "OK");
-    });
+  const { toast } = useToast();
 
   // Use hydration-safe date to prevent server/client mismatch
   const today = useTodayDate();
@@ -168,14 +163,23 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
       // Invalidate batch caches to trigger refresh across all components
       invalidateBatches();
 
-      // Show success modal instead of toast
-      setSuccessData({
-        batchNumber: batch?.batch_number ?? "",
-        batchId: batch?.id ?? "",
-        varietyName: selectedVariety?.name ?? "Unknown",
-        sizeName: selectedSize?.name ?? "Unknown",
-        quantity: totalUnits,
-      });
+      // If onSubmitSuccess is provided (dialog context), use toast and let parent handle close
+      // Otherwise show success modal for standalone page usage
+      if (onSubmitSuccess) {
+        toast({
+          title: "Propagation Created!",
+          description: `Batch #${batch?.batch_number ?? ""} - ${totalUnits.toLocaleString()} plants`,
+        });
+        onSubmitSuccess(batch);
+      } else {
+        setSuccessData({
+          batchNumber: batch?.batch_number ?? "",
+          batchId: batch?.id ?? "",
+          varietyName: selectedVariety?.name ?? "Unknown",
+          sizeName: selectedSize?.name ?? "Unknown",
+          quantity: totalUnits,
+        });
+      }
 
       form.reset({
         plant_variety_id: "",
@@ -185,7 +189,6 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
         containers: 1,
         notes: "",
       });
-      onSubmitSuccess?.(batch);
     } catch (err) {
       const e = err as HttpError;
       toast({

@@ -85,8 +85,8 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
           setSelectedPrinter(json.data[0].id);
         }
       }
-    } catch (e) {
-      console.error("Failed to fetch printers:", e);
+    } catch {
+      // Silently fail - printers will show empty state
     }
   };
 
@@ -104,8 +104,8 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
           setSelectedTemplate(json.data[0].id);
         }
       }
-    } catch (e) {
-      console.error("Failed to fetch templates:", e);
+    } catch {
+      // Silently fail - will use default template
     }
   };
 
@@ -415,8 +415,8 @@ function PrinterSettings({
       if (json.data) {
         setAgents(json.data);
       }
-    } catch (e) {
-      console.error("Failed to fetch agents:", e);
+    } catch {
+      // Silently fail - agents will show empty
     }
   };
 
