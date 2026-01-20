@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 async function getCustomers(orgId: string) {
   const supabase = await getSupabaseServerApp();
 
-  // Fetch customers with addresses
+  // Fetch customers with addresses and pre-pricing settings
   const { data: customers, error } = await supabase
     .from('customers')
     .select(`
@@ -19,6 +19,9 @@ async function getCustomers(orgId: string) {
       store,
       currency,
       country_code,
+      requires_pre_pricing,
+      pre_pricing_foc,
+      pre_pricing_cost_per_label,
       customer_addresses (
         id,
         label,
@@ -49,6 +52,9 @@ async function getCustomers(orgId: string) {
     store: c.store,
     currency: c.currency ?? 'EUR',
     countryCode: c.country_code ?? 'IE',
+    requiresPrePricing: c.requires_pre_pricing ?? false,
+    prePricingFoc: c.pre_pricing_foc ?? false,
+    prePricingCostPerLabel: c.pre_pricing_cost_per_label ?? null,
     addresses: (c.customer_addresses ?? []).map((a: {
       id: string;
       label: string;

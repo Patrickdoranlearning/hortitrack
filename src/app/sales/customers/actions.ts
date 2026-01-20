@@ -39,6 +39,8 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
     credit_limit: parsed.creditLimit ?? null,
     account_code: cleanString(parsed.accountCode),
     requires_pre_pricing: parsed.requiresPrePricing ?? false,
+    pre_pricing_foc: parsed.prePricingFoc ?? false,
+    pre_pricing_cost_per_label: parsed.prePricingCostPerLabel ?? null,
   };
 
   let data;

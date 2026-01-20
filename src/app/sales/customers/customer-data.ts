@@ -25,6 +25,8 @@ export type CustomerRow = {
   credit_limit: number | null;
   account_code: string | null;
   requires_pre_pricing: boolean;
+  pre_pricing_foc: boolean;
+  pre_pricing_cost_per_label: number | null;
   // Relations
   price_lists: { id: string; name: string } | null;
   price_list_customers: Array<{
@@ -100,6 +102,8 @@ export async function fetchCustomerManagementData(
         credit_limit,
         account_code,
         requires_pre_pricing,
+        pre_pricing_foc,
+        pre_pricing_cost_per_label,
         price_lists ( id, name ),
         price_list_customers (
           id,
@@ -192,6 +196,8 @@ export function mapCustomers(rows: CustomerRow[]): CustomerSummary[] {
     creditLimit: row.credit_limit,
     accountCode: row.account_code,
     requiresPrePricing: row.requires_pre_pricing ?? false,
+    prePricingFoc: row.pre_pricing_foc ?? false,
+    prePricingCostPerLabel: row.pre_pricing_cost_per_label ?? null,
     deliveryPreferences: null,
     // Aggregated
     orderCount: 0, // TODO: aggregate from orders

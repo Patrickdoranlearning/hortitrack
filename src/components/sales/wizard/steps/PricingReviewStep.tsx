@@ -12,6 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Truck, Tag } from 'lucide-react';
 
+type CustomerPrePricingSettings = {
+  prePricingFoc: boolean;
+  prePricingCostPerLabel: number | null;
+};
+
 type Props = {
   form: UseFormReturn<CreateOrderInput>;
   totals: { net: number; vat: number; total: number };
@@ -20,16 +25,18 @@ type Props = {
   selectedCustomerId?: string;
   defaultShowRrp?: boolean;
   fees?: OrgFee[];
+  customerPrePricing?: CustomerPrePricingSettings;
 };
 
-export function PricingReviewStep({ 
-  form, 
-  totals, 
-  lines, 
+export function PricingReviewStep({
+  form,
+  totals,
+  lines,
   products,
   selectedCustomerId,
   defaultShowRrp = true,
   fees = [],
+  customerPrePricing,
 }: Props) {
   const watchedLines = useWatch({ control: form.control, name: 'lines' });
   
@@ -54,10 +61,10 @@ export function PricingReviewStep({
     return defaultDelivery?.id || '';
   });
 
-  // Calculate pre-pricing fee
+  // Calculate pre-pricing fee (considering customer-specific settings)
   const prePricingInfo = useMemo(() => {
-    if (!prePricingFee) return { totalUnits: 0, fee: 0, vatAmount: 0 };
-    
+    if (!prePricingFee) return { totalUnits: 0, fee: 0, vatAmount: 0, isFoc: false, ratePerUnit: 0 };
+
     let totalUnits = 0;
     watchedLines?.forEach((line, index) => {
       if (rrpEnabled[index] && line?.rrp != null) {
@@ -65,10 +72,20 @@ export function PricingReviewStep({
         totalUnits += qty;
       }
     });
-    const fee = totalUnits * prePricingFee.amount;
+
+    // Check if customer has FOC (Free of Charge) pre-pricing
+    const isFoc = customerPrePricing?.prePricingFoc ?? false;
+
+    // Determine the rate per unit: customer-specific > org default
+    const ratePerUnit = isFoc
+      ? 0
+      : (customerPrePricing?.prePricingCostPerLabel ?? prePricingFee.amount);
+
+    const fee = totalUnits * ratePerUnit;
     const vatAmount = fee * (prePricingFee.vatRate / 100);
-    return { totalUnits, fee, vatAmount };
-  }, [watchedLines, rrpEnabled, prePricingFee]);
+
+    return { totalUnits, fee, vatAmount, isFoc, ratePerUnit };
+  }, [watchedLines, rrpEnabled, prePricingFee, customerPrePricing]);
 
   // Calculate delivery fee
   const deliveryInfo = useMemo((): { fee: number; vatAmount: number; name: string; waived: boolean; minValue?: number } => {
@@ -324,11 +341,21 @@ export function PricingReviewStep({
             <span className="text-muted-foreground flex items-center gap-2">
               <Tag className="h-3 w-3" />
               Pre-pricing
-              <Badge variant="secondary" className="text-[10px] font-normal">
-                {prePricingInfo.totalUnits} × €{prePricingFee.amount.toFixed(2)}
-              </Badge>
+              {prePricingInfo.isFoc ? (
+                <Badge variant="secondary" className="text-[10px] font-normal">
+                  FOC
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px] font-normal">
+                  {prePricingInfo.totalUnits} × €{prePricingInfo.ratePerUnit.toFixed(2)}
+                </Badge>
+              )}
             </span>
-            <span className="font-medium">€{prePricingInfo.fee.toFixed(2)}</span>
+            {prePricingInfo.isFoc ? (
+              <span className="font-medium text-green-600">FOC</span>
+            ) : (
+              <span className="font-medium">€{prePricingInfo.fee.toFixed(2)}</span>
+            )}
           </div>
         )}
 

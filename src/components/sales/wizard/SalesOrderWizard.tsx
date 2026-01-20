@@ -30,6 +30,8 @@ export type SalesCustomer = {
   countryCode?: string;
   addresses?: CustomerAddress[];
   requiresPrePricing?: boolean;
+  prePricingFoc?: boolean;
+  prePricingCostPerLabel?: number | null;
 };
 
 type SalesOrderWizardProps = {
@@ -311,6 +313,14 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
               selectedCustomerId={selectedCustomerId}
               fees={fees}
               defaultShowRrp={selectedCustomer?.requiresPrePricing ?? false}
+              customerPrePricing={
+                selectedCustomer
+                  ? {
+                      prePricingFoc: selectedCustomer.prePricingFoc ?? false,
+                      prePricingCostPerLabel: selectedCustomer.prePricingCostPerLabel ?? null,
+                    }
+                  : undefined
+              }
             />
           )}
 

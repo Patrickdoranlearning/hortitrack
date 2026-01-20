@@ -121,6 +121,8 @@ type AccountFormState = {
   creditLimit: number | null;
   accountCode: string;
   requiresPrePricing: boolean;
+  prePricingFoc: boolean;
+  prePricingCostPerLabel: number | null;
 };
 
 // =============================================================================
@@ -162,6 +164,8 @@ export function CustomerSheet({
       creditLimit: c?.creditLimit ?? null,
       accountCode: c?.accountCode ?? "",
       requiresPrePricing: c?.requiresPrePricing ?? false,
+      prePricingFoc: c?.prePricingFoc ?? false,
+      prePricingCostPerLabel: c?.prePricingCostPerLabel ?? null,
     };
   }
 
@@ -199,6 +203,8 @@ export function CustomerSheet({
         creditLimit: form.creditLimit,
         accountCode: form.accountCode || null,
         requiresPrePricing: form.requiresPrePricing,
+        prePricingFoc: form.prePricingFoc,
+        prePricingCostPerLabel: form.prePricingCostPerLabel,
       });
       if (!result.success) {
         toast({ variant: "destructive", title: "Save failed", description: result.error });
@@ -502,22 +508,82 @@ function AccountDetailsTab({
       </div>
 
       {/* Pre-Pricing Requirement */}
-      <div className="rounded-lg border p-4 bg-muted/30">
+      <div className="rounded-lg border p-4 bg-muted/30 space-y-3">
         <div className="flex items-center space-x-2">
           <Checkbox
             id="requiresPrePricing"
             checked={form.requiresPrePricing}
-            onCheckedChange={(checked) =>
-              setForm((p) => ({ ...p, requiresPrePricing: checked === true }))
-            }
+            onCheckedChange={(checked) => {
+              const isChecked = checked === true;
+              setForm((p) => ({
+                ...p,
+                requiresPrePricing: isChecked,
+                // Reset FOC and cost when unchecking pre-pricing
+                prePricingFoc: isChecked ? p.prePricingFoc : false,
+                prePricingCostPerLabel: isChecked ? p.prePricingCostPerLabel : null,
+              }));
+            }}
           />
           <Label htmlFor="requiresPrePricing" className="text-sm font-medium">
             Requires pre-pricing labels
           </Label>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 ml-6">
-          Enable if this customer requires RRP labels on their pots. Pre-pricing fee will be added to orders.
+        <p className="text-xs text-muted-foreground ml-6">
+          Enable if this customer requires RRP labels on their pots.
         </p>
+
+        {/* FOC and Cost per Label - only shown when pre-pricing is required */}
+        {form.requiresPrePricing && (
+          <div className="ml-6 mt-3 rounded-md border p-3 bg-background space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="prePricingFoc"
+                checked={form.prePricingFoc}
+                onCheckedChange={(checked) =>
+                  setForm((p) => ({
+                    ...p,
+                    prePricingFoc: checked === true,
+                    // Clear cost when setting FOC
+                    prePricingCostPerLabel: checked === true ? null : p.prePricingCostPerLabel,
+                  }))
+                }
+              />
+              <Label htmlFor="prePricingFoc" className="text-sm font-medium">
+                FOC (Free of Charge)
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground ml-6">
+              Check if pre-pricing is free for this customer.
+            </p>
+
+            {/* Cost per label input - only shown when not FOC */}
+            {!form.prePricingFoc && (
+              <div className="space-y-1">
+                <Label htmlFor="prePricingCostPerLabel" className="text-sm">
+                  Cost per label
+                </Label>
+                <Input
+                  id="prePricingCostPerLabel"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Leave blank for org default"
+                  className="w-40"
+                  value={form.prePricingCostPerLabel ?? ""}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      prePricingCostPerLabel: e.target.value ? parseFloat(e.target.value) : null,
+                    }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to use organization default rate.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* B2B Portal Access */}
