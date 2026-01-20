@@ -120,6 +120,7 @@ type AccountFormState = {
   paymentTermsDays: number;
   creditLimit: number | null;
   accountCode: string;
+  requiresPrePricing: boolean;
 };
 
 // =============================================================================
@@ -160,6 +161,7 @@ export function CustomerSheet({
       paymentTermsDays: c?.paymentTermsDays ?? 30,
       creditLimit: c?.creditLimit ?? null,
       accountCode: c?.accountCode ?? "",
+      requiresPrePricing: c?.requiresPrePricing ?? false,
     };
   }
 
@@ -196,6 +198,7 @@ export function CustomerSheet({
         paymentTermsDays: form.paymentTermsDays,
         creditLimit: form.creditLimit,
         accountCode: form.accountCode || null,
+        requiresPrePricing: form.requiresPrePricing,
       });
       if (!result.success) {
         toast({ variant: "destructive", title: "Save failed", description: result.error });
@@ -496,6 +499,25 @@ function AccountDetailsTab({
           value={form.accountsEmail}
           onChange={(e) => setForm((p) => ({ ...p, accountsEmail: e.target.value }))}
         />
+      </div>
+
+      {/* Pre-Pricing Requirement */}
+      <div className="rounded-lg border p-4 bg-muted/30">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="requiresPrePricing"
+            checked={form.requiresPrePricing}
+            onCheckedChange={(checked) =>
+              setForm((p) => ({ ...p, requiresPrePricing: checked === true }))
+            }
+          />
+          <Label htmlFor="requiresPrePricing" className="text-sm font-medium">
+            Requires pre-pricing labels
+          </Label>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1 ml-6">
+          Enable if this customer requires RRP labels on their pots. Pre-pricing fee will be added to orders.
+        </p>
       </div>
 
       {/* B2B Portal Access */}

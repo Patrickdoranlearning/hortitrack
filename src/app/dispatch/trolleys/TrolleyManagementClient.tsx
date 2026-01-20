@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -50,8 +51,15 @@ import {
   Minus,
   Camera,
   FileText,
+  ArrowRight,
+  Bell,
+  ExternalLink,
+  Check,
+  X,
+  FileSignature,
 } from "lucide-react";
 import { format } from "date-fns";
+import { SignatureCaptureDialog } from "@/components/dispatch/driver/SignatureCaptureDialog";
 
 type CustomerBalance = {
   customerId: string;
@@ -90,6 +98,23 @@ type TrolleyTransaction = {
   recordedBy?: string;
 };
 
+type PendingTransfer = {
+  id: string;
+  fromHaulierId: string;
+  fromHaulierName: string;
+  toCustomerId: string;
+  toCustomerName: string;
+  trolleys: number;
+  shelves: number;
+  deliveryRunNumber?: string;
+  reason: string;
+  driverNotes?: string;
+  signedDocketUrl?: string;
+  photoUrl?: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string;
+};
+
 type RecordMovementForm = {
   type: "delivered" | "returned" | "not_returned";
   customerId: string;
@@ -113,9 +138,25 @@ export default function TrolleyManagementClient() {
   const [customerBalances, setCustomerBalances] = useState<CustomerBalance[]>([]);
   const [haulierBalances, setHaulierBalances] = useState<HaulierBalance[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<TrolleyTransaction[]>([]);
+  const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([]);
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
+
+  // Transfer approval dialog
+  const [selectedTransfer, setSelectedTransfer] = useState<PendingTransfer | null>(null);
+  const [transferAction, setTransferAction] = useState<"approve" | "reject" | null>(null);
+  const [transferNotes, setTransferNotes] = useState("");
+  const [isProcessingTransfer, setIsProcessingTransfer] = useState(false);
+
+  // Signature capture dialog
+  const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
+  const [signatureTarget, setSignatureTarget] = useState<{
+    customerId: string;
+    customerName: string;
+    trolleys: number;
+    shelves: number;
+  } | null>(null);
   
   // Record movement dialog
   const [isRecordDialogOpen, setIsRecordDialogOpen] = useState(false);
@@ -158,6 +199,13 @@ export default function TrolleyManagementClient() {
         setRecentTransactions(transactionsData.transactions);
       }
 
+      // Fetch pending transfers
+      const transfersRes = await fetch("/api/dispatch/trolleys/transfers?status=pending");
+      const transfersData = await transfersRes.json();
+      if (transfersData.transfers) {
+        setPendingTransfers(transfersData.transfers);
+      }
+
       // Fetch customers for dropdown
       const customersRes = await fetch("/api/lookups/customers");
       const customersData = await customersRes.json();
@@ -169,6 +217,51 @@ export default function TrolleyManagementClient() {
       toast({ variant: "destructive", title: "Failed to load data" });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleProcessTransfer = async () => {
+    if (!selectedTransfer || !transferAction) return;
+
+    setIsProcessingTransfer(true);
+    try {
+      const response = await fetch(
+        `/api/dispatch/trolleys/transfers/${selectedTransfer.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: transferAction,
+            notes: transferNotes || undefined,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || `Failed to ${transferAction} transfer`);
+      }
+
+      toast({
+        title: transferAction === "approve" ? "Transfer Approved" : "Transfer Rejected",
+        description:
+          transferAction === "approve"
+            ? `${selectedTransfer.trolleys} trolleys transferred from ${selectedTransfer.fromHaulierName} to ${selectedTransfer.toCustomerName}`
+            : "Transfer request has been rejected",
+      });
+
+      setSelectedTransfer(null);
+      setTransferAction(null);
+      setTransferNotes("");
+      fetchData();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    } finally {
+      setIsProcessingTransfer(false);
     }
   };
 
@@ -233,6 +326,7 @@ export default function TrolleyManagementClient() {
   const overdueCustomers = customerBalances.filter((b) => b.hasOverdueItems).length;
   const trolleysOnTrucks = haulierBalances.reduce((sum, h) => sum + h.trolleysLoaded, 0);
   const notReturnedCount = recentTransactions.filter((t) => t.type === "not_returned").length;
+  const pendingTransferCount = pendingTransfers.length;
 
   // Filter balances
   const filteredCustomerBalances = customerBalances.filter((b) => {
@@ -327,6 +421,14 @@ export default function TrolleyManagementClient() {
         <TabsList>
           <TabsTrigger value="customers">Customer Balances</TabsTrigger>
           <TabsTrigger value="hauliers">Haulier Loads</TabsTrigger>
+          <TabsTrigger value="transfers" className="relative">
+            Pending Transfers
+            {pendingTransferCount > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium bg-orange-500 text-white rounded-full">
+                {pendingTransferCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="history">Transaction History</TabsTrigger>
         </TabsList>
 
@@ -381,7 +483,14 @@ export default function TrolleyManagementClient() {
                         key={balance.customerId}
                         className={balance.hasOverdueItems ? "bg-orange-50" : ""}
                       >
-                        <TableCell className="font-medium">{balance.customerName}</TableCell>
+                        <TableCell>
+                          <Link
+                            href={`/dispatch/trolleys/customer/${balance.customerId}`}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {balance.customerName}
+                          </Link>
+                        </TableCell>
                         <TableCell className="text-right">
                           {balance.trolleysOut > 0 ? (
                             <Badge variant="secondary" className="bg-purple-100 text-purple-700">
@@ -499,6 +608,142 @@ export default function TrolleyManagementClient() {
           </Card>
         </TabsContent>
 
+        {/* Pending Transfers Tab */}
+        <TabsContent value="transfers" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-orange-500" />
+                Pending Balance Transfers
+              </CardTitle>
+              <CardDescription>
+                Transfer requests from hauliers when customers don't return equipment.
+                Approve to move the balance from the haulier to the customer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pendingTransfers.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-green-500 opacity-50" />
+                  <p className="font-medium text-foreground">No pending transfers</p>
+                  <p className="text-sm">All transfer requests have been processed.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingTransfers.map((transfer) => (
+                    <Card key={transfer.id} className="border-2 border-orange-200 bg-orange-50/50">
+                      <CardContent className="pt-4">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          {/* Transfer Details */}
+                          <div className="flex-1 space-y-3">
+                            {/* From/To */}
+                            <div className="flex items-center gap-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Truck className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{transfer.fromHaulierName}</span>
+                              </div>
+                              <ArrowRight className="h-4 w-4 text-orange-500" />
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{transfer.toCustomerName}</span>
+                              </div>
+                            </div>
+
+                            {/* Quantities */}
+                            <div className="flex gap-4">
+                              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                                {transfer.trolleys} Trolleys
+                              </Badge>
+                              {transfer.shelves > 0 && (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                                  {transfer.shelves} Shelves
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Reason & Notes */}
+                            <div className="text-sm">
+                              <p className="text-muted-foreground">
+                                <span className="font-medium text-foreground">Reason:</span> {transfer.reason}
+                              </p>
+                              {transfer.driverNotes && (
+                                <p className="text-muted-foreground mt-1">
+                                  <span className="font-medium text-foreground">Driver notes:</span> {transfer.driverNotes}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Evidence Links */}
+                            <div className="flex gap-3">
+                              {transfer.signedDocketUrl && (
+                                <a
+                                  href={transfer.signedDocketUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  View Signed Docket
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                              {transfer.photoUrl && (
+                                <a
+                                  href={transfer.photoUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                >
+                                  <Camera className="h-4 w-4" />
+                                  View Photo
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
+
+                            {/* Request Info */}
+                            <p className="text-xs text-muted-foreground">
+                              Requested {formatDate(transfer.requestedAt)}
+                              {transfer.deliveryRunNumber && ` • Run ${transfer.deliveryRunNumber}`}
+                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-2 lg:flex-col">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTransfer(transfer);
+                                setTransferAction("approve");
+                              }}
+                              className="flex-1"
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedTransfer(transfer);
+                                setTransferAction("reject");
+                              }}
+                              className="flex-1"
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Transaction History Tab */}
         <TabsContent value="history" className="space-y-4">
           <Card>
@@ -575,10 +820,23 @@ export default function TrolleyManagementClient() {
                               View
                             </a>
                           ) : tx.type === "not_returned" ? (
-                            <Badge variant="outline" className="text-orange-600">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Needed
-                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs text-orange-600 border-orange-300 hover:bg-orange-50"
+                              onClick={() => {
+                                setSignatureTarget({
+                                  customerId: tx.customerId,
+                                  customerName: tx.customerName,
+                                  trolleys: tx.trolleys,
+                                  shelves: tx.shelves,
+                                });
+                                setSignatureDialogOpen(true);
+                              }}
+                            >
+                              <FileSignature className="h-3 w-3 mr-1" />
+                              Capture
+                            </Button>
                           ) : (
                             "—"
                           )}
@@ -772,14 +1030,11 @@ export default function TrolleyManagementClient() {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-red-800">Signed Docket Required</p>
+                    <p className="font-medium text-red-800">Signed Docket Recommended</p>
                     <p className="text-red-700">
-                      A signed delivery docket confirming non-return should be uploaded as proof.
+                      Get customer signature to confirm equipment was not returned.
+                      You can capture it after recording this movement.
                     </p>
-                    <Button variant="outline" size="sm" className="mt-2" disabled>
-                      <Camera className="h-4 w-4 mr-2" />
-                      Upload Signed Docket (Coming Soon)
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -800,6 +1055,129 @@ export default function TrolleyManagementClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Transfer Approval/Rejection Dialog */}
+      <Dialog
+        open={selectedTransfer !== null && transferAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedTransfer(null);
+            setTransferAction(null);
+            setTransferNotes("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {transferAction === "approve" ? "Approve Transfer" : "Reject Transfer"}
+            </DialogTitle>
+            <DialogDescription>
+              {transferAction === "approve"
+                ? "This will transfer the equipment balance from the haulier to the customer."
+                : "This will reject the transfer request. The haulier will retain the balance."}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedTransfer && (
+            <div className="space-y-4 py-4">
+              {/* Transfer Summary */}
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">From:</span>
+                  <span className="font-medium">{selectedTransfer.fromHaulierName}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">To:</span>
+                  <span className="font-medium">{selectedTransfer.toCustomerName}</span>
+                </div>
+                <div className="flex gap-3 mt-2">
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                    {selectedTransfer.trolleys} Trolleys
+                  </Badge>
+                  {selectedTransfer.shelves > 0 && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                      {selectedTransfer.shelves} Shelves
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="grid gap-2">
+                <Label htmlFor="transfer-notes">
+                  {transferAction === "approve" ? "Approval Notes (optional)" : "Rejection Reason"}
+                </Label>
+                <Textarea
+                  id="transfer-notes"
+                  placeholder={
+                    transferAction === "approve"
+                      ? "Add any notes about this approval..."
+                      : "Explain why this transfer is being rejected..."
+                  }
+                  value={transferNotes}
+                  onChange={(e) => setTransferNotes(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              {/* Warning for rejection */}
+              {transferAction === "reject" && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
+                    <p className="text-sm text-orange-700">
+                      Rejecting this transfer means the haulier ({selectedTransfer.fromHaulierName})
+                      keeps the equipment on their balance. Make sure this is correct.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedTransfer(null);
+                setTransferAction(null);
+                setTransferNotes("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleProcessTransfer}
+              disabled={isProcessingTransfer}
+              variant={transferAction === "reject" ? "destructive" : "default"}
+            >
+              {isProcessingTransfer && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {transferAction === "approve" ? "Approve Transfer" : "Reject Transfer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Signature Capture Dialog */}
+      {signatureTarget && (
+        <SignatureCaptureDialog
+          open={signatureDialogOpen}
+          onOpenChange={(open) => {
+            setSignatureDialogOpen(open);
+            if (!open) setSignatureTarget(null);
+          }}
+          customerId={signatureTarget.customerId}
+          customerName={signatureTarget.customerName}
+          trolleysNotReturned={signatureTarget.trolleys}
+          shelvesNotReturned={signatureTarget.shelves}
+          onComplete={() => {
+            fetchData();
+            toast({
+              title: "Signed docket captured",
+              description: "The signature has been recorded.",
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

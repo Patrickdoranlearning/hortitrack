@@ -12,7 +12,7 @@ export interface PrinterConfig {
 }
 
 export interface SendToPrinterOptions {
-  jobType: "batch" | "sale" | "location" | "trolley";
+  jobType: "batch" | "sale" | "location" | "trolley" | "passport";
   orgId: string;
   userId?: string;
   copies?: number;

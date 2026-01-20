@@ -5,6 +5,7 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { getBatchAncestry, getBatchSummary } from "@/lib/api/batches";
 import { AncestryNode, BatchSummary } from "@/types/batch";
 import { AncestryTab } from "@/components/batch/AncestryTab";
@@ -149,43 +150,45 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
           <div ref={liveRef} aria-live="polite" className="sr-only" />
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="mt-2">
-          <TabsList>
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="log">Log History</TabsTrigger>
-            <TabsTrigger value="photos">Photos</TabsTrigger>
-            <TabsTrigger value="ancestry">Ancestry</TabsTrigger>
-            <TabsTrigger value="ai">AI Tools</TabsTrigger>
-          </TabsList>
+        <ErrorBoundary>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)} className="mt-2">
+            <TabsList>
+              <TabsTrigger value="summary">Summary</TabsTrigger>
+              <TabsTrigger value="log">Log History</TabsTrigger>
+              <TabsTrigger value="photos">Photos</TabsTrigger>
+              <TabsTrigger value="ancestry">Ancestry</TabsTrigger>
+              <TabsTrigger value="ai">AI Tools</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="summary" className="pt-3">
-            {/* existing Summary tab content goes here; ensure it renders from activeBatch */}
-            {/* <BatchSummary batchNumber={activeBatch} /> */}
-          </TabsContent>
+            <TabsContent value="summary" className="pt-3">
+              {/* existing Summary tab content goes here; ensure it renders from activeBatch */}
+              {/* <BatchSummary batchNumber={activeBatch} /> */}
+            </TabsContent>
 
-          <TabsContent value="log" className="pt-3">
-            {/* <BatchLogHistory batchNumber={activeBatch} /> */}
-          </TabsContent>
+            <TabsContent value="log" className="pt-3">
+              {/* <BatchLogHistory batchNumber={activeBatch} /> */}
+            </TabsContent>
 
-          <TabsContent value="photos" className="pt-3">
-            {/* <BatchPhotos batchNumber={activeBatch} /> */}
-          </TabsContent>
+            <TabsContent value="photos" className="pt-3">
+              {/* <BatchPhotos batchNumber={activeBatch} /> */}
+            </TabsContent>
 
-          <TabsContent value="ancestry" className="pt-3">
-            <AncestryTab
-              nodes={ancestry}
-              currentBatchNumber={activeBatch}
-              onOpenBatch={openBatchInDialog}
-              loadingToId={loadingToId}
-              stayOnAncestry={stayOnAncestry}
-              onToggleStayOnAncestry={setStayOnAncestry}
-            />
-          </TabsContent>
+            <TabsContent value="ancestry" className="pt-3">
+              <AncestryTab
+                nodes={ancestry}
+                currentBatchNumber={activeBatch}
+                onOpenBatch={openBatchInDialog}
+                loadingToId={loadingToId}
+                stayOnAncestry={stayOnAncestry}
+                onToggleStayOnAncestry={setStayOnAncestry}
+              />
+            </TabsContent>
 
-          <TabsContent value="ai" className="pt-3">
-            {/* <BatchAiTools batchNumber={activeBatch} /> */}
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="ai" className="pt-3">
+              {/* <BatchAiTools batchNumber={activeBatch} /> */}
+            </TabsContent>
+          </Tabs>
+        </ErrorBoundary>
       </DialogContent>
     </Dialog>
   );

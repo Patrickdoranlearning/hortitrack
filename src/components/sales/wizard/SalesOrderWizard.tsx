@@ -29,6 +29,7 @@ export type SalesCustomer = {
   currency?: string;
   countryCode?: string;
   addresses?: CustomerAddress[];
+  requiresPrePricing?: boolean;
 };
 
 type SalesOrderWizardProps = {
@@ -309,6 +310,7 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
               products={products}
               selectedCustomerId={selectedCustomerId}
               fees={fees}
+              defaultShowRrp={selectedCustomer?.requiresPrePricing ?? false}
             />
           )}
 

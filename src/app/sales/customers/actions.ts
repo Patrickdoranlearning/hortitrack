@@ -38,6 +38,7 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
     payment_terms_days: parsed.paymentTermsDays ?? 30,
     credit_limit: parsed.creditLimit ?? null,
     account_code: cleanString(parsed.accountCode),
+    requires_pre_pricing: parsed.requiresPrePricing ?? false,
   };
 
   let data;

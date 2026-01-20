@@ -30,6 +30,7 @@ export type CustomerSummary = {
   paymentTermsDays: number;
   creditLimit: number | null;
   accountCode: string | null;
+  requiresPrePricing: boolean;
   deliveryPreferences: DeliveryPreferences | null;
   // Aggregated data
   orderCount: number;
@@ -97,6 +98,7 @@ export type CustomerFormData = {
   paymentTermsDays?: number;
   creditLimit?: number | null;
   accountCode?: string | null;
+  requiresPrePricing?: boolean;
 };
 
 export const customerFormSchema = z.object({
@@ -117,6 +119,7 @@ export const customerFormSchema = z.object({
   paymentTermsDays: z.number().int().min(0).default(30),
   creditLimit: z.number().nonnegative().optional().nullable(),
   accountCode: z.string().max(50).optional().nullable(),
+  requiresPrePricing: z.boolean().default(false),
 });
 
 export const customerAddressSchema = z.object({

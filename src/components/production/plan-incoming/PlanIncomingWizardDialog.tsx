@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PlanIncomingWizard } from './PlanIncomingWizard';
 
 type PlanIncomingWizardDialogProps = {
@@ -41,10 +42,12 @@ export function PlanIncomingWizardDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-1 -mr-1">
-          <PlanIncomingWizard
-            onComplete={handleComplete}
-            onCancel={handleCancel}
-          />
+          <ErrorBoundary>
+            <PlanIncomingWizard
+              onComplete={handleComplete}
+              onCancel={handleCancel}
+            />
+          </ErrorBoundary>
         </div>
       </DialogContent>
     </Dialog>

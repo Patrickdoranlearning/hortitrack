@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { generateInvoice, getOrderDetails } from '@/app/sales/actions';
 import { useToast } from '@/components/ui/use-toast';
 import { SalesOrder, Invoice } from '@/lib/sales/types';
@@ -84,19 +85,20 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                     </div>
                 </DialogHeader>
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-                    <TabsList>
-                        <TabsTrigger value="order">Order</TabsTrigger>
-                        <TabsTrigger value="pick">Pick</TabsTrigger>
-                        <TabsTrigger value="invoice">Invoice</TabsTrigger>
-                        <TabsTrigger value="qc">QC</TabsTrigger>
-                    </TabsList>
+                <ErrorBoundary>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+                        <TabsList>
+                            <TabsTrigger value="order">Order</TabsTrigger>
+                            <TabsTrigger value="pick">Pick</TabsTrigger>
+                            <TabsTrigger value="invoice">Invoice</TabsTrigger>
+                            <TabsTrigger value="qc">QC</TabsTrigger>
+                        </TabsList>
 
-                    <div className="flex-1 overflow-y-auto mt-4">
-                        {loading ? (
-                            <div className="p-4 text-center">Loading...</div>
-                        ) : (
-                            <>
+                        <div className="flex-1 overflow-y-auto mt-4">
+                            {loading ? (
+                                <div className="p-4 text-center">Loading...</div>
+                            ) : (
+                                <>
                                 <TabsContent value="order">
                                     <div className="p-4 space-y-4">
                                         {/* Order Summary */}
@@ -283,8 +285,9 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                 </TabsContent>
                             </>
                         )}
-                    </div>
-                </Tabs>
+                        </div>
+                    </Tabs>
+                </ErrorBoundary>
             </DialogContent>
         </Dialog>
     );
