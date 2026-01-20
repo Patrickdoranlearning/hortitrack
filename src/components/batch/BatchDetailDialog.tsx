@@ -15,7 +15,7 @@ import { track } from "@/lib/analytics";
 import { logError, logInfo } from "@/lib/log";
 import { useAncestryNavPreference } from "@/lib/prefs";
 import BatchActionsBar from "@/components/batch/BatchActionsBar";
-import { PlantPassportCard } from "@/components/batch/PlantPassportCard";
+import { PlantPassportCard } from "@/components/batches/PlantPassportCard";
 
 type TabKey = "summary" | "log" | "photos" | "ancestry" | "ai";
 

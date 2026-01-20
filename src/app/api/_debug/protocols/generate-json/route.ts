@@ -5,6 +5,10 @@ import { isValidDocId } from "@/server/utils/ids";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  // Disable debug endpoints in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const id = new URL(req.url).searchParams.get("batchId") || "";
   if (!isValidDocId(id)) return NextResponse.json({ error: "Invalid batch id" }, { status: 422 });
   try {

@@ -3,6 +3,10 @@ import type { NextRequest } from "next/server";
 import { isAllowedOrigin } from "@/lib/security/origin";
 
 export async function GET(req: NextRequest) {
+  // Disable diagnostic endpoints in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   return NextResponse.json({
     ok: true,
     allowed: isAllowedOrigin(req),

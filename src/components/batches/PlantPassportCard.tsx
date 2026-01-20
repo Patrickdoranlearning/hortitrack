@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Alert, AlertDescription } from "../ui/alert";
-import { Clipboard, Leaf } from "lucide-react";
+import { Clipboard, Leaf, Printer, Loader2 } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
 import { copyToClipboard } from "@/lib/copy";
+import { useToast } from "@/hooks/use-toast";
 
 type PassportDto = {
   batchId: string;
@@ -22,6 +23,35 @@ export function PlantPassportCard({ batchId }: { batchId: string }) {
   const [data, setData] = useState<PassportDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const { toast } = useToast();
+
+  const handlePrint = async (format: "compact" | "large" | "combined" = "compact") => {
+    setIsPrinting(true);
+    try {
+      const res = await fetch("/api/labels/print-passport", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId, format, copies: 1 }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Print failed");
+      }
+      toast({
+        title: "Passport Label Sent",
+        description: "The plant passport label has been sent to the printer.",
+      });
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Print Failed",
+        description: e?.message || "Could not print passport label.",
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -71,9 +101,24 @@ export function PlantPassportCard({ batchId }: { batchId: string }) {
   return (
     <Card className="border-2">
       <CardHeader className="py-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Leaf className="h-4 w-4" aria-hidden /> EU Plant Passport
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Leaf className="h-4 w-4" aria-hidden /> EU Plant Passport
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handlePrint("compact")}
+            disabled={isPrinting}
+          >
+            {isPrinting ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4 mr-1" />
+            )}
+            Print
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="divide-y">

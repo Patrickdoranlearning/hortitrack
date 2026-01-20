@@ -42,8 +42,8 @@ export async function checkRateLimit(opts: { key: string; windowMs: number; max:
 
   if (error) {
     console.error("Rate limit error:", error);
-    // Fail open if DB error
-    return { allowed: true, remaining: 1, resetMs: 0 };
+    // Fail closed on DB error to prevent bypass attacks
+    return { allowed: false, remaining: 0, resetMs: windowMs };
   }
 
   const allowed = points <= max;

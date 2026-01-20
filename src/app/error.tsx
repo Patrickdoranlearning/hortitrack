@@ -1,6 +1,7 @@
+'use client';
 
-'use client'; 
-
+import * as Sentry from '@sentry/nextjs';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
@@ -12,6 +13,11 @@ export default function Error({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    // Report the error to Sentry
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-lg text-center">

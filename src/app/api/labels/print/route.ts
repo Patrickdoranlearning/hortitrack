@@ -8,13 +8,14 @@ import { sendToPrinter } from "@/server/labels/send-to-printer";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { 
-      batchNumber, 
-      variety, 
-      family, 
-      quantity, 
-      size, 
-      location,
+    const {
+      batchId,
+      batchNumber: providedBatchNumber,
+      variety: providedVariety,
+      family: providedFamily,
+      quantity: providedQuantity,
+      size: providedSize,
+      location: providedLocation,
       payload,
       printerId,
       templateId,
@@ -26,6 +27,41 @@ export async function POST(req: NextRequest) {
 
     if (!orgId) {
       return NextResponse.json({ ok: false, error: "No active organization" }, { status: 401 });
+    }
+
+    // If batchId provided, fetch batch data from DB
+    let batchNumber = providedBatchNumber;
+    let variety = providedVariety;
+    let family = providedFamily;
+    let quantity = providedQuantity;
+    let size = providedSize;
+    let location = providedLocation;
+
+    if (batchId) {
+      const { data: batch, error: batchError } = await supabase
+        .from("batches")
+        .select(`
+          batch_number,
+          quantity,
+          plant_varieties (name, family),
+          plant_sizes (name),
+          nursery_locations:location_id (name)
+        `)
+        .eq("id", batchId)
+        .eq("org_id", orgId)
+        .single();
+
+      if (batchError || !batch) {
+        return NextResponse.json({ ok: false, error: "Batch not found" }, { status: 404 });
+      }
+
+      // Use DB values, but allow overrides from request
+      batchNumber = batchNumber || batch.batch_number;
+      variety = variety || (batch.plant_varieties as any)?.name;
+      family = family || (batch.plant_varieties as any)?.family;
+      quantity = quantity ?? batch.quantity;
+      size = size || (batch.plant_sizes as any)?.name;
+      location = location || (batch.nursery_locations as any)?.name;
     }
 
     // Get printer configuration

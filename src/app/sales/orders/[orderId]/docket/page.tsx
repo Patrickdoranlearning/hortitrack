@@ -102,12 +102,23 @@ export default async function DeliveryDocketPage({ params }: DocketPageProps) {
     logoUrl: orgData?.logo_url as string || null,
   };
 
+  // Fetch customer trolley balance
+  let trolleyBalance: { trolleys_out: number; shelves_out: number } | null = null;
+  if (order.customer_id) {
+    const { data: balance } = await supabase
+      .from('customer_trolley_balance')
+      .select('trolleys_out, shelves_out')
+      .eq('customer_id', order.customer_id)
+      .maybeSingle();
+    trolleyBalance = balance;
+  }
+
   // Prepare data for client component
   const docketData = {
     orderNumber: order.order_number,
     status: order.status,
     createdAt: format(new Date(order.created_at), 'PPP'),
-    deliveryDate: order.requested_delivery_date 
+    deliveryDate: order.requested_delivery_date
       ? format(new Date(order.requested_delivery_date), 'PPP')
       : null,
     notes: order.notes,
@@ -122,6 +133,10 @@ export default async function DeliveryDocketPage({ params }: DocketPageProps) {
       quantity: item.quantity,
     })),
     company: companyInfo,
+    trolleyBalance: trolleyBalance ? {
+      trolleysOut: trolleyBalance.trolleys_out || 0,
+      shelvesOut: trolleyBalance.shelves_out || 0,
+    } : null,
   };
 
   return <PrintableDocketClient docket={docketData} />;

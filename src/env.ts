@@ -20,17 +20,23 @@ const Schema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   ALLOWED_ORIGINS: z.string().optional(),
 
-  // Supabase (for dual-write)
-  SUPABASE_URL: z.string().optional(),
-  SUPABASE_SERVICE_ROLE: z.string().optional(),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
+  // Supabase (required for application to function)
+  SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
+  SUPABASE_SERVICE_ROLE: z.string().min(1, "SUPABASE_SERVICE_ROLE is required"),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url("NEXT_PUBLIC_SUPABASE_URL must be a valid URL"),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
   USE_SUPABASE_READS: z.string().optional(),  // "1" to prefer Supabase for reads
   DUAL_WRITE: z.string().optional(),
 
   // Runtime hints (optional)
   VERCEL_URL: z.string().optional(),
   VERCEL: z.string().optional(),
+
+  // Sentry (optional - only needed for error monitoring)
+  SENTRY_DSN: z.string().url().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ORG: z.string().optional(),
+  SENTRY_PROJECT: z.string().optional(),
 });
 
 const raw = {
@@ -54,6 +60,11 @@ const raw = {
 
   VERCEL_URL: process.env.VERCEL_URL,
   VERCEL: process.env.VERCEL,
+
+  SENTRY_DSN: process.env.SENTRY_DSN,
+  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  SENTRY_ORG: process.env.SENTRY_ORG,
+  SENTRY_PROJECT: process.env.SENTRY_PROJECT,
 };
 
 export const env = Schema.parse(raw);

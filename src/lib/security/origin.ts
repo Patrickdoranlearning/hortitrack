@@ -65,8 +65,9 @@ export function isAllowedOrigin(req: NextRequest) {
 
   if (!originHost && hostHeader && originHost === hostHeader) return true;
   if (originHost && xfHost && originHost === xfHost) return true;
-  if (process.env.NODE_ENV !== "production") return true;
 
+  // Check against explicitly allowed origins (includes dev convenience origins in non-production)
+  // NOTE: Removed blanket NODE_ENV !== 'production' bypass to protect staging/preview environments
   const allow = buildAllowedOrigins();
   const origin = originOrigin || originHeader;
   return allow.some((p) => (p.includes("*") ? wildcardMatch(origin, p) : origin === p));

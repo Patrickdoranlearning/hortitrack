@@ -1,9 +1,11 @@
 // src/components/batch/BatchActionsBar.tsx
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { MoveRight, ScanLine, Scissors, ClipboardList, Pencil, Archive } from "lucide-react";
+import { MoveRight, ScanLine, Scissors, ClipboardList, Pencil, Archive, Printer, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type Props = {
   batchId: string;
@@ -17,11 +19,45 @@ type Props = {
  */
 export default function BatchActionsBar({ batchId, batchNumber, disabled }: Props) {
   const q = `?batchId=${encodeURIComponent(batchId)}`;
+  const [isPrinting, setIsPrinting] = useState(false);
+  const { toast } = useToast();
+
+  const handlePrintLabel = async () => {
+    setIsPrinting(true);
+    try {
+      const res = await fetch("/api/labels/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId, copies: 1 }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Print failed");
+      }
+      toast({
+        title: "Label Sent",
+        description: "The batch label has been sent to the printer.",
+      });
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Print Failed",
+        description: e?.message || "Could not print batch label.",
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   return (
     <div
       className="sticky top-0 z-10 -mx-6 px-6 py-2 bg-background/80 border-b
                  backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <Button size="sm" variant="outline" disabled={disabled || isPrinting} onClick={handlePrintLabel} className="shrink-0">
+          {isPrinting ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Printer className="h-4 w-4 mr-1"/>}
+          Print
+        </Button>
         <Link href={`/production/check-in${q}`}><Button size="sm" disabled={disabled} className="shrink-0"><ScanLine className="h-4 w-4 mr-1"/>Check-in</Button></Link>
         <Link href={`/production/transplant${q}`}><Button size="sm" disabled={disabled} className="shrink-0"><Scissors className="h-4 w-4 mr-1"/>Transplant</Button></Link>
         <Link href={`/production/move${q}`}><Button size="sm" disabled={disabled} className="shrink-0"><MoveRight className="h-4 w-4 mr-1"/>Move</Button></Link>

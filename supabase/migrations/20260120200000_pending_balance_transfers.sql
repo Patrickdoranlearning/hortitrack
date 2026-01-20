@@ -397,38 +397,35 @@ ALTER TABLE public.haulier_trolley_balance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pending_balance_transfers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.balance_transfer_log ENABLE ROW LEVEL SECURITY;
 
--- Haulier balance policies
-CREATE POLICY "Users can view haulier balances for their org"
-  ON public.haulier_trolley_balance
-  FOR SELECT
-  USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()));
-
-CREATE POLICY "Users can manage haulier balances for their org"
+-- Haulier balance policies (use org_memberships, not org_members)
+CREATE POLICY "Org members can manage haulier balances"
   ON public.haulier_trolley_balance
   FOR ALL
-  USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()));
+  USING (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = (select auth.uid())))
+  WITH CHECK (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = (select auth.uid())));
 
 -- Pending transfers policies
-CREATE POLICY "Users can view pending transfers for their org"
+CREATE POLICY "Org members can manage pending transfers"
   ON public.pending_balance_transfers
-  FOR SELECT
-  USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()));
-
-CREATE POLICY "Users can create pending transfers for their org"
-  ON public.pending_balance_transfers
-  FOR INSERT
-  WITH CHECK (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()));
-
-CREATE POLICY "Users can update pending transfers for their org"
-  ON public.pending_balance_transfers
-  FOR UPDATE
-  USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()));
+  FOR ALL
+  USING (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = (select auth.uid())))
+  WITH CHECK (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = (select auth.uid())));
 
 -- Transfer log policies
-CREATE POLICY "Users can view transfer logs for their org"
+CREATE POLICY "Org members can view transfer logs"
   ON public.balance_transfer_log
   FOR SELECT
-  USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()));
+  USING (org_id IN (SELECT org_id FROM org_memberships WHERE user_id = (select auth.uid())));
+
+-- Service role grants
+GRANT ALL ON public.haulier_trolley_balance TO service_role;
+GRANT ALL ON public.pending_balance_transfers TO service_role;
+GRANT ALL ON public.balance_transfer_log TO service_role;
+
+-- Authenticated user grants
+GRANT SELECT, INSERT, UPDATE ON public.haulier_trolley_balance TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.pending_balance_transfers TO authenticated;
+GRANT SELECT ON public.balance_transfer_log TO authenticated;
 
 -- ================================================
 -- COMMENTS

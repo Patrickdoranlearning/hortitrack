@@ -55,6 +55,7 @@ export async function POST(
     const isPlanned = batch.status === "Planned";
 
     // If this was a planned batch with a parent, update the parent's quantities
+    // CRITICAL: Parent update must succeed for data integrity
     if (isPlanned && batch.parent_batch_id) {
       // Fetch parent batch to update its quantities
       const { data: parentBatch, error: parentErr } = await supabase
@@ -64,7 +65,15 @@ export async function POST(
         .eq("org_id", orgId)
         .single();
 
-      if (!parentErr && parentBatch) {
+      if (parentErr) {
+        console.error("[actualize] Failed to fetch parent batch:", parentErr);
+        return NextResponse.json(
+          { error: "Failed to fetch parent batch for quantity update" },
+          { status: 500 }
+        );
+      }
+
+      if (parentBatch) {
         const parentReserved = parentBatch.reserved_quantity ?? 0;
         const parentQuantity = parentBatch.quantity ?? 0;
 
@@ -85,7 +94,11 @@ export async function POST(
 
         if (parentUpdateErr) {
           console.error("[actualize] Failed to update parent batch:", parentUpdateErr);
-          // Continue anyway - the main batch update should still proceed
+          // FAIL the operation to maintain data integrity
+          return NextResponse.json(
+            { error: "Failed to update parent batch quantities. Please try again." },
+            { status: 500 }
+          );
         }
       }
     }

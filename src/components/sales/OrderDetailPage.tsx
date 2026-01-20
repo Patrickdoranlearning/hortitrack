@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { emitMutation } from '@/lib/events/mutation-events';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, FileText, Package, ClipboardList, History, Truck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Printer, FileText, Package, ClipboardList, History, Truck, Tag } from 'lucide-react';
 import OrderSummaryCard from './OrderSummaryCard';
 import OrderItemsTable from './OrderItemsTable';
 import OrderInvoicePanel from './OrderInvoicePanel';
 import OrderHistoryPanel from './OrderHistoryPanel';
 import OrderStatusBadge from './OrderStatusBadge';
+import SaleLabelPrintWizard, { type SaleItemData } from './SaleLabelPrintWizard';
 
 export interface OrderCustomer {
   id: string;
@@ -22,6 +24,7 @@ export interface OrderCustomer {
   city: string | null;
   county: string | null;
   eircode: string | null;
+  requires_pre_pricing?: boolean;
 }
 
 export interface OrderItem {
@@ -36,6 +39,7 @@ export interface OrderItem {
   discount_pct: number;
   line_total_ex_vat: number;
   line_vat_amount: number;
+  rrp?: number | null;
   product?: {
     name: string | null;
   } | null;
@@ -110,6 +114,8 @@ interface OrderDetailPageProps {
 
 export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [priceLabelWizardOpen, setPriceLabelWizardOpen] = useState(false);
+  const [currentLabelItem, setCurrentLabelItem] = useState<SaleItemData | null>(null);
   const handleOrderMutation = () => emitMutation({ resource: 'orders', action: 'update', id: order.id });
 
   const handlePrintDocket = () => {
@@ -126,8 +132,33 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     window.open(`/sales/orders/${order.id}/dispatch-documents`, '_blank');
   };
 
+  // Handle printing price labels for an item
+  const handlePrintPriceLabel = (item: OrderItem) => {
+    // Use RRP if available, otherwise fall back to unit price with VAT
+    const price = item.rrp ?? (item.unit_price_ex_vat * (1 + (item.vat_rate || 0.23)));
+    const priceText = `€${price.toFixed(2)}`;
+
+    const productName = item.sku?.plant_varieties?.name || item.description || 'Product';
+    const size = item.sku?.plant_sizes?.name || '';
+
+    setCurrentLabelItem({
+      productTitle: productName,
+      size,
+      priceText,
+      barcode: item.sku?.code || item.sku_id,
+      quantity: item.quantity,
+    });
+    setPriceLabelWizardOpen(true);
+  };
+
   // Show dispatch documents button for orders that are ready for dispatch or later
   const showDispatchDocs = ['ready', 'packed', 'dispatched', 'delivered'].includes(order.status);
+
+  // Check if customer requires pre-pricing
+  const requiresPrePricing = order.customer?.requires_pre_pricing ?? false;
+
+  // Check if any items have RRP set
+  const hasRrpItems = order.order_items.some(item => item.rrp != null);
 
   return (
     <div className="space-y-6">
@@ -143,6 +174,12 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">Order #{order.order_number}</h1>
               <OrderStatusBadge status={order.status} />
+              {requiresPrePricing && (
+                <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-300">
+                  <Tag className="h-3 w-3 mr-1" />
+                  Pre-Pricing Required
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground">
               {order.customer?.name || 'Unknown Customer'}
@@ -151,6 +188,17 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {(requiresPrePricing || hasRrpItems) && order.order_items.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+              onClick={() => handlePrintPriceLabel(order.order_items[0])}
+            >
+              <Tag className="h-4 w-4 mr-2" />
+              Print Price Labels
+            </Button>
+          )}
           {showDispatchDocs && (
             <Button size="sm" onClick={handlePrintDispatchDocuments} className="bg-green-600 hover:bg-green-700">
               <Truck className="h-4 w-4 mr-2" />
@@ -225,6 +273,15 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           </TabsContent>
         </div>
       </Tabs>
+
+      {/* Price Label Print Wizard */}
+      {currentLabelItem && (
+        <SaleLabelPrintWizard
+          open={priceLabelWizardOpen}
+          onOpenChange={setPriceLabelWizardOpen}
+          item={currentLabelItem}
+        />
+      )}
     </div>
   );
 }

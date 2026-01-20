@@ -26,6 +26,10 @@ interface DocketData {
     phone: string;
     logoUrl: string | null;
   };
+  trolleyBalance?: {
+    trolleysOut: number;
+    shelvesOut: number;
+  } | null;
 }
 
 interface PrintableDocketClientProps {
@@ -144,6 +148,30 @@ export default function PrintableDocketClient({ docket }: PrintableDocketClientP
           </div>
         </div>
 
+        {/* Trolley Balance Section */}
+        {docket.trolleyBalance && (docket.trolleyBalance.trolleysOut > 0 || docket.trolleyBalance.shelvesOut > 0) && (
+          <div className="bg-orange-50 border border-orange-200 rounded p-3 sm:p-4 mb-6 sm:mb-8">
+            <h3 className="text-xs uppercase tracking-wide text-orange-700 font-semibold mb-2">
+              Outstanding Equipment Balance
+            </h3>
+            <div className="flex gap-6 text-sm">
+              <div>
+                <span className="text-orange-600">Trolleys:</span>{' '}
+                <strong className="text-orange-800">{docket.trolleyBalance.trolleysOut}</strong>
+              </div>
+              {docket.trolleyBalance.shelvesOut > 0 && (
+                <div>
+                  <span className="text-orange-600">Shelves:</span>{' '}
+                  <strong className="text-orange-800">{docket.trolleyBalance.shelvesOut}</strong>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-orange-600 mt-2">
+              Please return any available trolleys/shelves with this delivery.
+            </p>
+          </div>
+        )}
+
         {/* Items Table */}
         <div className="overflow-x-auto mb-6 sm:mb-8">
           <table className="w-full min-w-[300px]">
@@ -175,6 +203,31 @@ export default function PrintableDocketClient({ docket }: PrintableDocketClientP
             <p className="text-xs sm:text-sm">{docket.notes}</p>
           </div>
         )}
+
+        {/* Trolley Return Section */}
+        <div className="border border-gray-300 rounded p-3 sm:p-4 mb-6 sm:mb-8">
+          <h4 className="text-xs uppercase tracking-wide text-gray-700 font-semibold mb-3">
+            Equipment Returns (Driver to complete)
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Trolleys Delivered</p>
+              <div className="border-b-2 border-gray-400 h-6" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Trolleys Returned</p>
+              <div className="border-b-2 border-gray-400 h-6" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Shelves Delivered</p>
+              <div className="border-b-2 border-gray-400 h-6" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Shelves Returned</p>
+              <div className="border-b-2 border-gray-400 h-6" />
+            </div>
+          </div>
+        </div>
 
         {/* Signature Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10 mt-6 sm:mt-10 pt-4 sm:pt-5 border-t border-gray-300">

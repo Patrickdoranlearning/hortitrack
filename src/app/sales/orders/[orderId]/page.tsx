@@ -32,7 +32,8 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
         name,
         email,
         phone,
-        vat_number
+        vat_number,
+        requires_pre_pricing
       )
     `)
     .eq('id', orderId)
@@ -144,6 +145,7 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
       city: customerAddress?.city || null,
       county: customerAddress?.county || null,
       eircode: customerAddress?.eircode || null,
+      requires_pre_pricing: (order.customer as any).requires_pre_pricing || false,
     } : null,
     order_items: (orderItems || []).map((item: any) => {
       const skuInfo = skuMap[item.sku_id];
@@ -159,6 +161,7 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
         discount_pct: item.discount_pct,
         line_total_ex_vat: item.line_total_ex_vat,
         line_vat_amount: item.line_vat_amount,
+        rrp: item.rrp || null,
         product: null,
         sku: skuInfo ? {
           code: skuInfo.code,

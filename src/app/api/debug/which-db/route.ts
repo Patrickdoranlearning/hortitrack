@@ -4,6 +4,10 @@ import { getSupabaseServerApp } from "@/server/db/supabase";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Disable debug endpoints in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const supabase = await getSupabaseServerApp();
 
   try {
