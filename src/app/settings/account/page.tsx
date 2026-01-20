@@ -10,7 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default async function AccountSettingsPage() {
-  const { userId } = await getUserIdAndOrgId();
+  const { userId, email } = await getUserIdAndOrgId();
 
   if (!userId) {
     redirect("/login");
@@ -18,10 +18,10 @@ export default async function AccountSettingsPage() {
 
   const supabase = await getSupabaseServerApp();
 
-  // Get user profile
+  // Get user profile (email comes from auth, not profiles table)
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email")
+    .select("full_name")
     .eq("id", userId)
     .single();
 
@@ -44,7 +44,7 @@ export default async function AccountSettingsPage() {
         <div className="space-y-6">
           <ProfileForm
             initialName={profile?.full_name || null}
-            email={profile?.email || null}
+            email={email || null}
           />
           <PasswordChangeForm />
         </div>

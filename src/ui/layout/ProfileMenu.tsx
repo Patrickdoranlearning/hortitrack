@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup,
@@ -22,6 +22,7 @@ import {
 export function ProfileMenu({ moduleKey, className }: { moduleKey: string; className?: string }) {
   const { companyName } = useActiveOrg()
   const [mounted, setMounted] = React.useState(false)
+  const router = useRouter()
 
   React.useEffect(() => {
     setMounted(true)
@@ -33,6 +34,10 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
       return companyName.substring(0, 2).toUpperCase()
     }
     return "HT"
+  }
+
+  const navigate = (href: string) => {
+    router.push(href)
   }
 
   if (!mounted) {
@@ -71,23 +76,17 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
 
         {/* Account Section */}
         <DropdownMenuGroup className="py-1">
-          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
-            <Link href="/settings/account" className="flex items-center gap-3 cursor-pointer">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span>My Account</span>
-            </Link>
+          <DropdownMenuItem onClick={() => navigate("/settings/account")} className="flex items-center gap-3 cursor-pointer">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span>My Account</span>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
-            <Link href="/settings/organization" className="flex items-center gap-3 cursor-pointer">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span>Organization</span>
-            </Link>
+          <DropdownMenuItem onClick={() => navigate("/settings/organization")} className="flex items-center gap-3 cursor-pointer">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span>Organization</span>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
-            <Link href="/settings/team" className="flex items-center gap-3 cursor-pointer">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span>Team Members</span>
-            </Link>
+          <DropdownMenuItem onClick={() => navigate("/settings/team")} className="flex items-center gap-3 cursor-pointer">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span>Team Members</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
@@ -95,17 +94,13 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
 
         {/* Tools Section */}
         <DropdownMenuGroup className="py-1">
-          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
-            <Link href="/settings" className="flex items-center gap-3 cursor-pointer">
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              <span>Settings & Data</span>
-            </Link>
+          <DropdownMenuItem onClick={() => navigate("/settings")} className="flex items-center gap-3 cursor-pointer">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span>Settings & Data</span>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
-            <Link href="/documents/designer" className="flex items-center gap-3 cursor-pointer">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span>Document Designer</span>
-            </Link>
+          <DropdownMenuItem onClick={() => navigate("/documents/designer")} className="flex items-center gap-3 cursor-pointer">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span>Document Designer</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
@@ -113,11 +108,9 @@ export function ProfileMenu({ moduleKey, className }: { moduleKey: string; class
 
         {/* Logout */}
         <DropdownMenuGroup className="py-1">
-          <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
-            <Link href="/logout" className="flex items-center gap-3 cursor-pointer text-destructive focus:text-destructive">
-              <LogOut className="h-4 w-4" />
-              <span>Log out</span>
-            </Link>
+          <DropdownMenuItem onClick={() => navigate("/logout")} className="flex items-center gap-3 cursor-pointer text-destructive focus:text-destructive">
+            <LogOut className="h-4 w-4" />
+            <span>Log out</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

@@ -25,12 +25,28 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get all members of the organization
-    const { data: memberships, error: membershipsError } = await supabase
+    // Get all members of the organization using admin client to bypass RLS
+    const { data: memberships, error: membershipsError } = await supabaseAdmin
       .from("org_memberships")
-      .select("user_id, role, created_at, profiles(id, full_name, email)")
+      .select("user_id, role, created_at, profiles(id, full_name, display_name)")
       .eq("org_id", orgId)
       .order("created_at", { ascending: true });
+
+    // Get emails from auth.users for each member
+    const memberIds = memberships?.map(m => m.user_id) || [];
+    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const emailMap = new Map(
+      authUsers?.users?.map(u => [u.id, u.email]) || []
+    );
+
+    // Merge email into the response
+    const membersWithEmail = memberships?.map(m => ({
+      ...m,
+      profiles: {
+        ...m.profiles,
+        email: emailMap.get(m.user_id) || null
+      }
+    })) || [];
 
     if (membershipsError) {
       // Check for the specific schema cache error and provide a user-friendly message
@@ -51,7 +67,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ members: memberships || [] });
+    return NextResponse.json({ members: membersWithEmail });
   } catch (error) {
     console.error("Error in GET /api/org/members:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

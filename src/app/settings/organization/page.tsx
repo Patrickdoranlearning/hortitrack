@@ -22,17 +22,23 @@ export default async function OrganizationSettingsPage() {
   // Check if user is admin or owner
   let isAdminOrOwner = false;
   if (orgId) {
-    const { data: membership } = await supabase
+    const { data: membership, error: membershipError } = await supabase
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
       .eq("user_id", userId)
       .single();
 
+    console.log("[Organization Page] userId:", userId, "orgId:", orgId);
+    console.log("[Organization Page] membership:", membership, "error:", membershipError);
+
     isAdminOrOwner = membership?.role === "admin" || membership?.role === "owner";
+  } else {
+    console.log("[Organization Page] No orgId found for user:", userId);
   }
 
   if (!isAdminOrOwner) {
+    console.log("[Organization Page] User is not admin/owner, redirecting to /settings");
     redirect("/settings");
   }
 
