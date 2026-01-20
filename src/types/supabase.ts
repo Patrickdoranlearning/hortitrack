@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -11,6 +12,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -708,6 +734,7 @@ export type Database = {
           dispatched_at: string | null
           grower_photo_url: string | null
           growing_status: string | null
+          hidden: boolean | null
           id: string
           initial_quantity: number | null
           location_id: string | null
@@ -747,6 +774,7 @@ export type Database = {
           dispatched_at?: string | null
           grower_photo_url?: string | null
           growing_status?: string | null
+          hidden?: boolean | null
           id?: string
           initial_quantity?: number | null
           location_id?: string | null
@@ -786,6 +814,7 @@ export type Database = {
           dispatched_at?: string | null
           grower_photo_url?: string | null
           growing_status?: string | null
+          hidden?: boolean | null
           id?: string
           initial_quantity?: number | null
           location_id?: string | null
@@ -11126,6 +11155,18 @@ export type Database = {
       }
     }
     Functions: {
+      actualize_batch: {
+        Args: {
+          p_actual_date: string
+          p_actual_quantity: number
+          p_batch_id: string
+          p_location_id?: string
+          p_notes?: string
+          p_org_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       apply_order_item_substitution: {
         Args: { _sub_id: string }
         Returns: undefined
@@ -11158,6 +11199,7 @@ export type Database = {
         Args: { p_amount: number; p_batch_id: string }
         Returns: number
       }
+      dispatch_load: { Args: { p_load_id: string }; Returns: Json }
       fn_checkin_batch: {
         Args: {
           p_containers: number
@@ -11320,20 +11362,19 @@ export type Database = {
         Returns: {
           available_quantity: number
           batch_number: string
-          category: string
           created_at: string
-          grade: string
           grower_photo_url: string
+          growing_status: string
           hidden: boolean
           id: string
           location: string
           plant_variety: string
           plant_variety_id: string
-          planting_date: string
-          qc_status: string
+          planted_at: string
           quantity: number
           reserved_quantity: number
           sales_photo_url: string
+          sales_status: string
           size: string
           size_id: string
           status: string
@@ -11402,9 +11443,14 @@ export type Database = {
         Args: { p_customer_id: string; p_org_id: string }
         Returns: undefined
       }
+      recall_load: { Args: { p_load_id: string }; Returns: Json }
       refresh_log_history_for_batch: {
         Args: { _batch_id: string }
         Returns: undefined
+      }
+      resolve_status_id: {
+        Args: { p_org_id: string; p_status_code: string }
+        Returns: string
       }
       search_batches_for_scout: {
         Args: { p_limit?: number; p_org_id: string; p_search: string }
@@ -11662,6 +11708,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       allocation_status: [
@@ -11802,4 +11851,3 @@ export const Constants = {
     },
   },
 } as const
-

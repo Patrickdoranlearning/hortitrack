@@ -185,3 +185,39 @@ export function onTrolleyMovement() {
   invalidateTrolleyBalances();
   invalidateTrolleyReconciliation();
 }
+
+// =============================================================================
+// Additional Invalidation Functions (for mutation event system)
+// =============================================================================
+
+/**
+ * Invalidate all customer-related caches
+ */
+export function invalidateCustomers() {
+  mutate((key) => typeof key === 'string' && key.includes('/customers'), undefined, { revalidate: true });
+  mutate((key) => typeof key === 'string' && key.includes('customers'), undefined, { revalidate: true });
+}
+
+/**
+ * Invalidate all order-related caches
+ */
+export function invalidateOrders() {
+  mutate((key) => typeof key === 'string' && key.includes('/orders'), undefined, { revalidate: true });
+  mutate((key) => typeof key === 'string' && key.includes('/dispatch'), undefined, { revalidate: true });
+  mutate((key) => typeof key === 'string' && key.includes('/picking'), undefined, { revalidate: true });
+}
+
+/**
+ * Invalidate all invoice-related caches
+ */
+export function invalidateInvoices() {
+  mutate((key) => typeof key === 'string' && key.includes('/invoices'), undefined, { revalidate: true });
+}
+
+/**
+ * Invalidate all product-related caches
+ */
+export function invalidateProducts() {
+  mutate((key) => typeof key === 'string' && key.includes('/products'), undefined, { revalidate: true });
+  mutate((key) => typeof key === 'string' && key.includes('products'), undefined, { revalidate: true });
+}

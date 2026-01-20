@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { requireRole } from "@/server/auth/getUser";
 import { getMaterial, updateMaterial, deleteMaterial } from "@/server/materials/service";
 import { UpdateMaterialSchema } from "@/lib/schemas/materials";
 
@@ -72,9 +73,16 @@ export async function PUT(req: Request, context: RouteContext) {
 /**
  * DELETE /api/materials/[id]
  * Soft delete a material (sets is_active = false)
+ * Requires admin or owner role
  */
 export async function DELETE(req: Request, context: RouteContext) {
   try {
+    // Check role first - only admins and owners can delete materials
+    const roleCheck = await requireRole(['owner', 'admin']);
+    if (!roleCheck.authorized) {
+      return NextResponse.json({ error: roleCheck.error }, { status: roleCheck.status });
+    }
+
     const { supabase, orgId } = await getUserAndOrg();
     const { id } = await context.params;
 

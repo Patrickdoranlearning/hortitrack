@@ -19,6 +19,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export type GalleryImage = {
   id: string; // media_library id
@@ -70,7 +71,8 @@ export function SmartGalleryUploader({
         try {
           await onUpload(file);
         } catch (err) {
-          console.error('Upload failed:', err);
+          const message = err instanceof Error ? err.message : 'Upload failed';
+          toast.error(message);
         } finally {
           setUploading(false);
         }

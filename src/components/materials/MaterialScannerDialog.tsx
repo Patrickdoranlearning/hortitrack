@@ -70,7 +70,11 @@ export function MaterialScannerDialog({
         return;
       }
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!data) {
+        setScanState({ status: 'error', message: 'Invalid response from server' });
+        return;
+      }
       const results = data.results ?? [];
 
       if (results.length > 0) {

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { OrgProvider } from "@/lib/org/context";
 import { OfflineProvider } from "@/offline/OfflineProvider";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { MutationProvider } from "@/components/providers/MutationProvider";
 import { getCompanyName } from "@/server/org/getOrganization";
 
 const ptSans = PT_Sans({
@@ -75,9 +76,11 @@ export default async function RootLayout({
       <body className={cn(ptSans.variable, playfairDisplay.variable, 'font-body', 'antialiased', 'overflow-x-hidden')}>
         <ServiceWorkerRegistration />
         <OrgProvider initialOrgId={activeOrgId} initialCompanyName={companyName}>
-          <OfflineProvider>
-            {children}
-          </OfflineProvider>
+          <MutationProvider>
+            <OfflineProvider>
+              {children}
+            </OfflineProvider>
+          </MutationProvider>
         </OrgProvider>
         <Toaster />
       </body>

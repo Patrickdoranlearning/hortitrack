@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { requireRole } from "@/server/auth/getUser";
 import { createHash, randomBytes } from "crypto";
 
 // Generate a secure API key with prefix
@@ -39,6 +40,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    // Only admins and owners can create print agents
+    const roleCheck = await requireRole(['owner', 'admin']);
+    if (!roleCheck.authorized) {
+      return NextResponse.json({ error: roleCheck.error }, { status: roleCheck.status });
+    }
+
     const supabase = await getSupabaseServerApp();
     const orgId = await resolveActiveOrgId();
 

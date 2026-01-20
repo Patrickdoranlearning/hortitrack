@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { emitMutation } from "@/lib/events/mutation-events";
 import {
   Plus,
   Pencil,
@@ -90,8 +90,7 @@ export default function MappingRulesClient({
   categories,
 }: Props) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<MappingRule | null>(null);
   const [formData, setFormData] = useState<Omit<MappingRuleInput, "productId"> & { productId: string }>(
     { ...emptyRule, productId: "" }
@@ -145,7 +144,7 @@ export default function MappingRulesClient({
       if (result.success) {
         toast({ title: editingRule ? "Rule updated" : "Rule created" });
         setIsDialogOpen(false);
-        router.refresh();
+        emitMutation({ resource: 'products', action: 'update' });
       } else {
         toast({ variant: "destructive", title: "Save failed", description: result.error });
       }
@@ -157,7 +156,7 @@ export default function MappingRulesClient({
     const result = await deleteMappingRuleAction(ruleId);
     if (result.success) {
       toast({ title: "Rule deleted" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     } else {
       toast({ variant: "destructive", title: "Delete failed", description: result.error });
     }
@@ -171,7 +170,7 @@ export default function MappingRulesClient({
           title: result.linked > 0 ? `Linked ${result.linked} batches` : "No new links",
           description: result.message,
         });
-        router.refresh();
+        emitMutation({ resource: 'products', action: 'update' });
       } else {
         toast({ variant: "destructive", title: "Auto-link failed", description: result.error });
       }

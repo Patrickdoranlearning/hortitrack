@@ -451,78 +451,39 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
 }
 
 /**
- * Dispatch an entire load - marks the delivery run as in_transit 
+ * Dispatch an entire load - marks the delivery run as in_transit
  * and updates all orders to dispatched status
+ *
+ * Uses atomic database function to ensure all updates happen in a single transaction.
+ * If any step fails, all changes are rolled back to prevent partial state.
  */
 export async function dispatchLoad(loadId: string) {
   try {
     console.log(`[dispatchLoad] Dispatching load: ${loadId}`);
 
-    // Get all orders in this load
-    const { data: deliveryItems, error: fetchError } = await supabaseAdmin
-      .from("delivery_items")
-      .select("order_id")
-      .eq("delivery_run_id", loadId);
+    // Use atomic RPC function - handles all updates in single transaction
+    const { data: result, error: rpcError } = await supabaseAdmin.rpc(
+      "dispatch_load",
+      { p_load_id: loadId }
+    );
 
-    if (fetchError) throw fetchError;
-
-    if (!deliveryItems || deliveryItems.length === 0) {
-      return { error: "No orders in this load to dispatch" };
+    if (rpcError) {
+      console.error(`[dispatchLoad] RPC error:`, rpcError);
+      return { error: rpcError.message || "Failed to dispatch load" };
     }
 
-    const orderIds = deliveryItems.map(item => item.order_id);
-    console.log(`[dispatchLoad] Found ${orderIds.length} orders to dispatch`);
-
-    // Check that all orders have completed pick lists (or no pick list for manual orders)
-    const { data: incompletePicks } = await supabaseAdmin
-      .from("pick_lists")
-      .select("id, order_id, status, orders(order_number)")
-      .in("order_id", orderIds)
-      .neq("status", "completed");
-
-    if (incompletePicks && incompletePicks.length > 0) {
-      const orderNumbers = incompletePicks
-        .map((p: any) => p.orders?.order_number || p.order_id)
-        .join(", ");
-      return {
-        error: `Cannot dispatch - ${incompletePicks.length} order(s) have incomplete picking: ${orderNumbers}. Complete all pick lists first.`
-      };
+    if (!result?.success) {
+      console.log(`[dispatchLoad] Validation failed:`, result?.error);
+      return { error: result?.error || "Failed to dispatch load" };
     }
 
-    // Update delivery run status to in_transit
-    const { error: runError } = await supabaseAdmin
-      .from("delivery_runs")
-      .update({
-        status: "in_transit",
-        actual_departure_time: new Date().toISOString()
-      })
-      .eq("id", loadId);
-
-    if (runError) throw runError;
-
-    // Update all delivery items to in_transit
-    const { error: itemsError } = await supabaseAdmin
-      .from("delivery_items")
-      .update({ status: "in_transit" })
-      .eq("delivery_run_id", loadId);
-
-    if (itemsError) throw itemsError;
-
-    // Update all orders to dispatched status
-    const { error: ordersError } = await supabaseAdmin
-      .from("orders")
-      .update({ status: "dispatched" })
-      .in("id", orderIds);
-
-    if (ordersError) throw ordersError;
-
-    console.log(`[dispatchLoad] Successfully dispatched ${orderIds.length} orders`);
+    console.log(`[dispatchLoad] Successfully dispatched ${result.ordersDispatched} orders`);
 
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
 
-    return { success: true, ordersDispatched: orderIds.length };
+    return { success: true, ordersDispatched: result.ordersDispatched };
   } catch (error: any) {
     console.error(`[dispatchLoad] Error:`, error);
     return { error: error.message };
@@ -532,78 +493,37 @@ export async function dispatchLoad(loadId: string) {
 /**
  * Recall/Undispatch a load - reverses the dispatch action
  * Use this when a load was dispatched by mistake or the driver hasn't actually left
+ *
+ * Uses atomic database function to ensure all updates happen in a single transaction.
+ * If any step fails, all changes are rolled back to prevent partial state.
  */
 export async function recallLoad(loadId: string) {
   try {
     console.log(`[recallLoad] Recalling load: ${loadId}`);
 
-    // Get current load status
-    const { data: load, error: loadError } = await supabaseAdmin
-      .from("delivery_runs")
-      .select("status")
-      .eq("id", loadId)
-      .single();
+    // Use atomic RPC function - handles all updates in single transaction
+    const { data: result, error: rpcError } = await supabaseAdmin.rpc(
+      "recall_load",
+      { p_load_id: loadId }
+    );
 
-    if (loadError) throw loadError;
-
-    console.log(`[recallLoad] Current status: ${load.status}`);
-
-    // Only allow recall from in_transit or loading status
-    if (load.status === "completed") {
-      return { error: "Cannot recall a completed load. Use reschedule instead." };
+    if (rpcError) {
+      console.error(`[recallLoad] RPC error:`, rpcError);
+      return { error: rpcError.message || "Failed to recall load" };
     }
 
-    if (load.status === "cancelled") {
-      return { error: "Cannot recall a cancelled load." };
+    if (!result?.success) {
+      console.log(`[recallLoad] Validation failed:`, result?.error);
+      return { error: result?.error || "Failed to recall load" };
     }
 
-    // Get all orders in this load
-    const { data: deliveryItems, error: fetchError } = await supabaseAdmin
-      .from("delivery_items")
-      .select("order_id")
-      .eq("delivery_run_id", loadId);
-
-    if (fetchError) throw fetchError;
-
-    const orderIds = deliveryItems?.map(item => item.order_id) || [];
-    console.log(`[recallLoad] Found ${orderIds.length} orders to recall`);
-
-    // Reset delivery run status back to planned
-    const { error: runError } = await supabaseAdmin
-      .from("delivery_runs")
-      .update({
-        status: "planned",
-        actual_departure_time: null
-      })
-      .eq("id", loadId);
-
-    if (runError) throw runError;
-
-    // Reset delivery items to pending
-    const { error: itemsError } = await supabaseAdmin
-      .from("delivery_items")
-      .update({ status: "pending" })
-      .eq("delivery_run_id", loadId);
-
-    if (itemsError) throw itemsError;
-
-    // Reset order status back to packed (or confirmed if picking isn't done)
-    if (orderIds.length > 0) {
-      const { error: ordersError } = await supabaseAdmin
-        .from("orders")
-        .update({ status: "packed" })
-        .in("id", orderIds);
-
-      if (ordersError) throw ordersError;
-    }
-
-    console.log(`[recallLoad] Successfully recalled ${orderIds.length} orders`);
+    console.log(`[recallLoad] Successfully recalled ${result.ordersRecalled} orders`);
 
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
 
-    return { success: true, ordersRecalled: orderIds.length };
+    return { success: true, ordersRecalled: result.ordersRecalled };
   } catch (error: any) {
     console.error(`[recallLoad] Error:`, error);
     return { error: error.message };

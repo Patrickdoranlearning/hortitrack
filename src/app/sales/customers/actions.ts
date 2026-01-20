@@ -67,7 +67,15 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
   if (data?.id) {
     revalidatePath(`/sales/customers/${data.id}`);
   }
-  return { success: true, data };
+  return {
+    success: true,
+    data,
+    _mutated: {
+      resource: 'customers' as const,
+      action: parsed.id ? 'update' as const : 'create' as const,
+      id: data?.id,
+    },
+  };
 }
 
 export async function updateCustomerDefaultPriceListAction(customerId: string, priceListId: string | null) {
@@ -85,7 +93,10 @@ export async function updateCustomerDefaultPriceListAction(customerId: string, p
 
   revalidatePath("/sales/customers");
   revalidatePath(`/sales/customers/${customerId}`);
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'update' as const, id: customerId },
+  };
 }
 
 export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typeof deliveryPreferencesSchema>) {
@@ -110,7 +121,10 @@ export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typ
 
   revalidatePath("/sales/customers");
   revalidatePath(`/sales/customers/${parsed.customerId}`);
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
+  };
 }
 
 export async function deleteCustomerAction(customerId: string) {
@@ -121,7 +135,10 @@ export async function deleteCustomerAction(customerId: string) {
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'delete' as const, id: customerId },
+  };
 }
 
 // =============================================================================
@@ -154,7 +171,10 @@ export async function assignPriceListToCustomerAction(input: z.infer<typeof pric
   }
 
   revalidatePath("/sales/customers");
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
+  };
 }
 
 export async function removePriceListAssignmentAction(assignmentId: string) {
@@ -165,7 +185,10 @@ export async function removePriceListAssignmentAction(assignmentId: string) {
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'update' as const },
+  };
 }
 
 // =============================================================================
@@ -236,7 +259,11 @@ export async function upsertCustomerAddressAction(input: z.infer<typeof customer
 
   revalidatePath("/sales/customers");
   revalidatePath(`/sales/customers/${parsed.customerId}`);
-  return { success: true, data };
+  return {
+    success: true,
+    data,
+    _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
+  };
 }
 
 export async function deleteCustomerAddressAction(addressId: string) {
@@ -247,7 +274,10 @@ export async function deleteCustomerAddressAction(addressId: string) {
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'update' as const },
+  };
 }
 
 // =============================================================================
@@ -302,7 +332,11 @@ export async function upsertCustomerContactAction(input: z.infer<typeof customer
 
   revalidatePath("/sales/customers");
   revalidatePath(`/sales/customers/${parsed.customerId}`);
-  return { success: true, data };
+  return {
+    success: true,
+    data,
+    _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
+  };
 }
 
 export async function deleteCustomerContactAction(contactId: string) {
@@ -313,7 +347,10 @@ export async function deleteCustomerContactAction(contactId: string) {
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'update' as const },
+  };
 }
 
 // =============================================================================
@@ -400,7 +437,11 @@ export async function upsertCustomerProductPricingAction(input: z.infer<typeof c
   }
 
   revalidatePath("/sales/customers");
-  return { success: true, data };
+  return {
+    success: true,
+    data,
+    _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
+  };
 }
 
 export async function deleteCustomerProductPricingAction(aliasId: string) {
@@ -411,7 +452,10 @@ export async function deleteCustomerProductPricingAction(aliasId: string) {
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'customers' as const, action: 'update' as const },
+  };
 }
 
 // Fetch customer product pricing
@@ -514,7 +558,11 @@ export async function setCustomerPortalPassword(input: z.infer<typeof portalPass
     }
 
     revalidatePath("/sales/customers");
-    return { success: true, data: { userId: authData.user.id } };
+    return {
+      success: true,
+      data: { userId: authData.user.id },
+      _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
+    };
   } catch (error) {
     console.error("[setCustomerPortalPassword] Unexpected error:", error);
     return {

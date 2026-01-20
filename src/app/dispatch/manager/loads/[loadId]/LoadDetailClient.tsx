@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { emitMutation } from '@/lib/events/mutation-events';
 import { format, parseISO } from 'date-fns';
 import {
   ArrowLeft,
@@ -112,7 +113,7 @@ export default function LoadDetailClient({
         toast.error(result.error);
       } else {
         toast.success(`Load dispatched with ${result.ordersDispatched} orders`);
-        router.refresh();
+        emitMutation({ resource: 'orders', action: 'update' });
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to dispatch load');
@@ -131,7 +132,7 @@ export default function LoadDetailClient({
         toast.error(result.error);
       } else {
         toast.success(`Load recalled - ${result.ordersRecalled} orders reverted`);
-        router.refresh();
+        emitMutation({ resource: 'orders', action: 'update' });
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to recall load');

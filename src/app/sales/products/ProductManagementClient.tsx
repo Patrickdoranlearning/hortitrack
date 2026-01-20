@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { emitMutation } from "@/lib/events/mutation-events";
 import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -64,8 +64,7 @@ const ProductGallerySection = dynamic(
 
 export default function ProductManagementClient(props: ProductManagementPayload) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [sheetOpen, setSheetOpen] = useState(false);
+    const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(props.products[0]?.id ?? null);
   const [skuSheetOpen, setSkuSheetOpen] = useState(false);
@@ -88,7 +87,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
       setSelectedProductId(productId);
       setSheetMode("edit");
     }
-    router.refresh();
+    emitMutation({ resource: 'products', action: 'update' });
   };
 
   return (
@@ -224,8 +223,7 @@ type ComposerProps = {
 
 function ProductComposerSheet({ open, onOpenChange, mode, product, products, skus, batches, priceLists, customers, onProductSaved }: ComposerProps) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
+    const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
   const [currentProductId, setCurrentProductId] = useState<string | null>(product?.id ?? null);
   const [isDeleting, startDeleting] = useTransition();
 
@@ -245,7 +243,7 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, products, sku
       toast({ title: "Product deleted" });
       onProductSaved(null);
       onOpenChange(false);
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     });
   };
 
@@ -392,8 +390,7 @@ export function ProductDetailsSection({
   plantSizes = [],
 }: ProductDetailsSectionProps) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+    const [pending, startTransition] = useTransition();
   const [skuConfigPending, startSkuConfigTransition] = useTransition();
   const [formState, setFormState] = useState(() => ({
     name: product?.name ?? "",
@@ -477,7 +474,7 @@ export function ProductDetailsSection({
         description: mode === "create" ? "You can now assign inventory and pricing." : undefined,
       });
       onSaved(savedId);
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     });
   };
 
@@ -579,7 +576,7 @@ export function ProductDetailsSection({
                         return;
                       }
                       toast({ title: "SKU variety updated" });
-                      router.refresh();
+                      emitMutation({ resource: 'products', action: 'update' });
                     });
                   }}
                   disabled={skuConfigPending}
@@ -617,7 +614,7 @@ export function ProductDetailsSection({
                         return;
                       }
                       toast({ title: "SKU size updated" });
-                      router.refresh();
+                      emitMutation({ resource: 'products', action: 'update' });
                     });
                   }}
                   disabled={skuConfigPending}
@@ -698,8 +695,7 @@ type ProductInventorySectionProps = {
 
 export function ProductInventorySection({ productId, linkedBatches, availableBatches }: ProductInventorySectionProps) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [batchOptions, setBatchOptions] = useState(availableBatches);
+    const [batchOptions, setBatchOptions] = useState(availableBatches);
   const [selectedBatchId, setSelectedBatchId] = useState<string>(availableBatches[0]?.id ?? "");
   const [overrideQty, setOverrideQty] = useState<string>("");
   const [pending, startTransition] = useTransition();
@@ -768,7 +764,7 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
         return;
       }
       toast({ title: "Batch linked" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
       setOverrideQty("");
       await refreshSelectableBatches();
     });
@@ -782,7 +778,7 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
         return;
       }
       toast({ title: "Batch removed" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
       await refreshSelectableBatches();
     });
   };
@@ -809,7 +805,7 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
             ? "Matched on SKU variety and size."
             : result.message ?? "Update the SKU variety/size to enable matching.",
       });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
       await refreshSelectableBatches();
     });
   };
@@ -970,8 +966,7 @@ type ProductPricingSectionProps = {
 
 export function ProductPricingSection({ productId, priceLists, prices }: ProductPricingSectionProps) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [pendingId, setPendingId] = useState<string | null>(null);
+    const [pendingId, setPendingId] = useState<string | null>(null);
   const priceMap = useMemo(() => {
     const map = new Map<string, ProductSummary["prices"][number]>();
     prices.forEach((price) => map.set(price.priceListId, price));
@@ -1023,7 +1018,7 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
         toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to save price." });
       } else {
         toast({ title: "Price saved" });
-        router.refresh();
+        emitMutation({ resource: 'products', action: 'update' });
       }
       setPendingId(null);
     });
@@ -1036,7 +1031,7 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
         toast({ variant: "destructive", title: "Delete failed", description: result.error ?? "Unable to remove price." });
       } else {
         toast({ title: "Price removed" });
-        router.refresh();
+        emitMutation({ resource: 'products', action: 'update' });
       }
       setPendingId(null);
     });
@@ -1112,8 +1107,7 @@ type AssignmentsCardProps = {
 
 export function PriceListAssignmentsCard({ priceLists, customers, assignments }: AssignmentsCardProps) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [assignmentForm, setAssignmentForm] = useState(() => ({
+    const [assignmentForm, setAssignmentForm] = useState(() => ({
     priceListId: priceLists[0]?.id ?? "",
     customerId: customers[0]?.id ?? "",
   }));
@@ -1147,7 +1141,7 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
         return;
       }
       toast({ title: "Price list assigned" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     });
   };
 
@@ -1159,7 +1153,7 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
         return;
       }
       toast({ title: "Assignment removed" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     });
   };
 
@@ -1262,8 +1256,7 @@ type ProductAliasesSectionProps = {
 
 export function ProductAliasesSection({ productId, aliases, customers, priceLists }: ProductAliasesSectionProps) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [form, setForm] = useState({
+    const [form, setForm] = useState({
     aliasName: "",
     customerId: "",
     customerSkuCode: "",
@@ -1308,7 +1301,7 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
         priceListId: "",
         notes: "",
       });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     });
   };
 
@@ -1320,7 +1313,7 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
         return;
       }
       toast({ title: "Alias removed" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     });
   };
 

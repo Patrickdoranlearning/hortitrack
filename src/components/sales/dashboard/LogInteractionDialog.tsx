@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { emitMutation } from '@/lib/events/mutation-events';
 import {
   Dialog,
   DialogContent,
@@ -56,7 +56,6 @@ export function LogInteractionDialog({
   customerId,
   customerName,
 }: LogInteractionDialogProps) {
-  const router = useRouter();
   const [type, setType] = useState<'call' | 'email' | 'visit' | 'whatsapp' | 'other'>('call');
   const [outcome, setOutcome] = useState<string>('');
   const [notes, setNotes] = useState('');
@@ -80,7 +79,10 @@ export function LogInteractionDialog({
         setOutcome('');
         setNotes('');
         onOpenChange(false);
-        router.refresh();
+        // Emit mutation event for cache invalidation
+        if (result._mutated) {
+          emitMutation(result._mutated);
+        }
       }
     } catch (error) {
       toast.error('Failed to log interaction');

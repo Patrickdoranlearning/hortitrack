@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { emitMutation } from '@/lib/events/mutation-events';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, FileText, Package, ClipboardList, History, Truck } from 'lucide-react';
 import OrderSummaryCard from './OrderSummaryCard';
@@ -109,8 +109,8 @@ interface OrderDetailPageProps {
 }
 
 export default function OrderDetailPage({ order }: OrderDetailPageProps) {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
+  const handleOrderMutation = () => emitMutation({ resource: 'orders', action: 'update', id: order.id });
 
   const handlePrintDocket = () => {
     window.open(`/sales/orders/${order.id}/docket`, '_blank');
@@ -193,7 +193,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
         <div className="mt-6">
           <TabsContent value="overview" className="mt-0">
-            <OrderSummaryCard order={order} onStatusChange={() => router.refresh()} />
+            <OrderSummaryCard order={order} onStatusChange={handleOrderMutation} />
           </TabsContent>
 
           <TabsContent value="items" className="mt-0">
@@ -201,7 +201,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               orderId={order.id}
               items={order.order_items} 
               status={order.status}
-              onItemsChange={() => router.refresh()}
+              onItemsChange={handleOrderMutation}
             />
           </TabsContent>
 
@@ -216,7 +216,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               subtotal={order.subtotal_ex_vat}
               vat={order.vat_amount}
               total={order.total_inc_vat}
-              onInvoiceGenerated={() => router.refresh()}
+              onInvoiceGenerated={handleOrderMutation}
             />
           </TabsContent>
 

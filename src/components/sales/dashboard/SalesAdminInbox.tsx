@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
+import { emitMutation } from '@/lib/events/mutation-events';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -79,7 +80,7 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
           toast.error(result.error);
         } else {
           toast.success(result.message || 'Order confirmed');
-          router.refresh();
+          emitMutation({ resource: 'orders', action: 'update', id: task.reference_id });
         }
       } else if (task.task_type === 'invoice_pending' || task.task_type === 'dispatch_prep') {
         // Generate invoice if not exists, then view it
@@ -93,7 +94,7 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
         }
         // Open invoice page
         window.open(`/sales/orders/${task.reference_id}/invoice`, '_blank');
-        router.refresh();
+        emitMutation({ resource: 'orders', action: 'update', id: task.reference_id });
       } else {
         // Navigate to order for stale drafts
         router.push(task.link_url);

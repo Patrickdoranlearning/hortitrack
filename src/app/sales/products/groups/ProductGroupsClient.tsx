@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { emitMutation } from '@/lib/events/mutation-events';
 import {
   ChevronRight,
   Layers,
@@ -120,7 +120,6 @@ export default function ProductGroupsClient({
   families,
   genera,
 }: Props) {
-  const router = useRouter();
   const [groups, setGroups] = useState(initialGroups);
   const [selectedGroup, setSelectedGroup] = useState<ProductGroup | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -228,7 +227,7 @@ export default function ProductGroupsClient({
       if (result.success) {
         toast.success(formData.id ? 'Group updated' : 'Group created');
         setIsFormOpen(false);
-        router.refresh();
+        emitMutation({ resource: 'products', action: formData.id ? 'update' : 'create' });
       } else {
         toast.error(result.error || 'Failed to save group');
       }
@@ -252,7 +251,7 @@ export default function ProductGroupsClient({
         if (selectedGroup?.id === groupToDelete.id) {
           setSelectedGroup(null);
         }
-        router.refresh();
+        emitMutation({ resource: 'products', action: 'delete' });
       } else {
         toast.error(result.error || 'Failed to delete group');
       }

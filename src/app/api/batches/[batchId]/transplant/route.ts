@@ -16,19 +16,29 @@ const Input = z.object({
   notes: z.string().optional().nullable(),
 });
 
-function corsHeaders() {
-  const allow =
-    process.env.NODE_ENV === "development" ? "*" : undefined;
+function corsHeaders(req?: NextRequest) {
+  // Use explicit allowed origins instead of wildcard
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") ?? [];
+
+  // In development, allow localhost origins
+  if (process.env.NODE_ENV === "development") {
+    allowedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000");
+  }
+
+  // Get origin from request and validate
+  const requestOrigin = req?.headers.get("origin") ?? "";
+  const allow = allowedOrigins.includes(requestOrigin) ? requestOrigin : "";
+
   return {
-    "access-control-allow-origin": allow ?? "",
+    "access-control-allow-origin": allow,
     "access-control-allow-methods": "POST,OPTIONS",
     "access-control-allow-headers": "content-type,idempotency-key",
     "access-control-allow-credentials": "true",
   };
 }
 
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders() });
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: corsHeaders(req) });
 }
 
 export async function POST(
@@ -41,7 +51,7 @@ export async function POST(
     if (!userId) {
        return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders() }
+        { status: 401, headers: corsHeaders(req) }
       );
     }
 
@@ -57,7 +67,7 @@ export async function POST(
             code: i.code,
           })),
         },
-        { status: 400, headers: corsHeaders() }
+        { status: 400, headers: corsHeaders(req) }
       );
     }
     const input = parsed.data;
@@ -76,7 +86,7 @@ export async function POST(
 
     return NextResponse.json(
       { ok: true, newBatch: result },
-      { status: 201, headers: corsHeaders() }
+      { status: 201, headers: corsHeaders(req) }
     );
   } catch (e: any) {
     const msg = e?.message ?? "unknown error";
@@ -88,7 +98,7 @@ export async function POST(
     console.error("Error in transplant route:", e);
     return NextResponse.json(
       { error: msg },
-      { status, headers: corsHeaders() }
+      { status, headers: corsHeaders(req) }
     );
   }
 }

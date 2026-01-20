@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { emitMutation } from "@/lib/events/mutation-events";
 import Link from "next/link";
 import { format } from "date-fns";
 import {
@@ -53,7 +53,6 @@ export default function CustomerDetailClient({
   priceLists,
   products,
 }: CustomerDetailClientProps) {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [editSheetOpen, setEditSheetOpen] = useState(false);
 
@@ -190,7 +189,7 @@ export default function CustomerDetailClient({
         customer={customer}
         priceLists={priceLists}
         products={products}
-        onSaved={() => router.refresh()}
+        onSaved={() => emitMutation({ resource: 'customers', action: 'update', id: customer.id })}
       />
     </div>
   );

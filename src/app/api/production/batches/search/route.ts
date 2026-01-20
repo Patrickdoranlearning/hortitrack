@@ -60,7 +60,10 @@ export async function GET(req: Request) {
 
     const { data, error, count } = await query;
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      // Log the full error server-side for debugging
+      console.error("[api/production/batches/search] Query error:", error);
+      // Return generic message to client
+      return NextResponse.json({ error: "Failed to search batches" }, { status: 400 });
     }
     return NextResponse.json({
       page,
@@ -69,7 +72,9 @@ export async function GET(req: Request) {
       items: data ?? [],
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Log the full error server-side for debugging
+    console.error("[api/production/batches/search] Error:", e);
+    // Return generic message to client - don't expose internal details
+    return NextResponse.json({ error: "An error occurred while searching batches" }, { status: 500 });
   }
 }

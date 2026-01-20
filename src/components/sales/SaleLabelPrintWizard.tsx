@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import SaleLabelPreview from "./SaleLabelPreview";
 import { useToast } from "@/hooks/use-toast";
 import { Printer, Settings2, Loader2, AlertCircle, Plus, Minus } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type PrinterType = {
   id: string;
@@ -59,6 +60,8 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [copies, setCopies] = useState<number>(item.quantity ?? 1);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [activeTab, setActiveTab] = useState("print");
 
   // Generate barcode if not provided
@@ -74,6 +77,7 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
   }, [open, item.quantity]);
 
   const fetchPrinters = async () => {
+    setIsLoadingPrinters(true);
     try {
       const res = await fetch("/api/printers");
       const json = await res.json();
@@ -89,10 +93,18 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
       }
     } catch (e) {
       console.error("Failed to fetch printers:", e);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load printers",
+      });
+    } finally {
+      setIsLoadingPrinters(false);
     }
   };
 
   const fetchTemplates = async () => {
+    setIsLoadingTemplates(true);
     try {
       const res = await fetch("/api/label-templates?type=sale");
       const json = await res.json();
@@ -108,6 +120,13 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
       }
     } catch (e) {
       console.error("Failed to fetch templates:", e);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load label templates",
+      });
+    } finally {
+      setIsLoadingTemplates(false);
     }
   };
 
@@ -232,7 +251,9 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
                 <Label htmlFor="printer" className="text-sm font-medium">
                   Printer
                 </Label>
-                {printers.length > 0 ? (
+                {isLoadingPrinters ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : printers.length > 0 ? (
                   <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
                     <SelectTrigger id="printer">
                       <SelectValue placeholder="Select a printer" />
@@ -270,7 +291,9 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
                 <Label htmlFor="template" className="text-sm font-medium">
                   Label Size
                 </Label>
-                {templates.length > 0 ? (
+                {isLoadingTemplates ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : templates.length > 0 ? (
                   <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                     <SelectTrigger id="template">
                       <SelectValue placeholder="Select a template" />

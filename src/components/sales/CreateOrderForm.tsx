@@ -12,6 +12,7 @@ import { createOrder } from '@/app/sales/actions';
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 interface CreateOrderFormProps {
     customers: { id: string; name: string }[];
@@ -40,11 +41,13 @@ export default function CreateOrderForm({ customers }: CreateOrderFormProps) {
         try {
             const result = await createOrder(data);
             if (result?.error) {
-                console.error(result.error);
-                // TODO: Show error toast
+                toast.error(result.error);
+            } else {
+                toast.success('Order created successfully');
+                form.reset();
             }
         } catch (error) {
-            console.error('Failed to create order', error);
+            toast.error('Failed to create order. Please try again.');
         } finally {
             setIsSubmitting(false);
         }

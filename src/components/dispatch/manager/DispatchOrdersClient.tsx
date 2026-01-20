@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { emitMutation } from '@/lib/events/mutation-events';
 import { format, getISOWeek } from 'date-fns';
 import {
   Table,
@@ -1217,7 +1218,7 @@ export default function DispatchOrdersClient({
                                   toast.error(result.error, { id: `dispatch-${load.id}` });
                                 } else {
                                   toast.success(`${load.name} dispatched with ${result.ordersDispatched} orders`, { id: `dispatch-${load.id}` });
-                                  router.refresh();
+                                  emitMutation({ resource: 'orders', action: 'update' });
                                 }
                               } catch (err: any) {
                                 toast.error(err?.message || 'Failed to dispatch load', { id: `dispatch-${load.id}` });

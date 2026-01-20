@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import {
   Plus,
   Trash2,
@@ -87,6 +86,7 @@ import {
   updateCustomerDeliveryPreferencesAction,
   updateCustomerDefaultPriceListAction,
 } from "./actions";
+import { emitMutation } from "@/lib/events/mutation-events";
 
 // =============================================================================
 // TYPES
@@ -136,7 +136,6 @@ export function CustomerSheet({
   onSaved,
 }: CustomerSheetProps) {
   const { toast } = useToast();
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<TabKey>("account");
   const [currentCustomerId, setCurrentCustomerId] = useState<string | null>(customer?.id ?? null);
@@ -229,7 +228,10 @@ export function CustomerSheet({
       }
       toast({ title: "Customer deleted" });
       onOpenChange(false);
-      router.refresh();
+      // Emit mutation event to trigger SWR cache invalidation
+      if (result._mutated) {
+        emitMutation(result._mutated);
+      }
     });
   };
 
@@ -295,12 +297,12 @@ export function CustomerSheet({
                 <DeliveryAddressesTab
                   customerId={effectiveCustomerId}
                   addresses={customer?.addresses ?? []}
-                  onUpdated={() => router.refresh()}
+                  onUpdated={() => emitMutation({ resource: 'customers', action: 'update', id: effectiveCustomerId })}
                 />
                 <DeliveryPreferencesCard
                   customerId={effectiveCustomerId}
                   initialPreferences={customer?.deliveryPreferences ?? null}
-                  onUpdated={() => router.refresh()}
+                  onUpdated={() => emitMutation({ resource: 'customers', action: 'update', id: effectiveCustomerId })}
                 />
               </div>
             ) : (
@@ -327,7 +329,7 @@ export function CustomerSheet({
                 priceLists={priceLists}
                 defaultPriceListId={form.defaultPriceListId}
                 onDefaultPriceListChange={(id) => setForm((p) => ({ ...p, defaultPriceListId: id }))}
-                onUpdated={() => router.refresh()}
+                onUpdated={() => emitMutation({ resource: 'customers', action: 'update', id: effectiveCustomerId })}
               />
             ) : (
               <EmptyTabState message="Save customer details first to configure pricing." />
@@ -342,7 +344,7 @@ export function CustomerSheet({
                 contacts={customer?.contacts ?? []}
                 notes={form.notes}
                 onNotesChange={(notes) => setForm((p) => ({ ...p, notes }))}
-                onUpdated={() => router.refresh()}
+                onUpdated={() => emitMutation({ resource: 'customers', action: 'update', id: effectiveCustomerId })}
               />
             ) : (
               <EmptyTabState message="Save customer details first to add contacts." />
@@ -1044,7 +1046,6 @@ function DeliveryPreferencesCard({
   onUpdated: () => void;
 }) {
   const { toast } = useToast();
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [prefs, setPrefs] = useState<DeliveryPreferences>({
     preferredTrolleyType: initialPreferences?.preferredTrolleyType ?? undefined,
@@ -1070,7 +1071,7 @@ function DeliveryPreferencesCard({
 
       toast({ title: "Delivery preferences saved" });
       onUpdated();
-      router.refresh();
+      // Mutation event emitted by onUpdated callback
     });
   };
 

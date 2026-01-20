@@ -19,38 +19,6 @@ const ActualizeSchema = z.object({
   consume_materials: z.boolean().default(true), // Enable/disable material consumption
 });
 
-// Resolve status_id from attribute_options
-async function resolveStatusId(
-  supabase: any,
-  orgId: string,
-  statusCode: string
-): Promise<string | null> {
-  const { data } = await supabase
-    .from("attribute_options")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("attribute_key", "production_status")
-    .ilike("system_code", statusCode)
-    .maybeSingle();
-
-  if (data) return data.id;
-
-  // Fallback: create the status if it doesn't exist
-  const { data: created } = await supabase
-    .from("attribute_options")
-    .insert({
-      org_id: orgId,
-      attribute_key: "production_status",
-      system_code: statusCode,
-      label: statusCode,
-      sort_order: 0,
-    })
-    .select("id")
-    .single();
-
-  return created?.id ?? null;
-}
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -62,126 +30,60 @@ export async function POST(req: Request) {
 
     const { supabase, orgId, user } = await getUserAndOrg();
 
-    // Resolve status_id for "Growing" (the active status)
-    const growingStatusId = await resolveStatusId(supabase, orgId, "Growing");
-
-    // Fetch all batches to validate they exist and are in "Planned" status
-    const batchIds = payload.batches.map((b) => b.batch_id);
-    const { data: existingBatches, error: fetchError } = await supabase
-      .from("batches")
-      .select("id, batch_number, status, quantity, location_id, parent_batch_id, reserved_quantity")
-      .in("id", batchIds)
-      .eq("org_id", orgId);
-
-    if (fetchError) {
-      return NextResponse.json({ error: "Failed to fetch batches" }, { status: 500 });
-    }
-
-    const batchMap = new Map(existingBatches?.map((b: any) => [b.id, b]) ?? []);
-
     const results: any[] = [];
     const errors: string[] = [];
-    const sourceUpdates: Map<string, number> = new Map(); // parent_batch_id -> quantity consumed
 
-    // Process each batch
+    // Process each batch using the atomic RPC function
+    // This ensures all updates (batch status, parent consumption, event logging)
+    // happen in a single database transaction
     for (const item of payload.batches) {
       try {
-        const batch = batchMap.get(item.batch_id);
-        if (!batch) {
-          errors.push(`Batch not found: ${item.batch_id}`);
+        // Call atomic actualization function
+        // This handles: batch update, parent batch consumption, event logging
+        // All in a single transaction - if any step fails, all changes are rolled back
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          "actualize_batch",
+          {
+            p_org_id: orgId,
+            p_batch_id: item.batch_id,
+            p_actual_quantity: item.actual_quantity,
+            p_actual_date: item.actual_date,
+            p_user_id: user.id,
+            p_location_id: item.actual_location_id ?? null,
+            p_notes: item.notes ?? null,
+          }
+        );
+
+        if (rpcError) {
+          // Extract user-friendly error message from RPC error
+          const errorMsg = rpcError.message || "Failed to actualize batch";
+          errors.push(errorMsg);
           continue;
         }
 
-        // Verify batch is in Planned status
-        if (batch.status !== "Planned" && batch.status !== "Incoming") {
-          errors.push(`Batch ${batch.batch_number} is not in Planned/Incoming status (current: ${batch.status})`);
+        if (!rpcResult?.success) {
+          errors.push(rpcResult?.error || `Failed to actualize batch ${item.batch_id}`);
           continue;
         }
 
-        // Calculate quantity difference for transplants
-        const quantityDiff = item.actual_quantity - batch.quantity;
-
-        // Build log entry
-        const logEntry = {
-          type: "actualized",
-          timestamp: new Date().toISOString(),
-          userId: user.id,
-          previousStatus: batch.status,
-          newStatus: "Growing",
-          plannedQuantity: batch.quantity,
-          actualQuantity: item.actual_quantity,
-          quantityDiff,
-          actualDate: item.actual_date,
-          notes: item.notes,
-          globalNotes: payload.notes,
-        };
-
-        // Update batch to Growing status
-        const updateData: Record<string, any> = {
-          status: "Growing",
-          status_id: growingStatusId,
-          quantity: item.actual_quantity,
-          planted_at: item.actual_date,
-          updated_at: new Date().toISOString(),
-        };
-
-        // Update location if provided
-        if (item.actual_location_id) {
-          updateData.location_id = item.actual_location_id;
-        }
-
-        const { data: updatedBatch, error: updateError } = await supabase
+        // Fetch the updated batch for the response
+        const { data: updatedBatch } = await supabase
           .from("batches")
-          .update(updateData)
-          .eq("id", item.batch_id)
-          .eq("org_id", orgId)
           .select("*")
+          .eq("id", item.batch_id)
           .single();
 
-        if (updateError) {
-          errors.push(`Failed to actualize batch ${batch.batch_number}: ${updateError.message}`);
-          continue;
-        }
-
-        // Append to log_history
-        const currentHistory = updatedBatch.log_history || [];
-        await supabase
-          .from("batches")
-          .update({ log_history: [...currentHistory, logEntry] })
-          .eq("id", item.batch_id);
-
-        // Log event
-        await supabase.from("batch_events").insert({
-          org_id: orgId,
-          batch_id: item.batch_id,
-          type: "ACTUALIZED",
-          by_user_id: user.id,
-          payload: {
-            previousStatus: batch.status,
-            plannedQuantity: batch.quantity,
-            actualQuantity: item.actual_quantity,
-            actualDate: item.actual_date,
-            locationId: item.actual_location_id,
-            notes: item.notes,
-          },
-        });
-
-        // Track source batch consumption for transplants
-        if (batch.parent_batch_id) {
-          const currentConsumption = sourceUpdates.get(batch.parent_batch_id) || 0;
-          sourceUpdates.set(batch.parent_batch_id, currentConsumption + item.actual_quantity);
-        }
-
         // Consume materials if enabled and size_id is provided
+        // This is kept separate as it has its own partial success logic
         let materialConsumption = null;
-        if (payload.consume_materials && item.size_id) {
+        if (payload.consume_materials && item.size_id && updatedBatch) {
           try {
             const consumptionResult = await consumeMaterialsForBatch(
               supabase,
               orgId,
               user.id,
               item.batch_id,
-              batch.batch_number,
+              updatedBatch.batch_number,
               item.size_id,
               item.actual_quantity,
               item.actual_location_id ?? null,
@@ -201,50 +103,13 @@ export async function POST(req: Request) {
 
         results.push({
           ...updatedBatch,
-          previousStatus: batch.status,
-          quantityDiff,
+          previousStatus: rpcResult.previousStatus,
+          quantityDiff: rpcResult.quantityDiff,
           materialConsumption,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         errors.push(`Error processing batch: ${message}`);
-      }
-    }
-
-    // Update source batches - consume quantity and release reservation
-    for (const [parentId, consumed] of sourceUpdates.entries()) {
-      const { data: parentBatch } = await supabase
-        .from("batches")
-        .select("quantity, reserved_quantity")
-        .eq("id", parentId)
-        .single();
-
-      if (parentBatch) {
-        // Reduce quantity and reserved_quantity
-        const newQuantity = Math.max(0, parentBatch.quantity - consumed);
-        const newReserved = Math.max(0, (parentBatch.reserved_quantity || 0) - consumed);
-
-        await supabase
-          .from("batches")
-          .update({
-            quantity: newQuantity,
-            reserved_quantity: newReserved,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", parentId);
-
-        // Log the consumption
-        await supabase.from("batch_events").insert({
-          org_id: orgId,
-          batch_id: parentId,
-          type: "CONSUMED",
-          by_user_id: user.id,
-          payload: {
-            consumedQuantity: consumed,
-            remainingQuantity: newQuantity,
-            reason: "transplant_actualized",
-          },
-        });
       }
     }
 

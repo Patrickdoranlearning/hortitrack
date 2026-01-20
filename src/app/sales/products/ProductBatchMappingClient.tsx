@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { emitMutation } from "@/lib/events/mutation-events";
 import { Tag, Link2, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +23,7 @@ type Props = {
 
 export default function ProductBatchMappingClient({ batches, products }: Props) {
   const { toast } = useToast();
-  const router = useRouter();
-  const [filter, setFilter] = useState("");
+    const [filter, setFilter] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Record<string, string>>({});
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isAutoAllPending, startAutoAll] = useTransition();
@@ -53,7 +52,7 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
       toast({ variant: "destructive", title: "Failed to link batch", description: result.error });
     } else {
       toast({ title: "Batch linked" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     }
     setPendingId(null);
   };
@@ -74,7 +73,7 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
       toast({ variant: "destructive", title: "Auto-link failed", description: result.error });
     } else {
       toast({ title: "Batch linked", description: `Mapped to ${match.name}` });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     }
     setPendingId(null);
   };
@@ -93,7 +92,7 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
       }
       if (updated) {
         toast({ title: `Auto-linked ${updated} batch${updated === 1 ? "" : "es"}` });
-        router.refresh();
+        emitMutation({ resource: 'products', action: 'update' });
       } else {
         toast({ title: "No auto-links applied", description: "No eligible batches found." });
       }
@@ -107,7 +106,7 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
       toast({ variant: "destructive", title: "Failed to remove link", description: result.error });
     } else {
       toast({ title: "Batch link removed" });
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'update' });
     }
     setPendingId(null);
   };

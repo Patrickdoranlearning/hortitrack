@@ -55,3 +55,73 @@ export async function getOptionalUser(): Promise<ServerUser | null> {
   }
   return { uid: userId, orgId: orgId ?? undefined };
 }
+
+export type OrgRole = 'owner' | 'admin' | 'grower' | 'sales' | 'viewer';
+
+/**
+ * Get the user's role within their active organization
+ * Returns null if user is not authenticated or has no membership
+ */
+export async function getUserRole(): Promise<{ userId: string; orgId: string; role: OrgRole } | null> {
+  const supabase = await createClient();
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (IS_DEV && (!user || userError)) {
+    // Dev bypass - assume admin role
+    return { userId: DEV_USER_ID, orgId: DEV_ORG_ID, role: 'admin' };
+  }
+
+  if (userError || !user) {
+    return null;
+  }
+
+  // Get profile with active_org_id
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("active_org_id")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile?.active_org_id) {
+    return null;
+  }
+
+  // Get user's role in this org
+  const { data: membership, error: membershipError } = await supabase
+    .from("org_memberships")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("org_id", profile.active_org_id)
+    .single();
+
+  if (membershipError || !membership) {
+    return null;
+  }
+
+  return {
+    userId: user.id,
+    orgId: profile.active_org_id,
+    role: membership.role as OrgRole,
+  };
+}
+
+/**
+ * Check if the current user has one of the required roles
+ * Returns error info if not authorized
+ */
+export async function requireRole(
+  allowedRoles: OrgRole[]
+): Promise<{ authorized: true; userId: string; orgId: string; role: OrgRole } | { authorized: false; error: string; status: 401 | 403 }> {
+  const userRole = await getUserRole();
+
+  if (!userRole) {
+    return { authorized: false, error: "Unauthorized", status: 401 };
+  }
+
+  if (!allowedRoles.includes(userRole.role)) {
+    return { authorized: false, error: "Insufficient permissions", status: 403 };
+  }
+
+  return { authorized: true, ...userRole };
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Copy, CheckCircle2, Key } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AddUserDialogProps {
   onUserAdded: () => void;
@@ -42,7 +43,20 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState<CreatedUser | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [touched, setTouched] = useState<{ fullName?: boolean; email?: boolean }>({});
   const { toast } = useToast();
+
+  // Validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const validation = useMemo(() => ({
+    fullName: fullName.trim().length >= 2,
+    email: emailRegex.test(email),
+  }), [fullName, email]);
+
+  const errors = useMemo(() => ({
+    fullName: touched.fullName && !validation.fullName ? "Name must be at least 2 characters" : null,
+    email: touched.email && !validation.email ? "Please enter a valid email address" : null,
+  }), [touched, validation]);
 
   const copyToClipboard = async (text: string, field: string) => {
     await navigator.clipboard.writeText(text);
@@ -56,6 +70,7 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
     setRole("grower");
     setCreatedUser(null);
     setCopiedField(null);
+    setTouched({});
   };
 
   const handleClose = () => {
@@ -230,9 +245,15 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
                   placeholder="John Smith"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, fullName: true }))}
                   required
                   disabled={isLoading}
+                  className={cn(errors.fullName && "border-red-500 focus-visible:ring-red-500")}
+                  aria-invalid={!!errors.fullName}
                 />
+                {errors.fullName && (
+                  <p className="text-sm text-red-500">{errors.fullName}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -243,9 +264,15 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
                   placeholder="john@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => setTouched((t) => ({ ...t, email: true }))}
                   required
                   disabled={isLoading}
+                  className={cn(errors.email && "border-red-500 focus-visible:ring-red-500")}
+                  aria-invalid={!!errors.email}
                 />
+                {errors.email && (
+                  <p className="text-sm text-red-500">{errors.email}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -301,7 +328,7 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
               <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading || !fullName || !email}>
+              <Button type="submit" disabled={isLoading || !validation.fullName || !validation.email}>
                 {isLoading ? "Creating..." : "Create User"}
               </Button>
             </DialogFooter>

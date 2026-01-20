@@ -38,7 +38,7 @@ import {
   deleteOrgFee,
 } from './actions';
 import { STANDARD_FEE_TYPES } from './constants';
-import { useRouter } from 'next/navigation';
+import { emitMutation } from '@/lib/events/mutation-events';
 
 type Props = {
   initialFees: OrgFee[];
@@ -80,7 +80,6 @@ const UNIT_LABELS: Record<FeeUnit, string> = {
 };
 
 export function FeeSettingsClient({ initialFees }: Props) {
-  const router = useRouter();
   const [fees, setFees] = useState(initialFees);
   const [isPending, startTransition] = useTransition();
   const [editingFee, setEditingFee] = useState<OrgFee | null>(null);
@@ -120,7 +119,7 @@ export function FeeSettingsClient({ initialFees }: Props) {
       if (existingId) {
         const result = await updateOrgFee(existingId, data);
         if (result.success) {
-          router.refresh();
+          emitMutation({ resource: 'reference-data', action: 'update' });
           setEditingFee(null);
         }
       } else {

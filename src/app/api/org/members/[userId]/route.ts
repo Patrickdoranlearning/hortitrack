@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserIdAndOrgId } from "@/server/auth/getUser";
-import { getSupabaseServerApp } from "@/server/db/supabase";
+import { getSupabaseServerApp, supabaseAdmin } from "@/server/db/supabase";
 
 export async function PATCH(
   request: NextRequest,
@@ -104,7 +104,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
@@ -115,10 +115,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await getSupabaseServerApp();
+    // Use admin client to bypass RLS for these operations
+    // Auth is already verified via getUserIdAndOrgId
 
     // Check if requester is admin or owner
-    const { data: requesterMembership } = await supabase
+    const { data: requesterMembership } = await supabaseAdmin
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
@@ -130,7 +131,7 @@ export async function DELETE(
     }
 
     // Check if target user is the last owner
-    const { data: targetMembership } = await supabase
+    const { data: targetMembership } = await supabaseAdmin
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
@@ -139,7 +140,7 @@ export async function DELETE(
 
     if (targetMembership?.role === "owner") {
       // Count owners in the org
-      const { count } = await supabase
+      const { count } = await supabaseAdmin
         .from("org_memberships")
         .select("*", { count: "exact", head: true })
         .eq("org_id", orgId)
@@ -154,7 +155,7 @@ export async function DELETE(
     }
 
     // Remove the member
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("org_memberships")
       .delete()
       .eq("org_id", orgId)

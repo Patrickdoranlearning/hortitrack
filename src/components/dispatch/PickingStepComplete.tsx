@@ -87,7 +87,7 @@ export default function PickingStepComplete({ onComplete }: PickingStepCompleteP
       }
 
       // Update packing record with trolley info
-      await fetch(`/api/dispatch/packing/${pickList.orderId}`, {
+      const packingRes = await fetch(`/api/dispatch/packing/${pickList.orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,6 +98,16 @@ export default function PickingStepComplete({ onComplete }: PickingStepCompleteP
           totalUnits: pickedUnits,
         }),
       });
+
+      if (!packingRes.ok) {
+        const packingData = await packingRes.json().catch(() => ({}));
+        toast({
+          variant: 'destructive',
+          title: 'Warning',
+          description: packingData.error || 'Failed to update packing record',
+        });
+        // Continue anyway since the pick list was completed successfully
+      }
 
       setIsCompleted(true);
 

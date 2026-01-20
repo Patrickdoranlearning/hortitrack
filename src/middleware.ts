@@ -17,12 +17,46 @@ export const config = {
   ],
 };
 
+// Security headers to add to all responses
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  // Prevent MIME type sniffing
+  response.headers.set("X-Content-Type-Options", "nosniff");
+
+  // Prevent clickjacking - deny framing
+  response.headers.set("X-Frame-Options", "DENY");
+
+  // Enable XSS filter in browsers
+  response.headers.set("X-XSS-Protection", "1; mode=block");
+
+  // Referrer policy - send origin only for cross-origin requests
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+
+  // Permissions policy - disable unnecessary browser features
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+  );
+
+  // HSTS - only in production and if not localhost
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains"
+    );
+  }
+
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
+
+  // Add security headers to all responses
+  response = addSecurityHeaders(response);
 
   const pathname = request.nextUrl.pathname;
   const ACTIVE_ORG_COOKIE = "active_org_id";

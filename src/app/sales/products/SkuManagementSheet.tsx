@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { emitMutation } from "@/lib/events/mutation-events";
 import {
   Sheet,
   SheetContent,
@@ -61,7 +61,6 @@ export default function SkuManagementSheet({
   onSkuCreated,
 }: Props) {
   const { toast } = useToast();
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"list" | "create">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState(defaultForm);
@@ -122,7 +121,7 @@ export default function SkuManagementSheet({
       onSkuCreated?.(newSku);
       setForm(defaultForm);
       setActiveTab("list");
-      router.refresh();
+      emitMutation({ resource: 'products', action: 'create' });
     });
   };
 
@@ -146,7 +145,7 @@ export default function SkuManagementSheet({
         });
       } else {
         toast({ title: "SKU updated" });
-        router.refresh();
+        emitMutation({ resource: 'products', action: 'update', id: skuId });
       }
       setEditingSkuId(null);
     });

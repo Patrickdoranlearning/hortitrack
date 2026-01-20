@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { emitMutation } from "@/lib/events/mutation-events";
 import {
   Plus,
   Settings2,
@@ -39,7 +39,6 @@ import { CustomerSheet } from "./CustomerSheet";
 type Props = CustomerManagementPayload;
 
 export default function CustomerManagementClient({ customers, priceLists, products }: Props) {
-  const router = useRouter();
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
@@ -408,7 +407,7 @@ export default function CustomerManagementClient({ customers, priceLists, produc
       description: parts.join(", ") + ".",
       variant: failures.length ? "destructive" : "default",
     });
-    router.refresh();
+    emitMutation({ resource: 'customers', action: 'update' });
   };
 
   const filters = (
@@ -539,7 +538,7 @@ export default function CustomerManagementClient({ customers, priceLists, produc
         priceLists={priceLists}
         products={products}
         onSaved={() => {
-          router.refresh();
+          emitMutation({ resource: 'customers', action: 'update' });
         }}
       />
     </DataPageShell>

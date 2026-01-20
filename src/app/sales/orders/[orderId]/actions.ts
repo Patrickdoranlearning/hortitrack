@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 import { createPickListFromOrder, getPickListForOrder } from '@/server/sales/picking';
 
@@ -9,10 +10,13 @@ import { createPickListFromOrder, getPickListForOrder } from '@/server/sales/pic
 // ================================================
 
 export async function updateOrderStatus(orderId: string, newStatus: string) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let user, orgId, supabase;
+  try {
+    const auth = await getUserAndOrg();
+    user = auth.user;
+    orgId = auth.orgId;
+    supabase = auth.supabase;
+  } catch {
     return { error: 'Not authenticated' };
   }
 
@@ -25,6 +29,11 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
 
   if (fetchError || !order) {
     return { error: 'Order not found' };
+  }
+
+  // Verify order belongs to user's organization
+  if (order.org_id !== orgId) {
+    return { error: 'Not authorized to modify this order' };
   }
 
   // Validate status transition
@@ -112,7 +121,14 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
   revalidatePath(`/sales/orders/${orderId}`);
   revalidatePath('/sales/orders');
   revalidatePath('/dispatch/picker');
-  return { success: true };
+  return {
+    success: true,
+    _mutated: {
+      resource: 'orders' as const,
+      action: 'update' as const,
+      id: orderId,
+    },
+  };
 }
 
 export async function voidOrder(orderId: string) {
@@ -124,13 +140,16 @@ export async function voidOrder(orderId: string) {
 // ================================================
 
 export async function updateOrderItem(
-  itemId: string, 
+  itemId: string,
   updates: { quantity?: number; unit_price_ex_vat?: number }
 ) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let user, orgId, supabase;
+  try {
+    const auth = await getUserAndOrg();
+    user = auth.user;
+    orgId = auth.orgId;
+    supabase = auth.supabase;
+  } catch {
     return { error: 'Not authenticated' };
   }
 
@@ -143,6 +162,11 @@ export async function updateOrderItem(
 
   if (fetchError || !item) {
     return { error: 'Order item not found' };
+  }
+
+  // Verify order belongs to user's organization
+  if (item.orders.org_id !== orgId) {
+    return { error: 'Not authorized to modify this order' };
   }
 
   // Check if order can be edited
@@ -187,14 +211,24 @@ export async function updateOrderItem(
   });
 
   revalidatePath(`/sales/orders/${item.order_id}`);
-  return { success: true };
+  return {
+    success: true,
+    _mutated: {
+      resource: 'orders' as const,
+      action: 'update' as const,
+      id: item.order_id,
+    },
+  };
 }
 
 export async function deleteOrderItem(itemId: string) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let user, orgId, supabase;
+  try {
+    const auth = await getUserAndOrg();
+    user = auth.user;
+    orgId = auth.orgId;
+    supabase = auth.supabase;
+  } catch {
     return { error: 'Not authenticated' };
   }
 
@@ -207,6 +241,11 @@ export async function deleteOrderItem(itemId: string) {
 
   if (fetchError || !item) {
     return { error: 'Order item not found' };
+  }
+
+  // Verify order belongs to user's organization
+  if (item.orders.org_id !== orgId) {
+    return { error: 'Not authorized to modify this order' };
   }
 
   // Check if order can be edited
@@ -239,7 +278,14 @@ export async function deleteOrderItem(itemId: string) {
   });
 
   revalidatePath(`/sales/orders/${item.order_id}`);
-  return { success: true };
+  return {
+    success: true,
+    _mutated: {
+      resource: 'orders' as const,
+      action: 'update' as const,
+      id: item.order_id,
+    },
+  };
 }
 
 // ================================================
@@ -247,13 +293,16 @@ export async function deleteOrderItem(itemId: string) {
 // ================================================
 
 export async function addQCNote(
-  orderId: string, 
+  orderId: string,
   data: { issue_type: string; description: string; severity: string }
 ) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let user, orgId, supabase;
+  try {
+    const auth = await getUserAndOrg();
+    user = auth.user;
+    orgId = auth.orgId;
+    supabase = auth.supabase;
+  } catch {
     return { error: 'Not authenticated' };
   }
 
@@ -268,6 +317,11 @@ export async function addQCNote(
     return { error: 'Order not found' };
   }
 
+  // Verify order belongs to user's organization
+  if (order.org_id !== orgId) {
+    return { error: 'Not authorized to modify this order' };
+  }
+
   // Log QC event
   await supabase.from('order_events').insert({
     org_id: order.org_id,
@@ -279,7 +333,14 @@ export async function addQCNote(
   });
 
   revalidatePath(`/sales/orders/${orderId}`);
-  return { success: true };
+  return {
+    success: true,
+    _mutated: {
+      resource: 'orders' as const,
+      action: 'update' as const,
+      id: orderId,
+    },
+  };
 }
 
 // ================================================
@@ -297,10 +358,13 @@ export async function createCreditNote(
     }>;
   }
 ) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let user, orgId, supabase;
+  try {
+    const auth = await getUserAndOrg();
+    user = auth.user;
+    orgId = auth.orgId;
+    supabase = auth.supabase;
+  } catch {
     return { error: 'Not authenticated' };
   }
 
@@ -313,6 +377,11 @@ export async function createCreditNote(
 
   if (orderError || !order) {
     return { error: 'Order not found' };
+  }
+
+  // Verify order belongs to user's organization
+  if (order.org_id !== orgId) {
+    return { error: 'Not authorized to modify this order' };
   }
 
   if (!order.invoices || order.invoices.length === 0) {
@@ -353,7 +422,15 @@ export async function createCreditNote(
 
   revalidatePath(`/sales/orders/${orderId}`);
   revalidatePath('/sales/invoices');
-  return { success: true };
+  return {
+    success: true,
+    _mutated: {
+      resource: 'orders' as const,
+      action: 'update' as const,
+      id: orderId,
+      relatedResources: ['invoices' as const],
+    },
+  };
 }
 
 // ================================================
@@ -361,7 +438,7 @@ export async function createCreditNote(
 // ================================================
 
 async function recalculateOrderTotals(orderId: string) {
-  const supabase = await createClient();
+  const { supabase } = await getUserAndOrg();
 
   // Get all items for this order
   const { data: items } = await supabase

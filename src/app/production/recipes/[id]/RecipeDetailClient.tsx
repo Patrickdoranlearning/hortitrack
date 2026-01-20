@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { emitMutation } from "@/lib/events/mutation-events";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -148,7 +148,6 @@ type Props = {
 };
 
 export default function RecipeDetailClient({ protocol }: Props) {
-  const router = useRouter();
   const { toast } = useToast();
   const { data: refData } = React.useContext(ReferenceDataContext);
   const [saving, setSaving] = React.useState(false);
@@ -423,7 +422,7 @@ export default function RecipeDetailClient({ protocol }: Props) {
       });
 
       toast({ title: "Recipe saved" });
-      router.refresh();
+      emitMutation({ resource: 'reference-data', action: 'update', id: protocol.id });
     } catch (error: any) {
       toast({
         title: "Failed to save",

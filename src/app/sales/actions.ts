@@ -328,7 +328,7 @@ export async function generateInvoice(orderId: string) {
     revalidatePath('/sales/invoices');
     revalidatePath('/sales/orders');
     revalidatePath(`/sales/orders/${orderId}`);
-    
+
     await supabase.from('order_events').insert({
         org_id: order.org_id,
         order_id: orderId,
@@ -336,8 +336,17 @@ export async function generateInvoice(orderId: string) {
         description: `Invoice ${invoiceNumber} generated`,
         created_by: user.id,
     });
-    
-    return { success: true, invoice };
+
+    return {
+        success: true,
+        invoice,
+        _mutated: {
+            resource: 'invoices' as const,
+            action: 'create' as const,
+            id: invoice.id,
+            relatedResources: ['orders' as const],
+        },
+    };
 }
 
 export async function getOrderDetails(orderId: string) {
@@ -736,8 +745,16 @@ export async function logInteraction(
 
     revalidatePath('/sales/targets');
     revalidatePath(`/sales/customers/${customerId}`);
-    
-    return { success: true, interaction };
+
+    return {
+        success: true,
+        interaction,
+        _mutated: {
+            resource: 'customers' as const,
+            action: 'update' as const,
+            id: customerId,
+        },
+    };
 }
 
 /**
@@ -861,7 +878,15 @@ export async function sendOrderConfirmation(orderId: string) {
     revalidatePath('/sales/orders');
     revalidatePath(`/sales/orders/${orderId}`);
 
-    return { success: true, message: `Confirmation sent to ${order.customer.email}` };
+    return {
+        success: true,
+        message: `Confirmation sent to ${order.customer.email}`,
+        _mutated: {
+            resource: 'orders' as const,
+            action: 'update' as const,
+            id: orderId,
+        },
+    };
 }
 
 /**
@@ -943,10 +968,16 @@ export async function dispatchAndInvoice(orderId: string) {
     revalidatePath(`/sales/orders/${orderId}`);
     revalidatePath('/sales/invoices');
 
-    return { 
-        success: true, 
+    return {
+        success: true,
         message: 'Order dispatched and invoice generated',
-        invoiceId 
+        invoiceId,
+        _mutated: {
+            resource: 'orders' as const,
+            action: 'update' as const,
+            id: orderId,
+            relatedResources: ['invoices' as const],
+        },
     };
 }
 

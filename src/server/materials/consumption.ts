@@ -71,31 +71,26 @@ export async function upsertConsumptionRules(
   orgId: string,
   rules: { materialId: string; sizeId: string; quantityPerUnit: number }[]
 ): Promise<void> {
-  // Delete existing rules for these material/size combinations
-  const combinations = rules.map((r) => `${r.materialId}:${r.sizeId}`);
+  if (rules.length === 0) return;
 
-  for (const rule of rules) {
-    await supabase
-      .from("material_consumption_rules")
-      .delete()
-      .eq("org_id", orgId)
-      .eq("material_id", rule.materialId)
-      .eq("size_id", rule.sizeId);
-  }
-
-  // Insert new rules
-  if (rules.length > 0) {
-    const { error } = await supabase.from("material_consumption_rules").insert(
+  // Use Postgres upsert (ON CONFLICT DO UPDATE) for atomic operation
+  // This avoids the race condition from delete-then-insert pattern
+  const { error } = await supabase
+    .from("material_consumption_rules")
+    .upsert(
       rules.map((r) => ({
         org_id: orgId,
         material_id: r.materialId,
         size_id: r.sizeId,
         quantity_per_unit: r.quantityPerUnit,
-      }))
+      })),
+      {
+        onConflict: "org_id,material_id,size_id",
+        ignoreDuplicates: false, // Update on conflict
+      }
     );
 
-    if (error) throw new Error(`Failed to save consumption rules: ${error.message}`);
-  }
+  if (error) throw new Error(`Failed to save consumption rules: ${error.message}`);
 }
 
 // ============================================================================
@@ -290,23 +285,20 @@ export async function consumeMaterialsForBatch(
     return { success: false, transactions: [], shortages };
   }
 
-  // Create consumption transactions
-  const transactions: MaterialTransaction[] = [];
+  // Build batch of transactions to insert (avoids N+1 query pattern)
+  const transactionsToInsert = preview
+    .map((item) => {
+      // Calculate actual consumption (may be limited by availability)
+      const actualQty = allowPartial
+        ? Math.min(item.quantityRequired, item.quantityAvailable)
+        : item.quantityRequired;
 
-  for (const item of preview) {
-    // Calculate actual consumption (may be limited by availability)
-    const actualQty = allowPartial
-      ? Math.min(item.quantityRequired, item.quantityAvailable)
-      : item.quantityRequired;
+      if (actualQty <= 0) return null;
 
-    if (actualQty <= 0) continue;
-
-    const { data, error } = await supabase
-      .from("material_transactions")
-      .insert({
+      return {
         org_id: orgId,
         material_id: item.materialId,
-        transaction_type: "consume",
+        transaction_type: "consume" as const,
         quantity: -actualQty, // Negative for consumption
         uom: item.baseUom,
         from_location_id: locationId ?? null,
@@ -314,31 +306,48 @@ export async function consumeMaterialsForBatch(
         reference: `Batch ${batchNumber}`,
         notes: `Auto-consumed for batch actualization`,
         created_by: userId,
-      })
-      .select()
-      .single();
+      };
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 
-    if (error) {
-      console.error(`Failed to create consumption transaction for ${item.materialId}:`, error);
-      continue;
-    }
-
-    transactions.push({
-      id: data.id,
-      orgId: data.org_id,
-      materialId: data.material_id,
-      transactionType: "consume",
-      quantity: Number(data.quantity),
-      uom: data.uom,
-      fromLocationId: data.from_location_id,
-      toLocationId: null,
-      batchId: data.batch_id,
-      reference: data.reference,
-      notes: data.notes,
-      createdBy: data.created_by,
-      createdAt: data.created_at,
-    });
+  if (transactionsToInsert.length === 0) {
+    return {
+      success: shortages.length === 0 || allowPartial,
+      transactions: [],
+      shortages,
+    };
   }
+
+  // Single batch insert for all transactions
+  const { data, error } = await supabase
+    .from("material_transactions")
+    .insert(transactionsToInsert)
+    .select();
+
+  if (error) {
+    console.error("Failed to create consumption transactions:", error);
+    return {
+      success: false,
+      transactions: [],
+      shortages,
+    };
+  }
+
+  const transactions: MaterialTransaction[] = (data ?? []).map((row) => ({
+    id: row.id,
+    orgId: row.org_id,
+    materialId: row.material_id,
+    transactionType: "consume" as const,
+    quantity: Number(row.quantity),
+    uom: row.uom,
+    fromLocationId: row.from_location_id,
+    toLocationId: null,
+    batchId: row.batch_id,
+    reference: row.reference,
+    notes: row.notes,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  }));
 
   return {
     success: shortages.length === 0 || allowPartial,
@@ -372,50 +381,44 @@ export async function reverseConsumption(
     return [];
   }
 
-  // Create return transactions
-  const transactions: MaterialTransaction[] = [];
+  // Build batch of return transactions (avoids N+1 query pattern)
+  const transactionsToInsert = consumptions.map((consumption) => ({
+    org_id: orgId,
+    material_id: consumption.material_id,
+    transaction_type: "return" as const,
+    quantity: Math.abs(Number(consumption.quantity)), // Positive for return
+    uom: consumption.uom,
+    to_location_id: consumption.from_location_id, // Return to original location
+    batch_id: batchId,
+    reference: consumption.reference,
+    notes: reason,
+    created_by: userId,
+  }));
 
-  for (const consumption of consumptions) {
-    const returnQty = Math.abs(Number(consumption.quantity));
+  // Single batch insert for all return transactions
+  const { data, error } = await supabase
+    .from("material_transactions")
+    .insert(transactionsToInsert)
+    .select();
 
-    const { data, error } = await supabase
-      .from("material_transactions")
-      .insert({
-        org_id: orgId,
-        material_id: consumption.material_id,
-        transaction_type: "return",
-        quantity: returnQty, // Positive for return
-        uom: consumption.uom,
-        to_location_id: consumption.from_location_id, // Return to original location
-        batch_id: batchId,
-        reference: consumption.reference,
-        notes: reason,
-        created_by: userId,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error(`Failed to create return transaction for ${consumption.material_id}:`, error);
-      continue;
-    }
-
-    transactions.push({
-      id: data.id,
-      orgId: data.org_id,
-      materialId: data.material_id,
-      transactionType: "return",
-      quantity: Number(data.quantity),
-      uom: data.uom,
-      fromLocationId: null,
-      toLocationId: data.to_location_id,
-      batchId: data.batch_id,
-      reference: data.reference,
-      notes: data.notes,
-      createdBy: data.created_by,
-      createdAt: data.created_at,
-    });
+  if (error) {
+    console.error("Failed to create return transactions:", error);
+    throw new Error(`Failed to reverse consumption: ${error.message}`);
   }
 
-  return transactions;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    orgId: row.org_id,
+    materialId: row.material_id,
+    transactionType: "return" as const,
+    quantity: Number(row.quantity),
+    uom: row.uom,
+    fromLocationId: null,
+    toLocationId: row.to_location_id,
+    batchId: row.batch_id,
+    reference: row.reference,
+    notes: row.notes,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  }));
 }

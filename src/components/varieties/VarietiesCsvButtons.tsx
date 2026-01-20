@@ -2,14 +2,13 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { emitMutation } from "@/lib/events/mutation-events";
 import { Button } from "../ui/button";
 import { Download, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function VarietiesCsvButtons() {
   const { toast } = useToast();
-  const router = useRouter();
   const [busy, setBusy] = React.useState<"down" | "up" | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -53,8 +52,8 @@ export function VarietiesCsvButtons() {
         title: "Import complete",
         description: `${summary.created} created, ${summary.updated} updated, ${summary.errors} errors.`
       });
-      // Refresh the page to show new data
-      router.refresh();
+      // Emit mutation to refresh variety data
+      emitMutation({ resource: 'varieties', action: 'update' });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Upload failed", description: e?.message || String(e) });
     } finally {

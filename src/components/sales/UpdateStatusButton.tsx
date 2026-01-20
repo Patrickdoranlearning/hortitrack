@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { emitMutation } from "@/lib/events/mutation-events";
 
 // Order status flow - 'packed' replaces 'ready' in the main flow
 const FLOW = ["confirmed", "picking", "packed", "dispatched", "delivered"] as const;
 
 export function UpdateStatusButton({ orderId, current }: { orderId: string; current: string }) {
   const { toast } = useToast();
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const idx = FLOW.indexOf(current as (typeof FLOW)[number]);
   const next = idx >= 0 && idx < FLOW.length - 1 ? FLOW[idx + 1] : null;
@@ -26,7 +25,7 @@ export function UpdateStatusButton({ orderId, current }: { orderId: string; curr
       const j = await res.json();
       if (!res.ok || !j?.ok) throw new Error(j?.error?.message || "Update failed");
       toast({ title: "Status updated", description: `Now ${status}` });
-      router.refresh();
+      emitMutation({ resource: 'orders', action: 'update', id: orderId });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {

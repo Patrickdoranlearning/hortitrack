@@ -105,7 +105,15 @@ export async function upsertProductAction(input: z.infer<typeof productDetailsSc
   }
 
   revalidatePath('/sales/products');
-  return { success: true, data };
+  return {
+    success: true,
+    data,
+    _mutated: {
+      resource: 'products' as const,
+      action: parsed.id ? 'update' as const : 'create' as const,
+      id: data?.id,
+    },
+  };
 }
 
 export async function deleteProductAction(productId: string) {
@@ -121,7 +129,10 @@ export async function deleteProductAction(productId: string) {
     return { success: false, error: error.message };
   }
   revalidatePath('/sales/products');
-  return { success: true };
+  return {
+    success: true,
+    _mutated: { resource: 'products' as const, action: 'delete' as const, id: productId },
+  };
 }
 
 export async function addProductBatchAction(input: z.infer<typeof productBatchSchema>) {
