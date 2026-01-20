@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CheckInWizard, type IncomingBatchData } from './CheckInWizard';
 
 type CheckInWizardDialogProps = {
@@ -45,11 +46,13 @@ export function CheckInWizardDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-1 -mr-1">
-          <CheckInWizard
-            incomingBatch={incomingBatch}
-            onComplete={handleComplete}
-            onCancel={handleCancel}
-          />
+          <ErrorBoundary>
+            <CheckInWizard
+              incomingBatch={incomingBatch}
+              onComplete={handleComplete}
+              onCancel={handleCancel}
+            />
+          </ErrorBoundary>
         </div>
       </DialogContent>
     </Dialog>

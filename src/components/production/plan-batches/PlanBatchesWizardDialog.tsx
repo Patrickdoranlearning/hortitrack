@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PlanBatchesWizard } from './PlanBatchesWizard';
 
 type PlanBatchesWizardDialogProps = {
@@ -41,10 +42,12 @@ export function PlanBatchesWizardDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-1 -mr-1">
-          <PlanBatchesWizard
-            onComplete={handleComplete}
-            onCancel={handleCancel}
-          />
+          <ErrorBoundary>
+            <PlanBatchesWizard
+              onComplete={handleComplete}
+              onCancel={handleCancel}
+            />
+          </ErrorBoundary>
         </div>
       </DialogContent>
     </Dialog>

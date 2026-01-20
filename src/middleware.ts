@@ -139,7 +139,9 @@ export async function middleware(request: NextRequest) {
   } else if (activeOrgId && activeOrgId !== activeOrgFromCookie) {
     response.cookies.set(ACTIVE_ORG_COOKIE, activeOrgId, {
       path: "/",
+      httpOnly: true, // Prevent JavaScript access
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production", // HTTPS only in production
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
   }

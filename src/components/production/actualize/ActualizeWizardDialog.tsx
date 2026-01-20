@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { ActualizeWizard } from './ActualizeWizard';
 import type { PlannedBatch } from './SelectPlannedBatchesStep';
 
@@ -43,12 +44,14 @@ export function ActualizeWizardDialog({
             and locations.
           </DialogDescription>
         </DialogHeader>
-        <ActualizeWizard
-          initialBatches={initialBatches}
-          jobId={jobId}
-          onComplete={handleComplete}
-          onCancel={() => onOpenChange(false)}
-        />
+        <ErrorBoundary>
+          <ActualizeWizard
+            initialBatches={initialBatches}
+            jobId={jobId}
+            onComplete={handleComplete}
+            onCancel={() => onOpenChange(false)}
+          />
+        </ErrorBoundary>
       </DialogContent>
     </Dialog>
   );
