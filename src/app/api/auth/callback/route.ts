@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import * as Sentry from "@sentry/nextjs";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -10,6 +11,15 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await getSupabaseServerApp();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    // Log auth errors to Sentry for monitoring
+    if (error) {
+      Sentry.captureException(error, {
+        tags: { component: "auth-callback", type: type ?? "unknown" },
+        extra: { hasCode: !!code, next },
+      });
+      console.error("[auth/callback] Code exchange failed:", error.message);
+    }
 
     if (!error && data.user) {
       // Check if this is an invite flow - user needs to set password
@@ -30,6 +40,15 @@ export async function GET(request: Request) {
       // Normal login - redirect to intended destination
       return NextResponse.redirect(`${origin}${next}`);
     }
+  }
+
+  // Log when no code is provided (potential issue with OAuth flow)
+  if (!code) {
+    Sentry.captureMessage("Auth callback called without code", {
+      level: "warning",
+      tags: { component: "auth-callback" },
+      extra: { type, next },
+    });
   }
 
   // Return the user to an error page with instructions

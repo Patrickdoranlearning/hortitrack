@@ -1,13 +1,22 @@
 /**
- * Development bypass configuration.
+ * Development Authentication Bypass
  *
- * SECURITY: The dev bypass is DISABLED by default.
- * To enable it for local development, set these in .env.local:
+ * ⚠️  SECURITY WARNING ⚠️
+ * This module allows bypassing authentication for local development ONLY.
+ *
+ * SAFEGUARDS:
+ * 1. Requires NODE_ENV === "development" (cannot work in production builds)
+ * 2. Requires explicit ENABLE_DEV_BYPASS=true environment variable
+ * 3. Credentials must be provided via env vars (not hardcoded)
+ *
+ * TO ENABLE (local development only):
+ * Add to .env.local:
  *   ENABLE_DEV_BYPASS=true
  *   DEV_BYPASS_USER_ID=<your-dev-user-uuid>
  *   DEV_BYPASS_ORG_ID=<your-dev-org-uuid>
  *
- * This should NEVER be enabled in staging, preview, or production environments.
+ * NEVER enable in staging, preview, or production environments.
+ * The .env.local file is gitignored and should never be committed.
  */
 
 // Only enable dev bypass if explicitly set AND in development mode

@@ -17,7 +17,12 @@ function cleanString(value?: string | null) {
 // =============================================================================
 
 export async function upsertCustomerAction(input: z.infer<typeof customerFormSchema>) {
-  const parsed = customerFormSchema.parse(input);
+  const validation = customerFormSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -103,7 +108,12 @@ export async function updateCustomerDefaultPriceListAction(customerId: string, p
 }
 
 export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typeof deliveryPreferencesSchema>) {
-  const parsed = deliveryPreferencesSchema.parse(input);
+  const validation = deliveryPreferencesSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
   const supabase = await getSupabaseServerApp();
 
   const prefs = {
@@ -156,7 +166,12 @@ const priceListAssignmentSchema = z.object({
 });
 
 export async function assignPriceListToCustomerAction(input: z.infer<typeof priceListAssignmentSchema>) {
-  const parsed = priceListAssignmentSchema.parse(input);
+  const validation = priceListAssignmentSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -199,7 +214,12 @@ export async function removePriceListAssignmentAction(assignmentId: string) {
 // =============================================================================
 
 export async function upsertCustomerAddressAction(input: z.infer<typeof customerAddressSchema>) {
-  const parsed = customerAddressSchema.parse(input);
+  const validation = customerAddressSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
   const supabase = await getSupabaseServerApp();
 
   const payload = {
@@ -288,7 +308,12 @@ export async function deleteCustomerAddressAction(addressId: string) {
 // =============================================================================
 
 export async function upsertCustomerContactAction(input: z.infer<typeof customerContactSchema>) {
-  const parsed = customerContactSchema.parse(input);
+  const validation = customerContactSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
   const supabase = await getSupabaseServerApp();
 
   const payload = {
@@ -372,7 +397,12 @@ const customerProductPricingSchema = z.object({
 });
 
 export async function upsertCustomerProductPricingAction(input: z.infer<typeof customerProductPricingSchema>) {
-  const parsed = customerProductPricingSchema.parse(input);
+  const validation = customerProductPricingSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -516,7 +546,12 @@ const portalPasswordSchema = z.object({
 });
 
 export async function setCustomerPortalPassword(input: z.infer<typeof portalPasswordSchema>) {
-  const parsed = portalPasswordSchema.parse(input);
+  const validation = portalPasswordSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 

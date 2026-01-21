@@ -43,7 +43,8 @@ export async function GET(request: Request) {
 
       if (error) {
         console.error("[api/batches GET] query error", error);
-        return NextResponse.json({ data: [], error: error.message }, { status: 500 });
+        // Don't expose database error details to clients
+        return NextResponse.json({ data: [], error: "Failed to fetch batches" }, { status: 500 });
       }
 
     const items = (data || []).map((b: any) => ({
@@ -150,9 +151,10 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json({ data: items }, { status: 200 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("[api/batches GET] 500", e);
-    return NextResponse.json({ data: [], error: e?.message || "Failed to search batches" }, { status: 500 });
+    // Don't expose internal error details to clients
+    return NextResponse.json({ data: [], error: "Failed to search batches" }, { status: 500 });
   }
 }
 
@@ -228,14 +230,14 @@ export const POST = withApiGuard({
       });
       return ok(result.body, result.status);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[/api/batches POST] failed", { err: String(err) });
-      const msg = err?.message ?? "Server error";
+      const msg = err instanceof Error ? err.message : "Server error";
       if (msg === "Unauthenticated") return fail(401, "UNAUTHORIZED", "Not authenticated");
       if (msg === "No active org selected") return fail(400, "NO_ORG", "No active organization found");
-      
-      // withApiGuard catches generic errors, but we can return fail() here to control the response format
-      return fail(500, "SERVER_ERROR", msg);
+
+      // Don't expose internal error details to clients
+      return fail(500, "SERVER_ERROR", "Failed to create batch");
     }
   }
 });

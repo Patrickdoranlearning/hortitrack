@@ -16,8 +16,10 @@ Sentry.init({
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
 
-  // Replay is disabled by default - enable if needed for debugging user sessions
-  replaysOnErrorSampleRate: 0,
+  // Session replay configuration - helps debug user-reported issues
+  // Capture replay on 10% of error sessions for debugging
+  replaysOnErrorSampleRate: 0.1,
+  // Don't capture general session replays to minimize performance impact
   replaysSessionSampleRate: 0,
 
   // Filter out noisy errors

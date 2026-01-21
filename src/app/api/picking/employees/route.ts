@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
     // Otherwise get all employees
     const employees = await getEmployees(orgId);
     return NextResponse.json({ employees });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching employees:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch employees" },
+      { error: "Failed to fetch employees" },
       { status: 500 }
     );
   }
@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ employee: result.employee }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error with employee operation:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to perform operation" },
+      { error: "Failed to perform operation" },
       { status: 500 }
     );
   }
@@ -111,10 +111,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating employee:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to update employee" },
+      { error: "Failed to update employee" },
       { status: 500 }
     );
   }

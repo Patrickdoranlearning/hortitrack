@@ -2,16 +2,31 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
 
 export async function loginCustomer(formData: FormData) {
   const supabase = await createClient();
 
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
+  const rawEmail = formData.get('email');
+  const rawPassword = formData.get('password');
 
-  if (!email || !password) {
-    return { error: 'Email and password are required' };
+  // Validate input before sending to Supabase
+  const validation = loginSchema.safeParse({
+    email: rawEmail,
+    password: rawPassword,
+  });
+
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? 'Invalid input';
+    return { error: firstError };
   }
+
+  const { email, password } = validation.data;
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,

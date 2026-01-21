@@ -78,8 +78,9 @@ export async function PATCH(
       .single();
 
     if (error || !data) {
+      console.error("[protocols PATCH] error:", error);
       return NextResponse.json(
-        { error: error?.message ?? "Protocol not found" },
+        { error: error?.code === "PGRST116" ? "Protocol not found" : "Failed to update protocol" },
         { status: error?.code === "PGRST116" ? 404 : 500 }
       );
     }
@@ -87,12 +88,13 @@ export async function PATCH(
     const protocol = rowToProtocolSummary(data as ProtocolRow);
     return NextResponse.json({ protocol });
   } catch (error) {
+    console.error("[protocols PATCH] exception:", error);
     if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json({ error: "Invalid payload", issues: (error as any).issues }, { status: 400 });
+      return NextResponse.json({ error: "Invalid payload", issues: (error as z.ZodError).issues }, { status: 400 });
     }
-    const message = error instanceof Error ? error.message : "Failed to update protocol";
+    const message = error instanceof Error ? error.message : "";
     const status = /unauth/i.test(message) ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: status === 401 ? "Unauthorized" : "Failed to update protocol" }, { status });
   }
 }
 
@@ -110,14 +112,16 @@ export async function DELETE(
       .eq("org_id", orgId);
 
     if (error) {
-      throw new Error(error.message);
+      console.error("[protocols DELETE] error:", error);
+      return NextResponse.json({ error: "Failed to delete protocol" }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to delete protocol";
+    console.error("[protocols DELETE] exception:", error);
+    const message = error instanceof Error ? error.message : "";
     const status = /unauth/i.test(message) ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: status === 401 ? "Unauthorized" : "Failed to delete protocol" }, { status });
   }
 }
 

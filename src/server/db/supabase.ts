@@ -19,7 +19,16 @@ function asBoolean(value?: string | null): boolean {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
+/**
+ * Dual-write mode: writes to both Firebase and Supabase for migration.
+ *
+ * Set DUAL_WRITE=true in your environment to enable.
+ *
+ * Legacy env vars are still supported for backwards compatibility but deprecated:
+ * - SUPABASE_DUALWRITE_ENABLED, SUPABASE_DUALWRITE, ENABLE_SUPABASE_DUALWRITE, ENABLE_DUALWRITE
+ */
 const dualwriteFlag =
+  process.env.DUAL_WRITE ?? // Preferred - matches .env.example
   process.env.SUPABASE_DUALWRITE_ENABLED ??
   process.env.SUPABASE_DUALWRITE ??
   process.env.ENABLE_SUPABASE_DUALWRITE ??

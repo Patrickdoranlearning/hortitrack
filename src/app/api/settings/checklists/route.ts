@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[API] GET /api/settings/checklists error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch templates" },
+      { error: "Failed to fetch templates" },
       { status: 500 }
     );
   }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[API] POST /api/settings/checklists error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create template" },
+      { error: "Failed to create template" },
       { status: 500 }
     );
   }
