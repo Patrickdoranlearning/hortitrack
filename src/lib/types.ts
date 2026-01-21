@@ -35,9 +35,11 @@ export type Organization = z.infer<typeof OrganizationSchema>;
 
 // --- Sites ---
 export const SiteSchema = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   orgId: z.string(),
-  name: z.string(),
+  name: z.string().min(1, "Site name is required"),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 export type Site = z.infer<typeof SiteSchema>;
 

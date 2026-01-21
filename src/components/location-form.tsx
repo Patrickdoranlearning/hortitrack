@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { NurseryLocationSchema, type NurseryLocation } from '@/lib/types';
+import { NurseryLocationSchema, type NurseryLocation, type Site } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -36,6 +37,7 @@ type LocationFormValues = z.infer<typeof LocationFormSchema>;
 
 interface LocationFormProps {
   location: NurseryLocation | null;
+  sites?: Site[];
   onSubmit: (data: Omit<NurseryLocation, 'id'> | NurseryLocation) => void;
   onCancel: () => void;
 }
@@ -49,7 +51,7 @@ const defaultValues: LocationFormValues = {
   siteId: undefined,
 };
 
-export function LocationForm({ location, onSubmit, onCancel }: LocationFormProps) {
+export function LocationForm({ location, sites = [], onSubmit, onCancel }: LocationFormProps) {
   const isEditing = !!location;
 
   const form = useForm<LocationFormValues>({
@@ -150,10 +152,25 @@ export function LocationForm({ location, onSubmit, onCancel }: LocationFormProps
                 name="siteId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Site ID (optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="External reference" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value || undefined)} />
-                    </FormControl>
+                    <FormLabel>Site (optional)</FormLabel>
+                    <Select
+                      value={field.value ?? ''}
+                      onValueChange={(value) => field.onChange(value || undefined)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select site..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {sites.map((site) => (
+                          <SelectItem key={site.id} value={site.id!}>
+                            {site.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

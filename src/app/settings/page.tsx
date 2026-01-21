@@ -279,17 +279,18 @@ export default function DataManagementPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-dashed">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPinned /> Nursery Sites
-                <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
               </CardTitle>
               <CardDescription>Group locations by physical site for multi-site nursery operations.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button disabled variant="outline">
-                Manage Sites
+              <Button asChild>
+                <Link href="/settings/sites">
+                  Manage Sites
+                </Link>
               </Button>
             </CardContent>
           </Card>

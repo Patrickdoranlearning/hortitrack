@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as z from 'zod';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,8 +17,8 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/hooks/use-collection';
-import type { NurseryLocation } from '@/lib/types';
-import { addLocationAction, deleteLocationAction, updateLocationAction } from '../actions';
+import type { NurseryLocation, Site } from '@/lib/types';
+import { addLocationAction, deleteLocationAction, updateLocationAction, getSitesAction } from '../actions';
 import { invalidateReferenceData } from '@/lib/swr/keys';
 import { LocationForm } from '@/components/location-form';
 import { PageFrame } from '@/ui/templates';
@@ -54,6 +54,7 @@ export default function LocationsPage() {
   const [filterText, setFilterText] = useState('');
   const [editingLocation, setEditingLocation] = useState<NurseryLocation | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [sites, setSites] = useState<Site[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: SortableLocationKey; direction: 'asc' | 'desc' }>({
     key: 'name',
     direction: 'asc',
@@ -61,6 +62,24 @@ export default function LocationsPage() {
 
   const { data: rawLocations, loading } = useCollection<any>('nursery_locations');
   const locations = useMemo<NurseryLocation[]>(() => (rawLocations || []).map(normalizeLocation).filter(Boolean) as NurseryLocation[], [rawLocations]);
+
+  // Fetch sites for the site dropdown and display
+  useEffect(() => {
+    getSitesAction().then((result) => {
+      if (result.success) {
+        setSites(result.data as Site[]);
+      }
+    });
+  }, []);
+
+  // Create a lookup map for site names
+  const siteNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    sites.forEach((site) => {
+      if (site.id) map.set(site.id, site.name);
+    });
+    return map;
+  }, [sites]);
 
   const quickForm = useForm<QuickLocationFormValues>({
     resolver: zodResolver(quickLocationSchema),
@@ -276,12 +295,15 @@ export default function LocationsPage() {
           setEditingLocation={setEditingLocation}
           setIsFormOpen={setIsFormOpen}
           handleDelete={handleDelete}
+          sites={sites}
+          siteNameMap={siteNameMap}
         />
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogContent className="max-w-2xl">
             <LocationForm
               location={editingLocation}
+              sites={sites}
               onSubmit={async (values) => {
                 const result = await (values as any).id
                   ? updateLocationAction(values as NurseryLocation)
@@ -319,6 +341,8 @@ function CardWithTable({
   setEditingLocation,
   setIsFormOpen,
   handleDelete,
+  sites,
+  siteNameMap,
 }: {
   locations: NurseryLocation[];
   loading: boolean;
@@ -328,6 +352,8 @@ function CardWithTable({
   setEditingLocation: (loc: NurseryLocation | null) => void;
   setIsFormOpen: (open: boolean) => void;
   handleDelete: (id: string, name: string) => void;
+  sites: Site[];
+  siteNameMap: Map<string, string>;
 }) {
   return (
     <div className="rounded-lg border bg-card">
@@ -351,7 +377,7 @@ function CardWithTable({
                 <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Type', 'type')}</TableHead>
                 <TableHead className="px-4 py-2 w-[140px]">{renderSortHeader('Covered', 'covered')}</TableHead>
                 <TableHead className="px-4 py-2 w-[140px]">{renderSortHeader('Area (m²)', 'area')}</TableHead>
-                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Site ID', 'siteId')}</TableHead>
+                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Site', 'siteId')}</TableHead>
                 <TableHead className="text-right px-4 py-2">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -460,10 +486,25 @@ function CardWithTable({
                       name="siteId"
                       render={({ field }) => (
                         <FormItem className="space-y-1">
-                          <FormLabel className="sr-only">Site ID</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Optional" value={field.value ?? ''} onChange={(event) => field.onChange(event.target.value || undefined)} />
-                          </FormControl>
+                          <FormLabel className="sr-only">Site</FormLabel>
+                          <Select
+                            value={field.value ?? ''}
+                            onValueChange={(value) => field.onChange(value || undefined)}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select site..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {sites.map((site) => (
+                                <SelectItem key={site.id} value={site.id!}>
+                                  {site.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
@@ -490,7 +531,7 @@ function CardWithTable({
                   <TableCell className="px-4 py-2">{location.type || '—'}</TableCell>
                   <TableCell className="px-4 py-2">{location.covered ? 'Covered' : 'Uncovered'}</TableCell>
                   <TableCell className="px-4 py-2">{location.area ? `${location.area.toLocaleString()} m²` : '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{location.siteId || '—'}</TableCell>
+                  <TableCell className="px-4 py-2">{location.siteId ? siteNameMap.get(location.siteId) || location.siteId : '—'}</TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-2">
                       <Button

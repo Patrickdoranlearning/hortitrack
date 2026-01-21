@@ -4,7 +4,7 @@
 import type { CareRecommendationsInput } from '@/ai/flows/care-recommendations';
 import type { BatchChatInput } from '@/ai/flows/batch-chat-flow';
 import type { NurseryIntelligenceInput } from '@/ai/flows/nursery-intelligence';
-import type { Batch, Customer, Haulier, HaulierVehicle, NurseryLocation, PlantSize, Supplier, SupplierAddress, SupplierAddressSummary, Variety } from '@/lib/types';
+import type { Batch, Customer, Haulier, HaulierVehicle, NurseryLocation, PlantSize, Site, Supplier, SupplierAddress, SupplierAddressSummary, Variety } from '@/lib/types';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/supabase';
 import { declassify } from '@/server/utils/declassify';
@@ -483,6 +483,71 @@ export async function deleteLocationAction(locationId: string) {
     const { error } = await supabase.from('nursery_locations').delete().eq('id', locationId);
     if (error) return { success: false, error: error.message };
     return { success: true };
+}
+
+// --- Sites ---
+function normalizeSiteRow(row: any): Site | null {
+  if (!row) return null;
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function getSitesAction() {
+  const [{ orgId }, supabase] = await Promise.all([getUserAndOrg(), getSupabaseForApp()]);
+  const { data, error } = await supabase
+    .from('sites')
+    .select('*, nursery_locations(id)')
+    .eq('org_id', orgId)
+    .order('name');
+  if (error) return { success: false, error: error.message, data: [] };
+  const sites = (data || []).map((row: any) => ({
+    ...normalizeSiteRow(row),
+    locationCount: row.nursery_locations?.length ?? 0,
+  }));
+  return { success: true, data: sites };
+}
+
+export async function addSiteAction(siteData: Omit<Site, 'id'>) {
+  const [{ orgId }, supabase] = await Promise.all([getUserAndOrg(), getSupabaseForApp()]);
+  const payload = {
+    org_id: orgId,
+    name: siteData.name,
+  };
+  const { data, error } = await supabase.from('sites').insert([payload]).select();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: normalizeSiteRow(data?.[0]) };
+}
+
+export async function updateSiteAction(siteData: Site) {
+  const supabase = await getSupabaseForApp();
+  const payload = {
+    name: siteData.name,
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase.from('sites').update(payload).eq('id', siteData.id).select();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: normalizeSiteRow(data?.[0]) };
+}
+
+export async function deleteSiteAction(siteId: string) {
+  const supabase = await getSupabaseForApp();
+  // Check if any locations are linked to this site
+  const { data: linkedLocations } = await supabase
+    .from('nursery_locations')
+    .select('id')
+    .eq('site_id', siteId)
+    .limit(1);
+  if (linkedLocations && linkedLocations.length > 0) {
+    return { success: false, error: 'Cannot delete site with linked locations. Reassign or remove locations first.' };
+  }
+  const { error } = await supabase.from('sites').delete().eq('id', siteId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 export async function addSizeAction(sizeData: Omit<PlantSize, 'id'>) {
