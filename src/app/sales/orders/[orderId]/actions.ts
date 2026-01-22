@@ -210,7 +210,9 @@ export async function updateOrderItem(
   }
 
   // Check if order can be edited
-  if (!['draft', 'confirmed'].includes(item.orders.status)) {
+  // Allow editing in draft, confirmed, and picking statuses
+  // This enables adjustments when customers call to change quantities
+  if (!['draft', 'confirmed', 'picking'].includes(item.orders.status)) {
     return { error: 'Order cannot be edited in current status' };
   }
 
@@ -289,7 +291,9 @@ export async function deleteOrderItem(itemId: string) {
   }
 
   // Check if order can be edited
-  if (!['draft', 'confirmed'].includes(item.orders.status)) {
+  // Allow editing in draft, confirmed, and picking statuses
+  // This enables adjustments when customers call to change quantities
+  if (!['draft', 'confirmed', 'picking'].includes(item.orders.status)) {
     return { error: 'Order cannot be edited in current status' };
   }
 

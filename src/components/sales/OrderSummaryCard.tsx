@@ -54,10 +54,13 @@ const STATUS_FLOW = [
   { status: 'delivered', label: 'Delivered', icon: Truck },
 ];
 
+// Manual status transitions allowed from this admin view
+// Note: picking -> packed is NOT allowed here - must go through the picking process
+// where pickers scan/assign batch numbers to order items
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   draft: ['confirmed', 'void'],
-  confirmed: ['picking', 'void'],
-  picking: ['packed', 'void'],
+  confirmed: ['void'], // picking is auto-created, not manual
+  picking: ['void'], // packed happens via picking completion, not manual
   ready: ['dispatched', 'void'], // legacy - redirect to packed behavior
   packed: ['dispatched', 'void'],
   dispatched: ['delivered'],

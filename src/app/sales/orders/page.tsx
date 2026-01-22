@@ -9,17 +9,30 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function SalesOrdersPage(props: {
-    searchParams?: Promise<{ page?: string; status?: string; pageSize?: string }>;
+    searchParams?: Promise<{
+        page?: string;
+        status?: string;
+        pageSize?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+    }>;
 }) {
     const searchParams = await props.searchParams;
     const page = Number(searchParams?.page) || 1;
-    const status = searchParams?.status || undefined;
     const pageSize = Number(searchParams?.pageSize) || 20;
+    const sortBy = searchParams?.sortBy || 'created_at';
+    const sortOrder = searchParams?.sortOrder || 'desc';
+
+    // Parse status - can be comma-separated for multiple statuses
+    const statusParam = searchParams?.status;
+    const status = statusParam ? statusParam.split(',').filter(Boolean) : undefined;
 
     const { orders, total, page: currentPage, pageSize: currentPageSize } = await listOrders({
         page,
         pageSize,
         status,
+        sortBy,
+        sortOrder,
     });
 
     return (
@@ -41,6 +54,8 @@ export default async function SalesOrdersPage(props: {
                     page={currentPage}
                     pageSize={currentPageSize}
                     statusFilter={status}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
                 />
             </div>
         </PageFrame>

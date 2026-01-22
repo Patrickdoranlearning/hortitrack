@@ -19,12 +19,18 @@ export const NewOrderSchema = z.object({
 });
 export type NewOrder = z.infer<typeof NewOrderSchema>;
 
-export async function listOrders(params: { page?: number; pageSize?: number; status?: string } = {}): Promise<{
-  orders: Array<Order & { 
-    org_id: string; 
-    order_number: string; 
-    total_inc_vat: number | null; 
-    requested_delivery_date: string | null; 
+export async function listOrders(params: {
+  page?: number;
+  pageSize?: number;
+  status?: string | string[];
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+} = {}): Promise<{
+  orders: Array<Order & {
+    org_id: string;
+    order_number: string;
+    total_inc_vat: number | null;
+    requested_delivery_date: string | null;
     customer?: { name: string | null } | null;
     ship_to_address?: { county: string | null; city: string | null } | null;
   }>;
@@ -38,15 +44,26 @@ export async function listOrders(params: { page?: number; pageSize?: number; sta
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
+  // Determine sort column and order
+  const sortBy = params.sortBy || 'created_at';
+  const sortOrder = params.sortOrder || 'desc';
+  const ascending = sortOrder === 'asc';
+
   // Removed count: "exact" for performance - use estimated count or cursor pagination instead
   let query = supabase
     .from("orders")
     .select("*, customers(name), customer_addresses!orders_ship_to_address_id_fkey(county, city)", { count: "estimated" })
-    .order("created_at", { ascending: false })
+    .order(sortBy, { ascending })
     .range(from, to);
 
+  // Support both single status string and array of statuses
   if (params.status) {
-    query = query.eq("status", params.status);
+    const statuses = Array.isArray(params.status) ? params.status : [params.status];
+    if (statuses.length === 1) {
+      query = query.eq("status", statuses[0]);
+    } else if (statuses.length > 1) {
+      query = query.in("status", statuses);
+    }
   }
 
   const { data, error, count } = await query;

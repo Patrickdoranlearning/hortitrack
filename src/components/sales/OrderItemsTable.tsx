@@ -42,7 +42,9 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange 
   const [itemToDelete, setItemToDelete] = useState<OrderItem | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const canEdit = ['draft', 'confirmed'].includes(status);
+  // Allow editing in draft, confirmed, and picking statuses
+  // This enables adjustments when customers call to change quantities
+  const canEdit = ['draft', 'confirmed', 'picking'].includes(status);
 
   const getItemDescription = (item: OrderItem) => {
     if (item.product?.name) return item.product.name;
