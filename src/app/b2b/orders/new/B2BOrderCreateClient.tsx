@@ -65,6 +65,55 @@ export function B2BOrderCreateClient({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Check for reorder items in sessionStorage on mount
+  useEffect(() => {
+    const reorderData = sessionStorage.getItem('b2b_reorder_items');
+    if (reorderData) {
+      try {
+        const reorderItems = JSON.parse(reorderData);
+        // Clear sessionStorage immediately to prevent duplicate loads
+        sessionStorage.removeItem('b2b_reorder_items');
+
+        // Transform reorder items to cart items
+        // Match with current catalog products to get latest prices and availability
+        const cartItems: CartItem[] = reorderItems
+          .map((item: any) => {
+            // Find matching product in current catalog
+            const product = products.find((p) => p.productId === item.product_id);
+            if (!product) {
+              // Product no longer available, skip
+              console.warn(`Product ${item.product_id} not found in catalog, skipping`);
+              return null;
+            }
+
+            return {
+              productId: item.product_id,
+              skuId: item.sku_id,
+              productName: item.description || product.productName,
+              varietyName: product.varietyName,
+              sizeName: product.sizeName,
+              sizeId: product.sizeId || undefined,
+              family: product.family || undefined,
+              quantity: item.quantity,
+              unitPriceExVat: product.unitPriceExVat ?? item.unit_price_ex_vat,
+              vatRate: product.vatRate ?? item.vat_rate,
+              rrp: item.rrp ?? undefined,
+              multibuyPrice2: item.multibuy_price_2 ?? undefined,
+              multibuyQty2: item.multibuy_qty_2 ?? undefined,
+            } as CartItem;
+          })
+          .filter(Boolean) as CartItem[];
+
+        if (cartItems.length > 0) {
+          setTrolley(cartItems);
+        }
+      } catch (err) {
+        console.error('Error parsing reorder items:', err);
+        sessionStorage.removeItem('b2b_reorder_items');
+      }
+    }
+  }, [products]);
+
   // Only show products during the cart step
   const showProducts = checkoutStep === 'cart';
 

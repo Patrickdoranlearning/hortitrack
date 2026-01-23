@@ -77,7 +77,9 @@ export function B2BOrdersClient({ orders, customerId }: B2BOrdersClientProps) {
     setReorderingId(orderId);
     try {
       const result = await reorderFromPastOrder(orderId);
-      if (result.success) {
+      if (result.success && result.items) {
+        // Store reorder items in sessionStorage for the new order page to pick up
+        sessionStorage.setItem('b2b_reorder_items', JSON.stringify(result.items));
         // Redirect to new order page with cart pre-populated
         router.push('/b2b/orders/new');
       }
@@ -199,9 +201,9 @@ export function B2BOrdersClient({ orders, customerId }: B2BOrdersClientProps) {
                       <p className="font-medium text-lg">€{order.total_inc_vat.toFixed(2)}</p>
                     </div>
                     <div className="flex items-end gap-2">
-                      <Button asChild variant="outline" className="flex-1">
-                        <Link href={`/b2b/orders/${order.id}`}>View Details</Link>
-                      </Button>
+                      <Link href={`/b2b/orders/${order.id}`} className="flex-1">
+                        <Button variant="outline" className="w-full">View Details</Button>
+                      </Link>
                       <Button
                         variant="outline"
                         onClick={() => handleReorder(order.id)}

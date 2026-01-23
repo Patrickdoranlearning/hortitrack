@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { UseFormReturn, useWatch } from 'react-hook-form';
 import { FormControl, FormField } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, Trash2, Layers } from 'lucide-react';
-import { BatchSelectionDialog, BatchAllocation } from '../BatchSelectionDialog';
+import { ChevronDown, ChevronRight, Trash2, Minus, Plus, MapPin } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import type { BatchAllocation } from '../BatchSelectionDialog';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
 import type { CreateOrderInput } from '@/lib/sales/types';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,16 @@ export type PricingHint = {
   multibuyQty2?: number | null;
   multibuyPrice2?: number | null;
 };
+
+// Quick quantity presets - TODO: Fetch from product size (plant_sizes.shelf_quantity, trolley_quantity)
+// For now using sensible defaults that can be overridden via props
+export const DEFAULT_quickQty = {
+  halfShelf: 15,
+  fullShelf: 30,
+  fullTrolley: 180,
+} as const;
+
+export type QuickQtyConfig = typeof DEFAULT_quickQty;
 
 type Props = {
   index: number;
@@ -29,13 +40,16 @@ type Props = {
   selectedCustomerId?: string;
   defaultExpanded?: boolean;
   pricingHints?: Record<string, PricingHint>;
+  quickQty?: QuickQtyConfig;
 };
 
-// Track variety quantities locally
-type VarietyQty = {
+// Track variety-level allocations
+type VarietyAllocation = {
   varietyName: string;
+  family: string | null;
   qty: number;
-  batchAllocations: BatchAllocation[];
+  // Optional specific batch allocations within the variety
+  batchAllocations?: Map<string, { batchId: string; batchNumber: string; qty: number; location?: string }>;
 };
 
 export function SalesProductAccordionRow({
@@ -48,71 +62,70 @@ export function SalesProductAccordionRow({
   onRemove,
   selectedCustomerId,
   pricingHints = {},
+  quickQty = DEFAULT_quickQty,
 }: Props) {
   const line = useWatch({ control: form.control, name: `lines.${index}` });
-  const [varietiesExpanded, setVarietiesExpanded] = useState(false);
-  const [varietyQuantities, setVarietyQuantities] = useState<VarietyQty[]>([]);
-  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
-  const [selectedVarietyForBatches, setSelectedVarietyForBatches] = useState<string>('');
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [varietyAllocations, setVarietyAllocations] = useState<Map<string, VarietyAllocation>>(new Map());
+  const [expandedVarieties, setExpandedVarieties] = useState<Set<string>>(new Set());
+
+  // Use ref to avoid infinite loops with onAllocationsChange
+  const onAllocationsChangeRef = useRef(onAllocationsChange);
+  onAllocationsChangeRef.current = onAllocationsChange;
+
+  // Track previous allocations to avoid unnecessary updates
+  const prevAllocationsRef = useRef<string>('');
 
   const selectedProduct = useMemo(() => {
     if (!line?.productId) return undefined;
     return products.find((p) => p.id === line.productId);
   }, [line?.productId, products]);
 
-  // Get unique varieties from batches with family info
-  const varietiesWithFamily = useMemo(() => {
+  // Get varieties with their batches (excluding Grower's Choice)
+  const varietiesWithBatches = useMemo(() => {
     if (!selectedProduct) return [];
-    const varietyMap = new Map<string, { name: string; family: string | null }>();
-    for (const batch of selectedProduct.batches) {
-      if (batch.plantVariety && !varietyMap.has(batch.plantVariety)) {
-        varietyMap.set(batch.plantVariety, {
-          name: batch.plantVariety,
-          family: batch.family || selectedProduct.family || null
-        });
-      }
-    }
-    return Array.from(varietyMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedProduct]);
 
-  // Simple list of variety names for backward compatibility
-  const varieties = varietiesWithFamily.map(v => v.name);
+    const varietyMap = new Map<string, {
+      name: string;
+      family: string | null;
+      batches: typeof selectedProduct.batches;
+      totalStock: number;
+    }>();
 
-  // Get stock info per variety
-  const varietyStockInfo = useMemo(() => {
-    if (!selectedProduct) return new Map<string, { totalQty: number; batchCount: number; family: string | null }>();
-    const info = new Map<string, { totalQty: number; batchCount: number; family: string | null }>();
-    
+    // Group batches by variety
     for (const batch of selectedProduct.batches) {
       const varietyName = batch.plantVariety || '';
-      if (!info.has(varietyName)) {
-        info.set(varietyName, { totalQty: 0, batchCount: 0, family: batch.family || null });
+      if (varietyName) {
+        if (!varietyMap.has(varietyName)) {
+          varietyMap.set(varietyName, {
+            name: varietyName,
+            family: batch.family || selectedProduct.family || null,
+            batches: [],
+            totalStock: 0,
+          });
+        }
+        const variety = varietyMap.get(varietyName)!;
+        variety.batches.push(batch);
+        variety.totalStock += batch.quantity;
       }
-      const existing = info.get(varietyName)!;
-      existing.totalQty += batch.quantity;
-      existing.batchCount += 1;
     }
-    
-    return info;
+
+    // Sort varieties alphabetically
+    return Array.from(varietyMap.entries()).sort((a, b) => a[1].name.localeCompare(b[1].name));
   }, [selectedProduct]);
 
-  // Initialize variety quantities when product changes
-  useEffect(() => {
-    if (selectedProduct && varieties.length > 0) {
-      setVarietyQuantities([
-        { varietyName: '', qty: 0, batchAllocations: [] }, // Grower's Choice
-        ...varieties.map(v => ({ varietyName: v, qty: 0, batchAllocations: [] }))
-      ]);
-    } else {
-      setVarietyQuantities([]);
-    }
-  }, [selectedProduct?.id, varieties.length]);
+  // Check if product has varieties to show (at least 1 variety with a name)
+  // or multiple batches that could be selected from
+  const hasVarietiesToShow = varietiesWithBatches.length >= 1;
+  const hasMultipleBatches = selectedProduct ? selectedProduct.batches.length > 1 : false;
 
-  // Calculate total from variety quantities
-  const varietyTotal = varietyQuantities.reduce((sum, v) => sum + v.qty, 0);
-  
-  // Use variety total if expanded, otherwise use form qty
-  const displayQty = varietiesExpanded && varietyTotal > 0 ? varietyTotal : (line?.qty || 0);
+  // Calculate total quantity from variety selections
+  const totalFromVarieties = useMemo(() => {
+    return Array.from(varietyAllocations.values()).reduce((sum, v) => sum + v.qty, 0);
+  }, [varietyAllocations]);
+
+  // Use variety total if we have selections, otherwise use form qty
+  const displayQty = totalFromVarieties > 0 ? totalFromVarieties : (line?.qty || 0);
   const price = typeof line?.unitPrice === 'number' ? line.unitPrice : Number(line?.unitPrice) || 0;
   const vatRate = typeof line?.vatRate === 'number' ? line.vatRate : Number(line?.vatRate) || 0;
   const lineNet = displayQty * price;
@@ -121,10 +134,55 @@ export function SalesProductAccordionRow({
 
   // Sync variety total to form
   useEffect(() => {
-    if (varietiesExpanded && varietyTotal > 0) {
-      form.setValue(`lines.${index}.qty`, varietyTotal);
+    if (totalFromVarieties > 0) {
+      form.setValue(`lines.${index}.qty`, totalFromVarieties);
     }
-  }, [varietyTotal, varietiesExpanded, form, index]);
+  }, [totalFromVarieties, form, index]);
+
+  // Sync allocations when variety allocations change
+  useEffect(() => {
+    const newAllocations: BatchAllocation[] = [];
+
+    varietyAllocations.forEach((va) => {
+      if (va.qty > 0) {
+        // If user specified specific batches, use those
+        if (va.batchAllocations && va.batchAllocations.size > 0) {
+          va.batchAllocations.forEach((ba) => {
+            if (ba.qty > 0) {
+              newAllocations.push({
+                batchId: ba.batchId,
+                batchNumber: ba.batchNumber,
+                plantVariety: va.varietyName,
+                family: va.family,
+                size: selectedProduct?.size || '',
+                qty: ba.qty,
+                location: ba.location,
+              });
+            }
+          });
+        } else {
+          // Otherwise create a variety-level allocation (picker will decide batch)
+          newAllocations.push({
+            batchId: '', // Empty = picker decides
+            batchNumber: '',
+            plantVariety: va.varietyName,
+            family: va.family,
+            size: selectedProduct?.size || '',
+            qty: va.qty,
+          });
+        }
+      }
+    });
+
+    // Only call if allocations have actually changed
+    const allocationsKey = JSON.stringify(
+      newAllocations.map(a => `${a.plantVariety}:${a.batchId}:${a.qty}`).sort()
+    );
+    if (allocationsKey !== prevAllocationsRef.current) {
+      prevAllocationsRef.current = allocationsKey;
+      onAllocationsChangeRef.current(index, newAllocations);
+    }
+  }, [varietyAllocations, index, selectedProduct?.size]);
 
   const resolveProductLabel = (product: ProductWithBatches) => {
     const alias = product.aliases?.find(
@@ -164,81 +222,177 @@ export function SalesProductAccordionRow({
         if (hint.multibuyPrice2 != null) form.setValue(`lines.${index}.multibuyPrice2`, hint.multibuyPrice2);
       }
     }
-    onAllocationsChange(index, []);
-    setVarietiesExpanded(false);
-    setVarietyQuantities([]);
+    setVarietyAllocations(new Map());
+    setExpandedVarieties(new Set());
+    setIsExpanded(false);
+    prevAllocationsRef.current = '[]';
+    onAllocationsChangeRef.current(index, []);
   };
 
   const handleMainQtyChange = (newQty: number) => {
     form.setValue(`lines.${index}.qty`, Math.max(0, newQty));
-    // If varieties were expanded but user edits main qty, collapse varieties
-    if (varietiesExpanded && varietyTotal > 0) {
-      setVarietiesExpanded(false);
-      setVarietyQuantities(prev => prev.map(v => ({ ...v, qty: 0, batchAllocations: [] })));
+    // Clear variety selections when manually editing qty (using Grower's Choice)
+    if (totalFromVarieties > 0) {
+      setVarietyAllocations(new Map());
     }
-    onAllocationsChange(index, []);
+    prevAllocationsRef.current = '[]';
+    onAllocationsChangeRef.current(index, []);
   };
 
-  const handleVarietyQtyChange = (varietyName: string, newQty: number) => {
-    setVarietyQuantities(prev => 
-      prev.map(v => 
-        v.varietyName === varietyName 
-          ? { ...v, qty: Math.max(0, newQty) }
-          : v
-      )
-    );
-  };
+  const updateVarietyQty = (varietyKey: string, variety: { name: string; family: string | null }, delta: number) => {
+    setVarietyAllocations(prev => {
+      const next = new Map(prev);
+      const existing = next.get(varietyKey);
+      const currentQty = existing?.qty || 0;
+      const newQty = Math.max(0, currentQty + delta);
 
-  const openBatchDialog = (varietyName: string) => {
-    setSelectedVarietyForBatches(varietyName);
-    setBatchDialogOpen(true);
-  };
-
-  const handleBatchConfirm = (allocs: BatchAllocation[]) => {
-    // Update the variety's batch allocations
-    setVarietyQuantities(prev =>
-      prev.map(v =>
-        v.varietyName === selectedVarietyForBatches
-          ? { 
-              ...v, 
-              batchAllocations: allocs,
-              qty: allocs.reduce((sum, a) => sum + a.qty, 0) || v.qty
-            }
-          : v
-      )
-    );
-    
-    // Update the overall allocations
-    const otherAllocations = allocations.filter(a => {
-      const batch = selectedProduct?.batches.find(b => b.id === a.batchId);
-      return batch?.plantVariety !== selectedVarietyForBatches && 
-             (selectedVarietyForBatches !== '' || batch?.plantVariety);
-    });
-    onAllocationsChange(index, [...otherAllocations, ...allocs]);
-  };
-
-  const batchDialogBatches = useMemo(() => {
-    if (!selectedProduct) return [];
-    if (selectedVarietyForBatches === '') {
-      return selectedProduct.batches; // All batches for Grower's Choice
-    }
-    return selectedProduct.batches.filter(b => b.plantVariety === selectedVarietyForBatches);
-  }, [selectedProduct, selectedVarietyForBatches]);
-
-  const getVarietyAllocations = (varietyName: string) => {
-    return allocations.filter(a => {
-      const batch = selectedProduct?.batches.find(b => b.id === a.batchId);
-      if (varietyName === '') return !batch?.plantVariety || batch.plantVariety === '';
-      return batch?.plantVariety === varietyName;
+      if (newQty === 0) {
+        next.delete(varietyKey);
+      } else {
+        next.set(varietyKey, {
+          varietyName: variety.name,
+          family: variety.family,
+          qty: newQty,
+          batchAllocations: existing?.batchAllocations,
+        });
+      }
+      return next;
     });
   };
+
+  const setVarietyQtyDirect = (varietyKey: string, variety: { name: string; family: string | null }, qty: number) => {
+    setVarietyAllocations(prev => {
+      const next = new Map(prev);
+      const existing = next.get(varietyKey);
+      const newQty = Math.max(0, qty);
+
+      if (newQty === 0) {
+        next.delete(varietyKey);
+      } else {
+        next.set(varietyKey, {
+          varietyName: variety.name,
+          family: variety.family,
+          qty: newQty,
+          batchAllocations: existing?.batchAllocations,
+        });
+      }
+      return next;
+    });
+  };
+
+  const toggleVarietyExpanded = (varietyKey: string) => {
+    setExpandedVarieties(prev => {
+      const next = new Set(prev);
+      if (next.has(varietyKey)) {
+        next.delete(varietyKey);
+      } else {
+        next.add(varietyKey);
+      }
+      return next;
+    });
+  };
+
+  const updateBatchQty = (
+    varietyKey: string,
+    variety: { name: string; family: string | null },
+    batch: { id: string; batchNumber: string; quantity: number; location?: string },
+    delta: number
+  ) => {
+    setVarietyAllocations(prev => {
+      const next = new Map(prev);
+      const existing = next.get(varietyKey) || {
+        varietyName: variety.name,
+        family: variety.family,
+        qty: 0,
+        batchAllocations: new Map(),
+      };
+
+      const batchAllocations = new Map(existing.batchAllocations || []);
+      const currentBatch = batchAllocations.get(batch.id);
+      const currentQty = currentBatch?.qty || 0;
+      const newQty = Math.max(0, Math.min(batch.quantity, currentQty + delta));
+
+      if (newQty === 0) {
+        batchAllocations.delete(batch.id);
+      } else {
+        batchAllocations.set(batch.id, {
+          batchId: batch.id,
+          batchNumber: batch.batchNumber,
+          qty: newQty,
+          location: batch.location,
+        });
+      }
+
+      // Calculate total from batches
+      const batchTotal = Array.from(batchAllocations.values()).reduce((sum, b) => sum + b.qty, 0);
+
+      if (batchTotal === 0 && existing.qty === 0) {
+        next.delete(varietyKey);
+      } else {
+        next.set(varietyKey, {
+          ...existing,
+          qty: Math.max(existing.qty, batchTotal), // Variety qty is at least sum of specific batches
+          batchAllocations,
+        });
+      }
+      return next;
+    });
+  };
+
+  const setBatchQtyDirect = (
+    varietyKey: string,
+    variety: { name: string; family: string | null },
+    batch: { id: string; batchNumber: string; quantity: number; location?: string },
+    qty: number
+  ) => {
+    setVarietyAllocations(prev => {
+      const next = new Map(prev);
+      const existing = next.get(varietyKey) || {
+        varietyName: variety.name,
+        family: variety.family,
+        qty: 0,
+        batchAllocations: new Map(),
+      };
+
+      const batchAllocations = new Map(existing.batchAllocations || []);
+      const newQty = Math.max(0, Math.min(batch.quantity, qty));
+
+      if (newQty === 0) {
+        batchAllocations.delete(batch.id);
+      } else {
+        batchAllocations.set(batch.id, {
+          batchId: batch.id,
+          batchNumber: batch.batchNumber,
+          qty: newQty,
+          location: batch.location,
+        });
+      }
+
+      // Calculate total from batches
+      const batchTotal = Array.from(batchAllocations.values()).reduce((sum, b) => sum + b.qty, 0);
+
+      if (batchTotal === 0 && existing.qty === 0) {
+        next.delete(varietyKey);
+      } else {
+        next.set(varietyKey, {
+          ...existing,
+          qty: Math.max(existing.qty, batchTotal),
+          batchAllocations,
+        });
+      }
+      return next;
+    });
+  };
+
+  // Count varieties with allocations
+  const selectedVarietyCount = varietyAllocations.size;
 
   return (
     <div className="border-b last:border-b-0">
-      {/* Main Product Row - Excel-like */}
+      {/* Main Product Row */}
       <div className="grid grid-cols-12 gap-1 md:gap-2 items-center py-2 px-2 md:px-3 hover:bg-muted/30">
-        {/* Product Select - col 1-6 mobile, 1-4 desktop */}
-        <div className="col-span-6 md:col-span-4">
+        {/* Product Select */}
+        <div className="col-span-5 md:col-span-4">
           <FormField
             control={form.control}
             name={`lines.${index}.productId`}
@@ -262,23 +416,23 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* Quantity - col 7-8 mobile, 5 desktop */}
+        {/* Quantity */}
         <div className="col-span-2 md:col-span-1">
           <FormField
             control={form.control}
             name={`lines.${index}.qty`}
-            render={({ field }) => (
+            render={() => (
               <FormControl>
                 <Input
                   type="number"
                   min="0"
                   className={cn(
                     "h-9 text-xs md:text-sm text-center px-1",
-                    varietiesExpanded && varietyTotal > 0 && "bg-muted text-muted-foreground"
+                    totalFromVarieties > 0 && "bg-muted text-muted-foreground"
                   )}
                   value={displayQty || ''}
                   onChange={(e) => handleMainQtyChange(parseInt(e.target.value) || 0)}
-                  readOnly={varietiesExpanded && varietyTotal > 0}
+                  readOnly={totalFromVarieties > 0}
                   placeholder="0"
                 />
               </FormControl>
@@ -286,7 +440,7 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* Price - col 6 desktop, hidden mobile */}
+        {/* Price */}
         <div className="hidden md:block md:col-span-1">
           <FormField
             control={form.control}
@@ -306,7 +460,7 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* VAT % - col 7 desktop, hidden mobile */}
+        {/* VAT % */}
         <div className="hidden md:block md:col-span-1">
           <FormField
             control={form.control}
@@ -326,43 +480,74 @@ export function SalesProductAccordionRow({
           />
         </div>
 
-        {/* Total - col 8 desktop, hidden mobile */}
+        {/* Total */}
         <div className="hidden md:block md:col-span-1 text-right text-sm font-medium">
           €{lineTotal.toFixed(2)}
         </div>
 
-        {/* Varieties Dropdown Button - col 9-12 mobile, 9-12 desktop */}
-        <div className="col-span-4 md:col-span-4 flex items-center justify-end gap-1">
-          {/* Always show varieties selector, disabled when no product or no varieties */}
-          <Button
-            type="button"
-            variant={varietiesExpanded ? "secondary" : "outline"}
-            size="sm"
-            className={cn(
-              "h-8 px-1.5 md:px-3 text-[10px] md:text-xs min-w-[70px] md:min-w-[100px] justify-between",
-              (!selectedProduct || varieties.length === 0) && "opacity-50"
-            )}
-            onClick={() => selectedProduct && varieties.length > 0 && setVarietiesExpanded(!varietiesExpanded)}
-            disabled={!selectedProduct || varieties.length === 0}
-          >
-            <span className="truncate mr-1">
-              {!selectedProduct 
-                ? "Varieties" 
-                : varieties.length === 0 
-                  ? "None" 
-                  : varietiesExpanded 
-                    ? `${varieties.length}`
-                    : "▾ Var"
-              }
-            </span>
-            {selectedProduct && varieties.length > 0 && (
-              varietiesExpanded ? (
-                <ChevronDown className="h-3 w-3 shrink-0" />
+        {/* Quick Qty, Expand/Collapse & Delete */}
+        <div className="col-span-5 md:col-span-4 flex items-center justify-end gap-1">
+          {/* Quick Qty Buttons - Only show when no varieties selected (Grower's Choice mode) */}
+          {selectedProduct && totalFromVarieties === 0 && (
+            <div className="hidden md:flex items-center gap-1 mr-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => handleMainQtyChange(quickQty.halfShelf)}
+                title={`Half shelf (${quickQty.halfShelf})`}
+              >
+                ½S
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => handleMainQtyChange(quickQty.fullShelf)}
+                title={`Full shelf (${quickQty.fullShelf})`}
+              >
+                1S
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => handleMainQtyChange(quickQty.fullTrolley)}
+                title={`Full trolley (${quickQty.fullTrolley})`}
+              >
+                1T
+              </Button>
+            </div>
+          )}
+          {selectedProduct && (hasVarietiesToShow || hasMultipleBatches) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 px-2 text-xs gap-1",
+                selectedVarietyCount > 0 && "text-primary font-medium"
+              )}
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
               ) : (
-                <ChevronRight className="h-3 w-3 shrink-0" />
-              )
-            )}
-          </Button>
+                <ChevronRight className="h-4 w-4" />
+              )}
+              <span>
+                {selectedVarietyCount > 0
+                  ? `${selectedVarietyCount} variet${selectedVarietyCount > 1 ? 'ies' : 'y'}`
+                  : hasVarietiesToShow
+                    ? `${varietiesWithBatches.length} variet${varietiesWithBatches.length > 1 ? 'ies' : 'y'}`
+                    : `${selectedProduct.batches.length} batches`
+                }
+              </span>
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -375,138 +560,363 @@ export function SalesProductAccordionRow({
         </div>
       </div>
 
-      {/* Variety Sub-Rows - Expanded */}
-      {varietiesExpanded && selectedProduct && (
+      {/* Expanded Varieties/Batches Panel - Full Width */}
+      {isExpanded && selectedProduct && (hasVarietiesToShow || hasMultipleBatches) && (
         <div className="bg-muted/20 border-t">
-          {/* Grower's Choice Row */}
-          <VarietyRow
-            varietyName=""
-            displayName="Grower's Choice"
-            family={null}
-            qty={varietyQuantities.find(v => v.varietyName === '')?.qty || 0}
-            stockInfo={{ totalQty: selectedProduct.availableStock, batchCount: selectedProduct.batches.length, family: null }}
-            allocations={getVarietyAllocations('')}
-            onQtyChange={(qty) => handleVarietyQtyChange('', qty)}
-            onBatchClick={() => openBatchDialog('')}
-            isLast={varieties.length === 0}
-          />
-          
-          {/* Individual Variety Rows */}
-          {varietiesWithFamily.map((variety, idx) => {
-            const stockInfo = varietyStockInfo.get(variety.name);
+          {hasVarietiesToShow ? varietiesWithBatches.map(([varietyKey, variety]) => {
+            const allocation = varietyAllocations.get(varietyKey);
+            const varietyQty = allocation?.qty || 0;
+            const isVarietyExpanded = expandedVarieties.has(varietyKey);
+
             return (
-              <VarietyRow
-                key={variety.name}
-                varietyName={variety.name}
-                displayName={variety.name}
-                family={variety.family}
-                qty={varietyQuantities.find(v => v.varietyName === variety.name)?.qty || 0}
-                stockInfo={stockInfo}
-                allocations={getVarietyAllocations(variety.name)}
-                onQtyChange={(qty) => handleVarietyQtyChange(variety.name, qty)}
-                onBatchClick={() => openBatchDialog(variety.name)}
-                isLast={idx === varietiesWithFamily.length - 1}
-              />
+              <div key={varietyKey} className="border-b last:border-b-0 border-muted/50">
+                {/* Variety Row */}
+                <div className="grid grid-cols-12 gap-2 items-center py-2 px-3">
+                  {/* Variety Name */}
+                  <div className="col-span-5 md:col-span-4">
+                    <div className="text-sm font-medium truncate">{variety.name}</div>
+                    {variety.family && (
+                      <div className="text-[10px] text-muted-foreground truncate">{variety.family}</div>
+                    )}
+                  </div>
+
+                  {/* Variety Quantity Controls */}
+                  <div className="col-span-4 md:col-span-3 flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateVarietyQty(varietyKey, variety, -10)}
+                      disabled={varietyQty === 0}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="h-7 w-16 text-xs text-center px-1"
+                      value={varietyQty || ''}
+                      onChange={(e) => setVarietyQtyDirect(varietyKey, variety, parseInt(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateVarietyQty(varietyKey, variety, 10)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+
+                  {/* Quick Qty Buttons & Batches & Available Stock */}
+                  <div className="col-span-3 md:col-span-5 flex items-center justify-end">
+                    <div className="hidden md:flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-8 px-0 text-[10px]"
+                        onClick={() => setVarietyQtyDirect(varietyKey, variety, quickQty.halfShelf)}
+                        title={`Half shelf (${quickQty.halfShelf})`}
+                      >
+                        ½S
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-8 px-0 text-[10px]"
+                        onClick={() => setVarietyQtyDirect(varietyKey, variety, quickQty.fullShelf)}
+                        title={`Full shelf (${quickQty.fullShelf})`}
+                      >
+                        1S
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-8 px-0 text-[10px]"
+                        onClick={() => setVarietyQtyDirect(varietyKey, variety, quickQty.fullTrolley)}
+                        title={`Full trolley (${quickQty.fullTrolley})`}
+                      >
+                        1T
+                      </Button>
+                    </div>
+                    <span className="text-xs text-muted-foreground w-20 text-right">
+                      {variety.totalStock} avail
+                    </span>
+                    {variety.batches.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-6 px-2 text-[10px] gap-1",
+                          (allocation?.batchAllocations?.size ?? 0) > 0 && "text-primary font-medium"
+                        )}
+                        onClick={() => toggleVarietyExpanded(varietyKey)}
+                      >
+                        {isVarietyExpanded ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
+                        )}
+                        <span>
+                          {(allocation?.batchAllocations?.size ?? 0) > 0
+                            ? `${allocation?.batchAllocations?.size} batch${(allocation?.batchAllocations?.size ?? 0) > 1 ? 'es' : ''}`
+                            : `${variety.batches.length} batches`
+                          }
+                        </span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Batch Details Panel - Full Width Dropdown */}
+                {isVarietyExpanded && variety.batches.length > 1 && (
+                  <div className="bg-muted/30 border-t border-muted/50">
+                    {variety.batches.map((batch) => {
+                      const batchAlloc = allocation?.batchAllocations?.get(batch.id);
+                      const batchQty = batchAlloc?.qty || 0;
+
+                      return (
+                        <div
+                          key={batch.id}
+                          className={cn(
+                            "grid grid-cols-12 gap-2 items-center py-1.5 px-3 pl-6 border-b last:border-b-0 border-muted/30",
+                            batchQty > 0 && "bg-primary/5"
+                          )}
+                        >
+                          {/* Batch Info */}
+                          <div className="col-span-5 md:col-span-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-medium truncate">{batch.batchNumber}</span>
+                              {batch.grade && (
+                                <Badge variant="secondary" className="text-[9px] h-4 px-1">
+                                  {batch.grade}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                              {batch.location ? (
+                                <>
+                                  <MapPin className="h-2.5 w-2.5" />
+                                  {batch.location}
+                                </>
+                              ) : (
+                                <span className="italic">No location</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Batch Quantity Controls */}
+                          <div className="col-span-4 md:col-span-3 flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => updateBatchQty(varietyKey, variety, batch, -10)}
+                              disabled={batchQty === 0}
+                            >
+                              <Minus className="h-2.5 w-2.5" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min="0"
+                              max={batch.quantity}
+                              className="h-6 w-14 text-xs text-center px-1"
+                              value={batchQty || ''}
+                              onChange={(e) => {
+                                const qty = Math.min(batch.quantity, parseInt(e.target.value) || 0);
+                                updateBatchQty(varietyKey, variety, batch, qty - batchQty);
+                              }}
+                              placeholder="0"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => updateBatchQty(varietyKey, variety, batch, 10)}
+                              disabled={batchQty >= batch.quantity}
+                            >
+                              <Plus className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+
+                          {/* Quick Qty Buttons & Batch Available */}
+                          <div className="col-span-3 md:col-span-5 flex items-center justify-end">
+                            <div className="hidden md:flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-5 w-7 px-0 text-[9px]"
+                                onClick={() => setBatchQtyDirect(varietyKey, variety, batch, quickQty.halfShelf)}
+                                title={`Half shelf (${quickQty.halfShelf})`}
+                              >
+                                ½S
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-5 w-7 px-0 text-[9px]"
+                                onClick={() => setBatchQtyDirect(varietyKey, variety, batch, quickQty.fullShelf)}
+                                title={`Full shelf (${quickQty.fullShelf})`}
+                              >
+                                1S
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-5 w-7 px-0 text-[9px]"
+                                onClick={() => setBatchQtyDirect(varietyKey, variety, batch, quickQty.fullTrolley)}
+                                title={`Full trolley (${quickQty.fullTrolley})`}
+                              >
+                                1T
+                              </Button>
+                            </div>
+                            <span className="text-xs text-muted-foreground w-20 text-right">
+                              {batch.quantity} avail
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
-          })}
-        </div>
-      )}
+          }) : (
+            /* Fallback: Show batches directly when no named varieties */
+            selectedProduct.batches.map((batch) => {
+              const batchAlloc = varietyAllocations.get('')?.batchAllocations?.get(batch.id);
+              const batchQty = batchAlloc?.qty || 0;
 
-      {/* Batch Selection Dialog */}
-      <BatchSelectionDialog
-        open={batchDialogOpen}
-        onOpenChange={setBatchDialogOpen}
-        batches={batchDialogBatches}
-        productName={selectedProduct ? resolveProductLabel(selectedProduct) : ''}
-        productVariety={selectedVarietyForBatches || 'Any'}
-        productSize={selectedProduct?.size || ''}
-        currentAllocations={getVarietyAllocations(selectedVarietyForBatches)}
-        onConfirm={handleBatchConfirm}
-      />
-    </div>
-  );
-}
+              return (
+                <div
+                  key={batch.id}
+                  className={cn(
+                    "grid grid-cols-12 gap-2 items-center py-2 px-3 border-b last:border-b-0 border-muted/50",
+                    batchQty > 0 && "bg-primary/5"
+                  )}
+                >
+                  {/* Batch Info */}
+                  <div className="col-span-5 md:col-span-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium truncate">{batch.batchNumber}</span>
+                      {batch.grade && (
+                        <Badge variant="secondary" className="text-[9px] h-4 px-1">
+                          {batch.grade}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                      {batch.location ? (
+                        <>
+                          <MapPin className="h-2.5 w-2.5" />
+                          {batch.location}
+                        </>
+                      ) : (
+                        <span className="italic">No location</span>
+                      )}
+                    </div>
+                  </div>
 
-// Sub-component for variety rows
-function VarietyRow({
-  varietyName,
-  displayName,
-  family,
-  qty,
-  stockInfo,
-  allocations,
-  onQtyChange,
-  onBatchClick,
-  isLast,
-}: {
-  varietyName: string;
-  displayName: string;
-  family: string | null;
-  qty: number;
-  stockInfo?: { totalQty: number; batchCount: number; family: string | null };
-  allocations: BatchAllocation[];
-  onQtyChange: (qty: number) => void;
-  onBatchClick: () => void;
-  isLast: boolean;
-}) {
-  return (
-    <div className={cn(
-      "grid grid-cols-12 gap-1 md:gap-2 items-center py-1.5 px-2 md:px-3 pl-4 md:pl-8",
-      !isLast && "border-b border-muted"
-    )}>
-      {/* Tree connector + Variety Name + Family - col 1-6 mobile, 1-4 desktop */}
-      <div className="col-span-6 md:col-span-4 flex items-center gap-1 md:gap-2 text-xs md:text-sm">
-        <span className="text-muted-foreground shrink-0">{isLast ? '└' : '├'}</span>
-        <div className="flex flex-col min-w-0">
-          <span className={cn(
-            "truncate",
-            qty > 0 ? "font-medium" : "text-muted-foreground"
-          )}>
-            {displayName}
-          </span>
-          {family && (
-            <span className="text-[9px] md:text-[10px] text-muted-foreground truncate">
-              {family}
-            </span>
+                  {/* Batch Quantity Controls */}
+                  <div className="col-span-4 md:col-span-3 flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateBatchQty('', { name: '', family: null }, batch, -10)}
+                      disabled={batchQty === 0}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Input
+                      type="number"
+                      min="0"
+                      max={batch.quantity}
+                      className="h-7 w-16 text-xs text-center px-1"
+                      value={batchQty || ''}
+                      onChange={(e) => {
+                        const qty = Math.min(batch.quantity, parseInt(e.target.value) || 0);
+                        updateBatchQty('', { name: '', family: null }, batch, qty - batchQty);
+                      }}
+                      placeholder="0"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateBatchQty('', { name: '', family: null }, batch, 10)}
+                      disabled={batchQty >= batch.quantity}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+
+                  {/* Quick Qty Buttons & Batch Available */}
+                  <div className="col-span-3 md:col-span-5 flex items-center justify-end">
+                    <div className="hidden md:flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-8 px-0 text-[10px]"
+                        onClick={() => setBatchQtyDirect('', { name: '', family: null }, batch, quickQty.halfShelf)}
+                        title={`Half shelf (${quickQty.halfShelf})`}
+                      >
+                        ½S
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-8 px-0 text-[10px]"
+                        onClick={() => setBatchQtyDirect('', { name: '', family: null }, batch, quickQty.fullShelf)}
+                        title={`Full shelf (${quickQty.fullShelf})`}
+                      >
+                        1S
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-8 px-0 text-[10px]"
+                        onClick={() => setBatchQtyDirect('', { name: '', family: null }, batch, quickQty.fullTrolley)}
+                        title={`Full trolley (${quickQty.fullTrolley})`}
+                      >
+                        1T
+                      </Button>
+                    </div>
+                    <span className="text-xs text-muted-foreground w-20 text-right">
+                      {batch.quantity} avail
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {/* Summary Footer */}
+          {totalFromVarieties > 0 && (
+            <div className="px-3 py-2 bg-background border-t flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Total selected:</span>
+              <span className="text-sm font-semibold">{totalFromVarieties}</span>
+            </div>
           )}
         </div>
-        <span className="text-[10px] md:text-xs text-muted-foreground shrink-0">
-          ({stockInfo?.totalQty || 0})
-        </span>
-      </div>
-
-      {/* Quantity Input - col 7-8 mobile, 5 desktop */}
-      <div className="col-span-2 md:col-span-1">
-        <Input
-          type="number"
-          min="0"
-          className="h-8 text-xs md:text-sm text-center px-1"
-          value={qty || ''}
-          onChange={(e) => onQtyChange(parseInt(e.target.value) || 0)}
-          placeholder="0"
-        />
-      </div>
-
-      {/* Empty cols hidden on mobile, 6-9 desktop */}
-      <div className="hidden md:block md:col-span-4" />
-
-      {/* Batch Selection - col 9-12 mobile, 10-11 desktop */}
-      <div className="col-span-4 md:col-span-3 flex justify-end">
-        {qty > 0 && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-1.5 md:px-2 text-[10px] md:text-xs"
-            onClick={onBatchClick}
-          >
-            <Layers className="h-3 w-3 mr-1 shrink-0" />
-            <span className="truncate">
-              {allocations.length > 0 ? `${allocations.length}b` : 'Batch'}
-            </span>
-          </Button>
-        )}
-      </div>
+      )}
     </div>
   );
 }

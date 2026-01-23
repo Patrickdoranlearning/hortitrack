@@ -49,8 +49,8 @@ export function CopyOrderDialog({ open, onOpenChange, customerId, onCopy }: Prop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Copy a previous order</DialogTitle>
         </DialogHeader>
 
@@ -78,28 +78,30 @@ export function CopyOrderDialog({ open, onOpenChange, customerId, onCopy }: Prop
         )}
 
         {orders.length > 0 && (
-          <div className="space-y-2">
-            {orders.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between border rounded-md p-3 hover:bg-muted/50 transition-colors"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">#{order.orderNumber}</span>
-                    <Badge variant="outline">{order.status}</Badge>
-                    <Badge variant="secondary">{order.lineCount} lines</Badge>
+          <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+            <div className="space-y-2">
+              {orders.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between border rounded-md p-3 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">#{order.orderNumber}</span>
+                      <Badge variant="outline">{order.status}</Badge>
+                      <Badge variant="secondary">{order.lineCount} lines</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {format(new Date(order.createdAt), 'PPP')} • {order.deliveryDate ? `Delivery ${order.deliveryDate}` : 'No delivery date'}
+                    </div>
+                    <div className="text-sm font-medium">€{order.total.toFixed(2)}</div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {format(new Date(order.createdAt), 'PPP')} • {order.deliveryDate ? `Delivery ${order.deliveryDate}` : 'No delivery date'}
-                  </div>
-                  <div className="text-sm font-medium">€{order.total.toFixed(2)}</div>
+                  <Button size="sm" onClick={() => onCopy(order.id)}>
+                    Copy Order
+                  </Button>
                 </div>
-                <Button size="sm" onClick={() => onCopy(order.id)}>
-                  Copy Order
-                </Button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </DialogContent>

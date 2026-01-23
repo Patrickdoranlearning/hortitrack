@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { emitMutation } from "@/lib/events/mutation-events";
 import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,8 @@ const ProductGallerySection = dynamic(
 
 export default function ProductManagementClient(props: ProductManagementPayload) {
   const { toast } = useToast();
-    const [sheetOpen, setSheetOpen] = useState(false);
+  const router = useRouter();
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
   const [selectedProductId, setSelectedProductId] = useState<string | null>(props.products[0]?.id ?? null);
   const [skuSheetOpen, setSkuSheetOpen] = useState(false);

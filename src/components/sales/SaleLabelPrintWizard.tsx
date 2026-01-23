@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import SaleLabelPreview from "./SaleLabelPreview";
 import { useToast } from "@/hooks/use-toast";
-import { Printer, Settings2, Loader2, AlertCircle, Plus, Minus } from "lucide-react";
+import { Printer, Settings2, Loader2, AlertCircle, Plus, Minus, ExternalLink, Pencil, Tag } from "lucide-react";
+import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type PrinterType = {
@@ -288,9 +289,19 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
 
               {/* Template Selection */}
               <div className="space-y-2">
-                <Label htmlFor="template" className="text-sm font-medium">
-                  Label Size
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="template" className="text-sm font-medium">
+                    Label Size
+                  </Label>
+                  <Link
+                    href="/settings/labels"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit Labels
+                  </Link>
+                </div>
                 {isLoadingTemplates ? (
                   <Skeleton className="h-10 w-full" />
                 ) : templates.length > 0 ? (
@@ -361,8 +372,62 @@ export default function SaleLabelPrintWizard({ open, onOpenChange, item }: Props
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4 mt-4 flex-1 overflow-y-auto pr-1">
-            <PrinterSettings 
-              printers={printers} 
+            {/* Label Templates Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Label Templates</h3>
+                <Link
+                  href="/settings/labels"
+                  onClick={() => onOpenChange(false)}
+                >
+                  <Button variant="outline" size="sm">
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Manage Labels
+                  </Button>
+                </Link>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Create and edit label templates, adjust sizes, and customize the layout of your price labels.
+              </p>
+              {templates.length > 0 && (
+                <div className="grid gap-2">
+                  {templates.slice(0, 3).map((template) => (
+                    <div
+                      key={template.id}
+                      className="flex items-center justify-between p-2 border rounded-lg bg-background text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        <span>{template.name}</span>
+                        <span className="text-muted-foreground text-xs">
+                          ({template.width_mm}×{template.height_mm}mm)
+                        </span>
+                        {template.is_default && (
+                          <Badge variant="secondary" className="text-xs">Default</Badge>
+                        )}
+                      </div>
+                      <Link
+                        href={`/settings/labels/editor?id=${template.id}`}
+                        onClick={() => onOpenChange(false)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                  ))}
+                  {templates.length > 3 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{templates.length - 3} more template{templates.length - 3 > 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            <PrinterSettings
+              printers={printers}
               onRefresh={fetchPrinters}
             />
           </TabsContent>
