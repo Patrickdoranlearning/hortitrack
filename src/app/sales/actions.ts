@@ -150,13 +150,13 @@ export async function createOrder(data: CreateOrderInput) {
             : (product.name ?? line.plantVariety ?? 'Product');
 
         resolvedLines.push({
-            skuId,
+            sku_id: skuId,
             description,
             quantity: line.qty,
-            unitPrice,
-            vatRate,
-            requiredVarietyId: line.requiredVarietyId ?? product.skus?.plant_variety_id ?? null,
-            requiredBatchId: line.requiredBatchId ?? line.specificBatchId ?? null,
+            unit_price: unitPrice,
+            vat_rate: vatRate,
+            required_variety_id: line.requiredVarietyId ?? product.skus?.plant_variety_id ?? null,
+            required_batch_id: line.requiredBatchId ?? line.specificBatchId ?? null,
             rrp: line.rrp ?? null,
             allocations: line.allocations?.filter(a => a.batchId).map(a => ({
                 batch_id: a.batchId,
