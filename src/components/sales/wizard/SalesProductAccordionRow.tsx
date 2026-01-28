@@ -915,7 +915,11 @@ export function SalesProductAccordionRow({
                           {/* Batch Info */}
                           <div className="col-span-5 md:col-span-4">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-medium truncate">{batch.batchNumber}</span>
+                              <span className="text-xs font-medium truncate">
+                                {batch.plantVariety && batch.plantVariety !== variety.name 
+                                  ? `${batch.plantVariety} - ${batch.batchNumber}`
+                                  : batch.batchNumber}
+                              </span>
                               {batch.grade && (
                                 <Badge variant="secondary" className="text-[9px] h-4 px-1">
                                   {batch.grade}
@@ -1046,7 +1050,11 @@ export function SalesProductAccordionRow({
                   {/* Batch Info */}
                   <div className="col-span-5 md:col-span-4">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium truncate">{batch.batchNumber}</span>
+                      <span className="text-sm font-medium truncate">
+                        {batch.plantVariety 
+                          ? `${batch.plantVariety} - ${batch.batchNumber}`
+                          : batch.batchNumber}
+                      </span>
                       {batch.grade && (
                         <Badge variant="secondary" className="text-[9px] h-4 px-1">
                           {batch.grade}
