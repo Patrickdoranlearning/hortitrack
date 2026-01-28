@@ -156,12 +156,12 @@ export function SalesProductAccordionRow({
         const childBatches = child.batches.map((b) => ({
           id: b.id,
           batchNumber: b.batchNumber,
-          plantVariety: child.productName,
+          plantVariety: b.varietyName || child.productName,
           family: null as string | null,
           size: '',
           quantity: b.availableQuantity,
           grade: undefined as string | undefined,
-          location: undefined as string | undefined,
+          location: b.location ?? undefined,
           status: '',
           plantingDate: '',
         }));

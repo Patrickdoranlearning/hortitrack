@@ -10,6 +10,8 @@ export interface ProductGroupChild {
     quantity: number;
     reservedQuantity: number;
     availableQuantity: number;
+    varietyName: string | null;
+    location: string | null;
   }[];
 }
 
@@ -128,7 +130,7 @@ export async function getProductGroupsWithAvailability(
   // 5. Get batch data
   let batchQuery = supabase
     .from('batches')
-    .select('id, batch_number, quantity, reserved_quantity, reserved_for_customer_id')
+    .select('id, batch_number, quantity, reserved_quantity, reserved_for_customer_id, plant_variety_id, location_id')
     .eq('org_id', orgId)
     .in('id', batchIds.length > 0 ? batchIds : ['00000000-0000-0000-0000-000000000000'])
     .in('status_id', availableStatusIds.length > 0 ? availableStatusIds : ['00000000-0000-0000-0000-000000000000'])
@@ -143,19 +145,35 @@ export async function getProductGroupsWithAvailability(
 
   const { data: batches } = await batchQuery;
 
+  // 5b. Get variety names for batches
+  const varietyIds = [...new Set(batches?.map((b) => b.plant_variety_id).filter(Boolean) || [])];
+  const { data: varieties } = varietyIds.length > 0
+    ? await supabase.from('plant_varieties').select('id, name').in('id', varietyIds)
+    : { data: [] };
+  const varietyMap = new Map(varieties?.map((v) => [v.id, v.name]) || []);
+
+  // 5c. Get location names for batches
+  const locationIds = [...new Set(batches?.map((b) => b.location_id).filter(Boolean) || [])];
+  const { data: locations } = locationIds.length > 0
+    ? await supabase.from('nursery_locations').select('id, name').in('id', locationIds)
+    : { data: [] };
+  const locationMap = new Map(locations?.map((l) => [l.id, l.name]) || []);
+
   // Create batch lookup
-  const batchMap = new Map<string, { id: string; batchNumber: string; quantity: number; reservedQuantity: number }>();
+  const batchMap = new Map<string, { id: string; batchNumber: string; quantity: number; reservedQuantity: number; varietyName: string | null; location: string | null }>();
   batches?.forEach((b) => {
     batchMap.set(b.id, {
       id: b.id,
       batchNumber: b.batch_number,
       quantity: b.quantity || 0,
       reservedQuantity: b.reserved_quantity || 0,
+      varietyName: varietyMap.get(b.plant_variety_id) || null,
+      location: locationMap.get(b.location_id) || null,
     });
   });
 
   // Create product -> batches mapping
-  type TransformedBatch = { id: string; batchNumber: string; quantity: number; reservedQuantity: number };
+  type TransformedBatch = { id: string; batchNumber: string; quantity: number; reservedQuantity: number; varietyName: string | null; location: string | null };
   const productBatchesMap = new Map<string, TransformedBatch[]>();
   productBatches?.forEach((pb) => {
     const batch = batchMap.get(pb.batch_id);
@@ -220,6 +238,8 @@ export async function getProductGroupsWithAvailability(
         quantity: b.quantity,
         reservedQuantity: b.reservedQuantity,
         availableQuantity: Math.max(0, b.quantity - b.reservedQuantity),
+        varietyName: b.varietyName,
+        location: b.location,
       }));
 
       const availableStock = batchesWithAvailability.reduce(
