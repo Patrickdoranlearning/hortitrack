@@ -225,6 +225,7 @@ export async function autoLinkProductBatchesAction(productId: string) {
       id,
       sku_id,
       match_families,
+      match_genera,
       skus (
         id,
         display_name,
@@ -267,35 +268,53 @@ export async function autoLinkProductBatchesAction(productId: string) {
   let candidates: { id: string }[] = [];
   let matchDescription = '';
 
-  // Check if family matching is configured
+  // Check if family or genus matching is configured
   const matchFamilies = product.match_families as string[] | null;
-  if (matchFamilies && matchFamilies.length > 0) {
-    // Family-based matching: find all batches with matching family + size
-    const { data: batchesWithFamily, error: batchError } = await supabase
+  const matchGenera = product.match_genera as string[] | null;
+  
+  if ((matchFamilies && matchFamilies.length > 0) || (matchGenera && matchGenera.length > 0)) {
+    // Family/Genus-based matching: find all batches with matching family/genus + size
+    const { data: batchesWithTaxonomy, error: batchError } = await supabase
       .from('batches')
       .select(`
         id,
-        plant_variety:plant_varieties!inner(family)
+        plant_variety:plant_varieties!inner(family, genus)
       `)
       .eq('org_id', orgId)
       .eq('size_id', sizeId)
       .gt('quantity', 0);
 
     if (batchError) {
-      console.error('[autoLinkProductBatchesAction] family batch lookup failed', batchError);
+      console.error('[autoLinkProductBatchesAction] taxonomy batch lookup failed', batchError);
       return { success: false, error: 'Unable to load matching batches.' };
     }
 
-    // Filter by families (case-insensitive)
-    const lowerFamilies = matchFamilies.map((f) => f.toLowerCase());
-    candidates = (batchesWithFamily ?? [])
+    // Filter by families and/or genera (case-insensitive)
+    const lowerFamilies = (matchFamilies ?? []).map((f) => f.toLowerCase());
+    const lowerGenera = (matchGenera ?? []).map((g) => g.toLowerCase());
+    
+    candidates = (batchesWithTaxonomy ?? [])
       .filter((b) => {
-        const family = (b.plant_variety as { family: string | null } | null)?.family;
-        return family && lowerFamilies.includes(family.toLowerCase());
+        const variety = b.plant_variety as { family: string | null; genus: string | null } | null;
+        const family = variety?.family?.toLowerCase();
+        const genus = variety?.genus?.toLowerCase();
+        
+        // Match if family matches OR genus matches
+        const familyMatch = family && lowerFamilies.includes(family);
+        const genusMatch = genus && lowerGenera.includes(genus);
+        
+        return familyMatch || genusMatch;
       })
       .map((b) => ({ id: b.id }));
 
-    matchDescription = `${matchFamilies.length} famil${matchFamilies.length === 1 ? 'y' : 'ies'}`;
+    const matchParts: string[] = [];
+    if (matchFamilies?.length) {
+      matchParts.push(`${matchFamilies.length} famil${matchFamilies.length === 1 ? 'y' : 'ies'}`);
+    }
+    if (matchGenera?.length) {
+      matchParts.push(`${matchGenera.length} genus${matchGenera.length === 1 ? '' : 'es'}`);
+    }
+    matchDescription = matchParts.join(' + ');
   } else {
     // Variety-based matching (existing logic)
     // Fetch linked varieties from product_varieties table
@@ -319,7 +338,7 @@ export async function autoLinkProductBatchesAction(productId: string) {
     if (varietyIds.length === 0) {
       return {
         success: false,
-        error: 'No families or varieties configured. Add families in the Details tab, or add varieties in the Varieties tab.',
+        error: 'No families, genera, or varieties configured. Add matching in the Batches tab.',
       };
     }
 
