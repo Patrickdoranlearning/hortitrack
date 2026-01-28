@@ -320,9 +320,26 @@ export function SalesProductAccordionRow({
       form.setValue(`lines.${index}.plantVariety`, '');
 
       if (group) {
-        // For groups, we don't set a specific size or price yet
         form.setValue(`lines.${index}.size`, '');
         form.setValue(`lines.${index}.description`, `${group.name} (Mix)`);
+        
+        // Check for customer-specific alias price first
+        let groupPrice: number | undefined;
+        if (selectedCustomerId && group.aliases) {
+          const customerAlias = group.aliases.find(
+            (a) => a.isActive && a.customerId === selectedCustomerId && a.unitPriceExVat != null
+          );
+          if (customerAlias?.unitPriceExVat != null) {
+            groupPrice = customerAlias.unitPriceExVat;
+          }
+        }
+        // Fall back to default price from first child product
+        if (groupPrice === undefined && group.defaultPrice != null) {
+          groupPrice = group.defaultPrice;
+        }
+        if (groupPrice !== undefined) {
+          form.setValue(`lines.${index}.unitPrice`, groupPrice);
+        }
       }
 
       setVarietyAllocations(new Map());

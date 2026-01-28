@@ -4,6 +4,7 @@ export interface ProductGroupChild {
   productId: string;
   productName: string;
   availableStock: number;
+  defaultPrice: number | null;
   batches: {
     id: string;
     batchNumber: string;
@@ -13,6 +14,15 @@ export interface ProductGroupChild {
     varietyName: string | null;
     location: string | null;
   }[];
+}
+
+export interface ProductGroupAlias {
+  id: string;
+  customerId: string | null;
+  aliasName: string;
+  unitPriceExVat: number | null;
+  rrp: number | null;
+  isActive: boolean;
 }
 
 export interface ProductGroupWithAvailability {
@@ -25,6 +35,8 @@ export interface ProductGroupWithAvailability {
   specificReserved: number;     // Orders against specific children (not batch-allocated)
   genericReserved: number;      // Orders against the group itself
   availableStock: number;       // totalStock - specificReserved - genericReserved
+  defaultPrice: number | null;  // First child's price, or null if no children have prices
+  aliases: ProductGroupAlias[]; // Customer-specific aliases with pricing
   children: ProductGroupChild[];
 }
 
@@ -62,6 +74,31 @@ export async function getProductGroupsWithAvailability(
   if (!groups || groups.length === 0) {
     return [];
   }
+
+  // 1b. Get all aliases for these groups
+  const groupIds = groups.map((g) => g.id);
+  const { data: allAliases } = await supabase
+    .from('product_group_aliases')
+    .select('id, group_id, customer_id, alias_name, unit_price_ex_vat, rrp, is_active')
+    .in('group_id', groupIds)
+    .eq('is_active', true);
+
+  // Create a map of group -> aliases
+  const groupAliasesMap = new Map<string, ProductGroupAlias[]>();
+  allAliases?.forEach((a) => {
+    const groupId = a.group_id;
+    if (!groupAliasesMap.has(groupId)) {
+      groupAliasesMap.set(groupId, []);
+    }
+    groupAliasesMap.get(groupId)!.push({
+      id: a.id,
+      customerId: a.customer_id,
+      aliasName: a.alias_name,
+      unitPriceExVat: a.unit_price_ex_vat,
+      rrp: a.rrp,
+      isActive: a.is_active,
+    });
+  });
 
   // 2. Get members for each group using the database function
   const groupMembers = await Promise.all(
@@ -104,9 +141,22 @@ export async function getProductGroupsWithAvailability(
       specificReserved: 0,
       genericReserved: 0,
       availableStock: 0,
+      defaultPrice: null,
+      aliases: groupAliasesMap.get(g.id) || [],
       children: [],
     }));
   }
+
+  // 2b. Get product prices for all member products
+  const { data: productPrices } = await supabase
+    .from('products')
+    .select('id, default_price_ex_vat')
+    .in('id', Array.from(allProductIds));
+
+  const productPriceMap = new Map<string, number | null>();
+  productPrices?.forEach((p) => {
+    productPriceMap.set(p.id, p.default_price_ex_vat);
+  });
 
   // 3. Get product-batch mappings for all products
   const { data: productBatches } = await supabase
@@ -251,6 +301,7 @@ export async function getProductGroupsWithAvailability(
         productId: member.product_id,
         productName: member.product_name,
         availableStock,
+        defaultPrice: productPriceMap.get(member.product_id) ?? null,
         batches: batchesWithAvailability,
       };
     });
@@ -267,6 +318,9 @@ export async function getProductGroupsWithAvailability(
 
     const availableStock = Math.max(0, totalStock - specificReserved - genericReserved);
 
+    // Get the default price from the first child that has a price
+    const defaultPrice = children.find((c) => c.defaultPrice != null)?.defaultPrice ?? null;
+
     return {
       id: group.id,
       name: group.name,
@@ -277,6 +331,8 @@ export async function getProductGroupsWithAvailability(
       specificReserved,
       genericReserved,
       availableStock,
+      defaultPrice,
+      aliases: groupAliasesMap.get(group.id) || [],
       children,
     };
   });
