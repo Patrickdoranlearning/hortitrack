@@ -306,7 +306,8 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
       return Boolean(selectedCustomerId);
     }
     if (step === 1) {
-      return (watchedLines || []).some((line) => line?.productId);
+      // Allow proceeding if any line has a product OR a product group selected
+      return (watchedLines || []).some((line) => line?.productId || line?.productGroupId);
     }
     return true;
   };
