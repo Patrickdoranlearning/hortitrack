@@ -640,33 +640,10 @@ export function ProductDetailsSection({
     }
   }, [forcedSkuId, onForcedSkuApplied]);
 
-  // Build a map of which SKUs are linked to which products (excluding current product if editing)
-  const skuToProductMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of products) {
-      // Skip the current product being edited
-      if (p.id === product?.id) continue;
-      map.set(p.skuId, p.name);
-    }
-    return map;
-  }, [products, product?.id]);
-
-  // Check if currently selected SKU is already linked to another product
-  const selectedSkuLinkedProduct = skuToProductMap.get(formState.skuId);
-
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formState.name.trim() || !formState.skuId) {
       toast({ variant: "destructive", title: "Missing fields", description: "Name and SKU are required." });
-      return;
-    }
-    // Prevent saving with an already-linked SKU
-    if (selectedSkuLinkedProduct) {
-      toast({
-        variant: "destructive",
-        title: "SKU already in use",
-        description: `This SKU is linked to "${selectedSkuLinkedProduct}". Please select a different SKU or create a new one.`
-      });
       return;
     }
     startTransition(async () => {
@@ -717,29 +694,15 @@ export function ProductDetailsSection({
               value={formState.skuId}
               onValueChange={(value) => setFormState((prev) => ({ ...prev, skuId: value }))}
             >
-              <SelectTrigger className={selectedSkuLinkedProduct ? "border-red-300" : ""}>
+              <SelectTrigger>
                 <SelectValue placeholder="Select SKU" />
               </SelectTrigger>
               <SelectContent>
-                {skus.map((sku) => {
-                  const linkedTo = skuToProductMap.get(sku.id);
-                  return (
-                    <SelectItem
-                      key={sku.id}
-                      value={sku.id}
-                      className={linkedTo ? "text-muted-foreground" : ""}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{sku.label}</span>
-                        {linkedTo && (
-                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
-                            In use
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
+                {skus.map((sku) => (
+                  <SelectItem key={sku.id} value={sku.id}>
+                    {sku.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {onCreateSku && (
@@ -748,11 +711,6 @@ export function ProductDetailsSection({
               </Button>
             )}
           </div>
-          {selectedSkuLinkedProduct && (
-            <p className="text-sm text-red-600">
-              This SKU is already linked to "{selectedSkuLinkedProduct}". Select a different SKU or create a new one.
-            </p>
-          )}
         </div>
       </div>
       {/* SKU Configuration - Pot size for trolley calculation and batch matching */}

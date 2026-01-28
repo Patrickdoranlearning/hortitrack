@@ -106,13 +106,6 @@ export async function upsertProductAction(input: z.infer<typeof productDetailsSc
 
   if (error) {
     console.error('[upsertProductAction] error', error);
-    // Check for duplicate SKU constraint violation
-    if (error.code === '23505' && error.message.includes('products_sku_id_key')) {
-      return {
-        success: false,
-        error: 'This SKU is already linked to another product. Please select a different SKU or create a new one.'
-      };
-    }
     return { success: false, error: error.message };
   }
 
