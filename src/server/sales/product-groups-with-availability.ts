@@ -248,7 +248,6 @@ export async function getProductGroupsWithAvailability(
     .in('orders.status', activeOrderStatuses);
 
   // Get generic orders (order_items with product_group_id)
-  const groupIds = groups.map((g) => g.id);
   const { data: genericOrders } = await supabase
     .from('order_items')
     .select('product_group_id, quantity, orders!inner(status)')
