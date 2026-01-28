@@ -49,21 +49,15 @@ export function MultiSelect({
   const selectedOptions = options.filter((opt) => values.includes(opt.value));
 
   const handleSelect = React.useCallback(
-    (selectedLabel: string) => {
-      // cmdk passes the lowercased label, so we need to find the option by label
-      const option = options.find(
-        (opt) => opt.label.toLowerCase() === selectedLabel.toLowerCase()
-      );
-      if (!option) return;
-
-      const selectedValue = option.value;
+    (selectedValue: string) => {
+      // Toggle selection - value is passed directly from onSelect
       if (values.includes(selectedValue)) {
         onChange(values.filter((v) => v !== selectedValue));
       } else {
         onChange([...values, selectedValue]);
       }
     },
-    [values, onChange, options]
+    [values, onChange]
   );
 
   const handleRemove = React.useCallback(
