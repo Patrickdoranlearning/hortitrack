@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import type { Database } from '@/types/supabase';
+import { logError } from '@/lib/log';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
 type CustomerAddress = Database['public']['Tables']['customer_addresses']['Row'];
@@ -101,7 +102,11 @@ export async function requireCustomerAuth(): Promise<B2BAuthContext> {
   // Validate address belongs to customer if set (extra safety check)
   if (profile?.customer_address_id && profileAddress) {
     if (profileAddress.customer_id !== profile.customer_id) {
-      console.error('Profile address does not belong to customer');
+      logError('Profile address does not belong to customer', {
+        userId: user.id,
+        customerId: profile.customer_id,
+        addressId: profile.customer_address_id,
+      });
       redirect('/b2b/login');
     }
   }

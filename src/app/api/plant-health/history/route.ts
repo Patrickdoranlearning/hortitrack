@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getOrgPlantHealthHistory } from "@/server/batches/plant-health-history";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 export async function GET(req: NextRequest) {
   try {
     // Validate user is authenticated
     const auth = await getUserAndOrg();
+
+    // Rate limit: 60 history requests per minute per user
+    const rlKey = `plant-health:history:${requestKey(req, auth.user.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests", resetMs: rl.resetMs },
+        { status: 429 }
+      );
+    }
 
     const { searchParams } = new URL(req.url);
     const batchId = searchParams.get('batchId') || undefined;

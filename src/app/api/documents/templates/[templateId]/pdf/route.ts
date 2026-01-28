@@ -27,10 +27,11 @@ export async function POST(
         "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[documents] pdf failed", err);
-    const status = err?.message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: err?.message ?? "Failed to generate PDF" }, { status });
+    const message = err instanceof Error ? err.message : "Failed to generate PDF";
+    const status = message === "Forbidden" ? 403 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

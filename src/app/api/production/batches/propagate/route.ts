@@ -139,7 +139,14 @@ export async function POST(req: NextRequest) {
         shortages: consumptionResult.shortages,
       };
     } catch (consumeErr) {
-      console.error("[propagate] Material consumption failed:", consumeErr);
+      console.error("[propagate] Material consumption failed, rolling back batch creation:", consumeErr);
+      // ROLLBACK BATCH CREATION ON MATERIAL ERROR
+      await Promise.all([
+        supabase.from("batch_events").delete().eq("batch_id", batch.id),
+        supabase.from("batch_passports").delete().eq("batch_id", batch.id),
+        supabase.from("batches").delete().eq("id", batch.id),
+      ]);
+      throw consumeErr;
     }
 
     return NextResponse.json({ batch, requestId, materialConsumption }, { status: 201 });

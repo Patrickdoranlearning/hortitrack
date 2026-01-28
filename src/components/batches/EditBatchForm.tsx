@@ -33,6 +33,8 @@ import {
   Batch,
 } from "@/lib/types";
 
+type CustomerLookup = { id: string; name: string };
+
 const Schema = z.object({
   status: z.enum(["Growing", "Ready", "Sold", "Archived"]).optional(),
   location_id: z.string().uuid().optional(),
@@ -44,6 +46,7 @@ const Schema = z.object({
     .int()
     .nonnegative({ message: "Quantity must be zero or greater" })
     .optional(),
+  reserved_for_customer_id: z.string().uuid().nullable().optional(),
 });
 
 const statusOptions: Array<{ label: string; value: z.infer<typeof Schema>["status"] }> =
@@ -69,6 +72,7 @@ export default function EditBatchForm({
   );
   const { data: sizeData } = useCollection<PlantSize>("plant_sizes");
   const { data: supplierData } = useCollection<Supplier>("suppliers");
+  const { data: customersData } = useCollection<CustomerLookup>("customers");
 
   const defaultValues = React.useMemo<FormValues>(
     () => ({
@@ -80,6 +84,7 @@ export default function EditBatchForm({
       supplier_id: (batch as any)?.supplierId ?? (batch as any)?.supplier_id,
       planted_at: batch?.plantedAt?.slice(0, 10) ?? undefined,
       quantity: batch?.quantity ?? undefined,
+      reserved_for_customer_id: (batch as any)?.reservedForCustomerId ?? (batch as any)?.reserved_for_customer_id ?? null,
     }),
     [batch]
   );
@@ -130,6 +135,11 @@ export default function EditBatchForm({
     }
     if (values.status && values.status !== batch?.status) {
       payload.status = values.status;
+    }
+    // Handle customer reservation (explicitly check for changes including null)
+    const currentReservation = (batch as any)?.reservedForCustomerId ?? (batch as any)?.reserved_for_customer_id ?? null;
+    if (values.reserved_for_customer_id !== currentReservation) {
+      payload.reservedForCustomerId = values.reserved_for_customer_id ?? null;
     }
 
     if (!Object.keys(payload).length) {
@@ -326,6 +336,41 @@ export default function EditBatchForm({
                   )}
                 />
               </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Customer reservation"
+              description="Reserve this batch for a specific customer (contract growing). Reserved batches won't be available to other customers."
+              className="lg:col-span-2"
+            >
+              <FormField
+                name="reserved_for_customer_id"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reserved for customer</FormLabel>
+                    <Select
+                      value={field.value ?? "__none__"}
+                      onValueChange={(v) => field.onChange(v === "__none__" ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="No reservation (available to all)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          No reservation (available to all)
+                        </SelectItem>
+                        {(customersData ?? []).map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            {customer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </SectionCard>
           </div>
         </div>

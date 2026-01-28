@@ -3,10 +3,10 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { createClient, SupabaseClient } from "@/lib/supabase/client";
 
-const orgScopedCollections = new Set(["nursery_locations", "suppliers"]);
+const orgScopedCollections = new Set(["nursery_locations", "suppliers", "customers"]);
 
 // In-memory cache for lookup data (shared across all hook instances)
-const cache = new Map<string, { data: any[]; timestamp: number }>();
+const cache = new Map<string, { data: unknown[]; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes for lookup data
 
 // Collections that rarely change and can be cached longer
@@ -30,11 +30,11 @@ function getCachedData<T>(key: string): T[] | null {
   return cached.data as T[];
 }
 
-function setCachedData(key: string, data: any[]) {
+function setCachedData(key: string, data: unknown[]) {
   cache.set(key, { data, timestamp: Date.now() });
 }
 
-export function useCollection<T = any>(collectionName: string, initialData?: T[]) {
+export function useCollection<T = unknown>(collectionName: string, initialData?: T[]) {
   // Check cache first for initial state
   const cachedInitial = useMemo(() => getCachedData<T>(collectionName), [collectionName]);
 
@@ -68,6 +68,8 @@ export function useCollection<T = any>(collectionName: string, initialData?: T[]
           const url =
             collectionName === "suppliers"
               ? "/api/lookups/suppliers"
+              : collectionName === "customers"
+              ? "/api/lookups/customers"
               : "/api/lookups/locations";
           const token = await getSessionToken(supabase);
           const res = await fetch(url, {
@@ -87,10 +89,10 @@ export function useCollection<T = any>(collectionName: string, initialData?: T[]
           if (mounted) {
             setData(result as unknown as T[]);
             setError(null);
-            setCachedData(collectionName, result as any[]);
+            setCachedData(collectionName, result as unknown[]);
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (mounted) setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
         if (mounted) setLoading(false);
@@ -113,6 +115,8 @@ export function useCollection<T = any>(collectionName: string, initialData?: T[]
         const url =
           collectionName === "suppliers"
             ? "/api/lookups/suppliers"
+            : collectionName === "customers"
+            ? "/api/lookups/customers"
             : "/api/lookups/locations";
         const token = await getSessionToken(supabase);
         const res = await fetch(url, {
@@ -127,7 +131,7 @@ export function useCollection<T = any>(collectionName: string, initialData?: T[]
         const { data: result, error } = await supabase.from(collectionName).select("*");
         if (error) throw error;
         setData(result as unknown as T[]);
-        setCachedData(collectionName, result as any[]);
+        setCachedData(collectionName, result as unknown[]);
       }
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));

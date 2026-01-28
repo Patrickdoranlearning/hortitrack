@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { emitMutation } from "@/lib/events/mutation-events";
-import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon, Package } from "lucide-react";
+import { Settings2, Trash2, Loader2, Tag, Link as LinkIcon, Sparkles, ImageIcon, Package, X, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -48,6 +48,7 @@ import {
   upsertProductAliasAction,
   deleteProductAliasAction,
   updateSkuConfigAction,
+  updateProductMatchingAction,
 } from "./actions";
 import type { ProductManagementPayload, ProductSummary, ProductSkuOption } from "./types";
 import dynamic from "next/dynamic";
@@ -63,6 +64,9 @@ const ProductGallerySection = dynamic(
   }
 );
 
+type SortColumn = "name" | "sku" | "status" | "inventory" | "priceLists";
+type SortDirection = "asc" | "desc";
+
 export default function ProductManagementClient(props: ProductManagementPayload) {
   const { toast } = useToast();
   const router = useRouter();
@@ -72,6 +76,13 @@ export default function ProductManagementClient(props: ProductManagementPayload)
   const [skuSheetOpen, setSkuSheetOpen] = useState(false);
   const [skuOptions, setSkuOptions] = useState(props.skus);
 
+  // Sorting and filtering state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "in-stock" | "out-of-stock">("all");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
   // Sync skus when props change
   useEffect(() => {
     setSkuOptions(props.skus);
@@ -79,6 +90,81 @@ export default function ProductManagementClient(props: ProductManagementPayload)
 
   const selectedProduct =
     sheetMode === "edit" && selectedProductId ? props.products.find((prod) => prod.id === selectedProductId) ?? null : null;
+
+  // Helper to calculate inventory for sorting
+  const getProductInventory = useCallback((product: ProductSummary) => {
+    const availableBatches = product.batches.filter(b => b.batch?.behavior === "available");
+    return availableBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+  }, []);
+
+  // Filtered and sorted products
+  const filteredAndSortedProducts = useMemo(() => {
+    let result = [...props.products];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        (p.sku?.code?.toLowerCase().includes(query) ?? false)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter === "active") {
+      result = result.filter(p => p.isActive);
+    } else if (statusFilter === "inactive") {
+      result = result.filter(p => !p.isActive);
+    }
+
+    // Apply stock filter
+    if (stockFilter === "in-stock") {
+      result = result.filter(p => getProductInventory(p) > 0);
+    } else if (stockFilter === "out-of-stock") {
+      result = result.filter(p => getProductInventory(p) === 0);
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortColumn) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "sku":
+          comparison = (a.sku?.code ?? "").localeCompare(b.sku?.code ?? "");
+          break;
+        case "status":
+          comparison = (a.isActive ? 1 : 0) - (b.isActive ? 1 : 0);
+          break;
+        case "inventory":
+          comparison = getProductInventory(a) - getProductInventory(b);
+          break;
+        case "priceLists":
+          comparison = a.prices.length - b.prices.length;
+          break;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return result;
+  }, [props.products, searchQuery, statusFilter, stockFilter, sortColumn, sortDirection, getProductInventory]);
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 text-muted-foreground/50" />;
+    return sortDirection === "asc"
+      ? <ArrowUp className="ml-1 h-3 w-3" />
+      : <ArrowDown className="ml-1 h-3 w-3" />;
+  };
 
   const handleManageProduct = (productId: string) => {
     router.push(`/sales/products/${productId}`);
@@ -105,74 +191,180 @@ export default function ProductManagementClient(props: ProductManagementPayload)
             Manage SKUs
           </Button>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          {props.products.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <p>No products yet. Click "New Product" above to get started.</p>
+        <CardContent className="space-y-4">
+          {/* Filter and search bar */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or SKU..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Inventory</TableHead>
-                  <TableHead>Price lists</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {props.products.map((product) => {
-                  // Calculate available vs pipeline quantities
-                  const availableBatches = product.batches.filter(b => b.batch?.behavior === "available");
-                  const pipelineBatches = product.batches.filter(b => b.batch?.behavior !== "available");
-                  const availableQty = availableBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
-                  const pipelineQty = pipelineBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
-                  const varietyNames = Array.from(
-                    new Set(
-                      product.batches
-                        .map((b) => b.batch?.varietyName)
-                        .filter((v): v is string => Boolean(v))
-                    )
-                  );
-                  
-                  return (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.sku?.code ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={product.isActive ? "default" : "outline"}>
-                          {product.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-green-700">{availableQty} available</span>
-                          {pipelineQty > 0 && (
-                            <span className="text-xs text-muted-foreground">{pipelineQty} coming</span>
-                          )}
-                          {varietyNames.length > 0 && (
-                            <span className="text-xs text-muted-foreground">
-                              Varieties: {varietyNames.slice(0, 3).join(", ")}
-                              {varietyNames.length > 3 && ` +${varietyNames.length - 3} more`}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{product.prices.length}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" onClick={() => handleManageProduct(product.id)}>
-                          <Settings2 className="mr-2 h-4 w-4" />
-                          Manage
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as typeof stockFilter)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Stock" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All stock</SelectItem>
+                  <SelectItem value="in-stock">In stock</SelectItem>
+                  <SelectItem value="out-of-stock">Out of stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Results summary */}
+          {(searchQuery || statusFilter !== "all" || stockFilter !== "all") && (
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                Showing {filteredAndSortedProducts.length} of {props.products.length} products
+              </span>
+              {(searchQuery || statusFilter !== "all" || stockFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("all");
+                    setStockFilter("all");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
+            </div>
           )}
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            {props.products.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                <p>No products yet. Click "New Product" above to get started.</p>
+              </div>
+            ) : filteredAndSortedProducts.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                <p>No products match your filters.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("name")}
+                    >
+                      <div className="flex items-center">
+                        Name
+                        <SortIcon column="name" />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("sku")}
+                    >
+                      <div className="flex items-center">
+                        SKU
+                        <SortIcon column="sku" />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("status")}
+                    >
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon column="status" />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("inventory")}
+                    >
+                      <div className="flex items-center">
+                        Inventory
+                        <SortIcon column="inventory" />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort("priceLists")}
+                    >
+                      <div className="flex items-center">
+                        Price lists
+                        <SortIcon column="priceLists" />
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedProducts.map((product) => {
+                    // Calculate available vs pipeline quantities
+                    const availableBatches = product.batches.filter(b => b.batch?.behavior === "available");
+                    const pipelineBatches = product.batches.filter(b => b.batch?.behavior !== "available");
+                    const availableQty = availableBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+                    const pipelineQty = pipelineBatches.reduce((sum, b) => sum + (b.batch?.quantity ?? 0), 0);
+                    const varietyNames = Array.from(
+                      new Set(
+                        product.batches
+                          .map((b) => b.batch?.varietyName)
+                          .filter((v): v is string => Boolean(v))
+                      )
+                    );
+
+                    return (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>{product.sku?.code ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={product.isActive ? "default" : "outline"}>
+                            {product.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`text-sm font-medium ${availableQty > 0 ? "text-green-700" : "text-muted-foreground"}`}>
+                              {availableQty} available
+                            </span>
+                            {pipelineQty > 0 && (
+                              <span className="text-xs text-muted-foreground">{pipelineQty} coming</span>
+                            )}
+                            {varietyNames.length > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                Varieties: {varietyNames.slice(0, 3).join(", ")}
+                                {varietyNames.length > 3 && ` +${varietyNames.length - 3} more`}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{product.prices.length}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => handleManageProduct(product.id)}>
+                            <Settings2 className="mr-2 h-4 w-4" />
+                            Manage
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -192,6 +384,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
         batches={props.batches}
         priceLists={props.priceLists}
         customers={props.customers}
+        plantVarieties={props.plantVarieties}
         onProductSaved={handleProductSaved}
       />
 
@@ -220,10 +413,11 @@ type ComposerProps = {
   batches: ProductManagementPayload["batches"];
   priceLists: ProductManagementPayload["priceLists"];
   customers: ProductManagementPayload["customers"];
+  plantVarieties: ProductManagementPayload["plantVarieties"];
   onProductSaved: (productId: string | null) => void;
 };
 
-function ProductComposerSheet({ open, onOpenChange, mode, product, products, skus, batches, priceLists, customers, onProductSaved }: ComposerProps) {
+function ProductComposerSheet({ open, onOpenChange, mode, product, products, skus, batches, priceLists, customers, plantVarieties, onProductSaved }: ComposerProps) {
   const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
   const [currentProductId, setCurrentProductId] = useState<string | null>(product?.id ?? null);
@@ -259,7 +453,7 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, products, sku
           <TabsList className="grid grid-cols-5">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="inventory" disabled={!currentProductId}>
-              Inventory
+              Batches
             </TabsTrigger>
             <TabsTrigger value="pricing" disabled={!currentProductId}>
               Pricing
@@ -313,11 +507,20 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, products, sku
           </TabsContent>
           <TabsContent value="inventory">
             {currentProductId ? (
-              <ProductInventorySection
-                productId={currentProductId}
-                linkedBatches={product?.batches ?? []}
-                availableBatches={batches}
-              />
+              <div className="space-y-6">
+                <BatchMatchingSection
+                  productId={currentProductId}
+                  matchFamilies={product?.matchFamilies ?? null}
+                  matchGenera={product?.matchGenera ?? null}
+                  plantVarieties={plantVarieties ?? []}
+                />
+                <Separator />
+                <ProductInventorySection
+                  productId={currentProductId}
+                  linkedBatches={product?.batches ?? []}
+                  availableBatches={batches}
+                />
+              </div>
             ) : (
               <EmptyTabState label="Save product details first to link batches." />
             )}
@@ -375,7 +578,6 @@ type ProductDetailsSectionProps = {
   onCreateSku?: () => void;
   forcedSkuId?: string | null;
   onForcedSkuApplied?: () => void;
-  plantVarieties?: ProductManagementPayload["plantVarieties"];
   plantSizes?: ProductManagementPayload["plantSizes"];
 };
 
@@ -388,7 +590,6 @@ export function ProductDetailsSection({
   onCreateSku,
   forcedSkuId,
   onForcedSkuApplied,
-  plantVarieties = [],
   plantSizes = [],
 }: ProductDetailsSectionProps) {
   const { toast } = useToast();
@@ -401,6 +602,12 @@ export function ProductDetailsSection({
     heroImageUrl: product?.heroImageUrl ?? "",
     defaultStatus: product?.defaultStatus ?? "",
     isActive: product?.isActive ?? true,
+    shelfQuantityOverride: product?.shelfQuantityOverride ?? null,
+    trolleyQuantityOverride: product?.trolleyQuantityOverride ?? null,
+    minOrderQty: product?.minOrderQty ?? 1,
+    unitQty: product?.unitQty ?? 1,
+    matchFamilies: product?.matchFamilies ?? [],
+    matchGenera: product?.matchGenera ?? [],
   }));
 
   useEffect(() => {
@@ -411,6 +618,12 @@ export function ProductDetailsSection({
       heroImageUrl: product?.heroImageUrl ?? "",
       defaultStatus: product?.defaultStatus ?? "",
       isActive: product?.isActive ?? true,
+      shelfQuantityOverride: product?.shelfQuantityOverride ?? null,
+      trolleyQuantityOverride: product?.trolleyQuantityOverride ?? null,
+      minOrderQty: product?.minOrderQty ?? 1,
+      unitQty: product?.unitQty ?? 1,
+      matchFamilies: product?.matchFamilies ?? [],
+      matchGenera: product?.matchGenera ?? [],
     });
   }, [product?.id]);
 
@@ -465,6 +678,12 @@ export function ProductDetailsSection({
         heroImageUrl: formState.heroImageUrl,
         defaultStatus: formState.defaultStatus,
         isActive: formState.isActive,
+        shelfQuantityOverride: formState.shelfQuantityOverride,
+        trolleyQuantityOverride: formState.trolleyQuantityOverride,
+        minOrderQty: formState.minOrderQty,
+        unitQty: formState.unitQty,
+        matchFamilies: formState.matchFamilies.length > 0 ? formState.matchFamilies : null,
+        matchGenera: formState.matchGenera.length > 0 ? formState.matchGenera : null,
       });
       if (!result.success) {
         toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to save product." });
@@ -536,117 +755,155 @@ export function ProductDetailsSection({
           )}
         </div>
       </div>
-      {/* SKU Configuration - Variety and Size for trolley calculation */}
-      {formState.skuId && (plantVarieties.length > 0 || plantSizes.length > 0) && (() => {
+      {/* SKU Configuration - Pot size for trolley calculation and batch matching */}
+      {formState.skuId && plantSizes.length > 0 && (() => {
         const selectedSku = skus.find((s) => s.id === formState.skuId);
-        const currentVarietyId = selectedSku?.plantVarietyId ?? "";
         const currentSizeId = selectedSku?.sizeId ?? "";
-        const currentVarietyName = plantVarieties.find((v) => v.id === currentVarietyId)?.name;
         const currentSizeName = plantSizes.find((s) => s.id === currentSizeId)?.name;
-        const isMissing = !currentVarietyId || !currentSizeId;
+        const isMissing = !currentSizeId;
 
         return (
           <div className={`rounded-lg border p-4 space-y-3 ${isMissing ? 'border-amber-300 bg-amber-50' : ''}`}>
             <div className="space-y-1">
               <Label className="flex items-center gap-2">
-                SKU Configuration
+                Pot Size
                 {isMissing && (
                   <Badge variant="outline" className="text-amber-700 border-amber-400">
-                    Required for trolley calculation
+                    Required for batch matching
                   </Badge>
                 )}
               </Label>
               <p className="text-sm text-muted-foreground">
-                Set the variety and size for this SKU to enable trolley calculation and auto-linking batches.
+                Set the pot size for this SKU to enable trolley calculation and auto-linking batches.
               </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="text-sm">Plant variety</Label>
-                <Select
-                  value={currentVarietyId || "__none__"}
-                  onValueChange={(value) => {
-                    const varietyId = value === "__none__" ? null : value;
-                    startSkuConfigTransition(async () => {
-                      const result = await updateSkuConfigAction({
-                        skuId: formState.skuId,
-                        plantVarietyId: varietyId,
-                        sizeId: currentSizeId || null,
-                      });
-                      if (!result.success) {
-                        toast({ variant: "destructive", title: "Update failed", description: result.error });
-                        return;
-                      }
-                      toast({ title: "SKU variety updated" });
-                      emitMutation({ resource: 'products', action: 'update' });
+            <div className="space-y-1.5">
+              <Select
+                value={currentSizeId || "__none__"}
+                onValueChange={(value) => {
+                  const sizeId = value === "__none__" ? null : value;
+                  startSkuConfigTransition(async () => {
+                    const result = await updateSkuConfigAction({
+                      skuId: formState.skuId,
+                      plantVarietyId: selectedSku?.plantVarietyId || null,
+                      sizeId: sizeId,
                     });
-                  }}
-                  disabled={skuConfigPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select variety" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="__none__">Not set</SelectItem>
-                    {plantVarieties.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {currentVarietyName && (
-                  <p className="text-xs text-muted-foreground">Current: {currentVarietyName}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">Pot size</Label>
-                <Select
-                  value={currentSizeId || "__none__"}
-                  onValueChange={(value) => {
-                    const sizeId = value === "__none__" ? null : value;
-                    startSkuConfigTransition(async () => {
-                      const result = await updateSkuConfigAction({
-                        skuId: formState.skuId,
-                        plantVarietyId: currentVarietyId || null,
-                        sizeId: sizeId,
-                      });
-                      if (!result.success) {
-                        toast({ variant: "destructive", title: "Update failed", description: result.error });
-                        return;
-                      }
-                      toast({ title: "SKU size updated" });
-                      emitMutation({ resource: 'products', action: 'update' });
-                    });
-                  }}
-                  disabled={skuConfigPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Not set</SelectItem>
-                    {plantSizes.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {currentSizeName && (
-                  <p className="text-xs text-muted-foreground">Current: {currentSizeName}</p>
-                )}
-              </div>
+                    if (!result.success) {
+                      toast({ variant: "destructive", title: "Update failed", description: result.error });
+                      return;
+                    }
+                    toast({ title: "Pot size updated" });
+                    emitMutation({ resource: 'products', action: 'update' });
+                  });
+                }}
+                disabled={skuConfigPending}
+              >
+                <SelectTrigger className="w-full md:w-[300px]">
+                  <SelectValue placeholder="Select pot size" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Not set</SelectItem>
+                  {plantSizes.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {currentSizeName && (
+                <p className="text-xs text-muted-foreground">Current: {currentSizeName}</p>
+              )}
             </div>
             {skuConfigPending && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Updating SKU...
+                Updating...
               </div>
             )}
           </div>
         );
       })()}
+      {/* Quantity Settings - for order form */}
+      <div className="rounded-lg border p-4 space-y-3">
+        <div className="space-y-1">
+          <Label>Quantity Settings</Label>
+          <p className="text-sm text-muted-foreground">
+            Configure order quantities and quick qty button values.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Min Order Qty</Label>
+            <Input
+              type="number"
+              min="1"
+              value={formState.minOrderQty}
+              onChange={(event) => {
+                const value = event.target.value;
+                setFormState((prev) => ({
+                  ...prev,
+                  minOrderQty: value ? parseInt(value, 10) : 1,
+                }));
+              }}
+            />
+            <p className="text-xs text-muted-foreground">Minimum quantity customers must order</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Unit Qty (e.g. tray size)</Label>
+            <Input
+              type="number"
+              min="1"
+              value={formState.unitQty}
+              onChange={(event) => {
+                const value = event.target.value;
+                setFormState((prev) => ({
+                  ...prev,
+                  unitQty: value ? parseInt(value, 10) : 1,
+                }));
+              }}
+            />
+            <p className="text-xs text-muted-foreground">Orders must be multiples of this (e.g., 6 for trays)</p>
+          </div>
+        </div>
+        <Separator className="my-3" />
+        <p className="text-xs text-muted-foreground">Quick qty buttons (for order form)</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Shelf Quantity Override</Label>
+            <Input
+              type="number"
+              min="1"
+              placeholder={`Size default (from Sizes page)`}
+              value={formState.shelfQuantityOverride ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setFormState((prev) => ({
+                  ...prev,
+                  shelfQuantityOverride: value ? parseInt(value, 10) : null,
+                }));
+              }}
+            />
+            <p className="text-xs text-muted-foreground">Plants per shelf</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Trolley Quantity Override</Label>
+            <Input
+              type="number"
+              min="1"
+              placeholder={`Size default (from Sizes page)`}
+              value={formState.trolleyQuantityOverride ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setFormState((prev) => ({
+                  ...prev,
+                  trolleyQuantityOverride: value ? parseInt(value, 10) : null,
+                }));
+              }}
+            />
+            <p className="text-xs text-muted-foreground">Plants per trolley</p>
+          </div>
+        </div>
+      </div>
       <div className="space-y-2">
         <Label>Description</Label>
         <Textarea
@@ -686,6 +943,212 @@ export function ProductDetailsSection({
         </Button>
       </div>
     </form>
+  );
+}
+
+type BatchMatchingSectionProps = {
+  productId: string;
+  matchFamilies: string[] | null;
+  matchGenera: string[] | null;
+  plantVarieties: Array<{ id: string; name: string; family: string | null; genus: string | null }>;
+};
+
+export function BatchMatchingSection({ productId, matchFamilies, matchGenera, plantVarieties }: BatchMatchingSectionProps) {
+  const { toast } = useToast();
+  const [pending, startTransition] = useTransition();
+  const [localFamilies, setLocalFamilies] = useState<string[]>(matchFamilies ?? []);
+  const [localGenera, setLocalGenera] = useState<string[]>(matchGenera ?? []);
+
+  // Sync with props when product changes
+  useEffect(() => {
+    setLocalFamilies(matchFamilies ?? []);
+    setLocalGenera(matchGenera ?? []);
+  }, [productId, matchFamilies, matchGenera]);
+
+  // Compute distinct families from plant varieties
+  const distinctFamilies = useMemo(() => {
+    const families = new Set<string>();
+    for (const v of plantVarieties) {
+      if (v.family) {
+        families.add(v.family);
+      }
+    }
+    return Array.from(families).sort();
+  }, [plantVarieties]);
+
+  // Compute distinct genera from plant varieties
+  const distinctGenera = useMemo(() => {
+    const genera = new Set<string>();
+    for (const v of plantVarieties) {
+      if (v.genus) {
+        genera.add(v.genus);
+      }
+    }
+    return Array.from(genera).sort();
+  }, [plantVarieties]);
+
+  // Check if there are unsaved changes
+  const hasChanges = useMemo(() => {
+    const originalFamilies = matchFamilies ?? [];
+    const originalGenera = matchGenera ?? [];
+    return (
+      JSON.stringify(localFamilies.sort()) !== JSON.stringify([...originalFamilies].sort()) ||
+      JSON.stringify(localGenera.sort()) !== JSON.stringify([...originalGenera].sort())
+    );
+  }, [localFamilies, localGenera, matchFamilies, matchGenera]);
+
+  const handleSave = () => {
+    startTransition(async () => {
+      const result = await updateProductMatchingAction({
+        productId,
+        matchFamilies: localFamilies.length > 0 ? localFamilies : null,
+        matchGenera: localGenera.length > 0 ? localGenera : null,
+      });
+      if (!result.success) {
+        toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to update matching." });
+        return;
+      }
+      toast({ title: "Batch matching updated" });
+      emitMutation({ resource: "products", action: "update" });
+    });
+  };
+
+  const showFamilySection = distinctFamilies.length > 0;
+  const showGenusSection = distinctGenera.length > 0;
+
+  if (!showFamilySection && !showGenusSection) {
+    return (
+      <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground">
+        <p>No plant varieties with family or genus data found.</p>
+        <p className="text-sm">Add family/genus to plant varieties to enable auto-matching.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Family Matching */}
+      {showFamilySection && (
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="space-y-1">
+            <Label className="flex items-center gap-2">
+              Family Matching
+              {localFamilies.length > 0 && (
+                <Badge variant="outline" className="text-blue-700 border-blue-400">
+                  Auto-links batches
+                </Badge>
+              )}
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Select plant families to automatically match batches. E.g., for "Heathers" select Erica Carnea, Calluna, Daboecia.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 min-h-[32px]">
+            {localFamilies.map((family) => (
+              <Badge
+                key={family}
+                variant="secondary"
+                className="cursor-pointer hover:bg-destructive/20 transition-colors"
+                onClick={() => setLocalFamilies((prev) => prev.filter((f) => f !== family))}
+              >
+                {family}
+                <X className="ml-1 h-3 w-3" />
+              </Badge>
+            ))}
+            {localFamilies.length === 0 && (
+              <span className="text-sm text-muted-foreground italic">No families selected</span>
+            )}
+          </div>
+          <Select
+            value=""
+            onValueChange={(value) => {
+              if (value && !localFamilies.includes(value)) {
+                setLocalFamilies((prev) => [...prev, value].sort());
+              }
+            }}
+          >
+            <SelectTrigger className="w-full md:w-[300px]">
+              <SelectValue placeholder="Add a family..." />
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              {distinctFamilies
+                .filter((f) => !localFamilies.includes(f))
+                .map((family) => (
+                  <SelectItem key={family} value={family}>
+                    {family}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Genus Matching */}
+      {showGenusSection && (
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="space-y-1">
+            <Label className="flex items-center gap-2">
+              Genus Matching
+              {localGenera.length > 0 && (
+                <Badge variant="outline" className="text-green-700 border-green-400">
+                  Auto-links batches
+                </Badge>
+              )}
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Select genera for precise matching. E.g., for "2L Lavender" select Lavandula to match Munstead, Hidcote, etc.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 min-h-[32px]">
+            {localGenera.map((genus) => (
+              <Badge
+                key={genus}
+                variant="secondary"
+                className="cursor-pointer hover:bg-destructive/20 transition-colors bg-green-100 text-green-800 border-green-300"
+                onClick={() => setLocalGenera((prev) => prev.filter((g) => g !== genus))}
+              >
+                {genus}
+                <X className="ml-1 h-3 w-3" />
+              </Badge>
+            ))}
+            {localGenera.length === 0 && (
+              <span className="text-sm text-muted-foreground italic">No genera selected</span>
+            )}
+          </div>
+          <Select
+            value=""
+            onValueChange={(value) => {
+              if (value && !localGenera.includes(value)) {
+                setLocalGenera((prev) => [...prev, value].sort());
+              }
+            }}
+          >
+            <SelectTrigger className="w-full md:w-[300px]">
+              <SelectValue placeholder="Add a genus..." />
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              {distinctGenera
+                .filter((g) => !localGenera.includes(g))
+                .map((genus) => (
+                  <SelectItem key={genus} value={genus}>
+                    {genus}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Save button */}
+      {hasChanges && (
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={pending}>
+            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Matching Config
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -968,13 +1431,17 @@ type ProductPricingSectionProps = {
 
 export function ProductPricingSection({ productId, priceLists, prices }: ProductPricingSectionProps) {
   const { toast } = useToast();
-    const [pendingId, setPendingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const priceMap = useMemo(() => {
     const map = new Map<string, ProductSummary["prices"][number]>();
     prices.forEach((price) => map.set(price.priceListId, price));
     return map;
   }, [prices]);
   const [drafts, setDrafts] = useState<Record<string, { price: string; minQty: string }>>({});
+
+  // Track original values to detect changes
+  const [originals, setOriginals] = useState<Record<string, { price: string; minQty: string }>>({});
 
   useEffect(() => {
     const initial: Record<string, { price: string; minQty: string }> = {};
@@ -986,48 +1453,107 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
       };
     });
     setDrafts(initial);
+    setOriginals(initial);
   }, [priceLists, priceMap]);
 
   const handleDraftChange = (priceListId: string, field: "price" | "minQty", value: string) => {
     setDrafts((prev) => ({ ...prev, [priceListId]: { ...prev[priceListId], [field]: value } }));
   };
 
-  const handleSavePrice = (priceListId: string) => {
-    const draft = drafts[priceListId];
-    if (!draft?.price) {
-      toast({ variant: "destructive", title: "Price required", description: "Enter a price before saving." });
-      return;
-    }
-    const parsedPrice = Number(draft.price);
-    const parsedMinQty = Number(draft.minQty || 1);
-    if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
-      toast({ variant: "destructive", title: "Invalid price value" });
-      return;
-    }
-    if (Number.isNaN(parsedMinQty) || parsedMinQty < 1) {
-      toast({ variant: "destructive", title: "Invalid minimum quantity" });
-      return;
-    }
-    setPendingId(priceListId);
-    upsertProductPriceAction({
-      productId,
-      priceListId,
-      unitPriceExVat: parsedPrice,
-      minQty: parsedMinQty,
-      currency: priceLists.find((pl) => pl.id === priceListId)?.currency ?? "EUR",
-    }).then((result) => {
-      if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to save price." });
-      } else {
-        toast({ title: "Price saved" });
-        emitMutation({ resource: 'products', action: 'update' });
-      }
-      setPendingId(null);
+  // Check if any price has changed
+  const hasChanges = useMemo(() => {
+    return priceLists.some((pl) => {
+      const draft = drafts[pl.id];
+      const original = originals[pl.id];
+      if (!draft || !original) return false;
+      return draft.price !== original.price || draft.minQty !== original.minQty;
     });
+  }, [priceLists, drafts, originals]);
+
+  // Count how many prices will be saved
+  const changesToSave = useMemo(() => {
+    return priceLists.filter((pl) => {
+      const draft = drafts[pl.id];
+      const original = originals[pl.id];
+      if (!draft || !original) return false;
+      // Only count if there's a price value and it changed
+      return draft.price && (draft.price !== original.price || draft.minQty !== original.minQty);
+    }).length;
+  }, [priceLists, drafts, originals]);
+
+  const handleSaveAllPrices = async () => {
+    // Validate all changed prices
+    const toSave: Array<{ priceListId: string; price: number; minQty: number; currency: string }> = [];
+
+    for (const pl of priceLists) {
+      const draft = drafts[pl.id];
+      const original = originals[pl.id];
+      if (!draft) continue;
+
+      // Skip if unchanged
+      if (draft.price === original?.price && draft.minQty === original?.minQty) continue;
+
+      // Skip if no price set
+      if (!draft.price) continue;
+
+      const parsedPrice = Number(draft.price);
+      const parsedMinQty = Number(draft.minQty || 1);
+
+      if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+        toast({ variant: "destructive", title: `Invalid price for ${pl.name}` });
+        return;
+      }
+      if (Number.isNaN(parsedMinQty) || parsedMinQty < 1) {
+        toast({ variant: "destructive", title: `Invalid min qty for ${pl.name}` });
+        return;
+      }
+
+      toSave.push({
+        priceListId: pl.id,
+        price: parsedPrice,
+        minQty: parsedMinQty,
+        currency: pl.currency,
+      });
+    }
+
+    if (toSave.length === 0) {
+      toast({ title: "No changes to save" });
+      return;
+    }
+
+    setIsSaving(true);
+
+    // Save all prices in parallel
+    const results = await Promise.all(
+      toSave.map((item) =>
+        upsertProductPriceAction({
+          productId,
+          priceListId: item.priceListId,
+          unitPriceExVat: item.price,
+          minQty: item.minQty,
+          currency: item.currency,
+        })
+      )
+    );
+
+    const failures = results.filter((r) => !r.success);
+
+    if (failures.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "Some prices failed to save",
+        description: `${failures.length} of ${toSave.length} prices failed.`,
+      });
+    } else {
+      toast({ title: `${toSave.length} price${toSave.length > 1 ? "s" : ""} saved` });
+      emitMutation({ resource: 'products', action: 'update' });
+    }
+
+    setIsSaving(false);
   };
 
   const handleDeletePrice = (priceId: string) => {
-    setPendingId(priceId);
+    setPendingDeleteId(priceId);
     deleteProductPriceAction(priceId).then((result) => {
       if (!result.success) {
         toast({ variant: "destructive", title: "Delete failed", description: result.error ?? "Unable to remove price." });
@@ -1035,7 +1561,7 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
         toast({ title: "Price removed" });
         emitMutation({ resource: 'products', action: 'update' });
       }
-      setPendingId(null);
+      setPendingDeleteId(null);
     });
   };
 
@@ -1044,15 +1570,24 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
       {priceLists.map((priceList) => {
         const entry = priceMap.get(priceList.id);
         const draft = drafts[priceList.id] ?? { price: "", minQty: "1" };
-        const pending = pendingId === priceList.id || pendingId === entry?.id;
+        const original = originals[priceList.id] ?? { price: "", minQty: "1" };
+        const isChanged = draft.price !== original.price || draft.minQty !== original.minQty;
+        const pending = pendingDeleteId === entry?.id;
         return (
-          <div key={priceList.id} className="rounded-lg border p-4 space-y-3">
+          <div key={priceList.id} className={`rounded-lg border p-4 space-y-3 ${isChanged ? "border-blue-300 bg-blue-50/30" : ""}`}>
             <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">{priceList.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  Currency: {priceList.currency} {priceList.isDefault ? "• Default list" : ""}
-                </p>
+              <div className="flex items-center gap-2">
+                <div>
+                  <p className="font-medium">{priceList.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Currency: {priceList.currency} {priceList.isDefault ? "• Default list" : ""}
+                  </p>
+                </div>
+                {isChanged && (
+                  <Badge variant="outline" className="text-blue-700 border-blue-400 bg-blue-50">
+                    Modified
+                  </Badge>
+                )}
               </div>
               {entry ? (
                 <Button
@@ -1061,7 +1596,7 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
                   className="text-destructive"
                   title="Remove price"
                   onClick={() => handleDeletePrice(entry.id)}
-                  disabled={pending}
+                  disabled={pending || isSaving}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -1076,6 +1611,7 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
                   min="0"
                   value={draft.price}
                   onChange={(event) => handleDraftChange(priceList.id, "price", event.target.value)}
+                  disabled={isSaving}
                 />
               </div>
               <div className="space-y-2">
@@ -1085,18 +1621,24 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
                   min="1"
                   value={draft.minQty}
                   onChange={(event) => handleDraftChange(priceList.id, "minQty", event.target.value)}
+                  disabled={isSaving}
                 />
               </div>
-            </div>
-            <div className="flex justify-end">
-              <Button variant="secondary" onClick={() => handleSavePrice(priceList.id)} disabled={pending}>
-                {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {entry ? "Update price" : "Save price"}
-              </Button>
             </div>
           </div>
         );
       })}
+
+      {/* Save all button */}
+      <div className="flex items-center justify-between pt-4 border-t">
+        <p className="text-sm text-muted-foreground">
+          {hasChanges ? `${changesToSave} price${changesToSave > 1 ? "s" : ""} to save` : "No changes"}
+        </p>
+        <Button onClick={handleSaveAllPrices} disabled={!hasChanges || isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save all prices
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1464,6 +2006,87 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+type ProductVarietiesSectionProps = {
+  productId: string;
+  plantVarieties: Array<{ id: string; name: string; family: string | null }>;
+  matchFamilies?: string[] | null;
+};
+
+export function ProductVarietiesSection({ productId, plantVarieties, matchFamilies }: ProductVarietiesSectionProps) {
+  // Compute auto-matched varieties based on family matching
+  const autoMatchedVarieties = useMemo(() => {
+    if (!matchFamilies || matchFamilies.length === 0) return [];
+    const lowerFamilies = matchFamilies.map((f) => f.toLowerCase());
+    return plantVarieties.filter(
+      (v) => v.family && lowerFamilies.includes(v.family.toLowerCase())
+    );
+  }, [plantVarieties, matchFamilies]);
+
+  // Group auto-matched by family for display
+  const autoMatchedByFamily = useMemo(() => {
+    const grouped: Record<string, typeof autoMatchedVarieties> = {};
+    for (const v of autoMatchedVarieties) {
+      const family = v.family ?? "Unknown";
+      if (!grouped[family]) grouped[family] = [];
+      grouped[family].push(v);
+    }
+    return grouped;
+  }, [autoMatchedVarieties]);
+
+  // No families configured
+  if (!matchFamilies || matchFamilies.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed p-6 text-center space-y-2">
+        <Sparkles className="h-8 w-8 mx-auto text-muted-foreground/50" />
+        <h4 className="font-medium">No families configured</h4>
+        <p className="text-sm text-muted-foreground">
+          Go to the <strong>Details</strong> tab and select families in the "Family Matching" section to automatically match varieties.
+        </p>
+      </div>
+    );
+  }
+
+  // Families configured but no matching varieties
+  if (autoMatchedVarieties.length === 0) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+        <p className="text-sm text-amber-700">
+          Family matching configured ({matchFamilies.join(", ")}) but no varieties found with these families.
+        </p>
+      </div>
+    );
+  }
+
+  // Show auto-matched varieties
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-blue-600" />
+          <h4 className="text-sm font-semibold">Matched varieties ({autoMatchedVarieties.length})</h4>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Based on family matching: {matchFamilies.join(", ")}. These varieties will be included when auto-linking batches.
+        </p>
+        <div className="space-y-3">
+          {Object.entries(autoMatchedByFamily).map(([family, varietiesInFamily]) => (
+            <div key={family} className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{family}</p>
+              <div className="flex flex-wrap gap-2">
+                {varietiesInFamily.map((v) => (
+                  <Badge key={v.id} variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                    {v.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

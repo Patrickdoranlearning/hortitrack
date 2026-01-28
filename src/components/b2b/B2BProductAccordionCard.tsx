@@ -38,13 +38,17 @@ type B2BProductAccordionCardProps = {
  */
 function getQuantityPresets(product: CustomerCatalogProductWithVarieties) {
   const shelfQty = product.shelfQuantity;
+  const trolleyQty = product.trolleyQuantity;
   const shelvesPerTrolley = product.shelvesPerTrolley ?? 6;
 
   if (!shelfQty || shelfQty <= 0) return null;
 
   const halfShelf = Math.floor(shelfQty / 2);
   const fullShelf = shelfQty;
-  const fullTrolley = shelfQty * shelvesPerTrolley;
+  // Use trolleyQuantity directly if available, otherwise calculate from shelf × shelves
+  const fullTrolley = trolleyQty && trolleyQty > 0
+    ? trolleyQty
+    : shelfQty * shelvesPerTrolley;
 
   return { halfShelf, fullShelf, fullTrolley };
 }
@@ -301,41 +305,83 @@ export function B2BProductAccordionCard({
                     </Badge>
                   </div>
 
-                  {/* Generic Quantity Input (Level 1) */}
-                  <div className="w-28" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                    {mode === 'generic' ? (
-                      <Input
-                        type="number"
-                        min="0"
-                        max={product.totalAvailableQty}
-                        value={genericQuantity || ''}
-                        onChange={(e) => handleGenericQuantityChange(e.target.value)}
-                        placeholder="Qty"
-                        className="h-10 text-center text-base"
-                      />
-                    ) : (
-                      <div className="h-10 flex items-center justify-center">
-                        <Badge variant="secondary" className="font-semibold text-base px-3 py-1">
-                          {totalQuantity}
-                        </Badge>
+                  {/* Quick quantity buttons + input */}
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    {/* Preset buttons - always visible when presets available */}
+                    {mode === 'generic' && presets && (
+                      <div className="hidden sm:flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setGenericQuantity(presets.halfShelf);
+                          }}
+                          disabled={presets.halfShelf > product.totalAvailableQty}
+                          className="h-8 text-xs px-2"
+                          title={`Add ${presets.halfShelf} (½ Shelf)`}
+                        >
+                          ½S
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setGenericQuantity(presets.fullShelf);
+                          }}
+                          disabled={presets.fullShelf > product.totalAvailableQty}
+                          className="h-8 text-xs px-2"
+                          title={`Add ${presets.fullShelf} (1 Shelf)`}
+                        >
+                          1S
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setGenericQuantity(presets.fullTrolley);
+                          }}
+                          disabled={presets.fullTrolley > product.totalAvailableQty}
+                          className="h-8 text-xs px-2"
+                          title={`Add ${presets.fullTrolley} (1 Trolley)`}
+                        >
+                          1T
+                        </Button>
                       </div>
                     )}
-                  </div>
 
-                  {/* Quick Add Button (appears when generic qty > 0) */}
-                  {mode === 'generic' && genericQuantity > 0 && (
-                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    {/* Quantity Input */}
+                    <div className="w-20">
+                      {mode === 'generic' ? (
+                        <Input
+                          type="number"
+                          min="0"
+                          max={product.totalAvailableQty}
+                          value={genericQuantity || ''}
+                          onChange={(e) => handleGenericQuantityChange(e.target.value)}
+                          placeholder="Qty"
+                          className="h-8 text-center text-sm"
+                        />
+                      ) : (
+                        <div className="h-8 flex items-center justify-center">
+                          <Badge variant="secondary" className="font-semibold text-sm px-2 py-0.5">
+                            {totalQuantity}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Add Button */}
+                    {mode === 'generic' && genericQuantity > 0 && (
                       <Button
                         onClick={handleQuickAdd}
                         disabled={!product.unitPriceExVat}
-                        size="default"
-                        className="h-10"
+                        size="sm"
+                        className="h-8"
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add
+                        <Plus className="h-4 w-4" />
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Chevron icon */}
                   <ChevronDown className={cn(

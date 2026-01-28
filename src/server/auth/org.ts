@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { logError, logInfo } from "@/lib/log";
 
 import { DEV_USER_ID, IS_DEV } from "@/server/auth/dev-bypass";
 
@@ -69,14 +70,14 @@ async function ensureOrgLink(user: User, adminClient?: SupabaseClient): Promise<
         .order("created_at", { ascending: true })
         .limit(1);
       if (orgErr) {
-        console.error("[getUserAndOrg] fallback org lookup failed", orgErr);
+        logError("[getUserAndOrg] fallback org lookup failed", { error: orgErr });
         return null;
       }
       targetOrgId = orgs?.[0]?.id ?? null;
     }
 
     if (!targetOrgId) {
-      console.error("[getUserAndOrg] no organizations available for fallback");
+      logError("[getUserAndOrg] no organizations available for fallback");
       return null;
     }
 
@@ -97,7 +98,7 @@ async function ensureOrgLink(user: User, adminClient?: SupabaseClient): Promise<
         { onConflict: "id" }
       );
     if (profileUpsertErr) {
-      console.error("[getUserAndOrg] failed to upsert profile", profileUpsertErr);
+      logError("[getUserAndOrg] failed to upsert profile", { error: profileUpsertErr });
       return null;
     }
 
@@ -116,22 +117,20 @@ async function ensureOrgLink(user: User, adminClient?: SupabaseClient): Promise<
         { onConflict: "org_id,user_id" }
       );
     if (membershipUpsertErr) {
-      console.error(
-        "[getUserAndOrg] failed to upsert org membership",
-        membershipUpsertErr
-      );
+      logError("[getUserAndOrg] failed to upsert org membership", {
+        error: membershipUpsertErr,
+      });
       // Profile was created successfully, so still return the org ID
       // The user can function with just a profile+active_org_id
     }
 
-    console.info(
-      "[getUserAndOrg] auto-linked user to organization",
-      user.id,
-      targetOrgId
-    );
+    logInfo("[getUserAndOrg] auto-linked user to organization", {
+      userId: user.id,
+      orgId: targetOrgId,
+    });
     return targetOrgId;
   } catch (err) {
-    console.error("[getUserAndOrg] ensureOrgLink failed", err);
+    logError("[getUserAndOrg] ensureOrgLink failed", { error: err });
     return null;
   }
 }
@@ -171,13 +170,13 @@ async function resolveActiveOrgId({
 
   if (!activeOrgId) {
     if (membershipResult.error) {
-      console.error("[getUserAndOrg] membership lookup failed", membershipResult.error);
+      logError("[getUserAndOrg] membership lookup failed", { error: membershipResult.error });
     }
     activeOrgId = membershipResult.data?.[0]?.org_id ?? null;
   }
 
   if (!activeOrgId) {
-    console.info("[resolveActiveOrgId] No org found for user, attempting auto-link", user.id);
+    logInfo("[resolveActiveOrgId] No org found for user, attempting auto-link", { userId: user.id });
     activeOrgId = await ensureOrgLink(user, admin);
   }
 

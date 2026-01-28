@@ -326,11 +326,7 @@ export async function consumeMaterialsForBatch(
 
   if (error) {
     console.error("Failed to create consumption transactions:", error);
-    return {
-      success: false,
-      transactions: [],
-      shortages,
-    };
+    throw new Error(`Failed to create consumption transactions: ${error.message}`);
   }
 
   const transactions: MaterialTransaction[] = (data ?? []).map((row) => ({

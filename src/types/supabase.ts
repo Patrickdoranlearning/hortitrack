@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -12,31 +11,6 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -83,6 +57,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "attribute_options_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      balance_transfer_log: {
+        Row: {
+          action: string
+          from_haulier_id: string
+          from_haulier_name: string
+          id: string
+          org_id: string
+          performed_at: string
+          performed_by: string
+          reason: string | null
+          shelves: number
+          to_customer_id: string
+          to_customer_name: string
+          transfer_request_id: string
+          trolleys: number
+        }
+        Insert: {
+          action: string
+          from_haulier_id: string
+          from_haulier_name: string
+          id?: string
+          org_id: string
+          performed_at?: string
+          performed_by: string
+          reason?: string | null
+          shelves: number
+          to_customer_id: string
+          to_customer_name: string
+          transfer_request_id: string
+          trolleys: number
+        }
+        Update: {
+          action?: string
+          from_haulier_id?: string
+          from_haulier_name?: string
+          id?: string
+          org_id?: string
+          performed_at?: string
+          performed_by?: string
+          reason?: string | null
+          shelves?: number
+          to_customer_id?: string
+          to_customer_name?: string
+          transfer_request_id?: string
+          trolleys?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_transfer_log_org_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -754,6 +784,7 @@ export type Database = {
           quantity: number
           quantity_produced: number | null
           ready_at: string | null
+          reserved_for_customer_id: string | null
           reserved_quantity: number
           saleable_quantity: number | null
           sales_photo_url: string | null
@@ -794,6 +825,7 @@ export type Database = {
           quantity?: number
           quantity_produced?: number | null
           ready_at?: string | null
+          reserved_for_customer_id?: string | null
           reserved_quantity?: number
           saleable_quantity?: number | null
           sales_photo_url?: string | null
@@ -834,6 +866,7 @@ export type Database = {
           quantity?: number
           quantity_produced?: number | null
           ready_at?: string | null
+          reserved_for_customer_id?: string | null
           reserved_quantity?: number
           saleable_quantity?: number | null
           sales_photo_url?: string | null
@@ -1757,7 +1790,10 @@ export type Database = {
           org_id: string
           payment_terms_days: number
           phone: string | null
+          pre_pricing_cost_per_label: number | null
+          pre_pricing_foc: boolean
           pricing_tier: string | null
+          requires_pre_pricing: boolean
           store: string | null
           updated_at: string
           vat_number: string | null
@@ -1778,7 +1814,10 @@ export type Database = {
           org_id: string
           payment_terms_days?: number
           phone?: string | null
+          pre_pricing_cost_per_label?: number | null
+          pre_pricing_foc?: boolean
           pricing_tier?: string | null
+          requires_pre_pricing?: boolean
           store?: string | null
           updated_at?: string
           vat_number?: string | null
@@ -1799,7 +1838,10 @@ export type Database = {
           org_id?: string
           payment_terms_days?: number
           phone?: string | null
+          pre_pricing_cost_per_label?: number | null
+          pre_pricing_foc?: boolean
           pricing_tier?: string | null
+          requires_pre_pricing?: boolean
           store?: string | null
           updated_at?: string
           vat_number?: string | null
@@ -2069,6 +2111,8 @@ export type Database = {
           route_notes: string | null
           run_date: string
           run_number: string
+          shelves_loaded: number | null
+          shelves_returned: number | null
           status: Database["public"]["Enums"]["delivery_run_status"]
           trolleys_loaded: number
           trolleys_returned: number
@@ -2095,6 +2139,8 @@ export type Database = {
           route_notes?: string | null
           run_date: string
           run_number: string
+          shelves_loaded?: number | null
+          shelves_returned?: number | null
           status?: Database["public"]["Enums"]["delivery_run_status"]
           trolleys_loaded?: number
           trolleys_returned?: number
@@ -2121,6 +2167,8 @@ export type Database = {
           route_notes?: string | null
           run_date?: string
           run_number?: string
+          shelves_loaded?: number | null
+          shelves_returned?: number | null
           status?: Database["public"]["Enums"]["delivery_run_status"]
           trolleys_loaded?: number
           trolleys_returned?: number
@@ -2605,6 +2653,57 @@ export type Database = {
             columns: ["target_size_id"]
             isOneToOne: false
             referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      haulier_trolley_balance: {
+        Row: {
+          created_at: string
+          haulier_id: string
+          id: string
+          last_load_date: string | null
+          last_return_date: string | null
+          org_id: string
+          shelves_out: number
+          trolleys_out: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          haulier_id: string
+          id?: string
+          last_load_date?: string | null
+          last_return_date?: string | null
+          org_id: string
+          shelves_out?: number
+          trolleys_out?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          haulier_id?: string
+          id?: string
+          last_load_date?: string | null
+          last_return_date?: string | null
+          org_id?: string
+          shelves_out?: number
+          trolleys_out?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "haulier_trolley_balance_haulier_fkey"
+            columns: ["haulier_id"]
+            isOneToOne: false
+            referencedRelation: "hauliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "haulier_trolley_balance_org_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -5479,6 +5578,139 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_balance_transfers: {
+        Row: {
+          created_at: string
+          delivery_item_id: string | null
+          delivery_run_id: string | null
+          driver_notes: string | null
+          from_haulier_id: string
+          id: string
+          org_id: string
+          photo_url: string | null
+          reason: string
+          requested_at: string
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shelves: number
+          signed_docket_url: string | null
+          status: Database["public"]["Enums"]["transfer_status"]
+          to_customer_id: string
+          trolleys: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_item_id?: string | null
+          delivery_run_id?: string | null
+          driver_notes?: string | null
+          from_haulier_id: string
+          id?: string
+          org_id: string
+          photo_url?: string | null
+          reason: string
+          requested_at?: string
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shelves?: number
+          signed_docket_url?: string | null
+          status?: Database["public"]["Enums"]["transfer_status"]
+          to_customer_id: string
+          trolleys?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_item_id?: string | null
+          delivery_run_id?: string | null
+          driver_notes?: string | null
+          from_haulier_id?: string
+          id?: string
+          org_id?: string
+          photo_url?: string | null
+          reason?: string
+          requested_at?: string
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shelves?: number
+          signed_docket_url?: string | null
+          status?: Database["public"]["Enums"]["transfer_status"]
+          to_customer_id?: string
+          trolleys?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_vat_treatment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_haulier_fkey"
+            columns: ["from_haulier_id"]
+            isOneToOne: false
+            referencedRelation: "hauliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_item_fkey"
+            columns: ["delivery_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_org_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_run_fkey"
+            columns: ["delivery_run_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_run_fkey"
+            columns: ["delivery_run_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_delivery_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pick_items: {
         Row: {
           created_at: string
@@ -7534,6 +7766,13 @@ export type Database = {
             referencedRelation: "production_jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "production_job_batches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "production_jobs_summary"
+            referencedColumns: ["id"]
+          },
         ]
       }
       production_jobs: {
@@ -7645,6 +7884,13 @@ export type Database = {
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "production_jobs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks_with_productivity"
+            referencedColumns: ["id"]
+          },
         ]
       }
       productivity_logs: {
@@ -7696,6 +7942,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "productivity_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "production_jobs_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "productivity_logs_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -7707,6 +7960,13 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productivity_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks_with_productivity"
             referencedColumns: ["id"]
           },
           {
@@ -7726,9 +7986,14 @@ export type Database = {
           hero_image_url: string | null
           id: string
           is_active: boolean
+          match_families: string[] | null
+          min_order_qty: number | null
           name: string
           org_id: string
+          shelf_quantity_override: number | null
           sku_id: string
+          trolley_quantity_override: number | null
+          unit_qty: number | null
           updated_at: string
         }
         Insert: {
@@ -7738,9 +8003,14 @@ export type Database = {
           hero_image_url?: string | null
           id?: string
           is_active?: boolean
+          match_families?: string[] | null
+          min_order_qty?: number | null
           name: string
           org_id: string
+          shelf_quantity_override?: number | null
           sku_id: string
+          trolley_quantity_override?: number | null
+          unit_qty?: number | null
           updated_at?: string
         }
         Update: {
@@ -7750,9 +8020,14 @@ export type Database = {
           hero_image_url?: string | null
           id?: string
           is_active?: boolean
+          match_families?: string[] | null
+          min_order_qty?: number | null
           name?: string
           org_id?: string
+          shelf_quantity_override?: number | null
           sku_id?: string
+          trolley_quantity_override?: number | null
+          unit_qty?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -7779,6 +8054,7 @@ export type Database = {
           customer_address_id: string | null
           customer_id: string | null
           display_name: string | null
+          email: string | null
           full_name: string | null
           id: string
           portal_role: string | null
@@ -7790,6 +8066,7 @@ export type Database = {
           customer_address_id?: string | null
           customer_id?: string | null
           display_name?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
           portal_role?: string | null
@@ -7801,6 +8078,7 @@ export type Database = {
           customer_address_id?: string | null
           customer_id?: string | null
           display_name?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
           portal_role?: string | null
@@ -8281,6 +8559,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rate_limits: {
+        Row: {
+          expire_at: number
+          key: string
+          points: number
+        }
+        Insert: {
+          expire_at: number
+          key: string
+          points?: number
+        }
+        Update: {
+          expire_at?: number
+          key?: string
+          points?: number
+        }
+        Relationships: []
       }
       sales_qc: {
         Row: {
@@ -10167,6 +10463,155 @@ export type Database = {
         }
         Relationships: []
       }
+      production_jobs_summary: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_email: string | null
+          assigned_to_name: string | null
+          batch_count: number | null
+          checklist_progress: Json | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string | null
+          location: string | null
+          machine: string | null
+          name: string | null
+          org_id: string | null
+          process_type: string | null
+          scheduled_date: string | null
+          scheduled_week: number | null
+          scheduled_year: number | null
+          started_at: string | null
+          status: string | null
+          task_id: string | null
+          total_plants: number | null
+          updated_at: string | null
+          wizard_progress: Json | null
+          wizard_template: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_jobs_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_jobs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks_with_productivity"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks_with_productivity: {
+        Row: {
+          assigned_team_id: string | null
+          assigned_team_name: string | null
+          assigned_to: string | null
+          assigned_to_email: string | null
+          assigned_to_name: string | null
+          checklist_progress: Json | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string | null
+          org_id: string | null
+          plant_quantity: number | null
+          plants_per_hour: number | null
+          priority: number | null
+          scheduled_date: string | null
+          source_module: string | null
+          source_ref_id: string | null
+          source_ref_type: string | null
+          started_at: string | null
+          status: string | null
+          task_type: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_team_id_fkey"
+            columns: ["assigned_team_id"]
+            isOneToOne: false
+            referencedRelation: "picking_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_assigned_team_id_fkey"
+            columns: ["assigned_team_id"]
+            isOneToOne: false
+            referencedRelation: "v_picking_team_workload"
+            referencedColumns: ["team_id"]
+          },
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_active_delivery_runs: {
         Row: {
           completed_deliveries: number | null
@@ -11434,6 +11879,19 @@ export type Database = {
             }
             Returns: Json
           }
+      pick_item_atomic: {
+        Args: {
+          p_notes?: string
+          p_org_id: string
+          p_pick_item_id: string
+          p_picked_batch_id: string
+          p_picked_qty: number
+          p_status?: string
+          p_substitution_reason?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       recalc_invoice_totals: {
         Args: { _invoice_id: string }
         Returns: undefined
@@ -11443,10 +11901,24 @@ export type Database = {
         Args: { p_customer_id: string; p_org_id: string }
         Returns: undefined
       }
+      recalculate_haulier_trolley_balance: {
+        Args: { p_haulier_id: string; p_org_id: string }
+        Returns: undefined
+      }
       recall_load: { Args: { p_load_id: string }; Returns: Json }
       refresh_log_history_for_batch: {
         Args: { _batch_id: string }
         Returns: undefined
+      }
+      reject_pick_list_atomic: {
+        Args: {
+          p_failed_items?: Json
+          p_failure_reason: string
+          p_org_id: string
+          p_pick_list_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       resolve_status_id: {
         Args: { p_org_id: string; p_status_code: string }
@@ -11465,6 +11937,10 @@ export type Database = {
       }
       switch_active_org: { Args: { _org: string }; Returns: undefined }
       user_in_org: { Args: { target_org_id: string }; Returns: boolean }
+      void_order_with_allocations: {
+        Args: { p_order_id: string; p_org_id: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       allocation_status:
@@ -11566,6 +12042,7 @@ export type Database = {
         | "rejected"
         | "applied"
         | "cancelled"
+      transfer_status: "pending" | "approved" | "rejected"
       trial_status: "draft" | "active" | "paused" | "completed" | "archived"
       trolley_status:
         | "available"
@@ -11708,9 +12185,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       allocation_status: [
@@ -11829,6 +12303,7 @@ export const Constants = {
         "applied",
         "cancelled",
       ],
+      transfer_status: ["pending", "approved", "rejected"],
       trial_status: ["draft", "active", "paused", "completed", "archived"],
       trolley_status: [
         "available",
@@ -11851,3 +12326,4 @@ export const Constants = {
     },
   },
 } as const
+

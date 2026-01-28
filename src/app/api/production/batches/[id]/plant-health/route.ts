@@ -12,17 +12,12 @@ export async function GET(
     const includeSummary = searchParams.get('summary') === 'true';
 
     // Validate user is authenticated
-    try {
-      await getUserAndOrg();
-    } catch (authError) {
-      const message = authError instanceof Error ? authError.message : "Authentication failed";
-      return NextResponse.json({ error: message }, { status: 401 });
-    }
+    const { orgId } = await getUserAndOrg();
 
-    const logs = await buildPlantHealthHistory(id);
+    const logs = await buildPlantHealthHistory(id, orgId);
 
     if (includeSummary) {
-      const summary = await getPlantHealthSummary(id);
+      const summary = await getPlantHealthSummary(id, orgId);
       return NextResponse.json({ logs, summary });
     }
 

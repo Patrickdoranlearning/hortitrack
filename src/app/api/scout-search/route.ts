@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -7,16 +8,27 @@ export const runtime = "nodejs";
  * Fast unified search for Scout Mode
  * Uses database RPC function for single-roundtrip batch search
  */
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim() || "";
     
     if (q.length < 2) {
       return NextResponse.json({ locations: [], batches: [] });
     }
 
-    const { orgId, supabase } = await getUserAndOrg();
+    const { orgId, user, supabase } = await getUserAndOrg();
+
+    // Rate limit: 60 search requests per minute per user
+    const rlKey = `scout:search:${requestKey(req, user.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests", resetMs: rl.resetMs },
+        { status: 429 }
+      );
+    }
+
     const searchPattern = `%${q}%`;
 
     // Fast parallel search using RPC for batches

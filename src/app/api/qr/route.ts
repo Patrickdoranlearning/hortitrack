@@ -1,10 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
 import bwip from "bwip-js";
+import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  // Auth Check
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ ok: false, error: "Unauthenticated" }, { status: 401 });
+  }
+
+  // Rate limit: 60 QR codes per minute per user
+  const rlKey = `qr:generate:${requestKey(req, user.id)}`;
+  const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, error: "Too many requests", resetMs: rl.resetMs },
+      { status: 429 }
+    );
+  }
+
   const value = req.nextUrl.searchParams.get("value") ?? req.nextUrl.searchParams.get("t") ?? "";
   const type = (req.nextUrl.searchParams.get("type") ?? "qr").toLowerCase(); // 'qr' | 'datamatrix'
   const format = (req.nextUrl.searchParams.get("format") ?? "png").toLowerCase(); // 'png' | 'svg'

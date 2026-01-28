@@ -8,6 +8,18 @@ export type ProductSummary = {
   isActive: boolean;
   skuVarietyId?: string | null;
   skuSizeId?: string | null;
+  // Quantity overrides for quick qty buttons (null = use size defaults)
+  shelfQuantityOverride: number | null;
+  trolleyQuantityOverride: number | null;
+  // Order quantity settings
+  minOrderQty: number;
+  unitQty: number;
+  // Family matching for auto-linking batches (broader - e.g., "Erica" family for Heathers)
+  matchFamilies: string[] | null;
+  // Genus matching for auto-linking batches (precise - e.g., "Lavandula" for all Lavender varieties)
+  matchGenera: string[] | null;
+  // Linked varieties (many-to-many)
+  varieties: ProductVariety[];
   sku: { id: string; code: string; label: string; displayName?: string | null } | null;
   aliases: ProductAlias[];
   batches: Array<{
@@ -76,7 +88,7 @@ export type ProductManagementPayload = {
     validFrom: string | null;
     validTo: string | null;
   }>;
-  plantVarieties?: Array<{ id: string; name: string }>;
+  plantVarieties?: Array<{ id: string; name: string; family: string | null; genus: string | null }>;
   plantSizes?: Array<{ id: string; name: string }>;
 };
 

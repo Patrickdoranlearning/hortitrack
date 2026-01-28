@@ -4,9 +4,20 @@ import { buildZpl, buildZplWithTemplate, buildZplRow } from "@/server/labels/bui
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 import { sendToPrinter } from "@/server/labels/send-to-printer";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { getUserAndOrg } from "@/server/auth/org";
 
 export async function POST(req: NextRequest) {
   try {
+    const { user, orgId, supabase } = await getUserAndOrg();
+
+    // Rate limit: 30 print requests per minute per user
+    const rlKey = `print:labels:${requestKey(req, user.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 30 });
+    if (!rl.allowed) {
+      return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });
+    }
+
     const body = await req.json();
     const {
       batchId,
@@ -21,13 +32,6 @@ export async function POST(req: NextRequest) {
       templateId,
       copies = 1,
     } = body;
-
-    const supabase = await getSupabaseServerApp();
-    const orgId = await resolveActiveOrgId();
-
-    if (!orgId) {
-      return NextResponse.json({ ok: false, error: "No active organization" }, { status: 401 });
-    }
 
     // If batchId provided, fetch batch data from DB
     let batchNumber = providedBatchNumber;
@@ -151,14 +155,10 @@ export async function POST(req: NextRequest) {
       zpl = buildZpl(labelInput, copies, printerDpi);
     }
 
-    // Get current user for tracking
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Send to printer (handles both network and agent-connected printers)
     const result = await sendToPrinter(printer, zpl, {
       jobType: "batch",
       orgId,
-      userId: user?.id,
+      userId: user.id,
       copies,
     });
 

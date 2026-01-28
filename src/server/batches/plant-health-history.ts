@@ -3,6 +3,9 @@
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { isValidDocId } from "@/server/utils/ids";
 import type { PlantHealthEvent } from "@/lib/history-types";
+import type { Database } from "@/types/supabase";
+
+type PlantHealthLogRow = Database['public']['Tables']['plant_health_logs']['Row'];
 
 type AnyDate = Date | string | number | null | undefined;
 
@@ -18,8 +21,9 @@ const toDate = (value: AnyDate) => {
 
 /**
  * Build plant health history for a specific batch
+ * Now with orgId for tenant isolation
  */
-export async function buildPlantHealthHistory(batchId: string): Promise<PlantHealthEvent[]> {
+export async function buildPlantHealthHistory(batchId: string, orgId: string): Promise<PlantHealthEvent[]> {
   if (!isValidDocId(batchId)) {
     throw new Error("Invalid batch ID provided.");
   }
@@ -51,6 +55,7 @@ export async function buildPlantHealthHistory(batchId: string): Promise<PlantHea
       photos
     `)
     .eq("batch_id", batchId)
+    .eq("org_id", orgId) // Tenant isolation
     .order("event_at", { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -96,7 +101,7 @@ export async function buildPlantHealthHistory(batchId: string): Promise<PlantHea
       harvestIntervalDays: log.harvest_interval_days,
       ecReading: log.ec_reading,
       phReading: log.ph_reading,
-      photos: log.photos ?? [],
+      photos: (log.photos as string[]) ?? [],
       userId: log.recorded_by,
       signedBy: log.signed_by
     };
@@ -230,7 +235,7 @@ export async function getOrgPlantHealthHistory(params: {
       harvestIntervalDays: log.harvest_interval_days,
       ecReading: log.ec_reading,
       phReading: log.ph_reading,
-      photos: log.photos ?? [],
+      photos: (log.photos as string[]) ?? [],
       userId: log.recorded_by,
       signedBy: log.signed_by
     };
@@ -245,8 +250,8 @@ export async function getOrgPlantHealthHistory(params: {
 /**
  * Get summary stats for plant health activity
  */
-export async function getPlantHealthSummary(batchId: string) {
-  const logs = await buildPlantHealthHistory(batchId);
+export async function getPlantHealthSummary(batchId: string, orgId: string) {
+  const logs = await buildPlantHealthHistory(batchId, orgId);
 
   const summary = {
     totalLogs: logs.length,

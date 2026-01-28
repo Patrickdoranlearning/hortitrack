@@ -13,6 +13,12 @@ const productDetailsSchema = z.object({
   heroImageUrl: z.string().url().optional().or(z.literal('')).nullable(),
   defaultStatus: z.string().max(120).optional().nullable(),
   isActive: z.boolean().default(true),
+  shelfQuantityOverride: z.number().int().positive().optional().nullable(),
+  trolleyQuantityOverride: z.number().int().positive().optional().nullable(),
+  minOrderQty: z.number().int().positive().optional().nullable(),
+  unitQty: z.number().int().positive().optional().nullable(),
+  matchFamilies: z.array(z.string()).optional().nullable(),
+  matchGenera: z.array(z.string()).optional().nullable(),
 });
 
 const productBatchSchema = z.object({
@@ -73,6 +79,12 @@ export async function upsertProductAction(input: z.infer<typeof productDetailsSc
     hero_image_url: cleanString(parsed.heroImageUrl),
     default_status: cleanString(parsed.defaultStatus),
     is_active: parsed.isActive ?? true,
+    shelf_quantity_override: parsed.shelfQuantityOverride ?? null,
+    trolley_quantity_override: parsed.trolleyQuantityOverride ?? null,
+    min_order_qty: parsed.minOrderQty ?? 1,
+    unit_qty: parsed.unitQty ?? 1,
+    match_families: parsed.matchFamilies ?? null,
+    match_genera: parsed.matchGenera ?? null,
   };
 
   let data;
@@ -111,6 +123,46 @@ export async function upsertProductAction(input: z.infer<typeof productDetailsSc
     _mutated: {
       resource: 'products' as const,
       action: parsed.id ? 'update' as const : 'create' as const,
+      id: data?.id,
+    },
+  };
+}
+
+const productMatchingSchema = z.object({
+  productId: z.string().uuid(),
+  matchFamilies: z.array(z.string()).nullable(),
+  matchGenera: z.array(z.string()).nullable(),
+});
+
+export async function updateProductMatchingAction(input: z.infer<typeof productMatchingSchema>) {
+  const parsed = productMatchingSchema.parse(input);
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      match_families: parsed.matchFamilies,
+      match_genera: parsed.matchGenera,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', parsed.productId)
+    .eq('org_id', orgId)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    console.error('[updateProductMatchingAction] error', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/sales/products');
+  return {
+    success: true,
+    data,
+    _mutated: {
+      resource: 'products' as const,
+      action: 'update' as const,
       id: data?.id,
     },
   };
@@ -179,6 +231,7 @@ export async function autoLinkProductBatchesAction(productId: string) {
       `
       id,
       sku_id,
+      match_families,
       skus (
         id,
         display_name,
@@ -196,15 +249,16 @@ export async function autoLinkProductBatchesAction(productId: string) {
     return { success: false, error: 'Unable to load product details.' };
   }
 
-  const varietyId = product.skus?.plant_variety_id;
+  const skuVarietyId = product.skus?.plant_variety_id;
   const sizeId = product.skus?.size_id;
-  if (!varietyId || !sizeId) {
+  if (!sizeId) {
     return {
       success: false,
-      error: 'The product SKU is missing a variety or size, so matching batches cannot be found.',
+      error: 'The product SKU is missing a size, so matching batches cannot be found.',
     };
   }
 
+  // Get existing links to avoid duplicates
   const { data: existingLinks, error: existingError } = await supabase
     .from('product_batches')
     .select('batch_id')
@@ -217,18 +271,81 @@ export async function autoLinkProductBatchesAction(productId: string) {
 
   const existingIds = new Set(existingLinks?.map((entry) => entry.batch_id));
 
-  // Get ALL batches with stock (link at inception, not just saleable)
-  const { data: candidates, error: candidateError } = await supabase
-    .from('batches')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('plant_variety_id', varietyId)
-    .eq('size_id', sizeId)
-    .gt('quantity', 0);
+  let candidates: { id: string }[] = [];
+  let matchDescription = '';
 
-  if (candidateError) {
-    console.error('[autoLinkProductBatchesAction] batch lookup failed', candidateError);
-    return { success: false, error: 'Unable to load matching batches.' };
+  // Check if family matching is configured
+  const matchFamilies = product.match_families as string[] | null;
+  if (matchFamilies && matchFamilies.length > 0) {
+    // Family-based matching: find all batches with matching family + size
+    const { data: batchesWithFamily, error: batchError } = await supabase
+      .from('batches')
+      .select(`
+        id,
+        plant_variety:plant_varieties!inner(family)
+      `)
+      .eq('org_id', orgId)
+      .eq('size_id', sizeId)
+      .gt('quantity', 0);
+
+    if (batchError) {
+      console.error('[autoLinkProductBatchesAction] family batch lookup failed', batchError);
+      return { success: false, error: 'Unable to load matching batches.' };
+    }
+
+    // Filter by families (case-insensitive)
+    const lowerFamilies = matchFamilies.map((f) => f.toLowerCase());
+    candidates = (batchesWithFamily ?? [])
+      .filter((b) => {
+        const family = (b.plant_variety as { family: string | null } | null)?.family;
+        return family && lowerFamilies.includes(family.toLowerCase());
+      })
+      .map((b) => ({ id: b.id }));
+
+    matchDescription = `${matchFamilies.length} famil${matchFamilies.length === 1 ? 'y' : 'ies'}`;
+  } else {
+    // Variety-based matching (existing logic)
+    // Fetch linked varieties from product_varieties table
+    const { data: linkedVarieties, error: linkedVarietiesError } = await supabase
+      .from('product_varieties')
+      .select('variety_id')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (linkedVarietiesError) {
+      console.error('[autoLinkProductBatchesAction] linked varieties lookup failed', linkedVarietiesError);
+      return { success: false, error: 'Unable to load product varieties.' };
+    }
+
+    // Build variety IDs to match: use linked varieties if any, otherwise fall back to SKU variety
+    const varietyIds: string[] = linkedVarieties?.map((v) => v.variety_id) ?? [];
+    if (varietyIds.length === 0 && skuVarietyId) {
+      varietyIds.push(skuVarietyId);
+    }
+
+    if (varietyIds.length === 0) {
+      return {
+        success: false,
+        error: 'No families or varieties configured. Add families in the Details tab, or add varieties in the Varieties tab.',
+      };
+    }
+
+    // Get ALL batches with stock matching any of the linked varieties
+    const { data: varietyCandidates, error: candidateError } = await supabase
+      .from('batches')
+      .select('id')
+      .eq('org_id', orgId)
+      .in('plant_variety_id', varietyIds)
+      .eq('size_id', sizeId)
+      .gt('quantity', 0);
+
+    if (candidateError) {
+      console.error('[autoLinkProductBatchesAction] batch lookup failed', candidateError);
+      return { success: false, error: 'Unable to load matching batches.' };
+    }
+
+    candidates = varietyCandidates ?? [];
+    matchDescription = `${varietyIds.length} variet${varietyIds.length === 1 ? 'y' : 'ies'}`;
   }
 
   const batchIdsToLink =
@@ -238,7 +355,7 @@ export async function autoLinkProductBatchesAction(productId: string) {
     return {
       success: true,
       linked: 0,
-      message: 'No additional batches matched this product.',
+      message: `No additional batches matched (checked ${matchDescription}).`,
     };
   }
 

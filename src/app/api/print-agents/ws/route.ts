@@ -5,6 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { agentConnectionManager } from "@/server/labels/agent-connection-manager";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * WebSocket endpoint for print agent connections.
@@ -18,6 +22,7 @@ import { agentConnectionManager } from "@/server/labels/agent-connection-manager
  * 3. Agent sends heartbeats every 30s: { type: "heartbeat", connectedPrinters: [...] }
  * 4. Server pushes print jobs: { type: "print_job", jobId, printerId, zpl, copies }
  * 5. Agent responds: { type: "job_result", jobId, status: "completed"|"failed", error? }
+ * 6. Agent shuts down: { type: "offline" }
  */
 
 // This is a GET handler that will be upgraded to WebSocket
@@ -30,6 +35,13 @@ export async function GET(req: NextRequest) {
       { error: "Expected WebSocket upgrade request" },
       { status: 426 }
     );
+  }
+
+  // Rate limit upgrade requests: 10 per minute per IP
+  const rlKey = `print-agent:ws-upgrade:${requestKey(req)}`;
+  const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 10 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   // For Vercel/Edge runtime, we need to handle WebSocket differently
@@ -64,6 +76,13 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit polling/auth requests: 60 per minute per IP
+    const rlKey = `print-agent:poll:${requestKey(req)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const body = await req.json();
     const { action, agentKey, ...data } = body;
 

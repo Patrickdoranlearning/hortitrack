@@ -6,6 +6,7 @@ import type {
   PurchaseOrderLine,
   PurchaseOrderStatus,
 } from "@/lib/types/materials";
+import { logError } from "@/lib/log";
 
 // ============================================================================
 // Purchase Order Queries
@@ -67,7 +68,10 @@ export async function listPurchaseOrders(
 
   const { data, error, count } = await query;
 
-  if (error) throw new Error(`Failed to fetch purchase orders: ${error.message}`);
+  if (error) {
+    logError("Failed to fetch purchase orders", { error: error.message, orgId });
+    throw new Error(`Failed to fetch purchase orders: ${error.message}`);
+  }
 
   return {
     orders: (data ?? []).map(mapPurchaseOrder),
@@ -106,6 +110,7 @@ export async function getPurchaseOrder(
     .single();
 
   if (error && error.code !== "PGRST116") {
+    logError("Failed to fetch purchase order", { error: error.message, poId: id });
     throw new Error(`Failed to fetch purchase order: ${error.message}`);
   }
 
@@ -132,71 +137,37 @@ export type CreatePurchaseOrderInput = {
   }[];
 };
 
+/**
+ * Atomic PO creation via RPC
+ */
 export async function createPurchaseOrder(
   supabase: SupabaseClient,
   orgId: string,
   userId: string,
   input: CreatePurchaseOrderInput
 ): Promise<PurchaseOrder> {
-  // Generate PO number
   const poNumber = await generatePONumber();
 
-  // Calculate totals
-  let subtotal = 0;
-  const linesWithTotals = input.lines.map((line, index) => {
-    const discount = (line.unitPrice * line.quantityOrdered * (line.discountPct ?? 0)) / 100;
-    const lineTotal = line.unitPrice * line.quantityOrdered - discount;
-    subtotal += lineTotal;
-    return {
-      ...line,
-      lineNumber: index + 1,
-      lineTotal,
-    };
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('create_purchase_order', {
+    p_org_id: orgId,
+    p_user_id: userId,
+    p_po_number: poNumber,
+    p_supplier_id: input.supplierId,
+    p_expected_delivery_date: input.expectedDeliveryDate || null,
+    p_delivery_location_id: input.deliveryLocationId || null,
+    p_delivery_notes: input.deliveryNotes || null,
+    p_supplier_ref: input.supplierRef || null,
+    p_notes: input.notes || null,
+    p_lines: input.lines as any
   });
 
-  // Insert PO
-  const { data: poData, error: poError } = await supabase
-    .from("purchase_orders")
-    .insert({
-      org_id: orgId,
-      po_number: poNumber,
-      supplier_id: input.supplierId,
-      status: "draft",
-      order_date: new Date().toISOString().split("T")[0],
-      expected_delivery_date: input.expectedDeliveryDate ?? null,
-      delivery_location_id: input.deliveryLocationId ?? null,
-      delivery_notes: input.deliveryNotes ?? null,
-      supplier_ref: input.supplierRef ?? null,
-      notes: input.notes ?? null,
-      subtotal,
-      tax_amount: 0,
-      total_amount: subtotal,
-      created_by: userId,
-    })
-    .select()
-    .single();
+  if (rpcError) {
+    logError("Failed to create purchase order via RPC", { error: rpcError.message, input });
+    throw new Error(`Failed to create purchase order: ${rpcError.message}`);
+  }
 
-  if (poError) throw new Error(`Failed to create purchase order: ${poError.message}`);
-
-  // Insert lines
-  const { error: linesError } = await supabase.from("purchase_order_lines").insert(
-    linesWithTotals.map((line) => ({
-      purchase_order_id: poData.id,
-      material_id: line.materialId,
-      line_number: line.lineNumber,
-      quantity_ordered: line.quantityOrdered,
-      quantity_received: 0,
-      unit_price: line.unitPrice,
-      discount_pct: line.discountPct ?? 0,
-      line_total: line.lineTotal,
-      notes: line.notes ?? null,
-    }))
-  );
-
-  if (linesError) throw new Error(`Failed to create PO lines: ${linesError.message}`);
-
-  // Return full PO
-  return (await getPurchaseOrder(supabase, orgId, poData.id))!;
+  const result = rpcResult as { success: boolean; po_id: string };
+  return (await getPurchaseOrder(supabase, orgId, result.po_id))!;
 }
 
 export async function updatePurchaseOrder(
@@ -212,7 +183,6 @@ export async function updatePurchaseOrder(
     notes: string;
   }>
 ): Promise<PurchaseOrder> {
-  // Check current status
   const existing = await getPurchaseOrder(supabase, orgId, id);
   if (!existing) throw new Error("Purchase order not found");
   if (existing.status !== "draft") {
@@ -238,7 +208,10 @@ export async function updatePurchaseOrder(
     .eq("org_id", orgId)
     .eq("id", id);
 
-  if (error) throw new Error(`Failed to update purchase order: ${error.message}`);
+  if (error) {
+    logError("Failed to update purchase order", { error: error.message, poId: id });
+    throw new Error(`Failed to update purchase order: ${error.message}`);
+  }
 
   return (await getPurchaseOrder(supabase, orgId, id))!;
 }
@@ -263,7 +236,10 @@ export async function submitPurchaseOrder(
     .eq("org_id", orgId)
     .eq("id", id);
 
-  if (error) throw new Error(`Failed to submit purchase order: ${error.message}`);
+  if (error) {
+    logError("Failed to submit purchase order", { error: error.message, poId: id });
+    throw new Error(`Failed to submit purchase order: ${error.message}`);
+  }
 
   return (await getPurchaseOrder(supabase, orgId, id))!;
 }
@@ -288,7 +264,10 @@ export async function cancelPurchaseOrder(
     .eq("org_id", orgId)
     .eq("id", id);
 
-  if (error) throw new Error(`Failed to cancel purchase order: ${error.message}`);
+  if (error) {
+    logError("Failed to cancel purchase order", { error: error.message, poId: id });
+    throw new Error(`Failed to cancel purchase order: ${error.message}`);
+  }
 
   return (await getPurchaseOrder(supabase, orgId, id))!;
 }
@@ -307,6 +286,9 @@ export type ReceiveGoodsInput = {
   notes?: string;
 };
 
+/**
+ * Atomic goods receipt via RPC
+ */
 export async function receiveGoods(
   supabase: SupabaseClient,
   orgId: string,
@@ -314,80 +296,22 @@ export async function receiveGoods(
   poId: string,
   input: ReceiveGoodsInput
 ): Promise<PurchaseOrder> {
-  const existing = await getPurchaseOrder(supabase, orgId, poId);
-  if (!existing) throw new Error("Purchase order not found");
-  if (existing.status === "cancelled" || existing.status === "received") {
-    throw new Error("Cannot receive goods for cancelled or completed orders");
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('receive_goods_atomic', {
+    p_org_id: orgId,
+    p_user_id: userId,
+    p_po_id: poId,
+    p_lines: input.lines as any,
+    p_location_id: input.locationId || null,
+    p_notes: input.notes || null
+  });
+
+  if (rpcError) {
+    logError("Failed to receive goods via RPC", { error: rpcError.message, poId, input });
+    throw new Error(`Failed to receive goods: ${rpcError.message}`);
   }
 
-  // Process each line
-  for (const lineInput of input.lines) {
-    if (lineInput.quantityReceived <= 0) continue;
-
-    const line = existing.lines?.find((l) => l.id === lineInput.lineId);
-    if (!line) throw new Error(`Line ${lineInput.lineId} not found`);
-
-    const remainingQty = line.quantityOrdered - line.quantityReceived;
-    if (lineInput.quantityReceived > remainingQty) {
-      throw new Error(
-        `Cannot receive ${lineInput.quantityReceived} for ${line.material?.partNumber}. Only ${remainingQty} remaining.`
-      );
-    }
-
-    // Update line received quantity
-    const { error: lineError } = await supabase
-      .from("purchase_order_lines")
-      .update({
-        quantity_received: line.quantityReceived + lineInput.quantityReceived,
-      })
-      .eq("id", lineInput.lineId);
-
-    if (lineError) throw new Error(`Failed to update line: ${lineError.message}`);
-
-    // Create stock transaction (receive)
-    const { error: txError } = await supabase.from("material_transactions").insert({
-      org_id: orgId,
-      material_id: line.materialId,
-      transaction_type: "receive",
-      quantity: lineInput.quantityReceived,
-      uom: line.material?.baseUom ?? "each",
-      to_location_id: input.locationId ?? null,
-      purchase_order_line_id: lineInput.lineId,
-      reference: existing.poNumber,
-      notes: lineInput.notes ?? input.notes ?? null,
-      created_by: userId,
-    });
-
-    if (txError) throw new Error(`Failed to create transaction: ${txError.message}`);
-  }
-
-  // Determine new status
-  const updatedPO = await getPurchaseOrder(supabase, orgId, poId);
-  if (!updatedPO) throw new Error("Failed to refresh PO");
-
-  const allReceived = updatedPO.lines?.every(
-    (l) => l.quantityReceived >= l.quantityOrdered
-  );
-  const someReceived = updatedPO.lines?.some((l) => l.quantityReceived > 0);
-
-  let newStatus: PurchaseOrderStatus = updatedPO.status;
-  if (allReceived) {
-    newStatus = "received";
-  } else if (someReceived) {
-    newStatus = "partially_received";
-  }
-
-  if (newStatus !== updatedPO.status) {
-    await supabase
-      .from("purchase_orders")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", poId);
-  }
-
-  return (await getPurchaseOrder(supabase, orgId, poId))!;
+  const result = rpcResult as { success: boolean; po_id: string };
+  return (await getPurchaseOrder(supabase, orgId, result.po_id))!;
 }
 
 // ============================================================================
@@ -428,7 +352,10 @@ export async function addPurchaseOrderLine(
     notes: input.notes ?? null,
   });
 
-  if (lineError) throw new Error(`Failed to add line: ${lineError.message}`);
+  if (lineError) {
+    logError("Failed to add PO line", { error: lineError.message, poId });
+    throw new Error(`Failed to add line: ${lineError.message}`);
+  }
 
   // Update totals
   const newSubtotal = (existing.subtotal ?? 0) + lineTotal;
@@ -461,7 +388,10 @@ export async function removePurchaseOrderLine(
 
   const { error } = await supabase.from("purchase_order_lines").delete().eq("id", lineId);
 
-  if (error) throw new Error(`Failed to remove line: ${error.message}`);
+  if (error) {
+    logError("Failed to remove PO line", { error: error.message, lineId });
+    throw new Error(`Failed to remove line: ${error.message}`);
+  }
 
   // Update totals
   const newSubtotal = (existing.subtotal ?? 0) - (line.lineTotal ?? 0);
@@ -521,7 +451,6 @@ function mapPurchaseOrderLine(row: Record<string, unknown>): PurchaseOrderLine {
     id: row.id as string,
     purchaseOrderId: row.purchase_order_id as string,
     materialId: row.material_id as string,
-    // Only partial material data is loaded for display - cast to satisfy type
     material: material
       ? ({
           id: material.id as string,

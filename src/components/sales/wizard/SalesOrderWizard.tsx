@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { FormProvider, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -13,12 +13,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { Trash2 } from 'lucide-react';
 import { CustomerDeliveryStep } from './steps/CustomerDeliveryStep';
 import { ProductSelectionStep } from './steps/ProductSelectionStep';
 import { PricingReviewStep } from './steps/PricingReviewStep';
 import { CopyOrderDialog } from './CopyOrderDialog';
 import { createOrder, getOrderForCopy, getPricingHints, type PricingHint } from '@/app/sales/actions';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
+import type { ProductGroupWithAvailability } from '@/server/sales/product-groups-with-availability';
 import type { BatchAllocation } from '../BatchSelectionDialog';
 import type { OrgFee } from '@/app/sales/settings/fees/actions';
 
@@ -37,6 +39,7 @@ export type SalesCustomer = {
 type SalesOrderWizardProps = {
   customers: SalesCustomer[];
   products: ProductWithBatches[];
+  productGroups?: ProductGroupWithAvailability[];
   copyOrderId?: string;
   fees?: OrgFee[];
 };
@@ -54,16 +57,64 @@ const DEFAULT_LINE = {
   rrp: undefined as number | undefined,
 };
 
+// Draft persistence key
+const DRAFT_STORAGE_KEY = 'hortitrack_sales_order_draft';
+
+type DraftData = {
+  formValues: Partial<CreateOrderInput>;
+  step: number;
+  lineAllocations: [number, BatchAllocation[]][];
+  savedAt: number;
+};
+
+function saveDraft(data: DraftData) {
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage may be unavailable or full
+  }
+}
+
+function loadDraft(): DraftData | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as DraftData;
+    // Expire drafts after 24 hours
+    if (Date.now() - data.savedAt > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
 const steps = [
   { id: 'customer', label: 'Customer & Delivery' },
   { id: 'products', label: 'Products & Varieties' },
   { id: 'pricing', label: 'Pricing & Review' },
 ];
 
-export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }: SalesOrderWizardProps) {
+export function SalesOrderWizard({ customers, products, productGroups = [], copyOrderId, fees = [] }: SalesOrderWizardProps) {
+  // Draft state - loaded in useEffect to avoid hydration mismatch
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // Initialize state without draft (server-safe defaults)
   const [step, setStep] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false); // Prevent auto-save during/after submission
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [lineAllocations, setLineAllocations] = useState<Map<number, BatchAllocation[]>>(new Map());
   const [prefillPending, startPrefillTransition] = useTransition();
@@ -76,7 +127,7 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
       storeId: 'main',
       deliveryAddress: '',
       orderReference: '',
-      deliveryDate: new Date().toISOString().split('T')[0], // Default to today
+      deliveryDate: new Date().toISOString().split('T')[0],
       shipMethod: '',
       notesCustomer: '',
       notesInternal: '',
@@ -84,6 +135,35 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
       lines: [DEFAULT_LINE],
     },
   });
+
+  // Load draft after mount to avoid hydration mismatch
+  useEffect(() => {
+    const draft = loadDraft();
+    if (draft && draft.formValues.customerId) {
+      // Restore form values
+      form.reset({
+        customerId: draft.formValues.customerId ?? '',
+        storeId: draft.formValues.storeId ?? 'main',
+        deliveryAddress: draft.formValues.deliveryAddress ?? '',
+        orderReference: draft.formValues.orderReference ?? '',
+        deliveryDate: draft.formValues.deliveryDate ?? new Date().toISOString().split('T')[0],
+        shipMethod: draft.formValues.shipMethod ?? '',
+        notesCustomer: draft.formValues.notesCustomer ?? '',
+        notesInternal: draft.formValues.notesInternal ?? '',
+        autoPrint: draft.formValues.autoPrint ?? true,
+        shipToAddressId: draft.formValues.shipToAddressId,
+        lines: draft.formValues.lines?.length ? draft.formValues.lines : [DEFAULT_LINE],
+      });
+      // Restore step and allocations
+      setStep(draft.step);
+      if (draft.lineAllocations) {
+        setLineAllocations(new Map(draft.lineAllocations));
+      }
+      setHasDraft(true);
+      setDraftLoaded(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { control, handleSubmit, reset, setValue } = form;
   const { fields, append, remove, replace } = useFieldArray({
@@ -98,6 +178,25 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
     () => customers.find((c) => c.id === selectedCustomerId),
     [customers, selectedCustomerId]
   );
+
+  // Filter products/batches based on customer reservation
+  // Shows: unreserved batches + batches reserved for the selected customer
+  const filteredProducts = useMemo(() => {
+    return products
+      .map((product) => {
+        const filteredBatches = product.batches.filter((batch) => {
+          // Include batch if: unreserved OR reserved for this customer
+          return !batch.reservedForCustomerId || batch.reservedForCustomerId === selectedCustomerId;
+        });
+        const availableStock = filteredBatches.reduce((sum, b) => sum + b.quantity, 0);
+        return {
+          ...product,
+          batches: filteredBatches,
+          availableStock,
+        };
+      })
+      .filter((p) => p.availableStock > 0); // Only show products with available stock
+  }, [products, selectedCustomerId]);
 
   const customerAddresses = useMemo(() => selectedCustomer?.addresses ?? [], [selectedCustomer]);
   const defaultShippingAddress = useMemo(
@@ -126,13 +225,13 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
       setPricingHints({});
       return;
     }
-    const productIds = products.map((p) => p.id);
+    const productIds = filteredProducts.map((p) => p.id);
     if (productIds.length === 0) return;
 
     getPricingHints(selectedCustomerId, productIds).then((hints) => {
       setPricingHints(hints);
     });
-  }, [selectedCustomerId, products]);
+  }, [selectedCustomerId, filteredProducts]);
 
   // Pre-fill from query string copyOrderId on first load
   useEffect(() => {
@@ -146,6 +245,45 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
       }
     });
   }, [copyOrderId]);
+
+  // Auto-save draft when form changes
+  const formValues = form.watch();
+  useEffect(() => {
+    // Don't save empty drafts or while loading copyOrderId
+    if (!formValues.customerId && step === 0) return;
+    if (prefillPending) return;
+    // Don't auto-save if we're submitting (prevents re-saving after clearDraft)
+    if (submittingRef.current) return;
+
+    const draftData: DraftData = {
+      formValues,
+      step,
+      lineAllocations: Array.from(lineAllocations.entries()),
+      savedAt: Date.now(),
+    };
+    saveDraft(draftData);
+    setHasDraft(true);
+  }, [formValues, step, lineAllocations, prefillPending]);
+
+  // Clear draft handler
+  const handleClearDraft = useCallback(() => {
+    clearDraft();
+    setHasDraft(false);
+    setStep(0);
+    setLineAllocations(new Map());
+    form.reset({
+      customerId: '',
+      storeId: 'main',
+      deliveryAddress: '',
+      orderReference: '',
+      deliveryDate: new Date().toISOString().split('T')[0],
+      shipMethod: '',
+      notesCustomer: '',
+      notesInternal: '',
+      autoPrint: true,
+      lines: [DEFAULT_LINE],
+    });
+  }, [form]);
 
   const totals = useMemo(() => {
     return (watchedLines || []).reduce(
@@ -176,10 +314,56 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     setIsSubmitting(true);
+    submittingRef.current = true; // Prevent auto-save from re-saving draft
     try {
-      await createOrder(values);
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to create order');
+      // Merge user-specified lineAllocations into form values before submission
+      // No auto-allocation - pickers will allocate specific batches during fulfillment
+      const valuesWithAllocations = {
+        ...values,
+        lines: values.lines.map((line, index) => {
+          const userAllocations = lineAllocations.get(index);
+          const validUserAllocations = userAllocations?.filter(a => a.batchId && a.batchId.length > 0) || [];
+
+          if (validUserAllocations.length > 0) {
+            return {
+              ...line,
+              allocations: validUserAllocations.map(a => ({
+                batchId: a.batchId,
+                qty: a.qty,
+              })),
+            };
+          }
+
+          // No allocations - order line will be fulfilled at pick time
+          return line;
+        }),
+      };
+
+      const result = await createOrder(valuesWithAllocations);
+      // If createOrder returns an error object, display it
+      if (result && 'error' in result) {
+        setSubmitError(result.error ?? 'Failed to create order');
+        setIsSubmitting(false);
+        submittingRef.current = false; // Allow auto-save to resume on error
+        return;
+      }
+      // Clear draft on successful order creation
+      clearDraft();
+      setHasDraft(false);
+    } catch (err: unknown) {
+      // Next.js redirect() throws an error with digest starting with NEXT_REDIRECT
+      // This is expected behavior and not an actual error
+      if (err && typeof err === 'object' && 'digest' in err) {
+        const digest = (err as { digest?: string }).digest;
+        if (digest?.startsWith('NEXT_REDIRECT')) {
+          // Clear draft before redirect completes
+          clearDraft();
+          setHasDraft(false);
+          return;
+        }
+      }
+      setSubmitError(err instanceof Error ? err.message : 'An unexpected response was received from the server.');
+      submittingRef.current = false; // Allow auto-save to resume on error
     } finally {
       setIsSubmitting(false);
     }
@@ -243,7 +427,14 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold">New Sales Order</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold">New Sales Order</h1>
+                {hasDraft && draftLoaded && (
+                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                    Draft restored
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">Wizard flow with batches & pre-pricing.</p>
             </div>
             <div className="flex items-center gap-2">
@@ -279,6 +470,21 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
         )}
 
         <Card className="p-6 space-y-6">
+          {/* Show customer info on steps 2 and 3 */}
+          {step > 0 && selectedCustomer && (
+            <div className="flex items-center gap-2 pb-4 border-b text-sm">
+              <span className="text-muted-foreground">Customer:</span>
+              <span className="font-medium">{selectedCustomer.name}</span>
+              {selectedCustomer.store && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="text-muted-foreground">Store:</span>
+                  <span className="font-medium">{selectedCustomer.store}</span>
+                </>
+              )}
+            </div>
+          )}
+
           {currentStep.id === 'customer' && (
             <CustomerDeliveryStep
               form={form}
@@ -293,7 +499,8 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
           {currentStep.id === 'products' && (
             <ProductSelectionStep
               form={form}
-              products={products}
+              products={filteredProducts}
+              productGroups={productGroups}
               fields={fields}
               append={append}
               remove={remove}
@@ -309,7 +516,7 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
               form={form}
               totals={totals}
               lines={fields}
-              products={products}
+              products={filteredProducts}
               selectedCustomerId={selectedCustomerId}
               fees={fees}
               defaultShowRrp={selectedCustomer?.requiresPrePricing ?? false}
@@ -325,8 +532,22 @@ export function SalesOrderWizard({ customers, products, copyOrderId, fees = [] }
           )}
 
           <div className="flex items-center justify-between pt-2">
-            <div className="text-sm text-muted-foreground">
-              Step {step + 1} of {steps.length}
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                Step {step + 1} of {steps.length}
+              </span>
+              {hasDraft && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={handleClearDraft}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Clear draft
+                </Button>
+              )}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>

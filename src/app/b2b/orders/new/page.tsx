@@ -38,6 +38,7 @@ export default async function B2BNewOrderPage() {
       hero_image_url,
       is_active,
       sku_id,
+      trolley_quantity_override,
       skus (
         id,
         code,
@@ -54,7 +55,8 @@ export default async function B2BNewOrderPage() {
           id,
           name,
           container_type,
-          shelf_quantity
+          shelf_quantity,
+          trolley_quantity
         )
       ),
       product_batches (
@@ -67,6 +69,7 @@ export default async function B2BNewOrderPage() {
           plant_variety_id,
           growing_status,
           sales_status,
+          status,
           planted_at,
           location_id,
           plant_varieties ( name, family ),
@@ -125,8 +128,8 @@ export default async function B2BNewOrderPage() {
         const availableQty = (batch.quantity || 0) - (batch.reserved_quantity || 0);
         if (availableQty <= 0) return null;
 
-        // B2B should only see available batches (not growing, not sold out)
-        if (batch.sales_status !== 'available') return null;
+        // B2B should only see batches marked as "Ready for Sale"
+        if (batch.status !== 'Ready for Sale') return null;
 
         // Transform batch photos - B2B customers only see SALES photos
         const images: BatchImage[] = (batch.batch_photos || [])
@@ -223,6 +226,7 @@ export default async function B2BNewOrderPage() {
       containerType: size?.container_type || null,
       // Trolley capacity for quantity presets
       shelfQuantity: (size as any)?.shelf_quantity || null,
+      trolleyQuantity: (row as any).trolley_quantity_override ?? (size as any)?.trolley_quantity ?? null,
       shelvesPerTrolley: size?.id
         ? (findCapacityConfig(trolleyCapacityConfigs, variety?.family || null, size.id)?.shelvesPerTrolley
            ?? TROLLEY_CONSTANTS.DEFAULT_SHELVES_PER_TROLLEY)

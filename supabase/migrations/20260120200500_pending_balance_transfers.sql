@@ -47,12 +47,6 @@ CREATE INDEX IF NOT EXISTS idx_haulier_trolley_balance_org ON public.haulier_tro
 -- ================================================
 -- Records pending transfers that require manager approval
 
-CREATE TYPE IF NOT EXISTS transfer_status AS ENUM (
-  'pending',    -- Awaiting approval
-  'approved',   -- Approved and applied
-  'rejected'    -- Rejected by manager
-);
-
 -- Ensure type exists (idempotent)
 DO $$
 BEGIN
@@ -396,6 +390,11 @@ CREATE TRIGGER trg_update_haulier_balance_on_run
 ALTER TABLE public.haulier_trolley_balance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pending_balance_transfers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.balance_transfer_log ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies for idempotency
+DROP POLICY IF EXISTS "Org members can manage haulier balances" ON public.haulier_trolley_balance;
+DROP POLICY IF EXISTS "Org members can manage pending transfers" ON public.pending_balance_transfers;
+DROP POLICY IF EXISTS "Org members can view transfer logs" ON public.balance_transfer_log;
 
 -- Haulier balance policies (use org_memberships, not org_members)
 CREATE POLICY "Org members can manage haulier balances"

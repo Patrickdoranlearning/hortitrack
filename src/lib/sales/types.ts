@@ -15,6 +15,8 @@ export type SalesOrderStatus = z.infer<typeof SalesOrderStatus>;
 export const CreateOrderLineSchema = z
   .object({
     productId: z.string().uuid().optional(),
+    // Product group for generic/mix orders (e.g., "1L Heather Mix")
+    productGroupId: z.string().uuid().optional(),
     // Product identity fallback (variety + size)
     plantVariety: z.string().optional(),
     size: z.string().optional(),
@@ -40,9 +42,9 @@ export const CreateOrderLineSchema = z
     })).optional(),
   })
   .refine(
-    (val) => Boolean(val.productId) || (Boolean(val.plantVariety) && Boolean(val.size)),
+    (val) => Boolean(val.productId) || Boolean(val.productGroupId) || (Boolean(val.plantVariety) && Boolean(val.size)),
     {
-      message: "Select a product or provide both plant variety and size",
+      message: "Select a product, product group, or provide both plant variety and size",
       path: ["productId"],
     }
   );

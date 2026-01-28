@@ -7,6 +7,7 @@
 
 -- Drop the existing overly permissive policy
 DROP POLICY IF EXISTS "Authenticated users can manage hauliers" ON public.hauliers;
+DROP POLICY IF EXISTS "Org members can manage hauliers" ON public.hauliers;
 
 -- Create new policy with proper org isolation
 CREATE POLICY "Org members can manage hauliers" ON public.hauliers

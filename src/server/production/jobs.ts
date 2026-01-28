@@ -6,6 +6,7 @@ import {
   initializeChecklistProgress,
   type ChecklistProgress,
 } from "@/server/tasks/checklist-service";
+import { logError } from "@/lib/log";
 
 // =============================================================================
 // TYPES
@@ -208,7 +209,7 @@ export async function getProductionJobs(filter: JobFilter = {}): Promise<Product
   const { data, error } = await query;
 
   if (error) {
-    console.error("[jobs/service] Error fetching jobs:", error);
+    logError("[jobs/service] Error fetching jobs", { error: error.message });
     throw new Error(error.message);
   }
 
@@ -230,7 +231,7 @@ export async function getJobById(jobId: string): Promise<ProductionJob | null> {
 
   if (error) {
     if (error.code === "PGRST116") return null;
-    console.error("[jobs/service] Error fetching job:", error);
+    logError("[jobs/service] Error fetching job", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
@@ -275,7 +276,7 @@ export async function getJobBatches(jobId: string): Promise<JobBatch[]> {
     .order("sort_order", { ascending: true });
 
   if (error) {
-    console.error("[jobs/service] Error fetching job batches:", error);
+    logError("[jobs/service] Error fetching job batches", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
@@ -328,7 +329,7 @@ export async function getAvailableGhostBatches(): Promise<JobBatch[]> {
     .order("ready_at", { ascending: true });
 
   if (error) {
-    console.error("[jobs/service] Error fetching ghost batches:", error);
+    logError("[jobs/service] Error fetching ghost batches", { error: error.message });
     throw new Error(error.message);
   }
 
@@ -386,7 +387,7 @@ export async function createJob(input: CreateJobInput): Promise<ProductionJob> {
     .single();
 
   if (jobError || !job) {
-    console.error("[jobs/service] Error creating job:", jobError);
+    logError("[jobs/service] Error creating job", { error: jobError?.message });
     throw new Error(jobError?.message ?? "Failed to create job");
   }
 
@@ -403,7 +404,7 @@ export async function createJob(input: CreateJobInput): Promise<ProductionJob> {
       .insert(batchInserts);
 
     if (batchError) {
-      console.error("[jobs/service] Error adding batches to job:", batchError);
+      logError("[jobs/service] Error adding batches to job", { error: batchError.message, jobId: job.id });
       // Don't throw - job was created, batches can be added later
     }
   }
@@ -454,7 +455,7 @@ export async function updateJob(
     .single();
 
   if (error) {
-    console.error("[jobs/service] Error updating job:", error);
+    logError("[jobs/service] Error updating job", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
@@ -507,7 +508,7 @@ export async function assignJob(
     .single();
 
   if (error) {
-    console.error("[jobs/service] Error assigning job:", error);
+    logError("[jobs/service] Error assigning job", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
@@ -517,10 +518,6 @@ export async function assignJob(
 
 /**
  * Start a job (records started_at)
- * 
- * Note: We update the task directly here instead of using startTask() because:
- * 1. We need the exact same timestamp for both job and task
- * 2. startTask() creates its own timestamp internally
  */
 export async function startJob(jobId: string): Promise<ProductionJob> {
   const { supabase, orgId } = await getUserAndOrg();
@@ -546,11 +543,11 @@ export async function startJob(jobId: string): Promise<ProductionJob> {
     .single();
 
   if (error) {
-    console.error("[jobs/service] Error starting job:", error);
+    logError("[jobs/service] Error starting job", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
-  // Sync the associated task status with the exact same timestamp
+  // Sync the associated task status
   if (job.taskId) {
     const { error: taskError } = await supabase
       .from("tasks")
@@ -562,9 +559,7 @@ export async function startJob(jobId: string): Promise<ProductionJob> {
       .eq("org_id", orgId);
 
     if (taskError) {
-      // Log the error with details for debugging, but don't fail the job
-      // Job status is the source of truth, task is for employee scheduling
-      console.error("[jobs/service] Failed to sync task status:", {
+      logError("[jobs/service] Failed to sync task status", {
         jobId,
         taskId: job.taskId,
         error: taskError.message,
@@ -577,12 +572,7 @@ export async function startJob(jobId: string): Promise<ProductionJob> {
 }
 
 /**
- * Complete a job (actualizes batches and logs productivity)
- * 
- * Note: We update the task directly here instead of using completeTask() because:
- * 1. We need the exact same timestamp for both job and task
- * 2. completeTask() logs productivity without machine/location context
- * 3. This function handles comprehensive productivity logging with job-specific data
+ * Complete a job (actualizes batches and logs productivity atomically)
  */
 export async function completeJob(
   jobId: string,
@@ -590,113 +580,24 @@ export async function completeJob(
 ): Promise<ProductionJob> {
   const { supabase, orgId, user } = await getUserAndOrg();
 
-  // Get job details
-  const job = await getJobById(jobId);
-  if (!job) {
-    throw new Error("Job not found");
-  }
-
-  // Use same timestamp for all operations for consistency
-  const now = new Date().toISOString();
-
-  // Update the job
-  const { data, error } = await supabase
-    .from("production_jobs")
-    .update({
-      status: "completed",
-      completed_at: now,
-      completed_by: user.id,
-      wizard_progress: wizardData ?? job.wizardProgress,
-    })
-    .eq("id", jobId)
-    .eq("org_id", orgId)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc(
+    'complete_production_job',
+    {
+      p_org_id: orgId,
+      p_job_id: jobId,
+      p_user_id: user.id,
+      p_wizard_data: wizardData || null
+    }
+  );
 
   if (error) {
-    console.error("[jobs/service] Error completing job:", error);
+    logError("[jobs/service] Error completing job (RPC)", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
-  // Sync the associated task completion with the exact same timestamp
-  // We don't use completeTask() to avoid duplicate productivity logging
-  if (job.taskId) {
-    const { error: taskError } = await supabase
-      .from("tasks")
-      .update({
-        status: "completed",
-        completed_at: now,
-        completed_by: user.id,
-      })
-      .eq("id", job.taskId)
-      .eq("org_id", orgId);
-
-    if (taskError) {
-      // Log the error with details for debugging, but don't fail the job
-      // Job status is the source of truth, task is for employee scheduling
-      console.error("[jobs/service] Failed to sync task completion:", {
-        jobId,
-        taskId: job.taskId,
-        error: taskError.message,
-      });
-    }
-  }
-
-  // Log productivity with full job context (machine, location, etc.)
-  if (job.totalPlants > 0 && job.startedAt) {
-    const startedAt = new Date(job.startedAt);
-    const completedAt = new Date(now);
-    const durationMinutes = Math.round(
-      (completedAt.getTime() - startedAt.getTime()) / 1000 / 60
-    );
-
-    if (durationMinutes > 0) {
-      const { error: productivityError } = await supabase.from("productivity_logs").insert({
-        org_id: orgId,
-        user_id: job.assignedTo ?? user.id,
-        task_id: job.taskId,
-        job_id: jobId,
-        task_type: job.processType ?? "production",
-        plant_count: job.totalPlants,
-        duration_minutes: durationMinutes,
-        machine: job.machine,
-        location: job.location,
-      });
-
-      if (productivityError) {
-        // Log but don't fail - productivity logging is not critical
-        console.error("[jobs/service] Failed to log productivity:", {
-          jobId,
-          error: productivityError.message,
-        });
-      }
-    }
-  }
-
-  // Actualize the ghost batches (change status from Planned/Incoming to Growing)
-  const batches = await getJobBatches(jobId);
-  for (const batch of batches) {
-    const { error: batchError } = await supabase
-      .from("batches")
-      .update({
-        status: "Growing",
-        updated_at: now,
-      })
-      .eq("id", batch.batchId)
-      .eq("org_id", orgId);
-
-    if (batchError) {
-      // Log but continue with other batches
-      console.error("[jobs/service] Failed to update batch status:", {
-        jobId,
-        batchId: batch.batchId,
-        error: batchError.message,
-      });
-    }
-  }
-
   const updatedJob = await getJobById(jobId);
-  return updatedJob ?? mapRowToJob(data);
+  if (!updatedJob) throw new Error("Failed to fetch updated job");
+  return updatedJob;
 }
 
 /**
@@ -742,7 +643,7 @@ export async function addBatchesToJob(
     .insert(batchInserts);
 
   if (error) {
-    console.error("[jobs/service] Error adding batches:", error);
+    logError("[jobs/service] Error adding batches", { error: error.message, jobId });
     throw new Error(error.message);
   }
 }
@@ -775,7 +676,7 @@ export async function removeBatchFromJob(
     .eq("batch_id", batchId);
 
   if (error) {
-    console.error("[jobs/service] Error removing batch:", error);
+    logError("[jobs/service] Error removing batch", { error: error.message, jobId, batchId });
     throw new Error(error.message);
   }
 }
@@ -797,7 +698,7 @@ export async function deleteJob(jobId: string): Promise<void> {
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("[jobs/service] Error deleting job:", error);
+    logError("[jobs/service] Error deleting job", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
@@ -806,8 +707,7 @@ export async function deleteJob(jobId: string): Promise<void> {
     try {
       await deleteTask(job.taskId);
     } catch (taskError) {
-      // Log but don't fail - the job is already deleted
-      console.error("[jobs/service] Failed to delete associated task:", {
+      logError("[jobs/service] Failed to delete associated task", {
         jobId,
         taskId: job.taskId,
         error: taskError instanceof Error ? taskError.message : "Unknown error",
@@ -815,10 +715,6 @@ export async function deleteJob(jobId: string): Promise<void> {
     }
   }
 }
-
-// =============================================================================
-// CHECKLIST FUNCTIONS
-// =============================================================================
 
 /**
  * Initialize checklist progress for a job from templates
@@ -846,7 +742,7 @@ export async function initializeJobChecklists(jobId: string): Promise<Production
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("[jobs/service] Error initializing checklists:", error);
+    logError("[jobs/service] Error initializing checklists", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
@@ -871,11 +767,10 @@ export async function updateJobChecklistProgress(
     .single();
 
   if (error) {
-    console.error("[jobs/service] Error updating checklist progress:", error);
+    logError("[jobs/service] Error updating checklist progress", { error: error.message, jobId });
     throw new Error(error.message);
   }
 
   const updatedJob = await getJobById(jobId);
   return updatedJob ?? mapRowToJob(data);
 }
-

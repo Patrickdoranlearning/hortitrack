@@ -13,6 +13,12 @@ export type ProductRow = {
   hero_image_url: string | null;
   is_active: boolean | null;
   sku_id: string;
+  shelf_quantity_override: number | null;
+  trolley_quantity_override: number | null;
+  min_order_qty: number | null;
+  unit_qty: number | null;
+  match_families: string[] | null;
+  match_genera: string[] | null;
   skus: {
     id: string;
     code: string;
@@ -64,6 +70,12 @@ export type ProductRow = {
     customers: { id: string; name: string } | null;
     price_lists: { id: string; name: string } | null;
   }> | null;
+  product_varieties: Array<{
+    id: string;
+    variety_id: string;
+    is_active: boolean | null;
+    plant_varieties: { id: string; name: string; family: string | null; genus: string | null } | null;
+  }> | null;
 };
 
 export type ProductManagementData = {
@@ -86,8 +98,8 @@ export type ProductManagementData = {
     status: string | null;
     plant_variety_id: string | null;
     size_id: string | null;
-    plant_varieties?: { id: string; name: string | null; family?: string | null } | null;
-    plant_sizes?: { id: string; name: string | null } | null;
+    plant_varieties?: { name: string | null; family: string | null; genus: string | null } | null;
+    plant_sizes?: { name: string | null } | null;
   }>;
   priceLists: Array<{ id: string; name: string; currency: string; is_default: boolean | null }>;
   customers: Array<{ id: string; name: string; default_price_list_id: string | null }>;
@@ -100,7 +112,7 @@ export type ProductManagementData = {
     price_lists: { id: string; name: string } | null;
     customers: { id: string; name: string } | null;
   }>;
-  plantVarieties: Array<{ id: string; name: string }>;
+  plantVarieties: Array<{ id: string; name: string; family: string | null; genus: string | null }>;
   plantSizes: Array<{ id: string; name: string }>;
 };
 
@@ -173,6 +185,12 @@ export async function fetchProductManagementData(
           notes,
           customers ( id, name ),
           price_lists ( id, name )
+        ),
+        product_varieties (
+          id,
+          variety_id,
+          is_active,
+          plant_varieties ( id, name, family, genus )
         )
       `
       )
@@ -237,7 +255,7 @@ export async function fetchProductManagementData(
           varietyIds.length
             ? supabase
                 .from("plant_varieties")
-                .select("id, name")
+                .select("id, name, family, genus")
                 .eq("org_id", orgId)
                 .in("id", varietyIds)
             : { data: [], error: null },
@@ -260,13 +278,13 @@ export async function fetchProductManagementData(
         }
 
         const varietyMap = new Map(
-          (varietiesRes.data ?? []).map((row) => [row.id, row.name ?? null])
+          (varietiesRes.data ?? []).map((row) => [row.id, { name: row.name ?? null, family: row.family ?? null, genus: row.genus ?? null }])
         );
         const sizeMap = new Map((sizesRes.data ?? []).map((row) => [row.id, row.name ?? null]));
 
         return rows.map((row) => ({
           ...row,
-          plant_varieties: { name: varietyMap.get(row.plant_variety_id ?? "") ?? null },
+          plant_varieties: varietyMap.get(row.plant_variety_id ?? "") ?? { name: null, family: null, genus: null },
           plant_sizes: { name: sizeMap.get(row.size_id ?? "") ?? null },
         }));
       }),
@@ -295,7 +313,7 @@ export async function fetchProductManagementData(
       .then((res) => res.data ?? []),
     supabase
       .from("plant_varieties")
-      .select("id, name")
+      .select("id, name, family, genus")
       .eq("org_id", orgId)
       .order("name", { ascending: true })
       .then((res) => res.data ?? []),
@@ -313,76 +331,183 @@ export async function fetchProductManagementData(
     priceLists: priceListRows,
     customers: customerRows,
     priceListCustomers: priceListCustomerRows,
-    plantVarieties: plantVarietyRows.map((v) => ({ id: v.id, name: v.name ?? "" })),
+    plantVarieties: plantVarietyRows.map((v) => ({ id: v.id, name: v.name ?? "", family: v.family ?? null, genus: v.genus ?? null })),
     plantSizes: plantSizeRows.map((s) => ({ id: s.id, name: s.name ?? "" })),
   };
 }
 
-export function mapProducts(rows: ProductRow[]): ProductManagementPayload["products"] {
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    skuId: row.sku_id,
-    description: row.description,
-    defaultStatus: row.default_status,
-    heroImageUrl: row.hero_image_url,
-    isActive: row.is_active ?? true,
-    skuVarietyId: row.skus?.plant_variety_id ?? null,
-    skuSizeId: row.skus?.size_id ?? null,
-    sku: row.skus
-      ? {
-          id: row.skus.id,
-          code: row.skus.code,
-          label: row.skus.display_name
-            ? `${row.skus.display_name} • ${row.skus.code}`
-            : row.skus.code,
-          displayName: row.skus.display_name ?? null,
+export function mapProducts(
+  rows: ProductRow[],
+  allBatches: ProductManagementData["batches"] = []
+): ProductManagementPayload["products"] {
+  return rows.map((row) => {
+    // 1. Start with manually linked batches
+    const linkedBatches = row.product_batches?.map((pb) => ({
+      id: pb.id,
+      batchId: pb.batch_id,
+      availableQuantityOverride: pb.available_quantity_override,
+      batch: pb.batches
+        ? {
+            id: pb.batches.id,
+            batchNumber: pb.batches.batch_number,
+            quantity: pb.batches.quantity ?? 0,
+            status: pb.batches.status ?? "",
+            behavior: pb.batches.attribute_options?.behavior ?? null,
+            varietyName: pb.batches.plant_varieties?.name ?? null,
+            sizeName: pb.batches.plant_sizes?.name ?? null,
+          }
+        : null,
+    })) ?? [];
+
+    // Create a Set of already-linked batch IDs and a mutable merged array
+    const linkedBatchIds = new Set(linkedBatches.map((lb) => lb.batchId));
+    const mergedBatches = [...linkedBatches];
+
+    // 2. Add family-matched batches if configured
+    if (row.match_families && row.match_families.length > 0 && row.skus?.size_id) {
+      const matchFamilies = row.match_families.map((f) => f.toLowerCase());
+      const skuSizeId = row.skus.size_id;
+
+      // Filter from allBatches
+      const matchingBatches = allBatches.filter((b) => {
+        // Must match size
+        if (b.size_id !== skuSizeId) return false;
+        // Must match family (case-insensitive)
+        const family = b.plant_varieties?.family?.toLowerCase();
+        return family && matchFamilies.includes(family);
+      });
+
+      // Add to merged list if not already linked
+      for (const batch of matchingBatches) {
+        if (!linkedBatchIds.has(batch.id)) {
+          mergedBatches.push({
+            id: `dynamic-${row.id}-${batch.id}`, // Virtual ID for the link
+            batchId: batch.id,
+            availableQuantityOverride: null,
+            batch: {
+              id: batch.id,
+              batchNumber: batch.batch_number,
+              quantity: batch.quantity ?? 0,
+              status: batch.status ?? "",
+              behavior: null,
+              varietyName: batch.plant_varieties?.name ?? null,
+              sizeName: batch.plant_sizes?.name ?? null,
+            },
+          });
+          linkedBatchIds.add(batch.id);
         }
-      : null,
-    aliases:
-      row.product_aliases?.map((alias) => ({
-        id: alias.id,
-        aliasName: alias.alias_name,
-        customerId: alias.customer_id,
-        customerName: alias.customers?.name ?? null,
-        customerSkuCode: alias.customer_sku_code,
-        customerBarcode: alias.customer_barcode,
-        unitPriceExVat: alias.unit_price_ex_vat,
-        rrp: alias.rrp,
-        priceListId: alias.price_list_id,
-        priceListName: alias.price_lists?.name ?? null,
-        isActive: alias.is_active ?? true,
-        notes: alias.notes,
-      })) ?? [],
-    batches:
-      row.product_batches?.map((pb) => ({
-        id: pb.id,
-        batchId: pb.batch_id,
-        availableQuantityOverride: pb.available_quantity_override,
-        batch: pb.batches
-          ? {
-              id: pb.batches.id,
-              batchNumber: pb.batches.batch_number,
-              quantity: pb.batches.quantity ?? 0,
-              status: pb.batches.status ?? "",
-              behavior: pb.batches.attribute_options?.behavior ?? null,
-              varietyName: pb.batches.plant_varieties?.name ?? null,
-              sizeName: pb.batches.plant_sizes?.name ?? null,
-            }
-          : null,
-      })) ?? [],
-    prices:
-      row.product_prices?.map((price) => ({
-        id: price.id,
-        priceListId: price.price_list_id,
-        priceListName: price.price_lists?.name ?? "Price list",
-        unitPriceExVat: price.unit_price_ex_vat,
-        currency: price.currency ?? "EUR",
-        minQty: price.min_qty ?? 1,
-        validFrom: price.valid_from,
-        validTo: price.valid_to,
-      })) ?? [],
-  }));
+      }
+    }
+
+    // 3. Add genus-matched batches if configured (more precise than family)
+    if (row.match_genera && row.match_genera.length > 0 && row.skus?.size_id) {
+      const matchGenera = row.match_genera.map((g) => g.toLowerCase());
+      const skuSizeId = row.skus.size_id;
+
+      // Filter from allBatches
+      const matchingBatches = allBatches.filter((b) => {
+        // Must match size
+        if (b.size_id !== skuSizeId) return false;
+        // Must match genus (case-insensitive)
+        const genus = b.plant_varieties?.genus?.toLowerCase();
+        return genus && matchGenera.includes(genus);
+      });
+
+      // Add to merged list if not already linked (may already be linked by family or explicit)
+      for (const batch of matchingBatches) {
+        if (!linkedBatchIds.has(batch.id)) {
+          mergedBatches.push({
+            id: `dynamic-genus-${row.id}-${batch.id}`, // Virtual ID for the link
+            batchId: batch.id,
+            availableQuantityOverride: null,
+            batch: {
+              id: batch.id,
+              batchNumber: batch.batch_number,
+              quantity: batch.quantity ?? 0,
+              status: batch.status ?? "",
+              behavior: null,
+              varietyName: batch.plant_varieties?.name ?? null,
+              sizeName: batch.plant_sizes?.name ?? null,
+            },
+          });
+          linkedBatchIds.add(batch.id);
+        }
+      }
+    }
+
+    return {
+      id: row.id,
+      name: row.name,
+      skuId: row.sku_id,
+      description: row.description,
+      defaultStatus: row.default_status,
+      heroImageUrl: row.hero_image_url,
+      isActive: row.is_active ?? true,
+      skuVarietyId: row.skus?.plant_variety_id ?? null,
+      skuSizeId: row.skus?.size_id ?? null,
+      shelfQuantityOverride: row.shelf_quantity_override ?? null,
+      trolleyQuantityOverride: row.trolley_quantity_override ?? null,
+      minOrderQty: row.min_order_qty ?? 1,
+      unitQty: row.unit_qty ?? 1,
+      matchFamilies: row.match_families ?? null,
+      matchGenera: row.match_genera ?? null,
+      varieties:
+        row.product_varieties?.map((pv) => ({
+          id: pv.id,
+          productId: row.id,
+          varietyId: pv.variety_id,
+          isActive: pv.is_active ?? true,
+          createdAt: "",
+          updatedAt: "",
+          variety: pv.plant_varieties
+            ? {
+                id: pv.plant_varieties.id,
+                name: pv.plant_varieties.name,
+                family: pv.plant_varieties.family,
+                genus: pv.plant_varieties.genus,
+                category: null,
+              }
+            : null,
+        })) ?? [],
+      sku: row.skus
+        ? {
+            id: row.skus.id,
+            code: row.skus.code,
+            label: row.skus.display_name
+              ? `${row.skus.display_name} • ${row.skus.code}`
+              : row.skus.code,
+            displayName: row.skus.display_name ?? null,
+          }
+        : null,
+      aliases:
+        row.product_aliases?.map((alias) => ({
+          id: alias.id,
+          aliasName: alias.alias_name,
+          customerId: alias.customer_id,
+          customerName: alias.customers?.name ?? null,
+          customerSkuCode: alias.customer_sku_code,
+          customerBarcode: alias.customer_barcode,
+          unitPriceExVat: alias.unit_price_ex_vat,
+          rrp: alias.rrp,
+          priceListId: alias.price_list_id,
+          priceListName: alias.price_lists?.name ?? null,
+          isActive: alias.is_active ?? true,
+          notes: alias.notes,
+        })) ?? [],
+      batches: mergedBatches,
+      prices:
+        row.product_prices?.map((price) => ({
+          id: price.id,
+          priceListId: price.price_list_id,
+          priceListName: price.price_lists?.name ?? "Price list",
+          unitPriceExVat: price.unit_price_ex_vat,
+          currency: price.currency ?? "EUR",
+          minQty: price.min_qty ?? 1,
+          validFrom: price.valid_from,
+          validTo: price.valid_to,
+        })) ?? [],
+    };
+  });
 }
 
 export function findProductById(products: ProductSummary[], productId: string) {

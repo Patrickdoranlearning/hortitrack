@@ -179,6 +179,7 @@ const CreateBatch = z.object({
 export const POST = withApiGuard({
   method: "POST",
   bodySchema: CreateBatch,
+  rate: { max: 20, windowMs: 60_000, keyPrefix: "batch:create" },
   handler: async ({ req, body }) => {
     try {
       // Robust Auth & Org

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { listMaterials, createMaterial } from "@/server/materials/service";
 import { MaterialsQuerySchema, CreateMaterialSchema } from "@/lib/schemas/materials";
+import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const { supabase, orgId, user } = await getUserAndOrg();
+
+    // Rate limit: 20 materials per minute per user
+    const rlKey = `materials:create:${requestKey(req, user.id)}`;
+    const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 20 });
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests", resetMs: rl.resetMs }, { status: 429 });
+    }
+
     const body = await req.json();
 
     const parsed = CreateMaterialSchema.safeParse(body);

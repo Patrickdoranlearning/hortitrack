@@ -26,6 +26,7 @@ export type CustomerCatalogProduct = {
   containerType: string | null;
   // Trolley capacity fields for quantity presets
   shelfQuantity: number | null; // Units per shelf from plant_sizes
+  trolleyQuantity: number | null; // Units per trolley (product override ?? size default)
   shelvesPerTrolley: number | null; // From trolley_capacity config
   heroImageUrl: string | null;
   galleryImages?: Array<{ url: string; badge?: string }> | null;
@@ -72,6 +73,7 @@ export type CartItem = {
   sizeName: string | null;
   sizeId?: string;    // For trolley calculation
   family?: string;    // Plant family for trolley calculation
+  trolleyQuantity?: number; // Units per trolley for simple calculation
   quantity: number;
   unitPriceExVat: number;
   vatRate: number;

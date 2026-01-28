@@ -5,6 +5,8 @@ import { DEV_USER_ID, DEV_ORG_ID, IS_DEV } from "@/server/auth/dev-bypass";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 
 // In-memory cache for org resolution (short TTL, cleared on auth changes)
+// NOTE: In serverless/edge environments, this cache is instance-local and not shared.
+// This is acceptable for short-lived (1m) optimizations, but not for global state.
 const orgCache = new Map<string, { orgId: string; timestamp: number }>();
 const ORG_CACHE_TTL = 60 * 1000; // 1 minute
 

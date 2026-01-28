@@ -14,7 +14,7 @@ export default async function ProductsPage() {
   const data = await fetchProductManagementData(supabase, orgId);
 
   const payload: ProductManagementPayload = {
-    products: mapProducts(data.productRows),
+    products: mapProducts(data.productRows, data.batches),
     skus: data.skus.map((row) => ({
       id: row.id,
       code: row.code,

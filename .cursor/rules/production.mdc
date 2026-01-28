@@ -1,0 +1,37 @@
+---
+description: Production standards for HortiTrack and CanopyB2B
+globs: ["src/**/*", "app/**/*", "api/**/*", "lib/**/*"]
+alwaysApply: true
+---
+
+# Production Standards
+
+## Error Handling
+- No `console.log` in production code - use structured logging
+- All async functions need try/catch with user-facing error states
+- API routes must return appropriate HTTP status codes
+- Database operations need transaction handling where appropriate
+
+## Type Safety
+- Zero `any` types - use strict TypeScript interfaces
+- All API boundaries validated with Zod schemas
+- Database queries must be typed (Supabase generated types)
+- Props and function parameters must have explicit types
+
+## Security
+- Check auth on ALL server actions and API routes
+- Validate and sanitize all user inputs
+- No hardcoded secrets - use environment variables
+- Row Level Security (RLS) policies for all Supabase tables
+
+## Database
+- Use parameterized queries only - no string concatenation
+- Include proper indexes for frequently queried columns
+- Handle null/undefined from database returns
+- Use transactions for multi-table operations
+
+## React/Next.js
+- No memory leaks in useEffect - cleanup subscriptions
+- Loading and error states for all async operations
+- Proper Suspense boundaries for streaming
+- Avoid N+1 query patterns - batch where possible

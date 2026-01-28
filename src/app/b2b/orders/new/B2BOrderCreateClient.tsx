@@ -94,6 +94,7 @@ export function B2BOrderCreateClient({
               sizeName: product.sizeName,
               sizeId: product.sizeId || undefined,
               family: product.family || undefined,
+              trolleyQuantity: product.trolleyQuantity || undefined,
               quantity: item.quantity,
               unitPriceExVat: product.unitPriceExVat ?? item.unit_price_ex_vat,
               vatRate: product.vatRate ?? item.vat_rate,
@@ -322,6 +323,7 @@ export function B2BOrderCreateClient({
             cart={trolley}
             addresses={addresses}
             pricingHints={pricingHints}
+            products={products}
             onUpdateCart={setTrolley}
             onSubmit={handleSubmitOrder}
             onStepChange={(_, stepId) => setCheckoutStep(stepId)}

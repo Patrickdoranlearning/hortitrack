@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { UseFieldArrayAppend, UseFieldArrayRemove, FieldArrayWithId, UseFormReturn } from 'react-hook-form';
 import type { CreateOrderInput } from '@/lib/sales/types';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
+import type { ProductGroupWithAvailability } from '@/server/sales/product-groups-with-availability';
 import { SalesProductAccordionRow, type PricingHint } from '../SalesProductAccordionRow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import type { BatchAllocation } from '../../BatchSelectionDialog';
 type Props = {
   form: UseFormReturn<CreateOrderInput>;
   products: ProductWithBatches[];
+  productGroups?: ProductGroupWithAvailability[];
   fields: FieldArrayWithId<CreateOrderInput, 'lines', 'id'>[];
   append: UseFieldArrayAppend<CreateOrderInput, 'lines'>;
   remove: UseFieldArrayRemove;
@@ -29,6 +31,7 @@ type SortOption = 'name' | 'family' | 'stock' | 'price';
 export function ProductSelectionStep({
   form,
   products,
+  productGroups = [],
   fields,
   append,
   remove,
@@ -241,6 +244,7 @@ export function ProductSelectionStep({
               index={index}
               form={form}
               products={products}
+              productGroups={productGroups}
               filteredProducts={filteredProducts}
               allocations={lineAllocations.get(index) || []}
               onAllocationsChange={onAllocationsChange}

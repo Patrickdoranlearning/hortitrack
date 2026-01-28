@@ -1,0 +1,36 @@
+---
+description: Supabase and database best practices
+globs: ["**/supabase/**/*", "**/*.sql", "**/db/**/*", "**/database/**/*"]
+alwaysApply: false
+---
+
+# Supabase Standards
+
+## Row Level Security
+- Every table MUST have RLS enabled
+- Policies for: SELECT, INSERT, UPDATE, DELETE as appropriate
+- Use `auth.uid()` for user-scoped data
+- Test policies with different user contexts
+
+## Queries
+- Use generated types from `supabase gen types`
+- Prefer `.single()` when expecting one row
+- Handle `.error` on every query
+- Use `.select()` to limit returned columns
+
+## Migrations
+- One migration per logical change
+- Include both `up` and `down` migrations
+- Test migrations on staging before production
+- Never modify existing migrations - create new ones
+
+## Edge Functions
+- Validate request body with Zod
+- Return consistent error format
+- Set appropriate CORS headers
+- Use service role key only when necessary
+
+## Real-time
+- Clean up subscriptions on unmount
+- Handle reconnection gracefully
+- Don't subscribe to more than needed

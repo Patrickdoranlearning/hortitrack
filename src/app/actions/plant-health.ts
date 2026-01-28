@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
+import { logError, logInfo } from '@/lib/log';
 
 // ============================================================================
 // Types
@@ -90,13 +91,11 @@ export type PlantHealthResult<T = void> =
   | { success: false; error: string };
 
 // ============================================================================
-// Treatment Actions (Fan-Out Engine)
+// Treatment Actions (Atomic RPC)
 // ============================================================================
 
 /**
- * THE FAN-OUT ENGINE
- * Applies a treatment to a location and auto-logs it to EVERY batch currently there.
- * This ensures full traceability - each batch has its own treatment record.
+ * Applies a treatment to a location atomically (Fan-out via RPC)
  */
 export async function applyLocationTreatment(
   input: TreatmentInput
@@ -104,103 +103,34 @@ export async function applyLocationTreatment(
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
-    // 1. Find all ACTIVE batches in this location
-    // Exclude archived/shipped batches to keep history clean
-    const { data: batches, error: batchError } = await supabase
-      .from('batches')
-      .select('id')
-      .eq('location_id', input.locationId)
-      .eq('org_id', orgId)
-      .not('status', 'in', '("Archived","Shipped")');
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('apply_location_treatment_atomic', {
+      p_org_id: orgId,
+      p_user_id: user.id,
+      p_location_id: input.locationId,
+      p_product_name: input.productName,
+      p_rate: input.rate,
+      p_unit: input.unit,
+      p_method: input.method,
+      p_rei_hours: input.reiHours,
+      p_notes: input.notes,
+      p_ipm_product_id: input.ipmProductId || null,
+      p_bottle_id: input.bottleId || null,
+      p_quantity_used_ml: input.quantityUsedMl || null
+    });
 
-    if (batchError) {
-      console.error('[applyLocationTreatment] batch lookup failed', batchError);
-      return { success: false, error: 'Failed to find batches at this location' };
-    }
-
-    if (!batches || batches.length === 0) {
-      return { success: false, error: 'No active batches found in this location to treat' };
-    }
-
-    const eventAt = new Date().toISOString();
-
-    // 2. Create the "Master" Location Log (The Audit Record)
-    const locationLog = {
-      org_id: orgId,
-      location_id: input.locationId,
-      batch_id: null, // Location-level record
-      event_type: 'treatment' as const,
-      product_name: input.productName,
-      rate: input.rate,
-      unit: input.unit,
-      method: input.method,
-      recorded_by: user.id,
-      notes: input.notes || `Broadcast treatment. Applied to ${batches.length} batches.`,
-      event_at: eventAt,
-      // Stock tracking fields
-      ipm_product_id: input.ipmProductId || null,
-      bottle_id: input.bottleId || null,
-      quantity_used_ml: input.quantityUsedMl || null,
-    };
-
-    // 3. Create the "Traceability" Logs (One per Batch)
-    const batchLogs = batches.map((batch) => ({
-      org_id: orgId,
-      batch_id: batch.id,
-      location_id: input.locationId, // Record WHERE it happened (in case batch moves later)
-      event_type: 'treatment' as const,
-      product_name: input.productName,
-      rate: input.rate,
-      unit: input.unit,
-      method: input.method,
-      recorded_by: user.id,
-      notes: `Treated via location broadcast`,
-      event_at: eventAt,
-      // Stock tracking - link to same bottle used
-      ipm_product_id: input.ipmProductId || null,
-      bottle_id: input.bottleId || null,
-    }));
-
-    // 4. Execute the inserts
-    const { error: insertError } = await supabase
-      .from('plant_health_logs')
-      .insert([locationLog, ...batchLogs]);
-
-    if (insertError) {
-      console.error('[applyLocationTreatment] insert failed', insertError);
-      return { success: false, error: `Failed to log treatment: ${insertError.message}` };
-    }
-
-    // 5. SAFETY LOCK: Set the "Do Not Enter" time if REI > 0
-    if (input.reiHours > 0) {
-      const unlockDate = new Date();
-      unlockDate.setHours(unlockDate.getHours() + input.reiHours);
-
-      const { error: updateError } = await supabase
-        .from('nursery_locations')
-        .update({
-          health_status: 'restricted',
-          restricted_until: unlockDate.toISOString(),
-        })
-        .eq('id', input.locationId)
-        .eq('org_id', orgId);
-
-      if (updateError) {
-        console.error('[applyLocationTreatment] safety lock failed', updateError);
-        // Don't fail the whole operation - treatment was logged successfully
-      }
+    if (rpcError) {
+      logError('Failed to apply treatment RPC', { error: rpcError.message, input });
+      return { success: false, error: rpcError.message };
     }
 
     revalidatePath('/locations');
     revalidatePath('/production');
+    revalidatePath('/plant-health');
 
-    return { success: true, data: { count: batches.length } };
+    return { success: true, data: { count: rpcResult.batch_count } };
   } catch (error) {
-    console.error('[applyLocationTreatment] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error applying treatment',
-    };
+    logError('Error in applyLocationTreatment action', { error: String(error) });
+    return { success: false, error: 'Failed to apply treatment' };
   }
 }
 
@@ -208,9 +138,6 @@ export async function applyLocationTreatment(
 // Measurement Actions
 // ============================================================================
 
-/**
- * Log EC/pH measurements for a location
- */
 export async function logMeasurement(
   input: MeasurementInput
 ): Promise<PlantHealthResult<{ logId: string }>> {
@@ -235,7 +162,7 @@ export async function logMeasurement(
     }).select('id').single();
 
     if (error) {
-      console.error('[logMeasurement] insert failed', error);
+      logError('Failed to log measurement', { error: error.message, input });
       return { success: false, error: `Failed to log measurement: ${error.message}` };
     }
 
@@ -243,414 +170,111 @@ export async function logMeasurement(
     revalidatePath('/plant-health');
     return { success: true, data: { logId: data.id } };
   } catch (error) {
-    console.error('[logMeasurement] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error logging measurement',
-    };
+    logError('Error in logMeasurement action', { error: String(error) });
+    return { success: false, error: 'An unexpected error occurred' };
   }
 }
 
 // ============================================================================
-// Location Flagging Actions
+// Location Flagging Actions (Atomic RPC)
 // ============================================================================
 
-/**
- * Flag a location as having a health issue (infested, diseased, etc.)
- */
 export async function flagLocation(
   input: FlagLocationInput
 ): Promise<PlantHealthResult<{ logId: string }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
-    // 1. Log the scouting event
-    const { data, error: logError } = await supabase.from('plant_health_logs').insert({
-      org_id: orgId,
-      location_id: input.locationId,
-      batch_id: null,
-      event_type: 'scout_flag' as const,
-      issue_reason: input.issueReason,
-      severity: input.severity,
-      recorded_by: user.id,
-      notes: input.notes,
-      photo_url: input.photoUrl,
-      affected_batch_ids: input.affectedBatchIds?.length ? input.affectedBatchIds : null,
-      event_at: new Date().toISOString(),
-    }).select('id').single();
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('flag_location_atomic', {
+      p_org_id: orgId,
+      p_user_id: user.id,
+      p_location_id: input.locationId,
+      p_issue_reason: input.issueReason,
+      p_severity: input.severity,
+      p_notes: input.notes,
+      p_photo_url: input.photoUrl,
+      p_affected_batch_ids: input.affectedBatchIds || null
+    });
 
-    if (logError) {
-      console.error('[flagLocation] log insert failed', logError);
-      return { success: false, error: `Failed to log flag: ${logError.message}` };
-    }
-
-    // 2. Update location health status
-    const { error: updateError } = await supabase
-      .from('nursery_locations')
-      .update({ health_status: 'infested' })
-      .eq('id', input.locationId)
-      .eq('org_id', orgId);
-
-    if (updateError) {
-      console.error('[flagLocation] status update failed', updateError);
-      // Don't fail - the log was created successfully
+    if (rpcError) {
+      logError('Failed to flag location RPC', { error: rpcError.message, input });
+      return { success: false, error: rpcError.message };
     }
 
     revalidatePath('/locations');
     revalidatePath('/plant-health');
-    return { success: true, data: { logId: data.id } };
+    return { success: true, data: { logId: rpcResult.log_id } };
   } catch (error) {
-    console.error('[flagLocation] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error flagging location',
-    };
+    logError('Error in flagLocation action', { error: String(error) });
+    return { success: false, error: 'Failed to flag location' };
   }
 }
 
-/**
- * Clear a location's health status (mark as clean after treatment/inspection)
- */
 export async function clearLocation(
   input: ClearLocationInput
 ): Promise<PlantHealthResult> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
-    // 1. Log the clearance event
-    const { error: logError } = await supabase.from('plant_health_logs').insert({
-      org_id: orgId,
-      location_id: input.locationId,
-      batch_id: null,
-      event_type: 'clearance' as const,
-      recorded_by: user.id,
-      notes: input.notes || 'Location cleared and marked as clean',
-      event_at: new Date().toISOString(),
+    const { error: rpcError } = await supabase.rpc('clear_location_atomic', {
+      p_org_id: orgId,
+      p_user_id: user.id,
+      p_location_id: input.locationId,
+      p_notes: input.notes
     });
 
-    if (logError) {
-      console.error('[clearLocation] log insert failed', logError);
-      return { success: false, error: `Failed to log clearance: ${logError.message}` };
-    }
-
-    // 2. Clear health status
-    const { error: updateError } = await supabase
-      .from('nursery_locations')
-      .update({
-        health_status: 'clean',
-        restricted_until: null,
-      })
-      .eq('id', input.locationId)
-      .eq('org_id', orgId);
-
-    if (updateError) {
-      console.error('[clearLocation] status update failed', updateError);
+    if (rpcError) {
+      logError('Failed to clear location RPC', { error: rpcError.message, input });
+      return { success: false, error: rpcError.message };
     }
 
     revalidatePath('/locations');
+    revalidatePath('/plant-health');
     return { success: true };
   } catch (error) {
-    console.error('[clearLocation] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error clearing location',
-    };
+    logError('Error in clearLocation action', { error: String(error) });
+    return { success: false, error: 'Failed to clear location' };
   }
 }
 
 // ============================================================================
-// Query Actions
+// Scout Wizard Actions (Refactored for consistency)
 // ============================================================================
 
-// Scout Log Type for listing
-export type ScoutLogEntry = {
-  id: string;
-  locationId: string | null;
-  locationName: string | null;
-  batchId: string | null;
-  batchNumber: string | null;
-  eventType: string;
-  logType: 'issue' | 'reading';
-  issueReason: string | null;
-  severity: 'low' | 'medium' | 'critical' | null;
-  ecReading: number | null;
-  phReading: number | null;
-  notes: string | null;
-  photoUrl: string | null;
-  affectedBatchIds: string[] | null;
-  recordedBy: string;
-  recordedByName: string | null;
-  eventAt: string;
-  createdAt: string;
-};
-
-/**
- * List all scout logs (issues and measurements) with pagination
- */
-export async function listScoutLogs(options?: {
-  limit?: number;
-  offset?: number;
-  locationId?: string;
-  logType?: 'issue' | 'reading' | 'all';
-}): Promise<PlantHealthResult<{ logs: ScoutLogEntry[]; total: number }>> {
-  try {
-    const { orgId, supabase } = await getUserAndOrg();
-    const limit = options?.limit || 50;
-    const offset = options?.offset || 0;
-
-    // Build query for scout-related logs (scout_flag = issue, measurement = reading)
-    let query = supabase
-      .from('plant_health_logs')
-      .select(`
-        id,
-        location_id,
-        batch_id,
-        event_type,
-        issue_reason,
-        severity,
-        ec_reading,
-        ph_reading,
-        notes,
-        photo_url,
-        affected_batch_ids,
-        recorded_by,
-        event_at,
-        created_at,
-        nursery_locations!plant_health_logs_location_id_fkey(name),
-        batches!plant_health_logs_batch_id_fkey(batch_number),
-        profiles!plant_health_logs_recorded_by_fkey(display_name)
-      `, { count: 'exact' })
-      .eq('org_id', orgId)
-      .in('event_type', ['scout_flag', 'measurement'])
-      .order('event_at', { ascending: false });
-
-    // Filter by location if provided
-    if (options?.locationId) {
-      query = query.eq('location_id', options.locationId);
-    }
-
-    // Filter by log type
-    if (options?.logType && options.logType !== 'all') {
-      if (options.logType === 'issue') {
-        query = query.eq('event_type', 'scout_flag');
-      } else if (options.logType === 'reading') {
-        query = query.eq('event_type', 'measurement');
-      }
-    }
-
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1);
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('[listScoutLogs] query failed', error);
-      return { success: false, error: error.message };
-    }
-
-    // Transform to ScoutLogEntry format
-    const logs: ScoutLogEntry[] = (data || []).map((row: any) => ({
-      id: row.id,
-      locationId: row.location_id,
-      locationName: row.nursery_locations?.name || null,
-      batchId: row.batch_id,
-      batchNumber: row.batches?.batch_number || null,
-      eventType: row.event_type,
-      logType: row.event_type === 'scout_flag' ? 'issue' : 'reading',
-      issueReason: row.issue_reason,
-      severity: row.severity,
-      ecReading: row.ec_reading,
-      phReading: row.ph_reading,
-      notes: row.notes,
-      photoUrl: row.photo_url,
-      affectedBatchIds: row.affected_batch_ids,
-      recordedBy: row.recorded_by,
-      recordedByName: row.profiles?.display_name || null,
-      eventAt: row.event_at,
-      createdAt: row.created_at,
-    }));
-
-    return { success: true, data: { logs, total: count || 0 } };
-  } catch (error) {
-    console.error('[listScoutLogs] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error listing scout logs',
-    };
-  }
-}
-
-/**
- * Get plant health logs for a location
- */
-export async function getLocationHealthLogs(locationId: string) {
-  try {
-    const { orgId, supabase } = await getUserAndOrg();
-
-    const { data, error } = await supabase
-      .from('plant_health_logs')
-      .select('*')
-      .eq('location_id', locationId)
-      .eq('org_id', orgId)
-      .order('event_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error('[getLocationHealthLogs] query failed', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, data };
-  } catch (error) {
-    console.error('[getLocationHealthLogs] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
-
-/**
- * Get plant health logs for a specific batch
- */
-export async function getBatchHealthLogs(batchId: string) {
-  try {
-    const { orgId, supabase } = await getUserAndOrg();
-
-    const { data, error } = await supabase
-      .from('plant_health_logs')
-      .select('*')
-      .eq('batch_id', batchId)
-      .eq('org_id', orgId)
-      .order('event_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error('[getBatchHealthLogs] query failed', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, data };
-  } catch (error) {
-    console.error('[getBatchHealthLogs] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
-
-// ============================================================================
-// Scout Wizard Actions
-// ============================================================================
-
-/**
- * Create a scout log entry (unified issue or reading)
- * Returns the logId for linking to treatments
- */
 export async function createScoutLog(
   input: ScoutLogInput
 ): Promise<PlantHealthResult<{ logId: string }>> {
   try {
-    const { user, orgId, supabase } = await getUserAndOrg();
-
-    // Need at least a location or a batch
-    if (!input.locationId && !input.batchId && (!input.affectedBatchIds || input.affectedBatchIds.length === 0)) {
-      return { success: false, error: 'Either a location or batch is required' };
-    }
-
     if (input.logType === 'issue') {
-      if (!input.issueReason) {
-        return { success: false, error: 'Issue reason is required' };
-      }
-
-      const { data, error } = await supabase.from('plant_health_logs').insert({
-        org_id: orgId,
-        location_id: input.locationId || null,
-        batch_id: input.batchId || null,
-        event_type: 'scout_flag' as const,
-        issue_reason: input.issueReason,
+      return flagLocation({
+        locationId: input.locationId || '',
+        issueReason: input.issueReason || '',
         severity: input.severity || 'medium',
-        recorded_by: user.id,
         notes: input.notes,
-        photo_url: input.photoUrl,
-        affected_batch_ids: input.affectedBatchIds?.length ? input.affectedBatchIds : null,
-        event_at: new Date().toISOString(),
-      }).select('id').single();
-
-      if (error) {
-        console.error('[createScoutLog] issue insert failed', error);
-        return { success: false, error: error.message };
-      }
-
-      if (!data) {
-        return { success: false, error: 'Failed to retrieve created log ID' };
-      }
-
-      // Update location health status if medium or critical (only if location provided)
-      if (input.locationId && (input.severity === 'medium' || input.severity === 'critical')) {
-        await supabase
-          .from('nursery_locations')
-          .update({ health_status: 'infested' })
-          .eq('id', input.locationId)
-          .eq('org_id', orgId);
-      }
-
-      revalidatePath('/locations');
-      revalidatePath('/plant-health');
-      return { success: true, data: { logId: data.id } };
+        photoUrl: input.photoUrl,
+        affectedBatchIds: input.affectedBatchIds
+      });
     } else {
-      // Reading
-      if (!input.ec && !input.ph) {
-        return { success: false, error: 'At least one measurement (EC or pH) is required' };
-      }
-
-      const { data, error } = await supabase.from('plant_health_logs').insert({
-        org_id: orgId,
-        location_id: input.locationId || null,
-        batch_id: input.batchId || null,
-        event_type: 'measurement' as const,
-        ec_reading: input.ec,
-        ph_reading: input.ph,
-        recorded_by: user.id,
+      return logMeasurement({
+        locationId: input.locationId || '',
+        ec: input.ec,
+        ph: input.ph,
         notes: input.notes,
-        photo_url: input.photoUrl,
-        event_at: new Date().toISOString(),
-      }).select('id').single();
-
-      if (error) {
-        console.error('[createScoutLog] measurement insert failed', error);
-        return { success: false, error: error.message };
-      }
-
-      if (!data) {
-        return { success: false, error: 'Failed to retrieve created log ID' };
-      }
-
-      revalidatePath('/locations');
-      revalidatePath('/plant-health');
-      return { success: true, data: { logId: data.id } };
+        photoUrl: input.photoUrl
+      });
     }
   } catch (error) {
-    console.error('[createScoutLog] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    logError('Error in createScoutLog action', { error: String(error) });
+    return { success: false, error: 'An unexpected error occurred' };
   }
 }
 
-/**
- * Schedule a treatment (chemical, mechanical, or feeding)
- * Called from the scout wizard step 3
- */
 export async function scheduleTreatment(
   input: ScheduleTreatmentInput
 ): Promise<PlantHealthResult<{ treatmentId: string }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
-    // Insert into ipm_spot_treatments table (extended for all types)
     const insertData: Record<string, any> = {
       org_id: orgId,
       target_type: 'location',
@@ -685,22 +309,14 @@ export async function scheduleTreatment(
       .single();
 
     if (error) {
-      console.error('[scheduleTreatment] insert failed', error);
+      logError('Failed to schedule treatment', { error: error.message, input });
       return { success: false, error: error.message };
-    }
-
-    if (!data) {
-      return { success: false, error: 'Failed to retrieve created treatment ID' };
     }
 
     revalidatePath('/plant-health');
     return { success: true, data: { treatmentId: data.id } };
   } catch (error) {
-    console.error('[scheduleTreatment] error', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    logError('Error in scheduleTreatment action', { error: String(error) });
+    return { success: false, error: 'An unexpected error occurred' };
   }
 }
-

@@ -5,13 +5,17 @@ import { z } from "zod";
 import { ProductionStatus } from "@/lib/types";
 import { toMessage } from "@/lib/errors";
 import { getBatchById, getBatchLogs, getBatchPhotos } from "@/server/batches/service";
-import { createClient } from "@/lib/supabase/server"; // Keep this for PATCH/DELETE
+import { getUserAndOrg } from "@/server/auth/org";
 
 type Params = { params: Promise<{ batchId: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   try {
     const { batchId } = await params;
+    
+    // Standard Auth
+    const { user, orgId, supabase } = await getUserAndOrg();
+
     const batch = await getBatchById(batchId);
 
     if (!batch) {
@@ -66,30 +70,29 @@ const PatchBody = z.object({
   supplier: z.string().optional(),
   growerPhotoUrl: z.string().optional(),
   salesPhotoUrl: z.string().optional(),
+  reservedForCustomerId: z.string().uuid().nullable().optional(), // Customer reservation for contract growing
 }).strict();
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
     const { batchId } = await params;
     const updates = PatchBody.parse(await req.json());
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Standard Auth
+    const { user, orgId, supabase } = await getUserAndOrg();
 
-    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-
-    // Get active org
-    let activeOrgId: string | null = null;
-    const { data: profile } = await supabase.from('profiles').select('active_org_id').eq('id', user.id).single();
-    if (profile?.active_org_id) {
-      activeOrgId = profile.active_org_id;
-    } else {
-      const { data: membership } = await supabase.from('org_memberships').select('org_id').eq('user_id', user.id).limit(1).single();
-      if (membership) activeOrgId = membership.org_id;
-    }
-
-    if (!activeOrgId) return NextResponse.json({ error: "No active organization found" }, { status: 400 });
-
-    const { data: stored, error: fetchError } = await supabase.from("batches").select("*").eq("id", batchId).single();
+    // Use row-level locking (FOR UPDATE) and fetch reserved_quantity
+    const { data: stored, error: fetchError } = await supabase
+      .from("batches")
+      .select("*")
+      .eq("id", batchId)
+      .eq("org_id", orgId)
+      .single();
+    
+    // Note: Admin client doesn't support SELECT ... FOR UPDATE via PostgREST easily
+    // but we can ensure consistency by using a CHECK constraint in the update
+    // or by doing a manual check. Since we are using the admin client, we 
+    // will stick to manual validation but make it tighter.
 
     if (fetchError || !stored) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -112,13 +115,13 @@ export async function PATCH(req: Request, { params }: Params) {
     }
 
     if (updates.location) {
-      const { data: l } = await supabase.from('nursery_locations').select('id').eq('name', updates.location).eq('org_id', activeOrgId).single();
+      const { data: l } = await supabase.from('nursery_locations').select('id').eq('name', updates.location).eq('org_id', orgId).single();
       if (!l) return NextResponse.json({ error: `Location '${updates.location}' not found` }, { status: 400 });
       locationId = l.id;
     }
 
     if (updates.supplier) {
-      const { data: s } = await supabase.from('suppliers').select('id').eq('name', updates.supplier).eq('org_id', activeOrgId).single();
+      const { data: s } = await supabase.from('suppliers').select('id').eq('name', updates.supplier).eq('org_id', orgId).single();
       if (!s) return NextResponse.json({ error: `Supplier '${updates.supplier}' not found` }, { status: 400 });
       supplierId = s.id;
     }
@@ -141,6 +144,12 @@ export async function PATCH(req: Request, { params }: Params) {
       return NextResponse.json({ error: "Quantity cannot exceed initial quantity." }, { status: 400 });
     }
 
+    if (nextQty < (stored.reserved_quantity ?? 0)) {
+      return NextResponse.json({ 
+        error: `Quantity (${nextQty}) cannot be less than reserved quantity (${stored.reserved_quantity ?? 0}).` 
+      }, { status: 400 });
+    }
+
     const shouldArchive = nextQty <= 0 || nextStatus === "Archived";
     const finalStatus = shouldArchive ? "Archived" : nextStatus;
 
@@ -150,7 +159,7 @@ export async function PATCH(req: Request, { params }: Params) {
       const { data: sOpt } = await supabase
         .from("attribute_options")
         .select("id")
-        .eq("org_id", activeOrgId)
+        .eq("org_id", orgId)
         .eq("attribute_key", "production_status")
         .or(`system_code.eq.${finalStatus},display_label.eq.${finalStatus}`)
         .single();
@@ -174,6 +183,11 @@ export async function PATCH(req: Request, { params }: Params) {
       updated_at: new Date().toISOString(),
     };
 
+    // Handle customer reservation (allow explicit null to clear)
+    if (updates.reservedForCustomerId !== undefined) {
+      serverUpdate.reserved_for_customer_id = updates.reservedForCustomerId;
+    }
+
     // Remove undefined keys
     Object.keys(serverUpdate).forEach(key => serverUpdate[key] === undefined && delete serverUpdate[key]);
 
@@ -181,6 +195,7 @@ export async function PATCH(req: Request, { params }: Params) {
       .from("batches")
       .update(serverUpdate)
       .eq("id", batchId)
+      .eq("org_id", orgId) // Extra safety check for admin client
       .select()
       .single();
 
@@ -191,7 +206,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (qtyChanged) {
       const diff = (updates.quantity ?? 0) - (stored.quantity ?? 0);
       await supabase.from("batch_events").insert({
-        org_id: activeOrgId,
+        org_id: orgId,
         batch_id: batchId,
         type: "ADJUSTMENT",
         payload: {
@@ -209,7 +224,7 @@ export async function PATCH(req: Request, { params }: Params) {
     const statusChanged = updates.status && updates.status !== stored.status;
     if (statusChanged || (shouldArchive && stored.status !== "Archived")) {
       await supabase.from("batch_events").insert({
-        org_id: activeOrgId,
+        org_id: orgId,
         batch_id: batchId,
         type: "STATUS_CHANGE",
         payload: {
@@ -225,7 +240,7 @@ export async function PATCH(req: Request, { params }: Params) {
     const becameArchived = shouldArchive && stored.status !== "Archived";
     if (becameArchived) {
       await supabase.from("logs").insert({
-        org_id: activeOrgId, // Added org_id
+        org_id: orgId,
         batch_id: batchId,
         type: "ARCHIVE",
         note: "Batch quantity reached zero and was automatically archived.",
@@ -245,27 +260,15 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(_req: Request, { params }: Params) {
   try {
     const { batchId } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-
-    // Get active org
-    let activeOrgId: string | null = null;
-    const { data: profile } = await supabase.from('profiles').select('active_org_id').eq('id', user.id).single();
-    if (profile?.active_org_id) {
-      activeOrgId = profile.active_org_id;
-    } else {
-      const { data: membership } = await supabase.from('org_memberships').select('org_id').eq('user_id', user.id).limit(1).single();
-      if (membership) activeOrgId = membership.org_id;
-    }
-
-    if (!activeOrgId) return NextResponse.json({ error: "No active organization found" }, { status: 400 });
+    
+    // Standard Auth
+    const { user, orgId, supabase } = await getUserAndOrg();
 
     // Resolve 'Archived' status_id
     const { data: sOpt } = await supabase
       .from("attribute_options")
       .select("id")
-      .eq("org_id", activeOrgId)
+      .eq("org_id", orgId)
       .eq("attribute_key", "production_status")
       .or(`system_code.eq.Archived,display_label.eq.Archived`)
       .single();
@@ -279,7 +282,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     const { error } = await supabase
       .from("batches")
       .update(updatePayload)
-      .eq("id", batchId);
+      .eq("id", batchId)
+      .eq("org_id", orgId); // Safety check for admin client
 
     if (error) throw error;
     return NextResponse.json({ ok: true });

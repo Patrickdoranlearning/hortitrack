@@ -10,7 +10,7 @@ import { B2BCheckoutTrolley } from './B2BCheckoutCart';
 import { B2BCheckoutPricing, type PricingHint } from './B2BCheckoutPricing';
 import { B2BCheckoutDelivery } from './B2BCheckoutDelivery';
 import { B2BCheckoutReview } from './B2BCheckoutReview';
-import type { CartItem } from '@/lib/b2b/types';
+import type { CartItem, CustomerCatalogProduct } from '@/lib/b2b/types';
 import type { Database } from '@/types/supabase';
 
 type CustomerAddress = Database['public']['Tables']['customer_addresses']['Row'];
@@ -19,6 +19,8 @@ type Props = {
   cart: CartItem[];
   addresses: CustomerAddress[];
   pricingHints?: Record<string, PricingHint>;
+  /** Products for trolley suggestions (optional) */
+  products?: Array<Pick<CustomerCatalogProduct, 'sizeName' | 'trolleyQuantity'>>;
   onUpdateCart: (cart: CartItem[]) => void;
   onSubmit: (deliveryAddressId: string, deliveryDate?: string, notes?: string) => Promise<void>;
   onStepChange?: (stepIndex: number, stepId: string) => void;
@@ -37,6 +39,7 @@ export function B2BCheckoutWizard({
   cart,
   addresses,
   pricingHints,
+  products,
   onUpdateCart,
   onSubmit,
   onStepChange,
@@ -106,7 +109,7 @@ export function B2BCheckoutWizard({
     switch (steps[currentStep].id) {
       case 'cart':
         return (
-          <B2BCheckoutTrolley trolley={cart} onUpdateItem={updateItem} onRemoveItem={removeItem} />
+          <B2BCheckoutTrolley trolley={cart} onUpdateItem={updateItem} onRemoveItem={removeItem} products={products} />
         );
       case 'pricing':
         return (

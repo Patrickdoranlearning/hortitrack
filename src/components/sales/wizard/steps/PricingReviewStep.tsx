@@ -9,8 +9,9 @@ import { FormField, FormItem, FormLabel, FormControl } from '@/components/ui/for
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Truck, Tag } from 'lucide-react';
+import { Truck, Tag, AlertTriangle } from 'lucide-react';
 
 type CustomerPrePricingSettings = {
   prePricingFoc: boolean;
@@ -47,10 +48,12 @@ export function PricingReviewStep({
   // Track RRP toggle state separately for better UX
   const [rrpEnabled, setRrpEnabled] = useState<Record<number, boolean>>(() => {
     // Initialize based on existing RRP values or customer default
+    // Priority: existing RRP value > customer preference > org default
     const initial: Record<number, boolean> = {};
     lines.forEach((_, index) => {
       const watched = watchedLines?.[index];
-      initial[index] = watched?.rrp != null ? true : (prePricingFee?.isDefault ?? defaultShowRrp);
+      // If line has RRP value, enable. Otherwise use customer preference, falling back to org default
+      initial[index] = watched?.rrp != null ? true : (defaultShowRrp || prePricingFee?.isDefault || false);
     });
     return initial;
   });
@@ -138,12 +141,33 @@ export function PricingReviewStep({
     return product.name || `${product.plantVariety} - ${product.size}`;
   };
 
+  // Check for lines without specific variety selection
+  const linesWithoutVariety = useMemo(() => {
+    return (watchedLines || []).filter(
+      (line) => line?.productId && !line.requiredVarietyId && !line.requiredBatchId && !line.specificBatchId
+    );
+  }, [watchedLines]);
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Step 3: Pricing & Review</h2>
         <p className="text-sm text-muted-foreground">Confirm pricing, VAT, and pre-pricing (RRP) for pot labels.</p>
       </div>
+
+      {/* Variety selection warning */}
+      {linesWithoutVariety.length > 0 && (
+        <Alert variant="default" className="border-amber-200 bg-amber-50/50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">Grower&apos;s Choice</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            {linesWithoutVariety.length === 1
+              ? '1 line item'
+              : `${linesWithoutVariety.length} line items`}{' '}
+            will be fulfilled with available stock at pick time. Go back to Step 2 to select specific varieties or batches if needed.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-3">
         {lines.map((line, index) => {
@@ -157,15 +181,21 @@ export function PricingReviewStep({
           
           const productName = watched?.description || resolveProductName(watched?.productId);
           const isRrpOn = rrpEnabled[index] ?? defaultShowRrp;
+          const isGrowersChoice = watched?.productId && !watched.requiredVarietyId && !watched.requiredBatchId && !watched.specificBatchId;
 
           return (
             <div key={line.id} className="border rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-medium">
+                  <div className="font-medium flex items-center gap-2">
                     {productName}
                     {watched?.plantVariety && watched.plantVariety !== productName && (
-                      <span className="text-muted-foreground ml-2">({watched.plantVariety})</span>
+                      <span className="text-muted-foreground">({watched.plantVariety})</span>
+                    )}
+                    {isGrowersChoice && (
+                      <Badge variant="outline" className="text-amber-700 border-amber-400 text-xs">
+                        Grower&apos;s Choice
+                      </Badge>
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground">
