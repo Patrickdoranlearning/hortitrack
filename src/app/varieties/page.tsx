@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Edit, Archive, ArchiveRestore } from "lucide-react";
+import { ViewToggle, useViewToggle } from "@/components/ui/view-toggle";
 
 const quickVarietySchema = z.object({
   name: z.string().min(1, "Variety name is required"),
@@ -94,6 +95,7 @@ export default function VarietiesPage() {
   });
   const [showArchived, setShowArchived] = useState(false);
   const [deleteFailedVariety, setDeleteFailedVariety] = useState<{ id: string; name: string; error: string } | null>(null);
+  const { value: viewMode, setValue: setViewMode } = useViewToggle('varieties-view', 'table');
 
   const { data: varietiesData, loading: varietiesLoading } = useCollection<any>("plant_varieties");
   const allVarieties = useMemo<Variety[]>(() => (varietiesData || []).map(normalizeVariety), [varietiesData]);
@@ -453,10 +455,17 @@ export default function VarietiesPage() {
               </div>
             }
             extraActions={
-              <Button size="sm" onClick={handleAddVariety}>
-                <Plus className="mr-2 h-4 w-4" />
-                Manage form
-              </Button>
+              <div className="flex items-center gap-2">
+                <ViewToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  storageKey="varieties-view"
+                />
+                <Button size="sm" onClick={handleAddVariety}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Manage form
+                </Button>
+              </div>
             }
           />
         }
@@ -464,7 +473,11 @@ export default function VarietiesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Varieties Golden Table</CardTitle>
-            <CardDescription>Use the quick row for single records or the pencil icon to edit uploads.</CardDescription>
+            <CardDescription>
+              {viewMode === 'card'
+                ? 'Tap a card to edit. Switch to table view for quick inline entry.'
+                : 'Use the quick row for single records or the pencil icon to edit uploads.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             {isLoading ? (
@@ -473,7 +486,102 @@ export default function VarietiesPage() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
+            ) : viewMode === 'card' ? (
+              /* Card View */
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {sortedVarieties.length === 0 ? (
+                  <div className="col-span-full text-center py-8 text-muted-foreground">
+                    No varieties found
+                  </div>
+                ) : (
+                  sortedVarieties.map((variety) => (
+                    <Card
+                      key={variety.id ?? variety.name}
+                      className="cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleEditVariety(variety)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="font-semibold truncate flex-1" title={variety.name}>
+                            {variety.name}
+                          </div>
+                          {(variety as any).isArchived && (
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded ml-2">Archived</span>
+                          )}
+                        </div>
+
+                        {variety.commonName && (
+                          <div className="text-sm text-muted-foreground mb-2 truncate" title={variety.commonName}>
+                            {variety.commonName}
+                          </div>
+                        )}
+
+                        <div className="space-y-1 text-sm">
+                          {variety.category && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Category</span>
+                              <span>{variety.category}</span>
+                            </div>
+                          )}
+                          {variety.family && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Family</span>
+                              <span>{variety.family}</span>
+                            </div>
+                          )}
+                          {typeof variety.evergreen === "boolean" && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Evergreen</span>
+                              <span>{variety.evergreen ? "Yes" : "No"}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditVariety(variety);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {showArchived ? (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnarchiveVariety(variety.id!);
+                              }}
+                            >
+                              <ArchiveRestore className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteVariety(variety.id!);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
             ) : (
+              /* Table View */
               <Table className="min-w-[1500px] whitespace-nowrap text-sm">
                 <TableHeader>
                   <TableRow>

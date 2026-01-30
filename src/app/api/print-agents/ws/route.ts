@@ -7,9 +7,6 @@ import { getSupabaseAdmin } from "@/server/db/supabase";
 import { agentConnectionManager } from "@/server/labels/agent-connection-manager";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 /**
  * WebSocket endpoint for print agent connections.
  *

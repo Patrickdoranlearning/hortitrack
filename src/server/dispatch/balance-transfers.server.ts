@@ -1,9 +1,50 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 // ================================================
 // TYPES
 // ================================================
+
+/** Query result type for pending transfer with joins (PostgREST returns arrays for joins) */
+type PendingTransferQueryRow = {
+  id: string;
+  org_id: string;
+  from_haulier_id: string;
+  to_customer_id: string;
+  trolleys: number;
+  shelves: number;
+  delivery_run_id: string | null;
+  reason: string;
+  driver_notes: string | null;
+  signed_docket_url: string | null;
+  photo_url: string | null;
+  status: string;
+  requested_by: string;
+  requested_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  hauliers: { id: string; name: string } | { id: string; name: string }[] | null;
+  customers: { id: string; name: string } | { id: string; name: string }[] | null;
+  delivery_runs: { id: string; run_number: string } | { id: string; run_number: string }[] | null;
+};
+
+/** Query result type for haulier balance with join */
+type HaulierBalanceQueryRow = {
+  haulier_id: string;
+  trolleys_out: number;
+  shelves_out: number;
+  last_load_date: string | null;
+  last_return_date: string | null;
+  hauliers: { id: string; name: string } | { id: string; name: string }[] | null;
+};
+
+/** Helper to get first element from array or value itself */
+function asSingle<T>(val: T | T[] | null): T | null {
+  if (!val) return null;
+  return Array.isArray(val) ? val[0] ?? null : val;
+}
 
 export type PendingTransfer = {
   id: string;
@@ -102,34 +143,40 @@ export async function getPendingTransfers(): Promise<PendingTransfer[]> {
     .order("requested_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching pending transfers:", error);
+    logger.trolley.error("Error fetching pending transfers", error, { orgId });
     return [];
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    orgId: row.org_id,
-    fromHaulierId: row.from_haulier_id,
-    fromHaulierName: row.hauliers?.name || "Unknown",
-    toCustomerId: row.to_customer_id,
-    toCustomerName: row.customers?.name || "Unknown",
-    trolleys: row.trolleys,
-    shelves: row.shelves,
-    deliveryRunId: row.delivery_run_id,
-    deliveryRunNumber: row.delivery_runs?.run_number || null,
-    reason: row.reason,
-    driverNotes: row.driver_notes,
-    signedDocketUrl: row.signed_docket_url,
-    photoUrl: row.photo_url,
-    status: row.status,
-    requestedBy: row.requested_by,
-    requestedByName: null, // Would need a join to profiles
-    requestedAt: row.requested_at,
-    reviewedBy: row.reviewed_by,
-    reviewedByName: null,
-    reviewedAt: row.reviewed_at,
-    reviewNotes: row.review_notes,
-  }));
+  return (data || []).map((row) => {
+    const typedRow = row as unknown as PendingTransferQueryRow;
+    const haulier = asSingle(typedRow.hauliers);
+    const customer = asSingle(typedRow.customers);
+    const run = asSingle(typedRow.delivery_runs);
+    return {
+      id: typedRow.id,
+      orgId: typedRow.org_id,
+      fromHaulierId: typedRow.from_haulier_id,
+      fromHaulierName: haulier?.name || "Unknown",
+      toCustomerId: typedRow.to_customer_id,
+      toCustomerName: customer?.name || "Unknown",
+      trolleys: typedRow.trolleys,
+      shelves: typedRow.shelves,
+      deliveryRunId: typedRow.delivery_run_id,
+      deliveryRunNumber: run?.run_number || null,
+      reason: typedRow.reason,
+      driverNotes: typedRow.driver_notes,
+      signedDocketUrl: typedRow.signed_docket_url,
+      photoUrl: typedRow.photo_url,
+      status: typedRow.status as "pending" | "approved" | "rejected",
+      requestedBy: typedRow.requested_by,
+      requestedByName: null, // Would need a join to profiles
+      requestedAt: typedRow.requested_at,
+      reviewedBy: typedRow.reviewed_by,
+      reviewedByName: null,
+      reviewedAt: typedRow.reviewed_at,
+      reviewNotes: typedRow.review_notes,
+    };
+  });
 }
 
 /**
@@ -181,34 +228,40 @@ export async function getTransferHistory(
     .limit(limit);
 
   if (error) {
-    console.error("Error fetching transfer history:", error);
+    logger.trolley.error("Error fetching transfer history", error, { orgId });
     return [];
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    orgId: row.org_id,
-    fromHaulierId: row.from_haulier_id,
-    fromHaulierName: row.hauliers?.name || "Unknown",
-    toCustomerId: row.to_customer_id,
-    toCustomerName: row.customers?.name || "Unknown",
-    trolleys: row.trolleys,
-    shelves: row.shelves,
-    deliveryRunId: row.delivery_run_id,
-    deliveryRunNumber: row.delivery_runs?.run_number || null,
-    reason: row.reason,
-    driverNotes: row.driver_notes,
-    signedDocketUrl: row.signed_docket_url,
-    photoUrl: row.photo_url,
-    status: row.status,
-    requestedBy: row.requested_by,
-    requestedByName: null,
-    requestedAt: row.requested_at,
-    reviewedBy: row.reviewed_by,
-    reviewedByName: null,
-    reviewedAt: row.reviewed_at,
-    reviewNotes: row.review_notes,
-  }));
+  return (data || []).map((row) => {
+    const typedRow = row as unknown as PendingTransferQueryRow;
+    const haulier = asSingle(typedRow.hauliers);
+    const customer = asSingle(typedRow.customers);
+    const run = asSingle(typedRow.delivery_runs);
+    return {
+      id: typedRow.id,
+      orgId: typedRow.org_id,
+      fromHaulierId: typedRow.from_haulier_id,
+      fromHaulierName: haulier?.name || "Unknown",
+      toCustomerId: typedRow.to_customer_id,
+      toCustomerName: customer?.name || "Unknown",
+      trolleys: typedRow.trolleys,
+      shelves: typedRow.shelves,
+      deliveryRunId: typedRow.delivery_run_id,
+      deliveryRunNumber: run?.run_number || null,
+      reason: typedRow.reason,
+      driverNotes: typedRow.driver_notes,
+      signedDocketUrl: typedRow.signed_docket_url,
+      photoUrl: typedRow.photo_url,
+      status: typedRow.status as "pending" | "approved" | "rejected",
+      requestedBy: typedRow.requested_by,
+      requestedByName: null,
+      requestedAt: typedRow.requested_at,
+      reviewedBy: typedRow.reviewed_by,
+      reviewedByName: null,
+      reviewedAt: typedRow.reviewed_at,
+      reviewNotes: typedRow.review_notes,
+    };
+  });
 }
 
 /**
@@ -224,7 +277,7 @@ export async function getPendingTransferCount(): Promise<number> {
     .eq("status", "pending");
 
   if (error) {
-    console.error("Error fetching pending transfer count:", error);
+    logger.trolley.error("Error fetching pending transfer count", error, { orgId });
     return 0;
   }
 
@@ -272,7 +325,7 @@ export async function requestBalanceTransfer(
     .single();
 
   if (error) {
-    console.error("Error creating transfer request:", error);
+    logger.trolley.error("Error creating transfer request", error, { orgId, input });
     return { success: false, error: error.message };
   }
 
@@ -296,7 +349,7 @@ export async function approveTransfer(
   });
 
   if (error) {
-    console.error("Error approving transfer:", error);
+    logger.trolley.error("Error approving transfer", error, { transferId });
     return { success: false, error: error.message };
   }
 
@@ -323,7 +376,7 @@ export async function rejectTransfer(
   });
 
   if (error) {
-    console.error("Error rejecting transfer:", error);
+    logger.trolley.error("Error rejecting transfer", error, { transferId });
     return { success: false, error: error.message };
   }
 
@@ -363,18 +416,22 @@ export async function getAllHaulierBalances(): Promise<HaulierBalance[]> {
     .gt("trolleys_out", 0);
 
   if (error) {
-    console.error("Error fetching haulier balances:", error);
+    logger.trolley.error("Error fetching haulier balances", error, { orgId });
     return [];
   }
 
-  return (data || []).map((row: any) => ({
-    haulierId: row.haulier_id,
-    haulierName: row.hauliers?.name || "Unknown",
-    trolleysOut: row.trolleys_out || 0,
-    shelvesOut: row.shelves_out || 0,
-    lastLoadDate: row.last_load_date,
-    lastReturnDate: row.last_return_date,
-  }));
+  return (data || []).map((row) => {
+    const typedRow = row as unknown as HaulierBalanceQueryRow;
+    const haulier = asSingle(typedRow.hauliers);
+    return {
+      haulierId: typedRow.haulier_id,
+      haulierName: haulier?.name || "Unknown",
+      trolleysOut: typedRow.trolleys_out || 0,
+      shelvesOut: typedRow.shelves_out || 0,
+      lastLoadDate: typedRow.last_load_date,
+      lastReturnDate: typedRow.last_return_date,
+    };
+  });
 }
 
 /**
@@ -422,12 +479,14 @@ export async function getHaulierBalance(
     };
   }
 
+  const haulierData = data as unknown as HaulierBalanceQueryRow;
+  const haulier = asSingle(haulierData.hauliers);
   return {
-    haulierId: data.haulier_id,
-    haulierName: (data.hauliers as any)?.name || "Unknown",
-    trolleysOut: data.trolleys_out || 0,
-    shelvesOut: data.shelves_out || 0,
-    lastLoadDate: data.last_load_date,
-    lastReturnDate: data.last_return_date,
+    haulierId: haulierData.haulier_id,
+    haulierName: haulier?.name || "Unknown",
+    trolleysOut: haulierData.trolleys_out || 0,
+    shelvesOut: haulierData.shelves_out || 0,
+    lastLoadDate: haulierData.last_load_date,
+    lastReturnDate: haulierData.last_return_date,
   };
 }

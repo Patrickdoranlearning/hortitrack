@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { AddToDeliveryRunSchema } from "@/lib/dispatch/types";
 import { addOrderToDeliveryRun } from "@/server/dispatch/queries.server";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 export async function POST(
   req: Request,
@@ -25,9 +26,9 @@ export async function POST(
     const id = await addOrderToDeliveryRun(parsed.data);
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (err) {
-    console.error("[api:dispatch/runs/[runId]/items][POST]", err);
+    logger.dispatch.error("Error adding item to delivery run", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }

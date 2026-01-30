@@ -590,9 +590,10 @@ export type StaffMember = {
 export async function getAssignableStaff(): Promise<StaffMember[]> {
   const { supabase, orgId } = await getUserAndOrg();
 
+  // Use explicit FK hint to avoid ambiguity with PostgREST
   const { data, error } = await supabase
     .from("org_memberships")
-    .select("user_id, role, profiles(id, display_name, email)")
+    .select("user_id, role, profiles:profiles!org_memberships_user_id_profiles_fkey(id, display_name, full_name)")
     .eq("org_id", orgId)
     .in("role", ["grower", "admin", "owner", "editor", "staff"]);
 
@@ -605,8 +606,9 @@ export async function getAssignableStaff(): Promise<StaffMember[]> {
     .filter((m) => m.profiles)
     .map((m) => ({
       id: m.user_id,
-      name: (m.profiles as { display_name?: string; email?: string })?.display_name ?? "Unknown",
-      email: (m.profiles as { display_name?: string; email?: string })?.email ?? null,
+      name: (m.profiles as { display_name?: string; full_name?: string })?.display_name ??
+            (m.profiles as { display_name?: string; full_name?: string })?.full_name ?? "Unknown",
+      email: null,
       role: m.role,
     }));
 }

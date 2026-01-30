@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { generateId } from "@/server/utils/ids";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 // List and create trolleys
 const createTrolleySchema = z.object({
@@ -35,11 +36,28 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("[GET trolleys] error:", error);
+      logger.trolley.error("Error fetching trolleys", error, { orgId });
       return NextResponse.json({ error: "Failed to fetch trolleys" }, { status: 500 });
     }
 
-    const trolleys = (data ?? []).map((t: any) => ({
+    // Type for trolley query result with joins
+    type TrolleyQueryRow = {
+      id: string;
+      trolley_number: string;
+      trolley_type: string | null;
+      status: string | null;
+      current_location: string | null;
+      customer_id: string | null;
+      delivery_run_id: string | null;
+      condition_notes: string | null;
+      last_inspection_date: string | null;
+      created_at: string;
+      updated_at: string;
+      customers: { name: string } | null;
+      delivery_runs: { run_number: string } | null;
+    };
+
+    const trolleys = ((data ?? []) as TrolleyQueryRow[]).map((t) => ({
       id: t.id,
       trolleyNumber: t.trolley_number,
       trolleyType: t.trolley_type ?? "danish",
@@ -57,7 +75,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ trolleys });
   } catch (error) {
-    console.error("[GET trolleys] unexpected:", error);
+    logger.trolley.error("Unexpected error in GET trolleys", error);
     return NextResponse.json({ error: "Failed to fetch trolleys" }, { status: 500 });
   }
 }
@@ -97,7 +115,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[POST trolleys] error:", error);
+      logger.trolley.error("Error creating trolley", error, { trolleyNumber: payload.trolleyNumber });
       return NextResponse.json({ error: "Failed to create trolley" }, { status: 500 });
     }
 
@@ -107,10 +125,10 @@ export async function POST(req: NextRequest) {
       status: data.status,
     });
   } catch (error) {
-    console.error("[POST trolleys] unexpected:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors[0]?.message }, { status: 400 });
     }
+    logger.trolley.error("Unexpected error in POST trolleys", error);
     return NextResponse.json({ error: "Failed to create trolley" }, { status: 500 });
   }
 }

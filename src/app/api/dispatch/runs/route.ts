@@ -6,7 +6,12 @@ import {
   createDeliveryRun,
   getActiveDeliveryRuns,
 } from "@/server/dispatch/queries.server";
-import { ok, fail } from "@/server/utils/envelope";
+import { logger, getErrorMessage } from "@/server/utils/logger";
+
+interface DeliveryRunFilters {
+  status?: string;
+  runDate?: string;
+}
 
 export async function GET(req: Request) {
   try {
@@ -21,16 +26,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, runs });
     }
 
-    const filters: any = {};
+    const filters: DeliveryRunFilters = {};
     if (status) filters.status = status;
     if (runDate) filters.runDate = runDate;
 
     const runs = await listDeliveryRuns(filters);
     return NextResponse.json({ ok: true, runs });
   } catch (err) {
-    console.error("[api:dispatch/runs][GET]", err);
+    logger.dispatch.error("Error listing delivery runs", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }
@@ -51,9 +56,9 @@ export async function POST(req: Request) {
     const id = await createDeliveryRun(parsed.data);
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (err) {
-    console.error("[api:dispatch/runs][POST]", err);
+    logger.dispatch.error("Error creating delivery run", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 /**
  * GET /api/dispatch/trolley-reconciliation?orderId=xxx
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error in trolley reconciliation route:", error);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logger.trolley.error("Error in trolley reconciliation route", error);
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

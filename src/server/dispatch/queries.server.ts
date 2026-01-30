@@ -4,6 +4,19 @@ import type { Haulier, HaulierVehicle, HaulierWithVehicles } from "@/lib/types";
 import { listAttributeOptions } from "@/server/attributeOptions/service";
 import { getUserAndOrg } from "@/server/auth/org";
 import type { AttributeOption } from "@/lib/attributeOptions";
+import { logger, getErrorMessage } from "@/server/utils/logger";
+import type {
+  DeliveryRunRow,
+  DeliveryRunUpdate,
+  DeliveryItemRow,
+  DeliveryItemUpdate,
+  OrderPackingRow,
+  OrderPackingUpdate,
+  TrolleyRow,
+  OrderStatusUpdateRow,
+  HaulierRow,
+  HaulierVehicleRow,
+} from "@/lib/dispatch/db-types";
 import type {
   DeliveryRun,
   DeliveryRunStatusType,
@@ -63,11 +76,11 @@ export async function listDeliveryRuns(
 
   const { data, error } = await query;
   if (error) {
-    console.error("Error listing delivery runs:", error);
+    logger.dispatch.error("Error listing delivery runs", error);
     throw error;
   }
 
-  return data.map(mapDeliveryRunFromDb);
+  return (data as DeliveryRunRow[]).map(mapDeliveryRunFromDb);
 }
 
 /**
@@ -107,7 +120,7 @@ export async function getActiveDeliveryRuns(options?: {
   const { data: runsData, error: runsError } = await runsQuery;
 
   if (runsError) {
-    console.error("Error fetching delivery runs:", runsError);
+    logger.dispatch.error("Error fetching delivery runs", runsError);
     // Return empty array instead of throwing to allow page to load
     return [];
   }
@@ -116,8 +129,19 @@ export async function getActiveDeliveryRuns(options?: {
     return [];
   }
 
+  // Type for the nested query result
+  type RunWithRelations = DeliveryRunRow & {
+    hauliers: HaulierRow | null;
+    haulier_vehicles: HaulierVehicleRow | null;
+    delivery_items: Array<{
+      id: string;
+      order_id: string;
+      orders: { trolleys_estimated: number | null } | null;
+    }>;
+  };
+
   // Process data - all relationships are already loaded
-  const processedRuns = runsData.map((d: any) => {
+  const processedRuns = (runsData as RunWithRelations[]).map((d) => {
     const haulier = d.hauliers;
     const vehicle = d.haulier_vehicles;
     const deliveryItems = Array.isArray(d.delivery_items) ? d.delivery_items : [];
@@ -125,7 +149,7 @@ export async function getActiveDeliveryRuns(options?: {
     // Calculate trolley totals from nested delivery_items
     let totalTrolleys = 0;
     for (const item of deliveryItems) {
-      totalTrolleys += (item.orders as any)?.trolleys_estimated || 0;
+      totalTrolleys += item.orders?.trolleys_estimated || 0;
     }
     const orderCount = deliveryItems.length;
 
@@ -138,14 +162,14 @@ export async function getActiveDeliveryRuns(options?: {
   });
 
   // Sort by display_order (if available) then run_date
-  const sortedRuns = [...processedRuns].sort((a: any, b: any) => {
+  const sortedRuns = [...processedRuns].sort((a, b) => {
     const orderA = a.display_order ?? 999;
     const orderB = b.display_order ?? 999;
     if (orderA !== orderB) return orderA - orderB;
     return (a.run_date || '').localeCompare(b.run_date || '');
   });
 
-  return sortedRuns.map((d: any) => {
+  return sortedRuns.map((d) => {
     const haulier = d.haulier;
     const vehicle = d.vehicle;
     // Use vehicle capacity if set, otherwise fall back to haulier capacity
@@ -156,7 +180,7 @@ export async function getActiveDeliveryRuns(options?: {
       : 0;
 
     // Compute week number from run_date if not stored
-    let weekNumber = d.week_number;
+    let weekNumber: number | undefined = d.week_number ?? undefined;
     if (!weekNumber && d.run_date) {
       try {
         const date = new Date(d.run_date);
@@ -171,22 +195,22 @@ export async function getActiveDeliveryRuns(options?: {
     return {
       id: d.id,
       runNumber: d.run_number,
-      loadCode: d.load_name,
+      loadCode: d.load_name ?? undefined,
       weekNumber,
       orgId: d.org_id,
       runDate: d.run_date,
       status: d.status,
-      driverName: d.driver_name,
-      vehicleRegistration: d.vehicle_registration,
+      driverName: d.driver_name ?? undefined,
+      vehicleRegistration: d.vehicle_registration ?? undefined,
       trolleysLoaded: d.trolleys_loaded || 0,
       trolleysReturned: d.trolleys_returned || 0,
       trolleysOutstanding: (d.trolleys_loaded || 0) - (d.trolleys_returned || 0),
       totalDeliveries: totals.orderCount,
       completedDeliveries: 0,
       pendingDeliveries: totals.orderCount,
-      haulierId: d.haulier_id,
+      haulierId: d.haulier_id ?? undefined,
       haulierName: haulier?.name,
-      vehicleId: d.vehicle_id,
+      vehicleId: d.vehicle_id ?? undefined,
       vehicleName: vehicle?.name,
       vehicleCapacity,
       displayOrder: d.display_order ?? 0,
@@ -211,7 +235,7 @@ export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRu
     .single();
 
   if (runError || !runData) {
-    console.error("Error fetching delivery run:", runError?.message, runError?.code, "runId:", runId, "orgId:", orgId);
+    logger.dispatch.error("Error fetching delivery run", runError, { runId, orgId });
     return null;
   }
 
@@ -240,26 +264,45 @@ export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRu
     .order("sequence_number", { ascending: true });
 
   if (itemsError) {
-    console.error("Error fetching delivery items:", itemsError);
+    logger.dispatch.error("Error fetching delivery items", itemsError, { runId });
     throw itemsError;
   }
 
-  const items = (itemsData || []).map((item: any) => ({
+  // Type for the nested query result
+  type DeliveryItemWithOrderJoin = DeliveryItemRow & {
+    orders: {
+      order_number: string;
+      customer_id: string;
+      status: string;
+      total_inc_vat: number;
+      requested_delivery_date: string | null;
+      customers: { name: string } | null;
+      customer_addresses: {
+        line1: string;
+        line2: string | null;
+        city: string | null;
+        county: string | null;
+        eircode: string | null;
+      } | null;
+    } | null;
+  };
+
+  const items = ((itemsData || []) as DeliveryItemWithOrderJoin[]).map((item) => ({
     ...mapDeliveryItemFromDb(item),
     order: {
       orderNumber: item.orders?.order_number || "",
       customerId: item.orders?.customer_id || "",
       customerName: item.orders?.customers?.name || "Unknown",
       totalIncVat: item.orders?.total_inc_vat || 0,
-      requestedDeliveryDate: item.orders?.requested_delivery_date,
+      requestedDeliveryDate: item.orders?.requested_delivery_date ?? undefined,
       orderStatus: item.orders?.status,
       shipToAddress: item.orders?.customer_addresses
         ? {
             line1: item.orders.customer_addresses.line1,
-            line2: item.orders.customer_addresses.line2,
-            city: item.orders.customer_addresses.city,
-            county: item.orders.customer_addresses.county,
-            eircode: item.orders.customer_addresses.eircode,
+            line2: item.orders.customer_addresses.line2 ?? undefined,
+            city: item.orders.customer_addresses.city ?? undefined,
+            county: item.orders.customer_addresses.county ?? undefined,
+            eircode: item.orders.customer_addresses.eircode ?? undefined,
           }
         : undefined,
     },
@@ -318,7 +361,7 @@ export async function createDeliveryRun(input: CreateDeliveryRun): Promise<strin
     .single();
 
   if (error) {
-    console.error("Error creating delivery run:", error);
+    logger.dispatch.error("Error creating delivery run", error, { runNumber });
     throw error;
   }
 
@@ -348,14 +391,14 @@ export async function updateDeliveryRun(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  const dbUpdates: any = {};
+  const dbUpdates: DeliveryRunUpdate = {};
   if (updates.driverName !== undefined) dbUpdates.driver_name = updates.driverName;
   if (updates.vehicleRegistration !== undefined) dbUpdates.vehicle_registration = updates.vehicleRegistration;
   if (updates.vehicleType !== undefined) dbUpdates.vehicle_type = updates.vehicleType;
   if (updates.plannedDepartureTime !== undefined) dbUpdates.planned_departure_time = updates.plannedDepartureTime;
   if (updates.estimatedReturnTime !== undefined) dbUpdates.estimated_return_time = updates.estimatedReturnTime;
   if (updates.routeNotes !== undefined) dbUpdates.route_notes = updates.routeNotes;
-  if (updates.status !== undefined) dbUpdates.status = updates.status;
+  if (updates.status !== undefined) dbUpdates.status = updates.status as DeliveryRunUpdate["status"];
 
   const { error } = await supabase
     .from("delivery_runs")
@@ -363,7 +406,7 @@ export async function updateDeliveryRun(
     .eq("id", runId);
 
   if (error) {
-    console.error("Error updating delivery run:", error);
+    logger.dispatch.error("Error updating delivery run", error, { runId });
     throw error;
   }
 
@@ -375,7 +418,7 @@ export async function updateDeliveryRun(
       .eq("delivery_run_id", runId);
 
     if (itemsError) {
-      console.error("Error fetching delivery items for run:", itemsError);
+      logger.dispatch.error("Error fetching delivery items for run", itemsError, { runId });
       throw itemsError;
     }
 
@@ -390,7 +433,7 @@ export async function updateDeliveryRun(
         .in("id", orderIds as string[]);
 
       if (orderError) {
-        console.error("Error updating orders to dispatched:", orderError);
+        logger.dispatch.error("Error updating orders to dispatched", orderError, { runId, orderIds });
         throw orderError;
       }
     }
@@ -460,7 +503,7 @@ export async function addOrderToDeliveryRun(input: AddToDeliveryRun): Promise<st
     .single();
 
   if (error) {
-    console.error("Error adding order to delivery run:", error);
+    logger.dispatch.error("Error adding order to delivery run", error, { deliveryRunId: input.deliveryRunId, orderId: input.orderId });
     throw error;
   }
 
@@ -484,7 +527,7 @@ export async function updateDeliveryItem(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  const dbUpdates: any = {};
+  const dbUpdates: DeliveryItemUpdate = {};
   if (updates.status !== undefined) dbUpdates.status = updates.status;
   if (updates.recipientName !== undefined) dbUpdates.recipient_name = updates.recipientName;
   if (updates.deliveryNotes !== undefined) dbUpdates.delivery_notes = updates.deliveryNotes;
@@ -498,7 +541,7 @@ export async function updateDeliveryItem(
     .eq("id", itemId);
 
   if (error) {
-    console.error("Error updating delivery item:", error);
+    logger.dispatch.error("Error updating delivery item", error, { itemId });
     throw error;
   }
 
@@ -535,20 +578,34 @@ export async function getOrdersReadyForDispatch(): Promise<OrderReadyForDispatch
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("Error fetching orders ready for dispatch:", error);
+    logger.dispatch.error("Error fetching orders ready for dispatch", error);
     throw error;
   }
 
-  return data.map((d: any) => ({
+  // Type for the view result
+  type OrderReadyRow = {
+    id: string;
+    order_number: string;
+    org_id: string;
+    customer_id: string;
+    customer_name: string;
+    requested_delivery_date: string | null;
+    total_inc_vat: number;
+    packing_status: string | null;
+    trolleys_used: number | null;
+    delivery_status: string;
+  };
+
+  return (data as OrderReadyRow[]).map((d) => ({
     id: d.id,
     orderNumber: d.order_number,
     orgId: d.org_id,
     customerId: d.customer_id,
     customerName: d.customer_name,
-    requestedDeliveryDate: d.requested_delivery_date,
+    requestedDeliveryDate: d.requested_delivery_date ?? undefined,
     totalIncVat: d.total_inc_vat,
-    packingStatus: d.packing_status,
-    trolleysUsed: d.trolleys_used,
+    packingStatus: d.packing_status as OrderReadyForDispatch["packingStatus"],
+    trolleysUsed: d.trolleys_used ?? undefined,
     deliveryStatus: d.delivery_status,
   }));
 }
@@ -583,11 +640,11 @@ export async function getOrCreateOrderPacking(orderId: string): Promise<OrderPac
     .single();
 
   if (error) {
-    console.error("Error creating order packing:", error);
+    logger.dispatch.error("Error creating order packing", error, { orderId });
     throw error;
   }
 
-  return mapOrderPackingFromDb(data);
+  return mapOrderPackingFromDb(data as OrderPackingRow);
 }
 
 /**
@@ -601,7 +658,7 @@ export async function updateOrderPacking(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  const dbUpdates: any = {};
+  const dbUpdates: OrderPackingUpdate = {};
   if (updates.status !== undefined) {
     dbUpdates.status = updates.status;
     if (updates.status === "in_progress") {
@@ -626,7 +683,7 @@ export async function updateOrderPacking(
     .eq("order_id", orderId);
 
   if (error) {
-    console.error("Error updating order packing:", error);
+    logger.dispatch.error("Error updating order packing", error, { orderId });
     throw error;
   }
 
@@ -661,11 +718,11 @@ export async function listTrolleys(filters?: { status?: string }): Promise<Troll
 
   const { data, error } = await query;
   if (error) {
-    console.error("Error listing trolleys:", error);
+    logger.trolley.error("Error listing trolleys", error);
     throw error;
   }
 
-  return data.map((d: any) => mapTrolleyFromDb(d));
+  return (data as TrolleyRowWithJoins[]).map((d) => mapTrolleyFromDb(d));
 }
 
 /**
@@ -680,18 +737,29 @@ export async function getCustomerTrolleyBalances(): Promise<CustomerTrolleySumma
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("Error fetching customer trolley balances:", error);
+    logger.trolley.error("Error fetching customer trolley balances", error);
     throw error;
   }
 
-  return data.map((d: any) => ({
+  // Type for the view result
+  type TrolleySummaryRow = {
+    customer_id: string;
+    customer_name: string;
+    org_id: string;
+    trolleys_outstanding: number;
+    last_delivery_date: string | null;
+    last_return_date: string | null;
+    days_outstanding: number | null;
+  };
+
+  return (data as TrolleySummaryRow[]).map((d) => ({
     customerId: d.customer_id,
     customerName: d.customer_name,
     orgId: d.org_id,
     trolleysOutstanding: d.trolleys_outstanding,
-    lastDeliveryDate: d.last_delivery_date,
-    lastReturnDate: d.last_return_date,
-    daysOutstanding: d.days_outstanding,
+    lastDeliveryDate: d.last_delivery_date ?? undefined,
+    lastReturnDate: d.last_return_date ?? undefined,
+    daysOutstanding: d.days_outstanding ?? undefined,
   }));
 }
 
@@ -715,7 +783,7 @@ export async function createTrolley(input: CreateTrolley): Promise<string> {
     .single();
 
   if (error) {
-    console.error("Error creating trolley:", error);
+    logger.trolley.error("Error creating trolley", error, { trolleyNumber: input.trolleyNumber });
     throw error;
   }
 
@@ -748,7 +816,7 @@ export async function recordTrolleyTransaction(
     .single();
 
   if (error) {
-    console.error("Error recording trolley transaction:", error);
+    logger.trolley.error("Error recording trolley transaction", error, { trolleyId: input.trolleyId, transactionType: input.transactionType });
     throw error;
   }
 
@@ -804,7 +872,7 @@ export async function createOrderStatusUpdate(
     .single();
 
   if (error) {
-    console.error("Error creating order status update:", error);
+    logger.dispatch.error("Error creating order status update", error, { orderId: input.orderId, statusType: input.statusType });
     throw error;
   }
 
@@ -824,11 +892,11 @@ export async function getOrderStatusUpdates(orderId: string): Promise<OrderStatu
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching order status updates:", error);
+    logger.dispatch.error("Error fetching order status updates", error, { orderId });
     throw error;
   }
 
-  return data.map(mapOrderStatusUpdateFromDb);
+  return (data as OrderStatusUpdateRow[]).map(mapOrderStatusUpdateFromDb);
 }
 
 // ================================================
@@ -848,43 +916,57 @@ export interface GrowerMember {
  */
 export async function getGrowerMembers(orgId: string): Promise<GrowerMember[]> {
   const supabase = await createClient();
-  
+
   try {
     // Get org members with roles that can be pickers
     // Valid roles: admin, editor, grower, owner, sales, staff, viewer
+    // Use explicit FK hint to avoid ambiguity with PostgREST
     const { data, error } = await supabase
       .from("org_memberships")
-      .select("user_id, role, profiles(id, full_name, email)")
+      .select("user_id, role, profiles:profiles!org_memberships_user_id_profiles_fkey(id, display_name, full_name)")
       .eq("org_id", orgId)
       .in("role", ["grower", "admin", "owner", "editor", "staff"]);
 
     if (error) {
       // If profiles join fails, try without it
-      console.warn("Could not fetch org members with profiles:", error.message);
-      
+      logger.dispatch.warn("Could not fetch org members with profiles", { error: error.message, orgId });
+
       // Fallback: just get user_ids with valid roles
       const { data: fallbackData } = await supabase
         .from("org_memberships")
         .select("user_id, role")
         .eq("org_id", orgId)
         .in("role", ["grower", "admin", "owner", "editor", "staff"]);
-      
-      return (fallbackData || []).map((m: any) => ({
+
+      type MembershipRow = { user_id: string; role: string };
+      return ((fallbackData || []) as MembershipRow[]).map((m) => ({
         id: m.user_id,
         name: m.role || "Staff",
         email: undefined,
       }));
     }
 
-    return (data || [])
-      .filter((m: any) => m.profiles)
-      .map((m: any) => ({
-        id: m.user_id,
-        name: m.profiles?.full_name || m.profiles?.email || "Unknown",
-        email: m.profiles?.email,
-      }));
+    // Type for the query result with profile join - PostgREST may return single object or array
+    type ProfileData = { id: string; display_name: string | null; full_name: string | null };
+    type MembershipWithProfile = {
+      user_id: string;
+      role: string;
+      profiles: ProfileData | ProfileData[] | null;
+    };
+
+    return ((data || []) as unknown as MembershipWithProfile[])
+      .filter((m) => m.profiles)
+      .map((m) => {
+        // Handle both single object and array cases from PostgREST
+        const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        return {
+          id: m.user_id,
+          name: profile?.display_name || profile?.full_name || "Unknown",
+          email: undefined,
+        };
+      });
   } catch (err) {
-    console.error("Error in getGrowerMembers:", err);
+    logger.dispatch.error("Error in getGrowerMembers", err, { orgId });
     return [];
   }
 }
@@ -902,17 +984,17 @@ export async function getHauliers(): Promise<Haulier[]> {
   if (error) {
     // If table doesn't exist, return empty
     if (error.code === "42P01") return [];
-    console.error("Error fetching hauliers:", error);
+    logger.dispatch.error("Error fetching hauliers", error);
     return [];
   }
 
-  return data.map((d: any) => ({
+  return (data as HaulierRow[]).map((d) => ({
     id: d.id,
     orgId: d.org_id,
     name: d.name,
-    phone: d.phone,
-    email: d.email,
-    notes: d.notes,
+    phone: d.phone ?? undefined,
+    email: d.email ?? undefined,
+    notes: d.notes ?? undefined,
     isActive: d.is_active,
     isInternal: d.is_internal ?? true,
     trolleyCapacity: d.trolley_capacity ?? 20,
@@ -934,35 +1016,42 @@ export async function getHauliersWithVehicles(): Promise<HaulierWithVehicles[]> 
     .order("name");
 
   if (hauliersError) {
-    console.error("Error fetching hauliers:", hauliersError);
+    logger.dispatch.error("Error fetching hauliers with vehicles", hauliersError);
     return [];
   }
 
+  // Type for the nested query result
+  type HaulierWithVehiclesRow = HaulierRow & {
+    haulier_vehicles: HaulierVehicleRow[];
+  };
+
   // Map results - vehicles are already nested
-  return (hauliersData || []).map((h: any) => {
+  return ((hauliersData || []) as HaulierWithVehiclesRow[]).map((h) => {
     const vehicles = (h.haulier_vehicles || [])
-      .filter((v: any) => v.is_active !== false)
-      .map((v: any) => ({
-        id: v.id,
-        orgId: v.org_id,
-        haulierId: v.haulier_id,
-        name: v.name,
-        registration: v.registration,
-        vehicleType: v.vehicle_type,
-        trolleyCapacity: v.trolley_capacity ?? 10,
-        isActive: v.is_active ?? true,
-        createdAt: v.created_at,
-        updatedAt: v.updated_at,
-      }));
+      .filter((v) => v.is_active !== false)
+      .map((v) => {
+        // Cast vehicle type to the expected union type
+        const vehicleType = v.vehicle_type as HaulierVehicle["vehicleType"];
+        return {
+          id: v.id,
+          orgId: v.org_id,
+          haulierId: v.haulier_id,
+          name: v.name,
+          registration: v.registration ?? undefined,
+          vehicleType,
+          trolleyCapacity: v.trolley_capacity ?? 10,
+          isActive: v.is_active ?? true,
+        };
+      });
 
     return {
       id: h.id,
       orgId: h.org_id,
       name: h.name,
-      contactName: h.contact_name,
-      contactPhone: h.contact_phone,
-      contactEmail: h.contact_email,
-      notes: h.notes,
+      contactName: undefined, // Not in HaulierRow
+      contactPhone: h.phone ?? undefined,
+      contactEmail: h.email ?? undefined,
+      notes: h.notes ?? undefined,
       trolleyCapacity: h.trolley_capacity ?? 20,
       isActive: h.is_active ?? true,
       isInternal: h.is_internal ?? true,
@@ -971,69 +1060,6 @@ export async function getHauliersWithVehicles(): Promise<HaulierWithVehicles[]> 
       vehicles,
     };
   });
-}
-
-// Keep old function signature for backwards compatibility but mark as deprecated
-/** @deprecated Use getHauliersWithVehicles instead */
-async function getHauliersWithVehiclesLegacy(): Promise<HaulierWithVehicles[]> {
-  const { orgId, supabase } = await getUserAndOrg();
-
-  // Get hauliers
-  const { data: hauliersData, error: hauliersError } = await supabase
-    .from("hauliers")
-    .select("*")
-    .eq("org_id", orgId)
-    .eq("is_active", true)
-    .order("name");
-
-  if (hauliersError) {
-    console.error("Error fetching hauliers:", hauliersError);
-    return [];
-  }
-
-  // Get vehicles
-  const { data: vehiclesData, error: vehiclesError } = await supabase
-    .from("haulier_vehicles")
-    .select("*")
-    .eq("org_id", orgId)
-    .eq("is_active", true)
-    .order("name");
-
-  if (vehiclesError) {
-    console.error("Error fetching vehicles:", vehiclesError);
-  }
-
-  // Group vehicles by haulier
-  const vehiclesByHaulier: Record<string, HaulierVehicle[]> = {};
-  for (const v of vehiclesData || []) {
-    if (!vehiclesByHaulier[v.haulier_id]) {
-      vehiclesByHaulier[v.haulier_id] = [];
-    }
-    vehiclesByHaulier[v.haulier_id].push({
-      id: v.id,
-      orgId: v.org_id,
-      haulierId: v.haulier_id,
-      name: v.name,
-      registration: v.registration,
-      vehicleType: v.vehicle_type,
-      trolleyCapacity: v.trolley_capacity ?? 10,
-      isActive: v.is_active,
-      notes: v.notes,
-    });
-  }
-
-  return (hauliersData || []).map((d: any) => ({
-    id: d.id,
-    orgId: d.org_id,
-    name: d.name,
-    phone: d.phone,
-    email: d.email,
-    notes: d.notes,
-    isActive: d.is_active,
-    isInternal: d.is_internal ?? true,
-    trolleyCapacity: d.trolley_capacity ?? 20,
-    vehicles: vehiclesByHaulier[d.id] || [],
-  }));
 }
 
 export async function getDispatchBoardData(options?: {
@@ -1098,39 +1124,74 @@ export async function getDispatchBoardData(options?: {
   ]);
 
   if (ordersData.error) {
-    console.error("Error fetching dispatch board orders:", JSON.stringify(ordersData.error, null, 2));
+    logger.dispatch.error("Error fetching dispatch board orders", ordersData.error);
     throw new Error(`Failed to fetch orders: ${ordersData.error.message}`);
   }
 
-  const orders: DispatchBoardOrder[] = ordersData.data.map((o: any) => {
-    const pickLists = Array.isArray(o.pick_lists) ? o.pick_lists : (o.pick_lists ? [o.pick_lists] : []);
+  // Type for the nested query result - PostgREST returns arrays/objects based on relationship
+  type CustomerData = { name: string };
+  type AddressData = { line1: string; city: string | null; county: string | null; eircode: string | null };
+  type PickListData = { id: string; assigned_team_id: string | null; assigned_user_id: string | null; status: string; trolleys_used: number | null };
+  type PackingData = { status: string };
+  type DeliveryRunData = { run_number: string; haulier_id: string | null; status: string };
+  type DeliveryItemData = { id: string; delivery_run_id: string | null; status: string; delivery_runs: DeliveryRunData | DeliveryRunData[] | null };
+
+  // Use unknown as intermediate step to handle Supabase's dynamic typing
+  const ordersDataTyped = ordersData.data as unknown as Array<{
+    id: string;
+    order_number: string;
+    customer_id: string;
+    status: string;
+    requested_delivery_date: string | null;
+    trolleys_estimated: number | null;
+    total_inc_vat: number;
+    customers: CustomerData | CustomerData[] | null;
+    customer_addresses: AddressData | AddressData[] | null;
+    pick_lists: PickListData | PickListData[] | null;
+    order_packing: PackingData | PackingData[] | null;
+    delivery_items: DeliveryItemData | DeliveryItemData[] | null;
+  }>;
+
+  const orders: DispatchBoardOrder[] = ordersDataTyped.map((o) => {
+    // Helper to normalize PostgREST results that could be arrays or single objects
+    const asArray = <T>(val: T | T[] | null): T[] => {
+      if (!val) return [];
+      return Array.isArray(val) ? val : [val];
+    };
+    const asSingle = <T>(val: T | T[] | null): T | null => {
+      if (!val) return null;
+      return Array.isArray(val) ? val[0] ?? null : val;
+    };
+
+    const pickLists = asArray(o.pick_lists);
     const pickList = pickLists[0];
-    
-    const packingRecords = Array.isArray(o.order_packing) ? o.order_packing : (o.order_packing ? [o.order_packing] : []);
+
+    const packingRecords = asArray(o.order_packing);
     const packingRecord = packingRecords[0];
 
-    const deliveryItems = Array.isArray(o.delivery_items) ? o.delivery_items : (o.delivery_items ? [o.delivery_items] : []);
-    const deliveryItem = deliveryItems.find((di: any) => di.delivery_run_id);
+    const deliveryItems = asArray(o.delivery_items);
+    const deliveryItem = deliveryItems.find((di) => di.delivery_run_id);
+    const deliveryRun = deliveryItem ? asSingle(deliveryItem.delivery_runs) : null;
 
     // Look up haulier name from the hauliers list (no FK constraint in DB)
-    const haulierId = deliveryItem?.delivery_runs?.haulier_id;
+    const haulierId = deliveryRun?.haulier_id ?? undefined;
     const haulierName = haulierId ? hauliers.find(h => h.id === haulierId)?.name : undefined;
 
     // Get picker info - assigned_user_id may not exist until migration is run
     // If the column exists, it will be in the data; otherwise pickerId stays undefined
-    const pickerId = (pickList as any)?.assigned_user_id;
+    const pickerId = pickList?.assigned_user_id ?? undefined;
     const pickerName = pickerId ? growers.find(g => g.id === pickerId)?.name : undefined;
 
     // Route name comes from the delivery run number for now
     // Route colors can be matched by run number prefix if routes follow naming conventions
-    const routeName = deliveryItem?.delivery_runs?.run_number;
+    const routeName = deliveryRun?.run_number;
     const routeColor: string | undefined = undefined; // Will be populated when route_name column is added
 
     // Compute Stage (simplified workflow: To Pick -> Picking -> Ready to Load -> On Route)
     let stage: DispatchStage = "to_pick";
-    const runStatus = (deliveryItem as any)?.delivery_runs?.status;
+    const runStatus = deliveryRun?.status;
 
-    if (deliveryItem?.delivery_run_id && ["in_transit", "completed"].includes(runStatus)) {
+    if (deliveryItem?.delivery_run_id && runStatus && ["in_transit", "completed"].includes(runStatus)) {
       // Actively out for delivery
       stage = "on_route";
     } else if (pickList?.status === "completed" || packingRecord?.status === "completed" || packingRecord?.status === "verified") {
@@ -1142,14 +1203,18 @@ export async function getDispatchBoardData(options?: {
     }
     // Default: "to_pick" - needs picker assignment
 
+    // Normalize nested objects
+    const customer = asSingle(o.customers);
+    const address = asSingle(o.customer_addresses);
+
     return {
       id: o.id,
       orderNumber: o.order_number,
-      customerName: o.customers?.name || "Unknown",
+      customerName: customer?.name || "Unknown",
       customerId: o.customer_id,
-      county: o.customer_addresses?.county,
-      eircode: o.customer_addresses?.eircode,
-      requestedDeliveryDate: o.requested_delivery_date,
+      county: address?.county ?? undefined,
+      eircode: address?.eircode ?? undefined,
+      requestedDeliveryDate: o.requested_delivery_date ?? undefined,
       trolleysEstimated: o.trolleys_estimated || 0,
       trolleysActual: pickList?.trolleys_used ?? null,
       totalIncVat: o.total_inc_vat,
@@ -1164,8 +1229,8 @@ export async function getDispatchBoardData(options?: {
 
       // Delivery
       deliveryItemId: deliveryItem?.id,
-      deliveryRunId: deliveryItem?.delivery_run_id,
-      deliveryRunNumber: deliveryItem?.delivery_runs?.run_number,
+      deliveryRunId: deliveryItem?.delivery_run_id ?? undefined,
+      deliveryRunNumber: deliveryRun?.run_number,
       routeName,
       routeColor,
       haulierId,
@@ -1183,92 +1248,101 @@ export async function getDispatchBoardData(options?: {
   };
 }
 
-// ... (helper functions remain unchanged)
-function mapDeliveryRunFromDb(d: any): DeliveryRun {
+// ================================================
+// MAPPER FUNCTIONS
+// ================================================
+
+function mapDeliveryRunFromDb(d: DeliveryRunRow): DeliveryRun {
   return {
     id: d.id,
     orgId: d.org_id,
     runNumber: d.run_number,
     runDate: d.run_date,
-    loadCode: d.load_name,
-    weekNumber: d.week_number,
-    haulierId: d.haulier_id,
-    vehicleId: d.vehicle_id,
-    driverName: d.driver_name,
-    vehicleRegistration: d.vehicle_registration,
-    vehicleType: d.vehicle_type,
-    plannedDepartureTime: d.planned_departure_time,
-    actualDepartureTime: d.actual_departure_time,
-    estimatedReturnTime: d.estimated_return_time,
-    actualReturnTime: d.actual_return_time,
+    loadCode: d.load_name ?? undefined,
+    weekNumber: d.week_number ?? undefined,
+    haulierId: d.haulier_id ?? undefined,
+    vehicleId: d.vehicle_id ?? undefined,
+    driverName: d.driver_name ?? undefined,
+    vehicleRegistration: d.vehicle_registration ?? undefined,
+    vehicleType: (d.vehicle_type as "van" | "truck" | "trailer" | undefined) ?? undefined,
+    plannedDepartureTime: d.planned_departure_time ?? undefined,
+    actualDepartureTime: d.actual_departure_time ?? undefined,
+    estimatedReturnTime: d.estimated_return_time ?? undefined,
+    actualReturnTime: d.actual_return_time ?? undefined,
     status: d.status,
     trolleysLoaded: d.trolleys_loaded,
     trolleysReturned: d.trolleys_returned,
-    routeNotes: d.route_notes,
+    routeNotes: d.route_notes ?? undefined,
     displayOrder: d.display_order ?? 0,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
-    createdBy: d.created_by,
+    createdBy: d.created_by ?? undefined,
   };
 }
 
-function mapDeliveryItemFromDb(d: any): DeliveryItem {
+function mapDeliveryItemFromDb(d: DeliveryItemRow): DeliveryItem {
   return {
     id: d.id,
     orgId: d.org_id,
     deliveryRunId: d.delivery_run_id,
     orderId: d.order_id,
     sequenceNumber: d.sequence_number,
-    estimatedDeliveryTime: d.estimated_delivery_time,
-    actualDeliveryTime: d.actual_delivery_time,
-    deliveryWindowStart: d.delivery_window_start,
-    deliveryWindowEnd: d.delivery_window_end,
+    estimatedDeliveryTime: d.estimated_delivery_time ?? undefined,
+    actualDeliveryTime: d.actual_delivery_time ?? undefined,
+    deliveryWindowStart: d.delivery_window_start ?? undefined,
+    deliveryWindowEnd: d.delivery_window_end ?? undefined,
     status: d.status,
     trolleysDelivered: d.trolleys_delivered,
     trolleysReturned: d.trolleys_returned,
-    trolleysOutstanding: d.trolleys_outstanding,
-    recipientName: d.recipient_name,
-    recipientSignatureUrl: d.recipient_signature_url,
-    deliveryNotes: d.delivery_notes,
-    deliveryPhotoUrl: d.delivery_photo_url,
-    failureReason: d.failure_reason,
-    rescheduledTo: d.rescheduled_to,
+    trolleysOutstanding: d.trolleys_outstanding ?? 0,
+    recipientName: d.recipient_name ?? undefined,
+    recipientSignatureUrl: d.recipient_signature_url ?? undefined,
+    deliveryNotes: d.delivery_notes ?? undefined,
+    deliveryPhotoUrl: d.delivery_photo_url ?? undefined,
+    failureReason: d.failure_reason ?? undefined,
+    rescheduledTo: d.rescheduled_to ?? undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
   };
 }
 
-function mapOrderPackingFromDb(d: any): OrderPacking {
+function mapOrderPackingFromDb(d: OrderPackingRow): OrderPacking {
   return {
     id: d.id,
     orgId: d.org_id,
     orderId: d.order_id,
     status: d.status,
     trolleysUsed: d.trolleys_used,
-    totalUnits: d.total_units,
-    verifiedBy: d.verified_by,
-    verifiedAt: d.verified_at,
-    packingNotes: d.packing_notes,
-    specialInstructions: d.special_instructions,
-    packingStartedAt: d.packing_started_at,
-    packingCompletedAt: d.packing_completed_at,
+    totalUnits: d.total_units ?? undefined,
+    verifiedBy: d.verified_by ?? undefined,
+    verifiedAt: d.verified_at ?? undefined,
+    packingNotes: d.packing_notes ?? undefined,
+    specialInstructions: d.special_instructions ?? undefined,
+    packingStartedAt: d.packing_started_at ?? undefined,
+    packingCompletedAt: d.packing_completed_at ?? undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
   };
 }
 
-function mapTrolleyFromDb(d: any): Trolley {
+/** Trolley row with optional joined customer and delivery run */
+type TrolleyRowWithJoins = TrolleyRow & {
+  customers?: { name: string } | null;
+  delivery_runs?: { run_number: string } | null;
+};
+
+function mapTrolleyFromDb(d: TrolleyRowWithJoins): Trolley {
   return {
     id: d.id,
     orgId: d.org_id,
     trolleyNumber: d.trolley_number,
-    trolleyType: d.trolley_type,
+    trolleyType: d.trolley_type ?? "danish",
     status: d.status,
-    currentLocation: d.current_location,
-    customerId: d.customer_id,
-    deliveryRunId: d.delivery_run_id,
-    conditionNotes: d.condition_notes,
-    lastInspectionDate: d.last_inspection_date,
+    currentLocation: d.current_location ?? undefined,
+    customerId: d.customer_id ?? undefined,
+    deliveryRunId: d.delivery_run_id ?? undefined,
+    conditionNotes: d.condition_notes ?? undefined,
+    lastInspectionDate: d.last_inspection_date ?? undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
     customerName: d.customers?.name,
@@ -1276,18 +1350,19 @@ function mapTrolleyFromDb(d: any): Trolley {
   };
 }
 
-function mapOrderStatusUpdateFromDb(d: any): OrderStatusUpdate {
+function mapOrderStatusUpdateFromDb(d: OrderStatusUpdateRow): OrderStatusUpdate {
   return {
     id: d.id,
     orgId: d.org_id,
     orderId: d.order_id,
-    deliveryItemId: d.delivery_item_id,
-    statusType: d.status_type,
+    deliveryItemId: d.delivery_item_id ?? undefined,
+    // Cast to expected union type - DB stores as string
+    statusType: d.status_type as OrderStatusUpdate["statusType"],
     title: d.title,
-    message: d.message,
+    message: d.message ?? undefined,
     visibleToCustomer: d.visible_to_customer,
-    customerNotifiedAt: d.customer_notified_at,
+    customerNotifiedAt: d.customer_notified_at ?? undefined,
     createdAt: d.created_at,
-    createdBy: d.created_by,
+    createdBy: d.created_by ?? undefined,
   };
 }

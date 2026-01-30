@@ -5,6 +5,7 @@ import {
   createOrderStatusUpdate,
   getOrderStatusUpdates,
 } from "@/server/dispatch/queries.server";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 export async function GET(
   req: Request,
@@ -15,9 +16,9 @@ export async function GET(
     const updates = await getOrderStatusUpdates(orderId);
     return NextResponse.json({ ok: true, updates });
   } catch (err) {
-    console.error("[api:dispatch/orders/[orderId]/status][GET]", err);
+    logger.dispatch.error("Error fetching order status updates", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }
@@ -45,9 +46,9 @@ export async function POST(
     const id = await createOrderStatusUpdate(parsed.data);
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (err) {
-    console.error("[api:dispatch/orders/[orderId]/status][POST]", err);
+    logger.dispatch.error("Error creating order status update", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }

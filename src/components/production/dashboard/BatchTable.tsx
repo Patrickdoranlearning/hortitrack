@@ -224,8 +224,8 @@ export default function BatchTable({ data, pageSize = 10 }: BatchTableProps) {
                   <SortIcon field="quantity" />
                 </div>
               </TableHead>
-              <TableHead 
-                className="cursor-pointer select-none text-right"
+              <TableHead
+                className="cursor-pointer select-none text-right hidden lg:table-cell"
                 onClick={() => handleSort('available')}
               >
                 <div className="flex items-center justify-end">
@@ -233,8 +233,8 @@ export default function BatchTable({ data, pageSize = 10 }: BatchTableProps) {
                   <SortIcon field="available" />
                 </div>
               </TableHead>
-              <TableHead 
-                className="cursor-pointer select-none"
+              <TableHead
+                className="cursor-pointer select-none hidden md:table-cell"
                 onClick={() => handleSort('location')}
               >
                 <div className="flex items-center">
@@ -278,7 +278,7 @@ export default function BatchTable({ data, pageSize = 10 }: BatchTableProps) {
                   <TableCell className="text-right font-medium">
                     {batch.quantity.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right hidden lg:table-cell">
                     <span className={batch.available > 0 ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
                       {batch.available.toLocaleString()}
                     </span>
@@ -288,7 +288,7 @@ export default function BatchTable({ data, pageSize = 10 }: BatchTableProps) {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="text-sm hidden md:table-cell">
                     {batch.location}
                   </TableCell>
                   <TableCell>

@@ -381,11 +381,11 @@ export default function StockDashboardPage() {
                     <TableRow>
                       <TableHead className="w-[120px]">Part Number</TableHead>
                       <TableHead>Material</TableHead>
-                      <TableHead>Category</TableHead>
+                      <TableHead className="hidden md:table-cell">Category</TableHead>
                       <TableHead className="text-right">On Hand</TableHead>
-                      <TableHead className="text-right">Reserved</TableHead>
+                      <TableHead className="text-right hidden lg:table-cell">Reserved</TableHead>
                       <TableHead className="text-right">Available</TableHead>
-                      <TableHead className="text-right">Reorder Point</TableHead>
+                      <TableHead className="text-right hidden lg:table-cell">Reorder Point</TableHead>
                       <TableHead className="w-[180px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -409,7 +409,7 @@ export default function StockDashboardPage() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <Badge variant="outline" className={getCategoryColor(item.categoryName)}>
                             {item.categoryName}
                           </Badge>
@@ -417,13 +417,13 @@ export default function StockDashboardPage() {
                         <TableCell className="text-right font-medium">
                           {item.totalOnHand.toLocaleString()} {item.baseUom}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
+                        <TableCell className="text-right text-muted-foreground hidden lg:table-cell">
                           {item.totalReserved > 0 ? item.totalReserved.toLocaleString() : '—'}
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {item.totalAvailable.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
+                        <TableCell className="text-right text-muted-foreground hidden lg:table-cell">
                           {item.reorderPoint ?? '—'}
                         </TableCell>
                         <TableCell>

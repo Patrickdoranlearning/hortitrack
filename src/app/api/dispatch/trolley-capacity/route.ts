@@ -7,6 +7,7 @@ import {
   getDistinctFamilies,
   getPlantSizesWithShelfQuantity,
 } from "@/server/dispatch/trolley-capacity.server";
+import { logger } from "@/server/utils/logger";
 
 // ================================================
 // VALIDATION SCHEMAS
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
       configs,
     });
   } catch (error) {
-    console.error("[GET trolley-capacity] error:", error);
+    logger.trolley.error("Error fetching trolley capacity configs", error);
     return NextResponse.json(
       { ok: false, error: "Failed to fetch trolley capacity configs" },
       { status: 500 }
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
       id: result.id,
     });
   } catch (error) {
-    console.error("[POST trolley-capacity] error:", error);
+    logger.trolley.error("Error saving trolley capacity config", error);
     return NextResponse.json(
       { ok: false, error: "Failed to save trolley capacity config" },
       { status: 500 }
@@ -130,7 +131,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[DELETE trolley-capacity] error:", error);
+    logger.trolley.error("Error deleting trolley capacity config", error);
     return NextResponse.json(
       { ok: false, error: "Failed to delete trolley capacity config" },
       { status: 500 }

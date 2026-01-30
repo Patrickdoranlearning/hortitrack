@@ -211,7 +211,10 @@ export function WizardStepIndicator<TId extends string>({
               ) : (
                 <Icon className="h-4 w-4" />
               )}
-              <span className="text-sm font-medium hidden md:inline">{step.label}</span>
+              <span className={cn(
+                "text-sm font-medium",
+                isActive ? "inline" : "hidden md:inline"
+              )}>{step.label}</span>
             </button>
           );
         })}

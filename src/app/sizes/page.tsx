@@ -36,6 +36,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Edit } from 'lucide-react';
 import { useAttributeOptions } from '@/hooks/useAttributeOptions';
+import { ViewToggle, useViewToggle } from '@/components/ui/view-toggle';
 
 const quickSizeSchema = z.object({
   name: z.string().min(1, 'Size name is required'),
@@ -91,6 +92,7 @@ export default function SizesPage() {
     key: 'name',
     direction: 'asc',
   });
+  const { value: viewMode, setValue: setViewMode } = useViewToggle('sizes-view', 'table');
 
   // Fetch container types from dropdown manager (configurable per tenant)
   const { options: containerTypeOptions, isLoading: containerTypesLoading } = useAttributeOptions('size_container_type');
@@ -415,10 +417,17 @@ export default function SizesPage() {
               />
             }
             extraActions={
-              <Button size="sm" onClick={handleAddSize}>
-                <Plus className="mr-2 h-4 w-4" />
-                Manage form
-              </Button>
+              <div className="flex items-center gap-2">
+                <ViewToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  storageKey="sizes-view"
+                />
+                <Button size="sm" onClick={handleAddSize}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Manage form
+                </Button>
+              </div>
             }
           />
         }
@@ -426,7 +435,11 @@ export default function SizesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Golden table</CardTitle>
-            <CardDescription>Use the quick row for single entries or the pencil icon to edit existing sizes.</CardDescription>
+            <CardDescription>
+              {viewMode === 'card'
+                ? 'Tap a card to edit. Switch to table view for quick inline entry.'
+                : 'Use the quick row for single entries or the pencil icon to edit existing sizes.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             {isLoading ? (
@@ -435,7 +448,84 @@ export default function SizesPage() {
                   <Skeleton key={index} className="h-12 w-full" />
                 ))}
               </div>
+            ) : viewMode === 'card' ? (
+              /* Card View */
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {sortedSizes.length === 0 ? (
+                  <div className="col-span-full text-center py-8 text-muted-foreground">
+                    No sizes found
+                  </div>
+                ) : (
+                  sortedSizes.map((size) => (
+                    <Card
+                      key={size.id}
+                      className="cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleEditSize(size)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="font-semibold">{size.name}</div>
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                            {formatType(size.containerType)}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Cells</span>
+                            <span>{size.cellMultiple ?? 1}</span>
+                          </div>
+                          {size.trayQuantity && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Tray qty</span>
+                              <span>{size.trayQuantity}</span>
+                            </div>
+                          )}
+                          {size.trolleyQuantity && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Trolley qty</span>
+                              <span>{size.trolleyQuantity}</span>
+                            </div>
+                          )}
+                          {size.cellWidthMm && size.cellLengthMm && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Dimensions</span>
+                              <span>{size.cellWidthMm} x {size.cellLengthMm}mm</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSize(size);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSize(size.id!);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
             ) : (
+              /* Table View */
               <Table className="min-w-[1300px] text-sm whitespace-nowrap">
                 <TableHeader>
                   <TableRow>

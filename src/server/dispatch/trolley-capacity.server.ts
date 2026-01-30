@@ -2,10 +2,37 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import type { TrolleyCapacityConfig } from "@/lib/dispatch/trolley-calculation";
+import { logger } from "@/server/utils/logger";
 
 // ================================================
 // TYPES
 // ================================================
+
+/** Query result type for trolley capacity with plant size join */
+type TrolleyCapacityQueryRow = {
+  id: string;
+  org_id: string;
+  family: string | null;
+  size_id: string | null;
+  shelves_per_trolley: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  plant_sizes: { name: string } | { name: string }[] | null;
+};
+
+/** Lightweight query result for calculation */
+type TrolleyCapacityCalcRow = {
+  family: string | null;
+  size_id: string | null;
+  shelves_per_trolley: number;
+};
+
+/** Helper to get first element from array or value itself */
+function asSingle<T>(val: T | T[] | null): T | null {
+  if (!val) return null;
+  return Array.isArray(val) ? val[0] ?? null : val;
+}
 
 export type TrolleyCapacityRecord = {
   id: string;
@@ -58,21 +85,25 @@ export async function getTrolleyCapacityRecords(): Promise<TrolleyCapacityRecord
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Error fetching trolley capacity configs:", error);
+    logger.trolley.error("Error fetching trolley capacity records", error, { orgId });
     return [];
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    orgId: row.org_id,
-    family: row.family,
-    sizeId: row.size_id,
-    sizeName: row.plant_sizes?.name ?? null,
-    shelvesPerTrolley: row.shelves_per_trolley,
-    notes: row.notes,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  return (data || []).map((row) => {
+    const typedRow = row as unknown as TrolleyCapacityQueryRow;
+    const plantSize = asSingle(typedRow.plant_sizes);
+    return {
+      id: typedRow.id,
+      orgId: typedRow.org_id,
+      family: typedRow.family,
+      sizeId: typedRow.size_id,
+      sizeName: plantSize?.name ?? null,
+      shelvesPerTrolley: typedRow.shelves_per_trolley,
+      notes: typedRow.notes,
+      createdAt: typedRow.created_at,
+      updatedAt: typedRow.updated_at,
+    };
+  });
 }
 
 /**
@@ -88,11 +119,11 @@ export async function getTrolleyCapacityConfigs(): Promise<TrolleyCapacityConfig
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("Error fetching trolley capacity configs:", error);
+    logger.trolley.error("Error fetching trolley capacity configs for calculation", error, { orgId });
     return [];
   }
 
-  return (data || []).map((row: any) => ({
+  return (data || []).map((row: TrolleyCapacityCalcRow) => ({
     family: row.family,
     sizeId: row.size_id,
     shelvesPerTrolley: row.shelves_per_trolley,
@@ -130,16 +161,18 @@ export async function getTrolleyCapacityById(
     return null;
   }
 
+  const capacityData = data as unknown as TrolleyCapacityQueryRow;
+  const plantSize = asSingle(capacityData.plant_sizes);
   return {
-    id: data.id,
-    orgId: data.org_id,
-    family: data.family,
-    sizeId: data.size_id,
-    sizeName: (data.plant_sizes as any)?.name ?? null,
-    shelvesPerTrolley: data.shelves_per_trolley,
-    notes: data.notes,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
+    id: capacityData.id,
+    orgId: capacityData.org_id,
+    family: capacityData.family,
+    sizeId: capacityData.size_id,
+    sizeName: plantSize?.name ?? null,
+    shelvesPerTrolley: capacityData.shelves_per_trolley,
+    notes: capacityData.notes,
+    createdAt: capacityData.created_at,
+    updatedAt: capacityData.updated_at,
   };
 }
 
@@ -176,7 +209,7 @@ export async function upsertTrolleyCapacity(
       .single();
 
     if (error) {
-      console.error("Error updating trolley capacity:", error);
+      logger.trolley.error("Error updating trolley capacity", error, { orgId, id: input.id });
       return { success: false, error: error.message };
     }
 
@@ -193,7 +226,7 @@ export async function upsertTrolleyCapacity(
     .single();
 
   if (error) {
-    console.error("Error upserting trolley capacity:", error);
+    logger.trolley.error("Error upserting trolley capacity", error, { orgId, input });
     return { success: false, error: error.message };
   }
 
@@ -215,7 +248,7 @@ export async function deleteTrolleyCapacity(
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("Error deleting trolley capacity:", error);
+    logger.trolley.error("Error deleting trolley capacity", error, { orgId, id });
     return { success: false, error: error.message };
   }
 
@@ -241,7 +274,7 @@ export async function getDistinctFamilies(): Promise<string[]> {
     .order("family", { ascending: true });
 
   if (error) {
-    console.error("Error fetching distinct families:", error);
+    logger.trolley.error("Error fetching distinct families", error, { orgId });
     return [];
   }
 
@@ -276,7 +309,7 @@ export async function getPlantSizesWithShelfQuantity(): Promise<
     .order("name", { ascending: true });
 
   if (error) {
-    console.error("Error fetching plant sizes:", error);
+    logger.trolley.error("Error fetching plant sizes", error);
     return [];
   }
 
@@ -307,7 +340,7 @@ export async function getShelfQuantitiesForSizes(
     .in("id", sizeIds);
 
   if (error) {
-    console.error("Error fetching shelf quantities:", error);
+    logger.trolley.error("Error fetching shelf quantities", error, { sizeIds });
     return new Map();
   }
 

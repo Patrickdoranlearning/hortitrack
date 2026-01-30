@@ -453,7 +453,10 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
                   >
                     {idx + 1}
                   </div>
-                  <span className={cn('text-sm font-medium', idx === step ? 'text-foreground' : 'text-muted-foreground')}>
+                  <span className={cn(
+                    'text-sm font-medium',
+                    idx === step ? 'text-foreground' : 'text-muted-foreground hidden md:inline'
+                  )}>
                     {s.label}
                   </span>
                   {idx < steps.length - 1 && <Separator orientation="vertical" className="h-8" />}

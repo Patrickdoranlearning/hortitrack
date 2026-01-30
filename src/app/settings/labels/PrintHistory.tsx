@@ -202,11 +202,11 @@ export default function PrintHistory() {
               <TableRow>
                 <TableHead className="w-[180px]">Date/Time</TableHead>
                 <TableHead>Label</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Template</TableHead>
-                <TableHead>Printer</TableHead>
-                <TableHead className="text-center">Copies</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Type</TableHead>
+                <TableHead className="hidden lg:table-cell">Template</TableHead>
+                <TableHead className="hidden sm:table-cell">Printer</TableHead>
+                <TableHead className="text-center hidden md:table-cell">Copies</TableHead>
+                <TableHead className="hidden lg:table-cell">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -234,26 +234,26 @@ export default function PrintHistory() {
                         {getPayloadSummary(job.payload_json)}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <Badge className={typeConfig.color}>
                         <TypeIcon className="h-3 w-3 mr-1" />
                         {typeConfig.label}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <span className="text-sm">
                         {job.template?.name || "Default"}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <span className="text-sm">
                         {job.printer?.name || "—"}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center hidden md:table-cell">
                       <Badge variant="outline">{job.copies}</Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <div className={`flex items-center gap-1 ${statusConfig.color}`}>
                         <StatusIcon className="h-4 w-4" />
                         <span className="text-sm">{statusConfig.label}</span>

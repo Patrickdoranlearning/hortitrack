@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getCustomerTrolleyBalance } from "@/server/dispatch/trolley-balance.server";
 import { z } from "zod";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 const createMovementSchema = z.object({
   type: z.enum(["delivered", "returned", "not_returned", "adjustment"]),
@@ -56,12 +57,29 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error } = await query;
 
     if (error) {
-      console.error("Error fetching transactions:", error);
+      logger.trolley.error("Error fetching transactions", error, { orgId, customerId });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Type for transaction query result
+    type TransactionQueryRow = {
+      id: string;
+      movement_date: string;
+      movement_type: string;
+      customer_id: string;
+      trolleys: number;
+      shelves: number;
+      delivery_run_id: string | null;
+      notes: string | null;
+      signed_docket_url: string | null;
+      recorded_by: string | null;
+      created_at: string;
+      customers: { id: string; name: string } | null;
+      delivery_runs: { id: string; run_number: string; driver_name: string | null } | null;
+    };
+
     // Transform data
-    const formattedTransactions = (transactions || []).map((t: any) => ({
+    const formattedTransactions = ((transactions || []) as unknown as TransactionQueryRow[]).map((t) => ({
       id: t.id,
       date: t.movement_date,
       type: t.movement_type,
@@ -79,8 +97,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ transactions: formattedTransactions });
   } catch (error) {
-    console.error("Error in transactions route:", error);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logger.trolley.error("Error in transactions route", error);
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }
 
@@ -119,7 +137,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Error creating movement:", error);
+      logger.trolley.error("Error creating movement", error, { customerId: data.customerId });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -142,7 +160,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error in create movement:", error);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logger.trolley.error("Error in create movement route", error);
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

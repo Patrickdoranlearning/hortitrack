@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 /**
  * POST /api/dispatch/trolleys/signed-docket
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
       });
 
     if (signatureUploadError) {
-      console.error("Signature upload error:", signatureUploadError);
+      logger.trolley.error("Signature upload error", signatureUploadError, { customerId });
       return NextResponse.json(
         { error: "Failed to upload signature" },
         { status: 500 }
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
         });
 
       if (photoUploadError) {
-        console.error("Photo upload error:", photoUploadError);
+        logger.trolley.warn("Photo upload error", { customerId, error: photoUploadError.message });
         // Don't fail the whole operation, signature is the important part
       } else {
         const { data: photoUrlData } = supabase.storage
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
       });
 
     if (movementError) {
-      console.error("Movement log error:", movementError);
+      logger.trolley.warn("Movement log error", { customerId, error: movementError.message });
       // Don't fail - the files are uploaded, just log the error
     }
 
@@ -127,8 +128,8 @@ export async function POST(request: Request) {
       signedDocketUrl,
       photoUrl,
     });
-  } catch (error: any) {
-    console.error("Error uploading signed docket:", error);
+  } catch (error) {
+    logger.trolley.error("Error uploading signed docket", error);
     return NextResponse.json(
       { error: "Failed to process signed docket" },
       { status: 500 }

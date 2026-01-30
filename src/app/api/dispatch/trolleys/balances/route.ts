@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { differenceInDays } from "date-fns";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,12 +38,22 @@ export async function GET(request: NextRequest) {
     const { data: balances, error } = await query;
 
     if (error) {
-      console.error("Error fetching balances:", error);
+      logger.trolley.error("Error fetching balances", error, { orgId, customerId });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Type for balance query result
+    type BalanceQueryRow = {
+      customer_id: string;
+      trolleys_out: number;
+      shelves_out: number;
+      last_delivery_date: string | null;
+      last_return_date: string | null;
+      customers: { id: string; name: string } | null;
+    };
+
     // Transform data and calculate days outstanding
-    const formattedBalances = (balances || []).map((b: any) => {
+    const formattedBalances = ((balances || []) as unknown as BalanceQueryRow[]).map((b) => {
       // Calculate days outstanding
       let daysOutstanding: number | null = null;
       let hasOverdueItems = false;
@@ -96,7 +107,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ balances: formattedBalances });
   } catch (error) {
-    console.error("Error in balances route:", error);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logger.trolley.error("Error in balances route", error);
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

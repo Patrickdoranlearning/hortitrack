@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
+import { logger, getErrorMessage } from '@/server/utils/logger';
+
+// Type for profile data
+interface ProfileData {
+  id: string;
+  display_name: string | null;
+  email: string | null;
+}
 
 /**
  * GET /api/dispatch/debug
@@ -28,7 +35,7 @@ export async function GET(req: NextRequest) {
       .limit(20);
 
     if (pickListsError) {
-      console.error('[Dispatch Debug] Error fetching pick lists:', pickListsError);
+      logger.picking.error('Error fetching pick lists for debug', pickListsError, { orgId });
       return NextResponse.json(
         { ok: false, error: 'Failed to fetch pick lists' },
         { status: 500 }
@@ -40,7 +47,7 @@ export async function GET(req: NextRequest) {
       (pickLists || [])
         .map(pl => pl.assigned_user_id)
         .filter(Boolean)
-    )];
+    )] as string[];
 
     let profilesMap: Record<string, string> = {};
     if (assignedUserIds.length > 0) {
@@ -49,7 +56,7 @@ export async function GET(req: NextRequest) {
         .select('id, display_name, email')
         .in('id', assignedUserIds);
 
-      (profiles || []).forEach((p: any) => {
+      ((profiles || []) as ProfileData[]).forEach((p) => {
         profilesMap[p.id] = p.display_name || p.email || 'Unknown';
       });
     }
@@ -80,10 +87,10 @@ export async function GET(req: NextRequest) {
       myActivePickLists,
       allRecentPickLists: enrichedPickLists,
     });
-  } catch (error: any) {
-    console.error('[Dispatch Debug] Error:', error);
+  } catch (error) {
+    logger.picking.error('Dispatch debug error', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
+import { logger, getErrorMessage } from '@/server/utils/logger';
 
 interface RouteParams {
   params: Promise<{ feedbackId: string }>;
@@ -52,10 +53,10 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ ok: true, feedback });
-  } catch (error: any) {
-    console.error('[QC Feedback] GET error:', error);
+  } catch (error) {
+    logger.picking.error('QC feedback GET error', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -90,7 +91,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const updates: Record<string, any> = {};
+    const updates: Record<string, string | null> = {};
 
     switch (action) {
       case 'acknowledge':
@@ -129,7 +130,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       .single();
 
     if (updateError) {
-      console.error('[QC Feedback] Update error:', updateError);
+      logger.picking.error('QC feedback update error', updateError, { feedbackId });
       return NextResponse.json(
         { ok: false, error: 'Failed to update feedback' },
         { status: 500 }
@@ -137,10 +138,10 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ ok: true, feedback });
-  } catch (error: any) {
-    console.error('[QC Feedback] PATCH error:', error);
+  } catch (error) {
+    logger.picking.error('QC feedback PATCH error', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

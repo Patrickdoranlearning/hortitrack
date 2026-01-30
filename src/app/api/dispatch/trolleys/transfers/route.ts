@@ -6,6 +6,7 @@ import {
   getPendingTransferCount,
   requestBalanceTransfer,
 } from "@/server/dispatch/balance-transfers.server";
+import { logger } from "@/server/utils/logger";
 
 /**
  * GET /api/dispatch/trolleys/transfers
@@ -36,8 +37,8 @@ export async function GET(request: Request) {
     // Default: pending transfers
     const transfers = await getPendingTransfers();
     return NextResponse.json({ transfers });
-  } catch (error: any) {
-    console.error("Error fetching transfers:", error);
+  } catch (error) {
+    logger.trolley.error("Error fetching transfers", error);
     return NextResponse.json(
       { error: "Failed to fetch transfers" },
       { status: 500 }
@@ -76,8 +77,8 @@ export async function POST(request: Request) {
       success: true,
       transferId: result.transferId,
     });
-  } catch (error: any) {
-    console.error("Error creating transfer request:", error);
+  } catch (error) {
+    logger.trolley.error("Error creating transfer request", error);
     return NextResponse.json(
       { error: "Failed to create transfer request" },
       { status: 500 }

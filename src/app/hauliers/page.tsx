@@ -310,12 +310,12 @@ function HauliersTable({
             ))}
           </div>
         ) : (
-          <Table className="min-w-[900px] text-sm">
+          <Table className="min-w-[600px] text-sm">
             <TableHeader>
               <TableRow>
                 <TableHead className="px-4 py-2 w-[260px]">{renderSortHeader('Name', 'name')}</TableHead>
-                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Phone', 'phone')}</TableHead>
-                <TableHead className="px-4 py-2 w-[240px]">{renderSortHeader('Email', 'email')}</TableHead>
+                <TableHead className="px-4 py-2 w-[200px] hidden md:table-cell">{renderSortHeader('Phone', 'phone')}</TableHead>
+                <TableHead className="px-4 py-2 w-[240px] hidden md:table-cell">{renderSortHeader('Email', 'email')}</TableHead>
                 <TableHead className="px-4 py-2 w-[140px]">Status</TableHead>
                 <TableHead className="px-4 py-2 text-right">Actions</TableHead>
               </TableRow>
@@ -338,7 +338,7 @@ function HauliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="phone"
@@ -353,7 +353,7 @@ function HauliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="email"
@@ -386,8 +386,8 @@ function HauliersTable({
               {hauliers.map((haulier) => (
                 <TableRow key={haulier.id}>
                   <TableCell className="px-4 py-2 font-medium">{haulier.name}</TableCell>
-                  <TableCell className="px-4 py-2">{haulier.phone || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{haulier.email || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden md:table-cell">{haulier.phone || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden md:table-cell">{haulier.email || '—'}</TableCell>
                   <TableCell className="px-4 py-2">{haulier.isActive ? 'Active' : 'Inactive'}</TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-2">

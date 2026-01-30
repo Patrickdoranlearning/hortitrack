@@ -287,18 +287,19 @@ export default function PriceListsPage() {
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Currency</TableHead>
-                    <TableHead>Valid From</TableHead>
-                    <TableHead>Valid To</TableHead>
-                    <TableHead className="text-center">Customers</TableHead>
-                    <TableHead className="text-center">Products</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Currency</TableHead>
+                      <TableHead className="hidden md:table-cell">Valid From</TableHead>
+                      <TableHead className="hidden md:table-cell">Valid To</TableHead>
+                      <TableHead className="text-center hidden lg:table-cell">Customers</TableHead>
+                      <TableHead className="text-center hidden lg:table-cell">Products</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {priceLists.map((priceList) => (
                     <TableRow key={priceList.id}>
@@ -318,19 +319,19 @@ export default function PriceListsPage() {
                           {getCurrencySymbol(priceList.currency)} {priceList.currency}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground hidden md:table-cell">
                         {formatDate(priceList.validFrom)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground hidden md:table-cell">
                         {formatDate(priceList.validTo)}
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center hidden lg:table-cell">
                         <div className="flex items-center justify-center gap-1 text-muted-foreground">
                           <Users className="h-4 w-4" />
                           <span>{priceList.customerCount ?? 0}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center hidden lg:table-cell">
                         <div className="flex items-center justify-center gap-1 text-muted-foreground">
                           <Package className="h-4 w-4" />
                           <span>{priceList.productCount ?? 0}</span>
@@ -369,6 +370,7 @@ export default function PriceListsPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
+import { logger, getErrorMessage } from '@/server/utils/logger';
 
 /**
  * POST /api/dispatch/delivery-photo
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('[Delivery Photo] Upload error:', uploadError);
+      logger.dispatch.error('Delivery photo upload failed', uploadError, { deliveryItemId });
       return NextResponse.json(
         { ok: false, error: 'Failed to upload photo' },
         { status: 500 }
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       .eq('id', deliveryItemId);
 
     if (updateError) {
-      console.error('[Delivery Photo] Update error:', updateError);
+      logger.dispatch.warn('Delivery photo update failed', { deliveryItemId, error: updateError.message });
       // Photo was uploaded but update failed - log but continue
     }
 
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
         created_by: userId,
       });
       if (eventError) {
-        console.error('[Delivery Photo] Error logging delivery event:', eventError);
+        logger.dispatch.warn('Error logging delivery event', { orderId: orderData.order_id, error: eventError.message });
       }
     }
 
@@ -112,10 +113,10 @@ export async function POST(req: NextRequest) {
       photoUrl,
       deliveryItemId,
     });
-  } catch (error: any) {
-    console.error('[Delivery Photo] Error:', error);
+  } catch (error) {
+    logger.dispatch.error('Error in delivery photo route', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

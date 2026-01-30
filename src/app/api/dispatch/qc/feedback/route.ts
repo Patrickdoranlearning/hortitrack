@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { z } from 'zod';
+import { logger, getErrorMessage } from '@/server/utils/logger';
 
 const CreateFeedbackSchema = z.object({
   pickListId: z.string().uuid(),
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error('[QC Feedback] Insert error:', insertError);
+      logger.picking.error('QC feedback insert error', insertError, { pickListId });
       return NextResponse.json(
         { ok: false, error: 'Failed to create feedback' },
         { status: 500 }
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
         .update({ picker_notified_at: new Date().toISOString() })
         .eq('id', feedback.id);
       if (notifyError) {
-        console.error('[QC Feedback] Error updating notification timestamp:', notifyError);
+        logger.picking.warn('Error updating QC feedback notification timestamp', { feedbackId: feedback.id, error: notifyError.message });
       }
     }
 
@@ -92,14 +93,14 @@ export async function POST(req: NextRequest) {
       created_by: userId,
     });
     if (eventError) {
-      console.error('[QC Feedback] Error logging event:', eventError);
+      logger.picking.warn('Error logging QC feedback event', { pickListId, error: eventError.message });
     }
 
     return NextResponse.json({ ok: true, feedback });
-  } catch (error: any) {
-    console.error('[QC Feedback] POST error:', error);
+  } catch (error) {
+    logger.picking.error('QC feedback POST error', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -131,7 +132,7 @@ export async function GET(req: NextRequest) {
       if (uuidRegex.test(pickerIdParam)) {
         targetPickerId = pickerIdParam;
       } else {
-        console.warn('[QC Feedback] Invalid pickerId format, using current user:', pickerIdParam);
+        logger.picking.warn('Invalid pickerId format, using current user', { invalidPickerId: pickerIdParam });
       }
     }
 
@@ -143,7 +144,7 @@ export async function GET(req: NextRequest) {
       .eq('assigned_user_id', targetPickerId);
 
     if (pickerListsError) {
-      console.error('[QC Feedback] Error fetching picker lists:', pickerListsError);
+      logger.picking.error('Error fetching picker lists for QC feedback', pickerListsError, { targetPickerId });
       return NextResponse.json(
         { ok: false, error: 'Failed to fetch picker data' },
         { status: 500 }
@@ -198,7 +199,7 @@ export async function GET(req: NextRequest) {
     const { data: feedback, error } = await query;
 
     if (error) {
-      console.error('[QC Feedback] GET error:', error);
+      logger.picking.error('Error fetching QC feedback', error, { targetPickerId });
       return NextResponse.json(
         { ok: false, error: 'Failed to fetch feedback' },
         { status: 500 }
@@ -218,10 +219,10 @@ export async function GET(req: NextRequest) {
       feedback: feedback || [],
       unacknowledgedCount: count || 0,
     });
-  } catch (error: any) {
-    console.error('[QC Feedback] GET error:', error);
+  } catch (error) {
+    logger.picking.error('QC feedback GET error', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

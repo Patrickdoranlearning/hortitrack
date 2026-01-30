@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { generateId } from '@/server/utils/ids';
+import { logger, getErrorMessage } from '@/server/utils/logger';
 
 /**
  * POST /api/dispatch/assign-picker
@@ -16,13 +17,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { orderId, pickerId } = body;
 
-    console.log('[Assign Picker] Request:', {
-      orderId,
-      pickerId,
-      pickerIdType: typeof pickerId,
-      orgId,
-      userId
-    });
+    logger.picking.info('Assign picker request', { orderId, pickerId, orgId, userId });
 
     if (!orderId) {
       return NextResponse.json(
@@ -40,7 +35,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orderError || !order) {
-      console.error('[Assign Picker] Order not found:', { orderId, orderError });
+      logger.picking.warn('Order not found for picker assignment', { orderId, error: orderError?.message });
       return NextResponse.json(
         { ok: false, error: 'Order not found' },
         { status: 404 }
@@ -58,7 +53,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (checkError) {
-      console.error('[Assign Picker] Check error:', checkError);
+      logger.picking.error('Error checking existing pick list', checkError, { orderId });
       return NextResponse.json(
         { ok: false, error: 'Failed to check existing pick list: ' + checkError.message },
         { status: 500 }
@@ -79,7 +74,7 @@ export async function POST(req: NextRequest) {
         .eq('id', existing.id);
 
       if (updateError) {
-        console.error('[Assign Picker] Update error:', updateError);
+        logger.picking.error('Error updating pick list', updateError, { pickListId: existing.id });
         return NextResponse.json(
           { ok: false, error: 'Failed to update pick list: ' + updateError.message },
           { status: 500 }
@@ -90,12 +85,7 @@ export async function POST(req: NextRequest) {
       wasCreated = false;
 
       // Verify the update was successful by re-fetching
-      const { data: verifyUpdate } = await supabase
-        .from('pick_lists')
-        .select('id, assigned_user_id, status')
-        .eq('id', existing.id)
-        .single();
-      console.log('[Assign Picker] Verified after update:', verifyUpdate);
+      logger.picking.info('Pick list updated', { pickListId: existing.id, pickerId });
     } else {
       // Create new pick list
       const newId = generateId();
@@ -116,7 +106,7 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (insertError) {
-        console.error('[Assign Picker] Insert error:', insertError);
+        logger.picking.error('Error creating pick list', insertError, { orderId });
         return NextResponse.json(
           { ok: false, error: 'Failed to create pick list: ' + insertError.message },
           { status: 500 }
@@ -126,16 +116,10 @@ export async function POST(req: NextRequest) {
       pickListId = inserted.id;
       wasCreated = true;
 
-      // Verify the insert was successful by re-fetching
-      const { data: verifyInsert } = await supabase
-        .from('pick_lists')
-        .select('id, assigned_user_id, status')
-        .eq('id', inserted.id)
-        .single();
-      console.log('[Assign Picker] Verified after insert:', verifyInsert);
+      logger.picking.info('Pick list created', { pickListId: inserted.id, orderId, pickerId });
     }
 
-    console.log('[Assign Picker] Pick list result:', { id: pickListId, wasCreated, assignedTo: pickerId });
+    logger.picking.info('Picker assignment complete', { pickListId, wasCreated, pickerId });
 
     return NextResponse.json({
       ok: true,
@@ -143,10 +127,10 @@ export async function POST(req: NextRequest) {
       pickerId,
       created: wasCreated,
     });
-  } catch (error: any) {
-    console.error('[Assign Picker] Error:', error);
+  } catch (error) {
+    logger.picking.error('Error in assign-picker route', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

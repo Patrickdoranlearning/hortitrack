@@ -12,6 +12,8 @@ import {
 } from "@/server/dispatch/queries.server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
+import { logger, getErrorMessage } from "@/server/utils/logger";
+import type { DeliveryRunUpdate } from "@/lib/dispatch/db-types";
 
 export async function assignOrderToTeam(orderId: string, teamId: string | null) {
   try {
@@ -32,8 +34,8 @@ export async function assignOrderToTeam(orderId: string, teamId: string | null) 
     revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -61,7 +63,7 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
         if (error) {
           // If column doesn't exist, log warning but don't fail
           if (error.code === "42703") {
-            console.warn("assigned_user_id column not found. Run migration 20251210100000_add_assigned_user_to_pick_lists.sql");
+            logger.dispatch.warn("assigned_user_id column not found. Run migration 20251210100000_add_assigned_user_to_pick_lists.sql");
             // Still return success as pick list was created
           } else {
             throw error;
@@ -78,7 +80,7 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
       if (error) {
         // If column doesn't exist, log warning but don't fail
         if (error.code === "42703") {
-          console.warn("assigned_user_id column not found. Run migration 20251210100000_add_assigned_user_to_pick_lists.sql");
+          logger.dispatch.warn("assigned_user_id column not found. Run migration 20251210100000_add_assigned_user_to_pick_lists.sql");
         } else {
           throw error;
         }
@@ -90,8 +92,8 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
     revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -129,8 +131,8 @@ export async function assignOrderToRun(orderId: string, runId: string) {
     revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -152,8 +154,8 @@ export async function createRunAndAssign(orderId: string, haulierId: string, dat
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true, runId };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -178,8 +180,8 @@ export async function createEmptyRoute(
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true, runId };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -206,8 +208,8 @@ export async function createLoadWithOrders(
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true, runId };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -221,7 +223,7 @@ export async function updateLoad(
   try {
     const supabase = await createClient();
     
-    const dbUpdates: Record<string, any> = {};
+    const dbUpdates: DeliveryRunUpdate = {};
     if (updates.loadCode !== undefined) dbUpdates.load_name = updates.loadCode;
     if (updates.haulierId !== undefined) dbUpdates.haulier_id = updates.haulierId || null;
     if (updates.vehicleId !== undefined) dbUpdates.vehicle_id = updates.vehicleId || null;
@@ -238,8 +240,8 @@ export async function updateLoad(
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -248,7 +250,7 @@ export async function updateLoad(
  */
 export async function deleteLoad(loadId: string) {
   try {
-    console.log(`[deleteLoad] Attempting to delete load: ${loadId}`);
+    logger.dispatch.info("Attempting to delete load", { loadId });
 
     // Use admin client to bypass any RLS issues
     // Check if any orders are assigned to this load
@@ -259,11 +261,11 @@ export async function deleteLoad(loadId: string) {
       .limit(1);
 
     if (checkError) {
-      console.error(`[deleteLoad] Error checking items:`, checkError);
+      logger.dispatch.error("Error checking items for load", checkError, { loadId });
       throw checkError;
     }
 
-    console.log(`[deleteLoad] Found ${items?.length ?? 0} items in load`);
+    logger.dispatch.info("Found items in load", { loadId, itemCount: items?.length ?? 0 });
 
     if (items && items.length > 0) {
       return { error: "Cannot delete load with assigned orders. Remove all orders first." };
@@ -275,17 +277,20 @@ export async function deleteLoad(loadId: string) {
       .delete()
       .eq("id", loadId);
 
-    console.log(`[deleteLoad] Delete completed, error: ${error?.message ?? 'none'}`);
+    if (error) {
+      logger.dispatch.error("Error deleting load", error, { loadId });
+      throw error;
+    }
 
-    if (error) throw error;
+    logger.dispatch.info("Load deleted successfully", { loadId });
 
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true };
-  } catch (error: any) {
-    console.error(`[deleteLoad] Error:`, error);
-    return { error: error.message };
+  } catch (error) {
+    logger.dispatch.error("Error in deleteLoad", error, { loadId });
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -315,8 +320,8 @@ export async function reorderLoads(loadIds: string[]) {
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -348,8 +353,8 @@ export async function removeOrderFromLoad(orderId: string) {
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -368,8 +373,8 @@ export async function updateOrderDate(orderId: string, date: string) {
     revalidatePath("/dispatch/picker");
     revalidatePath("/dispatch/driver");
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -445,8 +450,8 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
     }
 
     return { success: true, routeId: targetRouteId };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -459,7 +464,7 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
  */
 export async function dispatchLoad(loadId: string) {
   try {
-    console.log(`[dispatchLoad] Dispatching load: ${loadId}`);
+    logger.dispatch.info("Dispatching load", { loadId });
 
     // Use atomic RPC function - handles all updates in single transaction
     const { data: result, error: rpcError } = await supabaseAdmin.rpc(
@@ -468,25 +473,25 @@ export async function dispatchLoad(loadId: string) {
     );
 
     if (rpcError) {
-      console.error(`[dispatchLoad] RPC error:`, rpcError);
+      logger.dispatch.error("RPC error dispatching load", rpcError, { loadId });
       return { error: rpcError.message || "Failed to dispatch load" };
     }
 
     if (!result?.success) {
-      console.log(`[dispatchLoad] Validation failed:`, result?.error);
+      logger.dispatch.warn("Dispatch validation failed", { loadId, error: result?.error });
       return { error: result?.error || "Failed to dispatch load" };
     }
 
-    console.log(`[dispatchLoad] Successfully dispatched ${result.ordersDispatched} orders`);
+    logger.dispatch.info("Successfully dispatched load", { loadId, ordersDispatched: result.ordersDispatched });
 
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
 
     return { success: true, ordersDispatched: result.ordersDispatched };
-  } catch (error: any) {
-    console.error(`[dispatchLoad] Error:`, error);
-    return { error: error.message };
+  } catch (error) {
+    logger.dispatch.error("Error in dispatchLoad", error, { loadId });
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -499,7 +504,7 @@ export async function dispatchLoad(loadId: string) {
  */
 export async function recallLoad(loadId: string) {
   try {
-    console.log(`[recallLoad] Recalling load: ${loadId}`);
+    logger.dispatch.info("Recalling load", { loadId });
 
     // Use atomic RPC function - handles all updates in single transaction
     const { data: result, error: rpcError } = await supabaseAdmin.rpc(
@@ -508,25 +513,25 @@ export async function recallLoad(loadId: string) {
     );
 
     if (rpcError) {
-      console.error(`[recallLoad] RPC error:`, rpcError);
+      logger.dispatch.error("RPC error recalling load", rpcError, { loadId });
       return { error: rpcError.message || "Failed to recall load" };
     }
 
     if (!result?.success) {
-      console.log(`[recallLoad] Validation failed:`, result?.error);
+      logger.dispatch.warn("Recall validation failed", { loadId, error: result?.error });
       return { error: result?.error || "Failed to recall load" };
     }
 
-    console.log(`[recallLoad] Successfully recalled ${result.ordersRecalled} orders`);
+    logger.dispatch.info("Successfully recalled load", { loadId, ordersRecalled: result.ordersRecalled });
 
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
 
     return { success: true, ordersRecalled: result.ordersRecalled };
-  } catch (error: any) {
-    console.error(`[recallLoad] Error:`, error);
-    return { error: error.message };
+  } catch (error) {
+    logger.dispatch.error("Error in recallLoad", error, { loadId });
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -537,31 +542,31 @@ export async function updateLoadStatus(loadId: string, status: 'planned' | 'load
   try {
     const supabase = await createClient();
     
-    const updates: Record<string, any> = { status };
-    
+    const dbUpdates: DeliveryRunUpdate = { status };
+
     // Set timestamps based on status changes
     if (status === 'in_transit') {
-      updates.actual_departure_time = new Date().toISOString();
+      dbUpdates.actual_departure_time = new Date().toISOString();
     } else if (status === 'completed') {
-      updates.actual_return_time = new Date().toISOString();
+      dbUpdates.actual_return_time = new Date().toISOString();
     } else if (status === 'planned') {
-      updates.actual_departure_time = null;
-      updates.actual_return_time = null;
+      dbUpdates.actual_departure_time = null;
+      dbUpdates.actual_return_time = null;
     }
     
     const { error } = await supabase
       .from("delivery_runs")
-      .update(updates)
+      .update(dbUpdates)
       .eq("id", loadId);
-      
+
     if (error) throw error;
-    
+
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
     revalidatePath("/dispatch/driver");
-    
+
     return { success: true };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }

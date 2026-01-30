@@ -172,8 +172,8 @@ export default function ScoutPage() {
                           <TableRow>
                             <TableHead>Type</TableHead>
                             <TableHead>Location / Batch</TableHead>
-                            <TableHead>Details</TableHead>
-                            <TableHead>Recorded By</TableHead>
+                            <TableHead className="hidden md:table-cell">Details</TableHead>
+                            <TableHead className="hidden lg:table-cell">Recorded By</TableHead>
                             <TableHead>When</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -213,7 +213,7 @@ export default function ScoutPage() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="hidden md:table-cell">
                                 {log.logType === 'issue' ? (
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm">{log.issueReason}</span>
@@ -236,7 +236,7 @@ export default function ScoutPage() {
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="hidden lg:table-cell">
                                 <span className="text-sm text-muted-foreground">
                                   {log.recordedByName || 'Unknown'}
                                 </span>

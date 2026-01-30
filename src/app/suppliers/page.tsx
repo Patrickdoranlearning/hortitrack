@@ -524,15 +524,15 @@ function SuppliersTable({
             ))}
           </div>
         ) : (
-          <Table className="min-w-[1100px] text-sm">
+          <Table className="min-w-[800px] text-sm">
             <TableHeader>
               <TableRow>
                 <TableHead className="px-4 py-2 w-[220px]">{renderSortHeader('Name', 'name')}</TableHead>
                 <TableHead className="px-4 py-2 w-[180px]">{renderSortHeader('Type', 'supplierType')}</TableHead>
-                <TableHead className="px-4 py-2 w-[120px]">{renderSortHeader('Country', 'countryCode')}</TableHead>
-                <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Producer code', 'producerCode')}</TableHead>
-                <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Phone', 'phone')}</TableHead>
-                <TableHead className="px-4 py-2 w-[220px]">{renderSortHeader('Email', 'email')}</TableHead>
+                <TableHead className="px-4 py-2 w-[120px] hidden md:table-cell">{renderSortHeader('Country', 'countryCode')}</TableHead>
+                <TableHead className="px-4 py-2 w-[160px] hidden lg:table-cell">{renderSortHeader('Producer code', 'producerCode')}</TableHead>
+                <TableHead className="px-4 py-2 w-[160px] hidden md:table-cell">{renderSortHeader('Phone', 'phone')}</TableHead>
+                <TableHead className="px-4 py-2 w-[220px] hidden lg:table-cell">{renderSortHeader('Email', 'email')}</TableHead>
                 <TableHead className="px-4 py-2 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -581,7 +581,7 @@ function SuppliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="countryCode"
@@ -601,7 +601,7 @@ function SuppliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="producerCode"
@@ -616,7 +616,7 @@ function SuppliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="phone"
@@ -631,7 +631,7 @@ function SuppliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="email"
@@ -664,10 +664,10 @@ function SuppliersTable({
                 <TableRow key={supplier.id}>
                   <TableCell className="px-4 py-2 font-medium">{supplier.name}</TableCell>
                   <TableCell className="px-4 py-2">{formatSupplierType(supplier.supplierType)}</TableCell>
-                  <TableCell className="px-4 py-2">{supplier.countryCode}</TableCell>
-                  <TableCell className="px-4 py-2">{supplier.producerCode || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{supplier.phone || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{supplier.email || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden md:table-cell">{supplier.countryCode}</TableCell>
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">{supplier.producerCode || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden md:table-cell">{supplier.phone || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">{supplier.email || '—'}</TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-2">
                       <Button

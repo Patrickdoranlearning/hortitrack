@@ -4,6 +4,7 @@ import {
   getDeliveryRunWithItems,
   updateDeliveryRun,
 } from "@/server/dispatch/queries.server";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 export async function GET(
   req: Request,
@@ -22,9 +23,9 @@ export async function GET(
 
     return NextResponse.json({ ok: true, run });
   } catch (err) {
-    console.error("[api:dispatch/runs/[runId]][GET]", err);
+    logger.dispatch.error("Error fetching delivery run", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }
@@ -41,9 +42,9 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[api:dispatch/runs/[runId]][PATCH]", err);
+    logger.dispatch.error("Error updating delivery run", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }

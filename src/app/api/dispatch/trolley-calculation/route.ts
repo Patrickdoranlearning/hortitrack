@@ -10,6 +10,7 @@ import {
   getShelfQuantitiesForSizes,
   getPlantSizesWithShelfQuantity,
 } from "@/server/dispatch/trolley-capacity.server";
+import { logger } from "@/server/utils/logger";
 
 // ================================================
 // VALIDATION SCHEMAS
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
       suggestions: includeSuggestions ? suggestions : undefined,
     });
   } catch (error) {
-    console.error("[POST trolley-calculation] error:", error);
+    logger.trolley.error("Trolley calculation failed", error);
     return NextResponse.json(
       { ok: false, error: "Calculation failed" },
       { status: 500 }

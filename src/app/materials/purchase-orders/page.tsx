@@ -321,11 +321,11 @@ export default function PurchaseOrdersPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[130px]">PO Number</TableHead>
-                      <TableHead>Supplier</TableHead>
+                      <TableHead className="hidden md:table-cell">Supplier</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Order Date</TableHead>
-                      <TableHead>Expected</TableHead>
-                      <TableHead className="text-right">Items</TableHead>
+                      <TableHead className="hidden sm:table-cell">Order Date</TableHead>
+                      <TableHead className="hidden lg:table-cell">Expected</TableHead>
+                      <TableHead className="text-right hidden md:table-cell">Items</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead className="w-[80px]"></TableHead>
                     </TableRow>
@@ -340,11 +340,11 @@ export default function PurchaseOrdersPage() {
                         <TableCell className="font-mono font-medium">
                           {order.poNumber}
                         </TableCell>
-                        <TableCell>{order.supplier?.name ?? '—'}</TableCell>
+                        <TableCell className="hidden md:table-cell">{order.supplier?.name ?? '—'}</TableCell>
                         <TableCell>{getStatusBadge(order.status)}</TableCell>
-                        <TableCell>{formatDate(order.orderDate)}</TableCell>
-                        <TableCell>{formatDate(order.expectedDeliveryDate)}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="hidden sm:table-cell">{formatDate(order.orderDate)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{formatDate(order.expectedDeliveryDate)}</TableCell>
+                        <TableCell className="text-right hidden md:table-cell">
                           {order.lines?.length ?? 0}
                         </TableCell>
                         <TableCell className="text-right font-medium">

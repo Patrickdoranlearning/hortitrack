@@ -78,12 +78,73 @@
 
 Available agents in `.claude/agents/`:
 
-- `module-reviewer.md` - Systematic module review with testing
-- `data-engineer.md` - Schema, migrations, RLS, queries
-- `security-auditor.md` - Security vulnerability scanning
-- `feature-builder.md` - Build features end-to-end
-- `verifier.md` - Run tests until green
-- `reviewer.md` - Code review before merge
-- `sync.md` - Context management
+### Coordinator
+- `jimmy` - Lead coordinator & workflow architect
+  - Routes tasks to specialized agents
+  - Manages pipelines and execution modes
+  - Guards database schema via `data-engineer`
+  - See `.claude/jimmy-commands.md` for quick commands
 
-Invoke with: `/agent [name] [task]`
+### Core Workflow Agents
+- `planner` - Architecture & implementation planning, writes to PLAN.md
+- `module-reviewer` - Systematic module review with manual testing checkpoints
+- `data-engineer` - Schema, migrations, RLS, queries
+- `security-auditor` - Security vulnerability scanning
+- `feature-builder` - Build features end-to-end
+- `verifier` - Run tests until green
+- `reviewer` - Code review before merge
+- `sync` - Context management
+
+### Quality & Validation Agents
+- `ultrathink-debugger` - Deep debugging with systematic root cause analysis (uses Opus)
+- `karen` - Reality check: validates actual vs claimed completion status
+- `task-completion-validator` - Verifies features actually work end-to-end
+- `code-quality-pragmatist` - Identifies over-engineering, promotes simplicity
+- `ui-comprehensive-tester` - Thorough UI testing and validation
+
+### Jimmy Quick Commands
+```
+jimmy quick fix      # Fix → verifier only
+jimmy fix this       # Medic Pipeline (debug → fix → verify)
+jimmy build [X]      # Feature Flow Pipeline
+jimmy schema [X]     # Schema Pipeline (mandatory for DB)
+jimmy plan [X]       # Route to planner → produces PLAN.md
+jimmy execute PLAN.md           # Execute plan (standard mode)
+jimmy execute PLAN.md --mode X  # Execute with specific mode
+jimmy plan status    # Show plan progress
+jimmy review         # module-reviewer → security-auditor
+jimmy pre-merge      # Shield Pipeline
+jimmy ship it        # Shield Pipeline → sync
+jimmy status         # Session state summary
+jimmy wrap up        # validator → karen → sync
+jimmy paranoid [X]   # Full audit mode
+```
+
+### Usage Examples
+```
+# Plan a complex feature (creates PLAN.md)
+Ask: "jimmy plan customer-reporting-dashboard"
+
+# Execute the plan
+Ask: "jimmy execute PLAN.md"
+
+# Deep debugging a tricky issue
+Ask: "Use the ultrathink-debugger to investigate why orders aren't saving"
+
+# Reality check on claimed completion
+Ask: "Use karen to assess the actual state of the auth implementation"
+
+# Validate a feature is truly complete
+Ask: "Use task-completion-validator to verify the batch creation feature"
+
+# Review for over-engineering
+Ask: "Use code-quality-pragmatist to review the inventory module"
+
+# Systematic UI testing
+Ask: "Use ui-comprehensive-tester to test the sales order wizard"
+
+# Use Jimmy to coordinate
+Ask: "jimmy build new-trials-feature"
+Ask: "jimmy schema add-customer-notes"
+Ask: "jimmy pre-merge"
+```

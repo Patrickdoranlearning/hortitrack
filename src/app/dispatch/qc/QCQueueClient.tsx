@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ViewToggle, useViewToggle } from '@/components/ui/view-toggle';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Search, ClipboardCheck, Package, User, Clock, ArrowRight } from 'lucide-react';
 
@@ -35,6 +36,7 @@ interface QCQueueClientProps {
 export default function QCQueueClient({ items }: QCQueueClientProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const { value: viewMode, setValue: setViewMode } = useViewToggle('qc-queue-view', 'table');
 
   const filteredItems = items.filter(item =>
     item.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -99,88 +101,146 @@ export default function QCQueueClient({ items }: QCQueueClientProps) {
       {/* Search and Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Orders Ready for QC Review</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search orders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search orders..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <ViewToggle
+                value={viewMode}
+                onChange={setViewMode}
+                storageKey="qc-queue-view"
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="text-center">Items</TableHead>
-                <TableHead className="text-center">Qty</TableHead>
-                <TableHead>Picked By</TableHead>
-                <TableHead>Completed</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No orders match your search
+            </div>
+          ) : viewMode === 'card' ? (
+            /* Card View */
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {filteredItems.map((item) => (
-                <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50">
-                  <TableCell className="font-medium">{item.orderNumber}</TableCell>
-                  <TableCell>{item.customerName}</TableCell>
-                  <TableCell className="text-center">{item.itemCount}</TableCell>
-                  <TableCell className="text-center">{item.totalQty}</TableCell>
-                  <TableCell>
-                    {item.pickerName ? (
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {item.pickerName}
+                <Card
+                  key={item.id}
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleStartQC(item.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-semibold">{item.orderNumber}</div>
+                        <div className="text-sm text-muted-foreground">{item.customerName}</div>
                       </div>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {item.pickCompletedAt ? (
-                      <span title={format(new Date(item.pickCompletedAt), 'PPp')}>
-                        {formatDistanceToNow(new Date(item.pickCompletedAt), { addSuffix: true })}
-                      </span>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={item.status === 'qc_pending' ? 'default' : 'secondary'}
-                      className={item.status === 'completed' ? 'bg-amber-100 text-amber-800' : ''}
-                    >
-                      {item.status === 'qc_pending' ? 'QC Pending' : 'Ready for QC'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      onClick={() => handleStartQC(item.id)}
-                      className="gap-2"
-                    >
-                      Start QC
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                      <Badge
+                        variant={item.status === 'qc_pending' ? 'default' : 'secondary'}
+                        className={item.status === 'completed' ? 'bg-amber-100 text-amber-800' : ''}
+                      >
+                        {item.status === 'qc_pending' ? 'QC Pending' : 'Ready'}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Items / Qty</span>
+                        <span className="font-medium">{item.itemCount} / {item.totalQty}</span>
+                      </div>
+
+                      {item.pickCompletedAt && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Completed</span>
+                          <span className="text-xs" title={format(new Date(item.pickCompletedAt), 'PPp')}>
+                            {formatDistanceToNow(new Date(item.pickCompletedAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t">
+                      <Button size="sm" className="w-full gap-2">
+                        Start QC
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-              {filteredItems.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No orders match your search
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            /* Table View */
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-center">Items</TableHead>
+                    <TableHead className="text-center hidden md:table-cell">Qty</TableHead>
+                    <TableHead className="hidden lg:table-cell">Picked By</TableHead>
+                    <TableHead className="hidden md:table-cell">Completed</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredItems.map((item) => (
+                    <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableCell className="font-medium">{item.orderNumber}</TableCell>
+                      <TableCell>{item.customerName}</TableCell>
+                      <TableCell className="text-center">{item.itemCount}</TableCell>
+                      <TableCell className="text-center hidden md:table-cell">{item.totalQty}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {item.pickerName ? (
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            {item.pickerName}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {item.pickCompletedAt ? (
+                          <span title={format(new Date(item.pickCompletedAt), 'PPp')}>
+                            {formatDistanceToNow(new Date(item.pickCompletedAt), { addSuffix: true })}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={item.status === 'qc_pending' ? 'default' : 'secondary'}
+                          className={item.status === 'completed' ? 'bg-amber-100 text-amber-800' : ''}
+                        >
+                          {item.status === 'qc_pending' ? 'QC Pending' : 'Ready for QC'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          onClick={() => handleStartQC(item.id)}
+                          className="gap-2"
+                        >
+                          Start QC
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

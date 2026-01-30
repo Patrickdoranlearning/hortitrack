@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { generateId } from '@/server/utils/ids';
+import { logger, getErrorMessage } from '@/server/utils/logger';
 
 /**
  * POST /api/dispatch/assign-load
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
           .eq('id', existingItem.id);
 
         if (deleteError) {
-          console.error('[Assign Load] Delete error:', deleteError);
+          logger.dispatch.error('Error removing order from load', deleteError, { orderId, deliveryItemId: existingItem.id });
           return NextResponse.json(
             { ok: false, error: 'Failed to remove from load' },
             { status: 500 }
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
         .eq('id', existingItem.id);
 
       if (updateError) {
-        console.error('[Assign Load] Update error:', updateError);
+        logger.dispatch.error('Error updating delivery item', updateError, { orderId, loadId });
         return NextResponse.json(
           { ok: false, error: 'Failed to update delivery item' },
           { status: 500 }
@@ -150,11 +151,11 @@ export async function POST(req: NextRequest) {
           insertSuccess = true;
         } else if (insertError.code === '23505') {
           // Unique constraint violation - retry with new sequence
-          console.warn(`[Assign Load] Sequence collision on attempt ${attempt + 1}, retrying...`);
+          logger.dispatch.warn('Sequence collision, retrying', { attempt: attempt + 1, orderId, loadId });
           lastError = insertError;
         } else {
           // Different error - don't retry
-          console.error('[Assign Load] Insert error:', insertError);
+          logger.dispatch.error('Error creating delivery item', insertError, { orderId, loadId });
           return NextResponse.json(
             { ok: false, error: 'Failed to create delivery item' },
             { status: 500 }
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (!insertSuccess) {
-        console.error('[Assign Load] Failed after 3 attempts:', lastError);
+        logger.dispatch.error('Failed to create delivery item after retries', lastError, { orderId, loadId });
         return NextResponse.json(
           { ok: false, error: 'Failed to create delivery item after retries' },
           { status: 500 }
@@ -179,10 +180,10 @@ export async function POST(req: NextRequest) {
         created: true,
       });
     }
-  } catch (error: any) {
-    console.error('[Assign Load] Error:', error);
+  } catch (error) {
+    logger.dispatch.error('Error in assign-load route', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

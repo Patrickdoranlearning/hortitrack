@@ -5,6 +5,7 @@ import {
   getOrCreateOrderPacking,
   updateOrderPacking,
 } from "@/server/dispatch/queries.server";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 export async function GET(
   req: Request,
@@ -15,9 +16,9 @@ export async function GET(
     const packing = await getOrCreateOrderPacking(orderId);
     return NextResponse.json({ ok: true, packing });
   } catch (err) {
-    console.error("[api:dispatch/packing/[orderId]][GET]", err);
+    logger.dispatch.error("Error fetching order packing", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }
@@ -42,9 +43,9 @@ export async function PATCH(
     await updateOrderPacking(orderId, parsed.data);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[api:dispatch/packing/[orderId]][PATCH]", err);
+    logger.dispatch.error("Error updating order packing", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }

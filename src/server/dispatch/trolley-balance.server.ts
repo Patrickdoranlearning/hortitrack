@@ -1,9 +1,43 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 // ================================================
 // TYPES
 // ================================================
+
+/** Query result type for customer trolley balance with join */
+type CustomerBalanceQueryRow = {
+  customer_id: string;
+  trolleys_out: number;
+  shelves_out: number;
+  last_delivery_date: string | null;
+  last_return_date: string | null;
+  updated_at: string;
+  customers: { id: string; name: string } | { id: string; name: string }[] | null;
+};
+
+/** Query result type for trolley movement with joins */
+type TrolleyMovementQueryRow = {
+  id: string;
+  movement_date: string;
+  movement_type: string;
+  customer_id: string;
+  trolleys: number;
+  shelves: number;
+  delivery_run_id: string | null;
+  notes: string | null;
+  signed_docket_url: string | null;
+  recorded_by: string | null;
+  customers: { id: string; name: string } | { id: string; name: string }[] | null;
+  delivery_runs: { id: string; run_number: string; driver_name: string | null } | { id: string; run_number: string; driver_name: string | null }[] | null;
+};
+
+/** Helper to get first element from array or value itself */
+function asSingle<T>(val: T | T[] | null): T | null {
+  if (!val) return null;
+  return Array.isArray(val) ? val[0] ?? null : val;
+}
 
 export type TrolleyBalance = {
   customerId: string;
@@ -115,16 +149,18 @@ export async function getCustomerTrolleyBalance(
       )
     : null;
 
+  const balanceData = data as unknown as CustomerBalanceQueryRow;
+  const customer = asSingle(balanceData.customers);
   return {
-    customerId: data.customer_id,
-    customerName: (data.customers as any)?.name || "Unknown",
+    customerId: balanceData.customer_id,
+    customerName: customer?.name || "Unknown",
     orgId,
-    trolleysOut: data.trolleys_out || 0,
-    shelvesOut: data.shelves_out || 0,
-    lastDeliveryDate: data.last_delivery_date,
-    lastReturnDate: data.last_return_date,
+    trolleysOut: balanceData.trolleys_out || 0,
+    shelvesOut: balanceData.shelves_out || 0,
+    lastDeliveryDate: balanceData.last_delivery_date,
+    lastReturnDate: balanceData.last_return_date,
     daysOutstanding,
-    updatedAt: data.updated_at,
+    updatedAt: balanceData.updated_at,
   };
 }
 
@@ -155,13 +191,15 @@ export async function getAllTrolleyBalances(): Promise<TrolleyBalance[]> {
     .order("trolleys_out", { ascending: false });
 
   if (error) {
-    console.error("Error fetching trolley balances:", error);
+    logger.trolley.error("Error fetching trolley balances", error, { orgId });
     return [];
   }
 
-  return (data || []).map((row: any) => {
-    const lastDeliveryDate = row.last_delivery_date
-      ? new Date(row.last_delivery_date)
+  return (data || []).map((row) => {
+    const typedRow = row as unknown as CustomerBalanceQueryRow;
+    const customer = asSingle(typedRow.customers);
+    const lastDeliveryDate = typedRow.last_delivery_date
+      ? new Date(typedRow.last_delivery_date)
       : null;
     const daysOutstanding = lastDeliveryDate
       ? Math.floor(
@@ -170,15 +208,15 @@ export async function getAllTrolleyBalances(): Promise<TrolleyBalance[]> {
       : null;
 
     return {
-      customerId: row.customer_id,
-      customerName: row.customers?.name || "Unknown",
+      customerId: typedRow.customer_id,
+      customerName: customer?.name || "Unknown",
       orgId,
-      trolleysOut: row.trolleys_out || 0,
-      shelvesOut: row.shelves_out || 0,
-      lastDeliveryDate: row.last_delivery_date,
-      lastReturnDate: row.last_return_date,
+      trolleysOut: typedRow.trolleys_out || 0,
+      shelvesOut: typedRow.shelves_out || 0,
+      lastDeliveryDate: typedRow.last_delivery_date,
+      lastReturnDate: typedRow.last_return_date,
       daysOutstanding,
-      updatedAt: row.updated_at,
+      updatedAt: typedRow.updated_at,
     };
   });
 }
@@ -214,7 +252,7 @@ export async function recordTrolleyMovement(
     .single();
 
   if (error) {
-    console.error("Error recording trolley movement:", error);
+    logger.trolley.error("Error recording trolley movement", error, { orgId, input });
     return { success: false, error: error.message };
   }
 
@@ -261,25 +299,30 @@ export async function getCustomerTrolleyHistory(
     .limit(limit);
 
   if (error) {
-    console.error("Error fetching trolley history:", error);
+    logger.trolley.error("Error fetching trolley history", error, { orgId, customerId });
     return [];
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    movementDate: row.movement_date,
-    movementType: row.movement_type,
-    customerId: row.customer_id,
-    customerName: row.customers?.name || "Unknown",
-    trolleys: row.trolleys,
-    shelves: row.shelves,
-    deliveryRunId: row.delivery_run_id,
-    deliveryRunNumber: row.delivery_runs?.run_number || null,
-    driverName: row.delivery_runs?.driver_name || null,
-    notes: row.notes,
-    signedDocketUrl: row.signed_docket_url,
-    recordedBy: row.recorded_by,
-  }));
+  return (data || []).map((row) => {
+    const typedRow = row as unknown as TrolleyMovementQueryRow;
+    const customer = asSingle(typedRow.customers);
+    const run = asSingle(typedRow.delivery_runs);
+    return {
+      id: typedRow.id,
+      movementDate: typedRow.movement_date,
+      movementType: typedRow.movement_type as "delivered" | "returned" | "not_returned" | "adjustment",
+      customerId: typedRow.customer_id,
+      customerName: customer?.name || "Unknown",
+      trolleys: typedRow.trolleys,
+      shelves: typedRow.shelves,
+      deliveryRunId: typedRow.delivery_run_id,
+      deliveryRunNumber: run?.run_number || null,
+      driverName: run?.driver_name || null,
+      notes: typedRow.notes,
+      signedDocketUrl: typedRow.signed_docket_url,
+      recordedBy: typedRow.recorded_by,
+    };
+  });
 }
 
 // ================================================
@@ -363,7 +406,7 @@ export async function getTrolleyDashboardStats(): Promise<{
     .gt("trolleys_out", 0);
 
   if (balanceError) {
-    console.error("Error fetching balance stats:", balanceError);
+    logger.trolley.error("Error fetching balance stats", balanceError, { orgId });
     return {
       totalOutstanding: 0,
       customersWithTrolleys: 0,

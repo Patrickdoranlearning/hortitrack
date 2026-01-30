@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getUserAndOrg } from "@/server/auth/org";
 import { requireRole } from "@/server/auth/getUser";
 import {
   approveTransfer,
   rejectTransfer,
 } from "@/server/dispatch/balance-transfers.server";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 type Params = {
   params: Promise<{
@@ -20,23 +20,18 @@ type Params = {
  * - action: "approve" | "reject"
  * - notes: string (optional)
  *
- * Requires manager/admin role
+ * Requires owner/admin role
  */
 export async function PATCH(request: Request, { params }: Params) {
   try {
     const { transferId } = await params;
-    const { user, orgId, supabase } = await getUserAndOrg();
 
-    // Require manager or admin role for approval/rejection
-    const roleCheck = await requireRole(supabase, orgId, user.id, [
-      "owner",
-      "admin",
-      "manager",
-    ]);
-    if (!roleCheck.allowed) {
+    // Require owner or admin role for approval/rejection
+    const roleCheck = await requireRole(["owner", "admin"]);
+    if (!roleCheck.authorized) {
       return NextResponse.json(
-        { error: "Insufficient permissions. Manager or admin role required." },
-        { status: 403 }
+        { error: roleCheck.error || "Insufficient permissions" },
+        { status: roleCheck.status }
       );
     }
 
@@ -67,10 +62,10 @@ export async function PATCH(request: Request, { params }: Params) {
       action,
       transferId,
     });
-  } catch (error: any) {
-    console.error("Error processing transfer:", error);
+  } catch (error) {
+    logger.trolley.error("Error processing transfer", error);
     return NextResponse.json(
-      { error: "Failed to process transfer" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

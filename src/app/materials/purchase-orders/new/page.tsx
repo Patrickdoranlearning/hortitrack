@@ -299,8 +299,8 @@ export default function NewPurchaseOrderPage() {
                         <TableRow>
                           <TableHead>Material</TableHead>
                           <TableHead className="w-[100px]">Qty</TableHead>
-                          <TableHead className="w-[120px]">Unit Price</TableHead>
-                          <TableHead className="w-[100px]">Discount %</TableHead>
+                          <TableHead className="w-[120px] hidden md:table-cell">Unit Price</TableHead>
+                          <TableHead className="w-[100px] hidden md:table-cell">Discount %</TableHead>
                           <TableHead className="text-right w-[120px]">Line Total</TableHead>
                           <TableHead className="w-[60px]"></TableHead>
                         </TableRow>
@@ -329,7 +329,7 @@ export default function NewPurchaseOrderPage() {
                                 className="w-20"
                               />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell">
                               <Input
                                 type="number"
                                 min={0}
@@ -343,7 +343,7 @@ export default function NewPurchaseOrderPage() {
                                 className="w-24"
                               />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell">
                               <Input
                                 type="number"
                                 min={0}

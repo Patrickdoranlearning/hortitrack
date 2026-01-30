@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { UpdateDeliveryItemSchema } from "@/lib/dispatch/types";
 import { updateDeliveryItem } from "@/server/dispatch/queries.server";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 export async function PATCH(
   req: Request,
@@ -22,9 +23,9 @@ export async function PATCH(
     await updateDeliveryItem(itemId, parsed.data);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[api:dispatch/items/[itemId]][PATCH]", err);
+    logger.dispatch.error("Error updating delivery item", err);
     return NextResponse.json(
-      { ok: false, error: String((err as any)?.message ?? err) },
+      { ok: false, error: getErrorMessage(err) },
       { status: 500 }
     );
   }

@@ -22,21 +22,21 @@ export default function DispatchDriverLayout({
             </div>
 
             {/* View Switcher */}
-            <div className="flex items-center gap-2 border-l pl-4">
-              <span className="text-xs text-muted-foreground">Switch to:</span>
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2 border-l pl-2 sm:pl-4">
+              <span className="text-xs text-muted-foreground hidden sm:inline">Switch to:</span>
               <Link
                 href="/dispatch/picker"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
                 <UserCircle className="h-3.5 w-3.5" />
-                Picker View
+                <span className="hidden sm:inline">Picker</span>
               </Link>
               <Link
                 href="/dispatch/manager"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
                 <LayoutDashboard className="h-3.5 w-3.5" />
-                Manager View
+                <span className="hidden sm:inline">Manager</span>
               </Link>
             </div>
           </div>

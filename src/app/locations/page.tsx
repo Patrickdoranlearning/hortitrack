@@ -369,15 +369,15 @@ function CardWithTable({
             ))}
           </div>
         ) : (
-          <Table className="min-w-[1000px] text-sm">
+          <Table className="min-w-[700px] text-sm">
             <TableHeader>
               <TableRow>
                 <TableHead className="px-4 py-2 w-[220px]">{renderSortHeader('Name', 'name')}</TableHead>
-                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Nursery site', 'nurserySite')}</TableHead>
+                <TableHead className="px-4 py-2 w-[200px] hidden md:table-cell">{renderSortHeader('Nursery site', 'nurserySite')}</TableHead>
                 <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Type', 'type')}</TableHead>
-                <TableHead className="px-4 py-2 w-[140px]">{renderSortHeader('Covered', 'covered')}</TableHead>
-                <TableHead className="px-4 py-2 w-[140px]">{renderSortHeader('Area (m²)', 'area')}</TableHead>
-                <TableHead className="px-4 py-2 w-[200px]">{renderSortHeader('Site', 'siteId')}</TableHead>
+                <TableHead className="px-4 py-2 w-[140px] hidden md:table-cell">{renderSortHeader('Covered', 'covered')}</TableHead>
+                <TableHead className="px-4 py-2 w-[140px] hidden lg:table-cell">{renderSortHeader('Area (m²)', 'area')}</TableHead>
+                <TableHead className="px-4 py-2 w-[200px] hidden lg:table-cell">{renderSortHeader('Site', 'siteId')}</TableHead>
                 <TableHead className="text-right px-4 py-2">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -399,7 +399,7 @@ function CardWithTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="nurserySite"
@@ -429,7 +429,7 @@ function CardWithTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="covered"
@@ -455,7 +455,7 @@ function CardWithTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="area"
@@ -480,7 +480,7 @@ function CardWithTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="siteId"
@@ -527,11 +527,11 @@ function CardWithTable({
               {locations.map((location) => (
                 <TableRow key={location.id}>
                   <TableCell className="px-4 py-2 font-medium">{location.name}</TableCell>
-                  <TableCell className="px-4 py-2">{location.nurserySite || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden md:table-cell">{location.nurserySite || '—'}</TableCell>
                   <TableCell className="px-4 py-2">{location.type || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{location.covered ? 'Covered' : 'Uncovered'}</TableCell>
-                  <TableCell className="px-4 py-2">{location.area ? `${location.area.toLocaleString()} m²` : '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{location.siteId ? siteNameMap.get(location.siteId) || location.siteId : '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden md:table-cell">{location.covered ? 'Covered' : 'Uncovered'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">{location.area ? `${location.area.toLocaleString()} m²` : '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden lg:table-cell">{location.siteId ? siteNameMap.get(location.siteId) || location.siteId : '—'}</TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-2">
                       <Button

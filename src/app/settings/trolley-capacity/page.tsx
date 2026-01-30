@@ -302,29 +302,30 @@ export default function TrolleyCapacityPage() {
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Configuration</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead className="text-center">Shelves / Trolley</TableHead>
-                    <TableHead className="text-center">Holes / Shelf</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Configuration</TableHead>
+                      <TableHead className="hidden sm:table-cell">Priority</TableHead>
+                      <TableHead className="text-center">Shelves / Trolley</TableHead>
+                      <TableHead className="text-center hidden md:table-cell">Holes / Shelf</TableHead>
+                      <TableHead className="hidden md:table-cell">Notes</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {configs.map((config) => (
                     <TableRow key={config.id}>
                       <TableCell className="font-medium">{getConfigLabel(config)}</TableCell>
-                      <TableCell>{getPriorityBadge(config)}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{getPriorityBadge(config)}</TableCell>
                       <TableCell className="text-center">
                         <span className="text-lg font-bold">{config.shelvesPerTrolley}</span>
                       </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
+                      <TableCell className="text-center text-muted-foreground hidden md:table-cell">
                         {holesPerShelf(config.shelvesPerTrolley)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                      <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate hidden md:table-cell">
                         {config.notes || '-'}
                       </TableCell>
                       <TableCell className="text-right">
@@ -345,6 +346,7 @@ export default function TrolleyCapacityPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

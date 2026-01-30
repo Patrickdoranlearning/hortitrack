@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { recordTrolleyMovement, getCustomerTrolleyBalance } from '@/server/dispatch/trolley-balance.server';
+import { logger, getErrorMessage } from '@/server/utils/logger';
+import type { DeliveryItemUpdate } from '@/lib/dispatch/db-types';
 
 /**
  * POST /api/dispatch/complete-delivery
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
         });
 
       if (uploadError) {
-        console.error('[Complete Delivery] Photo upload error:', uploadError);
+        logger.dispatch.warn('Photo upload failed, continuing without photo', { deliveryItemId, error: uploadError.message });
         // Continue without photo
       } else {
         const { data: urlData } = supabase.storage
@@ -76,17 +78,16 @@ export async function POST(req: NextRequest) {
         if (urlData?.publicUrl) {
           photoUrl = urlData.publicUrl;
         } else {
-          console.error('[Complete Delivery] Failed to get public URL for uploaded photo');
+          logger.dispatch.warn('Failed to get public URL for uploaded photo', { deliveryItemId });
         }
       }
     }
 
     // Update the delivery item with trolley return info and status
-    const updatePayload: Record<string, any> = {
+    const updatePayload: DeliveryItemUpdate = {
       status: 'delivered',
       trolleys_returned: trolleysReturned,
       actual_delivery_time: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     };
 
     if (photoUrl) {
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
       .eq('id', deliveryItemId);
 
     if (updateError) {
-      console.error('[Complete Delivery] Update error:', updateError);
+      logger.dispatch.error('Error updating delivery item', updateError, { deliveryItemId });
       return NextResponse.json(
         { ok: false, error: 'Failed to update delivery' },
         { status: 500 }
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orderError) {
-      console.error('[Complete Delivery] Error fetching order data:', orderError);
+      logger.dispatch.warn('Error fetching order data for delivery', { orderId: deliveryItem.order_id, error: orderError.message });
     }
 
     // Record equipment movements using centralized function
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
         deliveryRunId: deliveryItem.delivery_run_id,
       });
       if (!result.success) {
-        console.error('[Complete Delivery] Error logging delivered equipment:', result.error);
+        logger.dispatch.warn('Error logging delivered equipment', { error: result.error, customerId: orderData.customer_id });
       }
     }
 
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
         deliveryRunId: deliveryItem.delivery_run_id,
       });
       if (!result.success) {
-        console.error('[Complete Delivery] Error logging returned equipment:', result.error);
+        logger.dispatch.warn('Error logging returned equipment', { error: result.error, customerId: orderData.customer_id });
       }
     }
 
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
         created_by: userId,
       });
       if (eventError) {
-        console.error('[Complete Delivery] Error logging delivery event:', eventError);
+        logger.dispatch.warn('Error logging delivery event', { orderId: orderData.id, error: eventError.message });
       }
     }
 
@@ -192,10 +193,10 @@ export async function POST(req: NextRequest) {
       trolleysOutstanding: trolleysDelivered - trolleysReturned,
       customerBalance,
     });
-  } catch (error: any) {
-    console.error('[Complete Delivery] Error:', error);
+  } catch (error) {
+    logger.dispatch.error('Error in complete-delivery route', error);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Internal server error' },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }
