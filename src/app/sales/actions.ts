@@ -151,6 +151,7 @@ export async function createOrder(data: CreateOrderInput) {
 
         resolvedLines.push({
             sku_id: skuId,
+            product_id: productId,
             description,
             quantity: line.qty,
             unit_price: unitPrice,
