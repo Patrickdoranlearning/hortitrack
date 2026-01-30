@@ -65,6 +65,7 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
 
     return {
       sku_id: item.skuId,
+      product_id: item.productId,
       quantity: item.quantity,
       unit_price: item.unitPriceExVat,
       vat_rate: item.vatRate,
