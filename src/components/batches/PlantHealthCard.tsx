@@ -3,13 +3,16 @@
 import * as React from "react";
 import useSWR from "swr";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PlantHealthLog } from "@/components/history/PlantHealthLog";
+import { AddHealthLogDialog } from "@/components/plant-health/AddHealthLogDialog";
 import type { PlantHealthEvent } from "@/lib/history-types";
-import { Heart, Loader2, Bug, Ruler, CheckCircle } from "lucide-react";
+import { Heart, Loader2, Bug, Ruler, CheckCircle, Plus } from "lucide-react";
 import { fetchJson } from "@/lib/http";
 
 interface PlantHealthCardProps {
   batchId: string;
+  batchNumber?: string;
 }
 
 const fetcher = async (url: string) => {
@@ -17,12 +20,17 @@ const fetcher = async (url: string) => {
   return data?.logs || [];
 };
 
-export function PlantHealthCard({ batchId }: PlantHealthCardProps) {
-  const { data: logs = [], error, isLoading: loading } = useSWR(
+export function PlantHealthCard({ batchId, batchNumber }: PlantHealthCardProps) {
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const { data: logs = [], error, isLoading: loading, mutate } = useSWR(
     batchId ? `/api/production/batches/${batchId}/plant-health` : null,
     fetcher,
     { revalidateOnFocus: false }
   );
+
+  const handleSuccess = React.useCallback(() => {
+    mutate(); // Refresh the health logs after adding a new one
+  }, [mutate]);
 
   // Calculate summary
   const summary = React.useMemo(() => {
@@ -37,12 +45,19 @@ export function PlantHealthCard({ batchId }: PlantHealthCardProps) {
   }, [logs]);
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Heart className="h-5 w-5 text-rose-500" />
-          Plant Health
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Heart className="h-5 w-5 text-rose-500" />
+            Plant Health
+          </CardTitle>
+          <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Log Event
+          </Button>
+        </div>
         {summary && (
           <div className="flex gap-3 text-xs text-muted-foreground">
             {summary.treatments > 0 && (
@@ -94,5 +109,14 @@ export function PlantHealthCard({ batchId }: PlantHealthCardProps) {
         )}
       </CardContent>
     </Card>
+
+    <AddHealthLogDialog
+      open={dialogOpen}
+      onOpenChange={setDialogOpen}
+      batchId={batchId}
+      batchNumber={batchNumber}
+      onSuccess={handleSuccess}
+    />
+    </>
   );
 }

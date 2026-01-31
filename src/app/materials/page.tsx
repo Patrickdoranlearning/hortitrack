@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package, PackagePlus, BarChart3, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { Package, PackagePlus, BarChart3, ShoppingCart, AlertTriangle, Boxes, ScanLine } from 'lucide-react';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -128,6 +128,31 @@ export default function MaterialsPage() {
                   <Link href="/materials/purchase-orders/new">
                     <PackagePlus className="mr-2 h-4 w-4" />
                     New PO
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Boxes className="h-5 w-5" />
+                Material Lots
+              </CardTitle>
+              <CardDescription>
+                Track individual boxes, bags, and pallets with scannable barcodes for full traceability.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <Button asChild variant="outline">
+                  <Link href="/materials/lots">View Lots</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/materials/receive">
+                    <ScanLine className="mr-2 h-4 w-4" />
+                    Receive Materials
                   </Link>
                 </Button>
               </div>

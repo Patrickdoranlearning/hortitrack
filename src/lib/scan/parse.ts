@@ -3,7 +3,9 @@ export type ParsedScan
   | { by: "id"; value: string; raw: string }
   | { by: "locationId"; value: string; raw: string }
   | { by: "materialPartNumber"; value: string; raw: string }
-  | { by: "materialBarcode"; value: string; raw: string };
+  | { by: "materialBarcode"; value: string; raw: string }
+  | { by: "lotNumber"; value: string; raw: string }
+  | { by: "lotBarcode"; value: string; raw: string };
 
 const digitsOnly = (s: string) => s.replace(/\D+/g, '');
 
@@ -31,6 +33,18 @@ export function parseScanCode(input: string): ParsedScan | null {
   const htFull = raw.match(/^HT:([a-z0-9]+):(M-[A-Z]{3}-\d+)$/i);
   if (htFull) {
     return { by: 'materialPartNumber', value: htFull[2].toUpperCase(), raw };
+  }
+
+  // HT:<orgPrefix>:LOT:<lotNumber> - Material lot barcode (e.g., HT:abc12345:LOT:L-M-POT-001-0042)
+  const htLot = raw.match(/^HT:([a-z0-9]+):LOT:(L-M-[A-Z]{3}-\d{3}-\d{4})$/i);
+  if (htLot) {
+    return { by: 'lotNumber', value: htLot[2].toUpperCase(), raw };
+  }
+
+  // L-M-XXX-NNN-NNNN pattern - Direct lot number (e.g., L-M-POT-001-0042)
+  const lotNum = raw.match(/^(L-M-[A-Z]{3}-\d{3}-\d{4})$/i);
+  if (lotNum) {
+    return { by: 'lotNumber', value: lotNum[1].toUpperCase(), raw };
   }
 
   // ht:batch:<code> (allow letters/digits/dashes/underscores)
@@ -112,6 +126,44 @@ export function parseMaterialScanCode(input: string):
   // (EAN, UPC, supplier barcode, etc.)
   if (raw.length >= 3) {
     return { by: 'barcode', value: raw };
+  }
+
+  return null;
+}
+
+/**
+ * Parse a scanned code specifically for material lot lookup.
+ * Returns the search strategy and value to use.
+ */
+export function parseLotScanCode(input: string):
+  | { by: "lotNumber"; value: string }
+  | { by: "lotBarcode"; value: string }
+  | null {
+  if (!input) return null;
+  const raw = String(input).trim();
+  if (!raw) return null;
+
+  // HT:<orgPrefix>:LOT:<lotNumber> - Full internal lot barcode format
+  const htLot = raw.match(/^HT:([a-z0-9]+):LOT:(L-M-[A-Z]{3}-\d{3}-\d{4})$/i);
+  if (htLot) {
+    return { by: 'lotNumber', value: htLot[2].toUpperCase() };
+  }
+
+  // L-M-XXX-NNN-NNNN pattern - Direct lot number (e.g., L-M-POT-001-0042)
+  const lotNum = raw.match(/^(L-M-[A-Z]{3}-\d{3}-\d{4})$/i);
+  if (lotNum) {
+    return { by: 'lotNumber', value: lotNum[1].toUpperCase() };
+  }
+
+  // Any other code starting with L- might be a lot number variant
+  const anyLot = raw.match(/^(L-[A-Z0-9-]+)$/i);
+  if (anyLot) {
+    return { by: 'lotNumber', value: anyLot[1].toUpperCase() };
+  }
+
+  // Full barcode format - treat as lot barcode lookup
+  if (raw.startsWith('HT:') && raw.includes(':LOT:')) {
+    return { by: 'lotBarcode', value: raw };
   }
 
   return null;

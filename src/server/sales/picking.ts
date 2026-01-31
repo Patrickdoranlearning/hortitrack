@@ -896,6 +896,16 @@ export async function completePickList(pickListId: string): Promise<{ error?: st
   const result = rpcResult as { success: boolean; error?: string };
   if (!result.success) return { error: result.error };
 
+  // Sync task status to completed
+  try {
+    const task = await getTaskBySourceRef("dispatch", "pick_list", pickListId);
+    if (task) await updateTask(task.id, { status: "completed" });
+  } catch (taskError) {
+    logError("Error updating task for pick list completion", { error: String(taskError), pickListId });
+  }
+
+  await logPickListEvent(orgId, pickListId, null, "completed", "Pick list completed");
+
   return {};
 }
 

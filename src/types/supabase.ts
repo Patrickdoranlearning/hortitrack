@@ -965,6 +965,34 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_vat_treatment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "batches_size_id_fkey"
             columns: ["size_id"]
             isOneToOne: false
@@ -7987,6 +8015,7 @@ export type Database = {
           id: string
           is_active: boolean
           match_families: string[] | null
+          match_genera: string[] | null
           min_order_qty: number | null
           name: string
           org_id: string
@@ -8004,6 +8033,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           match_families?: string[] | null
+          match_genera?: string[] | null
           min_order_qty?: number | null
           name: string
           org_id: string
@@ -8021,6 +8051,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           match_families?: string[] | null
+          match_genera?: string[] | null
           min_order_qty?: number | null
           name?: string
           org_id?: string
@@ -8041,7 +8072,7 @@ export type Database = {
           {
             foreignKeyName: "products_sku_id_fkey"
             columns: ["sku_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "skus"
             referencedColumns: ["id"]
           },
@@ -11612,24 +11643,86 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_balance_transfer: {
+        Args: { p_notes?: string; p_reviewer_id: string; p_transfer_id: string }
+        Returns: Json
+      }
+      apply_location_treatment_atomic: {
+        Args: {
+          p_bottle_id?: string
+          p_ipm_product_id?: string
+          p_location_id: string
+          p_method: string
+          p_notes?: string
+          p_org_id: string
+          p_product_name: string
+          p_quantity_used_ml?: number
+          p_rate: number
+          p_rei_hours: number
+          p_unit: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       apply_order_item_substitution: {
         Args: { _sub_id: string }
         Returns: undefined
       }
       bootstrap_org_owner: { Args: { _org: string }; Returns: undefined }
       cleanup_stale_print_queue: { Args: never; Returns: undefined }
+      clear_location_atomic: {
+        Args: {
+          p_location_id: string
+          p_notes?: string
+          p_org_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      complete_pick_list: {
+        Args: { p_org_id: string; p_pick_list_id: string; p_user_id: string }
+        Returns: Json
+      }
+      complete_production_job: {
+        Args: {
+          p_job_id: string
+          p_org_id: string
+          p_user_id: string
+          p_wizard_data?: Json
+        }
+        Returns: Json
+      }
       compute_quantity_produced: {
         Args: { _cell_multiple: number; _container: string; _initial: number }
         Returns: number
       }
       create_order_with_allocations: {
         Args: {
+          p_created_by_staff_id?: string
+          p_created_by_user_id?: string
           p_customer_id: string
           p_lines: Json
           p_notes?: string
           p_order_number: string
           p_org_id: string
           p_requested_delivery_date?: string
+          p_ship_to_address_id?: string
+          p_status?: Database["public"]["Enums"]["order_status"]
+        }
+        Returns: Json
+      }
+      create_purchase_order: {
+        Args: {
+          p_delivery_location_id?: string
+          p_delivery_notes?: string
+          p_expected_delivery_date?: string
+          p_lines?: Json
+          p_notes?: string
+          p_org_id: string
+          p_po_number: string
+          p_supplier_id: string
+          p_supplier_ref?: string
+          p_user_id: string
         }
         Returns: Json
       }
@@ -11645,6 +11738,19 @@ export type Database = {
         Returns: number
       }
       dispatch_load: { Args: { p_load_id: string }; Returns: Json }
+      flag_location_atomic: {
+        Args: {
+          p_affected_batch_ids?: string[]
+          p_issue_reason: string
+          p_location_id: string
+          p_notes?: string
+          p_org_id: string
+          p_photo_url?: string
+          p_severity: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       fn_checkin_batch: {
         Args: {
           p_containers: number
@@ -11684,6 +11790,10 @@ export type Database = {
       generate_credit_number: {
         Args: { _issue_date: string; _org_id: string }
         Returns: string
+      }
+      generate_invoice_for_order: {
+        Args: { p_order_id: string; p_org_id: string; p_user_id: string }
+        Returns: Json
       }
       generate_invoice_number: {
         Args: { _issue_date: string; _org_id: string }
@@ -11906,9 +12016,24 @@ export type Database = {
         Returns: undefined
       }
       recall_load: { Args: { p_load_id: string }; Returns: Json }
+      receive_goods_atomic: {
+        Args: {
+          p_lines: Json
+          p_location_id?: string
+          p_notes?: string
+          p_org_id: string
+          p_po_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       refresh_log_history_for_batch: {
         Args: { _batch_id: string }
         Returns: undefined
+      }
+      reject_balance_transfer: {
+        Args: { p_notes?: string; p_reviewer_id: string; p_transfer_id: string }
+        Returns: Json
       }
       reject_pick_list_atomic: {
         Args: {
@@ -11934,6 +12059,19 @@ export type Database = {
           variety_family: string
           variety_name: string
         }[]
+      }
+      submit_qc_check: {
+        Args: {
+          p_checklist: Json
+          p_failed_items: Json
+          p_failure_reason?: string
+          p_order_id: string
+          p_org_id: string
+          p_passed: boolean
+          p_pick_list_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       switch_active_org: { Args: { _org: string }; Returns: undefined }
       user_in_org: { Args: { target_org_id: string }; Returns: boolean }
@@ -12326,4 +12464,3 @@ export const Constants = {
     },
   },
 } as const
-

@@ -1,11 +1,12 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { generatePONumber } from "@/server/numbering/materials";
+import { generatePONumber, generateLotNumber, generateLotBarcode } from "@/server/numbering/materials";
 import type {
   Material,
   PurchaseOrder,
   PurchaseOrderLine,
   PurchaseOrderStatus,
 } from "@/lib/types/materials";
+import type { MaterialLot } from "@/lib/types/material-lots";
 import { logError } from "@/lib/log";
 
 // ============================================================================
@@ -286,6 +287,25 @@ export type ReceiveGoodsInput = {
   notes?: string;
 };
 
+export type ReceiveGoodsWithLotsInput = {
+  lines: {
+    lineId: string;
+    quantityReceived: number;
+    lots: {
+      quantity: number;
+      unitType: 'box' | 'bag' | 'pallet' | 'roll' | 'bundle' | 'unit';
+      unitsPerPackage?: number;
+      supplierLotNumber?: string;
+      expiryDate?: string;
+      manufacturedDate?: string;
+      notes?: string;
+    }[];
+    notes?: string;
+  }[];
+  locationId?: string | null;
+  notes?: string;
+};
+
 /**
  * Atomic goods receipt via RPC
  */
@@ -312,6 +332,189 @@ export async function receiveGoods(
 
   const result = rpcResult as { success: boolean; po_id: string };
   return (await getPurchaseOrder(supabase, orgId, result.po_id))!;
+}
+
+/**
+ * Receive goods with lot creation
+ * Creates individual material lots for each received item
+ */
+export async function receiveGoodsWithLots(
+  supabase: SupabaseClient,
+  orgId: string,
+  userId: string,
+  poId: string,
+  input: ReceiveGoodsWithLotsInput
+): Promise<{ order: PurchaseOrder; lots: MaterialLot[] }> {
+  // First, get the PO and validate
+  const po = await getPurchaseOrder(supabase, orgId, poId);
+  if (!po) throw new Error("Purchase order not found");
+
+  if (po.status === "received" || po.status === "cancelled") {
+    throw new Error(`Cannot receive goods: order is ${po.status}`);
+  }
+
+  const createdLots: MaterialLot[] = [];
+
+  // Process each line
+  for (const lineInput of input.lines) {
+    const line = po.lines?.find((l) => l.id === lineInput.lineId);
+    if (!line) {
+      throw new Error(`Line ${lineInput.lineId} not found`);
+    }
+
+    // Validate total lot quantity matches received quantity
+    const totalLotQuantity = lineInput.lots.reduce((sum, lot) => sum + lot.quantity, 0);
+    if (totalLotQuantity !== lineInput.quantityReceived) {
+      throw new Error(
+        `Lot quantities (${totalLotQuantity}) must equal received quantity (${lineInput.quantityReceived}) for line ${line.lineNumber}`
+      );
+    }
+
+    // Get material details
+    const { data: material, error: matError } = await supabase
+      .from("materials")
+      .select("part_number, base_uom")
+      .eq("id", line.materialId)
+      .single();
+
+    if (matError || !material) {
+      throw new Error(`Material not found for line ${line.lineNumber}`);
+    }
+
+    // Create lots for this line
+    for (const lotInput of lineInput.lots) {
+      const lotNumber = await generateLotNumber(material.part_number);
+      const lotBarcode = generateLotBarcode(orgId, lotNumber);
+
+      // Create lot record
+      const { data: lot, error: lotError } = await supabase
+        .from("material_lots")
+        .insert({
+          org_id: orgId,
+          material_id: line.materialId,
+          lot_number: lotNumber,
+          lot_barcode: lotBarcode,
+          supplier_lot_number: lotInput.supplierLotNumber ?? null,
+          initial_quantity: lotInput.quantity,
+          current_quantity: lotInput.quantity,
+          uom: material.base_uom,
+          unit_type: lotInput.unitType ?? "box",
+          units_per_package: lotInput.unitsPerPackage ?? null,
+          supplier_id: po.supplierId,
+          purchase_order_line_id: line.id,
+          location_id: input.locationId ?? null,
+          expiry_date: lotInput.expiryDate ?? null,
+          manufactured_date: lotInput.manufacturedDate ?? null,
+          notes: lotInput.notes ?? null,
+          created_by: userId,
+        })
+        .select()
+        .single();
+
+      if (lotError) {
+        throw new Error(`Failed to create lot: ${lotError.message}`);
+      }
+
+      // Create lot transaction
+      await supabase.from("material_lot_transactions").insert({
+        org_id: orgId,
+        lot_id: lot.id,
+        material_id: line.materialId,
+        transaction_type: "receive",
+        quantity: lotInput.quantity,
+        uom: material.base_uom,
+        to_location_id: input.locationId ?? null,
+        purchase_order_line_id: line.id,
+        quantity_after: lotInput.quantity,
+        notes: `Received via PO ${po.poNumber}`,
+        created_by: userId,
+      });
+
+      // Also update aggregate material_stock via material_transactions
+      await supabase.from("material_transactions").insert({
+        org_id: orgId,
+        material_id: line.materialId,
+        transaction_type: "receive",
+        quantity: lotInput.quantity,
+        uom: material.base_uom,
+        to_location_id: input.locationId ?? null,
+        purchase_order_line_id: line.id,
+        lot_id: lot.id,
+        notes: `Lot ${lotNumber} received via PO ${po.poNumber}`,
+        created_by: userId,
+      });
+
+      createdLots.push({
+        id: lot.id,
+        orgId: lot.org_id,
+        materialId: lot.material_id,
+        lotNumber: lot.lot_number,
+        lotBarcode: lot.lot_barcode,
+        supplierLotNumber: lot.supplier_lot_number,
+        initialQuantity: lot.initial_quantity,
+        currentQuantity: lot.current_quantity,
+        uom: lot.uom,
+        unitType: lot.unit_type,
+        unitsPerPackage: lot.units_per_package,
+        supplierId: lot.supplier_id,
+        purchaseOrderLineId: lot.purchase_order_line_id,
+        locationId: lot.location_id,
+        receivedAt: lot.received_at,
+        expiryDate: lot.expiry_date,
+        manufacturedDate: lot.manufactured_date,
+        status: lot.status,
+        costPerUnit: lot.cost_per_unit,
+        notes: lot.notes,
+        qualityNotes: lot.quality_notes,
+        createdBy: lot.created_by,
+        createdAt: lot.created_at,
+        updatedAt: lot.updated_at,
+      });
+    }
+
+    // Update line quantity_received
+    const newReceived = (line.quantityReceived ?? 0) + lineInput.quantityReceived;
+    await supabase
+      .from("purchase_order_lines")
+      .update({
+        quantity_received: newReceived,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", line.id);
+  }
+
+  // Update PO status
+  const allLines = po.lines ?? [];
+  const anyPartiallyReceived = allLines.some((l) => {
+    const lineInput = input.lines.find((il) => il.lineId === l.id);
+    const newReceived = (l.quantityReceived ?? 0) + (lineInput?.quantityReceived ?? 0);
+    return newReceived > 0 && newReceived < l.quantityOrdered;
+  });
+
+  const allFullyReceived = allLines.every((l) => {
+    const lineInput = input.lines.find((il) => il.lineId === l.id);
+    const newReceived = (l.quantityReceived ?? 0) + (lineInput?.quantityReceived ?? 0);
+    return newReceived >= l.quantityOrdered;
+  });
+
+  let newStatus: PurchaseOrderStatus = po.status;
+  if (allFullyReceived) {
+    newStatus = "received";
+  } else if (anyPartiallyReceived || input.lines.length > 0) {
+    newStatus = "partially_received";
+  }
+
+  await supabase
+    .from("purchase_orders")
+    .update({
+      status: newStatus,
+      received_at: newStatus === "received" ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", poId);
+
+  const updatedOrder = await getPurchaseOrder(supabase, orgId, poId);
+  return { order: updatedOrder!, lots: createdLots };
 }
 
 // ============================================================================

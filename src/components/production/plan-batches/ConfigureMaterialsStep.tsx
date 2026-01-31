@@ -22,6 +22,7 @@ import {
   Package,
   Layers,
   SkipForward,
+  Boxes,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReferenceData } from '@/contexts/ReferenceDataContext';
@@ -31,6 +32,7 @@ import {
   MaterialSearchCombobox,
   type MaterialSearchResult,
 } from '@/components/materials/MaterialSearchCombobox';
+import { LotSelectionCombobox, type AvailableLot } from '@/components/materials/LotSelectionCombobox';
 
 export type PlannedMaterialEntry = {
   id: string;          // temp ID for UI
@@ -42,6 +44,10 @@ export type PlannedMaterialEntry = {
   quantity: number;
   uom: string;
   notes?: string;
+  // Lot tracking (optional - for specific lot selection)
+  lotId?: string;
+  lotNumber?: string;
+  useSpecificLot?: boolean;
 };
 
 export type ConfigureMaterialsStepData = {
@@ -239,6 +245,7 @@ export function ConfigureMaterialsStep({
                         <TableHead>Material</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead className="w-[120px]">Quantity</TableHead>
+                        <TableHead className="w-[200px]">Lot</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -271,6 +278,53 @@ export function ConfigureMaterialsStep({
                               />
                               <span className="text-sm text-muted-foreground">{mat.uom}</span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {mat.lotNumber ? (
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="font-mono">
+                                  <Boxes className="h-3 w-3 mr-1" />
+                                  {mat.lotNumber}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs text-muted-foreground"
+                                  onClick={() =>
+                                    setMaterials((prev) =>
+                                      prev.map((m) =>
+                                        m.id === mat.id
+                                          ? { ...m, lotId: undefined, lotNumber: undefined, useSpecificLot: false }
+                                          : m
+                                      )
+                                    )
+                                  }
+                                >
+                                  Clear
+                                </Button>
+                              </div>
+                            ) : (
+                              <LotSelectionCombobox
+                                materialId={mat.materialId}
+                                requiredQuantity={mat.quantity}
+                                value={mat.lotId ?? null}
+                                onChange={(lot: AvailableLot | null) => {
+                                  setMaterials((prev) =>
+                                    prev.map((m) =>
+                                      m.id === mat.id
+                                        ? {
+                                            ...m,
+                                            lotId: lot?.lotId,
+                                            lotNumber: lot?.lotNumber,
+                                            useSpecificLot: !!lot,
+                                          }
+                                        : m
+                                    )
+                                  );
+                                }}
+                                placeholder="Any stock"
+                              />
+                            )}
                           </TableCell>
                           <TableCell>
                             <Button

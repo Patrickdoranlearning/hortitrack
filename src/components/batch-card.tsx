@@ -28,6 +28,8 @@ import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
 import type { ActionMode } from "@/components/actions/types";
 import { PlayCircle, Truck } from "lucide-react";
 import { ActualizeBatchDialog } from "@/components/batches/ActualizeBatchDialog";
+import { HealthIndicator } from "@/components/batch/HealthIndicator";
+import type { HealthStatusLevel } from "@/components/batch/HealthIndicator";
 
 // --- runtime guard: logs undefined imports without crashing ---
 const _ensure = <T,>(x: T | undefined | null, name: string): T => {
@@ -58,12 +60,20 @@ type BatchCardBatch = Batch & {
   locationName?: string;
   // Distribution data from v_batch_search view
   distribution?: SimpleDistribution;
+  // Health status data (optional, from health status API)
+  healthStatus?: {
+    level: HealthStatusLevel;
+    lastEventAt?: string | null;
+    lastEventType?: string | null;
+    activeIssuesCount?: number;
+  };
 };
 
 type BatchCardProps = {
   batch: BatchCardBatch;
   onOpen?: (batch: BatchCardBatch) => void;
   onLogAction?: (batch: BatchCardBatch, mode: ActionMode) => void;
+  onHealthClick?: (batch: BatchCardBatch) => void;
   actionsSlot?: React.ReactNode;
   className?: string;
 };
@@ -72,6 +82,7 @@ export function BatchCard({
   batch,
   onOpen,
   onLogAction,
+  onHealthClick,
   actionsSlot,
   className,
 }: BatchCardProps) {
@@ -298,12 +309,12 @@ export function BatchCard({
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {/* For ghost batches, show a combined badge with status; for real batches show phase + status */}
           {isGhostBatch ? (
             <>
-              <Badge 
-                variant={isIncoming ? "secondary" : "outline"} 
+              <Badge
+                variant={isIncoming ? "secondary" : "outline"}
                 className={cn(
                   "font-medium",
                   isPlanned && "border-amber-400 text-amber-700 dark:text-amber-400",
@@ -328,6 +339,19 @@ export function BatchCard({
                 <Badge variant={getStatusVariant(batch.status)}>
                   {batch.status}
                 </Badge>
+              )}
+              {/* Health indicator */}
+              {batch.healthStatus && (
+                <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
+                  <HealthIndicator
+                    level={batch.healthStatus.level}
+                    lastEventAt={batch.healthStatus.lastEventAt}
+                    lastEventType={batch.healthStatus.lastEventType}
+                    activeIssuesCount={batch.healthStatus.activeIssuesCount}
+                    size="sm"
+                    onClick={onHealthClick ? () => onHealthClick(batch) : undefined}
+                  />
+                </div>
               )}
             </>
           )}

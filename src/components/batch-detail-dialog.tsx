@@ -35,7 +35,11 @@ import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
 import type { ActionMode } from "@/components/actions/types";
 import { StockMovementLog } from "@/components/history/StockMovementLog";
 import { PlantHealthLog } from "@/components/history/PlantHealthLog";
-import { Package, Heart } from "lucide-react";
+import { Package, Heart, Search, Plus, Trash2 as TrashIcon, Download } from "lucide-react";
+import { StockAdjustmentDialog } from "@/components/batch/StockAdjustmentDialog";
+import { RecordLossDialog } from "@/components/batch/RecordLossDialog";
+import { AddHealthLogDialog } from "@/components/plant-health/AddHealthLogDialog";
+import { ScoutLogCard } from "@/components/batches/ScoutLogCard";
 
 // Lazy load gallery to avoid slowing down dialog open
 const BatchGallerySection = dynamic(
@@ -77,6 +81,17 @@ export function BatchDetailDialog({
 }: BatchDetailDialogProps) {
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
+
+  // Dialog states for actions
+  const [adjustDialogOpen, setAdjustDialogOpen] = React.useState(false);
+  const [lossDialogOpen, setLossDialogOpen] = React.useState(false);
+  const [healthLogDialogOpen, setHealthLogDialogOpen] = React.useState(false);
+  const [isExportingStock, setIsExportingStock] = React.useState(false);
+
+  // Scout logs state
+  const [scoutLogs, setScoutLogs] = React.useState<PlantHealthEvent[]>([]);
+  const [scoutLoading, setScoutLoading] = React.useState(false);
+  const [scoutError, setScoutError] = React.useState<string | null>(null);
 
   // Stock movements state
   const [stockMovements, setStockMovements] = React.useState<StockMovement[]>([]);
@@ -171,6 +186,99 @@ export function BatchDetailDialog({
     };
   }, [open, batch?.id]);
 
+  // Fetch scout logs when dialog opens
+  React.useEffect(() => {
+    if (!open || !batch?.id) {
+      setScoutLogs([]);
+      return;
+    }
+
+    let cancelled = false;
+    setScoutLoading(true);
+    setScoutError(null);
+
+    fetch(`/api/production/batches/${batch.id}/scout-logs`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j?.error || res.statusText);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setScoutLogs(data.logs || []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setScoutError(err?.message || String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setScoutLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, batch?.id]);
+
+  // Refresh functions
+  const refreshStockMovements = React.useCallback(async () => {
+    if (!batch?.id) return;
+    setStockLoading(true);
+    try {
+      const res = await fetch(`/api/production/batches/${batch.id}/stock-movements`);
+      const data = await res.json();
+      setStockMovements(data.movements || []);
+    } catch {
+      // Ignore refresh errors
+    } finally {
+      setStockLoading(false);
+    }
+  }, [batch?.id]);
+
+  const refreshHealthLogs = React.useCallback(async () => {
+    if (!batch?.id) return;
+    setHealthLoading(true);
+    try {
+      const res = await fetch(`/api/production/batches/${batch.id}/plant-health`);
+      const data = await res.json();
+      setHealthLogs(data.logs || []);
+    } catch {
+      // Ignore refresh errors
+    } finally {
+      setHealthLoading(false);
+    }
+  }, [batch?.id]);
+
+  // Export stock movements
+  const handleExportStock = async () => {
+    if (!batch?.id) return;
+    setIsExportingStock(true);
+    try {
+      const response = await fetch(`/api/production/batches/${batch.id}/stock-movements/export`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `stock-movements-${batch.batchNumber || batch.id}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExportingStock(false);
+    }
+  };
+
   // Callback for fetching detailed distribution
   const fetchDetailedDistribution = React.useCallback(async (batchId: string): Promise<DetailedDistribution> => {
     const res = await fetch(`/api/production/batches/${batchId}/distribution`);
@@ -248,6 +356,10 @@ export function BatchDetailDialog({
                     <Heart className="h-3.5 w-3.5" />
                     Health
                   </TabsTrigger>
+                  <TabsTrigger value="scout" className="flex items-center gap-1">
+                    <Search className="h-3.5 w-3.5" />
+                    Scout
+                  </TabsTrigger>
                   <TabsTrigger value="photos">
                     <ImageIcon className="h-4 w-4 mr-1" />
                     Photos
@@ -294,7 +406,44 @@ export function BatchDetailDialog({
 
                 {/* Stock Movement Tab */}
                 <TabsContent value="stock">
-                  <div className="max-h-96 overflow-y-auto mt-4">
+                  <div className="flex items-center justify-between mt-4 mb-3">
+                    <div className="text-sm text-muted-foreground">
+                      Current: <span className="font-semibold text-foreground">{(batch.quantity ?? 0).toLocaleString()}</span> units
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAdjustDialogOpen(true)}
+                        className="text-emerald-600 hover:text-emerald-700"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adjust
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setLossDialogOpen(true)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <TrashIcon className="h-4 w-4 mr-1" />
+                        Loss
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportStock}
+                        disabled={isExportingStock || stockMovements.length === 0}
+                      >
+                        {isExportingStock ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
                     {stockLoading && (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -315,7 +464,21 @@ export function BatchDetailDialog({
 
                 {/* Plant Health Tab */}
                 <TabsContent value="health">
-                  <div className="max-h-96 overflow-y-auto mt-4">
+                  <div className="flex items-center justify-between mt-4 mb-3">
+                    <div className="text-sm text-muted-foreground">
+                      {healthLogs.length} health event{healthLogs.length !== 1 ? 's' : ''} recorded
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHealthLogDialogOpen(true)}
+                      className="text-emerald-600 hover:text-emerald-700"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Log Event
+                    </Button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
                     {healthLoading && (
                       <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -330,6 +493,33 @@ export function BatchDetailDialog({
                     )}
                     {!healthLoading && healthLogs.length > 0 && (
                       <PlantHealthLog logs={healthLogs} />
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* Scout Tab */}
+                <TabsContent value="scout">
+                  <div className="mt-4">
+                    {scoutLoading && (
+                      <div className="flex items-center justify-center py-8 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Loading scout observations...
+                      </div>
+                    )}
+                    {scoutError && (
+                      <div className="text-sm text-red-600 py-4">{scoutError}</div>
+                    )}
+                    {!scoutLoading && !scoutError && scoutLogs.length === 0 && (
+                      <div className="text-muted-foreground py-4 text-center">
+                        No scout observations for this batch yet.
+                      </div>
+                    )}
+                    {!scoutLoading && scoutLogs.length > 0 && (
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {scoutLogs.map((log) => (
+                          <ScoutLogCard key={log.id} log={log} compact />
+                        ))}
+                      </div>
                     )}
                   </div>
                 </TabsContent>
@@ -379,11 +569,40 @@ export function BatchDetailDialog({
           </div>
         </DialogContent>
       </Dialog>
-      <BatchChatDialog 
+      <BatchChatDialog
         open={isChatOpen}
         onOpenChange={setIsChatOpen}
         batchId={batch?.id}
         batchNumber={batch?.batchNumber}
+      />
+
+      {/* Stock Adjustment Dialog */}
+      <StockAdjustmentDialog
+        open={adjustDialogOpen}
+        onOpenChange={setAdjustDialogOpen}
+        batchId={batch?.id || ''}
+        batchNumber={batch?.batchNumber}
+        currentQuantity={batch?.quantity ?? 0}
+        onSuccess={() => refreshStockMovements()}
+      />
+
+      {/* Loss Recording Dialog */}
+      <RecordLossDialog
+        open={lossDialogOpen}
+        onOpenChange={setLossDialogOpen}
+        batchId={batch?.id || ''}
+        batchNumber={batch?.batchNumber}
+        currentQuantity={batch?.quantity ?? 0}
+        onSuccess={() => refreshStockMovements()}
+      />
+
+      {/* Health Log Dialog */}
+      <AddHealthLogDialog
+        open={healthLogDialogOpen}
+        onOpenChange={setHealthLogDialogOpen}
+        batchId={batch?.id || ''}
+        batchNumber={batch?.batchNumber}
+        onSuccess={() => refreshHealthLogs()}
       />
     </>
   );

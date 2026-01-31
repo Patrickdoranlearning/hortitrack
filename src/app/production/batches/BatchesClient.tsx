@@ -67,6 +67,8 @@ import { Badge } from "@/components/ui/badge";
 import { fetchJson } from '@/lib/http';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import TransplantForm from '@/components/batches/TransplantForm';
+import { useBatchHealthStatuses } from '@/hooks/useBatchHealthStatus';
+import { HealthDot } from '@/components/batch/HealthIndicator';
 
 
 export default function BatchesClient({ initialBatches }: { initialBatches: Batch[] }) {
@@ -79,7 +81,8 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     plantFamily: string;
     status: string;
     category: string;
-  }>({ plantFamily: 'all', status: 'all', category: 'all' });
+    healthStatus: string;
+  }>({ plantFamily: 'all', status: 'all', category: 'all', healthStatus: 'all' });
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'batchNumber', direction: 'desc' });
 
@@ -118,6 +121,16 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     "catalog/locations",
     () => fetchJson<{ value: string; label: string }[]>("/api/catalog/locations")
   );
+
+  // Fetch health statuses for all active batches
+  const activeBatchIds = useMemo(() =>
+    batches
+      .filter((b) => b.status !== "Archived" && b.status !== "Planned" && b.status !== "Incoming")
+      .map((b) => b.id)
+      .filter((id): id is string => !!id),
+    [batches]
+  );
+  const { statuses: healthStatuses } = useBatchHealthStatuses(activeBatchIds);
 
   const nurseryLocations = useMemo<NurseryLocation[]>(() => {
     if (!Array.isArray(locationsData) || !locationsData.length) return [];
@@ -207,8 +220,19 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
       .filter((batch) => {
         if (filters.status === 'all') return true;
         return batch.status === filters.status;
-      });
-    
+      })
+      .filter((batch) => {
+        if (filters.healthStatus === 'all') return true;
+        const healthStatus = batch.id ? healthStatuses[batch.id] : undefined;
+        const level = healthStatus?.level || 'healthy';
+        return level === filters.healthStatus;
+      })
+      // Enrich batches with health status
+      .map((batch) => ({
+        ...batch,
+        healthStatus: batch.id ? healthStatuses[batch.id] : undefined,
+      }));
+
     // Apply sorting
     return [...filtered].sort((a, b) => {
       const { key, direction } = sortConfig;
@@ -251,7 +275,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
       const comparison = String(aVal).localeCompare(String(bVal));
       return direction === 'asc' ? comparison : -comparison;
     });
-  }, [batches, searchQuery, filters, sortConfig]);
+  }, [batches, searchQuery, filters, sortConfig, healthStatuses]);
   
   const handleSort = (key: string) => {
     setSortConfig(prev => ({
@@ -294,6 +318,13 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const handleCareRecommendations = (batch: Batch) => {
     setSelectedBatch(batch);
     setIsCareOpen(true);
+  };
+
+  const handleHealthClick = (batch: Batch) => {
+    // Open batch detail dialog to Health tab
+    setSelectedBatch(batch);
+    setIsDetailDialogOpen(true);
+    // TODO: Could add state to open to Health tab directly
   };
 
   const handleScanDetected = React.useCallback(
@@ -370,12 +401,12 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
             <span className="text-sm text-muted-foreground">
               {filteredBatches.length} batch{filteredBatches.length !== 1 ? 'es' : ''}
             </span>
-            {(filters.status !== 'all' || filters.plantFamily !== 'all' || filters.category !== 'all') && (
+            {(filters.status !== 'all' || filters.plantFamily !== 'all' || filters.category !== 'all' || filters.healthStatus !== 'all') && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2 text-xs"
-                onClick={() => setFilters({ plantFamily: 'all', status: 'all', category: 'all' })}
+                onClick={() => setFilters({ plantFamily: 'all', status: 'all', category: 'all', healthStatus: 'all' })}
               >
                 Clear filters
               </Button>
@@ -412,14 +443,40 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                   </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Family</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup 
-                    value={filters.plantFamily} 
+                  <DropdownMenuRadioGroup
+                    value={filters.plantFamily}
                     onValueChange={(value) => setFilters((f) => ({ ...f, plantFamily: value }))}
                   >
                     <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
                     {(plantFamilies || []).filter(p => p !== 'all').map((p) => (
                       <DropdownMenuRadioItem key={p} value={p}>{p}</DropdownMenuRadioItem>
                     ))}
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Health Status</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={filters.healthStatus}
+                    onValueChange={(value) => setFilters((f) => ({ ...f, healthStatus: value }))}
+                  >
+                    <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="healthy">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        Healthy
+                      </span>
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="attention">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-amber-500" />
+                        Needs Attention
+                      </span>
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="critical">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        Critical
+                      </span>
+                    </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -458,6 +515,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                     batch={batch}
                     onOpen={handleViewDetails}
                     onLogAction={handleLogAction}
+                    onHealthClick={handleHealthClick}
                     actionsSlot={
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                           <TooltipProvider>
@@ -631,7 +689,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{getFamilyLabel(batch)}</TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap items-center gap-1">
                               {batch.phase && (
                                 <Badge variant="secondary" className="capitalize text-xs">
                                   {batch.phase}
@@ -641,6 +699,23 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                                 <Badge variant={getStatusVariant(batch.status)} className="text-xs">
                                   {batch.status}
                                 </Badge>
+                              )}
+                              {batch.healthStatus && batch.healthStatus.level !== 'healthy' && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <HealthDot level={batch.healthStatus.level} className="ml-1" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {batch.healthStatus.level === 'critical'
+                                        ? 'Critical health issues'
+                                        : 'Health attention needed'}
+                                      {batch.healthStatus.activeIssuesCount
+                                        ? ` (${batch.healthStatus.activeIssuesCount} issues)`
+                                        : ''}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               )}
                             </div>
                           </TableCell>

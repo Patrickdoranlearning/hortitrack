@@ -560,7 +560,8 @@ export async function completeTasks(
         product_name,
         rate,
         rate_unit,
-        method
+        method,
+        calendar_week
       `)
       .in('id', taskIds)
       .eq('org_id', orgId);
@@ -653,8 +654,27 @@ export async function completeTasks(
       });
     }
 
+    // Sync completion to any linked generic task summaries
+    if (tasks && tasks.length > 0) {
+      const productWeekPairs = new Set<string>();
+      for (const task of tasks) {
+        if (task.product_id && task.calendar_week) {
+          productWeekPairs.add(`${task.product_id}:${task.calendar_week}`);
+        }
+      }
+      for (const pair of productWeekPairs) {
+        const [productId, calendarWeek] = pair.split(':');
+        try {
+          await completeIpmSummaryTask({ productId, calendarWeek: parseInt(calendarWeek, 10) });
+        } catch {
+          // Ignore errors - summary task may not exist
+        }
+      }
+    }
+
     revalidatePath('/plant-health');
     revalidatePath('/batches');
+    revalidatePath('/tasks');
     return { success: true };
   } catch (error) {
     console.error('[completeTasks] error', error);

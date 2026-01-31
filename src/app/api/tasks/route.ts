@@ -9,6 +9,7 @@ import {
 } from "@/server/tasks/service";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 import { createClient } from "@/lib/supabase/server";
+import { logError } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ const CreateTaskSchema = z.object({
   description: z.string().optional(),
   taskType: z.string().optional(),
   assignedTo: z.string().uuid().optional(),
+  assignedTeamId: z.string().uuid().optional(),
   scheduledDate: z.string().optional(),
   priority: z.number().int().optional(),
   plantQuantity: z.number().int().optional(),
@@ -56,7 +58,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ tasks, totalCount: tasks.length });
   } catch (error: unknown) {
-    console.error("[api/tasks] GET error:", error);
+    logError("[api/tasks] GET error", { error });
     const message = error instanceof Error ? error.message : "Failed to fetch tasks";
     const status = /unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ task }, { status: 201 });
   } catch (error: unknown) {
-    console.error("[api/tasks] POST error:", error);
+    logError("[api/tasks] POST error", { error });
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request", issues: error.issues },

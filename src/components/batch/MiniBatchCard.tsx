@@ -3,12 +3,23 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { AncestryNode } from "@/types/ancestry";
+import type { AncestryNode } from "@/types/batch";
+import { HealthDot } from "@/components/batch/HealthIndicator";
+import type { HealthStatusLevel } from "@/components/batch/HealthIndicator";
+
+// Extended node with optional id and health status
+type MiniBatchNode = AncestryNode & {
+  id: string;
+  healthStatus?: {
+    level: HealthStatusLevel;
+    activeIssuesCount?: number;
+  };
+};
 
 interface MiniBatchCardProps {
-  node: AncestryNode;
+  node: MiniBatchNode;
   isCurrent?: boolean;
-  onOpen: (batchId: string) => void;
+  onOpen: (batchId: string, tab?: string) => void;
 }
 
 export function MiniBatchCard({ node, isCurrent, onOpen }: MiniBatchCardProps) {
@@ -30,7 +41,20 @@ export function MiniBatchCard({ node, isCurrent, onOpen }: MiniBatchCardProps) {
       )}
       aria-label={`Open batch ${node.batchNumber}`}
     >
-      <div className="absolute right-2 top-2">
+      <div className="absolute right-2 top-2 flex items-center gap-1">
+        {node.healthStatus && node.healthStatus.level !== "healthy" && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen(node.id, "health");
+            }}
+            className="hover:opacity-80"
+            aria-label="View health issues"
+          >
+            <HealthDot level={node.healthStatus.level} />
+          </button>
+        )}
         <Badge variant={node.status === "Active" ? "default" : "secondary"}>{node.status}</Badge>
       </div>
 

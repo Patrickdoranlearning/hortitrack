@@ -54,3 +54,35 @@ export function generateInternalBarcode(orgId: string, partNumber: string): stri
   const orgPrefix = orgId.slice(0, 8);
   return `HT:${orgPrefix}:${partNumber}`;
 }
+
+/**
+ * Generate a lot number for a new material lot
+ * Format: L-{MATERIAL_PART_NUMBER}-{SEQUENCE}
+ * Example: L-M-POT-001-0042
+ */
+export async function generateLotNumber(materialPartNumber: string): Promise<string> {
+  const { supabase, orgId } = await getUserAndOrg();
+  const key = `lot-${materialPartNumber}`;
+
+  const { data, error } = await supabase.rpc("increment_counter", {
+    p_org_id: orgId,
+    p_key: key,
+  });
+
+  if (error) {
+    throw new Error(`Lot number generation failed: ${error.message}`);
+  }
+
+  const seq = String(data as number).padStart(4, "0");
+  return `L-${materialPartNumber}-${seq}`;
+}
+
+/**
+ * Generate internal barcode for a material lot
+ * Format: HT:{ORG_PREFIX}:LOT:{LOT_NUMBER}
+ * Example: HT:abc12345:LOT:L-M-POT-001-0042
+ */
+export function generateLotBarcode(orgId: string, lotNumber: string): string {
+  const orgPrefix = orgId.slice(0, 8);
+  return `HT:${orgPrefix}:LOT:${lotNumber}`;
+}

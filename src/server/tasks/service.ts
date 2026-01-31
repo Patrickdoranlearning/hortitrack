@@ -1,5 +1,6 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logError } from "@/lib/log";
 
 // =============================================================================
 // TYPES
@@ -187,7 +188,7 @@ export async function getTasks(filter: TaskFilter = {}): Promise<Task[]> {
   const { data, error } = await query;
 
   if (error) {
-    console.error("[tasks/service] Error fetching tasks:", error);
+    logError("[tasks/service] Error fetching tasks", { error });
     throw new Error(error.message);
   }
 
@@ -228,7 +229,7 @@ export async function getTaskById(taskId: string): Promise<Task | null> {
 
   if (error) {
     if (error.code === "PGRST116") return null; // Not found
-    console.error("[tasks/service] Error fetching task:", error);
+    logError("[tasks/service] Error fetching task", { error });
     throw new Error(error.message);
   }
 
@@ -267,7 +268,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
     .single();
 
   if (error) {
-    console.error("[tasks/service] Error creating task:", error);
+    logError("[tasks/service] Error creating task", { error });
     throw new Error(error.message);
   }
 
@@ -323,7 +324,7 @@ export async function updateTask(
     .single();
 
   if (error) {
-    console.error("[tasks/service] Error updating task:", error);
+    logError("[tasks/service] Error updating task", { error });
     throw new Error(error.message);
   }
 
@@ -377,7 +378,7 @@ export async function assignTask(
     .single();
 
   if (error) {
-    console.error("[tasks/service] Error assigning task:", error);
+    logError("[tasks/service] Error assigning task", { error });
     throw new Error(error.message);
   }
 
@@ -402,7 +403,7 @@ export async function startTask(taskId: string): Promise<Task> {
     .single();
 
   if (error) {
-    console.error("[tasks/service] Error starting task:", error);
+    logError("[tasks/service] Error starting task", { error });
     throw new Error(error.message);
   }
 
@@ -448,7 +449,7 @@ export async function completeTask(
     .single();
 
   if (error) {
-    console.error("[tasks/service] Error completing task:", error);
+    logError("[tasks/service] Error completing task", { error });
     throw new Error(error.message);
   }
 
@@ -492,7 +493,7 @@ export async function cancelTask(taskId: string): Promise<Task> {
     .single();
 
   if (error) {
-    console.error("[tasks/service] Error cancelling task:", error);
+    logError("[tasks/service] Error cancelling task", { error });
     throw new Error(error.message);
   }
 
@@ -512,7 +513,7 @@ export async function deleteTask(taskId: string): Promise<void> {
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("[tasks/service] Error deleting task:", error);
+    logError("[tasks/service] Error deleting task", { error });
     throw new Error(error.message);
   }
 }
@@ -542,7 +543,7 @@ export async function getTaskBySourceRef(
       return null;
     }
     // For real errors, throw so callers can handle appropriately
-    console.error("[tasks/service] Error fetching task by source ref:", error);
+    logError("[tasks/service] Error fetching task by source ref", { error });
     throw new Error(error.message);
   }
 
@@ -568,7 +569,7 @@ export async function deleteTaskBySourceRef(
     .eq("source_ref_id", sourceRefId);
 
   if (error) {
-    console.error("[tasks/service] Error deleting task by source ref:", error);
+    logError("[tasks/service] Error deleting task by source ref", { error });
     throw new Error(error.message);
   }
 }
@@ -598,7 +599,7 @@ export async function getAssignableStaff(): Promise<StaffMember[]> {
     .in("role", ["grower", "admin", "owner", "editor", "staff"]);
 
   if (error) {
-    console.error("[tasks/service] Error fetching staff:", error);
+    logError("[tasks/service] Error fetching staff", { error });
     throw new Error(error.message);
   }
 
