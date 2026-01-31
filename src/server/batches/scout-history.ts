@@ -41,8 +41,7 @@ export async function getBatchScoutHistory(
       batches!plant_health_logs_batch_id_fkey (
         batch_number,
         plant_varieties (name)
-      ),
-      profiles:recorded_by (full_name)
+      )
     `)
     .eq('org_id', orgId)
     .eq('event_type', 'scout_flag')
@@ -55,6 +54,7 @@ export async function getBatchScoutHistory(
   }
 
   // Transform to PlantHealthEvent type
+  // Note: recorded_by references auth.users, not profiles, so we can't join to get the name
   return (data || []).map((row: any) => ({
     id: row.id,
     batchId: row.batch_id,
@@ -68,7 +68,7 @@ export async function getBatchScoutHistory(
     issueType: row.issue_reason,
     photos: row.photo_url ? [row.photo_url] : undefined,
     userId: row.recorded_by,
-    userName: row.profiles?.full_name,
+    userName: undefined, // FK is to auth.users, not profiles - would need migration to fix
   }));
 }
 
@@ -111,8 +111,7 @@ export async function getBatchLocationScouts(
       issue_reason,
       severity,
       photo_url,
-      nursery_locations!plant_health_logs_location_id_fkey (name),
-      profiles:recorded_by (full_name)
+      nursery_locations!plant_health_logs_location_id_fkey (name)
     `)
     .eq('org_id', orgId)
     .eq('event_type', 'scout_flag')
@@ -126,6 +125,7 @@ export async function getBatchLocationScouts(
     return [];
   }
 
+  // Note: recorded_by references auth.users, not profiles, so we can't join to get the name
   return (data || []).map((row: any) => ({
     id: row.id,
     batchId: row.batch_id,
@@ -137,7 +137,7 @@ export async function getBatchLocationScouts(
     issueType: row.issue_reason,
     photos: row.photo_url ? [row.photo_url] : undefined,
     userId: row.recorded_by,
-    userName: row.profiles?.full_name,
+    userName: undefined, // FK is to auth.users, not profiles - would need migration to fix
   }));
 }
 
