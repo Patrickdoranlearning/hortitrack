@@ -6,6 +6,7 @@ import {
   assignPickListToTeam,
   updatePickListSequence,
 } from "@/server/sales/picking";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 // GET /api/picking/[pickListId] - Get pick list details
 export async function GET(
@@ -24,10 +25,10 @@ export async function GET(
     }
 
     return NextResponse.json({ pickList });
-  } catch (error: any) {
-    console.error("Error fetching pick list:", error);
+  } catch (error) {
+    logger.picking.error("Error fetching pick list", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch pick list" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -80,10 +81,10 @@ export async function PATCH(
 
     const pickList = await getPickListById(pickListId);
     return NextResponse.json({ pickList });
-  } catch (error: any) {
-    console.error("Error updating pick list:", error);
+  } catch (error) {
+    logger.picking.error("Error updating pick list", error);
     return NextResponse.json(
-      { error: error.message || "Failed to update pick list" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

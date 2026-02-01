@@ -142,10 +142,18 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     }));
   }, [locationsData, batches]);
   
-  if (batchesError) console.error("Error fetching batches:", batchesError);
+  useEffect(() => {
+    if (batchesError && process.env.NODE_ENV === "development") {
+      // Development-only logging for batch fetch errors
+      console.error("[BatchesClient] Error fetching batches:", batchesError);
+    }
+  }, [batchesError]);
+
   useEffect(() => {
     if (locationsError) {
-      console.error("Error loading locations:", locationsError);
+      if (process.env.NODE_ENV === "development") {
+        console.error("[BatchesClient] Error loading locations:", locationsError);
+      }
       toast({
         variant: "destructive",
         title: "Locations unavailable",
@@ -196,13 +204,13 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const getLocationLabel = (batch: Batch) =>
     typeof batch.location === "string"
       ? batch.location
-      : (batch as any)?.location?.name ??
-        (batch as any)?.locationName ??
+      : (batch as { location?: { name?: string }; locationName?: string })?.location?.name ??
+        (batch as { locationName?: string })?.locationName ??
         "Unassigned";
 
   const getFamilyLabel = (batch: Batch) =>
     batch.plantFamily ||
-    (batch as any)?.plant_family ||
+    (batch as { plant_family?: string })?.plant_family ||
     "Unspecified";
 
   const filteredBatches = useMemo(() => {
@@ -236,8 +244,9 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
     // Apply sorting
     return [...filtered].sort((a, b) => {
       const { key, direction } = sortConfig;
-      let aVal: any, bVal: any;
-      
+      let aVal: string | number;
+      let bVal: string | number;
+
       switch (key) {
         case 'batchNumber':
           aVal = a.batchNumber || '';
@@ -290,8 +299,10 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   };
   
   const handleEditBatch = (batch: Batch) => {
-    // Logic to open an edit form/dialog
-    console.log("Editing batch:", batch);
+    // TODO: Logic to open an edit form/dialog
+    // Currently opens detail dialog which has edit functionality
+    setSelectedBatch(batch);
+    setIsDetailDialogOpen(true);
   };
 
   const handleLogAction = (batch: Batch, mode: ActionMode) => {
@@ -334,11 +345,11 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         // Simple redirect to homepage with batch param if we can find it
         router.push(`/?batch=${encodeURIComponent(text)}`);
         setIsScanOpen(false);
-      } catch (err: any) {
+      } catch (err) {
         toast({
           variant: "destructive",
           title: "Scan failed",
-          description: err?.message || "Could not look up that batch.",
+          description: err instanceof Error ? err.message : "Could not look up that batch.",
         });
       }
     },

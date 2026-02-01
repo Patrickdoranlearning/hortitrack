@@ -5,6 +5,7 @@ import { getUserFromRequest } from "@/server/security/auth";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 import { jsonError } from "./responses";
 import type { UserSession } from "@/lib/types";
+import { logger } from "@/server/utils/logger";
 
 type GuardOpts<B extends z.ZodTypeAny | undefined = undefined> = {
   method: "GET"|"POST"|"PATCH"|"DELETE";
@@ -61,12 +62,13 @@ export function withApiGuard<B extends z.ZodTypeAny | undefined>(opts: GuardOpts
 
       const resp = await opts.handler({ req, user, body });
       return resp;
-    } catch (e: any) {
-      console.error("api_error", { route: req.nextUrl.pathname, method: req.method, msg: e?.message });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unknown error";
+      logger.api.error("API error", e, { route: req.nextUrl.pathname, method: req.method });
       return jsonError("Internal Error", 500);
     } finally {
       const dur = Date.now() - started;
-      console.log("api_done", { route: req.nextUrl.pathname, method: req.method, ms: dur });
+      logger.api.info("Request completed", { route: req.nextUrl.pathname, method: req.method, durationMs: dur });
     }
   };
 }

@@ -5,7 +5,8 @@ export type ParsedScan
   | { by: "materialPartNumber"; value: string; raw: string }
   | { by: "materialBarcode"; value: string; raw: string }
   | { by: "lotNumber"; value: string; raw: string }
-  | { by: "lotBarcode"; value: string; raw: string };
+  | { by: "lotBarcode"; value: string; raw: string }
+  | { by: "taskId"; value: string; raw: string };
 
 const digitsOnly = (s: string) => s.replace(/\D+/g, '');
 
@@ -15,6 +16,12 @@ export function parseScanCode(input: string): ParsedScan | null {
 
   // Normalize common prefixes
   const lower = raw.toLowerCase();
+
+  // ht:task:<taskId> - Task codes (UUID format)
+  const htTask = lower.match(/^ht:task:([a-f0-9-]{36})$/i);
+  if (htTask) {
+    return { by: 'taskId', value: htTask[1], raw };
+  }
 
   // ht:loc:<locationId> - Location codes
   const htLoc = lower.match(/^ht:loc:([a-z0-9-_]+)$/i);

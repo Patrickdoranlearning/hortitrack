@@ -1,5 +1,5 @@
 
-import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, Store, Target, ListTodo, Package } from "lucide-react";
+import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, Store, Target, Package } from "lucide-react";
 
 export type NavItem = {
   key: string;
@@ -91,18 +91,6 @@ export const APP_NAV: NavItem[] = [
       { label: "Catalog", href: "/materials/catalog", description: "Manage materials catalog (pots, trays, soil, etc.)." },
       { label: "Stock", href: "/materials/stock", description: "View and manage stock levels." },
       { label: "Purchase Orders", href: "/materials/purchase-orders", description: "Create and manage purchase orders." },
-    ]
-  },
-  {
-    key: "tasks",
-    label: "Tasks",
-    href: "/tasks",
-    icon: ListTodo,
-    items: [
-      { label: "Overview", href: "/tasks", description: "Task dashboard and your daily schedule." },
-      { label: "Production Tasks", href: "/tasks/production", description: "Manage and assign production jobs." },
-      { label: "Plant Health Tasks", href: "/tasks/plant-health", description: "IPM and health-related tasks." },
-      { label: "Dispatch Tasks", href: "/tasks/dispatch", description: "Picking, packing, and loading tasks." },
     ]
   },
 ];

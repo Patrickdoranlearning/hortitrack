@@ -26,6 +26,8 @@ Quick reference for the Jimmy coordinator agent.
 | Command | What It Does |
 |---------|--------------|
 | `jimmy plan [X]` | Route to `planner` → produces PLAN.md |
+| `jimmy dual-plan [X]` | Run two planners in parallel, synthesize best plan |
+| `jimmy dual-plan [X] --perspectives "A" "B"` | Specify perspectives (e.g., "MVP speed" "proper architecture") |
 | `jimmy journey` | Describe a user journey → planner parses and plans |
 | `jimmy execute PLAN.md` | Execute plan with standard mode |
 | `jimmy execute PLAN.md --mode thorough` | Execute with thorough mode |
@@ -33,6 +35,15 @@ Quick reference for the Jimmy coordinator agent.
 | `jimmy execute PLAN-[name].md` | Execute a specific named plan |
 | `jimmy plan status` | Show progress against current PLAN.md |
 | `jimmy plan status --all` | Show all plans and their status |
+
+## Testing Commands
+
+| Command | What It Does |
+|---------|--------------|
+| `jimmy test [feature]` | Route to `tester-tim` → validate against FEATURES.md |
+| `jimmy test all` | Full regression test of all features |
+| `jimmy test --quick [feature]` | Quick smoke test (happy path only) |
+| `jimmy retest` | Re-run last failed tests |
 
 ---
 
@@ -66,7 +77,9 @@ Quick reference for the Jimmy coordinator agent.
 | Pipeline | Steps |
 |----------|-------|
 | **Planning** | planner → PLAN.md → jimmy execute |
-| **Feature Flow** | [data-engineer] → feature-builder → verifier → validator |
+| **Dual-Planning** | 2× planner (parallel) → jimmy evaluates → synthesize/select → PLAN.md |
+| **Feature Flow** | [data-engineer] → feature-builder → verifier → tester-tim → validator |
+| **Testing** | tester-tim (against FEATURES.md) → pass/fail → fix loop if needed |
 | **Schema** | data-engineer → security-auditor → verifier → regen types |
 | **Medic** | [debugger] → fix → verifier → [ui-tester] |
 | **Shield** | verifier → module-reviewer → security-auditor → karen |
@@ -103,6 +116,12 @@ jimmy schema add-trials-table
 # Plan a complex new feature
 jimmy plan customer-portal
 
+# Run two planners with different perspectives, pick the best
+jimmy dual-plan inventory-tracking
+
+# Specify the perspectives explicitly
+jimmy dual-plan reporting-dashboard --perspectives "client-side charts" "server-side rendering"
+
 # Describe a user journey (planner will ask follow-up questions)
 jimmy journey
 # Then describe: "As a grower, I scan a batch, see its history, update status..."
@@ -118,6 +137,15 @@ jimmy plan status
 
 # Before merging a PR
 jimmy pre-merge
+
+# Test a specific feature against FEATURES.md spec
+jimmy test batch-management
+
+# Full regression test
+jimmy test all
+
+# Quick smoke test
+jimmy test --quick orders
 
 # End of session
 jimmy wrap up

@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         .filter(Boolean)
     )] as string[];
 
-    let profilesMap: Record<string, string> = {};
+    const profilesMap: Record<string, string> = {};
     if (assignedUserIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')

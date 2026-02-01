@@ -67,6 +67,7 @@
 
 | File | Purpose |
 |------|---------|
+| `FEATURES.md` | Source of truth for feature behavior (Tester Tim validates against this) |
 | `PLAN.md` | Current production readiness plan |
 | `REVIEW-STATUS.md` | Module review progress tracker |
 | `STATUS.md` | Session context handoff |
@@ -96,6 +97,7 @@ Available agents in `.claude/agents/`:
 - `sync` - Context management
 
 ### Quality & Validation Agents
+- `tester-tim` - Feature validation against FEATURES.md specifications
 - `ultrathink-debugger` - Deep debugging with systematic root cause analysis (uses Opus)
 - `karen` - Reality check: validates actual vs claimed completion status
 - `task-completion-validator` - Verifies features actually work end-to-end
@@ -108,10 +110,13 @@ jimmy quick fix      # Fix → verifier only
 jimmy fix this       # Medic Pipeline (debug → fix → verify)
 jimmy build [X]      # Feature Flow Pipeline
 jimmy schema [X]     # Schema Pipeline (mandatory for DB)
-jimmy plan [X]       # Route to planner → produces PLAN.md
+jimmy plan [X]       # Explore → planner → produces PLAN.md
+jimmy dual-plan [X]  # Two planners in parallel, synthesize best plan
 jimmy execute PLAN.md           # Execute plan (standard mode)
 jimmy execute PLAN.md --mode X  # Execute with specific mode
 jimmy plan status    # Show plan progress
+jimmy test [X]       # Tester Tim validates against FEATURES.md
+jimmy test all       # Full regression test
 jimmy review         # module-reviewer → security-auditor
 jimmy pre-merge      # Shield Pipeline
 jimmy ship it        # Shield Pipeline → sync
@@ -122,11 +127,19 @@ jimmy paranoid [X]   # Full audit mode
 
 ### Usage Examples
 ```
-# Plan a complex feature (creates PLAN.md)
+# Plan a complex feature (explores codebase first, then creates PLAN.md)
 Ask: "jimmy plan customer-reporting-dashboard"
+
+# Get two competing plans and pick the best approach
+Ask: "jimmy dual-plan inventory-tracking"
+Ask: "jimmy dual-plan reports --perspectives 'MVP speed' 'proper architecture'"
 
 # Execute the plan
 Ask: "jimmy execute PLAN.md"
+
+# Test a feature against FEATURES.md specifications
+Ask: "jimmy test batch-management"
+Ask: "jimmy test all"  # Full regression
 
 # Deep debugging a tricky issue
 Ask: "Use the ultrathink-debugger to investigate why orders aren't saving"

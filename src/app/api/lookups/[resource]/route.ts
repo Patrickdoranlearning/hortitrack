@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { type SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/server/utils/logger";
 
 const Resource = z.enum(["varieties", "sizes", "locations", "suppliers", "customers"]);
 
@@ -13,18 +14,47 @@ function cache(resp: NextResponse) {
   return resp;
 }
 
+/**
+ * Get the organization ID for the request.
+ *
+ * SECURITY: The x-org-id header is validated against the user's org memberships
+ * to prevent unauthorized access to other organizations' data.
+ */
 async function getOrgId(supabase: SupabaseClient) {
-  // Prefer explicit header, else use the user's profile.active_org_id
+  // First, get the authenticated user
+  const { data: authUser } = await supabase.auth.getUser();
+  if (!authUser?.user) return null;
+
+  const userId = authUser.user.id;
+
+  // Check if x-org-id header is provided
   const hdr = await headers();
-  const byHeader = hdr.get("x-org-id");
-  if (byHeader) return byHeader;
-  const { data: user } = await supabase.auth.getUser();
-  if (!user?.user) return null;
+  const headerOrgId = hdr.get("x-org-id");
+
+  if (headerOrgId) {
+    // SECURITY: Validate that user has membership in the requested org
+    // This prevents users from accessing other orgs by spoofing the header
+    const { data: membership } = await supabase
+      .from("org_memberships")
+      .select("org_id")
+      .eq("user_id", userId)
+      .eq("org_id", headerOrgId)
+      .maybeSingle();
+
+    if (membership) {
+      // User has verified access to this org
+      return headerOrgId;
+    }
+    // Header org_id not valid for this user - fall through to profile lookup
+  }
+
+  // Fallback to user's active_org_id from profile
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("active_org_id")
-    .eq("id", user.user.id)
+    .eq("id", userId)
     .single();
+
   if (error) return null;
   return profile?.active_org_id ?? null;
 }
@@ -104,11 +134,9 @@ export async function GET(
       }
     }
     return cache(NextResponse.json({ data }));
-  } catch (e: any) {
-    console.error("[lookups] error:", e);
-    return NextResponse.json(
-      { error: e?.message ?? "Lookup failed" },
-      { status: 500 }
-    );
+  } catch (e: unknown) {
+    logger.api.error("Lookup failed", e, { resource });
+    const message = e instanceof Error ? e.message : "Lookup failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

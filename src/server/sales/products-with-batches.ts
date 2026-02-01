@@ -167,7 +167,9 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
 
       // Group batches by family and genus (for quick lookup when building product->batch map)
       matchedBatches?.forEach(b => {
-        const variety = b.plant_varieties as { family: string | null; genus: string | null } | null;
+        // Supabase returns joined data as arrays; extract first element if available
+        const varietyData = b.plant_varieties as { family: string | null; genus: string | null }[] | { family: string | null; genus: string | null } | null;
+        const variety = Array.isArray(varietyData) ? varietyData[0] ?? null : varietyData;
         const batchFamily = variety?.family?.toLowerCase();
         const batchGenus = variety?.genus?.toLowerCase();
         

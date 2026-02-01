@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import { ok, fail } from "@/server/utils/envelope";
 import { requireRoles } from "@/server/auth/roles";
 import { OrderStatus, canTransition } from "@/server/sales/status";
+import { getUserAndOrg } from "@/server/auth/org";
 
 export async function GET(
   _: NextRequest,
@@ -16,15 +16,19 @@ export async function GET(
     const authz = await requireRoles(["sales:read"]);
     if (!authz.ok) return fail(authz.reason === "unauthenticated" ? 401 : 403, authz.reason, "Not allowed.");
 
-    const { data: order, error: orderErr } = await supabaseAdmin
+    // Get org context to ensure multi-tenant isolation
+    const { supabase, orgId } = await getUserAndOrg();
+
+    const { data: order, error: orderErr } = await supabase
       .from("orders")
       .select("*")
       .eq("id", orderId)
+      .eq("org_id", orgId) // SECURITY: Enforce org_id filter for multi-tenant isolation
       .single();
 
     if (orderErr || !order) return fail(404, "not_found", "Order not found.");
 
-    const { data: lines, error: linesErr } = await supabaseAdmin
+    const { data: lines, error: linesErr } = await supabase
       .from("order_items")
       .select("*")
       .eq("order_id", orderId);
@@ -32,9 +36,13 @@ export async function GET(
     if (linesErr) console.error("Error fetching lines:", linesErr);
 
     return ok({ ...order, lines: lines || [] });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    if (/Unauthenticated/i.test(message)) {
+      return fail(401, "unauthenticated", "Not authenticated.");
+    }
     console.error("[sales:order:GET]", e);
-    return fail(500, "server_error", e?.message || "Unexpected");
+    return fail(500, "server_error", message || "Unexpected");
   }
 }
 
@@ -52,36 +60,45 @@ export async function PATCH(
     const authz = await requireRoles(["sales:update", "sales:read"]);
     if (!authz.ok) return fail(authz.reason === "unauthenticated" ? 401 : 403, authz.reason, "Not allowed.");
 
+    // Get org context to ensure multi-tenant isolation
+    const { supabase, orgId } = await getUserAndOrg();
+
     const body = await req.json();
     const parsed = PatchSchema.safeParse(body);
     if (!parsed.success) return fail(400, "invalid_input", "Invalid payload.", parsed.error.flatten());
 
-    const { data: order, error: orderErr } = await supabaseAdmin
+    const { data: order, error: orderErr } = await supabase
       .from("orders")
       .select("status")
       .eq("id", orderId)
+      .eq("org_id", orgId) // SECURITY: Enforce org_id filter for multi-tenant isolation
       .single();
 
     if (orderErr || !order) return fail(404, "not_found", "Order not found.");
 
-    const current = String(order.status || "draft") as any;
+    const current = String(order.status || "draft") as OrderStatus;
     const target = parsed.data.status;
 
     if (!canTransition(current, target)) {
       return fail(400, "invalid_transition", `Cannot move from ${current} to ${target}.`);
     }
 
-    const { error: updateErr } = await supabaseAdmin
+    const { error: updateErr } = await supabase
       .from("orders")
       .update({ status: target, updated_at: new Date().toISOString() })
-      .eq("id", orderId);
+      .eq("id", orderId)
+      .eq("org_id", orgId); // SECURITY: Enforce org_id filter on update too
 
     if (updateErr) throw new Error(updateErr.message);
 
     console.info("[sales:order:PATCH] status", { id: orderId, from: current, to: target });
     return ok({ id: orderId, status: target });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    if (/Unauthenticated/i.test(message)) {
+      return fail(401, "unauthenticated", "Not authenticated.");
+    }
     console.error("[sales:order:PATCH]", e);
-    return fail(500, "server_error", e?.message || "Unexpected");
+    return fail(500, "server_error", message || "Unexpected");
   }
 }

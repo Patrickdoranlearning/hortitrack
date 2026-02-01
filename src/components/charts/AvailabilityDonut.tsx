@@ -8,7 +8,10 @@ import {
   Cell,
   Tooltip,
   Legend,
+  type TooltipProps,
 } from 'recharts';
+import { type NameType, type ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import type { PieLabelRenderProps } from 'recharts';
 import { ChartContainer } from '@/components/ui/chart';
 
 interface AvailabilityDonutProps {
@@ -52,12 +55,12 @@ export default function AvailabilityDonut({
     }
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: TooltipProps<ValueType, NameType>) => {
     if (!active || !payload?.length) return null;
-    
-    const item = payload[0].payload;
+
+    const item = payload[0].payload as { name: string; value: number };
     const percentage = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0;
-    
+
     return (
       <div className="bg-popover border rounded-md shadow-md px-3 py-2 text-sm">
         <div className="font-medium">{item.name}</div>
@@ -68,7 +71,7 @@ export default function AvailabilityDonut({
     );
   };
 
-  const renderCustomLabel = ({ cx, cy }: any) => {
+  const renderCustomLabel = ({ cx, cy }: PieLabelRenderProps) => {
     return (
       <text
         x={cx}
@@ -128,7 +131,7 @@ export default function AvailabilityDonut({
           <Legend
             verticalAlign="bottom"
             height={36}
-            formatter={(value, entry: any) => {
+            formatter={(value) => {
               const item = data.find(d => d.name === value);
               return (
                 <span className="text-sm">

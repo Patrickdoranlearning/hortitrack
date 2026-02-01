@@ -2,13 +2,19 @@
 import "server-only";
 import type { Allocation } from "@/lib/sales/types";
 import { getSaleableBatches, InventoryBatch } from "@/server/sales/inventory";
+import { logger } from "@/server/utils/logger";
 
-function toTs(d: any): number {
+type DateLike = string | Date | { toDate: () => Date } | null | undefined;
+
+function toTs(d: DateLike): number {
   try {
     if (!d) return 0;
     if (typeof d === "string") return new Date(d).getTime() || 0;
-    if (typeof d?.toDate === "function") return d.toDate().getTime() || 0;
-    return new Date(d).getTime() || 0;
+    if (d instanceof Date) return d.getTime() || 0;
+    if (typeof d === "object" && "toDate" in d && typeof d.toDate === "function") {
+      return d.toDate().getTime() || 0;
+    }
+    return 0;
   } catch { return 0; }
 }
 
@@ -51,7 +57,7 @@ export async function allocateForProductLine(
   if (specificBatchId) {
     saleable = saleable.filter(b => b.id === specificBatchId);
     if (saleable.length === 0) {
-      console.warn(`Specific batch ${specificBatchId} not found or not available`);
+      logger.sales.warn(`Specific batch not found or not available`, { specificBatchId });
       return [];
     }
   }
@@ -118,10 +124,13 @@ export async function allocateForProductLine(
 
   // Warn if we couldn't fulfill the full quantity
   if (remaining > 0) {
-    console.warn(
-      `Could not fully allocate ${qty} units of ${plantVariety} ${size}. ` +
-      `${remaining} units short. Available: ${qty - remaining}`
-    );
+    logger.sales.warn("Could not fully allocate requested quantity", {
+      requestedQty: qty,
+      plantVariety,
+      size,
+      shortfall: remaining,
+      allocated: qty - remaining,
+    });
   }
 
   return out;

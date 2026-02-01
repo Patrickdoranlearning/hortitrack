@@ -9,7 +9,9 @@ import {
   Area,
   Tooltip,
   CartesianGrid,
+  type TooltipProps,
 } from 'recharts';
+import { type NameType, type ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { ChartContainer } from '@/components/ui/chart';
 import { format, parseISO, subDays, eachDayOfInterval } from 'date-fns';
 
@@ -66,11 +68,11 @@ export default function LossTrendChart({ data, days = 30 }: LossTrendChartProps)
     return { total, avg, daysWithLoss };
   }, [chartData]);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
     if (!active || !payload?.length) return null;
-    
-    const value = payload[0].value;
-    
+
+    const value = payload[0].value as number;
+
     return (
       <div className="bg-popover border rounded-md shadow-md px-3 py-2 text-sm">
         <div className="text-muted-foreground text-xs">{label}</div>

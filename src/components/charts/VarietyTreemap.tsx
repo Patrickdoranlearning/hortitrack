@@ -5,7 +5,9 @@ import {
   ResponsiveContainer,
   Treemap,
   Tooltip,
+  type TooltipProps,
 } from 'recharts';
+import { type NameType, type ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { ChartContainer } from '@/components/ui/chart';
 
 interface VarietyTreemapProps {
@@ -85,15 +87,27 @@ export default function VarietyTreemap({
     };
   }, [data]);
 
-  const CustomContent = (props: any) => {
+  interface TreemapContentProps {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    name?: string;
+    depth: number;
+    color?: string;
+    family?: string;
+    varietyId?: string;
+  }
+
+  const CustomContent = (props: TreemapContentProps) => {
     const { x, y, width, height, name, depth, color, family, varietyId } = props;
-    
+
     if (width < 20 || height < 20 || !name) return null;
 
     const displayName = String(name);
-    const isActive = depth === 1 
+    const isActive = depth === 1
       ? activeFamilies.length === 0 || activeFamilies.includes(displayName)
-      : activeVarieties.length === 0 || activeVarieties.includes(varietyId);
+      : activeVarieties.length === 0 || activeVarieties.includes(varietyId ?? '');
 
     const handleClick = () => {
       if (depth === 1 && onFamilyClick) {
@@ -123,7 +137,7 @@ export default function VarietyTreemap({
             textAnchor="middle"
             dominantBaseline="middle"
             className="fill-white text-xs font-medium"
-            style={{ 
+            style={{
               fontSize: Math.min(12, width / 8),
               pointerEvents: 'none',
             }}
@@ -135,20 +149,20 @@ export default function VarietyTreemap({
     );
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: TooltipProps<ValueType, NameType>) => {
     if (!active || !payload?.length) return null;
-    
-    const data = payload[0].payload;
-    
+
+    const tooltipData = payload[0].payload as TreemapNode;
+
     return (
       <div className="bg-popover border rounded-md shadow-md px-3 py-2 text-sm">
-        <div className="font-medium">{data.name}</div>
-        {data.family && data.family !== data.name && (
-          <div className="text-muted-foreground text-xs">{data.family}</div>
+        <div className="font-medium">{tooltipData.name}</div>
+        {tooltipData.family && tooltipData.family !== tooltipData.name && (
+          <div className="text-muted-foreground text-xs">{tooltipData.family}</div>
         )}
-        {data.size && (
+        {tooltipData.size && (
           <div className="text-muted-foreground">
-            {data.size.toLocaleString()} plants
+            {tooltipData.size.toLocaleString()} plants
           </div>
         )}
       </div>

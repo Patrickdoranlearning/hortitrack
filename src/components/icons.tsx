@@ -40,3 +40,27 @@ export const CareIcon = () => (
       <line x1="8.12" y1="8.12" x2="12" y2="12" />
     </svg>
 );
+
+export const SprayIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M8 3v4" />
+      <path d="M8 7h5" />
+      <path d="M15 7V5a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v2" />
+      <rect x="5" y="7" width="10" height="4" rx="1" />
+      <path d="M7 11v8a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-8" />
+      <path d="M19 7l-2 2" />
+      <path d="M19 3l-2 2" />
+      <path d="M22 5l-2 2" />
+    </svg>
+);

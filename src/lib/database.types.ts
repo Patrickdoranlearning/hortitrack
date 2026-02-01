@@ -64,6 +64,62 @@ export type Database = {
           },
         ]
       }
+      balance_transfer_log: {
+        Row: {
+          action: string
+          from_haulier_id: string
+          from_haulier_name: string
+          id: string
+          org_id: string
+          performed_at: string
+          performed_by: string
+          reason: string | null
+          shelves: number
+          to_customer_id: string
+          to_customer_name: string
+          transfer_request_id: string
+          trolleys: number
+        }
+        Insert: {
+          action: string
+          from_haulier_id: string
+          from_haulier_name: string
+          id?: string
+          org_id: string
+          performed_at?: string
+          performed_by: string
+          reason?: string | null
+          shelves: number
+          to_customer_id: string
+          to_customer_name: string
+          transfer_request_id: string
+          trolleys: number
+        }
+        Update: {
+          action?: string
+          from_haulier_id?: string
+          from_haulier_name?: string
+          id?: string
+          org_id?: string
+          performed_at?: string
+          performed_by?: string
+          reason?: string | null
+          shelves?: number
+          to_customer_id?: string
+          to_customer_name?: string
+          transfer_request_id?: string
+          trolleys?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_transfer_log_org_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_allocations: {
         Row: {
           batch_id: string
@@ -121,32 +177,11 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batch_allocations_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "batch_allocations_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batch_allocations_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "batch_allocations_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
           },
           {
             foreignKeyName: "batch_allocations_org_id_fkey"
@@ -202,13 +237,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batch_ancestry_child_batch_id_fkey"
-            columns: ["child_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "batch_ancestry_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -235,13 +263,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "batch_ancestry_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -300,13 +321,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "batch_events_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "batch_events_org_id_fkey"
@@ -389,13 +403,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batch_images_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "batch_images_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -466,13 +473,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "batch_logs_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "batch_logs_org_id_fkey"
@@ -564,13 +564,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batch_passports_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "batch_passports_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -636,13 +629,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batch_photos_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "batch_photos_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -651,14 +637,134 @@ export type Database = {
           },
         ]
       }
+      batch_plans: {
+        Row: {
+          created_at: string
+          guide_plan_id: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          planned_quantity: number
+          plant_variety_id: string
+          protocol_id: string | null
+          ready_from_week: number | null
+          ready_from_year: number | null
+          ready_to_week: number | null
+          ready_to_year: number | null
+          status: string
+          target_size_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          guide_plan_id?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          planned_quantity: number
+          plant_variety_id: string
+          protocol_id?: string | null
+          ready_from_week?: number | null
+          ready_from_year?: number | null
+          ready_to_week?: number | null
+          ready_to_year?: number | null
+          status?: string
+          target_size_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          guide_plan_id?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          planned_quantity?: number
+          plant_variety_id?: string
+          protocol_id?: string | null
+          ready_from_week?: number | null
+          ready_from_year?: number | null
+          ready_to_week?: number | null
+          ready_to_year?: number | null
+          status?: string
+          target_size_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_plans_guide_plan_id_fkey"
+            columns: ["guide_plan_id"]
+            isOneToOne: false
+            referencedRelation: "guide_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_plant_variety_id_fkey"
+            columns: ["plant_variety_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_varieties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_plant_variety_id_fkey"
+            columns: ["plant_variety_id"]
+            isOneToOne: false
+            referencedRelation: "plant_varieties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_plant_variety_id_fkey"
+            columns: ["plant_variety_id"]
+            isOneToOne: false
+            referencedRelation: "plant_varieties_compat"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_plant_variety_id_fkey"
+            columns: ["plant_variety_id"]
+            isOneToOne: false
+            referencedRelation: "v_plant_varieties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_target_size_id_fkey"
+            columns: ["target_size_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_plans_target_size_id_fkey"
+            columns: ["target_size_id"]
+            isOneToOne: false
+            referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batches: {
         Row: {
           archived_at: string | null
           batch_number: string
+          batch_plan_id: string | null
           created_at: string
           dispatched_at: string | null
           grower_photo_url: string | null
           growing_status: string | null
+          hidden: boolean | null
           id: string
           initial_quantity: number | null
           location_id: string | null
@@ -678,6 +784,7 @@ export type Database = {
           quantity: number
           quantity_produced: number | null
           ready_at: string | null
+          reserved_for_customer_id: string | null
           reserved_quantity: number
           saleable_quantity: number | null
           sales_photo_url: string | null
@@ -693,10 +800,12 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           batch_number: string
+          batch_plan_id?: string | null
           created_at?: string
           dispatched_at?: string | null
           grower_photo_url?: string | null
           growing_status?: string | null
+          hidden?: boolean | null
           id?: string
           initial_quantity?: number | null
           location_id?: string | null
@@ -716,6 +825,7 @@ export type Database = {
           quantity?: number
           quantity_produced?: number | null
           ready_at?: string | null
+          reserved_for_customer_id?: string | null
           reserved_quantity?: number
           saleable_quantity?: number | null
           sales_photo_url?: string | null
@@ -731,10 +841,12 @@ export type Database = {
         Update: {
           archived_at?: string | null
           batch_number?: string
+          batch_plan_id?: string | null
           created_at?: string
           dispatched_at?: string | null
           grower_photo_url?: string | null
           growing_status?: string | null
+          hidden?: boolean | null
           id?: string
           initial_quantity?: number | null
           location_id?: string | null
@@ -754,6 +866,7 @@ export type Database = {
           quantity?: number
           quantity_produced?: number | null
           ready_at?: string | null
+          reserved_for_customer_id?: string | null
           reserved_quantity?: number
           saleable_quantity?: number | null
           sales_photo_url?: string | null
@@ -767,6 +880,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "batches_batch_plan_id_fkey"
+            columns: ["batch_plan_id"]
+            isOneToOne: false
+            referencedRelation: "batch_plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "batches_location_id_fkey"
             columns: ["location_id"]
@@ -810,13 +930,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batches_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "batches_plant_variety_id_fkey"
             columns: ["plant_variety_id"]
             isOneToOne: false
@@ -852,6 +965,34 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_vat_treatment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "batches_reserved_for_customer_id_fkey"
+            columns: ["reserved_for_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "batches_size_id_fkey"
             columns: ["size_id"]
             isOneToOne: false
@@ -884,6 +1025,66 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          checklist_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          items: Json
+          name: string
+          org_id: string
+          process_type: string
+          source_module: string
+          updated_at: string
+        }
+        Insert: {
+          checklist_type: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          items?: Json
+          name: string
+          org_id: string
+          process_type: string
+          source_module?: string
+          updated_at?: string
+        }
+        Update: {
+          checklist_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          items?: Json
+          name?: string
+          org_id?: string
+          process_type?: string
+          source_module?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_templates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1077,21 +1278,7 @@ export type Database = {
             foreignKeyName: "credit_notes_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "credit_notes_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "credit_notes_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1187,21 +1374,7 @@ export type Database = {
             foreignKeyName: "customer_addresses_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_addresses_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_addresses_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
         ]
@@ -1269,21 +1442,7 @@ export type Database = {
             foreignKeyName: "customer_contacts_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_contacts_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_contacts_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
         ]
@@ -1342,21 +1501,7 @@ export type Database = {
             foreignKeyName: "customer_favorite_products_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_favorite_products_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_favorite_products_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1435,21 +1580,7 @@ export type Database = {
             foreignKeyName: "customer_impersonation_sessions_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_impersonation_sessions_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_impersonation_sessions_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1518,21 +1649,7 @@ export type Database = {
             foreignKeyName: "customer_interactions_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_interactions_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_interactions_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1672,21 +1789,7 @@ export type Database = {
             foreignKeyName: "customer_trolley_balance_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_trolley_balance_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "customer_trolley_balance_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -1715,7 +1818,10 @@ export type Database = {
           org_id: string
           payment_terms_days: number
           phone: string | null
+          pre_pricing_cost_per_label: number | null
+          pre_pricing_foc: boolean
           pricing_tier: string | null
+          requires_pre_pricing: boolean
           store: string | null
           updated_at: string
           vat_number: string | null
@@ -1736,7 +1842,10 @@ export type Database = {
           org_id: string
           payment_terms_days?: number
           phone?: string | null
+          pre_pricing_cost_per_label?: number | null
+          pre_pricing_foc?: boolean
           pricing_tier?: string | null
+          requires_pre_pricing?: boolean
           store?: string | null
           updated_at?: string
           vat_number?: string | null
@@ -1757,7 +1866,10 @@ export type Database = {
           org_id?: string
           payment_terms_days?: number
           phone?: string | null
+          pre_pricing_cost_per_label?: number | null
+          pre_pricing_foc?: boolean
           pricing_tier?: string | null
+          requires_pre_pricing?: boolean
           store?: string | null
           updated_at?: string
           vat_number?: string | null
@@ -2027,6 +2139,8 @@ export type Database = {
           route_notes: string | null
           run_date: string
           run_number: string
+          shelves_loaded: number | null
+          shelves_returned: number | null
           status: Database["public"]["Enums"]["delivery_run_status"]
           trolleys_loaded: number
           trolleys_returned: number
@@ -2053,6 +2167,8 @@ export type Database = {
           route_notes?: string | null
           run_date: string
           run_number: string
+          shelves_loaded?: number | null
+          shelves_returned?: number | null
           status?: Database["public"]["Enums"]["delivery_run_status"]
           trolleys_loaded?: number
           trolleys_returned?: number
@@ -2079,6 +2195,8 @@ export type Database = {
           route_notes?: string | null
           run_date?: string
           run_number?: string
+          shelves_loaded?: number | null
+          shelves_returned?: number | null
           status?: Database["public"]["Enums"]["delivery_run_status"]
           trolleys_loaded?: number
           trolleys_returned?: number
@@ -2161,13 +2279,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "dispatch_events_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "dispatch_events_order_id_fkey"
@@ -2450,21 +2561,7 @@ export type Database = {
             foreignKeyName: "equipment_movement_log_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "equipment_movement_log_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "equipment_movement_log_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -2504,6 +2601,140 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      guide_plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          org_id: string
+          protocol_id: string | null
+          ready_from_week: number
+          ready_from_year: number
+          ready_to_week: number
+          ready_to_year: number
+          status: string
+          target_family: string
+          target_quantity: number
+          target_size_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          org_id: string
+          protocol_id?: string | null
+          ready_from_week: number
+          ready_from_year: number
+          ready_to_week: number
+          ready_to_year: number
+          status?: string
+          target_family: string
+          target_quantity: number
+          target_size_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          org_id?: string
+          protocol_id?: string | null
+          ready_from_week?: number
+          ready_from_year?: number
+          ready_to_week?: number
+          ready_to_year?: number
+          status?: string
+          target_family?: string
+          target_quantity?: number
+          target_size_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guide_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guide_plans_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guide_plans_target_size_id_fkey"
+            columns: ["target_size_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_sizes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guide_plans_target_size_id_fkey"
+            columns: ["target_size_id"]
+            isOneToOne: false
+            referencedRelation: "plant_sizes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      haulier_trolley_balance: {
+        Row: {
+          created_at: string
+          haulier_id: string
+          id: string
+          last_load_date: string | null
+          last_return_date: string | null
+          org_id: string
+          shelves_out: number
+          trolleys_out: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          haulier_id: string
+          id?: string
+          last_load_date?: string | null
+          last_return_date?: string | null
+          org_id: string
+          shelves_out?: number
+          trolleys_out?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          haulier_id?: string
+          id?: string
+          last_load_date?: string | null
+          last_return_date?: string | null
+          org_id?: string
+          shelves_out?: number
+          trolleys_out?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "haulier_trolley_balance_haulier_fkey"
+            columns: ["haulier_id"]
+            isOneToOne: false
+            referencedRelation: "hauliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "haulier_trolley_balance_org_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       haulier_vehicles: {
         Row: {
@@ -2684,20 +2915,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invoice_items_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "invoice_items_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
-          },
-          {
             foreignKeyName: "invoice_items_sku_id_fkey"
             columns: ["sku_id"]
             isOneToOne: false
@@ -2790,21 +3007,7 @@ export type Database = {
             foreignKeyName: "invoices_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "invoices_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "invoices_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -3219,7 +3422,7 @@ export type Database = {
           method: string | null
           next_application_date: string | null
           org_id: string
-          product_id: string
+          product_id: string | null
           rate: number | null
           rate_unit: string | null
           reason: string | null
@@ -3246,7 +3449,7 @@ export type Database = {
           method?: string | null
           next_application_date?: string | null
           org_id: string
-          product_id: string
+          product_id?: string | null
           rate?: number | null
           rate_unit?: string | null
           reason?: string | null
@@ -3273,7 +3476,7 @@ export type Database = {
           method?: string | null
           next_application_date?: string | null
           org_id?: string
-          product_id?: string
+          product_id?: string | null
           rate?: number | null
           rate_unit?: string | null
           reason?: string | null
@@ -3334,13 +3537,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
-            columns: ["target_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ipm_spot_treatments_target_location_id_fkey"
@@ -3620,13 +3816,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "ipm_tasks_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ipm_tasks_bottle_id_fkey"
@@ -4005,13 +4194,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "material_transactions_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "material_transactions_from_location_id_fkey"
@@ -4488,20 +4670,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_exceptions_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "order_exceptions_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
-          },
-          {
             foreignKeyName: "order_exceptions_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -4650,20 +4818,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_item_preferences_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "order_item_preferences_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
-          },
-          {
             foreignKeyName: "order_item_preferences_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -4798,20 +4952,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "order_items"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_item_substitutions_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "order_item_substitutions_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
           },
           {
             foreignKeyName: "order_item_substitutions_org_id_fkey"
@@ -4969,13 +5109,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "order_items_required_batch_id_fkey"
-            columns: ["required_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "order_items_required_variety_id_fkey"
@@ -5205,6 +5338,7 @@ export type Database = {
           confirmation_sent_at: string | null
           created_at: string
           created_by_staff_id: string | null
+          created_by_user_id: string | null
           customer_id: string
           dispatch_email_sent_at: string | null
           id: string
@@ -5225,6 +5359,7 @@ export type Database = {
           confirmation_sent_at?: string | null
           created_at?: string
           created_by_staff_id?: string | null
+          created_by_user_id?: string | null
           customer_id: string
           dispatch_email_sent_at?: string | null
           id?: string
@@ -5245,6 +5380,7 @@ export type Database = {
           confirmation_sent_at?: string | null
           created_at?: string
           created_by_staff_id?: string | null
+          created_by_user_id?: string | null
           customer_id?: string
           dispatch_email_sent_at?: string | null
           id?: string
@@ -5287,21 +5423,7 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -5443,7 +5565,9 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          latitude: number | null
           logo_url: string | null
+          longitude: number | null
           name: string
           phone: string | null
           producer_code: string | null
@@ -5456,7 +5580,9 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          latitude?: number | null
           logo_url?: string | null
+          longitude?: number | null
           name: string
           phone?: string | null
           producer_code?: string | null
@@ -5469,7 +5595,9 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          latitude?: number | null
           logo_url?: string | null
+          longitude?: number | null
           name?: string
           phone?: string | null
           producer_code?: string | null
@@ -5477,6 +5605,218 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      pending_balance_transfers: {
+        Row: {
+          created_at: string
+          delivery_item_id: string | null
+          delivery_run_id: string | null
+          driver_notes: string | null
+          from_haulier_id: string
+          id: string
+          org_id: string
+          photo_url: string | null
+          reason: string
+          requested_at: string
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shelves: number
+          signed_docket_url: string | null
+          status: Database["public"]["Enums"]["transfer_status"]
+          to_customer_id: string
+          trolleys: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_item_id?: string | null
+          delivery_run_id?: string | null
+          driver_notes?: string | null
+          from_haulier_id: string
+          id?: string
+          org_id: string
+          photo_url?: string | null
+          reason: string
+          requested_at?: string
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shelves?: number
+          signed_docket_url?: string | null
+          status?: Database["public"]["Enums"]["transfer_status"]
+          to_customer_id: string
+          trolleys?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_item_id?: string | null
+          delivery_run_id?: string | null
+          driver_notes?: string | null
+          from_haulier_id?: string
+          id?: string
+          org_id?: string
+          photo_url?: string | null
+          reason?: string
+          requested_at?: string
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shelves?: number
+          signed_docket_url?: string | null
+          status?: Database["public"]["Enums"]["transfer_status"]
+          to_customer_id?: string
+          trolleys?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_vat_treatment"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_customer_trolley_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_customer_fkey"
+            columns: ["to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_scheduled_deliveries_map"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_haulier_fkey"
+            columns: ["from_haulier_id"]
+            isOneToOne: false
+            referencedRelation: "hauliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_item_fkey"
+            columns: ["delivery_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_org_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_run_fkey"
+            columns: ["delivery_run_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_balance_transfers_run_fkey"
+            columns: ["delivery_run_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_delivery_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pick_item_batches: {
+        Row: {
+          batch_id: string
+          created_at: string | null
+          id: string
+          org_id: string
+          pick_item_id: string
+          picked_at: string | null
+          picked_by: string | null
+          quantity: number
+          updated_at: string | null
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string | null
+          id?: string
+          org_id: string
+          pick_item_id: string
+          picked_at?: string | null
+          picked_by?: string | null
+          quantity: number
+          updated_at?: string | null
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string | null
+          id?: string
+          org_id?: string
+          pick_item_id?: string
+          picked_at?: string | null
+          picked_by?: string | null
+          quantity?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_item_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_item_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_item_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "pick_item_batches_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_item_batches_pick_item_id_fkey"
+            columns: ["pick_item_id"]
+            isOneToOne: false
+            referencedRelation: "pick_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_item_batches_picked_by_fkey"
+            columns: ["picked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pick_items: {
         Row: {
@@ -5539,20 +5879,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pick_items_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "pick_items_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
-          },
-          {
             foreignKeyName: "pick_items_original_batch_fkey"
             columns: ["original_batch_id"]
             isOneToOne: false
@@ -5572,13 +5898,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "pick_items_original_batch_fkey"
-            columns: ["original_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pick_items_pick_list_id_fkey"
@@ -5621,13 +5940,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "pick_items_picked_batch_fkey"
-            columns: ["picked_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -5883,20 +6195,6 @@ export type Database = {
             referencedRelation: "order_items"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "pick_orders_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "pick_orders_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
-          },
         ]
       }
       picking_feedback: {
@@ -5984,13 +6282,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "picking_feedback_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "picking_feedback_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -6031,20 +6322,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "order_items"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "picking_feedback_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "picking_feedback_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
           },
           {
             foreignKeyName: "picking_feedback_org_id_fkey"
@@ -6125,6 +6402,75 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "picking_teams_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planned_batch_materials: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          material_id: string
+          notes: string | null
+          org_id: string
+          quantity_planned: number
+          updated_at: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          material_id: string
+          notes?: string | null
+          org_id: string
+          quantity_planned: number
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          material_id?: string
+          notes?: string | null
+          org_id?: string
+          quantity_planned?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planned_batch_materials_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planned_batch_materials_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planned_batch_materials_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "planned_batch_materials_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planned_batch_materials_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -6279,13 +6625,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "plant_health_logs_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "plant_health_logs_bottle_id_fkey"
             columns: ["bottle_id"]
             isOneToOne: false
@@ -6366,7 +6705,7 @@ export type Database = {
           cell_shape: string | null
           cell_volume_l: number | null
           cell_width_mm: number | null
-          container_type: Database["public"]["Enums"]["size_container_type"]
+          container_type: string
           created_at: string
           id: string
           name: string
@@ -6383,7 +6722,7 @@ export type Database = {
           cell_shape?: string | null
           cell_volume_l?: number | null
           cell_width_mm?: number | null
-          container_type?: Database["public"]["Enums"]["size_container_type"]
+          container_type?: string
           created_at?: string
           id?: string
           name: string
@@ -6400,7 +6739,7 @@ export type Database = {
           cell_shape?: string | null
           cell_volume_l?: number | null
           cell_width_mm?: number | null
-          container_type?: Database["public"]["Enums"]["size_container_type"]
+          container_type?: string
           created_at?: string
           id?: string
           name?: string
@@ -6424,6 +6763,7 @@ export type Database = {
           flowering_period: string | null
           genus: string | null
           id: string
+          is_archived: boolean
           name: string
           org_id: string
           plant_breeders_rights: boolean | null
@@ -6443,6 +6783,7 @@ export type Database = {
           flowering_period?: string | null
           genus?: string | null
           id?: string
+          is_archived?: boolean
           name: string
           org_id: string
           plant_breeders_rights?: boolean | null
@@ -6462,6 +6803,7 @@ export type Database = {
           flowering_period?: string | null
           genus?: string | null
           id?: string
+          is_archived?: boolean
           name?: string
           org_id?: string
           plant_breeders_rights?: boolean | null
@@ -6533,21 +6875,7 @@ export type Database = {
             foreignKeyName: "price_list_customers_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "price_list_customers_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "price_list_customers_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -6652,8 +6980,129 @@ export type Database = {
           },
         ]
       }
+      print_agents: {
+        Row: {
+          agent_key: string
+          agent_key_prefix: string
+          created_at: string
+          created_by: string | null
+          id: string
+          last_seen_at: string | null
+          name: string
+          org_id: string
+          status: string
+          updated_at: string
+          workstation_info: Json | null
+        }
+        Insert: {
+          agent_key: string
+          agent_key_prefix: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_seen_at?: string | null
+          name: string
+          org_id: string
+          status?: string
+          updated_at?: string
+          workstation_info?: Json | null
+        }
+        Update: {
+          agent_key?: string
+          agent_key_prefix?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_seen_at?: string | null
+          name?: string
+          org_id?: string
+          status?: string
+          updated_at?: string
+          workstation_info?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_agents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      print_queue: {
+        Row: {
+          agent_id: string
+          completed_at: string | null
+          copies: number
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          job_type: string
+          org_id: string
+          printer_id: string
+          sent_at: string | null
+          status: string
+          zpl_data: string
+        }
+        Insert: {
+          agent_id: string
+          completed_at?: string | null
+          copies?: number
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          job_type: string
+          org_id: string
+          printer_id: string
+          sent_at?: string | null
+          status?: string
+          zpl_data: string
+        }
+        Update: {
+          agent_id?: string
+          completed_at?: string | null
+          copies?: number
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          job_type?: string
+          org_id?: string
+          printer_id?: string
+          sent_at?: string | null
+          status?: string
+          zpl_data?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_queue_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "print_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_queue_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_queue_printer_id_fkey"
+            columns: ["printer_id"]
+            isOneToOne: false
+            referencedRelation: "printers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       printers: {
         Row: {
+          agent_id: string | null
           connection_type: string
           created_at: string | null
           dpi: number | null
@@ -6661,14 +7110,20 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_default: boolean | null
+          label_columns: number | null
+          label_gap_mm: number | null
+          label_width_mm: number | null
           name: string
           notes: string | null
           org_id: string
           port: number | null
           type: string
           updated_at: string | null
+          usb_device_id: string | null
+          usb_device_name: string | null
         }
         Insert: {
+          agent_id?: string | null
           connection_type?: string
           created_at?: string | null
           dpi?: number | null
@@ -6676,14 +7131,20 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
+          label_columns?: number | null
+          label_gap_mm?: number | null
+          label_width_mm?: number | null
           name: string
           notes?: string | null
           org_id: string
           port?: number | null
           type?: string
           updated_at?: string | null
+          usb_device_id?: string | null
+          usb_device_name?: string | null
         }
         Update: {
+          agent_id?: string | null
           connection_type?: string
           created_at?: string | null
           dpi?: number | null
@@ -6691,14 +7152,26 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
+          label_columns?: number | null
+          label_gap_mm?: number | null
+          label_width_mm?: number | null
           name?: string
           notes?: string | null
           org_id?: string
           port?: number | null
           type?: string
           updated_at?: string | null
+          usb_device_id?: string | null
+          usb_device_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "printers_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "print_agents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "printers_org_id_fkey"
             columns: ["org_id"]
@@ -6786,21 +7259,7 @@ export type Database = {
             foreignKeyName: "product_aliases_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "product_aliases_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "product_aliases_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -6905,13 +7364,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "product_batches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "product_batches_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -7002,21 +7454,7 @@ export type Database = {
             foreignKeyName: "product_group_aliases_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "product_group_aliases_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "product_group_aliases_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -7429,13 +7867,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "production_job_batches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "production_job_batches_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
@@ -7454,6 +7885,7 @@ export type Database = {
       production_jobs: {
         Row: {
           assigned_to: string | null
+          checklist_progress: Json | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
@@ -7477,6 +7909,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          checklist_progress?: Json | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -7500,6 +7933,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          checklist_progress?: Json | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -7659,9 +8093,15 @@ export type Database = {
           hero_image_url: string | null
           id: string
           is_active: boolean
+          match_families: string[] | null
+          match_genera: string[] | null
+          min_order_qty: number | null
           name: string
           org_id: string
+          shelf_quantity_override: number | null
           sku_id: string
+          trolley_quantity_override: number | null
+          unit_qty: number | null
           updated_at: string
         }
         Insert: {
@@ -7671,9 +8111,15 @@ export type Database = {
           hero_image_url?: string | null
           id?: string
           is_active?: boolean
+          match_families?: string[] | null
+          match_genera?: string[] | null
+          min_order_qty?: number | null
           name: string
           org_id: string
+          shelf_quantity_override?: number | null
           sku_id: string
+          trolley_quantity_override?: number | null
+          unit_qty?: number | null
           updated_at?: string
         }
         Update: {
@@ -7683,9 +8129,15 @@ export type Database = {
           hero_image_url?: string | null
           id?: string
           is_active?: boolean
+          match_families?: string[] | null
+          match_genera?: string[] | null
+          min_order_qty?: number | null
           name?: string
           org_id?: string
+          shelf_quantity_override?: number | null
           sku_id?: string
+          trolley_quantity_override?: number | null
+          unit_qty?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -7699,7 +8151,7 @@ export type Database = {
           {
             foreignKeyName: "products_sku_id_fkey"
             columns: ["sku_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "skus"
             referencedColumns: ["id"]
           },
@@ -7709,6 +8161,7 @@ export type Database = {
         Row: {
           active_org_id: string | null
           created_at: string | null
+          customer_address_id: string | null
           customer_id: string | null
           display_name: string | null
           email: string | null
@@ -7720,6 +8173,7 @@ export type Database = {
         Insert: {
           active_org_id?: string | null
           created_at?: string | null
+          customer_address_id?: string | null
           customer_id?: string | null
           display_name?: string | null
           email?: string | null
@@ -7731,6 +8185,7 @@ export type Database = {
         Update: {
           active_org_id?: string | null
           created_at?: string | null
+          customer_address_id?: string | null
           customer_id?: string | null
           display_name?: string | null
           email?: string | null
@@ -7745,6 +8200,13 @@ export type Database = {
             columns: ["active_org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_customer_address_id_fkey"
+            columns: ["customer_address_id"]
+            isOneToOne: false
+            referencedRelation: "customer_addresses"
             referencedColumns: ["id"]
           },
           {
@@ -7772,22 +8234,95 @@ export type Database = {
             foreignKeyName: "profiles_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "profiles_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
             referencedColumns: ["customer_id"]
           },
+        ]
+      }
+      protocol_performance: {
+        Row: {
+          actual_duration_days: number | null
+          actual_ready_week: number | null
+          actual_yield_pct: number | null
+          batch_id: string
+          completed_at: string | null
+          created_at: string | null
+          final_quantity: number | null
+          id: string
+          initial_quantity: number | null
+          org_id: string
+          planned_duration_days: number | null
+          planned_ready_week: number | null
+          planned_yield_pct: number | null
+          protocol_id: string
+        }
+        Insert: {
+          actual_duration_days?: number | null
+          actual_ready_week?: number | null
+          actual_yield_pct?: number | null
+          batch_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          final_quantity?: number | null
+          id?: string
+          initial_quantity?: number | null
+          org_id: string
+          planned_duration_days?: number | null
+          planned_ready_week?: number | null
+          planned_yield_pct?: number | null
+          protocol_id: string
+        }
+        Update: {
+          actual_duration_days?: number | null
+          actual_ready_week?: number | null
+          actual_yield_pct?: number | null
+          batch_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          final_quantity?: number | null
+          id?: string
+          initial_quantity?: number | null
+          org_id?: string
+          planned_duration_days?: number | null
+          planned_ready_week?: number | null
+          planned_yield_pct?: number | null
+          protocol_id?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "profiles_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "protocol_performance_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: true
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_performance_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: true
+            referencedRelation: "v_available_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_performance_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: true
+            referencedRelation: "v_batch_passport"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "protocol_performance_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
-            referencedColumns: ["customer_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_performance_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -8135,6 +8670,24 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          expire_at: number
+          key: string
+          points: number
+        }
+        Insert: {
+          expire_at: number
+          key: string
+          points?: number
+        }
+        Update: {
+          expire_at?: number
+          key?: string
+          points?: number
+        }
+        Relationships: []
+      }
       sales_qc: {
         Row: {
           batch_id: string | null
@@ -8187,13 +8740,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "sales_qc_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "sales_qc_pick_order_id_fkey"
@@ -8331,13 +8877,91 @@ export type Database = {
           },
         ]
       }
+      supplier_addresses: {
+        Row: {
+          city: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          country_code: string
+          county: string | null
+          created_at: string
+          eircode: string | null
+          id: string
+          is_default: boolean
+          label: string
+          line1: string
+          line2: string | null
+          org_id: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country_code?: string
+          county?: string | null
+          created_at?: string
+          eircode?: string | null
+          id?: string
+          is_default?: boolean
+          label: string
+          line1: string
+          line2?: string | null
+          org_id: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country_code?: string
+          county?: string | null
+          created_at?: string
+          eircode?: string | null
+          id?: string
+          is_default?: boolean
+          label?: string
+          line1?: string
+          line2?: string | null
+          org_id?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_addresses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_addresses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "lookup_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_addresses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: string | null
           country_code: string
           created_at: string
           eircode: string | null
-          email: string | null
           id: string
           is_internal: boolean | null
           name: string
@@ -8352,7 +8976,6 @@ export type Database = {
           country_code?: string
           created_at?: string
           eircode?: string | null
-          email?: string | null
           id?: string
           is_internal?: boolean | null
           name: string
@@ -8367,7 +8990,6 @@ export type Database = {
           country_code?: string
           created_at?: string
           eircode?: string | null
-          email?: string | null
           id?: string
           is_internal?: boolean | null
           name?: string
@@ -8421,7 +9043,9 @@ export type Database = {
       }
       tasks: {
         Row: {
+          assigned_team_id: string | null
           assigned_to: string | null
+          checklist_progress: Json | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
@@ -8442,7 +9066,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_team_id?: string | null
           assigned_to?: string | null
+          checklist_progress?: Json | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -8463,7 +9089,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_team_id?: string | null
           assigned_to?: string | null
+          checklist_progress?: Json | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -8484,6 +9112,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_team_id_fkey"
+            columns: ["assigned_team_id"]
+            isOneToOne: false
+            referencedRelation: "picking_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_assigned_team_id_fkey"
+            columns: ["assigned_team_id"]
+            isOneToOne: false
+            referencedRelation: "v_picking_team_workload"
+            referencedColumns: ["team_id"]
+          },
           {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
@@ -8882,13 +9524,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_batch_passport"
             referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "trial_subjects_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "trial_subjects_group_id_fkey"
@@ -9386,21 +10021,7 @@ export type Database = {
             foreignKeyName: "trolley_transactions_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trolley_transactions_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trolley_transactions_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -9509,21 +10130,7 @@ export type Database = {
             foreignKeyName: "trolleys_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trolleys_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trolleys_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -9652,14 +10259,41 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batch_events_batch_id_fkey"
-            columns: ["batch_id"]
+            foreignKeyName: "batch_events_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "v_batch_search"
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates_summary: {
+        Row: {
+          checklist_type: string | null
+          created_at: string | null
+          created_by: string | null
+          created_by_name: string | null
+          description: string | null
+          id: string | null
+          is_active: boolean | null
+          item_count: number | null
+          items: Json | null
+          name: string | null
+          org_id: string | null
+          process_type: string | null
+          source_module: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "batch_events_org_id_fkey"
+            foreignKeyName: "checklist_templates_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -9707,21 +10341,7 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -9798,25 +10418,19 @@ export type Database = {
       lookup_sizes: {
         Row: {
           cell_multiple: number | null
-          container_type:
-            | Database["public"]["Enums"]["size_container_type"]
-            | null
+          container_type: string | null
           id: string | null
           name: string | null
         }
         Insert: {
           cell_multiple?: number | null
-          container_type?:
-            | Database["public"]["Enums"]["size_container_type"]
-            | null
+          container_type?: string | null
           id?: string | null
           name?: string | null
         }
         Update: {
           cell_multiple?: number | null
-          container_type?:
-            | Database["public"]["Enums"]["size_container_type"]
-            | null
+          container_type?: string | null
           id?: string | null
           name?: string | null
         }
@@ -9965,6 +10579,7 @@ export type Database = {
           assigned_to_email: string | null
           assigned_to_name: string | null
           batch_count: number | null
+          checklist_progress: Json | null
           completed_at: string | null
           completed_by: string | null
           created_at: string | null
@@ -10035,9 +10650,12 @@ export type Database = {
       }
       tasks_with_productivity: {
         Row: {
+          assigned_team_id: string | null
+          assigned_team_name: string | null
           assigned_to: string | null
           assigned_to_email: string | null
           assigned_to_name: string | null
+          checklist_progress: Json | null
           completed_at: string | null
           completed_by: string | null
           created_at: string | null
@@ -10060,6 +10678,20 @@ export type Database = {
           updated_at: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_team_id_fkey"
+            columns: ["assigned_team_id"]
+            isOneToOne: false
+            referencedRelation: "picking_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_assigned_team_id_fkey"
+            columns: ["assigned_team_id"]
+            isOneToOne: false
+            referencedRelation: "v_picking_team_workload"
+            referencedColumns: ["team_id"]
+          },
           {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
@@ -10225,13 +10857,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "batches_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "batches_plant_variety_id_fkey"
             columns: ["plant_variety_id"]
             isOneToOne: false
@@ -10319,17 +10944,20 @@ export type Database = {
           behavior: string | null
           category: string | null
           created_at: string | null
+          distribution: Json | null
           family: string | null
           grower_photo_url: string | null
           id: string | null
           initial_quantity: number | null
           location_id: string | null
           location_name: string | null
+          log_history: Json | null
           org_id: string | null
           phase: string | null
           plant_variety_id: string | null
           quantity: number | null
           ready_at: string | null
+          reserved_quantity: number | null
           saleable_quantity: number | null
           sales_photo_url: string | null
           size_id: string | null
@@ -10341,92 +10969,7 @@ export type Database = {
           updated_at: string | null
           variety_name: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "batches_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "lookup_locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "nursery_locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_plant_variety_id_fkey"
-            columns: ["plant_variety_id"]
-            isOneToOne: false
-            referencedRelation: "lookup_varieties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_plant_variety_id_fkey"
-            columns: ["plant_variety_id"]
-            isOneToOne: false
-            referencedRelation: "plant_varieties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_plant_variety_id_fkey"
-            columns: ["plant_variety_id"]
-            isOneToOne: false
-            referencedRelation: "plant_varieties_compat"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_plant_variety_id_fkey"
-            columns: ["plant_variety_id"]
-            isOneToOne: false
-            referencedRelation: "v_plant_varieties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_size_id_fkey"
-            columns: ["size_id"]
-            isOneToOne: false
-            referencedRelation: "lookup_sizes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_size_id_fkey"
-            columns: ["size_id"]
-            isOneToOne: false
-            referencedRelation: "plant_sizes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_status_id_fkey"
-            columns: ["status_id"]
-            isOneToOne: false
-            referencedRelation: "attribute_options"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "lookup_suppliers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       v_credit_note_summary: {
         Row: {
@@ -10514,21 +11057,6 @@ export type Database = {
           },
         ]
       }
-      v_delivery_note_lines: {
-        Row: {
-          container_type:
-            | Database["public"]["Enums"]["size_container_type"]
-            | null
-          delivery_id: string | null
-          description: string | null
-          order_item_id: string | null
-          quantity: number | null
-          size_name: string | null
-          sku_code: string | null
-          variety_name: string | null
-        }
-        Relationships: []
-      }
       v_invoice_summary: {
         Row: {
           amount_credited: number | null
@@ -10576,87 +11104,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-        ]
-      }
-      v_order_picklist: {
-        Row: {
-          batch_id: string | null
-          batch_number: string | null
-          container_type:
-            | Database["public"]["Enums"]["size_container_type"]
-            | null
-          location_name: string | null
-          order_id: string | null
-          order_item_id: string | null
-          quantity: number | null
-          size_name: string | null
-          sku_code: string | null
-          variety_name: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "batch_allocations_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batch_allocations_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_available_batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batch_allocations_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_passport"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "batch_allocations_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_header"
-            referencedColumns: ["order_id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_orders_ready_for_dispatch"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["order_id"]
           },
         ]
       }
@@ -10721,21 +11168,7 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "v_sales_rep_targets"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
             referencedRelation: "v_scheduled_deliveries_map"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "v_smart_sales_targets"
             referencedColumns: ["customer_id"]
           },
           {
@@ -10868,13 +11301,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "picking_feedback_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "picking_feedback_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -10915,20 +11341,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "order_items"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "picking_feedback_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "picking_feedback_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
           },
           {
             foreignKeyName: "picking_feedback_org_id_fkey"
@@ -11101,36 +11513,6 @@ export type Database = {
         }
         Relationships: []
       }
-      v_sales_rep_targets: {
-        Row: {
-          avg_order_value: number | null
-          city: string | null
-          context_note: string | null
-          county: string | null
-          customer_id: string | null
-          customer_name: string | null
-          email: string | null
-          last_interaction_at: string | null
-          last_interaction_outcome: string | null
-          last_order_at: string | null
-          org_id: string | null
-          phone: string | null
-          priority_score: number | null
-          suggested_delivery_date: string | null
-          target_reason: string | null
-          total_orders: number | null
-          van_current_load: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customers_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       v_scheduled_deliveries_map: {
         Row: {
           city: string | null
@@ -11151,48 +11533,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "orders_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      v_smart_sales_targets: {
-        Row: {
-          avg_order_interval: number | null
-          avg_order_value: number | null
-          city: string | null
-          context_note: string | null
-          county: string | null
-          customer_id: string | null
-          customer_name: string | null
-          eircode: string | null
-          email: string | null
-          last_interaction_at: string | null
-          last_interaction_outcome: string | null
-          last_order_at: string | null
-          lat: number | null
-          lng: number | null
-          org_id: string | null
-          phone: string | null
-          preferred_dow: number | null
-          priority_score: number | null
-          probability_score: number | null
-          route_fit_score: number | null
-          routing_key: string | null
-          suggested_delivery_date: string | null
-          target_reason: string | null
-          total_orders: number | null
-          total_revenue: number | null
-          value_quartile: number | null
-          van_current_load: number | null
-          zone_name: string | null
-          zone_order_count: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customers_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -11259,20 +11599,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "order_items"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_item_substitutions_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_delivery_note_lines"
-            referencedColumns: ["order_item_id"]
-          },
-          {
-            foreignKeyName: "order_item_substitutions_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "v_order_picklist"
-            referencedColumns: ["order_item_id"]
           },
           {
             foreignKeyName: "order_item_substitutions_org_id_fkey"
@@ -11367,13 +11693,6 @@ export type Database = {
             referencedColumns: ["batch_id"]
           },
           {
-            foreignKeyName: "ipm_spot_treatments_target_batch_id_fkey"
-            columns: ["target_batch_id"]
-            isOneToOne: false
-            referencedRelation: "v_batch_search"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "ipm_spot_treatments_target_location_id_fkey"
             columns: ["target_location_id"]
             isOneToOne: false
@@ -11391,27 +11710,98 @@ export type Database = {
       }
     }
     Functions: {
+      actualize_batch: {
+        Args: {
+          p_actual_date: string
+          p_actual_quantity: number
+          p_batch_id: string
+          p_location_id?: string
+          p_notes?: string
+          p_org_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      apply_balance_transfer: {
+        Args: { p_notes?: string; p_reviewer_id: string; p_transfer_id: string }
+        Returns: Json
+      }
+      apply_location_treatment_atomic: {
+        Args: {
+          p_bottle_id?: string
+          p_ipm_product_id?: string
+          p_location_id: string
+          p_method: string
+          p_notes?: string
+          p_org_id: string
+          p_product_name: string
+          p_quantity_used_ml?: number
+          p_rate: number
+          p_rei_hours: number
+          p_unit: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       apply_order_item_substitution: {
         Args: { _sub_id: string }
         Returns: undefined
       }
       bootstrap_org_owner: { Args: { _org: string }; Returns: undefined }
-      compute_quantity_produced: {
+      cleanup_stale_print_queue: { Args: never; Returns: undefined }
+      clear_location_atomic: {
         Args: {
-          _cell_multiple: number
-          _container: Database["public"]["Enums"]["size_container_type"]
-          _initial: number
+          p_location_id: string
+          p_notes?: string
+          p_org_id: string
+          p_user_id: string
         }
+        Returns: Json
+      }
+      complete_pick_list: {
+        Args: { p_org_id: string; p_pick_list_id: string; p_user_id: string }
+        Returns: Json
+      }
+      complete_production_job: {
+        Args: {
+          p_job_id: string
+          p_org_id: string
+          p_user_id: string
+          p_wizard_data?: Json
+        }
+        Returns: Json
+      }
+      compute_quantity_produced: {
+        Args: { _cell_multiple: number; _container: string; _initial: number }
         Returns: number
       }
       create_order_with_allocations: {
         Args: {
+          p_created_by_staff_id?: string
+          p_created_by_user_id?: string
           p_customer_id: string
           p_lines: Json
           p_notes?: string
           p_order_number: string
           p_org_id: string
           p_requested_delivery_date?: string
+          p_ship_to_address_id?: string
+          p_status?: Database["public"]["Enums"]["order_status"]
+        }
+        Returns: Json
+      }
+      create_purchase_order: {
+        Args: {
+          p_delivery_location_id?: string
+          p_delivery_notes?: string
+          p_expected_delivery_date?: string
+          p_lines?: Json
+          p_notes?: string
+          p_org_id: string
+          p_po_number: string
+          p_supplier_id: string
+          p_supplier_ref?: string
+          p_user_id: string
         }
         Returns: Json
       }
@@ -11421,6 +11811,24 @@ export type Database = {
       decrement_batch_quantity: {
         Args: { p_batch_id: string; p_org_id: string; p_units: number }
         Returns: number
+      }
+      decrement_reserved_quantity: {
+        Args: { p_amount: number; p_batch_id: string }
+        Returns: number
+      }
+      dispatch_load: { Args: { p_load_id: string }; Returns: Json }
+      flag_location_atomic: {
+        Args: {
+          p_affected_batch_ids?: string[]
+          p_issue_reason: string
+          p_location_id: string
+          p_notes?: string
+          p_org_id: string
+          p_photo_url?: string
+          p_severity: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       fn_checkin_batch: {
         Args: {
@@ -11462,11 +11870,59 @@ export type Database = {
         Args: { _issue_date: string; _org_id: string }
         Returns: string
       }
+      generate_invoice_for_order: {
+        Args: { p_order_id: string; p_org_id: string; p_user_id: string }
+        Returns: Json
+      }
       generate_invoice_number: {
         Args: { _issue_date: string; _org_id: string }
         Returns: string
       }
       generate_trial_number: { Args: { p_org_id: string }; Returns: string }
+      get_batch_distribution: { Args: { p_batch_id: string }; Returns: Json }
+      get_batch_plan_progress: {
+        Args: { p_batch_plan_id: string }
+        Returns: {
+          batch_count: number
+          batch_plan_id: string
+          planned_quantity: number
+          total_completed: number
+          total_in_batches: number
+        }[]
+      }
+      get_batches_for_view: {
+        Args: never
+        Returns: {
+          batch_number: string
+          behavior: string
+          category: string
+          created_at: string
+          distribution: Json
+          family: string
+          grower_photo_url: string
+          id: string
+          initial_quantity: number
+          location_id: string
+          location_name: string
+          log_history: Json
+          org_id: string
+          phase: string
+          plant_variety_id: string
+          quantity: number
+          ready_at: string
+          reserved_quantity: number
+          saleable_quantity: number
+          sales_photo_url: string
+          size_id: string
+          size_name: string
+          status: string
+          status_id: string
+          supplier_id: string
+          supplier_name: string
+          updated_at: string
+          variety_name: string
+        }[]
+      }
       get_dashboard_stats: {
         Args: { p_org_id: string }
         Returns: {
@@ -11477,6 +11933,45 @@ export type Database = {
           ready_for_sale_plants: number
           size_distribution: Json
           total_plants: number
+        }[]
+      }
+      get_guide_plan_progress: {
+        Args: { p_guide_plan_id: string }
+        Returns: {
+          guide_plan_id: string
+          target_quantity: number
+          total_completed: number
+          total_in_batches: number
+          total_planned: number
+        }[]
+      }
+      get_planning_buckets: {
+        Args: {
+          p_horizon_months?: number
+          p_org_id: string
+          p_start_date?: string
+        }
+        Returns: {
+          bucket_label: string
+          bucket_month: string
+          incoming: number
+          physical: number
+          planned: number
+        }[]
+      }
+      get_product_availability: {
+        Args: { p_org_id: string }
+        Returns: {
+          available_quantity: number
+          batch_count: number
+          plant_variety: string
+          plant_variety_id: string
+          product_key: string
+          reserved_quantity: number
+          sample_image_url: string
+          size: string
+          size_id: string
+          total_quantity: number
         }[]
       }
       get_product_group_members: {
@@ -11496,6 +11991,33 @@ export type Database = {
           varieties: Json
         }[]
       }
+      get_saleable_batches: {
+        Args: { p_org_id: string }
+        Returns: {
+          available_quantity: number
+          batch_number: string
+          created_at: string
+          grower_photo_url: string
+          growing_status: string
+          hidden: boolean
+          id: string
+          location: string
+          plant_variety: string
+          plant_variety_id: string
+          planted_at: string
+          quantity: number
+          reserved_quantity: number
+          sales_photo_url: string
+          sales_status: string
+          size: string
+          size_id: string
+          status: string
+        }[]
+      }
+      increment_batch_quantity: {
+        Args: { p_batch_id: string; p_org_id: string; p_units: number }
+        Returns: number
+      }
       increment_counter: {
         Args: { p_key: string; p_org_id: string }
         Returns: number
@@ -11504,7 +12026,12 @@ export type Database = {
         Args: { p_key: string; p_org_id: string }
         Returns: number
       }
+      increment_reserved_quantity: {
+        Args: { p_amount: number; p_batch_id: string }
+        Returns: number
+      }
       is_member_of: { Args: { _org: string }; Returns: boolean }
+      mark_stale_agents_offline: { Args: never; Returns: undefined }
       migrate_log_history_to_events: {
         Args: { p_batch_id?: string }
         Returns: number
@@ -11541,13 +12068,78 @@ export type Database = {
             }
             Returns: Json
           }
+      pick_item_atomic: {
+        Args: {
+          p_notes?: string
+          p_org_id: string
+          p_pick_item_id: string
+          p_picked_batch_id: string
+          p_picked_qty: number
+          p_status?: string
+          p_substitution_reason?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      pick_item_multi_batch: {
+        Args: {
+          p_batches: Json
+          p_notes?: string
+          p_org_id: string
+          p_pick_item_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       recalc_invoice_totals: {
         Args: { _invoice_id: string }
         Returns: undefined
       }
       recalc_order_totals: { Args: { _order_id: string }; Returns: undefined }
+      recalculate_customer_trolley_balance: {
+        Args: { p_customer_id: string; p_org_id: string }
+        Returns: undefined
+      }
+      recalculate_haulier_trolley_balance: {
+        Args: { p_haulier_id: string; p_org_id: string }
+        Returns: undefined
+      }
+      recall_load: { Args: { p_load_id: string }; Returns: Json }
+      receive_goods_atomic: {
+        Args: {
+          p_lines: Json
+          p_location_id?: string
+          p_notes?: string
+          p_org_id: string
+          p_po_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       refresh_log_history_for_batch: {
         Args: { _batch_id: string }
+        Returns: undefined
+      }
+      reject_balance_transfer: {
+        Args: { p_notes?: string; p_reviewer_id: string; p_transfer_id: string }
+        Returns: Json
+      }
+      reject_pick_list_atomic: {
+        Args: {
+          p_failed_items?: Json
+          p_failure_reason: string
+          p_org_id: string
+          p_pick_list_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      resolve_status_id: {
+        Args: { p_org_id: string; p_status_code: string }
+        Returns: string
+      }
+      restore_batch_quantity: {
+        Args: { p_batch_id: string; p_quantity: number }
         Returns: undefined
       }
       search_batches_for_scout: {
@@ -11561,10 +12153,25 @@ export type Database = {
           variety_name: string
         }[]
       }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
+      submit_qc_check: {
+        Args: {
+          p_checklist: Json
+          p_failed_items: Json
+          p_failure_reason?: string
+          p_order_id: string
+          p_org_id: string
+          p_passed: boolean
+          p_pick_list_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       switch_active_org: { Args: { _org: string }; Returns: undefined }
       user_in_org: { Args: { target_org_id: string }; Returns: boolean }
+      void_order_with_allocations: {
+        Args: { p_order_id: string; p_org_id: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       allocation_status:
@@ -11614,10 +12221,12 @@ export type Database = {
         | "draft"
         | "confirmed"
         | "picking"
+        | "ready"
         | "packed"
         | "dispatched"
         | "delivered"
         | "cancelled"
+        | "void"
       org_role:
         | "owner"
         | "admin"
@@ -11664,6 +12273,7 @@ export type Database = {
         | "rejected"
         | "applied"
         | "cancelled"
+      transfer_status: "pending" | "approved" | "rejected"
       trial_status: "draft" | "active" | "paused" | "completed" | "archived"
       trolley_status:
         | "available"
@@ -11861,10 +12471,12 @@ export const Constants = {
         "draft",
         "confirmed",
         "picking",
+        "ready",
         "packed",
         "dispatched",
         "delivered",
         "cancelled",
+        "void",
       ],
       org_role: [
         "owner",
@@ -11922,6 +12534,7 @@ export const Constants = {
         "applied",
         "cancelled",
       ],
+      transfer_status: ["pending", "approved", "rejected"],
       trial_status: ["draft", "active", "paused", "completed", "archived"],
       trolley_status: [
         "available",
@@ -11944,6 +12557,4 @@ export const Constants = {
     },
   },
 } as const
-
-
 

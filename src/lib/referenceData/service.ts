@@ -1,4 +1,13 @@
 // src/lib/referenceData/service.ts
+
+// Client-side logging (development only) - production uses structured logger on server
+const isDev = process.env.NODE_ENV === "development";
+const log = {
+  info: (msg: string) => isDev && console.info(`[refdata] ${msg}`),
+  warn: (msg: string) => isDev && console.warn(`[refdata] ${msg}`),
+  error: (msg: string, err?: unknown) => isDev && console.error(`[refdata] ${msg}`, err),
+};
+
 export type ReferenceData = {
   varieties: Array<{
     id: string;
@@ -46,21 +55,21 @@ function stringifyErrors(errs: any[]): string[] {
 }
 
 export async function fetchReferenceData(): Promise<ReferenceData> {
-  console.log("[refData] fetching /api/reference-data");
+  log.info("fetching /api/reference-data");
   const res = await fetch("/api/reference-data", { method: "GET", cache: "no-store" });
-  console.log("[refData] fetch complete, status:", res.status);
+  log.info(`fetch complete, status: ${res.status}`);
 
   if (!res.ok && res.status !== 207) {
     const text = await res.text().catch(() => "");
     const payload = text ? JSON.parse(text) : {};
     const msg = payload?.error || text;
-    console.warn("[refdata] HTTP", res.status, msg);
+    log.warn(`HTTP ${res.status}: ${msg}`);
     // Allow 401 to pass through as a soft error (varieties/sizes may still be present)
     return { varieties: payload?.varieties ?? [], sizes: payload?.sizes ?? [], locations: payload?.locations ?? [], suppliers: payload?.suppliers ?? [], materials: payload?.materials ?? [], errors: payload?.errors ?? [`HTTP ${res.status}: ${msg || "no body"}`] };
   }
 
   const json = await res.json().catch((e) => {
-    console.error("[refdata] invalid JSON:", e);
+    log.error("invalid JSON", e);
     return null;
   });
 
@@ -74,9 +83,9 @@ export async function fetchReferenceData(): Promise<ReferenceData> {
     for (const line of errors) {
       const msg = typeof line === "string" ? line : JSON.stringify(line);
       if (msg.includes("Unauthenticated")) {
-        console.info("[refdata] info:", msg);
+        log.info(msg);
       } else {
-        console.warn("[refdata] warning:", msg);
+        log.warn(msg);
       }
     }
   }

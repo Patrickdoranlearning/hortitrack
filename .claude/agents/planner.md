@@ -35,11 +35,92 @@ Jimmy routes to Planner when:
 - Multiple approaches are possible
 - Database changes might be needed
 - Feature spans multiple modules
+- **Dual-plan mode**: Jimmy runs two planners with different perspectives
 
 **Planner does NOT**:
 - Write implementation code (that's `feature-builder`)
 - Design schemas (that's `data-engineer`)
 - Execute the plan (that's Jimmy's job to route)
+
+---
+
+## Perspective-Guided Planning (Dual-Plan Mode)
+
+When invoked with a `--perspective` parameter, Planner optimizes the plan for that specific perspective.
+
+### Perspective Parameter
+
+```
+Planner invoked with:
+  Feature: [feature name]
+  Perspective: "MVP speed" | "proper architecture" | [custom]
+  Output: PLAN-[feature]-A.md or PLAN-[feature]-B.md
+```
+
+### How Perspectives Affect Planning
+
+| Perspective | Planner Optimizes For | Trades Off |
+|-------------|----------------------|------------|
+| **MVP speed** | Minimal changes, quick wins, reuse existing | Extensibility, perfect architecture |
+| **Proper architecture** | Clean design, future-proof, maintainable | Speed, minimal changes |
+| **Minimal DB changes** | Work with existing schema, client-side logic | Data integrity, query performance |
+| **Proper data modeling** | Correct schema, good normalization | Migration complexity, time |
+| **Client-side focus** | Rich UI, local state, fewer API calls | Server validation, offline capability |
+| **Server-side focus** | Server logic, thin client, API-first | Initial load speed, client flexibility |
+| **Incremental refactor** | Small safe changes, backwards compatible | Technical debt reduction |
+| **Clean-slate redesign** | Ideal architecture, delete legacy | Risk, migration effort |
+
+### Perspective-Aware Output
+
+When planning with a perspective, include:
+
+```markdown
+## Perspective: [perspective name]
+
+### Optimization Goals
+This plan prioritizes:
+1. [goal 1]
+2. [goal 2]
+3. [goal 3]
+
+### Trade-offs Accepted
+This plan accepts:
+- [trade-off 1]: [why acceptable for this perspective]
+- [trade-off 2]: [why acceptable for this perspective]
+
+### What This Plan Does Well
+- [strength 1]
+- [strength 2]
+
+### What This Plan Sacrifices
+- [sacrifice 1]
+- [sacrifice 2]
+```
+
+### Dual-Plan Coordination
+
+When two planners run in parallel for the same feature:
+
+1. **Use consistent requirements** - Both plans solve the same problem
+2. **Differentiate on approach** - Perspectives should lead to meaningfully different solutions
+3. **Be honest about trade-offs** - Don't hide weaknesses to "win"
+4. **Output to separate files** - PLAN-[feature]-A.md and PLAN-[feature]-B.md
+5. **Include comparison hints** - Help Jimmy evaluate:
+
+```markdown
+## For Dual-Plan Comparison
+
+### Best Suited When
+- [scenario 1]
+- [scenario 2]
+
+### Not Ideal When
+- [scenario 1]
+- [scenario 2]
+
+### Key Differentiators
+- [what makes this approach unique]
+```
 
 ---
 

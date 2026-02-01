@@ -19,23 +19,35 @@ const MM_TO_PT = 2.83465;
 // A4 page size in mm
 const A4_MM = { width: 210, height: 297 };
 
-function resolvePath(data: any, path?: string | null): any {
+/**
+ * Document data is a flexible record for template binding.
+ * Values can be primitives, arrays, or nested objects.
+ */
+type DocumentData = Record<string, unknown>;
+
+/**
+ * Table row data for document tables
+ */
+type TableRowData = Record<string, unknown>;
+
+function resolvePath(data: DocumentData, path?: string | null): unknown {
   if (!path) return null;
   const parts = path.split(".");
-  let cur: any = data;
+  let cur: unknown = data;
   for (const p of parts) {
+    if (cur === undefined || cur === null) break;
+    if (typeof cur !== "object") break;
     if (p.endsWith("[]")) {
       const key = p.slice(0, -2);
-      cur = cur?.[key];
+      cur = (cur as Record<string, unknown>)[key];
     } else {
-      cur = cur?.[p];
+      cur = (cur as Record<string, unknown>)[p];
     }
-    if (cur === undefined || cur === null) break;
   }
   return cur ?? null;
 }
 
-function applyBindings(text: string | undefined, data: any): string {
+function applyBindings(text: string | undefined, data: DocumentData): string {
   if (!text) return "";
   return text.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, path) => {
     const val = resolvePath(data, path.trim());
@@ -71,7 +83,7 @@ function toCss(style?: ComponentStyle, includePosition = false) {
   return css.join(";");
 }
 
-function isVisible(component: DocumentComponent, data: any): boolean {
+function isVisible(component: DocumentComponent, data: DocumentData): boolean {
   const rule = component.visibleWhen;
   if (!rule) return true;
   const rules = Array.isArray(rule) ? rule : [rule];
@@ -90,7 +102,7 @@ function isVisible(component: DocumentComponent, data: any): boolean {
   });
 }
 
-function renderComponentHtml(component: DocumentComponent, data: any, usePositioning = false): string {
+function renderComponentHtml(component: DocumentComponent, data: DocumentData, usePositioning = false): string {
   if (!isVisible(component, data)) return "";
   const style = toCss(component.style, usePositioning && !!component.style?.position);
 
@@ -143,8 +155,9 @@ function renderComponentHtml(component: DocumentComponent, data: any, usePositio
       return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;${style}">${children}</div>`;
     }
     case "table": {
-      const rows: any[] = Array.isArray(resolvePath(data, component.rowsBinding ?? ""))
-        ? (resolvePath(data, component.rowsBinding ?? "") as any[])
+      const resolvedRows = resolvePath(data, component.rowsBinding ?? "");
+      const rows: TableRowData[] = Array.isArray(resolvedRows)
+        ? (resolvedRows as TableRowData[])
         : [];
       const cols = component.columns ?? [];
       const headers = component.showHeader !== false
@@ -176,13 +189,13 @@ function renderComponentHtml(component: DocumentComponent, data: any, usePositio
   }
 }
 
-function formatValue(value: any, fmt?: string): string {
+function formatValue(value: unknown, fmt?: string): string {
   if (value === undefined || value === null) return "";
   if (fmt === "currency") return new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" }).format(Number(value) || 0);
   if (fmt === "number") return new Intl.NumberFormat("en-IE", { maximumFractionDigits: 2 }).format(Number(value) || 0);
   if (fmt === "date") {
     try {
-      const d = new Date(value);
+      const d = new Date(value as string | number | Date);
       if (isFinite(d.getTime())) return d.toISOString().slice(0, 10);
     } catch {
       /* no-op */
@@ -191,7 +204,7 @@ function formatValue(value: any, fmt?: string): string {
   return String(value);
 }
 
-export function renderDocumentHtml(layout: TemplateLayout, data: any, opts?: RenderOptions): string {
+export function renderDocumentHtml(layout: TemplateLayout, data: DocumentData, opts?: RenderOptions): string {
   // Check if this is the new DocumentLayout format with positioning
   const isNewFormat = isDocumentLayout(layout);
   const components = getLayoutComponents(layout);
@@ -229,7 +242,7 @@ export function renderDocumentHtml(layout: TemplateLayout, data: any, opts?: Ren
   `;
 }
 
-export async function renderDocumentPdf(layout: TemplateLayout, data: any, opts?: RenderOptions): Promise<Uint8Array> {
+export async function renderDocumentPdf(layout: TemplateLayout, data: DocumentData, opts?: RenderOptions): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   let page = pdf.addPage([595.28, 841.89]); // A4
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -323,8 +336,9 @@ export async function renderDocumentPdf(layout: TemplateLayout, data: any, opts?
         }
         case "table": {
           // For positioned tables, render at the specified position
-          const rows: any[] = Array.isArray(resolvePath(data, component.rowsBinding ?? ""))
-            ? (resolvePath(data, component.rowsBinding ?? "") as any[])
+          const resolvedRowsPos = resolvePath(data, component.rowsBinding ?? "");
+          const rows: TableRowData[] = Array.isArray(resolvedRowsPos)
+            ? (resolvedRowsPos as TableRowData[])
             : [];
           const cols = component.columns ?? [];
           const rowHeight = 18;
@@ -344,7 +358,7 @@ export async function renderDocumentPdf(layout: TemplateLayout, data: any, opts?
           for (const row of rows) {
             let xOffset = 0;
             for (const col of cols) {
-              const raw = col.binding ? resolvePath(row, col.binding) : row?.[col.key];
+              const raw = col.binding ? resolvePath(row as DocumentData, col.binding) : row?.[col.key];
               const cellText = formatValue(raw, col.format);
               drawTextAt(cellText ?? "", pos.x + xOffset / MM_TO_PT, tableY, 11);
               xOffset += colWidth / MM_TO_PT;
@@ -408,8 +422,9 @@ export async function renderDocumentPdf(layout: TemplateLayout, data: any, opts?
         return;
       }
       case "table": {
-        const rows: any[] = Array.isArray(resolvePath(data, component.rowsBinding ?? ""))
-          ? (resolvePath(data, component.rowsBinding ?? "") as any[])
+        const resolvedRowsFlow = resolvePath(data, component.rowsBinding ?? "");
+        const rows: TableRowData[] = Array.isArray(resolvedRowsFlow)
+          ? (resolvedRowsFlow as TableRowData[])
           : [];
         const cols = component.columns ?? [];
         const rowHeight = 18;
@@ -427,7 +442,7 @@ export async function renderDocumentPdf(layout: TemplateLayout, data: any, opts?
           ensureSpace(rowHeight);
           let x = margin;
           for (const col of cols) {
-            const raw = col.binding ? resolvePath(row, col.binding) : row?.[col.key];
+            const raw = col.binding ? resolvePath(row as DocumentData, col.binding) : row?.[col.key];
             const text = formatValue(raw, col.format);
             page.drawText(text ?? "", { x, y: y - 12, size: 11, font });
             x += usableWidth / Math.max(cols.length, 1);

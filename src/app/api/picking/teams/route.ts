@@ -8,6 +8,7 @@ import {
   getTeamMembers,
   getUserTeams,
 } from "@/server/sales/picking";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 // GET /api/picking/teams - List picking teams
 export async function GET(request: NextRequest) {
@@ -24,10 +25,10 @@ export async function GET(request: NextRequest) {
 
     const teams = await getPickingTeams(orgId);
     return NextResponse.json({ teams });
-  } catch (error: any) {
-    console.error("Error fetching picking teams:", error);
+  } catch (error) {
+    logger.picking.error("Error fetching picking teams", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch picking teams" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -57,10 +58,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ team: result.team }, { status: 201 });
-  } catch (error: any) {
-    console.error("Error creating picking team:", error);
+  } catch (error) {
+    logger.picking.error("Error creating picking team", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create picking team" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

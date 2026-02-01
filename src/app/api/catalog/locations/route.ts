@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveOrgId } from "@/server/auth/org";
+import { safeIlikePattern } from "@/server/db/sanitize";
 
 const Query = z.object({
   q: z.string().trim().optional(),
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
       .limit(limit);
 
     if (q && q.length > 0) {
-      query = query.ilike("name", `%${q}%`);
+      query = query.ilike("name", safeIlikePattern(q));
     }
 
     const { data, error } = await query;

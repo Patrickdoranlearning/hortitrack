@@ -6,17 +6,19 @@ import {
   createPickList,
   getPickingTeams,
   createPickingTeam,
+  type PickListStatus,
 } from "@/server/sales/picking";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 // GET /api/picking - List pick lists for org
 export async function GET(request: NextRequest) {
   try {
     const { orgId } = await getUserAndOrg();
     const { searchParams } = new URL(request.url);
-    
+
     const teamId = searchParams.get("teamId") ?? undefined;
     const statusParam = searchParams.get("status");
-    const statuses = statusParam ? statusParam.split(",") as any[] : undefined;
+    const statuses = statusParam ? statusParam.split(",") as PickListStatus[] : undefined;
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined;
     const includeOrders = searchParams.get("includeOrders") === "true";
 
@@ -31,10 +33,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ pickLists });
-  } catch (error: any) {
-    console.error("Error fetching pick lists:", error);
+  } catch (error) {
+    logger.picking.error("Error fetching pick lists", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch pick lists" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -66,10 +68,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ pickList: result.pickList }, { status: 201 });
-  } catch (error: any) {
-    console.error("Error creating pick list:", error);
+  } catch (error) {
+    logger.picking.error("Error creating pick list", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create pick list" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

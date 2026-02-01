@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   Check,
   CheckCircle2,
   AlertTriangle,
@@ -15,14 +20,18 @@ import {
   Minus,
   Plus,
   Printer,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PickItem } from '@/server/sales/picking';
 import SaleLabelPrintWizard from './SaleLabelPrintWizard';
+import MultiBatchPickDialog from './MultiBatchPickDialog';
 
 interface PickItemCardProps {
   item: PickItem;
+  pickListId: string;
   onPick: (itemId: string, pickedQty: number, batchId?: string) => Promise<void>;
+  onMultiBatchPick: (itemId: string, batches: Array<{ batchId: string; quantity: number }>, notes?: string) => Promise<void>;
   onSubstitute: (itemId: string) => void;
   isSubmitting?: boolean;
   readonly?: boolean;
@@ -54,7 +63,9 @@ const statusConfig = {
 
 export default function PickItemCard({
   item,
+  pickListId,
   onPick,
+  onMultiBatchPick,
   onSubstitute,
   isSubmitting = false,
   readonly = false,
@@ -63,7 +74,11 @@ export default function PickItemCard({
   const [qty, setQty] = useState(item.targetQty);
   const [isExpanded, setIsExpanded] = useState(false);
   const [printWizardOpen, setPrintWizardOpen] = useState(false);
+  const [multiBatchDialogOpen, setMultiBatchDialogOpen] = useState(false);
   const config = statusConfig[item.status];
+
+  // Check if this was a multi-batch pick
+  const isMultiBatchPick = item.batchPicks && item.batchPicks.length > 1;
 
   // Prepare label data
   const labelData = {
@@ -74,8 +89,18 @@ export default function PickItemCard({
     quantity: item.status === 'picked' ? item.pickedQty : item.targetQty,
   };
 
-  const handleQuickPick = async () => {
-    await onPick(item.id, item.targetQty, item.originalBatchId || item.pickedBatchId);
+  // Open the multi-batch dialog as the DEFAULT pick action
+  const handlePick = () => {
+    setMultiBatchDialogOpen(true);
+  };
+
+  // Handle multi-batch pick confirmation
+  const handleMultiBatchConfirm = async (
+    batches: Array<{ batchId: string; quantity: number }>,
+    notes?: string
+  ) => {
+    await onMultiBatchPick(item.id, batches, notes);
+    setMultiBatchDialogOpen(false);
   };
 
   const handleCustomPick = async () => {
@@ -135,12 +160,38 @@ export default function PickItemCard({
         </div>
 
         {/* Batch Info */}
-        {(item.originalBatchNumber || item.pickedBatchNumber) && (
+        {(item.originalBatchNumber || item.pickedBatchNumber || isMultiBatchPick) && (
           <div className="flex items-center gap-2 mb-3 text-sm">
             <span className="text-muted-foreground">Batch:</span>
-            <Badge variant="outline" className="font-mono">
-              {item.pickedBatchNumber || item.originalBatchNumber}
-            </Badge>
+            {isMultiBatchPick ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Badge variant="outline" className="cursor-pointer gap-1 hover:bg-muted">
+                    <Layers className="h-3 w-3" />
+                    {item.batchPicks!.length} batches
+                  </Badge>
+                </PopoverTrigger>
+                <PopoverContent className="w-64">
+                  <div className="space-y-2">
+                    <p className="font-medium text-sm">Batch Breakdown</p>
+                    {item.batchPicks!.map(bp => (
+                      <div key={bp.id} className="flex justify-between text-sm">
+                        <span className="font-mono text-xs">{bp.batchNumber}</span>
+                        <span>{bp.quantity} units</span>
+                      </div>
+                    ))}
+                    <div className="border-t pt-2 flex justify-between font-medium text-sm">
+                      <span>Total</span>
+                      <span>{item.pickedQty} units</span>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Badge variant="outline" className="font-mono">
+                {item.pickedBatchNumber || item.originalBatchNumber}
+              </Badge>
+            )}
             {item.substitutionReason && (
               <span className="text-xs text-blue-600">
                 (substituted: {item.substitutionReason})
@@ -157,11 +208,11 @@ export default function PickItemCard({
                 <Button
                   size="lg"
                   className="flex-1 gap-2 h-14 text-lg"
-                  onClick={handleQuickPick}
+                  onClick={handlePick}
                   disabled={isSubmitting}
                 >
-                  <Check className="h-5 w-5" />
-                  Pick All ({item.targetQty})
+                  <Package className="h-5 w-5" />
+                  Pick ({item.targetQty})
                 </Button>
                 <Button
                   variant="outline"
@@ -314,6 +365,18 @@ export default function PickItemCard({
         open={printWizardOpen}
         onOpenChange={setPrintWizardOpen}
         item={labelData}
+      />
+
+      {/* Multi-Batch Pick Dialog - DEFAULT picking UI */}
+      <MultiBatchPickDialog
+        open={multiBatchDialogOpen}
+        onOpenChange={setMultiBatchDialogOpen}
+        pickItemId={item.id}
+        pickListId={pickListId}
+        productName={item.productName || `${item.plantVariety} - ${item.size}`}
+        targetQty={item.targetQty}
+        currentPicks={item.batchPicks}
+        onConfirm={handleMultiBatchConfirm}
       />
     </Card>
   );

@@ -71,6 +71,17 @@ export interface PickList {
   pickedQty?: number;
 }
 
+// Individual batch pick within a multi-batch pick
+export interface BatchPick {
+  id: string;
+  batchId: string;
+  batchNumber: string;
+  quantity: number;
+  location?: string;
+  pickedAt?: string;
+  pickedBy?: string;
+}
+
 export interface PickItem {
   id: string;
   pickListId: string;
@@ -92,10 +103,14 @@ export interface PickItem {
   originalBatchNumber?: string;
   pickedBatchNumber?: string;
   batchLocation?: string;
+  // Pricing (for label printing)
+  unitPriceExVat?: number;
   // Product group fields
   isProductGroup?: boolean;
   productGroupId?: string;
   productGroupName?: string;
+  // Multi-batch picks
+  batchPicks?: BatchPick[];
 }
 
 export interface CreatePickListInput {
@@ -955,7 +970,7 @@ export async function reorderPickLists(orgId: string, teamId: string | null, ord
 export async function getPickItems(pickListId: string): Promise<PickItem[]> {
   const supabase = await getSupabaseServerApp();
   const { data, error } = await supabase.from("pick_items").select(`
-      *, order_items(description, quantity, product_group_id, skus(code, plant_varieties(name), plant_sizes(name)), products(name), product_groups(name)),
+      *, order_items(description, quantity, product_group_id, unit_price_ex_vat, skus(code, plant_varieties(name), plant_sizes(name)), products(name), product_groups(name)),
       original_batch:original_batch_id(batch_number, nursery_locations(name)),
       picked_batch:picked_batch_id(batch_number, nursery_locations(name))
     `).eq("pick_list_id", pickListId).order("created_at");
@@ -963,6 +978,39 @@ export async function getPickItems(pickListId: string): Promise<PickItem[]> {
   if (error) {
     logError("Error fetching pick items", { error: error.message, pickListId });
     return [];
+  }
+
+  // Fetch batch picks for all items in this pick list
+  const pickItemIds = (data || []).map((row: any) => row.id);
+  const batchPicksMap = new Map<string, BatchPick[]>();
+
+  if (pickItemIds.length > 0) {
+    const { data: batchPicksData, error: batchPicksError } = await supabase
+      .from("pick_item_batches")
+      .select(`
+        id, pick_item_id, batch_id, quantity, picked_at, picked_by,
+        batches(batch_number, nursery_locations(name))
+      `)
+      .in("pick_item_id", pickItemIds);
+
+    if (batchPicksError) {
+      logWarning("Error fetching batch picks", { error: batchPicksError.message, pickListId });
+    } else if (batchPicksData) {
+      for (const bp of batchPicksData) {
+        const batchPick: BatchPick = {
+          id: bp.id,
+          batchId: bp.batch_id,
+          batchNumber: (bp.batches as any)?.batch_number || "",
+          quantity: bp.quantity,
+          location: (bp.batches as any)?.nursery_locations?.name,
+          pickedAt: bp.picked_at || undefined,
+          pickedBy: bp.picked_by || undefined,
+        };
+        const existing = batchPicksMap.get(bp.pick_item_id) || [];
+        existing.push(batchPick);
+        batchPicksMap.set(bp.pick_item_id, existing);
+      }
+    }
   }
 
   return (data || []).map((row: any) => {
@@ -979,8 +1027,10 @@ export async function getPickItems(pickListId: string): Promise<PickItem[]> {
       originalBatchNumber: row.original_batch?.batch_number,
       pickedBatchNumber: row.picked_batch?.batch_number,
       batchLocation: row.original_batch?.nursery_locations?.name || row.picked_batch?.nursery_locations?.name,
+      unitPriceExVat: row.order_items?.unit_price_ex_vat ?? undefined,
       isProductGroup, productGroupId: row.order_items?.product_group_id,
       productGroupName: isProductGroup ? row.order_items?.product_groups?.name : undefined,
+      batchPicks: batchPicksMap.get(row.id) || [],
     };
   });
 }
@@ -1067,6 +1117,160 @@ export async function updatePickItem(input: UpdatePickItemInput): Promise<{ erro
   return {};
 }
 
+// Multi-batch pick input
+export interface MultiBatchPickInput {
+  pickItemId: string;
+  batches: Array<{ batchId: string; quantity: number }>;
+  notes?: string;
+}
+
+/**
+ * Pick an item from multiple batches atomically.
+ * This allows splitting a single line item across multiple batches.
+ */
+export async function pickItemMultiBatch(input: MultiBatchPickInput): Promise<{
+  success: boolean;
+  error?: string;
+  status?: string;
+  pickedQty?: number;
+}> {
+  const { user, orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  // Validate input
+  if (!input.batches || input.batches.length === 0) {
+    return { success: false, error: "No batches provided" };
+  }
+
+  // Convert batches array to JSONB format expected by RPC
+  const batchesJson = input.batches.map(b => ({
+    batchId: b.batchId,
+    quantity: b.quantity,
+  }));
+
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("pick_item_multi_batch", {
+    p_org_id: orgId,
+    p_pick_item_id: input.pickItemId,
+    p_batches: batchesJson,
+    p_user_id: user.id,
+    p_notes: input.notes || null,
+  });
+
+  if (rpcError) {
+    logError("Error in pick_item_multi_batch", { error: rpcError.message, pickItemId: input.pickItemId });
+    return { success: false, error: rpcError.message };
+  }
+
+  const result = rpcResult as { success: boolean; error?: string; status?: string; pickedQty?: number };
+  if (!result?.success) {
+    logError("pick_item_multi_batch failed", { error: result?.error, pickItemId: input.pickItemId });
+    return { success: false, error: result?.error || "Failed to pick item" };
+  }
+
+  return {
+    success: true,
+    status: result.status,
+    pickedQty: result.pickedQty,
+  };
+}
+
+/**
+ * Get batch picks for a specific pick item
+ */
+export async function getBatchPicksForItem(pickItemId: string): Promise<BatchPick[]> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("pick_item_batches")
+    .select(`
+      id, batch_id, quantity, picked_at, picked_by,
+      batches(batch_number, nursery_locations(name))
+    `)
+    .eq("pick_item_id", pickItemId)
+    .order("picked_at");
+
+  if (error) {
+    logError("Error fetching batch picks for item", { error: error.message, pickItemId });
+    return [];
+  }
+
+  return (data || []).map((bp: any) => ({
+    id: bp.id,
+    batchId: bp.batch_id,
+    batchNumber: bp.batches?.batch_number || "",
+    quantity: bp.quantity,
+    location: bp.batches?.nursery_locations?.name,
+    pickedAt: bp.picked_at || undefined,
+    pickedBy: bp.picked_by || undefined,
+  }));
+}
+
+/**
+ * Remove a specific batch pick (for undo functionality)
+ */
+export async function removeBatchPick(batchPickId: string): Promise<{ error?: string }> {
+  const { orgId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  // Get the batch pick details first
+  const { data: batchPick, error: fetchError } = await supabase
+    .from("pick_item_batches")
+    .select("id, pick_item_id, batch_id, quantity, org_id")
+    .eq("id", batchPickId)
+    .eq("org_id", orgId)
+    .single();
+
+  if (fetchError || !batchPick) {
+    return { error: "Batch pick not found or access denied" };
+  }
+
+  // Restore batch inventory
+  const { error: batchError } = await supabase
+    .from("batches")
+    .update({ quantity: supabase.rpc("increment_quantity", { row_id: batchPick.batch_id, amount: batchPick.quantity }) })
+    .eq("id", batchPick.batch_id);
+
+  // Note: The above won't work directly - we need a simple increment
+  // Let's use raw SQL via RPC or direct update
+  const { error: restoreError } = await supabase.rpc("restore_batch_quantity", {
+    p_batch_id: batchPick.batch_id,
+    p_quantity: batchPick.quantity,
+  });
+
+  if (restoreError) {
+    logWarning("Could not restore batch quantity", { error: restoreError.message, batchPickId });
+  }
+
+  // Delete the batch pick
+  const { error: deleteError } = await supabase
+    .from("pick_item_batches")
+    .delete()
+    .eq("id", batchPickId);
+
+  if (deleteError) {
+    logError("Error deleting batch pick", { error: deleteError.message, batchPickId });
+    return { error: deleteError.message };
+  }
+
+  // Update pick_items picked_qty by recalculating from remaining batch picks
+  const { data: remainingPicks } = await supabase
+    .from("pick_item_batches")
+    .select("quantity")
+    .eq("pick_item_id", batchPick.pick_item_id);
+
+  const totalRemaining = (remainingPicks || []).reduce((sum, p) => sum + p.quantity, 0);
+
+  await supabase
+    .from("pick_items")
+    .update({
+      picked_qty: totalRemaining,
+      status: totalRemaining === 0 ? "pending" : "short",
+    })
+    .eq("id", batchPick.pick_item_id);
+
+  return {};
+}
+
 export async function substituteBatch(pickItemId: string, newBatchId: string, reason: string): Promise<{ error?: string }> {
   const { user, orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -1099,36 +1303,82 @@ export async function substituteBatch(pickItemId: string, newBatchId: string, re
 }
 
 export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
-  id: string; batchNumber: string; quantity: number; location: string; grade?: string; status?: string; productName?: string;
+  id: string; batchNumber: string; quantity: number; location: string; grade?: string; status?: string; productName?: string; shelfQuantity?: number;
 }[]> {
   const supabase = await getSupabaseServerApp();
   const { data: pickItem } = await supabase.from("pick_items").select(`order_items(required_variety_id, required_batch_id, product_id, product_group_id, skus(plant_variety_id, size_id))`).eq("id", pickItemId).single();
   if (!pickItem?.order_items) return [];
   const orderItem = pickItem.order_items as any;
 
+  // Helper to get shelf quantity for a product
+  const getShelfQuantityForProduct = async (productId: string): Promise<number | undefined> => {
+    const { data: product } = await supabase
+      .from("products")
+      .select("shelf_quantity_override, skus(plant_sizes(shelf_quantity))")
+      .eq("id", productId)
+      .single();
+    if (!product) return undefined;
+    // Use override if set, otherwise use size's shelf_quantity
+    if (product.shelf_quantity_override) return product.shelf_quantity_override;
+    const sku = product.skus as { plant_sizes?: { shelf_quantity?: number | null } } | null;
+    return sku?.plant_sizes?.shelf_quantity ?? undefined;
+  };
+
+  // Helper to get shelf quantity for a size
+  const getShelfQuantityForSize = async (sizeId: string): Promise<number | undefined> => {
+    const { data: size } = await supabase
+      .from("plant_sizes")
+      .select("shelf_quantity")
+      .eq("id", sizeId)
+      .single();
+    return size?.shelf_quantity ?? undefined;
+  };
+
   if (orderItem.product_group_id && !orderItem.product_id) {
     const { data: groupMembers } = await supabase.rpc('get_product_group_members', { p_group_id: orderItem.product_group_id });
     if (!groupMembers || groupMembers.length === 0) return [];
     const childProductIds = groupMembers.map((m: any) => m.product_id);
-    const { data: productBatches, error } = await supabase.from("product_batches").select(`product_id, products(name), batches(id, batch_number, quantity, status, nursery_locations(name))`).in("product_id", childProductIds);
+    const { data: productBatches, error } = await supabase.from("product_batches").select(`product_id, products(name, shelf_quantity_override, skus(plant_sizes(shelf_quantity))), batches(id, batch_number, quantity, status, nursery_locations(name))`).in("product_id", childProductIds);
     if (error) { logError("Error fetching product group batches", { error: error.message, pickItemId }); return []; }
-    return (productBatches || []).filter((pb: any) => pb.batches && pb.batches.quantity > 0).map((pb: any) => ({
-      id: pb.batches.id, batchNumber: pb.batches.batch_number, quantity: pb.batches.quantity,
-      location: pb.batches.nursery_locations?.name || "Unknown", status: pb.batches.status, productName: pb.products?.name,
-    }));
+    return (productBatches || []).filter((pb: any) => pb.batches && pb.batches.quantity > 0).map((pb: any) => {
+      const product = pb.products as { name?: string; shelf_quantity_override?: number | null; skus?: { plant_sizes?: { shelf_quantity?: number | null } } } | null;
+      const shelfQty = product?.shelf_quantity_override ?? product?.skus?.plant_sizes?.shelf_quantity ?? undefined;
+      return {
+        id: pb.batches.id, batchNumber: pb.batches.batch_number, quantity: pb.batches.quantity,
+        location: pb.batches.nursery_locations?.name || "Unknown", status: pb.batches.status, productName: product?.name,
+        shelfQuantity: shelfQty ?? undefined,
+      };
+    });
   }
 
   if (orderItem.required_batch_id) {
-    const { data: requiredBatch } = await supabase.from("batches").select(`id, batch_number, quantity, status, nursery_locations(name)`).eq("id", orderItem.required_batch_id).single();
+    const { data: requiredBatch } = await supabase.from("batches").select(`id, batch_number, quantity, status, size_id, nursery_locations(name), plant_sizes(shelf_quantity)`).eq("id", orderItem.required_batch_id).single();
     if (!requiredBatch) return [];
+    const plantSize = requiredBatch.plant_sizes as { shelf_quantity?: number | null } | null;
     return [{
       id: requiredBatch.id, batchNumber: requiredBatch.batch_number, quantity: requiredBatch.quantity,
       location: (requiredBatch.nursery_locations as any)?.name || "Unknown", status: requiredBatch.status ?? undefined,
+      shelfQuantity: plantSize?.shelf_quantity ?? undefined,
     }];
   }
 
   const varietyId = orderItem.required_variety_id || orderItem.skus?.plant_variety_id;
   const sizeId = orderItem.skus?.size_id;
+
+  // Get shelf quantity for the size if we have it
+  let shelfQuantityForSize: number | undefined;
+  if (sizeId) {
+    shelfQuantityForSize = await getShelfQuantityForSize(sizeId);
+  }
+
+  // If we have a product_id, get its shelf quantity override
+  let productShelfQuantity: number | undefined;
+  if (orderItem.product_id) {
+    productShelfQuantity = await getShelfQuantityForProduct(orderItem.product_id);
+  }
+
+  // Final shelf quantity: product override > size default
+  const finalShelfQuantity = productShelfQuantity ?? shelfQuantityForSize;
 
   if (!varietyId) {
     if (orderItem.product_id) {
@@ -1137,6 +1387,7 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
       return (productBatches || []).filter((pb: any) => pb.batches && pb.batches.quantity > 0).map((pb: any) => ({
         id: pb.batches.id, batchNumber: pb.batches.batch_number, quantity: pb.batches.quantity,
         location: pb.batches.nursery_locations?.name || "Unknown", status: pb.batches.status,
+        shelfQuantity: finalShelfQuantity,
       }));
     }
     return [];
@@ -1149,6 +1400,7 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
   return (batches || []).map((b: any) => ({
     id: b.id, batchNumber: b.batch_number, quantity: b.quantity,
     location: b.nursery_locations?.name || "Unknown", status: b.status,
+    shelfQuantity: finalShelfQuantity,
   }));
 }
 

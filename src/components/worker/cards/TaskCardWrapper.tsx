@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, ArrowRight, Loader2 } from "lucide-react";
+import { Play, ArrowRight, Loader2, WifiOff } from "lucide-react";
+import { useOfflineTaskAction } from "@/hooks/useOfflineTaskAction";
+import { useWorkerOffline } from "@/offline/WorkerOfflineProvider";
+import { hasPendingStart } from "@/offline/task-queue";
 import type { WorkerTask } from "@/lib/types/worker-tasks";
 import { getStatusLabel, getStatusBadgeVariant } from "@/lib/types/worker-tasks";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface TaskCardWrapperProps {
   task: WorkerTask;
@@ -27,6 +30,7 @@ interface TaskCardWrapperProps {
 /**
  * Shared wrapper for all task card types
  * Provides consistent layout, status badges, and action buttons
+ * Now with offline support - actions are queued when offline
  */
 export function TaskCardWrapper({
   task,
@@ -36,30 +40,33 @@ export function TaskCardWrapper({
   footer,
   onUpdate,
 }: TaskCardWrapperProps) {
-  const [loading, setLoading] = useState(false);
-  const isInProgress = task.status === "in_progress";
+  const { isOnline, getTaskWithOptimisticState } = useWorkerOffline();
+
+  const { startTask, loading } = useOfflineTaskAction({
+    haptics: true,
+    onSuccess: () => {
+      onUpdate?.();
+    },
+    onError: (error) => {
+      toast.error("Failed to start task", { description: error });
+    },
+  });
+
+  // Apply optimistic state to determine display status
+  const optimisticTask = getTaskWithOptimisticState(task);
+  const isInProgress = optimisticTask.status === "in_progress";
+  const isPendingStart = hasPendingStart(task.id);
 
   const handleStart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/tasks/${task.id}/start`, {
-        method: "POST",
+    const result = await startTask(task.id);
+
+    if (result.isQueued) {
+      toast.info("Task will start when online", {
+        description: "Your action has been queued for sync.",
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to start task");
-      }
-
-      onUpdate?.();
-    } catch (err) {
-      // In production, show toast notification
-      console.error("Failed to start task:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -74,14 +81,23 @@ export function TaskCardWrapper({
         <CardContent className="p-4">
           {/* Top row: Type badge + Status badge */}
           <div className="flex items-center justify-between mb-2">
-            <Badge variant={typeBadgeVariant} className="text-xs">
-              {typeLabel}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant={typeBadgeVariant} className="text-xs">
+                {typeLabel}
+              </Badge>
+              {/* Show pending indicator if action is queued */}
+              {isPendingStart && (
+                <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                  <WifiOff className="h-3 w-3 mr-1" />
+                  Queued
+                </Badge>
+              )}
+            </div>
             <Badge
-              variant={getStatusBadgeVariant(task.status)}
+              variant={getStatusBadgeVariant(optimisticTask.status)}
               className="text-xs"
             >
-              {getStatusLabel(task.status)}
+              {getStatusLabel(optimisticTask.status)}
             </Badge>
           </div>
 
@@ -117,14 +133,21 @@ export function TaskCardWrapper({
                 className="w-full h-12 text-base font-semibold"
                 variant="secondary"
                 onClick={handleStart}
-                disabled={loading}
+                disabled={loading || isPendingStart}
               >
                 {loading ? (
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : !isOnline ? (
+                  <>
+                    <WifiOff className="mr-2 h-5 w-5" />
+                    Start (Offline)
+                  </>
                 ) : (
-                  <Play className="mr-2 h-5 w-5" />
+                  <>
+                    <Play className="mr-2 h-5 w-5" />
+                    Start
+                  </>
                 )}
-                Start
               </Button>
             )}
           </div>

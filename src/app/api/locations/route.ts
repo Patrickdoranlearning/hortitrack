@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { safeIlikePattern } from "@/server/db/sanitize";
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
       .limit(limit);
 
     if (q) {
-      query = query.ilike("name", `%${q}%`);
+      query = query.ilike("name", safeIlikePattern(q));
     }
 
     const { data, error } = await query;

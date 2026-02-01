@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/server/utils/logger";
 
 export interface Result {
   allowed: boolean;
@@ -42,7 +43,7 @@ export async function checkRateLimit(opts: { key: string; windowMs: number; max:
     .upsert({ key, points, expire_at: expireAt });
 
   if (error) {
-    console.error("Rate limit error:", error);
+    logger.security.error("Rate limit DB error", error, { key, windowMs, max });
     // Report to Sentry for monitoring - DB errors here could indicate infrastructure issues
     Sentry.captureException(error, {
       tags: { component: "rate-limit" },

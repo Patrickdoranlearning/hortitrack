@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { reorderPickLists } from "@/server/sales/picking";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 // POST /api/picking/reorder - Reorder pick lists
 export async function POST(request: NextRequest) {
@@ -26,10 +27,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Error reordering pick lists:", error);
+  } catch (error) {
+    logger.picking.error("Error reordering pick lists", error);
     return NextResponse.json(
-      { error: error.message || "Failed to reorder pick lists" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

@@ -23,7 +23,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Package,
-  MapPin,
   RefreshCw,
   ChevronDown,
   ChevronUp,
@@ -176,6 +175,50 @@ export default function PickingWorkflowClient({
     }
   };
 
+  // Handle multi-batch pick (new default flow)
+  const handleMultiBatchPick = async (
+    itemId: string,
+    batches: Array<{ batchId: string; quantity: number }>,
+    notes?: string
+  ) => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/picking/${pickList.id}/items/${itemId}/batches`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batches, notes }),
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        toast({
+          title: 'Error',
+          description: data.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      await refreshItems();
+
+      const totalPicked = batches.reduce((sum, b) => sum + b.quantity, 0);
+      toast({
+        title: batches.length > 1 ? 'Picked from multiple batches' : 'Item picked',
+        description: `Picked ${totalPicked} units from ${batches.length} batch${batches.length > 1 ? 'es' : ''}`,
+      });
+    } catch (error) {
+      console.error('Error in multi-batch pick:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to pick item',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCompletePicking = async () => {
     setIsSubmitting(true);
     try {
@@ -280,7 +323,9 @@ export default function PickingWorkflowClient({
               <PickItemCard
                 key={item.id}
                 item={item}
+                pickListId={pickList.id}
                 onPick={handlePickItem}
+                onMultiBatchPick={handleMultiBatchPick}
                 onSubstitute={handleSubstitute}
                 isSubmitting={isSubmitting}
               />
@@ -316,7 +361,9 @@ export default function PickingWorkflowClient({
                 <PickItemCard
                   key={item.id}
                   item={item}
+                  pickListId={pickList.id}
                   onPick={handlePickItem}
+                  onMultiBatchPick={handleMultiBatchPick}
                   onSubstitute={handleSubstitute}
                   isSubmitting={isSubmitting}
                   readonly

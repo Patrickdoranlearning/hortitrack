@@ -4,6 +4,7 @@ import {
   addTeamMember,
   removeTeamMember,
 } from "@/server/sales/picking";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 // GET /api/picking/teams/[teamId]/members - Get team members
 export async function GET(
@@ -15,10 +16,10 @@ export async function GET(
     const members = await getTeamMembers(teamId);
 
     return NextResponse.json({ members });
-  } catch (error: any) {
-    console.error("Error fetching team members:", error);
+  } catch (error) {
+    logger.picking.error("Error fetching team members", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch team members" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -52,10 +53,10 @@ export async function POST(
 
     const members = await getTeamMembers(teamId);
     return NextResponse.json({ members }, { status: 201 });
-  } catch (error: any) {
-    console.error("Error adding team member:", error);
+  } catch (error) {
+    logger.picking.error("Error adding team member", error);
     return NextResponse.json(
-      { error: error.message || "Failed to add team member" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -88,10 +89,10 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Error removing team member:", error);
+  } catch (error) {
+    logger.picking.error("Error removing team member", error);
     return NextResponse.json(
-      { error: error.message || "Failed to remove team member" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

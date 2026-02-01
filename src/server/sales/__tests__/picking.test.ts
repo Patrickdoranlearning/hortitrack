@@ -279,32 +279,14 @@ describe('picking service', () => {
   // ============================================================================
   describe('completePickList', () => {
     it('should complete a pick list and update the task', async () => {
-      const mockPickList = createPickListRow({
-        id: 'pick-1',
-        status: 'in_progress',
+      // Mock the RPC call for complete_pick_list
+      mockSupabase.rpc = jest.fn().mockResolvedValue({
+        data: { success: true },
+        error: null,
       });
 
-      let callCount = 0;
+      // Mock pick_list_events for logging
       mockSupabase.from = jest.fn((table: string) => {
-        callCount++;
-        if (table === 'pick_items' && callCount === 1) {
-          // Check pending items
-          return new MockSupabaseQueryBuilder({ data: [], error: null });
-        }
-        if (table === 'pick_lists') {
-          if (callCount === 2) {
-            // Update pick list
-            return new MockSupabaseQueryBuilder({ data: null, error: null });
-          }
-          // Get order_id
-          return new MockSupabaseQueryBuilder({
-            data: { order_id: 'order-1' },
-            error: null,
-          });
-        }
-        if (table === 'orders') {
-          return new MockSupabaseQueryBuilder({ data: null, error: null });
-        }
         if (table === 'pick_list_events') {
           return new MockSupabaseQueryBuilder({ data: null, error: null });
         }
@@ -315,20 +297,23 @@ describe('picking service', () => {
 
       expect(result.error).toBeUndefined();
 
+      // Verify RPC was called with correct params
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('complete_pick_list', {
+        p_org_id: mockOrgId,
+        p_pick_list_id: 'pick-1',
+        p_user_id: mockUser.id,
+      });
+
       // Verify task update
       expect(mockGetTaskBySourceRef).toHaveBeenCalledWith('dispatch', 'pick_list', 'pick-1');
       expect(mockUpdateTask).toHaveBeenCalledWith('task-1', { status: 'completed' });
     });
 
     it('should reject completion if items are still pending', async () => {
-      mockSupabase.from = jest.fn((table: string) => {
-        if (table === 'pick_items') {
-          return new MockSupabaseQueryBuilder({
-            data: [{ id: 'item-1' }, { id: 'item-2' }],
-            error: null,
-          });
-        }
-        return new MockSupabaseQueryBuilder({ data: null, error: null });
+      // Mock the RPC call to return error for pending items
+      mockSupabase.rpc = jest.fn().mockResolvedValue({
+        data: { success: false, error: '2 items still pending' },
+        error: null,
       });
 
       const result = await completePickList('pick-1');

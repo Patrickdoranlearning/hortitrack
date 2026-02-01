@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import type { UserSession } from "@/lib/types";
+import { logger } from "@/server/utils/logger";
 
 import { DEV_USER_ID, DEV_ORG_ID, IS_DEV } from "@/server/auth/dev-bypass";
 
@@ -68,13 +69,15 @@ export async function getUserFromRequest(req: NextRequest): Promise<UserSession 
         orgId = orgId ?? membership.org_id ?? null;
         role = role ?? (membership.role as string | null) ?? null;
       } else {
-        console.log("getUserFromRequest: no membership found for user", user.id);
+        logger.auth.warn("No membership found for user", { userId: user.id });
       }
     }
 
     role = role ?? (user.app_metadata?.role as string | undefined) ?? null;
 
-    if (!orgId) console.log("getUserFromRequest: returning null because no orgId resolved");
+    if (!orgId) {
+      logger.auth.warn("No orgId resolved for user", { userId: user.id });
+    }
 
     return {
       uid: user.id,
@@ -83,7 +86,7 @@ export async function getUserFromRequest(req: NextRequest): Promise<UserSession 
       role,
     };
   } catch (err) {
-    console.error("[auth] getUserFromRequest failed", err);
+    logger.auth.error("getUserFromRequest failed", err);
     return null;
   }
 }

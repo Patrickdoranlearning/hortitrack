@@ -8,7 +8,9 @@ import {
   Bar,
   Cell,
   Tooltip,
+  type TooltipProps,
 } from 'recharts';
+import { type NameType, type ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { ChartContainer } from '@/components/ui/chart';
 
 interface BatchAgeHistogramProps {
@@ -42,11 +44,11 @@ export default function BatchAgeHistogram({
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: TooltipProps<ValueType, NameType>) => {
     if (!active || !payload?.length) return null;
-    
-    const item = payload[0].payload;
-    
+
+    const item = payload[0].payload as { weekNumber: number; quantity: number };
+
     return (
       <div className="bg-popover border rounded-md shadow-md px-3 py-2 text-sm">
         <div className="font-medium">

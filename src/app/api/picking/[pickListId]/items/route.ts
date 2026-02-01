@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPickItems, updatePickItem } from "@/server/sales/picking";
+import { logger, getErrorMessage } from "@/server/utils/logger";
 
 // GET /api/picking/[pickListId]/items - Get all items for a pick list
 export async function GET(
@@ -11,10 +12,10 @@ export async function GET(
     const items = await getPickItems(pickListId);
 
     return NextResponse.json({ items });
-  } catch (error: any) {
-    console.error("Error fetching pick items:", error);
+  } catch (error) {
+    logger.picking.error("Error fetching pick items", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch pick items" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -63,10 +64,10 @@ export async function PATCH(
     const { pickListId } = await params;
     const items = await getPickItems(pickListId);
     return NextResponse.json({ items });
-  } catch (error: any) {
-    console.error("Error updating pick item:", error);
+  } catch (error) {
+    logger.picking.error("Error updating pick item", error);
     return NextResponse.json(
-      { error: error.message || "Failed to update pick item" },
+      { error: getErrorMessage(error) },
       { status: 500 }
     );
   }

@@ -17,6 +17,10 @@ import type {
   MaterialLotSortField,
   MaterialLotSortOrder,
 } from "@/lib/types/material-lots";
+import type {
+  MaterialCategoryCode,
+  MaterialParentGroup,
+} from "@/lib/types/materials";
 
 // ============================================================================
 // Lot CRUD Operations
@@ -679,7 +683,9 @@ export async function getAvailableLotsFifo(
       requiredQuantity === undefined || runningTotal < requiredQuantity;
     runningTotal += row.current_quantity;
 
-    const location = row.location as { id: string; name: string } | null;
+    // Supabase returns joined data as arrays; extract first element if available
+    const locationArray = row.location as { id: string; name: string }[] | null;
+    const location = Array.isArray(locationArray) ? locationArray[0] ?? null : locationArray;
 
     return {
       lotId: row.id,
@@ -838,10 +844,10 @@ function mapMaterialLot(row: Record<string, unknown>): MaterialLot {
           category: material.category
             ? {
                 id: (material.category as Record<string, unknown>).id as string,
-                code: (material.category as Record<string, unknown>).code as string,
+                code: (material.category as Record<string, unknown>).code as MaterialCategoryCode,
                 name: (material.category as Record<string, unknown>).name as string,
                 parentGroup: (material.category as Record<string, unknown>)
-                  .parent_group as string,
+                  .parent_group as MaterialParentGroup,
                 consumptionType: (material.category as Record<string, unknown>)
                   .consumption_type as "per_unit" | "proportional" | "fixed",
                 sortOrder: (material.category as Record<string, unknown>)
