@@ -168,6 +168,7 @@ export default function HomePageView({
   const [isProtocolOpen, setIsProtocolOpen] = React.useState(false);
   const [isRecommendationsOpen, setIsRecommendationsOpen] = React.useState(false);
   const [isVarietyFormOpen, setIsVarietyFormOpen] = React.useState(false);
+  const [varietyFormSaving, setVarietyFormSaving] = React.useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const [isNewPropagationOpen, setIsNewPropagationOpen] = React.useState(false);
   const [isCheckinFormOpen, setIsCheckinFormOpen] = React.useState(false);
@@ -1304,17 +1305,24 @@ export default function HomePageView({
             </DialogHeader>
             <VarietyForm
                 variety={{ name: newVarietyName } as Variety}
+                saving={varietyFormSaving}
                 onSubmit={async (data) => {
-                const supabase = supabaseClient();
-                const { error } = await supabase.from('plant_varieties').insert({
-                    name: data.name, genus: data.genus, species: data.species, family: data.family, notes: data.notes
-                });
-                if (error) {
-                    toast({ variant: 'destructive', title: 'Failed to create variety', description: error.message });
-                    throw error;
-                };
-                setIsVarietyFormOpen(false);
-                setNewVarietyName('');
+                  setVarietyFormSaving(true);
+                  try {
+                    const supabase = supabaseClient();
+                    const { error } = await supabase.from('plant_varieties').insert({
+                      name: data.name, genus: data.genus, species: data.species, family: data.family, notes: data.notes
+                    });
+                    if (error) {
+                      toast({ variant: 'destructive', title: 'Failed to create variety', description: error.message });
+                      return;
+                    }
+                    toast({ title: 'Variety created', description: `"${data.name}" has been added.` });
+                    setIsVarietyFormOpen(false);
+                    setNewVarietyName('');
+                  } finally {
+                    setVarietyFormSaving(false);
+                  }
                 }}
                 onCancel={() => setIsVarietyFormOpen(false)}
             />

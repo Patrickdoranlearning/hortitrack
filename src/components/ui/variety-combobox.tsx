@@ -46,6 +46,7 @@ export function VarietyCombobox({
   disabled,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const items = useMemo(
     () =>
       varieties
@@ -61,10 +62,14 @@ export function VarietyCombobox({
     // optional: immediately select it in the form
     onSelect({ name });
     setOpen(false);
+    setSearch("");
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) setSearch("");
+    }}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -80,24 +85,25 @@ export function VarietyCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command shouldFilter={true}>
-          <CommandInput placeholder={placeholder} />
+          <CommandInput
+            placeholder={placeholder}
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty className="p-3 text-sm text-muted-foreground">
               {emptyMessage}
-              {onCreate && (
+              {onCreate && search.trim() && (
                 <div className="mt-2">
                   <Button
                     type="button"
                     size="sm"
                     variant="secondary"
                     className="w-full"
-                    onClick={() => handleCreate(
-                      // pull current input from the DOM (CommandInput keeps value in its input)
-                      (document.querySelector("[cmdk-input]") as HTMLInputElement | null)?.value?.trim() || ""
-                    )}
+                    onClick={() => handleCreate(search.trim())}
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    Create “{(document.querySelector("[cmdk-input]") as HTMLInputElement | null)?.value?.trim() || "new variety"}”
+                    Create &quot;{search.trim()}&quot;
                   </Button>
                 </div>
               )}

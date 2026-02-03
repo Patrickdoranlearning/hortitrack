@@ -20,7 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { SelectWithCreate } from "../ui/select-with-create";
+import { SearchableSelect } from "../ui/searchable-select";
 import { useRefreshOnFocus } from "../../hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -344,15 +344,16 @@ export default function TransplantForm({
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Target size / container</FormLabel>
-                    <SelectWithCreate
+                    <SearchableSelect
                       options={sizes.map((s) => ({
                         value: s.id,
-                        label: `${s.name}${s.container_type ? ` · ${s.container_type}` : ""}${s.cell_multiple ? ` · ${s.cell_multiple}/tray` : ""}`,
+                        label: s.name,
+                        description: `${s.container_type ?? ""}${s.cell_multiple ? ` · ${s.cell_multiple}/tray` : ""}`.trim() || undefined,
                       }))}
                       value={field.value ?? ""}
                       onValueChange={field.onChange}
                       createHref="/sizes"
-                      placeholder="Select a size"
+                      placeholder="Search sizes..."
                       createLabel="Add new size"
                     />
                     <FormMessage />

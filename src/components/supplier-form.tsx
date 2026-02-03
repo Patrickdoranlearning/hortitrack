@@ -36,9 +36,10 @@ interface SupplierFormProps {
   supplier: Supplier | null;
   onSubmit: (data: Omit<Supplier, 'id'> | Supplier) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
-export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps) {
+export function SupplierForm({ supplier, onSubmit, onCancel, saving }: SupplierFormProps) {
   const isEditing = !!supplier;
 
   const form = useForm<SupplierFormValues>({
@@ -176,10 +177,12 @@ export function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps
           </div>
             
           <DialogFooter className="pt-6">
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
                 Cancel
             </Button>
-            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Supplier'}</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Supplier'}
+            </Button>
           </DialogFooter>
         </form>
       </Form>

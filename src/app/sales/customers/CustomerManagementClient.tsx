@@ -456,13 +456,13 @@ export default function CustomerManagementClient({ customers, priceLists, produc
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead className="min-w-[120px]">Name</TableHead>
                     <TableHead className="hidden sm:table-cell">Code</TableHead>
-                    <TableHead className="hidden md:table-cell">Contact</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead className="hidden lg:table-cell">Currency</TableHead>
-                    <TableHead className="hidden md:table-cell">Addresses</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="hidden lg:table-cell">Contact</TableHead>
+                    <TableHead className="hidden sm:table-cell">Country</TableHead>
+                    <TableHead className="hidden xl:table-cell">Currency</TableHead>
+                    <TableHead className="hidden lg:table-cell">Addresses</TableHead>
+                    <TableHead className="text-right w-[80px] sm:w-auto">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
               <TableBody>
@@ -477,7 +477,7 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                       </Link>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{customer.code || "—"}</TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell className="hidden lg:table-cell">
                       <div className="flex flex-col gap-1 text-sm">
                         {customer.email && (
                           <a
@@ -485,7 +485,7 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                             href={`mailto:${customer.email}`}
                           >
                             <Mail className="h-3 w-3" />
-                            {customer.email}
+                            <span className="truncate max-w-[200px]">{customer.email}</span>
                           </a>
                         )}
                         {customer.phone && (
@@ -500,13 +500,13 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                         {!customer.email && !customer.phone && "—"}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <Badge variant="outline">
                         {COUNTRY_OPTIONS.find((c) => c.code === customer.countryCode)?.name ?? customer.countryCode}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">{customer.currency}</TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell className="hidden xl:table-cell">{customer.currency}</TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {customer.addresses.length > 0 ? (
                         <span className="text-sm text-muted-foreground">
                           {customer.addresses.length} location{customer.addresses.length !== 1 ? "s" : ""}
@@ -517,8 +517,8 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" onClick={() => handleEdit(customer)}>
-                        <Settings2 className="mr-2 h-4 w-4" />
-                        Manage
+                        <Settings2 className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Manage</span>
                       </Button>
                     </TableCell>
                   </TableRow>

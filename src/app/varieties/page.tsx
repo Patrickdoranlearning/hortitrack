@@ -87,6 +87,7 @@ export default function VarietiesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVariety, setEditingVariety] = useState<Variety | null>(null);
   const [filterText, setFilterText] = useState("");
+  const [formSaving, setFormSaving] = useState(false);
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const [sortConfig, setSortConfig] = useState<{ key: SortableVarietyKey; direction: "asc" | "desc" }>({
@@ -192,25 +193,30 @@ export default function VarietiesPage() {
 
   const handleFormSubmit = async (varietyData: Omit<Variety, "id"> | Variety) => {
     const isEditing = "id" in varietyData;
+    setFormSaving(true);
 
-    const result = isEditing
-      ? await updateVarietyAction(varietyData as Variety)
-      : await addVarietyAction(varietyData);
+    try {
+      const result = isEditing
+        ? await updateVarietyAction(varietyData as Variety)
+        : await addVarietyAction(varietyData);
 
-    if (result.success) {
-      invalidateReferenceData();
-      toast({
-        title: isEditing ? "Variety updated" : "Variety added",
-        description: `Successfully ${isEditing ? "updated" : "added"} "${result.data?.name}".`,
-      });
-      setIsFormOpen(false);
-      setEditingVariety(null);
-    } else {
-      toast({
-        variant: "destructive",
-        title: isEditing ? "Update failed" : "Add failed",
-        description: result.error,
-      });
+      if (result.success) {
+        invalidateReferenceData();
+        toast({
+          title: isEditing ? "Variety updated" : "Variety added",
+          description: `Successfully ${isEditing ? "updated" : "added"} "${result.data?.name}".`,
+        });
+        setIsFormOpen(false);
+        setEditingVariety(null);
+      } else {
+        toast({
+          variant: "destructive",
+          title: isEditing ? "Update failed" : "Add failed",
+          description: result.error,
+        });
+      }
+    } finally {
+      setFormSaving(false);
     }
   };
 
@@ -897,6 +903,7 @@ export default function VarietiesPage() {
           <DialogContent className="max-w-2xl">
             <VarietyForm
               variety={editingVariety}
+              saving={formSaving}
               onSubmit={handleFormSubmit}
               onCancel={() => {
                 setIsFormOpen(false);

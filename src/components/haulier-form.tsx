@@ -25,6 +25,7 @@ interface HaulierFormProps {
   haulier: Haulier | null;
   onSubmit: (data: Omit<Haulier, 'id'> | Haulier) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
 const defaultValues: HaulierFormValues = {
@@ -35,7 +36,7 @@ const defaultValues: HaulierFormValues = {
   isActive: true,
 };
 
-export function HaulierForm({ haulier, onSubmit, onCancel }: HaulierFormProps) {
+export function HaulierForm({ haulier, onSubmit, onCancel, saving }: HaulierFormProps) {
   const isEditing = !!haulier;
 
   const form = useForm<HaulierFormValues>({
@@ -108,10 +109,12 @@ export function HaulierForm({ haulier, onSubmit, onCancel }: HaulierFormProps) {
             </FormItem>
           )} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit">{isEditing ? 'Save changes' : 'Add haulier'}</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : isEditing ? 'Save changes' : 'Add haulier'}
+            </Button>
           </DialogFooter>
         </form>
       </Form>

@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { VarietyComboboxGrouped } from "@/components/ui/variety-combobox-grouped";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { useToast } from "@/hooks/use-toast";
@@ -305,20 +306,13 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Variety</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select variety" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-[300px]">
-                            {varieties.map((v) => (
-                              <SelectItem key={v.id} value={v.id}>
-                                {v.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <VarietyComboboxGrouped
+                          varieties={varieties}
+                          value={field.value}
+                          onSelect={(id) => field.onChange(id)}
+                          placeholder="Search varieties..."
+                          createHref="/varieties"
+                        />
                         <FormMessage />
                       </FormItem>
                     )}

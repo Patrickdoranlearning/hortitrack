@@ -43,6 +43,7 @@ export default function HauliersPage() {
   const [filterText, setFilterText] = useState('');
   const [editingHaulier, setEditingHaulier] = useState<Haulier | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formSaving, setFormSaving] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableHaulierKey; direction: 'asc' | 'desc' }>({
     key: 'name',
     direction: 'asc',
@@ -249,20 +250,26 @@ export default function HauliersPage() {
           <DialogContent className="max-w-2xl">
             <HaulierForm
               haulier={editingHaulier}
+              saving={formSaving}
               onSubmit={async (values) => {
-                const result = await ('id' in values && values.id
-                  ? updateHaulierAction(values as Haulier)
-                  : addHaulierAction(values as Omit<Haulier, 'id'>));
-                if (result.success) {
-                  invalidateReferenceData();
-                  toast({
-                    title: editingHaulier ? 'Haulier updated' : 'Haulier added',
-                    description: `"${result.data?.name ?? values.name}" saved successfully.`,
-                  });
-                  setIsFormOpen(false);
-                  setEditingHaulier(null);
-                } else {
-                  toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                setFormSaving(true);
+                try {
+                  const result = await ('id' in values && values.id
+                    ? updateHaulierAction(values as Haulier)
+                    : addHaulierAction(values as Omit<Haulier, 'id'>));
+                  if (result.success) {
+                    invalidateReferenceData();
+                    toast({
+                      title: editingHaulier ? 'Haulier updated' : 'Haulier added',
+                      description: `"${result.data?.name ?? values.name}" saved successfully.`,
+                    });
+                    setIsFormOpen(false);
+                    setEditingHaulier(null);
+                  } else {
+                    toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                  }
+                } finally {
+                  setFormSaving(false);
                 }
               }}
               onCancel={() => {
@@ -310,20 +317,20 @@ function HauliersTable({
             ))}
           </div>
         ) : (
-          <Table className="min-w-[600px] text-sm">
+          <Table className="min-w-[320px] sm:min-w-[600px] text-sm">
             <TableHeader>
               <TableRow>
-                <TableHead className="px-4 py-2 w-[260px]">{renderSortHeader('Name', 'name')}</TableHead>
-                <TableHead className="px-4 py-2 w-[200px] hidden md:table-cell">{renderSortHeader('Phone', 'phone')}</TableHead>
-                <TableHead className="px-4 py-2 w-[240px] hidden md:table-cell">{renderSortHeader('Email', 'email')}</TableHead>
-                <TableHead className="px-4 py-2 w-[140px]">Status</TableHead>
-                <TableHead className="px-4 py-2 text-right">Actions</TableHead>
+                <TableHead className="px-2 sm:px-4 py-2 min-w-[120px] sm:w-[260px]">{renderSortHeader('Name', 'name')}</TableHead>
+                <TableHead className="px-2 sm:px-4 py-2 w-[200px] hidden md:table-cell">{renderSortHeader('Phone', 'phone')}</TableHead>
+                <TableHead className="px-2 sm:px-4 py-2 w-[240px] hidden lg:table-cell">{renderSortHeader('Email', 'email')}</TableHead>
+                <TableHead className="px-2 sm:px-4 py-2 w-[80px] sm:w-[140px]">Status</TableHead>
+                <TableHead className="px-2 sm:px-4 py-2 text-right w-[100px] sm:w-auto">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <Form {...quickForm}>
                 <TableRow className="bg-muted/60">
-                  <TableCell className="px-4 py-2">
+                  <TableCell className="px-2 sm:px-4 py-2">
                     <FormField
                       control={quickForm.control}
                       name="name"
@@ -338,7 +345,7 @@ function HauliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2 hidden md:table-cell">
+                  <TableCell className="px-2 sm:px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="phone"
@@ -353,7 +360,7 @@ function HauliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2 hidden md:table-cell">
+                  <TableCell className="px-2 sm:px-4 py-2 hidden lg:table-cell">
                     <FormField
                       control={quickForm.control}
                       name="email"
@@ -368,16 +375,17 @@ function HauliersTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2">Active</TableCell>
-                  <TableCell className="px-4 py-2 text-right">
+                  <TableCell className="px-2 sm:px-4 py-2 text-xs sm:text-sm">Active</TableCell>
+                  <TableCell className="px-2 sm:px-4 py-2 text-right">
                     <Button
                       type="button"
                       size="sm"
-                      className="w-full sm:w-auto gap-2"
+                      className="w-full sm:w-auto gap-1 sm:gap-2"
                       onClick={handleQuickAdd}
                     >
                       <Plus className="h-4 w-4" />
-                      Save row
+                      <span className="hidden sm:inline">Save row</span>
+                      <span className="sm:hidden">Add</span>
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -385,30 +393,38 @@ function HauliersTable({
 
               {hauliers.map((haulier) => (
                 <TableRow key={haulier.id}>
-                  <TableCell className="px-4 py-2 font-medium">{haulier.name}</TableCell>
-                  <TableCell className="px-4 py-2 hidden md:table-cell">{haulier.phone || '—'}</TableCell>
-                  <TableCell className="px-4 py-2 hidden md:table-cell">{haulier.email || '—'}</TableCell>
-                  <TableCell className="px-4 py-2">{haulier.isActive ? 'Active' : 'Inactive'}</TableCell>
-                  <TableCell className="px-4 py-2 text-right">
-                    <div className="flex justify-end gap-2">
+                  <TableCell className="px-2 sm:px-4 py-2 font-medium">
+                    <div className="flex flex-col">
+                      <span>{haulier.name}</span>
+                      {/* Show phone on mobile under name */}
+                      {haulier.phone && (
+                        <span className="text-xs text-muted-foreground md:hidden">{haulier.phone}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="px-2 sm:px-4 py-2 hidden md:table-cell">{haulier.phone || '—'}</TableCell>
+                  <TableCell className="px-2 sm:px-4 py-2 hidden lg:table-cell">{haulier.email || '—'}</TableCell>
+                  <TableCell className="px-2 sm:px-4 py-2 text-xs sm:text-sm">{haulier.isActive ? 'Active' : 'Inactive'}</TableCell>
+                  <TableCell className="px-2 sm:px-4 py-2 text-right">
+                    <div className="flex justify-end gap-1 sm:gap-2">
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="gap-2"
+                        className="gap-1 sm:gap-2 px-2 sm:px-3"
                         onClick={() => {
                           setEditingHaulier(haulier);
                           setIsFormOpen(true);
                         }}
                       >
                         <Edit className="h-4 w-4" />
-                        Edit
+                        <span className="hidden sm:inline">Edit</span>
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button type="button" size="sm" variant="destructive" className="gap-2">
+                          <Button type="button" size="sm" variant="destructive" className="gap-1 sm:gap-2 px-2 sm:px-3">
                             <Trash2 className="h-4 w-4" />
-                            Delete
+                            <span className="hidden sm:inline">Delete</span>
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>

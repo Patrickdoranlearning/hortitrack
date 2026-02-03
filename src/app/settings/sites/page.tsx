@@ -35,6 +35,7 @@ export default function SitesPage() {
   const [filterText, setFilterText] = useState('');
   const [editingSite, setEditingSite] = useState<SiteWithCount | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formSaving, setFormSaving] = useState(false);
   const [sites, setSites] = useState<SiteWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState<{ key: SortableKey; direction: 'asc' | 'desc' }>({
@@ -96,21 +97,26 @@ export default function SitesPage() {
   };
 
   const handleFormSubmit = async (values: Omit<Site, 'id'> | Site) => {
-    const isUpdate = 'id' in values && values.id;
-    const result = isUpdate
-      ? await updateSiteAction(values as Site)
-      : await addSiteAction(values as Omit<Site, 'id'>);
+    setFormSaving(true);
+    try {
+      const isUpdate = 'id' in values && values.id;
+      const result = isUpdate
+        ? await updateSiteAction(values as Site)
+        : await addSiteAction(values as Omit<Site, 'id'>);
 
-    if (result.success) {
-      toast({
-        title: isUpdate ? 'Site updated' : 'Site added',
-        description: `"${values.name}" saved successfully.`,
-      });
-      setIsFormOpen(false);
-      setEditingSite(null);
-      fetchSites();
-    } else {
-      toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+      if (result.success) {
+        toast({
+          title: isUpdate ? 'Site updated' : 'Site added',
+          description: `"${values.name}" saved successfully.`,
+        });
+        setIsFormOpen(false);
+        setEditingSite(null);
+        fetchSites();
+      } else {
+        toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+      }
+    } finally {
+      setFormSaving(false);
     }
   };
 
@@ -337,6 +343,7 @@ export default function SitesPage() {
           <DialogContent className="max-w-md">
             <SiteForm
               site={editingSite}
+              saving={formSaving}
               onSubmit={handleFormSubmit}
               onCancel={() => {
                 setIsFormOpen(false);

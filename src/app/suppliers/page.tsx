@@ -72,6 +72,7 @@ export default function SuppliersPage() {
     key: 'name',
     direction: 'asc',
   });
+  const [formSaving, setFormSaving] = useState(false);
   
   // Address management state
   const [addressSheetSupplier, setAddressSheetSupplier] = useState<Supplier | null>(null);
@@ -355,20 +356,26 @@ export default function SuppliersPage() {
           <DialogContent className="max-w-2xl">
             <SupplierForm
               supplier={editingSupplier}
+              saving={formSaving}
               onSubmit={async (values) => {
-                const result = await ('id' in values && values.id
-                  ? updateSupplierAction(values as Supplier)
-                  : addSupplierAction(values as Omit<Supplier, 'id'>));
-                if (result.success) {
-                  invalidateReferenceData();
-                  toast({
-                    title: editingSupplier ? 'Supplier updated' : 'Supplier added',
-                    description: `"${result.data?.name ?? values.name}" saved successfully.`,
-                  });
-                  setIsFormOpen(false);
-                  setEditingSupplier(null);
-                } else {
-                  toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                setFormSaving(true);
+                try {
+                  const result = await ('id' in values && values.id
+                    ? updateSupplierAction(values as Supplier)
+                    : addSupplierAction(values as Omit<Supplier, 'id'>));
+                  if (result.success) {
+                    invalidateReferenceData();
+                    toast({
+                      title: editingSupplier ? 'Supplier updated' : 'Supplier added',
+                      description: `"${result.data?.name ?? values.name}" saved successfully.`,
+                    });
+                    setIsFormOpen(false);
+                    setEditingSupplier(null);
+                  } else {
+                    toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                  }
+                } finally {
+                  setFormSaving(false);
                 }
               }}
               onCancel={() => {

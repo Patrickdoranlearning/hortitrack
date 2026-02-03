@@ -264,7 +264,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                 <TableHeader>
                   <TableRow>
                     <TableHead
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors min-w-[120px]"
                       onClick={() => handleSort("name")}
                     >
                       <div className="flex items-center">
@@ -273,7 +273,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                       </div>
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors hidden sm:table-cell"
                       onClick={() => handleSort("sku")}
                     >
                       <div className="flex items-center">
@@ -282,7 +282,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                       </div>
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors hidden md:table-cell"
                       onClick={() => handleSort("status")}
                     >
                       <div className="flex items-center">
@@ -295,12 +295,13 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                       onClick={() => handleSort("inventory")}
                     >
                       <div className="flex items-center">
-                        Inventory
+                        <span className="hidden sm:inline">Inventory</span>
+                        <span className="sm:hidden">Stock</span>
                         <SortIcon column="inventory" />
                       </div>
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="cursor-pointer hover:bg-muted/50 transition-colors hidden lg:table-cell"
                       onClick={() => handleSort("priceLists")}
                     >
                       <div className="flex items-center">
@@ -308,7 +309,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                         <SortIcon column="priceLists" />
                       </div>
                     </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right w-[70px] sm:w-auto">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -328,9 +329,17 @@ export default function ProductManagementClient(props: ProductManagementPayload)
 
                     return (
                       <TableRow key={product.id}>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.sku?.code ?? "—"}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span className="truncate max-w-[150px] sm:max-w-none">{product.name}</span>
+                            {/* Show SKU on mobile under name */}
+                            <span className="text-xs text-muted-foreground sm:hidden">
+                              {product.sku?.code ?? "No SKU"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">{product.sku?.code ?? "—"}</TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <Badge variant={product.isActive ? "default" : "outline"}>
                             {product.isActive ? "Active" : "Inactive"}
                           </Badge>
@@ -338,24 +347,26 @@ export default function ProductManagementClient(props: ProductManagementPayload)
                         <TableCell>
                           <div className="flex flex-col gap-0.5">
                             <span className={`text-sm font-medium ${availableQty > 0 ? "text-green-700" : "text-muted-foreground"}`}>
-                              {availableQty} available
+                              {availableQty} <span className="hidden sm:inline">available</span>
                             </span>
                             {pipelineQty > 0 && (
                               <span className="text-xs text-muted-foreground">{pipelineQty} coming</span>
                             )}
-                            {varietyNames.length > 0 && (
-                              <span className="text-xs text-muted-foreground">
-                                Varieties: {varietyNames.slice(0, 3).join(", ")}
-                                {varietyNames.length > 3 && ` +${varietyNames.length - 3} more`}
-                              </span>
-                            )}
+                            <span className="hidden lg:block text-xs text-muted-foreground">
+                              {varietyNames.length > 0 && (
+                                <>
+                                  Varieties: {varietyNames.slice(0, 3).join(", ")}
+                                  {varietyNames.length > 3 && ` +${varietyNames.length - 3} more`}
+                                </>
+                              )}
+                            </span>
                           </div>
                         </TableCell>
-                        <TableCell>{product.prices.length}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{product.prices.length}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="outline" size="sm" onClick={() => handleManageProduct(product.id)}>
-                            <Settings2 className="mr-2 h-4 w-4" />
-                            Manage
+                            <Settings2 className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Manage</span>
                           </Button>
                         </TableCell>
                       </TableRow>

@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { VarietyComboboxGrouped } from "@/components/ui/variety-combobox-grouped";
 import { useToast } from "@/components/ui/use-toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -263,25 +264,13 @@ export function PropagationForm({
               Variety
             </div>
 
-            <Select value={varietyId} onValueChange={setVarietyId}>
-              <SelectTrigger className="min-h-[56px]">
-                <SelectValue placeholder="Select variety" />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {varieties.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    <div className="flex flex-col items-start">
-                      <span>{v.name}</span>
-                      {v.family && (
-                        <span className="text-xs text-muted-foreground">
-                          {v.family}
-                        </span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <VarietyComboboxGrouped
+              varieties={varieties}
+              value={varietyId}
+              onSelect={setVarietyId}
+              placeholder="Search varieties..."
+              triggerClassName="min-h-[56px]"
+            />
 
             {selectedVariety && (
               <div className="text-sm text-muted-foreground">

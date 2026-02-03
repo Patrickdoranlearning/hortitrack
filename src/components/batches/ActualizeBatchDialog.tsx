@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SelectWithCreate } from "../ui/select-with-create";
+import { SearchableSelect } from "../ui/searchable-select";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -232,15 +232,16 @@ export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: P
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assign to location</FormLabel>
-                      <SelectWithCreate
+                      <SearchableSelect
                         options={realLocations.map((loc) => ({
                           value: loc.id!,
-                          label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                          label: loc.name,
+                          description: loc.nursery_site ?? undefined,
                         }))}
                         value={field.value}
                         onValueChange={field.onChange}
                         createHref="/locations"
-                        placeholder="Select production location"
+                        placeholder="Search locations..."
                         createLabel="Add new location"
                       />
                       <FormMessage />

@@ -26,9 +26,10 @@ interface SizeFormProps {
   size: PlantSize | null;
   onSubmit: (data: Omit<PlantSize, 'id'> | PlantSize) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
-export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
+export function SizeForm({ size, onSubmit, onCancel, saving }: SizeFormProps) {
   const isEditing = !!size;
 
   // Fetch container types from dropdown manager (configurable per tenant)
@@ -414,14 +415,14 @@ export function SizeForm({ size, onSubmit, onCancel }: SizeFormProps) {
               type="button"
               variant="outline"
               onClick={onCancel}
-              disabled={form.formState.isSubmitting}
+              disabled={saving || form.formState.isSubmitting}
             >
               Cancel
             </Button>
           )}
 
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? 'Saving…' : 'Save'}
+          <Button type="submit" disabled={saving || form.formState.isSubmitting}>
+            {saving || form.formState.isSubmitting ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </form>

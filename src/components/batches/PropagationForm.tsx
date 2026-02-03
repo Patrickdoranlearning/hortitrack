@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { SelectWithCreate } from "../ui/select-with-create";
+import { VarietyComboboxGrouped } from "../ui/variety-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
@@ -254,16 +255,12 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 render={({ field }) => (
                   <FormItem className="lg:col-span-2">
                     <FormLabel>Variety</FormLabel>
-                    <SelectWithCreate
-                      options={varieties.map((v) => ({
-                        value: v.id,
-                        label: v.name + (v.family ? ` · ${v.family}` : ""),
-                      }))}
+                    <VarietyComboboxGrouped
+                      varieties={varieties}
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onSelect={(id) => field.onChange(id)}
+                      placeholder="Search varieties..."
                       createHref="/varieties"
-                      placeholder="Search or pick a variety"
-                      createLabel="Add new variety"
                     />
                     <FormMessage />
                   </FormItem>

@@ -85,6 +85,7 @@ export default function SizesPage() {
   const { loading: authLoading } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSize, setEditingSize] = useState<PlantSize | null>(null);
+  const [formSaving, setFormSaving] = useState(false);
   const { toast } = useToast();
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
   const [filterText, setFilterText] = useState('');
@@ -200,25 +201,30 @@ export default function SizesPage() {
   };
 
   const handleFormSubmit = async (data: Omit<PlantSize, 'id'> | PlantSize) => {
-    const isEditing = 'id' in data;
-    const result = isEditing
-      ? await updateSizeAction(data as PlantSize)
-      : await addSizeAction(data as Omit<PlantSize, 'id'>);
+    setFormSaving(true);
+    try {
+      const isEditing = 'id' in data;
+      const result = isEditing
+        ? await updateSizeAction(data as PlantSize)
+        : await addSizeAction(data as Omit<PlantSize, 'id'>);
 
-    if (result.success) {
-      invalidateReferenceData();
-      toast({
-        title: isEditing ? 'Size updated' : 'Size added',
-        description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`,
-      });
-      setIsFormOpen(false);
-      setEditingSize(null);
-    } else {
-      toast({
-        variant: 'destructive',
-        title: isEditing ? 'Update failed' : 'Add failed',
-        description: result.error,
-      });
+      if (result.success) {
+        invalidateReferenceData();
+        toast({
+          title: isEditing ? 'Size updated' : 'Size added',
+          description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`,
+        });
+        setIsFormOpen(false);
+        setEditingSize(null);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: isEditing ? 'Update failed' : 'Add failed',
+          description: result.error,
+        });
+      }
+    } finally {
+      setFormSaving(false);
     }
   };
 
@@ -877,6 +883,7 @@ export default function SizesPage() {
             </DialogHeader>
             <SizeForm
               size={editingSize}
+              saving={formSaving}
               onSubmit={handleFormSubmit}
               onCancel={() => setIsFormOpen(false)}
             />

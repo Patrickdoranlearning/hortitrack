@@ -64,23 +64,24 @@ export default async function ProductsPage() {
         title="Products & Pricing"
         description="Manage saleable products, linked batches, and customer-facing price lists."
         actionsSlot={
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm" className="sm:size-default">
               <Link href="/sales/products/groups">
-                <Layers className="mr-2 h-4 w-4" />
-                Product Groups
+                <Layers className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Product Groups</span>
               </Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" size="sm" className="sm:size-default">
               <Link href="/sales/products/mapping">
-                <Settings2 className="mr-2 h-4 w-4" />
-                Mapping Rules
+                <Settings2 className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Mapping Rules</span>
               </Link>
             </Button>
-            <Button asChild>
+            <Button asChild size="sm" className="sm:size-default">
               <Link href="/sales/products/new">
-                <Plus className="mr-2 h-4 w-4" />
-                New Product
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden xs:inline">New</span>
+                <span className="hidden sm:inline"> Product</span>
               </Link>
             </Button>
           </div>

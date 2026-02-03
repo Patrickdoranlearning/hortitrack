@@ -25,6 +25,7 @@ interface CustomerFormProps {
   customer: Customer | null;
   onSubmit: (data: Omit<Customer, 'id'> | Customer) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
 const defaultValues: CustomerFormValues = {
@@ -40,7 +41,7 @@ const defaultValues: CustomerFormValues = {
   pricingTier: '',
 };
 
-export function CustomerForm({ customer, onSubmit, onCancel }: CustomerFormProps) {
+export function CustomerForm({ customer, onSubmit, onCancel, saving }: CustomerFormProps) {
   const isEditing = !!customer;
 
   const form = useForm<CustomerFormValues>({
@@ -136,10 +137,12 @@ export function CustomerForm({ customer, onSubmit, onCancel }: CustomerFormProps
             </FormItem>
           )} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit">{isEditing ? 'Save changes' : 'Add customer'}</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : isEditing ? 'Save changes' : 'Add customer'}
+            </Button>
           </DialogFooter>
         </form>
       </Form>

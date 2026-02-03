@@ -37,9 +37,10 @@ interface VarietyFormProps {
   variety: Variety | null;
   onSubmit: (data: VarietyFormValues) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
-export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
+export function VarietyForm({ variety, onSubmit, onCancel, saving }: VarietyFormProps) {
   const isEditing = !!variety?.id;
 
   const form = useForm<VarietyFormValues>({
@@ -291,10 +292,12 @@ export function VarietyForm({ variety, onSubmit, onCancel }: VarietyFormProps) {
             </div>
           </ScrollArea>
           <DialogFooter className="pt-6">
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
                 Cancel
             </Button>
-            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Variety'}</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Variety'}
+            </Button>
           </DialogFooter>
         </form>
       </Form>

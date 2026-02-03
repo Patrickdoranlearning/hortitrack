@@ -54,6 +54,7 @@ export default function LocationsPage() {
   const [filterText, setFilterText] = useState('');
   const [editingLocation, setEditingLocation] = useState<NurseryLocation | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formSaving, setFormSaving] = useState(false);
   const [sites, setSites] = useState<Site[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: SortableLocationKey; direction: 'asc' | 'desc' }>({
     key: 'name',
@@ -304,20 +305,26 @@ export default function LocationsPage() {
             <LocationForm
               location={editingLocation}
               sites={sites}
+              saving={formSaving}
               onSubmit={async (values) => {
-                const result = await (values as any).id
-                  ? updateLocationAction(values as NurseryLocation)
-                  : addLocationAction(values as Omit<NurseryLocation, 'id'>);
-                if (result.success) {
-                  invalidateReferenceData();
-                  toast({
-                    title: (values as any).id ? 'Location updated' : 'Location added',
-                    description: `"${result.data?.name ?? values.name}" saved successfully.`,
-                  });
-                  setIsFormOpen(false);
-                  setEditingLocation(null);
-                } else {
-                  toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                setFormSaving(true);
+                try {
+                  const result = await (values as any).id
+                    ? updateLocationAction(values as NurseryLocation)
+                    : addLocationAction(values as Omit<NurseryLocation, 'id'>);
+                  if (result.success) {
+                    invalidateReferenceData();
+                    toast({
+                      title: (values as any).id ? 'Location updated' : 'Location added',
+                      description: `"${result.data?.name ?? values.name}" saved successfully.`,
+                    });
+                    setIsFormOpen(false);
+                    setEditingLocation(null);
+                  } else {
+                    toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                  }
+                } finally {
+                  setFormSaving(false);
                 }
               }}
               onCancel={() => {

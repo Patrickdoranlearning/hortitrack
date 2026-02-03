@@ -40,6 +40,7 @@ interface LocationFormProps {
   sites?: Site[];
   onSubmit: (data: Omit<NurseryLocation, 'id'> | NurseryLocation) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
 const defaultValues: LocationFormValues = {
@@ -51,7 +52,7 @@ const defaultValues: LocationFormValues = {
   siteId: undefined,
 };
 
-export function LocationForm({ location, sites = [], onSubmit, onCancel }: LocationFormProps) {
+export function LocationForm({ location, sites = [], onSubmit, onCancel, saving }: LocationFormProps) {
   const isEditing = !!location;
 
   const form = useForm<LocationFormValues>({
@@ -219,10 +220,12 @@ export function LocationForm({ location, sites = [], onSubmit, onCancel }: Locat
             </div>
           </ScrollArea>
           <DialogFooter className="pt-6">
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit">{isEditing ? 'Save changes' : 'Add location'}</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : isEditing ? 'Save changes' : 'Add location'}
+            </Button>
           </DialogFooter>
         </form>
       </Form>

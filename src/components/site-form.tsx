@@ -24,13 +24,14 @@ interface SiteFormProps {
   site: Site | null;
   onSubmit: (data: Omit<Site, 'id'> | Site) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
 const defaultValues: SiteFormValues = {
   name: '',
 };
 
-export function SiteForm({ site, onSubmit, onCancel }: SiteFormProps) {
+export function SiteForm({ site, onSubmit, onCancel, saving }: SiteFormProps) {
   const isEditing = !!site;
 
   const form = useForm<SiteFormValues>({
@@ -81,10 +82,12 @@ export function SiteForm({ site, onSubmit, onCancel }: SiteFormProps) {
         />
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit">{isEditing ? 'Save Changes' : 'Create Site'}</Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Site'}
+          </Button>
         </DialogFooter>
       </form>
     </Form>

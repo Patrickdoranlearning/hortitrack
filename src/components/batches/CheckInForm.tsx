@@ -25,7 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SelectWithCreate } from "../ui/select-with-create";
+import { SearchableSelect } from "../ui/searchable-select";
+import { VarietyComboboxGrouped } from "../ui/variety-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -267,15 +268,12 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Variety</FormLabel>
-                    <SelectWithCreate
-                      options={varieties.map((v) => ({
-                        value: v.id,
-                        label: v.name + (v.family ? ` · ${v.family}` : ""),
-                      }))}
+                    <VarietyComboboxGrouped
+                      varieties={varieties}
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onSelect={(id) => field.onChange(id)}
                       createHref="/varieties"
-                      placeholder="Select a variety"
+                      placeholder="Search varieties..."
                       createLabel="Add new variety"
                     />
                     <FormMessage />
@@ -289,15 +287,16 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Size / Container</FormLabel>
-                    <SelectWithCreate
+                    <SearchableSelect
                       options={sizes.map((s) => ({
                         value: s.id,
-                        label: s.name + (s.container_type ? ` · ${s.container_type}` : ""),
+                        label: s.name,
+                        description: s.container_type ?? undefined,
                       }))}
                       value={field.value}
                       onValueChange={field.onChange}
                       createHref="/sizes"
-                      placeholder="Select a size"
+                      placeholder="Search sizes..."
                       createLabel="Add new size"
                     />
                     <FormMessage />
@@ -332,15 +331,16 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Supplier</FormLabel>
-                    <SelectWithCreate
+                    <SearchableSelect
                       options={suppliers.map((s) => ({
                         value: s.id,
-                        label: s.name + (s.producer_code ? ` · ${s.producer_code}` : ""),
+                        label: s.name,
+                        description: s.producer_code ?? undefined,
                       }))}
                       value={field.value}
                       onValueChange={field.onChange}
                       createHref="/suppliers"
-                      placeholder="Select a supplier"
+                      placeholder="Search suppliers..."
                       createLabel="Add new supplier"
                     />
                     <FormMessage />
@@ -361,15 +361,16 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nursery location</FormLabel>
-                    <SelectWithCreate
+                    <SearchableSelect
                       options={locations.map((loc) => ({
                         value: loc.id,
-                        label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                        label: loc.name,
+                        description: loc.nursery_site ?? undefined,
                       }))}
                       value={field.value}
                       onValueChange={field.onChange}
                       createHref="/locations"
-                      placeholder="Select a location"
+                      placeholder="Search locations..."
                       createLabel="Add new location"
                     />
                     <FormMessage />

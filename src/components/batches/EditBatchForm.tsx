@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SelectWithCreate } from "../ui/select-with-create";
+import { SearchableSelect } from "../ui/searchable-select";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection } from "@/hooks/useCollection";
@@ -189,15 +189,16 @@ export default function EditBatchForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <SelectWithCreate
+                      <SearchableSelect
                         options={(locationsData ?? []).map((loc) => ({
                           value: loc.id!,
-                          label: (loc.nurserySite ? `${loc.nurserySite} • ` : "") + loc.name,
+                          label: loc.name,
+                          description: loc.nurserySite ?? undefined,
                         }))}
                         value={field.value ?? ""}
                         onValueChange={field.onChange}
                         createHref="/locations"
-                        placeholder="Select location"
+                        placeholder="Search locations..."
                         createLabel="Add new location"
                         disabled={!locationsData?.length}
                       />
@@ -212,7 +213,7 @@ export default function EditBatchForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Supplier</FormLabel>
-                      <SelectWithCreate
+                      <SearchableSelect
                         options={(supplierData ?? []).map((sup) => ({
                           value: sup.id!,
                           label: sup.name,
@@ -220,7 +221,7 @@ export default function EditBatchForm({
                         value={field.value ?? ""}
                         onValueChange={field.onChange}
                         createHref="/suppliers"
-                        placeholder="Select supplier"
+                        placeholder="Search suppliers..."
                         createLabel="Add new supplier"
                         disabled={!supplierData?.length}
                       />
@@ -242,15 +243,16 @@ export default function EditBatchForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Size</FormLabel>
-                      <SelectWithCreate
+                      <SearchableSelect
                         options={(sizeData ?? []).map((size) => ({
                           value: size.id!,
-                          label: size.name + (size.containerType ? ` · ${size.containerType}` : ""),
+                          label: size.name,
+                          description: size.containerType ?? undefined,
                         }))}
                         value={field.value ?? ""}
                         onValueChange={field.onChange}
                         createHref="/sizes"
-                        placeholder="Select size"
+                        placeholder="Search sizes..."
                         createLabel="Add new size"
                         disabled={!sizeData?.length}
                       />
