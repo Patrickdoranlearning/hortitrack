@@ -11,8 +11,8 @@ import {
   LOSS_REASON_LABELS,
 } from '@/lib/shared/batch-stock-constants';
 
-// Re-export types for consumers (types are allowed in 'use server' files)
-export type { AdjustmentReason, LossReason };
+// Note: Types should be imported directly from '@/lib/shared/batch-stock-constants'
+// by consumers, not re-exported from this 'use server' file
 
 // ============================================================================
 // Types

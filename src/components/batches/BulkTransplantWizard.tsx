@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Plus, Trash2, Search, CheckCircle2, AlertCircle, Loader2, ScanLine, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SearchableSelect } from "../ui/searchable-select";
+import { SizeComboboxGrouped } from "../ui/size-combobox-grouped";
+import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -444,35 +445,27 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Target Size</Label>
-                <SearchableSelect
-                  options={referenceData.sizes.map((size) => ({
-                    value: size.id!,
-                    label: size.name + (size.cell_multiple && size.cell_multiple > 1 ? ` (${size.cell_multiple} cells)` : ""),
-                  }))}
+                <SizeComboboxGrouped
+                  sizes={referenceData.sizes}
                   value={defaults.sizeId ?? ""}
-                  onValueChange={(value) =>
+                  onSelect={(value) =>
                     setDefaults((prev) => ({ ...prev, sizeId: value }))
                   }
                   createHref="/sizes"
                   placeholder="Select size"
-                  createLabel="Add new size"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label>Target Location</Label>
-                <SearchableSelect
-                  options={referenceData.locations.map((loc) => ({
-                    value: loc.id!,
-                    label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
-                  }))}
+                <LocationComboboxGrouped
+                  locations={referenceData.locations}
                   value={defaults.locationId ?? ""}
-                  onValueChange={(value) =>
+                  onSelect={(value) =>
                     setDefaults((prev) => ({ ...prev, locationId: value }))
                   }
                   createHref="/locations"
                   placeholder="Select location"
-                  createLabel="Add new location"
                 />
               </div>
 

@@ -308,6 +308,159 @@ Incoming → Planned → Germinating → Growing → Ready → Saleable → Disp
 
 ---
 
+## 2.5 Execution Page (Printable Worksheets)
+
+### User Stories
+
+| ID | As a... | I want to... | So that... |
+|----|---------|--------------|------------|
+| EXEC-1 | Manager | Organize batches into execution groups | I can plan work by production phase |
+| EXEC-2 | Manager | Print worksheets for each group | Staff can track work on paper |
+| EXEC-3 | Manager | Filter batches within groups | I can narrow down what to print |
+| EXEC-4 | Manager | Configure custom groups | I can organize work my way |
+| EXEC-5 | Staff | Have a clear printed checklist | I know what batches to process |
+
+### Acceptance Criteria
+
+**EXEC-1: Execution Groups**
+- [x] Default groups created on first visit: Incoming, Propagation, Plugs/Liners, Potting
+- [x] Groups filter batches by status and/or phase
+- [x] Groups show batch count and total plants
+- [x] Groups are collapsible for easier navigation
+- [x] Groups sorted by configurable sort order
+
+**EXEC-2: Print Worksheets**
+- [x] Print single group worksheet with one click
+- [x] Print all groups as multi-page worksheet
+- [x] Worksheet includes: batch variety, size, quantity, date/week, supplier
+- [x] Worksheet has checkbox column for "Done" tracking
+- [x] Worksheet has notes area for staff comments
+- [x] Print output hides navigation and screen-only elements
+- [x] Page breaks between groups on multi-page print
+
+**EXEC-3: Inline Filtering**
+- [x] Filter by supplier within a group
+- [x] Filter by size within a group
+- [x] Filter by week within a group
+- [x] Clear filters button resets to group defaults
+- [x] Filters applied on top of group's base criteria
+
+**EXEC-4: Group Configuration**
+- [x] Create new group with name, description, color
+- [x] Edit existing group settings
+- [x] Delete group (with confirmation)
+- [x] Reorder groups (move up/down)
+- [x] Reset to default groups option
+- [x] Filter criteria: status, phase (more criteria available)
+- [x] Preview matching batches while configuring
+
+**EXEC-5: User Experience**
+- [x] Responsive design for mobile viewing
+- [x] Empty state with setup guidance
+- [x] Loading skeletons during data fetch
+- [x] Keyboard shortcuts: Cmd/Ctrl+N (new group), Cmd/Ctrl+P (print all)
+- [x] Escape key closes dialogs
+
+### Edge Cases
+- No batches match group criteria -> show "No batches match" message
+- Group with 0 batches -> print button disabled
+- First visit with no groups -> default groups seeded automatically
+- Reset groups deletes all custom groups and restores defaults
+- Inline filter reduces batches to 0 -> show message, allow clearing filter
+
+### Not Supported
+- Drag-and-drop batch reordering within groups
+- Saving inline filter presets
+- Scheduling automatic prints
+
+---
+
+## 2.6 Execution Worksheets (Persistent Tracking)
+
+### User Stories
+
+| ID | As a... | I want to... | So that... |
+|----|---------|--------------|------------|
+| WKS-1 | Manager | Select specific batches for a worksheet | I can create targeted work orders |
+| WKS-2 | Manager | Save worksheets with batches | I can track work over multiple days |
+| WKS-3 | Manager | See worksheet progress | I know how much work is done |
+| WKS-4 | Manager | Print saved worksheets | Staff can see completion status |
+| WKS-5 | Manager | Delete worksheets when done | I can keep the list clean |
+
+### Acceptance Criteria
+
+**WKS-1: Batch Selection**
+- [x] Selection mode toggle in execution page header
+- [x] Checkbox column on batch table when in selection mode
+- [x] "Select All" checkbox per group
+- [x] Selected count badge displayed per group
+- [x] Selection banner shows total selected count
+- [x] Clear selection button available
+
+**WKS-2: Create Worksheet**
+- [x] "Create Worksheet" button shows when batches selected
+- [x] Dialog shows selected batch count
+- [x] Worksheet name with smart default (date-based)
+- [x] Optional description field
+- [x] Optional scheduled date picker
+- [x] Creates worksheet with all selected batches
+- [x] Clears selection after successful creation
+- [x] Success toast with worksheet confirmation
+
+**WKS-3: Worksheet Progress Tracking**
+- [x] Saved Worksheets panel on execution page
+- [x] Progress bar shows completed/total batches
+- [x] Open worksheets listed first
+- [x] Completed worksheets hidden by default (toggle to show)
+- [x] Auto-refresh every 30 seconds to catch updates
+- [x] Batch completion tracked when batch is actualized
+- [x] Worksheet auto-completes when all batches complete
+- [x] Manual "Mark Complete" option in dropdown
+
+**WKS-4: Worksheet Detail View**
+- [x] Expand worksheet to see batch list
+- [x] Completed batches show checkmark icon
+- [x] Completed batches sorted to bottom of list
+- [x] Batch status badges (Incoming/Growing/etc)
+- [x] Link to batch detail page
+- [x] Completion timestamp shown on batches
+- [x] Print button prints worksheet with completion status
+- [x] Printed worksheet highlights completed rows
+
+**WKS-5: Worksheet Management**
+- [x] Delete worksheet with confirmation dialog
+- [x] Reopen completed worksheet option
+- [x] Created timestamp shown
+- [x] Loading skeleton during fetch
+- [x] Error state with retry button
+- [x] Empty state when no worksheets exist
+
+### Database
+
+**Tables:**
+- `execution_worksheets`: Stores worksheet metadata (name, description, scheduled_date, status)
+- `execution_worksheet_batches`: Junction table linking worksheets to batches with completion tracking
+
+**Auto-completion Trigger:**
+- When batch status changes from Incoming/Planned to another status
+- Marks corresponding worksheet_batch entry as completed
+- Checks if all batches in worksheet are complete -> updates worksheet status
+
+### Edge Cases
+- Batch deleted while on worksheet -> CASCADE delete removes worksheet entry
+- Same batch on multiple worksheets -> Each worksheet tracks independently
+- Worksheet with 0 batches -> Not allowed (validation requires at least 1 batch)
+- Printing completed worksheet -> Shows completion status on paper
+
+### Not Supported
+- Edit worksheet after creation (add/remove batches)
+- Worksheet templates (saved filter criteria)
+- Email notifications on worksheet completion
+- Assigning worksheets to specific users
+- Automatic worksheet creation from jobs
+
+---
+
 # 3. Sales & Orders
 
 ## 3.1 Order Creation

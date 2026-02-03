@@ -18,8 +18,9 @@ import {
   FormControl,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { SearchableSelect } from "../ui/searchable-select";
 import { VarietyComboboxGrouped } from "../ui/variety-combobox-grouped";
+import { SizeComboboxGrouped } from "../ui/size-combobox-grouped";
+import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
@@ -300,22 +301,12 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Size / Container</FormLabel>
-                    <SearchableSelect
-                      options={sizes.map((s) => ({
-                        value: s.id,
-                        label: s.name,
-                        description: s.container_type ?? undefined,
-                        badge: s.container_type === "prop_tray" ? (
-                          <Badge variant="outline" className="ml-2 bg-primary/5 text-[10px] uppercase tracking-wider py-0 px-1 border-primary/20 text-primary">
-                            Prop
-                          </Badge>
-                        ) : undefined,
-                      }))}
+                    <SizeComboboxGrouped
+                      sizes={sizes}
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onSelect={field.onChange}
                       createHref="/sizes"
                       placeholder="Search sizes..."
-                      createLabel="Add new size"
                     />
                     <FormMessage />
                   </FormItem>
@@ -366,17 +357,12 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nursery location</FormLabel>
-                    <SearchableSelect
-                      options={locations.map((loc) => ({
-                        value: loc.id,
-                        label: loc.name,
-                        description: loc.nursery_site ?? undefined,
-                      }))}
+                    <LocationComboboxGrouped
+                      locations={locations}
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onSelect={field.onChange}
                       createHref="/locations"
                       placeholder="Search locations..."
-                      createLabel="Add new location"
                     />
                     <FormMessage />
                   </FormItem>

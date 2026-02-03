@@ -628,18 +628,38 @@ export async function getSmartTargets(filters?: TargetFilters): Promise<{ target
     if (!user) return { error: 'Not authenticated', targets: [] };
     const activeOrgId = await resolveActiveOrgId(supabase, user.id);
     if (!activeOrgId) return { error: 'No organization found', targets: [] };
-    let query = supabase.from('v_smart_sales_targets').select('*').eq('org_id', activeOrgId);
-    if (filters?.reason && filters.reason !== 'all') query = query.eq('target_reason', filters.reason);
-    if (filters?.county) query = query.eq('county', filters.county);
-    if (filters?.routingKey) query = query.eq('routing_key', filters.routingKey);
-    if (filters?.minScore) query = query.gte('priority_score', filters.minScore);
-    query = query.order('priority_score', { ascending: false });
-    const { data: targets, error } = await query;
-    if (error) {
-        logError('Error fetching smart targets', { error: error.message, activeOrgId });
-        return { error: 'Failed to fetch targets', targets: [] };
+
+    try {
+        let query = supabase.from('v_smart_sales_targets').select('*').eq('org_id', activeOrgId);
+        if (filters?.reason && filters.reason !== 'all') query = query.eq('target_reason', filters.reason);
+        if (filters?.county) query = query.eq('county', filters.county);
+        if (filters?.routingKey) query = query.eq('routing_key', filters.routingKey);
+        if (filters?.minScore) query = query.gte('priority_score', filters.minScore);
+        query = query.order('priority_score', { ascending: false });
+        const { data: targets, error } = await query;
+
+        if (error) {
+            // Check if view doesn't exist (common during development)
+            const errorMsg = error.message || error.code || JSON.stringify(error);
+            if (errorMsg.includes('does not exist') || errorMsg.includes('42P01')) {
+                logInfo('v_smart_sales_targets view not found - returning empty targets', { activeOrgId });
+                return { targets: [], error: 'Smart targeting view not deployed. Run Supabase migrations.' };
+            }
+            logError('Error fetching smart targets', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
+                activeOrgId
+            });
+            return { error: `Failed to fetch targets: ${errorMsg}`, targets: [] };
+        }
+        return { targets: (targets || []) as SmartTarget[] };
+    } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        logError('Exception fetching smart targets', { error: errMsg, activeOrgId });
+        return { error: `Failed to fetch targets: ${errMsg}`, targets: [] };
     }
-    return { targets: (targets || []) as SmartTarget[] };
 }
 
 export async function getActiveDeliveryZones(): Promise<{ zones: DeliveryZone[]; error?: string; }> {
@@ -648,12 +668,23 @@ export async function getActiveDeliveryZones(): Promise<{ zones: DeliveryZone[];
     if (!user) return { error: 'Not authenticated', zones: [] };
     const activeOrgId = await resolveActiveOrgId(supabase, user.id);
     if (!activeOrgId) return { error: 'No organization found', zones: [] };
-    const { data: zones, error } = await supabase.from('v_active_delivery_zones').select('*').eq('org_id', activeOrgId).order('requested_delivery_date', { ascending: true });
-    if (error) {
-        logError('Error fetching delivery zones', { error: error.message, activeOrgId });
-        return { error: 'Failed to fetch delivery zones', zones: [] };
+
+    try {
+        const { data: zones, error } = await supabase.from('v_active_delivery_zones').select('*').eq('org_id', activeOrgId).order('requested_delivery_date', { ascending: true });
+        if (error) {
+            const errorMsg = error.message || error.code || JSON.stringify(error);
+            if (errorMsg.includes('does not exist') || errorMsg.includes('42P01')) {
+                return { zones: [] };
+            }
+            logError('Error fetching delivery zones', { message: error.message, code: error.code, activeOrgId });
+            return { error: 'Failed to fetch delivery zones', zones: [] };
+        }
+        return { zones: (zones || []) as DeliveryZone[] };
+    } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        logError('Exception fetching delivery zones', { error: errMsg, activeOrgId });
+        return { error: errMsg, zones: [] };
     }
-    return { zones: (zones || []) as DeliveryZone[] };
 }
 
 export async function getScheduledDeliveries(): Promise<{ deliveries: ScheduledDelivery[]; error?: string; }> {
@@ -662,12 +693,23 @@ export async function getScheduledDeliveries(): Promise<{ deliveries: ScheduledD
     if (!user) return { error: 'Not authenticated', deliveries: [] };
     const activeOrgId = await resolveActiveOrgId(supabase, user.id);
     if (!activeOrgId) return { error: 'No organization found', deliveries: [] };
-    const { data: deliveries, error } = await supabase.from('v_scheduled_deliveries_map').select('*').eq('org_id', activeOrgId).order('requested_delivery_date', { ascending: true });
-    if (error) {
-        logError('Error fetching scheduled deliveries', { error: error.message, activeOrgId });
-        return { error: 'Failed to fetch scheduled deliveries', deliveries: [] };
+
+    try {
+        const { data: deliveries, error } = await supabase.from('v_scheduled_deliveries_map').select('*').eq('org_id', activeOrgId).order('requested_delivery_date', { ascending: true });
+        if (error) {
+            const errorMsg = error.message || error.code || JSON.stringify(error);
+            if (errorMsg.includes('does not exist') || errorMsg.includes('42P01')) {
+                return { deliveries: [] };
+            }
+            logError('Error fetching scheduled deliveries', { message: error.message, code: error.code, activeOrgId });
+            return { error: 'Failed to fetch scheduled deliveries', deliveries: [] };
+        }
+        return { deliveries: (deliveries || []) as ScheduledDelivery[] };
+    } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        logError('Exception fetching scheduled deliveries', { error: errMsg, activeOrgId });
+        return { error: errMsg, deliveries: [] };
     }
-    return { deliveries: (deliveries || []) as ScheduledDelivery[] };
 }
 
 export async function getTargetingConfig(): Promise<{ config: TargetingConfig; error?: string; }> {

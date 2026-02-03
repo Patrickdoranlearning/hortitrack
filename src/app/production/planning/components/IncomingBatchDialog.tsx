@@ -33,6 +33,9 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { VarietyComboboxGrouped } from "@/components/ui/variety-combobox-grouped";
+import { SizeComboboxGrouped } from "@/components/ui/size-combobox-grouped";
+import { LocationComboboxGrouped } from "@/components/ui/location-combobox-grouped";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { useToast } from "@/hooks/use-toast";
@@ -323,20 +326,13 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Size</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select size" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-[300px]">
-                            {sizes.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                {s.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SizeComboboxGrouped
+                          sizes={sizes}
+                          value={field.value}
+                          onSelect={field.onChange}
+                          placeholder="Search sizes..."
+                          createHref="/sizes"
+                        />
                         <FormMessage />
                       </FormItem>
                     )}
@@ -470,24 +466,20 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Supplier</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(value === OPTIONAL_SELECT_VALUE ? undefined : value)}
-                        value={field.value ?? OPTIONAL_SELECT_VALUE}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Optional supplier" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="max-h-[300px]">
-                          <SelectItem value={OPTIONAL_SELECT_VALUE}>Not set</SelectItem>
-                          {suppliers.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        options={suppliers.map((s) => ({
+                          value: s.id,
+                          label: s.name,
+                          description: s.country_code ? `Country: ${s.country_code}` : undefined,
+                        }))}
+                        value={field.value ?? ""}
+                        onValueChange={(value) => field.onChange(value === "" ? undefined : value)}
+                        placeholder="Search suppliers..."
+                        createHref="/suppliers"
+                        createLabel="Add new supplier"
+                        emptyLabel="Not set"
+                        emptyValue=""
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -499,24 +491,15 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Landing location</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(value === OPTIONAL_SELECT_VALUE ? undefined : value)}
-                        value={field.value ?? OPTIONAL_SELECT_VALUE}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Use virtual Transit location" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="max-h-[300px]">
-                          <SelectItem value={OPTIONAL_SELECT_VALUE}>Auto (Transit - Incoming)</SelectItem>
-                          {locations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <LocationComboboxGrouped
+                        locations={locations}
+                        value={field.value ?? ""}
+                        onSelect={(value) => field.onChange(value === "" ? undefined : value)}
+                        placeholder="Search locations..."
+                        createHref="/locations"
+                        emptyLabel="Auto (Transit - Incoming)"
+                        emptyValue=""
+                      />
                       <FormMessage />
                     </FormItem>
                   )}

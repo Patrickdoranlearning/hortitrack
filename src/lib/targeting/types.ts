@@ -143,6 +143,9 @@ export interface TargetFilters {
 // Map marker types
 export type MapMarkerType = 'scheduled' | 'target_high' | 'target_medium' | 'target_low';
 
+// Probability tiers for traffic light colors
+export type ProbabilityTier = 'high' | 'medium' | 'low';
+
 export interface MapMarker {
   id: string;
   type: MapMarkerType;
@@ -154,9 +157,59 @@ export interface MapMarker {
 
 // Helper to get marker type from priority score
 export function getMarkerType(score: number): MapMarkerType {
-  if (score >= 80) return 'target_high';
-  if (score >= 50) return 'target_medium';
+  if (score >= 70) return 'target_high';
+  if (score >= 40) return 'target_medium';
   return 'target_low';
+}
+
+// Traffic light color system based on probability score
+export function getProbabilityTier(probabilityScore: number): ProbabilityTier {
+  if (probabilityScore >= 70) return 'high';
+  if (probabilityScore >= 40) return 'medium';
+  return 'low';
+}
+
+// Get traffic light color for probability score
+export function getProbabilityColor(probabilityScore: number): string {
+  if (probabilityScore >= 70) return '#16a34a'; // green-600 - Hot lead
+  if (probabilityScore >= 40) return '#eab308'; // yellow-500 - Warm lead
+  return '#f97316'; // orange-500 - Cool lead
+}
+
+// Get tier label for display
+export function getProbabilityLabel(probabilityScore: number): string {
+  if (probabilityScore >= 70) return 'High Probability';
+  if (probabilityScore >= 40) return 'Medium Probability';
+  return 'Low Probability';
+}
+
+// Get marker radius based on customer value quartile
+export function getValueBasedRadius(valueQuartile: number | null, isSelected: boolean): number {
+  const baseRadius = isSelected ? 14 : 8;
+  if (valueQuartile === 4) return baseRadius + 4; // Platinum - largest
+  if (valueQuartile === 3) return baseRadius + 2; // Gold
+  if (valueQuartile === 2) return baseRadius + 1; // Silver
+  return baseRadius; // Bronze or unknown
+}
+
+// Haversine distance calculation for route optimization (in km)
+export function haversineDistance(
+  point1: { lat: number; lng: number },
+  point2: { lat: number; lng: number }
+): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = toRad(point2.lat - point1.lat);
+  const dLng = toRad(point2.lng - point1.lng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(point1.lat)) * Math.cos(toRad(point2.lat)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRad(deg: number): number {
+  return deg * (Math.PI / 180);
 }
 
 // Helper to get display color for target reason
