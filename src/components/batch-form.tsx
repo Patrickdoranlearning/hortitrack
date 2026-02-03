@@ -13,7 +13,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -325,7 +325,7 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Variety</FormLabel>
-                <SelectWithCreate
+                <SearchableSelect
                   options={[
                     ...varietyOptions,
                     ...(field.value && !varietyOptions.some(o => o.value === field.value)
@@ -358,7 +358,7 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Location</FormLabel>
-                <SelectWithCreate
+                <SearchableSelect
                   options={[
                     ...locationOptions,
                     ...(field.value && !locationOptions.some(o => o.value === field.value)
@@ -382,7 +382,7 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Size</FormLabel>
-                <SelectWithCreate
+                <SearchableSelect
                   options={[
                     ...sizeOptions,
                     ...(field.value && !sizeOptions.some(o => o.value === field.value)
@@ -522,7 +522,7 @@ export function BatchForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Supplier</FormLabel>
-                <SelectWithCreate
+                <SearchableSelect
                   options={[
                     ...supplierOptions,
                     ...(field.value && !supplierOptions.some(o => o.value === field.value)

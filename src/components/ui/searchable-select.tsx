@@ -24,6 +24,8 @@ export interface SelectOption {
   label: string;
   /** Optional secondary text shown below the label */
   description?: string;
+  /** Optional badge or icon to render after the label */
+  badge?: React.ReactNode;
 }
 
 export interface SearchableSelectProps {
@@ -47,6 +49,10 @@ export interface SearchableSelectProps {
   disabled?: boolean;
   /** Optional className for the trigger button */
   className?: string;
+  /** If provided, adds a clear/empty option at the top with this label */
+  emptyLabel?: string;
+  /** Value to use for the empty option (defaults to empty string) */
+  emptyValue?: string;
 }
 
 /**
@@ -75,6 +81,8 @@ export function SearchableSelect({
   emptyMessage = "No results found.",
   disabled = false,
   className,
+  emptyLabel,
+  emptyValue = "",
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -84,6 +92,9 @@ export function SearchableSelect({
     () => options.find((opt) => opt.value === value),
     [options, value]
   );
+
+  // Check if empty option is selected
+  const isEmptySelected = emptyLabel && value === emptyValue;
 
   // Filter options based on search
   const filteredOptions = useMemo(() => {
@@ -122,7 +133,7 @@ export function SearchableSelect({
           disabled={disabled}
         >
           <span className="truncate">
-            {selectedOption ? selectedOption.label : placeholder}
+            {isEmptySelected ? emptyLabel : selectedOption ? selectedOption.label : placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -148,6 +159,21 @@ export function SearchableSelect({
               </div>
             )}
             <CommandGroup>
+              {emptyLabel && !search && (
+                <CommandItem
+                  value={emptyLabel}
+                  onSelect={() => handleSelect(emptyValue)}
+                  className="cursor-pointer"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4 flex-shrink-0",
+                      value === emptyValue ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <span className="text-muted-foreground">{emptyLabel}</span>
+                </CommandItem>
+              )}
               {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
@@ -161,8 +187,11 @@ export function SearchableSelect({
                       value === option.value ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <div className="flex flex-col">
-                    <span>{option.label}</span>
+                  <div className="flex flex-col flex-1">
+                    <div className="flex items-center">
+                      <span>{option.label}</span>
+                      {option.badge}
+                    </div>
                     {option.description && (
                       <span className="text-xs text-muted-foreground">
                         {option.description}

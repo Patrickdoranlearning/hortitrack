@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, Download, RefreshCw, FileSpreadsheet, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SelectWithCreate } from "../ui/select-with-create";
+import { SearchableSelect } from "../ui/searchable-select";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { invalidateBatches } from "@/lib/swr/keys";
 import { useTodayDate, getTodayISO } from "@/lib/date-sync";
@@ -410,7 +410,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <SelectWithCreate
+              <SearchableSelect
                 className="w-48"
                 options={referenceData.locations.map((loc) => ({
                   value: loc.id!,
@@ -427,7 +427,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                 emptyValue="none"
               />
 
-              <SelectWithCreate
+              <SearchableSelect
                 className="w-48"
                 options={sortedSizes.map((size) => ({
                   value: size.id!,
@@ -498,7 +498,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <SelectWithCreate
+              <SearchableSelect
                 className="w-48"
                 options={referenceData.locations.map((loc) => ({
                   value: loc.id!,
@@ -515,7 +515,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                 emptyValue="none"
               />
 
-              <SelectWithCreate
+              <SearchableSelect
                 className="w-48"
                 options={sortedSizes.map((size) => ({
                   value: size.id!,
@@ -570,7 +570,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                     <TableRow key={row.id} className={row.status === "error" ? "bg-destructive/5" : undefined}>
                       <TableCell className="font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="max-w-[220px]">
-                        <SelectWithCreate
+                        <SearchableSelect
                           options={referenceData.varieties.map((variety) => ({
                             value: variety.id!,
                             label: variety.name,
@@ -591,7 +591,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                         />
                       </TableCell>
                       <TableCell className="max-w-[180px]">
-                        <SelectWithCreate
+                        <SearchableSelect
                           options={sortedSizes.map((size) => ({
                             value: size.id!,
                             label: size.name,
@@ -617,7 +617,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                         />
                       </TableCell>
                       <TableCell className="max-w-[200px]">
-                        <SelectWithCreate
+                        <SearchableSelect
                           options={referenceData.locations.map((loc) => ({
                             value: loc.id!,
                             label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,

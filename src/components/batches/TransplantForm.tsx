@@ -367,15 +367,16 @@ export default function TransplantForm({
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Nursery location</FormLabel>
-                    <SelectWithCreate
+                    <SearchableSelect
                       options={locations.map((loc) => ({
                         value: loc.id,
-                        label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                        label: loc.name,
+                        description: loc.nursery_site ?? undefined,
                       }))}
                       value={field.value ?? ""}
                       onValueChange={field.onChange}
                       createHref="/locations"
-                      placeholder="Select a bench or tunnel"
+                      placeholder="Search locations..."
                       createLabel="Add new location"
                     />
                     <FormMessage />

@@ -18,7 +18,7 @@ import {
   FormControl,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { SelectWithCreate } from "../ui/select-with-create";
+import { SearchableSelect } from "../ui/searchable-select";
 import { VarietyComboboxGrouped } from "../ui/variety-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
@@ -300,10 +300,11 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Size / Container</FormLabel>
-                    <SelectWithCreate
+                    <SearchableSelect
                       options={sizes.map((s) => ({
                         value: s.id,
-                        label: s.name + (s.container_type ? ` · ${s.container_type}` : ""),
+                        label: s.name,
+                        description: s.container_type ?? undefined,
                         badge: s.container_type === "prop_tray" ? (
                           <Badge variant="outline" className="ml-2 bg-primary/5 text-[10px] uppercase tracking-wider py-0 px-1 border-primary/20 text-primary">
                             Prop
@@ -313,7 +314,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                       value={field.value}
                       onValueChange={field.onChange}
                       createHref="/sizes"
-                      placeholder="Select a size"
+                      placeholder="Search sizes..."
                       createLabel="Add new size"
                     />
                     <FormMessage />
@@ -365,15 +366,16 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nursery location</FormLabel>
-                    <SelectWithCreate
+                    <SearchableSelect
                       options={locations.map((loc) => ({
                         value: loc.id,
-                        label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                        label: loc.name,
+                        description: loc.nursery_site ?? undefined,
                       }))}
                       value={field.value}
                       onValueChange={field.onChange}
                       createHref="/locations"
-                      placeholder="Select a bench or tunnel"
+                      placeholder="Search locations..."
                       createLabel="Add new location"
                     />
                     <FormMessage />

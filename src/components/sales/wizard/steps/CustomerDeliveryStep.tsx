@@ -4,7 +4,7 @@ import { UseFormReturn, Controller } from 'react-hook-form';
 import { CreateOrderInput, CustomerAddress } from '@/lib/sales/types';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CalendarIcon, Copy } from 'lucide-react';
@@ -51,7 +51,7 @@ export function CustomerDeliveryStep({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Customer *</FormLabel>
-              <SelectWithCreate
+              <SearchableSelect
                 options={customers.map((c) => ({
                   value: c.id,
                   label: c.name,

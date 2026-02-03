@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SelectWithCreate } from '../ui/select-with-create';
+import { SearchableSelect } from '../ui/searchable-select';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
@@ -179,7 +179,7 @@ export function MaterialForm({ material, categories, onSubmit, onCancel }: Mater
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Linked Plant Size</FormLabel>
-                  <SelectWithCreate
+                  <SearchableSelect
                     options={sizes.map((size) => ({
                       value: size.id,
                       label: size.name,
@@ -235,7 +235,7 @@ export function MaterialForm({ material, categories, onSubmit, onCancel }: Mater
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Default Supplier</FormLabel>
-                  <SelectWithCreate
+                  <SearchableSelect
                     options={suppliers.map((supplier) => ({
                       value: supplier.id,
                       label: supplier.name,

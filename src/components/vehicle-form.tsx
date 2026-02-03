@@ -20,7 +20,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/co
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -139,7 +139,7 @@ export function VehicleForm({ vehicle, hauliers, onSubmit, onCancel }: VehicleFo
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Haulier</FormLabel>
-                  <SelectWithCreate
+                  <SearchableSelect
                     options={hauliers.map((haulier) => ({
                       value: haulier.id!,
                       label: haulier.name,

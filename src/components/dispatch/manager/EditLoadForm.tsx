@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Popover,
   PopoverContent,
@@ -58,7 +58,7 @@ export function EditLoadForm({
         </div>
         <div className="space-y-2">
           <Label>Haulier</Label>
-          <SelectWithCreate
+          <SearchableSelect
             options={hauliers.map((h) => ({
               value: h.id!,
               label: h.name + (h.vehicles.length > 0 ? ` (${h.vehicles.length} vehicles)` : ''),

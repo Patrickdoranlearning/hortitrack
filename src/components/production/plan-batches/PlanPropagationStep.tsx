@@ -20,7 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { SelectWithCreate } from '@/components/ui/select-with-create';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Table,
   TableBody,
@@ -266,7 +266,7 @@ export function PlanPropagationStep({
                       />
                     </TableCell>
                     <TableCell>
-                      <SelectWithCreate
+                      <SearchableSelect
                         className="h-8"
                         options={locations.map((loc) => ({
                           value: loc.id,
