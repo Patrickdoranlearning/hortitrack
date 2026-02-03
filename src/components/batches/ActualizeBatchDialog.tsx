@@ -210,7 +210,7 @@ export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: P
                     <FormItem>
                       <FormLabel>Actual quantity</FormLabel>
                       <FormControl>
-                        <Input type="number" min={1} {...field} value={field.value ?? ""} />
+                        <Input type="number" min={1} {...field} value={field.value ?? ""} onFocus={(e) => e.target.select()} />
                       </FormControl>
                       <FormDescription>
                         {quantityDiff === 0 ? (

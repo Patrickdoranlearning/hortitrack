@@ -748,8 +748,39 @@ export async function updateHaulierAction(haulierData: Haulier) {
 
 export async function deleteHaulierAction(haulierId: string) {
     const supabase = await getSupabaseForApp();
+
+    // Check for related records that would prevent deletion
+    const [vehiclesCheck, runsCheck, balanceCheck] = await Promise.all([
+      supabase.from('haulier_vehicles').select('id', { count: 'exact', head: true }).eq('haulier_id', haulierId),
+      supabase.from('delivery_runs').select('id', { count: 'exact', head: true }).eq('haulier_id', haulierId),
+      supabase.from('haulier_trolley_balance').select('haulier_id', { count: 'exact', head: true }).eq('haulier_id', haulierId),
+    ]);
+
+    const vehicleCount = vehiclesCheck.count ?? 0;
+    const runCount = runsCheck.count ?? 0;
+    const balanceCount = balanceCheck.count ?? 0;
+
+    // Build a meaningful error message if there are related records
+    const blockers: string[] = [];
+    if (vehicleCount > 0) blockers.push(`${vehicleCount} vehicle${vehicleCount > 1 ? 's' : ''}`);
+    if (runCount > 0) blockers.push(`${runCount} delivery run${runCount > 1 ? 's' : ''}`);
+    if (balanceCount > 0) blockers.push('trolley balance records');
+
+    if (blockers.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete haulier: has ${blockers.join(', ')}. Remove these first or mark the haulier as inactive instead.`
+      };
+    }
+
     const { error } = await supabase.from('hauliers').delete().eq('id', haulierId);
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      // Handle any remaining FK constraint errors gracefully
+      if (error.message.includes('foreign key constraint')) {
+        return { success: false, error: 'Cannot delete haulier: it is referenced by other records. Mark as inactive instead.' };
+      }
+      return { success: false, error: error.message };
+    }
     return { success: true };
 }
 

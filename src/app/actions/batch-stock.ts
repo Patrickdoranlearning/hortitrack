@@ -4,26 +4,19 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 import { logError, logInfo } from '@/lib/log';
+import {
+  type AdjustmentReason,
+  type LossReason,
+  ADJUSTMENT_REASON_LABELS,
+  LOSS_REASON_LABELS,
+} from '@/lib/shared/batch-stock-constants';
+
+// Re-export types for consumers (types are allowed in 'use server' files)
+export type { AdjustmentReason, LossReason };
 
 // ============================================================================
 // Types
 // ============================================================================
-
-export type AdjustmentReason =
-  | 'count_correction'
-  | 'damage'
-  | 'theft'
-  | 'found'
-  | 'transfer_in'
-  | 'other';
-
-export type LossReason =
-  | 'pest_damage'
-  | 'disease'
-  | 'environmental'
-  | 'quality_cull'
-  | 'mechanical_damage'
-  | 'other';
 
 export type StockAdjustmentInput = {
   batchId: string;
@@ -42,28 +35,6 @@ export type LossRecordInput = {
 export type BatchStockResult<T = void> =
   | { success: true; data?: T; newQuantity?: number }
   | { success: false; error: string };
-
-// ============================================================================
-// Adjustment Reason Labels
-// ============================================================================
-
-export const ADJUSTMENT_REASON_LABELS: Record<AdjustmentReason, string> = {
-  count_correction: 'Count Correction',
-  damage: 'Damage (subtract)',
-  theft: 'Theft/Loss',
-  found: 'Found/Recovered',
-  transfer_in: 'Transfer In',
-  other: 'Other',
-};
-
-export const LOSS_REASON_LABELS: Record<LossReason, string> = {
-  pest_damage: 'Pest Damage',
-  disease: 'Disease',
-  environmental: 'Environmental (frost/heat/wind)',
-  quality_cull: 'Quality Cull',
-  mechanical_damage: 'Mechanical Damage',
-  other: 'Other',
-};
 
 // ============================================================================
 // Stock Adjustment

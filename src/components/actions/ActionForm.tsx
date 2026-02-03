@@ -405,6 +405,7 @@ export function ActionForm({
                               onChange={(e) =>
                                 field.onChange(e.target.value === "" ? undefined : Number(e.target.value))
                               }
+                              onFocus={(e) => e.target.select()}
                             />
                           </FormControl>
                           <div className="text-xs text-muted-foreground">{max.toLocaleString()} available in batch</div>
@@ -473,7 +474,7 @@ export function ActionForm({
                 <FormControl>
                   <Input type="number" min={1} max={max} value={field.value ?? ""} onChange={(e) =>
                     field.onChange(e.target.value === "" ? undefined : Number(e.target.value))
-                  } />
+                  } onFocus={(e) => e.target.select()} />
                 </FormControl>
                 <div className="text-xs text-muted-foreground">Available: {max}</div>
                 <FormMessage />

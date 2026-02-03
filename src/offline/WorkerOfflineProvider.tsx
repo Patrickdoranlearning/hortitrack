@@ -224,13 +224,25 @@ export function WorkerOfflineProvider({
   }, []);
 
   // Fetch tasks from server
+  // Uses plant-health-tasks endpoint since generic tasks are deferred
   const fetchTasks = useCallback(async (date?: string) => {
-    const url = date ? `/api/worker/my-tasks?date=${date}` : '/api/worker/my-tasks';
+    const url = date
+      ? `/api/worker/plant-health-tasks?date=${date}`
+      : '/api/worker/plant-health-tasks';
 
     try {
       const response = await fetch(url);
 
       if (!response.ok) {
+        // Handle 404 gracefully - endpoint may not exist in some deployments
+        if (response.status === 404) {
+          console.warn('[WorkerOfflineProvider] plant-health-tasks endpoint not found, returning empty');
+          if (!isMountedRef.current) return;
+          setTasks([]);
+          setStats(defaultStats);
+          setError(null);
+          return { tasks: [], stats: defaultStats };
+        }
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${response.status}`);
       }

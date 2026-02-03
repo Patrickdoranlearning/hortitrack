@@ -30,6 +30,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { calculateTotalPlants } from "@/lib/shared";
 import { MaterialsNeededCard } from "./MaterialsNeededCard";
 
 interface Variety {
@@ -127,7 +128,7 @@ export function PropagationForm({
   );
 
   const cellMultiple = selectedSize?.cellMultiple ?? 1;
-  const totalUnits = containers * Math.max(1, cellMultiple);
+  const totalUnits = calculateTotalPlants(containers, cellMultiple);
 
   // Validation
   const isValid = varietyId && sizeId && locationId && containers > 0;
@@ -382,6 +383,7 @@ export function PropagationForm({
                   onChange={(e) =>
                     setContainers(Math.max(1, parseInt(e.target.value) || 1))
                   }
+                  onFocus={(e) => e.target.select()}
                   className="text-center text-2xl font-bold h-14"
                   min={1}
                 />

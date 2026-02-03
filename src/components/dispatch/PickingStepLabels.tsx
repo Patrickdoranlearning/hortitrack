@@ -1,9 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   Printer,
@@ -14,8 +21,15 @@ import {
   Package,
   SkipForward,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { usePickingWizardStore } from '@/stores/use-picking-wizard-store';
+
+interface PrinterConfig {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
 
 export default function PickingStepLabels() {
   const { toast } = useToast();
@@ -33,33 +47,79 @@ export default function PickingStepLabels() {
   const [priceLabelsPrinted, setPriceLabelsPrinted] = useState(false);
   const [plantLabelsPrinted, setPlantLabelsPrinted] = useState(false);
 
+  // Printer state
+  const [printers, setPrinters] = useState<PrinterConfig[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState<string>('');
+  const [loadingPrinters, setLoadingPrinters] = useState(true);
+
+  // Fetch printers on mount
+  useEffect(() => {
+    fetch('/api/printers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.data) {
+          setPrinters(data.data);
+          const defaultPrinter = data.data.find((p: PrinterConfig) => p.is_default);
+          if (defaultPrinter) {
+            setSelectedPrinter(defaultPrinter.id);
+          } else if (data.data.length > 0) {
+            setSelectedPrinter(data.data[0].id);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch printers:', err);
+      })
+      .finally(() => setLoadingPrinters(false));
+  }, []);
+
   if (!pickList) {
     return null;
   }
 
   const totalUnits = items.reduce((sum, item) => sum + item.targetQty, 0);
 
+  // Helper to format price for labels
+  const formatPrice = (price: number | null) => {
+    if (price == null) return 'Price TBC';
+    return new Intl.NumberFormat('en-IE', {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(price);
+  };
+
   const handlePrintPriceLabels = async () => {
     setPrintingType('price');
     setLoading(true);
     try {
-      // Call the existing label printing API
-      const res = await fetch(`/api/sales/orders/${pickList.orderId}/labels/print`, {
-        method: 'POST',
-      });
-      
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMessage = typeof data.error === 'object'
-          ? data.error?.message || JSON.stringify(data.error)
-          : data.error || 'Failed to print labels';
-        throw new Error(errorMessage);
+      // Print each item using the new print-sale API
+      const printPromises = items.map((item) =>
+        fetch('/api/labels/print-sale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productTitle: item.productName || item.plantVariety,
+            size: item.size,
+            priceText: formatPrice(item.unitPriceExVat ?? null),
+            barcode: `PLU:${item.productName || item.plantVariety}|${item.size}`.slice(0, 40),
+            symbology: 'code128',
+            printerId: selectedPrinter || undefined,
+            copies: item.targetQty,
+          }),
+        })
+      );
+
+      const results = await Promise.all(printPromises);
+      const failedResults = results.filter((r) => !r.ok);
+
+      if (failedResults.length > 0) {
+        throw new Error(`${failedResults.length} item(s) failed to print`);
       }
 
       setPriceLabelsPrinted(true);
       toast({
         title: 'Labels Sent',
-        description: 'Price labels have been sent to the printer.',
+        description: `Price labels for ${items.length} items sent to printer.`,
       });
     } catch (error) {
       toast({
@@ -77,26 +137,35 @@ export default function PickingStepLabels() {
     setPrintingType('labels');
     setLoading(true);
     try {
-      // Print plant/batch labels - this might be a different endpoint
-      // For now, we'll use the same endpoint or skip if not implemented
-      const res = await fetch(`/api/sales/orders/${pickList.orderId}/labels/print`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'plant' }),
-      });
-      
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMessage = typeof data.error === 'object'
-          ? data.error?.message || JSON.stringify(data.error)
-          : data.error || 'Failed to print labels';
-        throw new Error(errorMessage);
+      // Print plant labels with batch/lot info
+      const printPromises = items.map((item) =>
+        fetch('/api/labels/print-sale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productTitle: item.productName || item.plantVariety,
+            size: item.size,
+            priceText: formatPrice(item.unitPriceExVat ?? null),
+            barcode: `PLU:${item.productName || item.plantVariety}|${item.size}`.slice(0, 40),
+            symbology: 'code128',
+            lotNumber: item.originalBatchNumber || item.pickedBatchNumber,
+            printerId: selectedPrinter || undefined,
+            copies: item.targetQty,
+          }),
+        })
+      );
+
+      const results = await Promise.all(printPromises);
+      const failedResults = results.filter((r) => !r.ok);
+
+      if (failedResults.length > 0) {
+        throw new Error(`${failedResults.length} item(s) failed to print`);
       }
 
       setPlantLabelsPrinted(true);
       toast({
         title: 'Labels Sent',
-        description: 'Plant labels have been sent to the printer.',
+        description: `Plant labels for ${items.length} items sent to printer.`,
       });
     } catch (error) {
       toast({
@@ -136,6 +205,36 @@ export default function PickingStepLabels() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Printer Selector */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Printer</label>
+            {loadingPrinters ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading printers...
+              </div>
+            ) : printers.length === 0 ? (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">No printers configured. Add a printer in Settings.</span>
+              </div>
+            ) : (
+              <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a printer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {printers.map((printer) => (
+                    <SelectItem key={printer.id} value={printer.id}>
+                      {printer.name}
+                      {printer.is_default && ' (Default)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
           {/* Summary */}
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-2">
@@ -167,7 +266,7 @@ export default function PickingStepLabels() {
             <Button
               variant={priceLabelsPrinted ? 'outline' : 'default'}
               onClick={handlePrintPriceLabels}
-              disabled={isLoading}
+              disabled={isLoading || !selectedPrinter}
             >
               {printingType === 'price' ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -202,7 +301,7 @@ export default function PickingStepLabels() {
             <Button
               variant={plantLabelsPrinted ? 'outline' : 'default'}
               onClick={handlePrintPlantLabels}
-              disabled={isLoading}
+              disabled={isLoading || !selectedPrinter}
             >
               {printingType === 'labels' ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -221,30 +320,68 @@ export default function PickingStepLabels() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Label Preview</CardTitle>
+          <CardDescription>How your labels will look when printed</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2 max-h-[200px] overflow-auto">
-            {items.slice(0, 4).map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {item.productName || item.plantVariety}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{item.size}</p>
+          <div className="space-y-4 max-h-[400px] overflow-auto">
+            {items.map((item) => (
+              <div key={item.id} className="space-y-2">
+                {/* Visual Label Mockup */}
+                <div className="relative border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
+                  {/* Quantity badge */}
+                  <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">
+                    ×{item.targetQty}
+                  </div>
+
+                  {/* Label content */}
+                  <div className="space-y-3">
+                    {/* Product name - large */}
+                    <div className="text-center">
+                      <p className="font-bold text-lg leading-tight">
+                        {item.productName || item.plantVariety}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{item.size}</p>
+                    </div>
+
+                    {/* Price - prominent */}
+                    <div className="text-center">
+                      <span className="text-2xl font-bold text-primary">
+                        {formatPrice(item.unitPriceExVat ?? null)}
+                      </span>
+                    </div>
+
+                    {/* Barcode mockup */}
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="flex items-end justify-center gap-[1px] h-10">
+                        {/* Generate barcode-like lines */}
+                        {Array.from({ length: 40 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="bg-black"
+                            style={{
+                              width: i % 3 === 0 ? '2px' : '1px',
+                              height: `${20 + (i % 5) * 4}px`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground font-mono">
+                        PLU:{(item.productName || item.plantVariety || '').slice(0, 15)}|{item.size}
+                      </p>
+                    </div>
+
+                    {/* Batch number (for plant labels) */}
+                    {(item.originalBatchNumber || item.pickedBatchNumber) && (
+                      <div className="text-center pt-1 border-t border-dashed">
+                        <p className="text-xs text-muted-foreground">
+                          Batch: <span className="font-mono font-medium">{item.originalBatchNumber || item.pickedBatchNumber}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <Badge variant="outline" className="ml-2 text-xs">
-                  ×{item.targetQty}
-                </Badge>
               </div>
             ))}
-            {items.length > 4 && (
-              <p className="text-xs text-muted-foreground text-center py-1">
-                +{items.length - 4} more items
-              </p>
-            )}
           </div>
         </CardContent>
       </Card>

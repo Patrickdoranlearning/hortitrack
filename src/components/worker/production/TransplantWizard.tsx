@@ -33,6 +33,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { calculateTotalPlants, calculateRemainder } from "@/lib/shared";
 import { ParentBatchSelector, type ParentBatchOption } from "./ParentBatchSelector";
 import { MaterialsNeededCard } from "./MaterialsNeededCard";
 
@@ -132,10 +133,10 @@ export function TransplantWizard({
   );
 
   const cellMultiple = selectedSize?.cellMultiple ?? 1;
-  const requiredUnits = containers * Math.max(1, cellMultiple);
+  const requiredUnits = calculateTotalPlants(containers, cellMultiple);
   const parentAvailable = parentBatch?.quantity ?? 0;
   const insufficient = requiredUnits > parentAvailable;
-  const remainderUnits = Math.max(0, parentAvailable - requiredUnits);
+  const remainderUnits = calculateRemainder(parentAvailable, requiredUnits);
 
   // Step navigation
   const stepIndex = STEPS.findIndex((s) => s.id === currentStep);
@@ -454,6 +455,7 @@ export function TransplantWizard({
                   onChange={(e) =>
                     setContainers(Math.max(1, parseInt(e.target.value) || 1))
                   }
+                  onFocus={(e) => e.target.select()}
                   className="text-center text-2xl font-bold h-14"
                   min={1}
                 />

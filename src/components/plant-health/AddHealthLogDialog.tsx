@@ -264,12 +264,12 @@ export function AddHealthLogDialog({
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading products...
                   </div>
                 ) : (
-                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                  <Select value={selectedProductId || undefined} onValueChange={(val) => setSelectedProductId(val === "__custom__" ? "" : val)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select IPM product or enter custom" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Custom product</SelectItem>
+                      <SelectItem value="__custom__">Custom product</SelectItem>
                       {products.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name} {p.pcsNumber ? `(PCS: ${p.pcsNumber})` : ""}

@@ -43,10 +43,12 @@ import {
   X,
   Keyboard,
   Loader2,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePickingWizardStore } from '@/stores/use-picking-wizard-store';
 import ScannerClient from '@/components/Scanner/ScannerClient';
+import MultiBatchPickDialog from '@/components/sales/MultiBatchPickDialog';
 import type { PickItem } from '@/server/sales/picking';
 
 interface SubstituteBatch {
@@ -82,6 +84,9 @@ export default function PickingStepPick() {
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PickItem | null>(null);
   const [manualBatchCode, setManualBatchCode] = useState('');
+
+  // Multi-batch picking state
+  const [multiBatchItem, setMultiBatchItem] = useState<PickItem | null>(null);
 
   // Substitution state
   const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
@@ -169,18 +174,16 @@ export default function PickingStepPick() {
   }, [selectedItem, pickList, updateItem, toast, setLoading]);
 
   // Search for batches matching the item's variety
-  const searchBatchesForItem = useCallback(async (query: string, item: PickItem) => {
+  const searchBatchesForItem = useCallback(async (query: string, _item: PickItem) => {
     if (!query || query.length < 2) {
       setBatchSearchResults([]);
       return;
     }
     setSearchingBatches(true);
     try {
-      // Search batches filtered by the item's variety for safety
-      // Use behavior=available to find saleable batches (or growing for batches not yet ready)
-      const varietyFilter = item.plantVarietyId ? `&varietyId=${item.plantVarietyId}` : '';
+      // Search batches - the API will filter by variety name if included in search
       const res = await fetch(
-        `/api/production/batches/search?q=${encodeURIComponent(query)}&pageSize=10${varietyFilter}`
+        `/api/production/batches/search?q=${encodeURIComponent(query)}&pageSize=10`
       );
       const data = await res.json();
       setBatchSearchResults(data.items ?? []);
@@ -535,6 +538,14 @@ export default function PickingStepPick() {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => setMultiBatchItem(item)}
+                    title="Pick from multiple batches"
+                  >
+                    <Layers className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="secondary"
                     onClick={() => handleConfirmPick(item)}
                     disabled={isLoading}
@@ -801,12 +812,80 @@ export default function PickingStepPick() {
       </Dialog>
 
       {/* Substitution Scanner */}
-      {showSubstitutionScanner && (
-        <ScannerClient
-          onScan={handleSubstitutionScan}
-          onClose={() => setShowSubstitutionScanner(false)}
-        />
-      )}
+      <Dialog open={showSubstitutionScanner} onOpenChange={setShowSubstitutionScanner}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan Substitute Batch</DialogTitle>
+            <DialogDescription>
+              Scan a batch label to select it for substitution
+            </DialogDescription>
+          </DialogHeader>
+          {showSubstitutionScanner && (
+            <ScannerClient onDecoded={handleSubstitutionScan} />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Multi-Batch Pick Dialog */}
+      <MultiBatchPickDialog
+        open={!!multiBatchItem}
+        onOpenChange={(open) => {
+          if (!open) setMultiBatchItem(null);
+        }}
+        pickItemId={multiBatchItem?.id || ''}
+        pickListId={pickList.id}
+        productName={multiBatchItem?.productName || multiBatchItem?.plantVariety || 'Unknown'}
+        targetQty={multiBatchItem?.targetQty || 0}
+        onConfirm={async (batches, notes) => {
+          if (!multiBatchItem) return;
+
+          setLoading(true);
+          try {
+            const res = await fetch(
+              `/api/picking/${pickList.id}/items/${multiBatchItem.id}/batches`,
+              {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ batches, notes }),
+              }
+            );
+
+            const data = await res.json();
+
+            if (!res.ok || data.error) {
+              toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: data.error || 'Failed to save picks',
+              });
+              return;
+            }
+
+            // Calculate total picked
+            const totalPicked = batches.reduce((sum, b) => sum + b.quantity, 0);
+
+            updateItem(multiBatchItem.id, {
+              status: data.status || (totalPicked >= multiBatchItem.targetQty ? 'picked' : 'short'),
+              pickedQty: data.pickedQty || totalPicked,
+            });
+
+            toast({
+              title: 'Item Picked',
+              description: `${multiBatchItem.productName || multiBatchItem.plantVariety} picked from ${batches.length} batch(es)`,
+            });
+
+            setMultiBatchItem(null);
+          } catch (error) {
+            toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Failed to save picks',
+            });
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
 
       {/* Navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t safe-area-pb">

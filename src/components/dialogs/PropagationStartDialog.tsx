@@ -107,7 +107,7 @@ export function PropagationStartDialog({ open, onOpenChange }: { open: boolean; 
       </div>
       <div className="col-span-3">
         <Label>Tray Quantity</Label>
-        <Input type="number" min={1} value={trayQty} onChange={(e) => form.setValue("initial_tray_qty", Number(e.target.value), { shouldValidate: true })} />
+        <Input type="number" min={1} value={trayQty} onChange={(e) => form.setValue("initial_tray_qty", Number(e.target.value), { shouldValidate: true })} onFocus={(e) => e.target.select()} />
       </div>
       <div className="col-span-3">
         <Label>Total (preview)</Label>

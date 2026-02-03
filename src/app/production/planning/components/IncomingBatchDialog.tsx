@@ -311,7 +311,7 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                               <SelectValue placeholder="Select variety" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="max-h-[300px]">
                             {varieties.map((v) => (
                               <SelectItem key={v.id} value={v.id}>
                                 {v.name}
@@ -335,7 +335,7 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                               <SelectValue placeholder="Select size" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="max-h-[300px]">
                             {sizes.map((s) => (
                               <SelectItem key={s.id} value={s.id}>
                                 {s.name}
@@ -426,7 +426,7 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                                 <SelectValue placeholder="Week" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent className="max-h-[300px]">
                               {getWeekOptions().map((week) => (
                                 <SelectItem key={week} value={week.toString()}>
                                   Week {week}
@@ -485,7 +485,7 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                             <SelectValue placeholder="Optional supplier" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent className="max-h-[300px]">
                           <SelectItem value={OPTIONAL_SELECT_VALUE}>Not set</SelectItem>
                           {suppliers.map((s) => (
                             <SelectItem key={s.id} value={s.id}>
@@ -514,8 +514,8 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
                             <SelectValue placeholder="Use virtual Transit location" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value={OPTIONAL_SELECT_VALUE}>Auto (Transit – Incoming)</SelectItem>
+                        <SelectContent className="max-h-[300px]">
+                          <SelectItem value={OPTIONAL_SELECT_VALUE}>Auto (Transit - Incoming)</SelectItem>
                           {locations.map((loc) => (
                             <SelectItem key={loc.id} value={loc.id}>
                               {loc.name}

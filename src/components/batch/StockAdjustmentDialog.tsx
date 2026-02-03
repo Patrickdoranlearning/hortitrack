@@ -22,11 +22,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Minus, AlertTriangle } from "lucide-react";
-import {
-  adjustBatchStock,
-  ADJUSTMENT_REASON_LABELS,
-  type AdjustmentReason,
-} from "@/app/actions/batch-stock";
+import { adjustBatchStock } from "@/app/actions/batch-stock";
+import { ADJUSTMENT_REASON_LABELS, type AdjustmentReason } from "@/lib/shared/batch-stock-constants";
 
 interface StockAdjustmentDialogProps {
   open: boolean;

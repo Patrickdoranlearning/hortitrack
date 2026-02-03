@@ -243,7 +243,7 @@ export function PlanBatchesStep({
                         <SelectTrigger className="h-8">
                           <SelectValue placeholder="TBD" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-[300px]">
                           <SelectItem value="__tbd__">TBD</SelectItem>
                           {locations.map((loc) => (
                             <SelectItem key={loc.id} value={loc.id}>

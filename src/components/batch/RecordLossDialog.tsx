@@ -22,11 +22,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trash2, AlertTriangle, Bug, Thermometer, Scissors, Cog } from "lucide-react";
-import {
-  recordBatchLoss,
-  LOSS_REASON_LABELS,
-  type LossReason,
-} from "@/app/actions/batch-stock";
+import { recordBatchLoss } from "@/app/actions/batch-stock";
+import { LOSS_REASON_LABELS, type LossReason } from "@/lib/shared/batch-stock-constants";
 
 interface RecordLossDialogProps {
   open: boolean;

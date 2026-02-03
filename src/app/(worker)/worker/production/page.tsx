@@ -1,29 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  RefreshCw,
   Plus,
-  ClipboardList,
   Package,
-  Clock,
-  AlertCircle,
   WifiOff,
   ChevronRight,
   Sprout,
   GitBranch,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PullToRefresh } from "@/components/worker/PullToRefresh";
-import { TaskCardSkeleton } from "@/components/worker/skeletons";
-import { useWorkerTasks } from "@/offline/WorkerOfflineProvider";
 import { vibrateSuccess, vibrateTap } from "@/lib/haptics";
-import { TaskCard } from "@/components/worker/TaskCard";
-import { cn } from "@/lib/utils";
 import type { WorkerBatch } from "@/types/worker";
 
 interface RecentBatchesResponse {
@@ -33,19 +26,24 @@ interface RecentBatchesResponse {
 
 export default function ProductionLandingPage() {
   const router = useRouter();
-  const { tasks, loading: tasksLoading, error: tasksError, refresh, isOnline } = useWorkerTasks();
   const [refreshing, setRefreshing] = useState(false);
   const [recentBatches, setRecentBatches] = useState<WorkerBatch[]>([]);
   const [batchesLoading, setBatchesLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
 
-  // Filter production tasks
-  const productionTasks = useMemo(() => {
-    return tasks.filter(
-      (t) => t.sourceModule === "production" && (t.status === "in_progress" || t.status === "assigned")
-    );
-  }, [tasks]);
-
-  const inProgressTasks = productionTasks.filter((t) => t.status === "in_progress");
+  // Track online status
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   // Fetch recent batches
   const fetchRecentBatches = useCallback(async () => {
@@ -73,7 +71,7 @@ export default function ProductionLandingPage() {
     vibrateTap();
     setRefreshing(true);
     try {
-      await Promise.all([refresh(), fetchRecentBatches()]);
+      await fetchRecentBatches();
       vibrateSuccess();
     } finally {
       setRefreshing(false);
@@ -83,7 +81,7 @@ export default function ProductionLandingPage() {
   // Handle pull-to-refresh
   const handlePullRefresh = async () => {
     vibrateTap();
-    await Promise.all([refresh(), fetchRecentBatches()]);
+    await fetchRecentBatches();
     vibrateSuccess();
   };
 
@@ -171,11 +169,11 @@ export default function ProductionLandingPage() {
             className="h-16 flex-col gap-1"
             onClick={() => {
               vibrateTap();
-              router.push("/worker/tasks");
+              router.push("/worker/saleability");
             }}
           >
-            <ClipboardList className="h-5 w-5" />
-            <span className="text-xs">Jobs</span>
+            <CheckCircle className="h-5 w-5" />
+            <span className="text-xs">Saleability</span>
           </Button>
           <Button
             variant="outline"
@@ -186,66 +184,6 @@ export default function ProductionLandingPage() {
             <span className="text-xs">Batches</span>
           </Button>
         </div>
-
-        {/* My Active Work Section */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">My Active Work</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={refreshing || !isOnline}
-              className="min-h-[44px] min-w-[44px]"
-            >
-              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-            </Button>
-          </div>
-
-          {tasksLoading && !refreshing && <TaskCardSkeleton count={2} />}
-
-          {tasksError && !tasksLoading && (
-            <Card className="border-destructive/50">
-              <CardContent className="flex flex-col items-center justify-center py-6 text-center">
-                <AlertCircle className="h-8 w-8 text-destructive mb-2" />
-                <p className="text-muted-foreground text-sm">{tasksError}</p>
-                <Button onClick={handleRefresh} variant="outline" size="sm" className="mt-3" disabled={!isOnline}>
-                  Try Again
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {!tasksLoading && !tasksError && inProgressTasks.length === 0 && (
-            <Card className="bg-muted/30">
-              <CardContent className="py-6 text-center">
-                <Clock className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
-                <p className="text-muted-foreground text-sm">No active production tasks</p>
-                <p className="text-muted-foreground text-xs mt-1">Start a new batch or view your jobs</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {!tasksLoading && !tasksError && inProgressTasks.length > 0 && (
-            <div className="space-y-3">
-              {inProgressTasks.map((task) => (
-                <TaskCard key={task.id} task={task} onUpdate={handleRefresh} />
-              ))}
-            </div>
-          )}
-
-          {/* Show assigned tasks if we have room and there are no in progress */}
-          {!tasksLoading && !tasksError && inProgressTasks.length === 0 && productionTasks.filter(t => t.status === "assigned").length > 0 && (
-            <div className="mt-4 space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">
-                Assigned ({productionTasks.filter(t => t.status === "assigned").length})
-              </h3>
-              {productionTasks.filter(t => t.status === "assigned").slice(0, 3).map((task) => (
-                <TaskCard key={task.id} task={task} onUpdate={handleRefresh} />
-              ))}
-            </div>
-          )}
-        </section>
 
         {/* Recent Batches Section */}
         <section>

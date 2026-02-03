@@ -488,8 +488,8 @@ function CardWithTable({
                         <FormItem className="space-y-1">
                           <FormLabel className="sr-only">Site</FormLabel>
                           <Select
-                            value={field.value ?? ''}
-                            onValueChange={(value) => field.onChange(value || undefined)}
+                            value={field.value ?? '__none__'}
+                            onValueChange={(value) => field.onChange(value === '__none__' ? undefined : value)}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -497,8 +497,8 @@ function CardWithTable({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
-                              {sites.map((site) => (
+                              <SelectItem value="__none__">None</SelectItem>
+                              {sites.filter(site => site.id).map((site) => (
                                 <SelectItem key={site.id} value={site.id!}>
                                   {site.name}
                                 </SelectItem>

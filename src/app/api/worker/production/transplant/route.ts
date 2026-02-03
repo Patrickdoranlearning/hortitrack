@@ -5,24 +5,19 @@ import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { logger } from "@/server/utils/logger";
 import { consumeMaterialsForBatch } from "@/server/materials/consumption";
+import { workerTransplantSchema } from "@/lib/shared";
 
 /**
  * Worker Transplant API
  *
  * Mobile-optimized endpoint for creating transplants.
  * Creates a child batch from a parent batch using the perform_transplant RPC.
+ *
+ * Uses shared schema from @/lib/shared/schemas/transplant.ts
  */
 
-const TransplantSchema = z.object({
-  parentBatchId: z.string().uuid("Invalid parent batch ID"),
-  sizeId: z.string().uuid("Invalid size ID"),
-  locationId: z.string().uuid("Invalid location ID"),
-  containers: z.number().int().positive("Containers must be positive"),
-  notes: z.string().max(1000).optional(),
-  archiveParentIfEmpty: z.boolean().optional().default(true),
-  writeOffRemainder: z.boolean().optional().default(false),
-  remainderUnits: z.number().int().min(0).optional(),
-});
+// Use the shared schema
+const TransplantSchema = workerTransplantSchema;
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();

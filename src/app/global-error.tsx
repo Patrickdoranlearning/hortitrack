@@ -2,7 +2,6 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 
 export default function GlobalError({
   error,
@@ -32,19 +31,31 @@ export default function GlobalError({
           <p style={{ color: '#666', margin: '1rem 0' }}>
             A global error occurred in the application layout or template.
           </p>
-          <pre style={{ 
-            background: '#f0f0f0', 
-            border: '1px solid #ccc', 
-            borderRadius: '4px', 
-            padding: '1rem', 
-            maxWidth: '800px', 
+          <pre style={{
+            background: '#f0f0f0',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            padding: '1rem',
+            maxWidth: '800px',
             overflow: 'auto'
           }}>
             {error.message}
           </pre>
-          <Button onClick={() => reset()} style={{ marginTop: '1rem' }}>
+          <button
+            onClick={() => reset()}
+            style={{
+              marginTop: '1rem',
+              padding: '0.5rem 1rem',
+              backgroundColor: '#0070f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '1rem'
+            }}
+          >
             Try again
-          </Button>
+          </button>
         </div>
       </body>
     </html>

@@ -5,22 +5,19 @@ import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { logger } from "@/server/utils/logger";
 import { consumeMaterialsForBatch } from "@/server/materials/consumption";
+import { workerPropagationSchema, calculateTotalPlants } from "@/lib/shared";
 
 /**
  * Worker Propagation API
  *
  * Mobile-optimized endpoint for creating propagation batches.
  * Creates a new batch from seeds/cuttings (no parent batch required).
+ *
+ * Uses shared schema from @/lib/shared/schemas/propagation.ts
  */
 
-const PropagateSchema = z.object({
-  plantVarietyId: z.string().uuid("Invalid variety ID"),
-  sizeId: z.string().uuid("Invalid size ID"),
-  locationId: z.string().uuid("Invalid location ID"),
-  containers: z.number().int().positive("Containers must be positive"),
-  plantedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  notes: z.string().max(1000).optional(),
-});
+// Use the shared schema
+const PropagateSchema = workerPropagationSchema;
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -75,9 +72,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate total quantity
+    // Calculate total quantity using shared utility
     const cellMultiple = size.cell_multiple ?? 1;
-    const totalQuantity = input.containers * Math.max(1, cellMultiple);
+    const totalQuantity = calculateTotalPlants(input.containers, cellMultiple);
 
     // Generate batch number using the sequence
     const { data: seqData, error: seqError } = await supabase.rpc(

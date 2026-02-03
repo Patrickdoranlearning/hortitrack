@@ -396,7 +396,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
             <FormItem>
                     <FormLabel>Containers</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} step={1} {...field} />
+                      <Input type="number" min={1} step={1} {...field} onFocus={(e) => e.target.select()} />
                     </FormControl>
               <FormMessage />
             </FormItem>

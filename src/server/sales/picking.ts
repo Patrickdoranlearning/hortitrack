@@ -1382,13 +1382,17 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
 
   if (!varietyId) {
     if (orderItem.product_id) {
-      const { data: productBatches, error } = await supabase.from("product_batches").select(`batches(id, batch_number, quantity, status, nursery_locations(name))`).eq("product_id", orderItem.product_id);
+      const { data: productBatches, error } = await supabase.from("product_batches").select(`batches(id, batch_number, quantity, status, planted_at, nursery_locations(name))`).eq("product_id", orderItem.product_id);
       if (error) { logError("Error fetching product batches", { error: error.message, pickItemId }); return []; }
-      return (productBatches || []).filter((pb: any) => pb.batches && pb.batches.quantity > 0).map((pb: any) => ({
-        id: pb.batches.id, batchNumber: pb.batches.batch_number, quantity: pb.batches.quantity,
-        location: pb.batches.nursery_locations?.name || "Unknown", status: pb.batches.status,
-        shelfQuantity: finalShelfQuantity,
-      }));
+      // Filter by saleable status (Ready, Looking Good) and positive quantity, then sort by planted_at (FEFO)
+      return (productBatches || [])
+        .filter((pb: any) => pb.batches && pb.batches.quantity > 0 && ["Ready", "Looking Good"].includes(pb.batches.status))
+        .sort((a: any, b: any) => new Date(a.batches.planted_at || 0).getTime() - new Date(b.batches.planted_at || 0).getTime())
+        .map((pb: any) => ({
+          id: pb.batches.id, batchNumber: pb.batches.batch_number, quantity: pb.batches.quantity,
+          location: pb.batches.nursery_locations?.name || "Unknown", status: pb.batches.status,
+          shelfQuantity: finalShelfQuantity,
+        }));
     }
     return [];
   }
