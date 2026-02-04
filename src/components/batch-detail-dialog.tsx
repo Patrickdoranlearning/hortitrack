@@ -20,6 +20,7 @@ import {
   Loader2,
   ImageIcon,
   ExternalLink,
+  ClipboardList,
 } from "lucide-react";
 import Link from "next/link";
 import type { Batch } from '@/lib/types';
@@ -31,7 +32,7 @@ import { BatchChatDialog } from "./batch-chat-dialog";
 import { InteractiveDistributionBar } from "./InteractiveDistributionBar";
 import AncestryStrip from "./ancestry-strip";
 import { PlantPassportCard } from "./batches/PlantPassportCard";
-import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
+// ActionMenuButton removed - using LogActionWizard directly
 import type { ActionMode } from "@/components/actions/types";
 import { StockMovementLog } from "@/components/history/StockMovementLog";
 import { PlantHealthLog } from "@/components/history/PlantHealthLog";
@@ -40,6 +41,7 @@ import { StockAdjustmentDialog } from "@/components/batch/StockAdjustmentDialog"
 import { RecordLossDialog } from "@/components/batch/RecordLossDialog";
 import { AddHealthLogDialog } from "@/components/plant-health/AddHealthLogDialog";
 import { ScoutLogCard } from "@/components/batches/ScoutLogCard";
+import { LogActionWizard, type BatchInfo } from "@/components/batches/LogActionWizard";
 
 // Lazy load gallery to avoid slowing down dialog open
 const BatchGallerySection = dynamic(
@@ -81,6 +83,7 @@ export function BatchDetailDialog({
 }: BatchDetailDialogProps) {
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
+  const [isWizardOpen, setIsWizardOpen] = React.useState(false);
 
   // Dialog states for actions
   const [adjustDialogOpen, setAdjustDialogOpen] = React.useState(false);
@@ -354,11 +357,11 @@ export function BatchDetailDialog({
                   </TabsTrigger>
                   <TabsTrigger value="health" className="flex items-center gap-1">
                     <Heart className="h-3.5 w-3.5" />
-                    Health
+                    Care
                   </TabsTrigger>
                   <TabsTrigger value="scout" className="flex items-center gap-1">
                     <Search className="h-3.5 w-3.5" />
-                    Scout
+                    Observations
                   </TabsTrigger>
                   <TabsTrigger value="photos">
                     <ImageIcon className="h-4 w-4 mr-1" />
@@ -548,7 +551,7 @@ export function BatchDetailDialog({
               <h4 className="font-semibold text-lg">Actions</h4>
               <Button onClick={() => onEdit(batch)} variant="outline"><Pencil /> Edit Batch</Button>
               <Button onClick={() => onTransplant(batch)} variant="outline" disabled={(batch.quantity ?? 0) === 0}><Sprout /> Transplant</Button>
-              <ActionMenuButton batch={batch} onSelect={(mode) => onLogAction(batch, mode)} className="w-full" />
+              <Button onClick={() => setIsWizardOpen(true)} variant="outline"><ClipboardList /> Log Action</Button>
               <Button onClick={() => setIsChatOpen(true)} variant="outline"><Share2 /> Chat about Batch</Button>
               {batch.id && (
                 <Button asChild variant="outline">
@@ -603,6 +606,22 @@ export function BatchDetailDialog({
         batchId={batch?.id || ''}
         batchNumber={batch?.batchNumber}
         onSuccess={() => refreshHealthLogs()}
+      />
+
+      {/* Log Action Wizard */}
+      <LogActionWizard
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
+        batch={{
+          id: batch?.id || '',
+          batchNumber: batch?.batchNumber || '',
+          variety: batch?.plantVariety?.toString(),
+          quantity: batch?.quantity ?? 0,
+        }}
+        onSuccess={() => {
+          refreshStockMovements();
+          refreshHealthLogs();
+        }}
       />
     </>
   );

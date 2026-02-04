@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { generatePartNumber, generateInternalBarcode } from "@/server/numbering/materials";
 import { receiveStock } from "./stock";
+import { logError } from "@/lib/log";
 import type {
   Material,
   MaterialCategory,
@@ -98,8 +99,10 @@ export async function listMaterials(
   }
 
   if (options?.search) {
+    // Sanitize search input to prevent SQL injection via special characters
+    const sanitizedSearch = options.search.replace(/[%_\\]/g, '\\$&');
     query = query.or(
-      `name.ilike.%${options.search}%,part_number.ilike.%${options.search}%,description.ilike.%${options.search}%`
+      `name.ilike.%${sanitizedSearch}%,part_number.ilike.%${sanitizedSearch}%,description.ilike.%${sanitizedSearch}%`
     );
   }
 
@@ -241,7 +244,11 @@ export async function createMaterial(
         "Initial stock on creation"
       );
     } catch (stockError) {
-      console.error("Failed to set initial stock:", stockError);
+      logError("Failed to set initial stock", {
+        error: stockError instanceof Error ? stockError.message : String(stockError),
+        materialId: material.id,
+        orgId,
+      });
       // Don't fail the entire create - material was created successfully
     }
   }

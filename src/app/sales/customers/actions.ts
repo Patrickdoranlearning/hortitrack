@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { customerFormSchema, customerAddressSchema, customerContactSchema, deliveryPreferencesSchema } from "./types";
+import type { CustomerFollowUp, CustomerMilestone, MilestoneType } from "./[customerId]/types";
 
 function cleanString(value?: string | null) {
   if (value === undefined || value === null) return null;
@@ -608,4 +609,417 @@ export async function setCustomerPortalPassword(input: z.infer<typeof portalPass
       error: error instanceof Error ? error.message : "An unexpected error occurred"
     };
   }
+}
+
+// =============================================================================
+// CUSTOMER FOLLOW-UPS
+// =============================================================================
+
+const createFollowUpSchema = z.object({
+  customerId: z.string().uuid(),
+  dueDate: z.string(),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional().nullable(),
+  sourceInteractionId: z.string().uuid().optional().nullable(),
+  assignedTo: z.string().uuid().optional().nullable(),
+});
+
+export async function createFollowUpAction(input: z.infer<typeof createFollowUpSchema>) {
+  const validation = createFollowUpSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
+  const { orgId, userId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("customer_follow_ups")
+    .insert({
+      org_id: orgId,
+      customer_id: parsed.customerId,
+      due_date: parsed.dueDate,
+      title: parsed.title.trim(),
+      description: parsed.description?.trim() || null,
+      source_interaction_id: parsed.sourceInteractionId || null,
+      assigned_to: parsed.assignedTo || userId,
+      status: 'pending',
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[createFollowUpAction]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/sales/customers");
+  revalidatePath(`/sales/customers/${parsed.customerId}`);
+  return {
+    success: true,
+    data,
+    _mutated: { resource: 'follow_ups' as const, action: 'create' as const, id: data?.id },
+  };
+}
+
+export async function completeFollowUpAction(followUpId: string) {
+  const { userId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("customer_follow_ups")
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      completed_by: userId,
+    })
+    .eq("id", followUpId)
+    .select("customer_id")
+    .single();
+
+  if (error) {
+    console.error("[completeFollowUpAction]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/sales/customers");
+  if (data?.customer_id) {
+    revalidatePath(`/sales/customers/${data.customer_id}`);
+  }
+  return {
+    success: true,
+    _mutated: { resource: 'follow_ups' as const, action: 'update' as const, id: followUpId },
+  };
+}
+
+export async function cancelFollowUpAction(followUpId: string) {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("customer_follow_ups")
+    .update({ status: 'cancelled' })
+    .eq("id", followUpId)
+    .select("customer_id")
+    .single();
+
+  if (error) {
+    console.error("[cancelFollowUpAction]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/sales/customers");
+  if (data?.customer_id) {
+    revalidatePath(`/sales/customers/${data.customer_id}`);
+  }
+  return {
+    success: true,
+    _mutated: { resource: 'follow_ups' as const, action: 'update' as const, id: followUpId },
+  };
+}
+
+export async function getCustomerFollowUpsAction(customerId: string, includeCompleted = false): Promise<{
+  success: boolean;
+  followUps: CustomerFollowUp[];
+  error?: string;
+}> {
+  const supabase = await getSupabaseServerApp();
+
+  let query = supabase
+    .from("customer_follow_ups")
+    .select(`
+      id,
+      customer_id,
+      source_interaction_id,
+      assigned_to,
+      due_date,
+      title,
+      description,
+      status,
+      completed_at,
+      completed_by,
+      created_at,
+      assigned_user:profiles!customer_follow_ups_assigned_to_fkey(display_name),
+      completed_user:profiles!customer_follow_ups_completed_by_fkey(display_name)
+    `)
+    .eq("customer_id", customerId)
+    .order("due_date", { ascending: true });
+
+  if (!includeCompleted) {
+    query = query.eq("status", "pending");
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[getCustomerFollowUpsAction]", error);
+    return { success: false, followUps: [], error: error.message };
+  }
+
+  const followUps: CustomerFollowUp[] = (data ?? []).map((row: any) => ({
+    id: row.id,
+    customerId: row.customer_id,
+    sourceInteractionId: row.source_interaction_id,
+    assignedToId: row.assigned_to,
+    assignedToName: row.assigned_user?.display_name ?? null,
+    dueDate: row.due_date,
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    completedAt: row.completed_at,
+    completedByName: row.completed_user?.display_name ?? null,
+    createdAt: row.created_at,
+  }));
+
+  return { success: true, followUps };
+}
+
+export async function getMyFollowUpsAction(): Promise<{
+  success: boolean;
+  followUps: (CustomerFollowUp & { customerName: string })[];
+  error?: string;
+}> {
+  const { userId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("customer_follow_ups")
+    .select(`
+      id,
+      customer_id,
+      source_interaction_id,
+      assigned_to,
+      due_date,
+      title,
+      description,
+      status,
+      completed_at,
+      created_at,
+      customers(name)
+    `)
+    .eq("assigned_to", userId)
+    .eq("status", "pending")
+    .order("due_date", { ascending: true });
+
+  if (error) {
+    console.error("[getMyFollowUpsAction]", error);
+    return { success: false, followUps: [], error: error.message };
+  }
+
+  const followUps = (data ?? []).map((row: any) => ({
+    id: row.id,
+    customerId: row.customer_id,
+    sourceInteractionId: row.source_interaction_id,
+    assignedToId: row.assigned_to,
+    assignedToName: null,
+    dueDate: row.due_date,
+    title: row.title,
+    description: row.description,
+    status: row.status as 'pending' | 'completed' | 'cancelled',
+    completedAt: row.completed_at,
+    completedByName: null,
+    createdAt: row.created_at,
+    customerName: row.customers?.name ?? 'Unknown Customer',
+  }));
+
+  return { success: true, followUps };
+}
+
+// =============================================================================
+// CUSTOMER MILESTONES
+// =============================================================================
+
+const createMilestoneSchema = z.object({
+  customerId: z.string().uuid(),
+  milestoneType: z.enum(['anniversary', 'first_order', 'contract_renewal', 'seasonal_peak', 'custom']),
+  title: z.string().min(1, "Title is required"),
+  eventDate: z.string(),
+  description: z.string().optional().nullable(),
+  recurring: z.boolean().optional().default(false),
+});
+
+export async function createMilestoneAction(input: z.infer<typeof createMilestoneSchema>) {
+  const validation = createMilestoneSchema.safeParse(input);
+  if (!validation.success) {
+    const firstError = validation.error.errors[0]?.message ?? "Invalid input";
+    return { success: false, error: firstError };
+  }
+  const parsed = validation.data;
+  const { orgId, userId } = await getUserAndOrg();
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("customer_milestones")
+    .insert({
+      org_id: orgId,
+      customer_id: parsed.customerId,
+      milestone_type: parsed.milestoneType,
+      title: parsed.title.trim(),
+      description: parsed.description?.trim() || null,
+      event_date: parsed.eventDate,
+      recurring: parsed.recurring ?? false,
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[createMilestoneAction]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/sales/customers");
+  revalidatePath(`/sales/customers/${parsed.customerId}`);
+  return {
+    success: true,
+    data,
+    _mutated: { resource: 'milestones' as const, action: 'create' as const, id: data?.id },
+  };
+}
+
+export async function deleteMilestoneAction(milestoneId: string) {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("customer_milestones")
+    .delete()
+    .eq("id", milestoneId)
+    .select("customer_id")
+    .single();
+
+  if (error) {
+    console.error("[deleteMilestoneAction]", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/sales/customers");
+  if (data?.customer_id) {
+    revalidatePath(`/sales/customers/${data.customer_id}`);
+  }
+  return {
+    success: true,
+    _mutated: { resource: 'milestones' as const, action: 'delete' as const, id: milestoneId },
+  };
+}
+
+export async function getCustomerMilestonesAction(customerId: string): Promise<{
+  success: boolean;
+  milestones: CustomerMilestone[];
+  error?: string;
+}> {
+  const supabase = await getSupabaseServerApp();
+
+  const { data, error } = await supabase
+    .from("customer_milestones")
+    .select(`
+      id,
+      customer_id,
+      milestone_type,
+      title,
+      description,
+      event_date,
+      recurring,
+      created_at
+    `)
+    .eq("customer_id", customerId)
+    .order("event_date", { ascending: true });
+
+  if (error) {
+    console.error("[getCustomerMilestonesAction]", error);
+    return { success: false, milestones: [], error: error.message };
+  }
+
+  const milestones: CustomerMilestone[] = (data ?? []).map((row: any) => ({
+    id: row.id,
+    customerId: row.customer_id,
+    milestoneType: row.milestone_type as MilestoneType,
+    title: row.title,
+    description: row.description,
+    eventDate: row.event_date,
+    recurring: row.recurring,
+    createdAt: row.created_at,
+  }));
+
+  return { success: true, milestones };
+}
+
+export async function getUpcomingMilestonesAction(customerId: string, days = 90): Promise<{
+  success: boolean;
+  milestones: CustomerMilestone[];
+  error?: string;
+}> {
+  const supabase = await getSupabaseServerApp();
+
+  // Get all milestones for this customer
+  const { data, error } = await supabase
+    .from("customer_milestones")
+    .select(`
+      id,
+      customer_id,
+      milestone_type,
+      title,
+      description,
+      event_date,
+      recurring,
+      created_at
+    `)
+    .eq("customer_id", customerId);
+
+  if (error) {
+    console.error("[getUpcomingMilestonesAction]", error);
+    return { success: false, milestones: [], error: error.message };
+  }
+
+  const today = new Date();
+  const futureDate = new Date(today);
+  futureDate.setDate(futureDate.getDate() + days);
+
+  // Filter to upcoming milestones (including recurring ones)
+  const upcoming: CustomerMilestone[] = [];
+
+  for (const row of data ?? []) {
+    const milestone: CustomerMilestone = {
+      id: row.id,
+      customerId: row.customer_id,
+      milestoneType: row.milestone_type as MilestoneType,
+      title: row.title,
+      description: row.description,
+      eventDate: row.event_date,
+      recurring: row.recurring,
+      createdAt: row.created_at,
+    };
+
+    const eventDate = new Date(row.event_date);
+
+    if (row.recurring) {
+      // For recurring milestones, calculate the next occurrence this year or next
+      const thisYear = today.getFullYear();
+      const nextOccurrence = new Date(thisYear, eventDate.getMonth(), eventDate.getDate());
+
+      // If this year's occurrence has passed, use next year's
+      if (nextOccurrence < today) {
+        nextOccurrence.setFullYear(thisYear + 1);
+      }
+
+      // Check if within range
+      if (nextOccurrence <= futureDate) {
+        // Update event_date to show the upcoming occurrence
+        upcoming.push({
+          ...milestone,
+          eventDate: nextOccurrence.toISOString().split('T')[0],
+        });
+      }
+    } else {
+      // Non-recurring: check if event is in the future and within range
+      if (eventDate >= today && eventDate <= futureDate) {
+        upcoming.push(milestone);
+      }
+    }
+  }
+
+  // Sort by upcoming date
+  upcoming.sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+
+  return { success: true, milestones: upcoming };
 }

@@ -15,6 +15,9 @@ import {
   MapPin,
   Calendar,
   TrendingUp,
+  Clock,
+  Plus,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,17 +32,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { CustomerSummary } from "../types";
-import type { CustomerOrder, FavouriteProduct, LastOrderWeek, CustomerStats } from "./types";
+import type { CustomerOrder, FavouriteProduct, LastOrderWeek, ExtendedCustomerStats, CustomerInteraction } from "./types";
 import { CustomerSheet } from "../CustomerSheet";
+import { ActivityTimeline } from "@/components/customers/ActivityTimeline";
+import { FollowUpBanner } from "@/components/customers/FollowUpBanner";
+import { MilestonesCard } from "@/components/customers/MilestonesCard";
+import { VisitPrepDialog } from "@/components/customers/VisitPrepDialog";
+import { OrderFrequencyChart } from "@/components/customers/OrderFrequencyChart";
+import { LogInteractionDialog } from "@/components/sales/dashboard/LogInteractionDialog";
 
-type TabKey = "overview" | "orders" | "favourites";
+type TabKey = "overview" | "orders" | "favourites" | "activity";
 
 interface CustomerDetailClientProps {
   customer: CustomerSummary;
   orders: CustomerOrder[];
   favouriteProducts: FavouriteProduct[];
+  interactions: CustomerInteraction[];
   lastOrderWeek: LastOrderWeek;
-  stats: CustomerStats;
+  stats: ExtendedCustomerStats;
   priceLists: Array<{ id: string; name: string; currency: string }>;
   products: Array<{ id: string; name: string; skuCode: string | null }>;
 }
@@ -48,6 +58,7 @@ export default function CustomerDetailClient({
   customer,
   orders,
   favouriteProducts,
+  interactions,
   lastOrderWeek,
   stats,
   priceLists,
@@ -55,6 +66,8 @@ export default function CustomerDetailClient({
 }: CustomerDetailClientProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [logInteractionOpen, setLogInteractionOpen] = useState(false);
+  const [visitPrepOpen, setVisitPrepOpen] = useState(false);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IE", {
@@ -74,11 +87,12 @@ export default function CustomerDetailClient({
             </Link>
           </Button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl font-bold">{customer.name}</h1>
               {customer.code && (
                 <Badge variant="outline">{customer.code}</Badge>
               )}
+              <CustomerHealthBadge status={stats.healthStatus} daysSinceLastOrder={stats.daysSinceLastOrder} />
             </div>
             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-muted-foreground">
               {customer.email && (
@@ -102,11 +116,24 @@ export default function CustomerDetailClient({
             </div>
           </div>
         </div>
-        <Button onClick={() => setEditSheetOpen(true)}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit customer
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setVisitPrepOpen(true)}>
+            <ClipboardList className="mr-2 h-4 w-4" />
+            Prepare for Visit
+          </Button>
+          <Button variant="outline" onClick={() => setLogInteractionOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Log Activity
+          </Button>
+          <Button onClick={() => setEditSheetOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit customer
+          </Button>
+        </div>
       </div>
+
+      {/* Follow-Up Banner */}
+      <FollowUpBanner customerId={customer.id} />
 
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -161,6 +188,10 @@ export default function CustomerDetailClient({
             <Star className="mr-1 h-4 w-4" />
             Favourites
           </TabsTrigger>
+          <TabsTrigger value="activity">
+            <Clock className="mr-1 h-4 w-4" />
+            Activity ({interactions.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -168,6 +199,7 @@ export default function CustomerDetailClient({
             customer={customer}
             orders={orders}
             favouriteProducts={favouriteProducts}
+            stats={stats}
             formatCurrency={formatCurrency}
           />
         </TabsContent>
@@ -178,6 +210,24 @@ export default function CustomerDetailClient({
 
         <TabsContent value="favourites">
           <FavouritesTab products={favouriteProducts} formatCurrency={formatCurrency} />
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-muted-foreground">
+                Showing {interactions.length} interaction{interactions.length !== 1 ? 's' : ''}
+              </p>
+              <Button onClick={() => setLogInteractionOpen(true)} size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Log Interaction
+              </Button>
+            </div>
+            <ActivityTimeline
+              interactions={interactions}
+              emptyMessage="No interactions recorded yet. Log your first interaction to start tracking activity."
+            />
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -191,6 +241,25 @@ export default function CustomerDetailClient({
         products={products}
         onSaved={() => emitMutation({ resource: 'customers', action: 'update', id: customer.id })}
       />
+
+      {/* Log Interaction Dialog */}
+      <LogInteractionDialog
+        open={logInteractionOpen}
+        onOpenChange={setLogInteractionOpen}
+        customerId={customer.id}
+        customerName={customer.name}
+      />
+
+      {/* Visit Prep Dialog */}
+      <VisitPrepDialog
+        open={visitPrepOpen}
+        onOpenChange={setVisitPrepOpen}
+        customer={customer}
+        orders={orders}
+        favouriteProducts={favouriteProducts}
+        interactions={interactions}
+        stats={stats}
+      />
     </div>
   );
 }
@@ -203,11 +272,13 @@ function OverviewTab({
   customer,
   orders,
   favouriteProducts,
+  stats,
   formatCurrency,
 }: {
   customer: CustomerSummary;
   orders: CustomerOrder[];
   favouriteProducts: FavouriteProduct[];
+  stats: ExtendedCustomerStats;
   formatCurrency: (value: number) => string;
 }) {
   const recentOrders = orders.slice(0, 5);
@@ -319,6 +390,9 @@ function OverviewTab({
         </CardContent>
       </Card>
 
+      {/* Milestones */}
+      <MilestonesCard customerId={customer.id} />
+
       {/* Top Products */}
       <Card className="md:col-span-2">
         <CardHeader>
@@ -353,6 +427,15 @@ function OverviewTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Order Frequency Chart */}
+      <div className="md:col-span-2">
+        <OrderFrequencyChart
+          ordersByMonth={stats.ordersByMonth}
+          ordersLast12Months={stats.ordersLast12Months}
+          averageDaysBetweenOrders={stats.averageDaysBetweenOrders}
+        />
+      </div>
 
       {/* Notes */}
       {customer.notes && (
@@ -552,6 +635,51 @@ function OrderStatusBadge({ status }: { status: string }) {
   return (
     <Badge variant={variants[status] || "outline"} className="text-xs">
       {labels[status] || status}
+    </Badge>
+  );
+}
+
+function CustomerHealthBadge({
+  status,
+  daysSinceLastOrder,
+}: {
+  status: 'active' | 'at_risk' | 'churning' | 'new';
+  daysSinceLastOrder: number | null;
+}) {
+  const config: Record<
+    typeof status,
+    { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; tooltip: string }
+  > = {
+    active: {
+      label: 'Active',
+      variant: 'default',
+      tooltip: 'Ordered within the last 6 weeks',
+    },
+    at_risk: {
+      label: 'At Risk',
+      variant: 'secondary',
+      tooltip: 'No orders in 6-12 weeks',
+    },
+    churning: {
+      label: 'Churning',
+      variant: 'destructive',
+      tooltip: 'No orders in 12+ weeks',
+    },
+    new: {
+      label: 'New',
+      variant: 'outline',
+      tooltip: 'No order history yet',
+    },
+  };
+
+  const { label, variant, tooltip } = config[status];
+
+  return (
+    <Badge variant={variant} className="text-xs" title={tooltip}>
+      {label}
+      {daysSinceLastOrder !== null && status !== 'new' && (
+        <span className="ml-1 opacity-70">({daysSinceLastOrder}d)</span>
+      )}
     </Badge>
   );
 }

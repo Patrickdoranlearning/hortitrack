@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { MaterialTransaction } from "@/lib/types/materials";
+import { logError } from "@/lib/log";
 
 // Local type for consumption preview - uses different property names than shared types
 type LocalConsumptionPreview = {
@@ -325,7 +326,11 @@ export async function consumeMaterialsForBatch(
     .select();
 
   if (error) {
-    console.error("Failed to create consumption transactions:", error);
+    logError("Failed to create consumption transactions", {
+      error: error.message,
+      batchId,
+      materialCount: transactionsToInsert.length,
+    });
     throw new Error(`Failed to create consumption transactions: ${error.message}`);
   }
 
@@ -398,7 +403,11 @@ export async function reverseConsumption(
     .select();
 
   if (error) {
-    console.error("Failed to create return transactions:", error);
+    logError("Failed to create return transactions", {
+      error: error.message,
+      batchId,
+      transactionCount: transactionsToInsert.length,
+    });
     throw new Error(`Failed to reverse consumption: ${error.message}`);
   }
 

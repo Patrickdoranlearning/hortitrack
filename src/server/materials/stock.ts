@@ -1,5 +1,24 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { MaterialStock, MaterialStockSummary, MaterialTransaction } from "@/lib/types/materials";
+import type { MaterialStock, MaterialStockSummary, MaterialTransaction, Material } from "@/lib/types/materials";
+import { logError } from "@/lib/log";
+
+// Type for joined material data from stock query (Supabase may return as array or object)
+type StockMaterialJoinRow = {
+  id: string;
+  name: string;
+  part_number: string;
+  base_uom: string;
+  reorder_point: number | null;
+  is_active: boolean;
+  material_categories: { name: string } | { name: string }[] | null;
+};
+
+// Helper to extract joined record (Supabase may return array or object)
+function extractJoinedMaterial(joined: unknown): StockMaterialJoinRow | null {
+  if (!joined) return null;
+  if (Array.isArray(joined)) return joined[0] ?? null;
+  return joined as StockMaterialJoinRow;
+}
 
 // ============================================================================
 // Stock Queries
@@ -53,7 +72,7 @@ export async function getStockSummary(
   }>();
 
   for (const row of data ?? []) {
-    const material = row.materials as any;
+    const material = extractJoinedMaterial(row.materials);
     if (!material?.is_active) continue;
 
     const existing = aggregated.get(row.material_id);
@@ -61,11 +80,16 @@ export async function getStockSummary(
       existing.totalOnHand += Number(row.quantity_on_hand) || 0;
       existing.totalReserved += Number(row.quantity_reserved) || 0;
     } else {
+      // Extract category name (may be array or object)
+      const category = Array.isArray(material.material_categories)
+        ? material.material_categories[0]
+        : material.material_categories;
+
       aggregated.set(row.material_id, {
         materialId: row.material_id,
         materialName: material.name,
         partNumber: material.part_number,
-        categoryName: material.material_categories?.name ?? 'Unknown',
+        categoryName: category?.name ?? 'Unknown',
         baseUom: material.base_uom,
         totalOnHand: Number(row.quantity_on_hand) || 0,
         totalReserved: Number(row.quantity_reserved) || 0,
@@ -260,7 +284,11 @@ export async function recordCount(
       .eq("location_id", locationId ?? null);
 
     if (updateError) {
-      console.error("Failed to update last_counted_at:", updateError);
+      logError("Failed to update last_counted_at", {
+        error: updateError.message,
+        materialId,
+        locationId,
+      });
     }
 
     // Return a synthetic transaction for the count
@@ -410,7 +438,7 @@ function mapTransaction(row: Record<string, unknown>): MaterialTransaction {
           id: material.id as string,
           name: material.name as string,
           partNumber: material.part_number as string,
-        } as any
+        } as Pick<Material, 'id' | 'name' | 'partNumber'>
       : undefined,
     transactionType: row.transaction_type as MaterialTransaction["transactionType"],
     quantity: Number(row.quantity) || 0,

@@ -7,8 +7,9 @@ import {
   fetchCustomerDetail,
   fetchCustomerOrders,
   fetchFavouriteProducts,
+  fetchCustomerInteractions,
   computeLastOrderWeek,
-  computeCustomerStats,
+  computeExtendedCustomerStats,
 } from "./customer-detail-data";
 
 export const runtime = "nodejs";
@@ -31,10 +32,11 @@ export default async function CustomerDetailPage({ params }: CustomerDetailPageP
   }
 
   // Fetch all data in parallel
-  const [customer, orders, favouriteProducts, priceLists, products] = await Promise.all([
+  const [customer, orders, favouriteProducts, interactionsResult, priceLists, products] = await Promise.all([
     fetchCustomerDetail(supabase, customerId),
     fetchCustomerOrders(supabase, customerId),
     fetchFavouriteProducts(supabase, customerId),
+    fetchCustomerInteractions(supabase, customerId),
     fetchPriceLists(supabase, orgId),
     fetchProducts(supabase, orgId),
   ]);
@@ -45,7 +47,7 @@ export default async function CustomerDetailPage({ params }: CustomerDetailPageP
 
   // Compute derived data
   const lastOrderWeek = computeLastOrderWeek(orders);
-  const stats = computeCustomerStats(orders);
+  const stats = computeExtendedCustomerStats(orders);
 
   return (
     <PageFrame moduleKey="sales">
@@ -53,6 +55,7 @@ export default async function CustomerDetailPage({ params }: CustomerDetailPageP
         customer={customer}
         orders={orders}
         favouriteProducts={favouriteProducts}
+        interactions={interactionsResult.interactions}
         lastOrderWeek={lastOrderWeek}
         stats={stats}
         priceLists={priceLists}

@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { generateLotNumber, generateLotBarcode } from "@/server/numbering/materials";
+import { logError } from "@/lib/log";
 import type {
   MaterialLot,
   MaterialLotWithMaterial,
@@ -93,8 +94,10 @@ export async function listMaterialLots(
   }
 
   if (filters?.search) {
+    // Sanitize search input to prevent SQL injection via special characters
+    const sanitizedSearch = filters.search.replace(/[%_\\]/g, '\\$&');
     query = query.or(
-      `lot_number.ilike.%${filters.search}%,supplier_lot_number.ilike.%${filters.search}%`
+      `lot_number.ilike.%${sanitizedSearch}%,supplier_lot_number.ilike.%${sanitizedSearch}%`
     );
   }
 
@@ -196,6 +199,7 @@ export async function getMaterialLotByBarcode(
   orgId: string,
   barcode: string
 ): Promise<MaterialLotWithMaterial | null> {
+  // Include org_id in query filter for security (not just post-query validation)
   const { data, error } = await supabase
     .from("material_lots")
     .select(
@@ -209,16 +213,12 @@ export async function getMaterialLotByBarcode(
       location:nursery_locations(id, name)
     `
     )
+    .eq("org_id", orgId)
     .eq("lot_barcode", barcode)
     .single();
 
   if (error && error.code !== "PGRST116") {
     throw new Error(`Failed to fetch material lot: ${error.message}`);
-  }
-
-  // Verify org ownership
-  if (data && data.org_id !== orgId) {
-    return null;
   }
 
   return data ? (mapMaterialLot(data) as MaterialLotWithMaterial) : null;
@@ -289,7 +289,7 @@ export async function receiveMaterialLots(
       throw new Error(`Failed to create lot: ${lotError.message}`);
     }
 
-    // Create receive transaction
+    // Create receive transaction - must succeed for data integrity
     const { error: txnError } = await supabase
       .from("material_lot_transactions")
       .insert({
@@ -306,10 +306,12 @@ export async function receiveMaterialLots(
       });
 
     if (txnError) {
-      console.error("Failed to create lot transaction:", txnError);
+      // Rollback: delete the orphaned lot record
+      await supabase.from("material_lots").delete().eq("id", lot.id);
+      throw new Error(`Failed to create lot transaction: ${txnError.message}`);
     }
 
-    // Also update aggregate material_stock
+    // Also update aggregate material_stock - must succeed for data integrity
     const { error: stockError } = await supabase
       .from("material_transactions")
       .insert({
@@ -325,7 +327,10 @@ export async function receiveMaterialLots(
       });
 
     if (stockError) {
-      console.error("Failed to update aggregate stock:", stockError);
+      // Rollback: delete lot transaction and lot record
+      await supabase.from("material_lot_transactions").delete().eq("lot_id", lot.id);
+      await supabase.from("material_lots").delete().eq("id", lot.id);
+      throw new Error(`Failed to update aggregate stock: ${stockError.message}`);
     }
 
     createdLots.push(mapMaterialLot(lot));

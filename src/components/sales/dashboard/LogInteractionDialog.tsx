@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { format, addDays } from 'date-fns';
 import { emitMutation } from '@/lib/events/mutation-events';
 import {
   Dialog,
@@ -13,6 +14,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -20,9 +23,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { logInteraction } from '@/app/sales/actions';
+import { createFollowUpAction } from '@/app/sales/customers/actions';
 import { toast } from 'sonner';
-import { Phone, Mail, MapPin, MessageCircle, MoreHorizontal } from 'lucide-react';
+import { Phone, Mail, MapPin, MessageCircle, MoreHorizontal, ChevronDown, CalendarClock } from 'lucide-react';
 
 interface LogInteractionDialogProps {
   open: boolean;
@@ -61,29 +70,85 @@ export function LogInteractionDialog({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Follow-up state
+  const [scheduleFollowUp, setScheduleFollowUp] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [followUpTitle, setFollowUpTitle] = useState('');
+
+  // Auto-enable follow-up when outcome is "follow_up_needed"
+  const handleOutcomeChange = (value: string) => {
+    setOutcome(value);
+    if (value === 'follow_up_needed' && !scheduleFollowUp) {
+      setScheduleFollowUp(true);
+    }
+  };
+
+  // Generate default follow-up title from notes
+  const generateFollowUpTitle = () => {
+    if (followUpTitle) return followUpTitle;
+    const preview = notes.trim().slice(0, 50);
+    return preview ? `Follow up: ${preview}${notes.length > 50 ? '...' : ''}` : 'Follow up with customer';
+  };
+
+  const resetForm = () => {
+    setType('call');
+    setOutcome('');
+    setNotes('');
+    setScheduleFollowUp(false);
+    setFollowUpDate(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+    setFollowUpTitle('');
+  };
+
   const handleSubmit = async () => {
     if (!notes.trim()) {
       toast.error('Please add some notes about the interaction');
       return;
     }
 
+    if (scheduleFollowUp && !followUpDate) {
+      toast.error('Please select a follow-up date');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      // Log the interaction first
       const result = await logInteraction(customerId, type, notes, outcome || undefined);
       if (result.error) {
         toast.error(result.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create follow-up if scheduled
+      if (scheduleFollowUp) {
+        const followUpResult = await createFollowUpAction({
+          customerId,
+          dueDate: followUpDate,
+          title: generateFollowUpTitle(),
+          description: notes.trim(),
+          sourceInteractionId: result.interaction?.id || null,
+        });
+
+        if (followUpResult.error) {
+          toast.error(`Interaction logged, but failed to create follow-up: ${followUpResult.error}`);
+        } else {
+          toast.success('Interaction logged and follow-up scheduled');
+          if (followUpResult._mutated) {
+            emitMutation(followUpResult._mutated);
+          }
+        }
       } else {
         toast.success('Interaction logged successfully');
-        // Reset form
-        setType('call');
-        setOutcome('');
-        setNotes('');
-        onOpenChange(false);
-        // Emit mutation event for cache invalidation
-        if (result._mutated) {
-          emitMutation(result._mutated);
-        }
       }
+
+      // Emit mutation event for cache invalidation
+      if (result._mutated) {
+        emitMutation(result._mutated);
+      }
+
+      resetForm();
+      onOpenChange(false);
     } catch (error) {
       toast.error('Failed to log interaction');
     } finally {
@@ -129,7 +194,7 @@ export function LogInteractionDialog({
           {/* Outcome */}
           <div className="space-y-2">
             <Label>Outcome</Label>
-            <Select value={outcome} onValueChange={setOutcome}>
+            <Select value={outcome} onValueChange={handleOutcomeChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Select outcome..." />
               </SelectTrigger>
@@ -153,6 +218,50 @@ export function LogInteractionDialog({
               rows={4}
             />
           </div>
+
+          {/* Schedule Follow-Up Section */}
+          <Collapsible open={scheduleFollowUp} onOpenChange={setScheduleFollowUp}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Schedule Follow-Up</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={scheduleFollowUp}
+                    onCheckedChange={setScheduleFollowUp}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${scheduleFollowUp ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3 space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="followUpDate">Due Date</Label>
+                <Input
+                  id="followUpDate"
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="followUpTitle">Title (optional)</Label>
+                <Input
+                  id="followUpTitle"
+                  placeholder={generateFollowUpTitle()}
+                  value={followUpTitle}
+                  onChange={(e) => setFollowUpTitle(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to auto-generate from notes
+                </p>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
         <DialogFooter>
@@ -160,7 +269,7 @@ export function LogInteractionDialog({
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting || !notes.trim()}>
-            {isSubmitting ? 'Saving...' : 'Save Interaction'}
+            {isSubmitting ? 'Saving...' : scheduleFollowUp ? 'Save & Schedule' : 'Save Interaction'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -169,7 +278,3 @@ export function LogInteractionDialog({
 }
 
 export default LogInteractionDialog;
-
-
-
-

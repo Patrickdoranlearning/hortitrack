@@ -4,7 +4,7 @@ import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { PlantHealthEvent } from "@/lib/history-types";
-import { AlertTriangle, Bug, ExternalLink, MapPin, Calendar } from "lucide-react";
+import { AlertTriangle, Bug, ExternalLink, Calendar, Gauge } from "lucide-react";
 import Link from "next/link";
 
 // Severity badge styling
@@ -45,16 +45,31 @@ export function ScoutLogCard({ log, showBatchLink = false, compact = false }: Sc
   const severity = log.severity?.toLowerCase() || 'unknown';
   const severityStyle = SEVERITY_STYLES[severity] || SEVERITY_STYLES.low;
 
+  // Determine if this is a reading vs an issue
+  const isReading = log.ecReading != null || log.phReading != null;
+  const displayIcon = isReading ? Gauge : AlertTriangle;
+  const IconComponent = displayIcon;
+
   if (compact) {
     return (
       <div className="flex items-center gap-3 py-2 border-b last:border-b-0">
-        <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${severityStyle.iconColor}`} />
+        <IconComponent className={`h-4 w-4 flex-shrink-0 ${isReading ? 'text-blue-500' : severityStyle.iconColor}`} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-sm truncate">{log.title || log.issueType || 'Scout Observation'}</span>
-            <Badge variant={severityStyle.variant} className={`text-[10px] flex-shrink-0 ${severityStyle.className}`}>
-              {log.severity || 'Unknown'}
-            </Badge>
+            {isReading ? (
+              // Display readings prominently
+              <span className="font-medium text-sm">
+                {log.ecReading != null && <span className="mr-2">EC: {log.ecReading}</span>}
+                {log.phReading != null && <span>pH: {log.phReading}</span>}
+              </span>
+            ) : (
+              <>
+                <span className="font-medium text-sm truncate">{log.title || log.issueType || 'Scout Observation'}</span>
+                <Badge variant={severityStyle.variant} className={`text-[10px] flex-shrink-0 ${severityStyle.className}`}>
+                  {log.severity || 'Unknown'}
+                </Badge>
+              </>
+            )}
           </div>
           <div className="text-xs text-muted-foreground flex items-center gap-2">
             <span>{new Date(log.at).toLocaleDateString()}</span>
@@ -69,21 +84,46 @@ export function ScoutLogCard({ log, showBatchLink = false, compact = false }: Sc
     <Card className="p-4 bg-muted/30">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className={`p-2 rounded-full bg-white border ${severity === 'critical' || severity === 'high' ? 'border-red-200' : severity === 'medium' ? 'border-yellow-200' : 'border-green-200'}`}>
-            <AlertTriangle className={`h-4 w-4 ${severityStyle.iconColor}`} />
+          <div className={`p-2 rounded-full bg-white border ${isReading ? 'border-blue-200' : severity === 'critical' || severity === 'high' ? 'border-red-200' : severity === 'medium' ? 'border-yellow-200' : 'border-green-200'}`}>
+            <IconComponent className={`h-4 w-4 ${isReading ? 'text-blue-500' : severityStyle.iconColor}`} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium">{log.title || 'Scout Observation'}</span>
-              <Badge variant={severityStyle.variant} className={`text-xs ${severityStyle.className}`}>
-                {log.severity || 'Unknown'}
-              </Badge>
-            </div>
-            {log.issueType && log.issueType !== log.title && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
-                <Bug className="h-3 w-3" />
-                {log.issueType}
+            {isReading ? (
+              // Reading display - show EC/pH prominently
+              <div>
+                <span className="font-medium">Reading</span>
+                <div className="flex items-center gap-4 mt-1">
+                  {log.ecReading != null && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground text-sm">EC:</span>
+                      <span className="font-semibold text-lg">{log.ecReading}</span>
+                      <span className="text-xs text-muted-foreground">mS/cm</span>
+                    </div>
+                  )}
+                  {log.phReading != null && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground text-sm">pH:</span>
+                      <span className="font-semibold text-lg">{log.phReading}</span>
+                    </div>
+                  )}
+                </div>
               </div>
+            ) : (
+              // Issue display
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">{log.title || 'Scout Observation'}</span>
+                  <Badge variant={severityStyle.variant} className={`text-xs ${severityStyle.className}`}>
+                    {log.severity || 'Unknown'}
+                  </Badge>
+                </div>
+                {log.issueType && log.issueType !== log.title && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                    <Bug className="h-3 w-3" />
+                    {log.issueType}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

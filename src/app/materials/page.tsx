@@ -1,13 +1,40 @@
 'use client';
 
 import Link from 'next/link';
+import useSWR from 'swr';
 import { Package, PackagePlus, BarChart3, ShoppingCart, AlertTriangle, Boxes, ScanLine } from 'lucide-react';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { fetchJson } from '@/lib/http';
+
+type MaterialStats = {
+  totalMaterials: number;
+  lowStockCount: number;
+  openPOsCount: number;
+  totalStockValue: number;
+};
 
 export default function MaterialsPage() {
+  // Fetch materials stats
+  const { data: stats, isLoading, error } = useSWR<MaterialStats>(
+    '/api/materials/stats',
+    fetchJson,
+    {
+      refreshInterval: 60000, // Refresh every minute
+      revalidateOnFocus: true,
+    }
+  );
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-IE', {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(value);
+  };
+
   return (
     <PageFrame moduleKey="materials">
       <div className="space-y-6">
@@ -24,7 +51,13 @@ export default function MaterialsPage() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : error ? (
+                <div className="text-2xl font-bold text-muted-foreground">-</div>
+              ) : (
+                <div className="text-2xl font-bold">{stats?.totalMaterials ?? 0}</div>
+              )}
               <p className="text-xs text-muted-foreground">Active items in catalog</p>
             </CardContent>
           </Card>
@@ -35,7 +68,15 @@ export default function MaterialsPage() {
               <AlertTriangle className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600">-</div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : error ? (
+                <div className="text-2xl font-bold text-muted-foreground">-</div>
+              ) : (
+                <div className={`text-2xl font-bold ${(stats?.lowStockCount ?? 0) > 0 ? 'text-amber-600' : ''}`}>
+                  {stats?.lowStockCount ?? 0}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">Items below reorder point</p>
             </CardContent>
           </Card>
@@ -46,7 +87,13 @@ export default function MaterialsPage() {
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : error ? (
+                <div className="text-2xl font-bold text-muted-foreground">-</div>
+              ) : (
+                <div className="text-2xl font-bold">{stats?.openPOsCount ?? 0}</div>
+              )}
               <p className="text-xs text-muted-foreground">Awaiting delivery</p>
             </CardContent>
           </Card>
@@ -57,7 +104,13 @@ export default function MaterialsPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : error ? (
+                <div className="text-2xl font-bold text-muted-foreground">-</div>
+              ) : (
+                <div className="text-2xl font-bold">{formatCurrency(stats?.totalStockValue ?? 0)}</div>
+              )}
               <p className="text-xs text-muted-foreground">Total inventory value</p>
             </CardContent>
           </Card>
@@ -172,10 +225,26 @@ export default function MaterialsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No low stock alerts.</p>
-              <p className="text-sm">Materials will appear here when stock falls below reorder point.</p>
-            </div>
+            {isLoading ? (
+              <div className="py-4">
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            ) : (stats?.lowStockCount ?? 0) > 0 ? (
+              <div className="py-4">
+                <p className="text-amber-600 font-medium">
+                  {stats?.lowStockCount} item{(stats?.lowStockCount ?? 0) !== 1 ? 's' : ''} below reorder point.
+                </p>
+                <Button asChild variant="link" className="p-0 h-auto text-sm">
+                  <Link href="/materials/stock?filter=low-stock">View low stock items</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No low stock alerts.</p>
+                <p className="text-sm">Materials will appear here when stock falls below reorder point.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -8,6 +8,23 @@ import type {
 } from "@/lib/types/materials";
 import type { MaterialLot } from "@/lib/types/material-lots";
 import { logError } from "@/lib/log";
+import type { Json } from "@/types/supabase";
+
+// Type for PO line input to RPC function
+type POLineRpcInput = {
+  materialId: string;
+  quantityOrdered: number;
+  unitPrice: number;
+  discountPct?: number;
+  notes?: string;
+};
+
+// Type for receive goods line input to RPC function
+type ReceiveGoodsLineRpcInput = {
+  lineId: string;
+  quantityReceived: number;
+  notes?: string;
+};
 
 // ============================================================================
 // Purchase Order Queries
@@ -57,8 +74,10 @@ export async function listPurchaseOrders(
   }
 
   if (options?.search) {
+    // Sanitize search input to prevent SQL injection via special characters
+    const sanitizedSearch = options.search.replace(/[%_\\]/g, '\\$&');
     query = query.or(
-      `po_number.ilike.%${options.search}%,supplier_ref.ilike.%${options.search}%`
+      `po_number.ilike.%${sanitizedSearch}%,supplier_ref.ilike.%${sanitizedSearch}%`
     );
   }
 
@@ -159,7 +178,7 @@ export async function createPurchaseOrder(
     p_delivery_notes: input.deliveryNotes || null,
     p_supplier_ref: input.supplierRef || null,
     p_notes: input.notes || null,
-    p_lines: input.lines as any
+    p_lines: input.lines as unknown as Json
   });
 
   if (rpcError) {
@@ -320,7 +339,7 @@ export async function receiveGoods(
     p_org_id: orgId,
     p_user_id: userId,
     p_po_id: poId,
-    p_lines: input.lines as any,
+    p_lines: input.lines as unknown as Json,
     p_location_id: input.locationId || null,
     p_notes: input.notes || null
   });

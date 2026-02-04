@@ -47,10 +47,21 @@
 
 ## Workflow
 
-### Planning
-- Use `/plan` for architecture and design work
-- Output plans to `PLAN.md` with P0/P1/P2 priorities
-- Track progress in `REVIEW-STATUS.md`
+### Plan-First Development (CRITICAL)
+**Every non-trivial task should have a plan.** Plans prevent lost context.
+
+- Plans live in `.claude/plans/`
+- Completed plans archived to `.claude/plans/completed/`
+- Use `jimmy dual-plan [X]` for complex features (RECOMMENDED)
+- Use `jimmy plan [X]` for standard features
+- Even smaller tasks get mini-plans via `jimmy new [X]` or `jimmy bugfix [X]`
+
+### Dual-Plan (Recommended for Complex Features)
+```
+jimmy dual-plan [feature]
+jimmy dual-plan [feature] --perspectives "MVP speed" "proper architecture"
+```
+Runs two planners with different perspectives, then synthesizes the best approach.
 
 ### Module Reviews
 - One module at a time
@@ -68,7 +79,8 @@
 | File | Purpose |
 |------|---------|
 | `FEATURES.md` | Source of truth for feature behavior (Tester Tim validates against this) |
-| `PLAN.md` | Current production readiness plan |
+| `.claude/plans/` | All active implementation plans |
+| `.claude/plans/completed/` | Archive of completed plans |
 | `REVIEW-STATUS.md` | Module review progress tracker |
 | `STATUS.md` | Session context handoff |
 | `.claude/agents/` | Specialized agent definitions |
@@ -105,59 +117,80 @@ Available agents in `.claude/agents/`:
 - `ui-comprehensive-tester` - Thorough UI testing and validation
 
 ### Jimmy Quick Commands
+
+Commands organized by intent:
+
 ```
-jimmy quick fix      # Fix → verifier only
-jimmy fix this       # Medic Pipeline (debug → fix → verify)
-jimmy build [X]      # Feature Flow Pipeline
-jimmy schema [X]     # Schema Pipeline (mandatory for DB)
-jimmy plan [X]       # Explore → planner → produces PLAN.md
-jimmy dual-plan [X]  # Two planners in parallel, synthesize best plan
-jimmy execute PLAN.md           # Execute plan (standard mode)
-jimmy execute PLAN.md --mode X  # Execute with specific mode
-jimmy plan status    # Show plan progress
-jimmy test [X]       # Tester Tim validates against FEATURES.md
-jimmy test all       # Full regression test
-jimmy review         # module-reviewer → security-auditor
-jimmy pre-merge      # Shield Pipeline
-jimmy ship it        # Shield Pipeline → sync
-jimmy status         # Session state summary
-jimmy wrap up        # validator → karen → sync
-jimmy paranoid [X]   # Full audit mode
+# === BUILDING ===
+jimmy new [X]        # Full feature: plan → build → test → review (5-6 agents)
+jimmy add [X]        # Quick add: build → verify → test (3-4 agents)
+jimmy feature [X]    # Complete lifecycle with max parallelism (8-10 agents)
+
+# === FIXING ===
+jimmy fix [X]        # Standard: explore → fix → verify → test
+jimmy hotfix [X]     # Urgent: fix → verify → ship (parallel)
+jimmy debug [X]      # Deep investigation: ultrathink + explore parallel
+jimmy bugfix [X]     # Complete lifecycle: investigate → fix → validate
+
+# === REVIEWING ===
+jimmy check          # Quick: 2 reviewers parallel
+jimmy audit          # Full: ALL 4 reviewers parallel
+jimmy turbo review   # Fast: 3 reviewers parallel
+
+# === SHIPPING ===
+jimmy ready          # Pre-merge: verifier → 3 reviewers parallel
+jimmy ship           # Full ship pipeline → sync
+jimmy release        # Maximum validation for releases
+
+# === PLANNING ===
+jimmy plan [X]       # Explore → planner → PLAN.md
+jimmy turbo plan [X] # 3 parallel explores → planner (faster!)
+jimmy dual-plan [X]  # 2 competing plans → synthesize best
+jimmy execute PLAN.md           # Run the plan
+jimmy execute PLAN.md --mode X  # thorough | paranoid
+
+# === MANAGING ===
+jimmy status         # Session summary
+jimmy pending        # Uncommitted changes, TODOs
+jimmy wrap up        # Validate → sync
+jimmy continue       # Resume from STATUS.md
+
+# === SPECIAL ===
+jimmy auto [task]    # Auto-detect workflow from description
+jimmy schema [X]     # DB changes (paranoid mode)
+jimmy test [X]       # Validate against FEATURES.md
+jimmy paranoid [X]   # Maximum caution mode
 ```
 
 ### Usage Examples
 ```
-# Plan a complex feature (explores codebase first, then creates PLAN.md)
-Ask: "jimmy plan customer-reporting-dashboard"
+# Complete feature lifecycle (8-10 agents, heavily parallelized)
+jimmy feature customer-portal
 
-# Get two competing plans and pick the best approach
-Ask: "jimmy dual-plan inventory-tracking"
-Ask: "jimmy dual-plan reports --perspectives 'MVP speed' 'proper architecture'"
+# Quick addition to existing functionality
+jimmy add export-button-to-reports
 
-# Execute the plan
-Ask: "jimmy execute PLAN.md"
+# Bug fix with full investigation
+jimmy bugfix order-total-not-calculating
 
-# Test a feature against FEATURES.md specifications
-Ask: "jimmy test batch-management"
-Ask: "jimmy test all"  # Full regression
+# Urgent production fix
+jimmy hotfix auth-session-expired
 
-# Deep debugging a tricky issue
-Ask: "Use the ultrathink-debugger to investigate why orders aren't saving"
+# Full audit before release (4 reviewers in parallel)
+jimmy audit
 
-# Reality check on claimed completion
-Ask: "Use karen to assess the actual state of the auth implementation"
+# Ready to ship
+jimmy ship
 
-# Validate a feature is truly complete
-Ask: "Use task-completion-validator to verify the batch creation feature"
+# Let Jimmy figure out what to do
+jimmy auto: users can't see their order history
 
-# Review for over-engineering
-Ask: "Use code-quality-pragmatist to review the inventory module"
+# Deep debugging
+jimmy debug intermittent-order-failures
 
-# Systematic UI testing
-Ask: "Use ui-comprehensive-tester to test the sales order wizard"
+# Database changes (always paranoid mode)
+jimmy schema add-customer-notes
 
-# Use Jimmy to coordinate
-Ask: "jimmy build new-trials-feature"
-Ask: "jimmy schema add-customer-notes"
-Ask: "jimmy pre-merge"
+# Two competing plans
+jimmy dual-plan reports --perspectives "MVP speed" "proper architecture"
 ```

@@ -39,7 +39,7 @@ export const APP_NAV: NavItem[] = [
     items: [
       { label: "Dashboard", href: "/plant-health", description: "Upcoming treatments and active programs." },
       { label: "IPM Tasks", href: "/plant-health/tasks", description: "Spray schedules grouped by product and week." },
-      { label: "Scout Mode", href: "/plant-health/scout", description: "Scan locations to log issues and readings." },
+      { label: "Scout Mode", href: "/plant-health/scout", description: "Log observations: issues and readings (EC/pH)." },
       { label: "Trials", href: "/plant-health/trials", description: "Scientific trials to compare treatments and processes." },
       { label: "IPM Products", href: "/plant-health/products", description: "Manage IPM product database." },
       { label: "IPM Programs", href: "/plant-health/programs", description: "Create week-based treatment programs." },

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getISOWeek, getYear } from "date-fns";
-import type { CustomerOrder, FavouriteProduct, LastOrderWeek, CustomerStats } from "./types";
+import type { CustomerOrder, FavouriteProduct, LastOrderWeek, CustomerStats, CustomerInteraction, ExtendedCustomerStats } from "./types";
+import { differenceInDays, subMonths, format, startOfMonth } from "date-fns";
 import type { CustomerSummary } from "../types";
 
 /**
@@ -31,6 +32,9 @@ export async function fetchCustomerDetail(
       accounts_email,
       pricing_tier,
       created_at,
+      requires_pre_pricing,
+      pre_pricing_foc,
+      pre_pricing_cost_per_label,
       customer_addresses (
         id,
         label,
@@ -159,6 +163,9 @@ export async function fetchCustomerDetail(
     })),
     orderCount: 0, // Will be computed separately
     aliasCount: 0, // Will be computed separately
+    requiresPrePricing: customer.requires_pre_pricing ?? false,
+    prePricingFoc: customer.pre_pricing_foc ?? false,
+    prePricingCostPerLabel: customer.pre_pricing_cost_per_label ?? null,
   };
 }
 
@@ -356,5 +363,133 @@ export function computeCustomerStats(orders: CustomerOrder[]): CustomerStats {
     totalOrders,
     totalRevenue,
     averageOrderValue,
+  };
+}
+
+/**
+ * Compute extended customer statistics including order patterns
+ */
+export function computeExtendedCustomerStats(orders: CustomerOrder[]): ExtendedCustomerStats {
+  const baseStats = computeCustomerStats(orders);
+  const now = new Date();
+
+  // Days since last order
+  let daysSinceLastOrder: number | null = null;
+  if (orders.length > 0) {
+    const lastOrderDate = new Date(orders[0].createdAt);
+    daysSinceLastOrder = differenceInDays(now, lastOrderDate);
+  }
+
+  // Average days between orders
+  let averageDaysBetweenOrders: number | null = null;
+  if (orders.length >= 2) {
+    const sortedOrders = [...orders].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    let totalDays = 0;
+    for (let i = 1; i < sortedOrders.length; i++) {
+      const daysBetween = differenceInDays(
+        new Date(sortedOrders[i].createdAt),
+        new Date(sortedOrders[i - 1].createdAt)
+      );
+      totalDays += daysBetween;
+    }
+    averageDaysBetweenOrders = Math.round(totalDays / (sortedOrders.length - 1));
+  }
+
+  // Orders in last 12 months
+  const twelveMonthsAgo = subMonths(now, 12);
+  const ordersLast12Months = orders.filter(
+    (o) => new Date(o.createdAt) >= twelveMonthsAgo
+  ).length;
+
+  // Orders by month (last 12 months)
+  const ordersByMonth: Array<{ month: string; count: number }> = [];
+  for (let i = 11; i >= 0; i--) {
+    const monthStart = startOfMonth(subMonths(now, i));
+    const monthLabel = format(monthStart, 'MMM');
+    const monthOrders = orders.filter((o) => {
+      const orderDate = new Date(o.createdAt);
+      const orderMonth = startOfMonth(orderDate);
+      return orderMonth.getTime() === monthStart.getTime();
+    });
+    ordersByMonth.push({ month: monthLabel, count: monthOrders.length });
+  }
+
+  // Health status
+  let healthStatus: 'active' | 'at_risk' | 'churning' | 'new';
+  if (orders.length === 0) {
+    healthStatus = 'new';
+  } else if (daysSinceLastOrder !== null) {
+    if (daysSinceLastOrder <= 42) {
+      // 6 weeks
+      healthStatus = 'active';
+    } else if (daysSinceLastOrder <= 84) {
+      // 12 weeks
+      healthStatus = 'at_risk';
+    } else {
+      healthStatus = 'churning';
+    }
+  } else {
+    healthStatus = 'new';
+  }
+
+  return {
+    ...baseStats,
+    averageDaysBetweenOrders,
+    ordersLast12Months,
+    ordersByMonth,
+    daysSinceLastOrder,
+    healthStatus,
+  };
+}
+
+/**
+ * Fetch customer interactions with user display names
+ * Returns interactions sorted by created_at DESC with pagination support
+ */
+export async function fetchCustomerInteractions(
+  supabase: SupabaseClient,
+  customerId: string,
+  limit = 50,
+  offset = 0
+): Promise<{ interactions: CustomerInteraction[]; hasMore: boolean }> {
+  const { data: interactions, error } = await supabase
+    .from("customer_interactions")
+    .select(`
+      id,
+      type,
+      notes,
+      outcome,
+      created_at,
+      user_id,
+      profiles:user_id (
+        display_name,
+        email
+      )
+    `)
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit);
+
+  if (error) {
+    console.error("Error fetching customer interactions:", error.message);
+    return { interactions: [], hasMore: false };
+  }
+
+  const mapped: CustomerInteraction[] = (interactions ?? []).map((row: any) => ({
+    id: row.id,
+    type: row.type,
+    notes: row.notes,
+    outcome: row.outcome,
+    createdAt: row.created_at,
+    userId: row.user_id,
+    userName: row.profiles?.display_name ?? null,
+    userEmail: row.profiles?.email ?? null,
+  }));
+
+  return {
+    interactions: mapped,
+    hasMore: mapped.length > limit,
   };
 }
