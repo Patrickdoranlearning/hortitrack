@@ -474,11 +474,11 @@ export function BatchDetailDialog({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setHealthLogDialogOpen(true)}
+                      onClick={() => setIsWizardOpen(true)}
                       className="text-emerald-600 hover:text-emerald-700"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Log Event
+                      <ClipboardList className="h-4 w-4 mr-1" />
+                      Log Action
                     </Button>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
@@ -518,7 +518,7 @@ export function BatchDetailDialog({
                       </div>
                     )}
                     {!scoutLoading && scoutLogs.length > 0 && (
-                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                      <div className="max-h-80 overflow-y-auto">
                         {scoutLogs.map((log) => (
                           <ScoutLogCard key={log.id} log={log} compact />
                         ))}

@@ -18,7 +18,7 @@ export type OperationalActionCategory = 'care' | 'operation' | 'log';
  * Simple care actions - no compliance burden
  * These are day-to-day maintenance activities
  */
-export type CareActionType = 'pruning' | 'weeding';
+export type CareActionType = 'pruning' | 'weeding' | 'spacing';
 
 /**
  * Batch operation actions - inventory/location changes
@@ -165,6 +165,12 @@ export const ACTION_META: Record<OperationalActionType, {
     icon: 'Leaf',
     category: 'care',
     description: 'Weed and tidy batch',
+  },
+  spacing: {
+    label: 'Spacing',
+    icon: 'Maximize2',
+    category: 'care',
+    description: 'Space out plants',
   },
   // Operation actions
   move: {

@@ -277,8 +277,8 @@ export function BatchCard({
               saleableQuantity: (batch as any)?.saleableQuantity ?? 0,
             }}
             onSuccess={() => {
-              // Parent can handle refresh if needed
-              onLogAction?.(batch);
+              // Wizard handles success toast internally
+              // Don't call onLogAction here - it opens the ActionDialog
             }}
           />
         )}

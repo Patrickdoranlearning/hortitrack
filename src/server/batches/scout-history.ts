@@ -48,7 +48,7 @@ export async function getBatchScoutHistory(
       )
     `)
     .eq('org_id', orgId)
-    .eq('event_type', 'scout_flag')
+    .in('event_type', ['scout_flag', 'measurement'])
     .or(`batch_id.eq.${batchId},affected_batch_ids.cs.{${batchId}}`)
     .order('event_at', { ascending: false });
 
@@ -65,11 +65,13 @@ export async function getBatchScoutHistory(
     batchNumber: row.batches?.batch_number,
     varietyName: row.batches?.plant_varieties?.name,
     at: row.event_at,
-    type: row.event_type as 'scout_flag',
-    title: row.title || row.issue_reason || 'Scout Observation',
+    type: row.event_type as 'scout_flag' | 'measurement',
+    title: row.title || row.issue_reason || (row.event_type === 'measurement' ? 'Reading' : 'Scout Observation'),
     details: row.notes,
     severity: row.severity,
     issueType: row.issue_reason,
+    ecReading: row.ec_reading,
+    phReading: row.ph_reading,
     photos: row.photo_url ? [row.photo_url] : undefined,
     userId: row.recorded_by,
     userName: undefined, // FK is to auth.users, not profiles - would need migration to fix

@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logBatchMove } from '@/app/actions/log-batch-action';
+import { logBatchHealthEvent } from '@/app/actions/batch-health';
 
 // ============================================================================
 // Types
@@ -148,6 +149,14 @@ export function MoveForm({
       });
 
       if (result.success) {
+        // Log spacing as a separate care event if enabled
+        if (values.spaced) {
+          await logBatchHealthEvent({
+            batchId,
+            eventType: 'spacing',
+            notes: 'Plants were spaced after move',
+          });
+        }
         onComplete();
       } else {
         toast.error('Failed to move batch', {

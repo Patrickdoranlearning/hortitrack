@@ -52,28 +52,38 @@ export function ScoutLogCard({ log, showBatchLink = false, compact = false }: Sc
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 py-2 border-b last:border-b-0">
-        <IconComponent className={`h-4 w-4 flex-shrink-0 ${isReading ? 'text-blue-500' : severityStyle.iconColor}`} />
+      <div className="flex items-start gap-3 py-3 px-3 border rounded-lg bg-muted/20 mb-2">
+        <div className={`p-1.5 rounded-full ${isReading ? 'bg-blue-100' : 'bg-orange-100'}`}>
+          <IconComponent className={`h-4 w-4 flex-shrink-0 ${isReading ? 'text-blue-600' : severityStyle.iconColor}`} />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
             {isReading ? (
               // Display readings prominently
               <span className="font-medium text-sm">
-                {log.ecReading != null && <span className="mr-2">EC: {log.ecReading}</span>}
-                {log.phReading != null && <span>pH: {log.phReading}</span>}
+                {log.ecReading != null && <span className="mr-3">EC: <strong>{log.ecReading}</strong> mS/cm</span>}
+                {log.phReading != null && <span>pH: <strong>{log.phReading}</strong></span>}
               </span>
             ) : (
-              <>
+              <div className="flex items-center gap-2">
                 <span className="font-medium text-sm truncate">{log.title || log.issueType || 'Scout Observation'}</span>
                 <Badge variant={severityStyle.variant} className={`text-[10px] flex-shrink-0 ${severityStyle.className}`}>
                   {log.severity || 'Unknown'}
                 </Badge>
-              </>
+              </div>
             )}
           </div>
-          <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <span>{new Date(log.at).toLocaleDateString()}</span>
-            {log.userName && <span>by {log.userName}</span>}
+          {log.details && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{log.details}</p>
+          )}
+          <div className="flex items-center gap-3 mt-2 text-xs">
+            <span className="flex items-center gap-1 font-medium text-foreground">
+              <Calendar className="h-3 w-3" />
+              {new Date(log.at).toLocaleDateString()} {new Date(log.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            {log.userName && (
+              <span className="text-muted-foreground">by {log.userName}</span>
+            )}
           </div>
         </div>
       </div>

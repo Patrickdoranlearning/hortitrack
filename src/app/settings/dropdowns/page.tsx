@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Move, PlusCircle, RefreshCw, Save, Palette } from "lucide-react";
+import { Move, PlusCircle, RefreshCw, Save, Palette, Bug, Leaf, Droplets, AlertCircle } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/attributeOptions";
 import { useAttributeOptions } from "@/hooks/useAttributeOptions";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 type EditableOption = AttributeOptionInput & { attributeKey: AttributeKey; source?: "custom" | "default"; localId?: string; category?: string | null };
 
@@ -52,6 +53,42 @@ const COLOR_PRESETS = [
   { color: "#0ea5e9", label: "Sky" },
   { color: "#a855f7", label: "Violet" },
 ];
+
+// Category styling for plant health issues
+const CATEGORY_STYLES: Record<string, {
+  icon: React.ReactNode;
+  className: string;
+  activeClassName: string;
+}> = {
+  Disease: {
+    icon: <AlertCircle className="h-3.5 w-3.5" />,
+    className: 'border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20',
+    activeClassName: 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/40 dark:border-red-700 dark:text-red-300',
+  },
+  Pest: {
+    icon: <Bug className="h-3.5 w-3.5" />,
+    className: 'border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20',
+    activeClassName: 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-300',
+  },
+  Cultural: {
+    icon: <Droplets className="h-3.5 w-3.5" />,
+    className: 'border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20',
+    activeClassName: 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/40 dark:border-blue-700 dark:text-blue-300',
+  },
+  Nutrition: {
+    icon: <Leaf className="h-3.5 w-3.5" />,
+    className: 'border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20',
+    activeClassName: 'bg-green-100 border-green-300 text-green-800 dark:bg-green-900/40 dark:border-green-700 dark:text-green-300',
+  },
+};
+
+function getCategoryStyle(category: string | null | undefined) {
+  return CATEGORY_STYLES[category ?? ''] ?? {
+    icon: null,
+    className: 'border-muted text-muted-foreground',
+    activeClassName: 'bg-muted border-muted-foreground/30',
+  };
+}
 
 export default function DropdownManagerPage() {
   const [selectedKey, setSelectedKey] = React.useState<AttributeKey>("production_status");
@@ -250,7 +287,21 @@ export default function DropdownManagerPage() {
                             <div className="text-xs text-muted-foreground">#{idx + 1}</div>
                           </div>
                           <div className="flex-1 space-y-1">
-                            <Label className="text-xs text-muted-foreground">Display label</Label>
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">Display label</Label>
+                              {meta.allowCategory && opt.category && (() => {
+                                const style = getCategoryStyle(opt.category);
+                                return (
+                                  <span className={cn(
+                                    "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border",
+                                    style.activeClassName
+                                  )}>
+                                    {style.icon}
+                                    {opt.category}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             <Input
                               value={opt.displayLabel}
                               onChange={(e) => {
@@ -388,27 +439,32 @@ export default function DropdownManagerPage() {
                         )}
                         {meta.allowCategory && meta.categoryOptions && (
                           <div className="mt-3">
-                            <Label className="text-xs text-muted-foreground">Category</Label>
-                            <Select
-                              value={opt.category ?? ""}
-                              onValueChange={(val) => {
-                                const next = [...items];
-                                next[idx] = { ...opt, category: val || null };
-                                setItems(next);
-                                setDirty(true);
-                              }}
-                            >
-                              <SelectTrigger className="w-full md:w-64 mt-1">
-                                <SelectValue placeholder="Choose category" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {meta.categoryOptions.map((cat) => (
-                                  <SelectItem key={cat} value={cat}>
+                            <Label className="text-xs text-muted-foreground mb-2 block">Category</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {meta.categoryOptions.map((cat) => {
+                                const style = getCategoryStyle(cat);
+                                const isActive = opt.category === cat;
+                                return (
+                                  <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => {
+                                      const next = [...items];
+                                      next[idx] = { ...opt, category: cat };
+                                      setItems(next);
+                                      setDirty(true);
+                                    }}
+                                    className={cn(
+                                      "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border transition-colors",
+                                      isActive ? style.activeClassName : style.className
+                                    )}
+                                  >
+                                    {style.icon}
                                     {cat}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>

@@ -36,8 +36,16 @@ export type AttributeOptionInput = Omit<AttributeOption, "id" | "attributeKey" |
 type DefaultOption = Omit<AttributeOption, "id" | "attributeKey" | "source">;
 
 // Category options for plant_health_issue
-export const PLANT_HEALTH_CATEGORIES = ["Pest", "Disease", "Environmental"] as const;
+export const PLANT_HEALTH_CATEGORIES = ["Disease", "Pest", "Cultural", "Nutrition"] as const;
 export type PlantHealthCategory = typeof PLANT_HEALTH_CATEGORIES[number];
+
+// Category display configuration (colors for UI)
+export const PLANT_HEALTH_CATEGORY_CONFIG: Record<PlantHealthCategory, { color: string; bgColor: string; icon: string }> = {
+  Disease: { color: "text-red-700", bgColor: "bg-red-100", icon: "virus" },
+  Pest: { color: "text-amber-700", bgColor: "bg-amber-100", icon: "bug" },
+  Cultural: { color: "text-blue-700", bgColor: "bg-blue-100", icon: "droplets" },
+  Nutrition: { color: "text-green-700", bgColor: "bg-green-100", icon: "leaf" },
+};
 
 export const ATTRIBUTE_META: Record<
   AttributeKey,
@@ -86,7 +94,7 @@ export const ATTRIBUTE_META: Record<
     description: "Common pest and disease issues for scouting and IPM logging.",
     allowColor: true,
     allowCategory: true,
-    categoryOptions: ["Pest", "Disease", "Environmental"],
+    categoryOptions: ["Disease", "Pest", "Cultural", "Nutrition"],
   },
   sprayer_used: {
     label: "Sprayers",
@@ -155,27 +163,41 @@ const DEFAULTS: Record<AttributeKey, DefaultOption[]> = {
     { systemCode: "SOUTH", displayLabel: "South", sortOrder: 60, isActive: true },
   ],
   plant_health_issue: [
-    // Pests
-    { systemCode: "APHIDS", displayLabel: "Aphids", sortOrder: 10, isActive: true, category: "Pest" },
-    { systemCode: "VINE_WEEVIL", displayLabel: "Vine Weevil", sortOrder: 20, isActive: true, category: "Pest" },
-    { systemCode: "SPIDER_MITES", displayLabel: "Spider Mites", sortOrder: 30, isActive: true, category: "Pest" },
-    { systemCode: "WHITEFLY", displayLabel: "Whitefly", sortOrder: 40, isActive: true, category: "Pest" },
-    { systemCode: "THRIPS", displayLabel: "Thrips", sortOrder: 50, isActive: true, category: "Pest" },
-    { systemCode: "SLUG_DAMAGE", displayLabel: "Slug/Snail Damage", sortOrder: 60, isActive: true, category: "Pest" },
-    { systemCode: "CATERPILLAR", displayLabel: "Caterpillar Damage", sortOrder: 70, isActive: true, category: "Pest" },
-    { systemCode: "SCALE_INSECTS", displayLabel: "Scale Insects", sortOrder: 80, isActive: true, category: "Pest" },
-    { systemCode: "MEALYBUG", displayLabel: "Mealybug", sortOrder: 90, isActive: true, category: "Pest" },
-    // Diseases
-    { systemCode: "FUNGAL_INFECTION", displayLabel: "Fungal Infection", sortOrder: 100, isActive: true, category: "Disease" },
-    { systemCode: "POWDERY_MILDEW", displayLabel: "Powdery Mildew", sortOrder: 110, isActive: true, category: "Disease" },
-    { systemCode: "DOWNY_MILDEW", displayLabel: "Downy Mildew", sortOrder: 120, isActive: true, category: "Disease" },
-    { systemCode: "ROOT_ROT", displayLabel: "Root Rot", sortOrder: 130, isActive: true, category: "Disease" },
-    { systemCode: "BOTRYTIS", displayLabel: "Botrytis", sortOrder: 140, isActive: true, category: "Disease" },
-    { systemCode: "RUST", displayLabel: "Rust", sortOrder: 150, isActive: true, category: "Disease" },
-    // Environmental
-    { systemCode: "NUTRIENT_DEFICIENCY", displayLabel: "Nutrient Deficiency", sortOrder: 200, isActive: true, category: "Environmental" },
-    { systemCode: "OVERWATERING", displayLabel: "Overwatering", sortOrder: 210, isActive: true, category: "Environmental" },
-    { systemCode: "UNDERWATERING", displayLabel: "Underwatering", sortOrder: 220, isActive: true, category: "Environmental" },
+    // Disease (fungal, bacterial, viral)
+    { systemCode: "POWDERY_MILDEW", displayLabel: "Powdery Mildew", sortOrder: 10, isActive: true, category: "Disease" },
+    { systemCode: "DOWNY_MILDEW", displayLabel: "Downy Mildew", sortOrder: 20, isActive: true, category: "Disease" },
+    { systemCode: "BOTRYTIS", displayLabel: "Botrytis (Grey Mould)", sortOrder: 30, isActive: true, category: "Disease" },
+    { systemCode: "ROOT_ROT", displayLabel: "Root Rot", sortOrder: 40, isActive: true, category: "Disease" },
+    { systemCode: "RUST", displayLabel: "Rust", sortOrder: 50, isActive: true, category: "Disease" },
+    { systemCode: "FUNGAL_INFECTION", displayLabel: "Fungal Infection (Other)", sortOrder: 60, isActive: true, category: "Disease" },
+    { systemCode: "BACTERIAL_INFECTION", displayLabel: "Bacterial Infection", sortOrder: 70, isActive: true, category: "Disease" },
+    // Pest (insects, mites, mollusks)
+    { systemCode: "APHIDS", displayLabel: "Aphids", sortOrder: 100, isActive: true, category: "Pest" },
+    { systemCode: "WHITEFLY", displayLabel: "Whitefly", sortOrder: 110, isActive: true, category: "Pest" },
+    { systemCode: "THRIPS", displayLabel: "Thrips", sortOrder: 120, isActive: true, category: "Pest" },
+    { systemCode: "SPIDER_MITES", displayLabel: "Spider Mites", sortOrder: 130, isActive: true, category: "Pest" },
+    { systemCode: "VINE_WEEVIL", displayLabel: "Vine Weevil", sortOrder: 140, isActive: true, category: "Pest" },
+    { systemCode: "SCALE_INSECTS", displayLabel: "Scale Insects", sortOrder: 150, isActive: true, category: "Pest" },
+    { systemCode: "MEALYBUG", displayLabel: "Mealybug", sortOrder: 160, isActive: true, category: "Pest" },
+    { systemCode: "CATERPILLAR", displayLabel: "Caterpillar Damage", sortOrder: 170, isActive: true, category: "Pest" },
+    { systemCode: "SLUG_DAMAGE", displayLabel: "Slug/Snail Damage", sortOrder: 180, isActive: true, category: "Pest" },
+    { systemCode: "SCIARID_FLY", displayLabel: "Sciarid Fly (Fungus Gnat)", sortOrder: 190, isActive: true, category: "Pest" },
+    // Cultural (environmental/physical damage)
+    { systemCode: "OVERWATERING", displayLabel: "Overwatering", sortOrder: 200, isActive: true, category: "Cultural" },
+    { systemCode: "UNDERWATERING", displayLabel: "Underwatering / Drought Stress", sortOrder: 210, isActive: true, category: "Cultural" },
+    { systemCode: "HEAT_STRESS", displayLabel: "Heat Stress", sortOrder: 220, isActive: true, category: "Cultural" },
+    { systemCode: "COLD_DAMAGE", displayLabel: "Cold/Frost Damage", sortOrder: 230, isActive: true, category: "Cultural" },
+    { systemCode: "SUNBURN", displayLabel: "Sunburn / Scorch", sortOrder: 240, isActive: true, category: "Cultural" },
+    { systemCode: "PHYSICAL_DAMAGE", displayLabel: "Physical Damage", sortOrder: 250, isActive: true, category: "Cultural" },
+    { systemCode: "POOR_DRAINAGE", displayLabel: "Poor Drainage", sortOrder: 260, isActive: true, category: "Cultural" },
+    // Nutrition (deficiencies and toxicities)
+    { systemCode: "NITROGEN_DEFICIENCY", displayLabel: "Nitrogen Deficiency", sortOrder: 300, isActive: true, category: "Nutrition" },
+    { systemCode: "IRON_CHLOROSIS", displayLabel: "Iron Chlorosis", sortOrder: 310, isActive: true, category: "Nutrition" },
+    { systemCode: "MAGNESIUM_DEFICIENCY", displayLabel: "Magnesium Deficiency", sortOrder: 320, isActive: true, category: "Nutrition" },
+    { systemCode: "POTASSIUM_DEFICIENCY", displayLabel: "Potassium Deficiency", sortOrder: 330, isActive: true, category: "Nutrition" },
+    { systemCode: "CALCIUM_DEFICIENCY", displayLabel: "Calcium Deficiency", sortOrder: 340, isActive: true, category: "Nutrition" },
+    { systemCode: "NUTRIENT_BURN", displayLabel: "Nutrient Burn (Over-fertilisation)", sortOrder: 350, isActive: true, category: "Nutrition" },
+    { systemCode: "PH_IMBALANCE", displayLabel: "pH Imbalance", sortOrder: 360, isActive: true, category: "Nutrition" },
   ],
   sprayer_used: [
     { systemCode: "KNAPSACK_1", displayLabel: "Knapsack #1", sortOrder: 10, isActive: true },

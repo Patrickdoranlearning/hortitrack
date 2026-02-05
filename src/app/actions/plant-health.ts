@@ -158,6 +158,7 @@ export type TreatmentInput = {
 
 export type MeasurementInput = {
   locationId: string;
+  batchId?: string;
   ec?: number;
   ph?: number;
   notes?: string;
@@ -319,7 +320,7 @@ export async function logMeasurement(
     const { data, error } = await supabase.from('plant_health_logs').insert({
       org_id: orgId,
       location_id: input.locationId,
-      batch_id: null,
+      batch_id: input.batchId || null,
       event_type: 'measurement' as const,
       ec_reading: input.ec,
       ph_reading: input.ph,
@@ -483,6 +484,7 @@ export async function createScoutLog(
       // Reading log - already validated that at least one measurement exists
       return logMeasurement({
         locationId,
+        batchId: input.batchId,
         ec: input.ec,
         ph: input.ph,
         notes: input.notes,

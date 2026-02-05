@@ -14,8 +14,10 @@ export type BatchHealthEventType =
   | 'fertilizer'
   | 'irrigation'
   | 'pruning'
+  | 'weeding'
   | 'grading'
-  | 'measurement';
+  | 'measurement'
+  | 'spacing';
 
 export type BatchHealthEventInput = {
   batchId: string;
@@ -66,9 +68,13 @@ function mapEventTypeToDbEnum(eventType: BatchHealthEventType): string {
       // Irrigation stored as treatment with method='irrigation'
       return 'treatment';
     case 'pruning':
-      // Pruning/grading are logged as clearance (general maintenance)
+      // Pruning/weeding/grading/spacing are logged as clearance (general maintenance)
+      return 'clearance';
+    case 'weeding':
       return 'clearance';
     case 'grading':
+      return 'clearance';
+    case 'spacing':
       return 'clearance';
     case 'measurement':
       return 'measurement';
@@ -142,12 +148,18 @@ export async function logBatchHealthEvent(
       insertData.title = `Measurement: ${parts.join(', ') || 'Recorded'}`;
     }
 
-    // Pruning/grading
+    // Pruning/weeding/grading/spacing
     if (input.eventType === 'pruning') {
       insertData.title = 'Pruning';
     }
+    if (input.eventType === 'weeding') {
+      insertData.title = 'Weeding';
+    }
     if (input.eventType === 'grading') {
       insertData.title = 'Grading';
+    }
+    if (input.eventType === 'spacing') {
+      insertData.title = 'Spacing';
     }
 
     // Insert the health log

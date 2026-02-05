@@ -56,12 +56,10 @@ export function WeedingForm({
     setIsSubmitting(true);
 
     try {
-      const notesWithAction = `Action: Weeding${values.notes ? `. ${values.notes}` : ''}`;
-
       const result = await logBatchHealthEvent({
         batchId,
-        eventType: 'pruning', // Weeding uses same db type as pruning (clearance)
-        notes: notesWithAction,
+        eventType: 'weeding',
+        notes: values.notes || undefined,
       });
 
       if (result.success) {

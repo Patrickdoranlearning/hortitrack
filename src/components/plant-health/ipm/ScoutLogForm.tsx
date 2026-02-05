@@ -16,13 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { GroupedIssueSelect } from '@/components/plant-health/GroupedIssueSelect';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -221,21 +215,15 @@ export function ScoutLogForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Issue Type *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="What's the issue?" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {issueOptions.map((opt) => (
-                          <SelectItem key={opt.systemCode} value={opt.displayLabel}>
-                            {opt.displayLabel}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="custom">Other (type below)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <GroupedIssueSelect
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={issueOptions}
+                        placeholder="What's the issue?"
+                        showCustomOption={true}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -23,6 +23,7 @@ import {
 import { ActionTypeStep } from './ActionTypeStep';
 import { PruningForm } from './forms/PruningForm';
 import { WeedingForm } from './forms/WeedingForm';
+import { SpacingForm } from './forms/SpacingForm';
 import { MoveForm } from './forms/MoveForm';
 import { DumpForm } from './forms/DumpForm';
 import { QuickScoutForm } from './forms/QuickScoutForm';
@@ -129,6 +130,8 @@ export function LogActionWizard({
         return <PruningForm {...commonProps} />;
       case 'weeding':
         return <WeedingForm {...commonProps} />;
+      case 'spacing':
+        return <SpacingForm {...commonProps} currentQuantity={currentQuantity} />;
       case 'move':
         return <MoveForm {...commonProps} currentQuantity={currentQuantity} />;
       case 'dump':
@@ -150,7 +153,11 @@ export function LogActionWizard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-lg max-h-[90vh] overflow-y-auto z-[1010]"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             {currentStep === 'select' && 'Log Action'}
