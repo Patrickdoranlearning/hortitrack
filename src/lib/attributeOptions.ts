@@ -24,6 +24,7 @@ export type AttributeOption = {
   isActive: boolean;
   behavior?: AttributeBehavior | null;
   color?: string | null;
+  category?: string | null;
   source?: "custom" | "default";
 };
 
@@ -34,6 +35,10 @@ export type AttributeOptionInput = Omit<AttributeOption, "id" | "attributeKey" |
 
 type DefaultOption = Omit<AttributeOption, "id" | "attributeKey" | "source">;
 
+// Category options for plant_health_issue
+export const PLANT_HEALTH_CATEGORIES = ["Pest", "Disease", "Environmental"] as const;
+export type PlantHealthCategory = typeof PLANT_HEALTH_CATEGORIES[number];
+
 export const ATTRIBUTE_META: Record<
   AttributeKey,
   {
@@ -41,6 +46,8 @@ export const ATTRIBUTE_META: Record<
     description: string;
     requiresBehavior?: boolean;
     allowColor?: boolean;
+    allowCategory?: boolean;
+    categoryOptions?: string[];
   }
 > = {
   production_phase: {
@@ -78,6 +85,8 @@ export const ATTRIBUTE_META: Record<
     label: "Plant Health Issues",
     description: "Common pest and disease issues for scouting and IPM logging.",
     allowColor: true,
+    allowCategory: true,
+    categoryOptions: ["Pest", "Disease", "Environmental"],
   },
   sprayer_used: {
     label: "Sprayers",
@@ -146,22 +155,27 @@ const DEFAULTS: Record<AttributeKey, DefaultOption[]> = {
     { systemCode: "SOUTH", displayLabel: "South", sortOrder: 60, isActive: true },
   ],
   plant_health_issue: [
-    { systemCode: "APHIDS", displayLabel: "Aphids", sortOrder: 10, isActive: true },
-    { systemCode: "VINE_WEEVIL", displayLabel: "Vine Weevil", sortOrder: 20, isActive: true },
-    { systemCode: "SPIDER_MITES", displayLabel: "Spider Mites", sortOrder: 30, isActive: true },
-    { systemCode: "WHITEFLY", displayLabel: "Whitefly", sortOrder: 40, isActive: true },
-    { systemCode: "THRIPS", displayLabel: "Thrips", sortOrder: 50, isActive: true },
-    { systemCode: "FUNGAL_INFECTION", displayLabel: "Fungal Infection", sortOrder: 60, isActive: true },
-    { systemCode: "POWDERY_MILDEW", displayLabel: "Powdery Mildew", sortOrder: 70, isActive: true },
-    { systemCode: "ROOT_ROT", displayLabel: "Root Rot", sortOrder: 80, isActive: true },
-    { systemCode: "NUTRIENT_DEFICIENCY", displayLabel: "Nutrient Deficiency", sortOrder: 90, isActive: true },
-    { systemCode: "OVERWATERING", displayLabel: "Overwatering", sortOrder: 100, isActive: true },
-    { systemCode: "UNDERWATERING", displayLabel: "Underwatering", sortOrder: 110, isActive: true },
-    { systemCode: "BOTRYTIS", displayLabel: "Botrytis", sortOrder: 120, isActive: true },
-    { systemCode: "SLUG_DAMAGE", displayLabel: "Slug/Snail Damage", sortOrder: 130, isActive: true },
-    { systemCode: "CATERPILLAR", displayLabel: "Caterpillar Damage", sortOrder: 140, isActive: true },
-    { systemCode: "SCALE_INSECTS", displayLabel: "Scale Insects", sortOrder: 150, isActive: true },
-    { systemCode: "MEALYBUG", displayLabel: "Mealybug", sortOrder: 160, isActive: true },
+    // Pests
+    { systemCode: "APHIDS", displayLabel: "Aphids", sortOrder: 10, isActive: true, category: "Pest" },
+    { systemCode: "VINE_WEEVIL", displayLabel: "Vine Weevil", sortOrder: 20, isActive: true, category: "Pest" },
+    { systemCode: "SPIDER_MITES", displayLabel: "Spider Mites", sortOrder: 30, isActive: true, category: "Pest" },
+    { systemCode: "WHITEFLY", displayLabel: "Whitefly", sortOrder: 40, isActive: true, category: "Pest" },
+    { systemCode: "THRIPS", displayLabel: "Thrips", sortOrder: 50, isActive: true, category: "Pest" },
+    { systemCode: "SLUG_DAMAGE", displayLabel: "Slug/Snail Damage", sortOrder: 60, isActive: true, category: "Pest" },
+    { systemCode: "CATERPILLAR", displayLabel: "Caterpillar Damage", sortOrder: 70, isActive: true, category: "Pest" },
+    { systemCode: "SCALE_INSECTS", displayLabel: "Scale Insects", sortOrder: 80, isActive: true, category: "Pest" },
+    { systemCode: "MEALYBUG", displayLabel: "Mealybug", sortOrder: 90, isActive: true, category: "Pest" },
+    // Diseases
+    { systemCode: "FUNGAL_INFECTION", displayLabel: "Fungal Infection", sortOrder: 100, isActive: true, category: "Disease" },
+    { systemCode: "POWDERY_MILDEW", displayLabel: "Powdery Mildew", sortOrder: 110, isActive: true, category: "Disease" },
+    { systemCode: "DOWNY_MILDEW", displayLabel: "Downy Mildew", sortOrder: 120, isActive: true, category: "Disease" },
+    { systemCode: "ROOT_ROT", displayLabel: "Root Rot", sortOrder: 130, isActive: true, category: "Disease" },
+    { systemCode: "BOTRYTIS", displayLabel: "Botrytis", sortOrder: 140, isActive: true, category: "Disease" },
+    { systemCode: "RUST", displayLabel: "Rust", sortOrder: 150, isActive: true, category: "Disease" },
+    // Environmental
+    { systemCode: "NUTRIENT_DEFICIENCY", displayLabel: "Nutrient Deficiency", sortOrder: 200, isActive: true, category: "Environmental" },
+    { systemCode: "OVERWATERING", displayLabel: "Overwatering", sortOrder: 210, isActive: true, category: "Environmental" },
+    { systemCode: "UNDERWATERING", displayLabel: "Underwatering", sortOrder: 220, isActive: true, category: "Environmental" },
   ],
   sprayer_used: [
     { systemCode: "KNAPSACK_1", displayLabel: "Knapsack #1", sortOrder: 10, isActive: true },

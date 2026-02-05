@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "clean": "rm -rf .next node_modules/.cache",
     "dev": "next dev --turbopack",
+    "dev:clean": "npm run clean && next dev --turbopack",
     "dev:webpack": "next dev",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
@@ -117,11 +119,14 @@
     "genkit-cli": "^1.16.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.2.0",
-    "next": "^15.4.6",
+    "next": "^16.1.6",
     "postcss": "^8",
     "storybook": "^10.1.10",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.1.2",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "require-in-the-middle": "^7.5.2"
   }
 }

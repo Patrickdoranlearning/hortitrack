@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
+import { requireOrgRole, isPermissionError } from '@/server/auth/permissions';
 import { revalidatePath } from 'next/cache';
 
 // ============================================================================
@@ -60,6 +61,7 @@ export type IpmProgramStep = {
   programId: string;
   productId: string;
   stepOrder: number;
+  weekNumber?: number;
   rate?: number;
   rateUnit?: string;
   method?: string;
@@ -314,7 +316,9 @@ export async function updateIpmProduct(
 
 export async function deleteIpmProduct(id: string): Promise<IpmResult> {
   try {
-    const { orgId, supabase } = await getUserAndOrg();
+    // RBAC: Only admin or owner can delete products
+    const { orgId } = await requireOrgRole(['admin', 'owner']);
+    const { supabase } = await getUserAndOrg();
 
     const { error } = await supabase
       .from('ipm_products')
@@ -331,6 +335,9 @@ export async function deleteIpmProduct(id: string): Promise<IpmResult> {
     return { success: true };
   } catch (error) {
     console.error('[deleteIpmProduct] error', error);
+    if (isPermissionError(error)) {
+      return { success: false, error: 'You do not have permission to delete products' };
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -362,6 +369,7 @@ function normalizeStep(row: any): IpmProgramStep {
     programId: row.program_id,
     productId: row.product_id,
     stepOrder: row.step_order,
+    weekNumber: row.week_number,
     rate: row.rate,
     rateUnit: row.rate_unit,
     method: row.method,
@@ -562,7 +570,9 @@ export async function updateIpmProgram(
 
 export async function deleteIpmProgram(id: string): Promise<IpmResult> {
   try {
-    const { orgId, supabase } = await getUserAndOrg();
+    // RBAC: Only admin or owner can delete programs
+    const { orgId } = await requireOrgRole(['admin', 'owner']);
+    const { supabase } = await getUserAndOrg();
 
     const { error } = await supabase
       .from('ipm_programs')
@@ -579,6 +589,9 @@ export async function deleteIpmProgram(id: string): Promise<IpmResult> {
     return { success: true };
   } catch (error) {
     console.error('[deleteIpmProgram] error', error);
+    if (isPermissionError(error)) {
+      return { success: false, error: 'You do not have permission to delete programs' };
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

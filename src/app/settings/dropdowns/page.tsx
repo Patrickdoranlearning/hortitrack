@@ -28,7 +28,7 @@ import {
 import { useAttributeOptions } from "@/hooks/useAttributeOptions";
 import { useToast } from "@/hooks/use-toast";
 
-type EditableOption = AttributeOptionInput & { attributeKey: AttributeKey; source?: "custom" | "default"; localId?: string };
+type EditableOption = AttributeOptionInput & { attributeKey: AttributeKey; source?: "custom" | "default"; localId?: string; category?: string | null };
 
 const BEHAVIOR_OPTIONS: { value: AttributeOption["behavior"]; label: string }[] = [
   { value: "growing", label: "Growing" },
@@ -74,6 +74,7 @@ export default function DropdownManagerPage() {
         sortOrder: opt.sortOrder,
         behavior: opt.behavior,
         color: opt.color ?? null,
+        category: opt.category ?? null,
         source: opt.source,
         localId: opt.id ?? `${opt.systemCode}-${opt.sortOrder}`,
       })
@@ -111,6 +112,7 @@ export default function DropdownManagerPage() {
       sortOrder: items.length + 1,
       behavior: meta.requiresBehavior ? "growing" : null,
       color: null,
+      category: meta.allowCategory ? (meta.categoryOptions?.[0] ?? null) : null,
       source: "custom",
     };
     setItems((prev) => [...prev, next]);
@@ -137,6 +139,7 @@ export default function DropdownManagerPage() {
         isActive: opt.isActive,
         behavior: opt.behavior,
         color: opt.color,
+        category: opt.category,
         sortOrder: idx + 1,
       }));
 
@@ -305,13 +308,13 @@ export default function DropdownManagerPage() {
                             <div className="flex items-center gap-2 mt-1">
                               <Popover>
                                 <PopoverTrigger asChild>
-                                  <Button 
-                                    variant="outline" 
+                                  <Button
+                                    variant="outline"
                                     className="w-full md:w-64 justify-start gap-2"
                                   >
                                     {opt.color ? (
                                       <>
-                                        <div 
+                                        <div
                                           className="h-4 w-4 rounded border"
                                           style={{ backgroundColor: opt.color }}
                                         />
@@ -334,8 +337,8 @@ export default function DropdownManagerPage() {
                                           type="button"
                                           title={preset.label}
                                           className={`h-8 w-8 rounded-md border-2 transition-all hover:scale-110 ${
-                                            opt.color === preset.color 
-                                              ? 'border-primary ring-2 ring-primary ring-offset-2' 
+                                            opt.color === preset.color
+                                              ? 'border-primary ring-2 ring-primary ring-offset-2'
                                               : 'border-transparent'
                                           }`}
                                           style={{ backgroundColor: preset.color }}
@@ -381,6 +384,31 @@ export default function DropdownManagerPage() {
                                 </PopoverContent>
                               </Popover>
                             </div>
+                          </div>
+                        )}
+                        {meta.allowCategory && meta.categoryOptions && (
+                          <div className="mt-3">
+                            <Label className="text-xs text-muted-foreground">Category</Label>
+                            <Select
+                              value={opt.category ?? ""}
+                              onValueChange={(val) => {
+                                const next = [...items];
+                                next[idx] = { ...opt, category: val || null };
+                                setItems(next);
+                                setDirty(true);
+                              }}
+                            >
+                              <SelectTrigger className="w-full md:w-64 mt-1">
+                                <SelectValue placeholder="Choose category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {meta.categoryOptions.map((cat) => (
+                                  <SelectItem key={cat} value={cat}>
+                                    {cat}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         )}
                       </div>

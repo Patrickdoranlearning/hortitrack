@@ -221,6 +221,28 @@ export async function createOrder(data: CreateOrderInput) {
         }
     }
 
+    // Create Tier 1 (product-level) allocations for lines without batch allocations
+    // This enables the two-tier allocation system where:
+    // - Tier 1: Product-level reservation (created at order confirmation)
+    // - Tier 2: Batch-level allocation (created when picker selects batches)
+    const hasUnallocatedLines = resolvedLines.some(line => !line.allocations || line.allocations.length === 0);
+    if (hasUnallocatedLines) {
+        try {
+            const { data: allocationResult, error: allocationError } = await supabase.rpc('fn_confirm_order_with_allocations', {
+                p_order_id: orderId,
+                p_actor_id: user.id,
+            });
+
+            if (allocationError) {
+                logError('Failed to create Tier 1 allocations', { error: allocationError.message, orderId });
+            } else if (allocationResult?.has_oversell_warning) {
+                logInfo('Order has oversell warning', { orderId, oversellItems: allocationResult.oversell_items });
+            }
+        } catch (e) {
+            logError('Failed to create Tier 1 allocations', { error: e instanceof Error ? e.message : String(e), orderId });
+        }
+    }
+
     // Auto-create pick list
     try {
         const { createPickListFromOrder } = await import('@/server/sales/picking');

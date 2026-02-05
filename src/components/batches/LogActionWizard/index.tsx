@@ -14,21 +14,19 @@ import { cn } from '@/lib/utils';
 import {
   Check,
   ChevronLeft,
-  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type OperationalActionType,
-  type LogActionWizardState,
   ACTION_META,
 } from '@/types/batch-actions';
 import { ActionTypeStep } from './ActionTypeStep';
-import { IrrigationForm } from './forms/IrrigationForm';
 import { PruningForm } from './forms/PruningForm';
-import { GradingForm } from './forms/GradingForm';
-import { MechanicalForm } from './forms/MechanicalForm';
+import { WeedingForm } from './forms/WeedingForm';
 import { MoveForm } from './forms/MoveForm';
 import { DumpForm } from './forms/DumpForm';
+import { QuickScoutForm } from './forms/QuickScoutForm';
+import { QuickSaleableForm } from './forms/QuickSaleableForm';
 
 // ============================================================================
 // Types
@@ -40,6 +38,7 @@ export type BatchInfo = {
   variety?: string;
   unitsCurrent?: number;
   quantity?: number;
+  saleableQuantity?: number;
 };
 
 type LogActionWizardProps = {
@@ -126,18 +125,24 @@ export function LogActionWizard({
     };
 
     switch (selectedAction) {
-      case 'irrigation':
-        return <IrrigationForm {...commonProps} />;
       case 'pruning':
         return <PruningForm {...commonProps} />;
-      case 'grading':
-        return <GradingForm {...commonProps} />;
-      case 'mechanical':
-        return <MechanicalForm {...commonProps} />;
+      case 'weeding':
+        return <WeedingForm {...commonProps} />;
       case 'move':
         return <MoveForm {...commonProps} currentQuantity={currentQuantity} />;
       case 'dump':
         return <DumpForm {...commonProps} currentQuantity={currentQuantity} />;
+      case 'scout':
+        return <QuickScoutForm {...commonProps} />;
+      case 'saleable':
+        return (
+          <QuickSaleableForm
+            {...commonProps}
+            currentQuantity={currentQuantity}
+            currentSaleableQuantity={batch.saleableQuantity}
+          />
+        );
       default:
         return null;
     }

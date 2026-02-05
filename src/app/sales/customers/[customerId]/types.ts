@@ -97,3 +97,67 @@ export type CustomerMilestone = {
   recurring: boolean;
   createdAt: string;
 };
+
+// =============================================================================
+// STORE-LEVEL TYPES (for store drill-down feature)
+// =============================================================================
+
+// Store with aggregated order metrics from v_store_order_metrics view
+export type StoreWithMetrics = {
+  addressId: string;
+  customerId: string;
+  label: string;
+  storeName: string | null;
+  city: string | null;
+  county: string | null;
+  orderCount: number;
+  totalRevenue: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+};
+
+// Order for a specific store (filtered by ship_to_address_id)
+export type StoreOrder = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  createdAt: string;
+  requestedDeliveryDate: string | null;
+  subtotalExVat: number;
+  vatAmount: number;
+  totalIncVat: number;
+  itemCount: number;
+};
+
+// Top product for a store (aggregated from order_items)
+export type StoreTopProduct = {
+  skuId: string;
+  productName: string;
+  varietyName: string | null;
+  sizeName: string | null;
+  totalQuantity: number;
+  totalRevenue: number;
+  orderCount: number;
+  lastOrderDate: string;
+};
+
+// Store preferences (stored as JSONB in customer_addresses.preferences)
+export type StorePreferences = {
+  deliveryNotes?: string;
+  preferredDeliveryDay?: string;
+  preferredTrolleyType?: string;
+  orderFrequencyTarget?: number; // days between orders
+  specialInstructions?: string;
+};
+
+// Store order frequency data for chart
+export type StoreOrderFrequency = {
+  ordersByMonth: Array<{ month: string; count: number }>;
+  ordersLast12Months: number;
+  averageDaysBetweenOrders: number | null;
+};
+
+// Extended store type with preferences
+export type StoreWithMetricsAndPreferences = StoreWithMetrics & {
+  preferences: StorePreferences;
+};

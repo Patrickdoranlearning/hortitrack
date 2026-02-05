@@ -11,6 +11,7 @@ import {
   computeLastOrderWeek,
   computeExtendedCustomerStats,
 } from "./customer-detail-data";
+import { fetchStoreListWithMetrics } from "./store-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,13 +33,14 @@ export default async function CustomerDetailPage({ params }: CustomerDetailPageP
   }
 
   // Fetch all data in parallel
-  const [customer, orders, favouriteProducts, interactionsResult, priceLists, products] = await Promise.all([
+  const [customer, orders, favouriteProducts, interactionsResult, priceLists, products, stores] = await Promise.all([
     fetchCustomerDetail(supabase, customerId),
     fetchCustomerOrders(supabase, customerId),
     fetchFavouriteProducts(supabase, customerId),
     fetchCustomerInteractions(supabase, customerId),
     fetchPriceLists(supabase, orgId),
     fetchProducts(supabase, orgId),
+    fetchStoreListWithMetrics(supabase, customerId),
   ]);
 
   if (!customer) {
@@ -60,6 +62,7 @@ export default async function CustomerDetailPage({ params }: CustomerDetailPageP
         stats={stats}
         priceLists={priceLists}
         products={products}
+        stores={stores}
       />
     </PageFrame>
   );

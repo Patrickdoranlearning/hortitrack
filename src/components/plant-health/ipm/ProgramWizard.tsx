@@ -54,6 +54,7 @@ import {
   updateIpmProgram,
   createIpmAssignment,
   type IpmProduct,
+  type IpmProgram,
 } from '@/app/actions/ipm';
 
 // Product in a tank mix
@@ -88,27 +89,12 @@ type AssignmentFormValues = z.infer<typeof assignmentSchema>;
 
 type Location = { id: string; name: string };
 
-type IpmProgramWithSteps = {
-  id: string;
-  name: string;
-  description?: string;
-  steps?: {
-    id: string;
-    weekNumber: number;
-    productId: string;
-    rate?: number;
-    rateUnit?: string;
-    method?: string;
-    product?: { id: string; name: string };
-  }[];
-};
-
 type ProgramWizardProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   locations: Location[];
   families: string[];
-  editingProgram?: IpmProgramWithSteps | null;
+  editingProgram?: IpmProgram | null;
   onSuccess?: () => void;
 };
 
@@ -154,7 +140,8 @@ export function ProgramWizard({
   useEffect(() => {
     if (editingProgram && open) {
       // Group steps by week number for tank mixes
-      const stepsByWeek = new Map<number, typeof editingProgram.steps>();
+      type StepType = NonNullable<typeof editingProgram.steps>[number];
+      const stepsByWeek = new Map<number, StepType[]>();
       for (const step of editingProgram.steps || []) {
         const week = step.weekNumber ?? 0;
         if (!stepsByWeek.has(week)) {
@@ -354,7 +341,7 @@ export function ProgramWizard({
         description: programValues.description,
         intervalDays: 7, // Weekly basis
         durationWeeks: programDuration,
-        scheduleType: 'week_based',
+        scheduleType: 'week_based' as const,
         steps: steps.map((s, idx) => ({
           productId: s.productId,
           rate: s.rate,
@@ -382,8 +369,14 @@ export function ProgramWizard({
         // Create new program
         const programResult = await createIpmProgram(programData);
 
-        if (!programResult.success || !programResult.data) {
+        if (!programResult.success) {
           toast.error(programResult.error || 'Failed to create program');
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!programResult.data) {
+          toast.error('Failed to create program - no data returned');
           setIsSubmitting(false);
           return;
         }

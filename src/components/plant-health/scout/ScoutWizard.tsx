@@ -22,6 +22,7 @@ import { ScanStep } from './ScanStep';
 import { ScoutLogStep, type LogData } from './ScoutLogStep';
 import { TreatmentStep, type TreatmentData } from './TreatmentStep';
 import { createScoutLog, scheduleTreatment } from '@/app/actions/plant-health';
+import { uploadPhoto } from '@/lib/storage/upload';
 
 export type Batch = {
   id: string;
@@ -134,6 +135,23 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
     setIsSaving(true);
 
     try {
+      // Upload photo if provided
+      let photoUrl: string | undefined;
+      if (logData.photoFile) {
+        try {
+          const timestamp = Date.now();
+          const ext = logData.photoFile.name.split('.').pop() || 'jpg';
+          const targetId = wizardState.target?.location?.id || wizardState.target?.batch?.id || 'unknown';
+          const path = `scouts/${targetId}/${timestamp}.${ext}`;
+
+          photoUrl = await uploadPhoto(logData.photoFile, 'plant-health', path);
+        } catch (uploadError) {
+          // Log but don't fail - photo is optional
+          console.error('Photo upload failed:', uploadError);
+          toast.warning('Photo upload failed - log will be saved without photo');
+        }
+      }
+
       // Save the scout log to the database
       const result = await createScoutLog({
         locationId: logData.locationId,
@@ -143,7 +161,7 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
         ec: logData.reading?.ec,
         ph: logData.reading?.ph,
         notes: logData.logType === 'issue' ? logData.issue?.notes : logData.reading?.notes,
-        photoUrl: logData.photoPreview, // TODO: Upload photo and get URL
+        photoUrl, // Now using uploaded URL (or undefined if upload failed/no photo)
         affectedBatchIds: logData.selectedBatchIds,
       });
 
@@ -151,6 +169,36 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
         toast.error('Failed to save', { description: result.error });
         setIsSaving(false);
         return;
+      }
+
+      // Upload quality photos if provided
+      if (logData.qualityPhotos?.length) {
+        let uploadedCount = 0;
+        for (const photo of logData.qualityPhotos) {
+          try {
+            const fd = new FormData();
+            fd.append('file', photo.file);
+            fd.append('entityType', 'batch');
+            fd.append('entityId', photo.batchId);
+            fd.append('badgeType', photo.badgeType);
+
+            const photoRes = await fetch('/api/media/upload', {
+              method: 'POST',
+              body: fd,
+            });
+
+            if (photoRes.ok) {
+              uploadedCount++;
+            } else {
+              console.error('Quality photo upload failed:', await photoRes.text());
+            }
+          } catch (uploadError) {
+            console.error('Quality photo upload error:', uploadError);
+          }
+        }
+        if (uploadedCount > 0) {
+          toast.success(`${uploadedCount} quality photo${uploadedCount > 1 ? 's' : ''} uploaded`);
+        }
       }
 
       setSavedLogId(result.data?.logId || null);
@@ -172,7 +220,7 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
     } finally {
       setIsSaving(false);
     }
-  }, [onComplete]);
+  }, [onComplete, wizardState.target]);
 
   const handleTreatmentComplete = useCallback(async (treatmentData: TreatmentData | null) => {
     if (!treatmentData) {
@@ -182,18 +230,33 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
       return;
     }
 
+    // Remedial programs are already applied by TreatmentStep via applyRemedialProgram
+    // Just complete the wizard without calling scheduleTreatment
+    if (treatmentData.type === 'remedial_program') {
+      setWizardState((prev) => ({ ...prev, treatmentData }));
+      toast.success('Scout complete', {
+        description: `Remedial program applied: ${treatmentData.remedialProgramName || 'Treatment program'}`
+      });
+      onComplete?.();
+      resetWizard();
+      return;
+    }
+
     setIsSaving(true);
     try {
       const targetLocation = wizardState.target?.location;
+      const targetBatch = wizardState.target?.batch;
 
-      if (!targetLocation) {
-        toast.error('No location selected - cannot schedule treatment for batch-only scans');
+      // Support both location and batch-only treatments
+      if (!targetLocation && !targetBatch) {
+        toast.error('No target selected - cannot schedule treatment');
         setIsSaving(false);
         return;
       }
 
       const result = await scheduleTreatment({
-        locationId: targetLocation.id,
+        locationId: targetLocation?.id, // Optional - can be undefined for batch-only
+        batchId: targetBatch?.id, // New - for batch-only treatments
         treatmentType: treatmentData.type,
         productId: treatmentData.productId,
         productName: treatmentData.productName,
@@ -355,13 +418,14 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
           />
         )}
 
-        {currentStep === 'treatment' && effectiveLocation && wizardState.logData && (
+        {currentStep === 'treatment' && (effectiveLocation || effectiveBatch) && wizardState.logData && (
           <TreatmentStep
-            locationId={effectiveLocation.id}
+            locationId={effectiveLocation?.id || ''}
             locationName={locationNameForDisplay}
             batches={batchesForLogging}
             logData={wizardState.logData}
             suggestedType={getSuggestedTreatmentType(wizardState.logData)}
+            savedLogId={savedLogId}
             onComplete={handleTreatmentComplete}
             onSkip={handleSkipTreatment}
             onBack={goBack}

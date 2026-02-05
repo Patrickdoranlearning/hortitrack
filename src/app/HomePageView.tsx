@@ -105,7 +105,7 @@ interface HomePageViewProps {
 export default function HomePageView({
   initialBatches,
   plantFamilies,
-  categories: _categories, // eslint-disable-line @typescript-eslint/no-unused-vars
+  categories: _categories,  
   actions,
 }: HomePageViewProps) {
   const router = useRouter();
@@ -313,7 +313,7 @@ export default function HomePageView({
       title: 'Signed Out',
       description: 'You have been successfully signed out.',
     });
-  }; void _handleSignOut; // eslint-disable-line @typescript-eslint/no-unused-expressions
+  }; void _handleSignOut;  
 
   React.useEffect(() => {
     if (!authLoading && !user) {
@@ -437,7 +437,7 @@ export default function HomePageView({
     const batchForRecs = batches[0];
     setSelectedBatch(batchForRecs);
     setIsRecommendationsOpen(true);
-  }; void _handleAiCareClick; // eslint-disable-line @typescript-eslint/no-unused-expressions
+  }; void _handleAiCareClick;  
 
   const handleScanDetected = React.useCallback(
     async (text: string) => {

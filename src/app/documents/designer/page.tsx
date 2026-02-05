@@ -1,4 +1,4 @@
-import { DocumentDesigner } from "@/components/documents/DocumentDesigner";
+import { TemplatePicker } from "@/components/documents/TemplatePicker";
 import { ModulePageHeader } from '@/ui/templates';
 import { PageFrame } from '@/ui/templates';
 
@@ -9,18 +9,11 @@ export default function DocumentDesignerPage() {
     <PageFrame moduleKey="sales">
       <div className="space-y-4">
         <ModulePageHeader
-          title="Document Designer"
-          description="Create and manage document templates for invoices, delivery dockets, and more"
+          title="Document Templates"
+          description="Choose a style for your business documents"
         />
-        <DocumentDesigner />
+        <TemplatePicker />
       </div>
     </PageFrame>
   );
 }
-
-
-
-
-
-
-

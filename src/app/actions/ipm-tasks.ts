@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getUserAndOrg } from '@/server/auth/org';
 import { createTask, updateTask, getTaskBySourceRef } from '@/server/tasks/service';
+import { logError, logWarning } from '@/lib/log';
 
 export type IpmTask = {
   id: string;
@@ -57,7 +58,9 @@ export type TaskGroup = {
   calendarWeek: number;
   weekStartDate: string;
   isTankMix: boolean;
+  tankMixGroupId?: string;
   tankMixProducts?: string[];
+  groupKey: string;
   tasks: IpmTask[];
   locations: { id: string; name: string; batchCount: number }[];
   totalBatches: number;
@@ -67,6 +70,7 @@ type TaskResult<T = void> = {
   success: boolean;
   data?: T;
   error?: string;
+  warning?: string; // For non-fatal issues that should be surfaced to the user
 };
 
 function normalizeTask(row: any): IpmTask {
@@ -402,6 +406,11 @@ export async function getGroupedTasks(options?: {
 
       if (!groupMap.has(groupKey)) {
         const weekStartDate = getWeekStartDate(task.scheduledDate);
+        // Compute the canonical group key for job matching
+        const canonicalGroupKey = task.tankMixGroupId
+          ? `tankmix:${task.tankMixGroupId}`
+          : `product:${task.productId}-rate:${task.rate || 'default'}-method:${task.method || 'spray'}`;
+
         groupMap.set(groupKey, {
           productId: task.productId,
           productName: task.productName,
@@ -411,7 +420,9 @@ export async function getGroupedTasks(options?: {
           calendarWeek: task.calendarWeek,
           weekStartDate,
           isTankMix: task.isTankMix,
+          tankMixGroupId: task.tankMixGroupId,
           tankMixProducts: task.isTankMix ? [task.productName] : undefined,
+          groupKey: canonicalGroupKey,
           tasks: [],
           locations: [],
           totalBatches: 0,
@@ -542,10 +553,26 @@ export type ComplianceData = {
  * Complete a task or group of tasks
  * Creates plant_health_logs for each affected batch for audit trail
  */
+const BULK_RATE_LIMIT = 100; // Max tasks per request
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function completeTasks(
   taskIds: string[],
   completionData?: ComplianceData
 ): Promise<TaskResult> {
+  // Rate limiting: Prevent bulk operations from overwhelming the database
+  if (taskIds.length > BULK_RATE_LIMIT) {
+    return {
+      success: false,
+      error: `Maximum ${BULK_RATE_LIMIT} tasks can be completed at once. Please select fewer tasks.`,
+    };
+  }
+
+  // Validate all IDs are proper UUIDs to prevent injection
+  if (!taskIds.every((id) => UUID_REGEX.test(id))) {
+    return { success: false, error: 'Invalid task ID format' };
+  }
+
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -633,13 +660,25 @@ export async function completeTasks(
         }));
 
       if (logsToInsert.length > 0) {
-        const { error: logError } = await supabase
+        const { error: healthLogInsertError } = await supabase
           .from('plant_health_logs')
           .insert(logsToInsert);
 
-        if (logError) {
-          console.error('[completeTasks] log insert failed', logError);
-          // Don't fail the whole operation, just log the error
+        if (healthLogInsertError) {
+          logWarning('[completeTasks] Health log insert failed', {
+            error: healthLogInsertError.message,
+            taskIds,
+            context: 'health_log_audit_trail',
+          });
+          // Don't fail the operation - tasks are completed, but warn about audit trail
+          // Return with warning so UI can inform the user
+          revalidatePath('/plant-health');
+          revalidatePath('/batches');
+          revalidatePath('/tasks');
+          return {
+            success: true,
+            warning: 'Tasks completed but audit log failed to save. Please verify treatment records.',
+          };
         }
       }
     }
@@ -1052,10 +1091,10 @@ export async function assignIpmWork(options: {
 }): Promise<TaskResult<{ taskId: string }>> {
   try {
     const sourceRefId = `ipm-${options.productId}-week${options.calendarWeek}`;
-    
+
     // Check if task already exists
     const existingTask = await getTaskBySourceRef('plant_health', 'ipm_summary', sourceRefId);
-    
+
     if (existingTask) {
       // Update the existing task with new assignment
       await updateTask(existingTask.id, {
@@ -1070,6 +1109,590 @@ export async function assignIpmWork(options: {
     return createIpmSummaryTask(options);
   } catch (error) {
     console.error('[assignIpmWork] error', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+// =============================================================================
+// IPM JOBS - Application Job Management
+// =============================================================================
+
+import type {
+  IpmJob,
+  JobStatus,
+  JobPriority,
+  JobLocation,
+  JobBatch,
+  CreateJobInput,
+  AssignJobInput,
+  CompleteJobInput,
+  JobsByStatus,
+} from '@/types/ipm-jobs';
+
+function normalizeJob(row: any, tasks?: any[]): IpmJob {
+  // Aggregate location and batch data from tasks
+  const locationMap = new Map<string, JobLocation>();
+  let completedTaskCount = 0;
+
+  for (const task of tasks || []) {
+    if (task.status === 'completed') completedTaskCount++;
+
+    const locId = task.location_id || 'no-location';
+    const locName = task.nursery_locations?.name || 'No Location';
+
+    if (!locationMap.has(locId)) {
+      locationMap.set(locId, {
+        id: locId,
+        name: locName,
+        taskCount: 0,
+        completedCount: 0,
+        batches: [],
+      });
+    }
+
+    const loc = locationMap.get(locId)!;
+    loc.taskCount++;
+    if (task.status === 'completed') loc.completedCount++;
+
+    if (task.batch_id) {
+      loc.batches.push({
+        id: task.batch_id,
+        batchNumber: task.batches?.batch_number || 'Unknown',
+        variety: task.batches?.plant_varieties?.name,
+        taskId: task.id,
+        isCompleted: task.status === 'completed',
+      });
+    }
+  }
+
+  const firstTask = tasks?.[0];
+  const isTankMix = firstTask?.is_tank_mix || false;
+  const tankMixProducts = isTankMix
+    ? [...new Set(tasks?.map((t: any) => t.product_name) || [])]
+    : undefined;
+
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    name: row.name,
+    groupKey: row.group_key,
+    scheduledDate: row.scheduled_date,
+    calendarWeek: row.calendar_week,
+    status: row.status as JobStatus,
+    assignedTo: row.assigned_to,
+    assignedToName: row.assigned_profile?.display_name || row.assigned_profile?.email,
+    assignedAt: row.assigned_at,
+    assignedBy: row.assigned_by,
+    scoutNotes: row.scout_notes,
+    priority: (row.priority || 'normal') as JobPriority,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    completedBy: row.completed_by,
+    weatherConditions: row.weather_conditions,
+    sprayerUsed: row.sprayer_used,
+    totalVolumeMl: row.total_volume_ml,
+    bottleId: row.bottle_id,
+    quantityUsedMl: row.quantity_used_ml,
+    signedBy: row.signed_by,
+    notes: row.notes,
+    taskCount: tasks?.length || 0,
+    completedTaskCount,
+    locationCount: locationMap.size,
+    batchCount: tasks?.filter((t: any) => t.batch_id).length || 0,
+    locations: Array.from(locationMap.values()),
+    product: {
+      id: firstTask?.product_id || '',
+      name: firstTask?.product_name || row.name,
+      pcsNumber: firstTask?.ipm_products?.pcs_number,
+      rate: firstTask?.rate,
+      rateUnit: firstTask?.rate_unit,
+      method: firstTask?.method,
+      harvestIntervalDays: firstTask?.ipm_products?.harvest_interval_days,
+      isTankMix,
+      tankMixProducts,
+    },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Create a job from a task group
+ */
+export async function createJob(input: CreateJobInput): Promise<TaskResult<{ job: IpmJob }>> {
+  try {
+    const { user, orgId, supabase } = await getUserAndOrg();
+
+    // Get tasks for this group to determine name
+    const { data: tasks } = await supabase
+      .from('ipm_tasks')
+      .select('product_name, is_tank_mix')
+      .eq('org_id', orgId)
+      .eq('group_key', input.groupKey)
+      .eq('calendar_week', input.calendarWeek)
+      .limit(5);
+
+    const isTankMix = tasks?.some(t => t.is_tank_mix);
+    const productNames = [...new Set(tasks?.map(t => t.product_name) || [])];
+    const defaultName = isTankMix
+      ? productNames.join(' + ')
+      : productNames[0] || 'IPM Application';
+
+    const { data: job, error } = await supabase
+      .from('ipm_jobs')
+      .insert({
+        org_id: orgId,
+        name: input.name || defaultName,
+        group_key: input.groupKey,
+        scheduled_date: input.scheduledDate,
+        calendar_week: input.calendarWeek,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // Handle unique constraint - job already exists
+      if (error.code === '23505') {
+        const { data: existing } = await supabase
+          .from('ipm_jobs')
+          .select('*')
+          .eq('org_id', orgId)
+          .eq('group_key', input.groupKey)
+          .eq('calendar_week', input.calendarWeek)
+          .single();
+
+        if (existing) {
+          return { success: true, data: { job: normalizeJob(existing) } };
+        }
+      }
+      logError('[createJob] insert failed', { error: error.message, input });
+      return { success: false, error: error.message };
+    }
+
+    // Link tasks to this job
+    await supabase
+      .from('ipm_tasks')
+      .update({ job_id: job.id })
+      .eq('org_id', orgId)
+      .eq('group_key', input.groupKey)
+      .eq('calendar_week', input.calendarWeek);
+
+    revalidatePath('/plant-health/tasks');
+    return { success: true, data: { job: normalizeJob(job) } };
+  } catch (error) {
+    logError('[createJob] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Assign a job to an applicator
+ */
+export async function assignJob(input: AssignJobInput): Promise<TaskResult<{ job: IpmJob }>> {
+  try {
+    const { user, orgId, supabase } = await getUserAndOrg();
+
+    const { data: job, error } = await supabase
+      .from('ipm_jobs')
+      .update({
+        assigned_to: input.assignedTo,
+        assigned_at: new Date().toISOString(),
+        assigned_by: user.id,
+        scout_notes: input.scoutNotes,
+        priority: input.priority || 'normal',
+        status: 'assigned',
+      })
+      .eq('id', input.jobId)
+      .eq('org_id', orgId)
+      .select(`
+        *,
+        assigned_profile:profiles!ipm_jobs_assigned_to_fkey(display_name, email)
+      `)
+      .single();
+
+    if (error) {
+      logError('[assignJob] update failed', { error: error.message, input });
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/plant-health/tasks');
+    return { success: true, data: { job: normalizeJob(job) } };
+  } catch (error) {
+    logError('[assignJob] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Start a job (mark as in_progress)
+ */
+export async function startJob(jobId: string): Promise<TaskResult<{ job: IpmJob }>> {
+  try {
+    const { user, orgId, supabase } = await getUserAndOrg();
+
+    const { data: job, error } = await supabase
+      .from('ipm_jobs')
+      .update({
+        status: 'in_progress',
+        started_at: new Date().toISOString(),
+      })
+      .eq('id', jobId)
+      .eq('org_id', orgId)
+      .select()
+      .single();
+
+    if (error) {
+      logError('[startJob] update failed', { error: error.message, jobId });
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/plant-health/tasks');
+    return { success: true, data: { job: normalizeJob(job) } };
+  } catch (error) {
+    logError('[startJob] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Complete a job with compliance data
+ */
+export async function completeJob(input: CompleteJobInput): Promise<TaskResult> {
+  try {
+    const { user, orgId, supabase } = await getUserAndOrg();
+
+    // Get the job and its tasks
+    const { data: job, error: jobError } = await supabase
+      .from('ipm_jobs')
+      .select('*, ipm_tasks(*)')
+      .eq('id', input.jobId)
+      .eq('org_id', orgId)
+      .single();
+
+    if (jobError || !job) {
+      return { success: false, error: 'Job not found' };
+    }
+
+    // Update the job with completion data
+    const { error: updateError } = await supabase
+      .from('ipm_jobs')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        completed_by: user.id,
+        weather_conditions: input.weatherConditions,
+        sprayer_used: input.sprayerUsed,
+        total_volume_ml: input.totalVolumeMl,
+        bottle_id: input.bottleId,
+        quantity_used_ml: input.quantityUsedMl,
+        signed_by: input.signedBy,
+        notes: input.notes,
+      })
+      .eq('id', input.jobId)
+      .eq('org_id', orgId);
+
+    if (updateError) {
+      logError('[completeJob] job update failed', { error: updateError.message });
+      return { success: false, error: updateError.message };
+    }
+
+    // Complete all linked tasks
+    const taskIds = (job.ipm_tasks || []).map((t: any) => t.id);
+    if (taskIds.length > 0) {
+      await completeTasks(taskIds, {
+        bottleId: input.bottleId,
+        quantityUsedMl: input.quantityUsedMl,
+        notes: input.notes,
+        weatherConditions: input.weatherConditions,
+        sprayerUsed: input.sprayerUsed,
+        signedBy: input.signedBy,
+      });
+    }
+
+    // Record stock usage if bottle used
+    if (input.bottleId && input.quantityUsedMl) {
+      const { recordUsage } = await import('./ipm-stock');
+      await recordUsage({
+        bottleId: input.bottleId,
+        quantityMl: input.quantityUsedMl,
+        notes: `IPM Job completion: ${job.name}`,
+      });
+    }
+
+    revalidatePath('/plant-health/tasks');
+    return { success: true };
+  } catch (error) {
+    logError('[completeJob] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Get all jobs for a specific week, grouped by status (for Scout Kanban view)
+ */
+export async function getJobsForWeek(calendarWeek: number): Promise<TaskResult<{ jobs: JobsByStatus; taskGroups: TaskGroup[] }>> {
+  try {
+    const { orgId, supabase } = await getUserAndOrg();
+
+    // Get existing jobs for this week
+    const { data: jobs, error: jobsError } = await supabase
+      .from('ipm_jobs')
+      .select(`
+        *,
+        assigned_profile:profiles!ipm_jobs_assigned_to_fkey(display_name, email)
+      `)
+      .eq('org_id', orgId)
+      .eq('calendar_week', calendarWeek);
+
+    if (jobsError) {
+      logError('[getJobsForWeek] jobs query failed', { error: jobsError.message });
+      return { success: false, error: jobsError.message };
+    }
+
+    // Get tasks for this week (to show ungrouped tasks and populate job details)
+    const { data: tasks, error: tasksError } = await supabase
+      .from('ipm_tasks')
+      .select(`
+        *,
+        batches(id, batch_number, plant_varieties(name)),
+        nursery_locations(id, name),
+        ipm_products(id, name, pcs_number, harvest_interval_days)
+      `)
+      .eq('org_id', orgId)
+      .eq('calendar_week', calendarWeek)
+      .in('status', ['pending', 'overdue']);
+
+    if (tasksError) {
+      logError('[getJobsForWeek] tasks query failed', { error: tasksError.message });
+      return { success: false, error: tasksError.message };
+    }
+
+    // Group tasks by job_id
+    const tasksByJob = new Map<string, any[]>();
+    const unassignedTasks: any[] = [];
+
+    for (const task of tasks || []) {
+      if (task.job_id) {
+        if (!tasksByJob.has(task.job_id)) {
+          tasksByJob.set(task.job_id, []);
+        }
+        tasksByJob.get(task.job_id)!.push(task);
+      } else {
+        unassignedTasks.push(task);
+      }
+    }
+
+    // Normalize jobs with their tasks
+    const normalizedJobs = (jobs || []).map(job =>
+      normalizeJob(job, tasksByJob.get(job.id) || [])
+    );
+
+    // Group by status
+    const jobsByStatus: JobsByStatus = {
+      pending: normalizedJobs.filter(j => j.status === 'pending'),
+      assigned: normalizedJobs.filter(j => j.status === 'assigned'),
+      inProgress: normalizedJobs.filter(j => j.status === 'in_progress'),
+      completed: normalizedJobs.filter(j => j.status === 'completed'),
+    };
+
+    // Also return task groups that don't have jobs yet (for "Create Job" UI)
+    const taskGroupsResult = await getGroupedTasks({
+      status: 'pending',
+      fromDate: getWeekStartDate(new Date().toISOString()),
+    });
+
+    return {
+      success: true,
+      data: {
+        jobs: jobsByStatus,
+        taskGroups: taskGroupsResult.data?.filter(g => g.calendarWeek === calendarWeek) || [],
+      },
+    };
+  } catch (error) {
+    logError('[getJobsForWeek] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Get jobs assigned to current user (for Applicator view)
+ */
+export async function getMyJobs(): Promise<TaskResult<{ jobs: IpmJob[] }>> {
+  try {
+    const { user, orgId, supabase } = await getUserAndOrg();
+
+    const { data: jobs, error: jobsError } = await supabase
+      .from('ipm_jobs')
+      .select(`
+        *,
+        assigned_profile:profiles!ipm_jobs_assigned_to_fkey(display_name, email)
+      `)
+      .eq('org_id', orgId)
+      .eq('assigned_to', user.id)
+      .in('status', ['assigned', 'in_progress'])
+      .order('scheduled_date', { ascending: true });
+
+    if (jobsError) {
+      logError('[getMyJobs] query failed', { error: jobsError.message });
+      return { success: false, error: jobsError.message };
+    }
+
+    // Get tasks for these jobs
+    const jobIds = (jobs || []).map(j => j.id);
+    const { data: tasks } = await supabase
+      .from('ipm_tasks')
+      .select(`
+        *,
+        batches(id, batch_number, plant_varieties(name)),
+        nursery_locations(id, name),
+        ipm_products(id, name, pcs_number, harvest_interval_days)
+      `)
+      .in('job_id', jobIds);
+
+    // Group tasks by job
+    const tasksByJob = new Map<string, any[]>();
+    for (const task of tasks || []) {
+      if (!tasksByJob.has(task.job_id)) {
+        tasksByJob.set(task.job_id, []);
+      }
+      tasksByJob.get(task.job_id)!.push(task);
+    }
+
+    const normalizedJobs = (jobs || []).map(job =>
+      normalizeJob(job, tasksByJob.get(job.id) || [])
+    );
+
+    return { success: true, data: { jobs: normalizedJobs } };
+  } catch (error) {
+    logError('[getMyJobs] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Get a single job with all its tasks (for execution view)
+ */
+export async function getJobWithTasks(jobId: string): Promise<TaskResult<{ job: IpmJob }>> {
+  try {
+    const { orgId, supabase } = await getUserAndOrg();
+
+    const { data: job, error: jobError } = await supabase
+      .from('ipm_jobs')
+      .select(`
+        *,
+        assigned_profile:profiles!ipm_jobs_assigned_to_fkey(display_name, email)
+      `)
+      .eq('id', jobId)
+      .eq('org_id', orgId)
+      .single();
+
+    if (jobError || !job) {
+      return { success: false, error: 'Job not found' };
+    }
+
+    // Get all tasks for this job
+    const { data: tasks } = await supabase
+      .from('ipm_tasks')
+      .select(`
+        *,
+        batches(id, batch_number, plant_varieties(name)),
+        nursery_locations(id, name),
+        ipm_products(id, name, pcs_number, harvest_interval_days)
+      `)
+      .eq('job_id', jobId)
+      .order('nursery_locations(name)', { ascending: true });
+
+    return { success: true, data: { job: normalizeJob(job, tasks || []) } };
+  } catch (error) {
+    logError('[getJobWithTasks] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Complete a specific task within a job (for per-location checkoff)
+ */
+export async function completeTaskInJob(taskId: string): Promise<TaskResult> {
+  try {
+    const { user, orgId, supabase } = await getUserAndOrg();
+
+    const { error } = await supabase
+      .from('ipm_tasks')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        completed_by: user.id,
+      })
+      .eq('id', taskId)
+      .eq('org_id', orgId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/plant-health/tasks');
+    return { success: true };
+  } catch (error) {
+    logError('[completeTaskInJob] error', { error });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Cancel a job
+ */
+export async function cancelJob(jobId: string): Promise<TaskResult> {
+  try {
+    const { orgId, supabase } = await getUserAndOrg();
+
+    const { error } = await supabase
+      .from('ipm_jobs')
+      .update({ status: 'cancelled' })
+      .eq('id', jobId)
+      .eq('org_id', orgId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    // Unlink tasks from this job
+    await supabase
+      .from('ipm_tasks')
+      .update({ job_id: null })
+      .eq('job_id', jobId);
+
+    revalidatePath('/plant-health/tasks');
+    return { success: true };
+  } catch (error) {
+    logError('[cancelJob] error', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

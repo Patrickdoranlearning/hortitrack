@@ -22,9 +22,20 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { useVarietyAllocations } from '@/hooks/useVarietyAllocations';
 import { VarietyAllocationTable } from './VarietyAllocationTable';
 import { cn } from '@/lib/utils';
+import { StockStatusIndicator } from '@/components/sales/ProductATSBadge';
 import type { CustomerCatalogProductWithVarieties, CartItem } from '@/lib/b2b/types';
+import type { StockStatus } from '@/app/sales/allocation-actions';
 
 const LOW_STOCK_THRESHOLD = 100;
+
+/**
+ * Convert totalAvailableQty to StockStatus for B2B display
+ */
+function getStockStatus(availableQty: number, lowThreshold = LOW_STOCK_THRESHOLD): StockStatus {
+  if (availableQty <= 0) return 'out_of_stock';
+  if (availableQty <= lowThreshold) return 'low_stock';
+  return 'in_stock';
+}
 
 type B2BProductAccordionCardProps = {
   product: CustomerCatalogProductWithVarieties;
@@ -298,11 +309,12 @@ export function B2BProductAccordionCard({
                     </span>
                   </div>
 
-                  {/* Stock Badge */}
-                  <div className="shrink-0">
-                    <Badge variant={isLowStock ? 'destructive' : 'secondary'} className="text-xs">
-                      {product.totalAvailableQty} in stock
-                    </Badge>
+                  {/* Stock Status Indicator */}
+                  <div className="shrink-0 flex items-center gap-2">
+                    <StockStatusIndicator status={getStockStatus(product.totalAvailableQty)} size="md" />
+                    <span className="text-xs text-muted-foreground">
+                      {product.totalAvailableQty}
+                    </span>
                   </div>
 
                   {/* Quick quantity buttons + input */}
@@ -511,9 +523,12 @@ export function B2BProductAccordionCard({
                       <span className="text-lg font-semibold">
                         €{product.unitPriceExVat?.toFixed(2) || '0.00'}
                       </span>
-                      <Badge variant={isLowStock ? 'destructive' : 'secondary'} className="text-xs">
-                        {product.totalAvailableQty} in stock
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <StockStatusIndicator status={getStockStatus(product.totalAvailableQty)} size="sm" />
+                        <span className="text-xs text-muted-foreground">
+                          {product.totalAvailableQty}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Generic Quantity Input (Level 1) */}

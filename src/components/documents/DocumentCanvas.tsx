@@ -39,32 +39,60 @@ type Props = {
   gridSize: number;
 };
 
-function getDefaultPosition(
+/**
+ * Get the absolute page position for a component.
+ * Returns coordinates relative to the page top-left corner.
+ *
+ * Component positions in templates are zone-relative (x,y relative to zone top-left).
+ * This function converts them to page-absolute coordinates.
+ */
+function getAbsolutePosition(
   component: DocumentComponent,
   index: number,
   zones: ZoneConfig[],
-  margins: { top: number; left: number }
+  margins: { top: number; left: number },
+  allZoneComponents: { header: DocumentComponent[]; body: DocumentComponent[]; footer: DocumentComponent[] }
 ): Position {
-  if (component.style?.position) {
-    return component.style.position;
-  }
-
   const zone = component.zone || "body";
   const headerHeight = zones.find((z) => z.zone === "header")?.height ?? 35;
+  const footerHeight = zones.find((z) => z.zone === "footer")?.height ?? 20;
 
-  let baseY = margins.top;
-  if (zone === "body") {
-    baseY = headerHeight + 5;
+  // Calculate zone offset (where the zone starts on the page)
+  let zoneOffsetY = 0;
+  if (zone === "header") {
+    zoneOffsetY = 0;
+  } else if (zone === "body") {
+    zoneOffsetY = headerHeight;
   } else if (zone === "footer") {
-    const footerZone = zones.find((z) => z.zone === "footer");
-    baseY = A4.height - (footerZone?.height ?? 20) - margins.top + 5;
+    zoneOffsetY = A4.height - footerHeight;
   }
 
-  const yOffset = index * 15;
+  // If component has explicit position, it's zone-relative - add zone offset
+  if (component.style?.position) {
+    const pos = component.style.position;
+    return {
+      ...pos,
+      y: (pos.y ?? 0) + zoneOffsetY,
+    };
+  }
+
+  // Auto-position for components without explicit positions
+  let componentIndex: number;
+  if (zone === "header") {
+    componentIndex = allZoneComponents.header.findIndex((c) => c.id === component.id);
+  } else if (zone === "footer") {
+    componentIndex = allZoneComponents.footer.findIndex((c) => c.id === component.id);
+  } else {
+    componentIndex = allZoneComponents.body.findIndex((c) => c.id === component.id);
+  }
+
+  // Stack components within their zone, starting from zone top with small margin
+  const yOffset = (componentIndex >= 0 ? componentIndex : index) * 15;
+  const localY = 5 + yOffset; // 5mm margin from zone top
 
   return {
     x: margins.left,
-    y: baseY + yOffset,
+    y: zoneOffsetY + localY,
     width: A4.width - margins.left - margins.left,
     height: component.type === "table" ? 40 : 12,
   };
@@ -331,12 +359,15 @@ function VisualComponent({
           </div>
         );
 
-      default:
+      default: {
+        // Type assertion for any unhandled component types
+        const fallbackComponent = component as DocumentComponent & { text?: string };
         return (
           <div style={baseStyles}>
-            {component.text || `${component.type} component`}
+            {fallbackComponent.text || `${fallbackComponent.type} component`}
           </div>
         );
+      }
     }
   };
 
@@ -439,40 +470,41 @@ export function DocumentCanvas({
   const bodyTop = headerHeight;
   const bodyHeight = pageSize.height - headerHeight - footerHeight;
 
-  // Group components by zone for rendering
+  // Group components by zone for position calculation
   const headerComponents = components.filter((c) => c.zone === "header");
   const bodyComponents = components.filter((c) => c.zone === "body" || !c.zone);
   const footerComponents = components.filter((c) => c.zone === "footer");
 
-  const renderZoneComponents = (zoneComponents: DocumentComponent[], zoneType: DocumentZone) => {
-    return zoneComponents.map((component, index) => {
-      const pos = getDefaultPosition(component, index, zones, margins);
-      const isSelected = selectedId === component.id;
+  const allZoneComponents = { header: headerComponents, body: bodyComponents, footer: footerComponents };
 
-      return (
-        <div
-          key={component.id}
-          className="absolute"
-          style={{
-            left: `${pos.x * SCALE * zoom}px`,
-            top: `${pos.y * SCALE * zoom}px`,
-            width: pos.width ? `${pos.width * SCALE * zoom}px` : "auto",
-            minHeight: `${(pos.height ?? 12) * SCALE * zoom}px`,
+  // Render all components with absolute page positioning
+  const renderComponent = (component: DocumentComponent, index: number) => {
+    const pos = getAbsolutePosition(component, index, zones, margins, allZoneComponents);
+    const isSelected = selectedId === component.id;
+
+    return (
+      <div
+        key={component.id}
+        className="absolute z-10"
+        style={{
+          left: `${pos.x * SCALE * zoom}px`,
+          top: `${pos.y * SCALE * zoom}px`,
+          width: pos.width ? `${pos.width * SCALE * zoom}px` : "auto",
+          minHeight: `${(pos.height ?? 12) * SCALE * zoom}px`,
+        }}
+      >
+        <VisualComponent
+          component={component}
+          isSelected={isSelected}
+          zoom={zoom}
+          onMouseDown={(e) => startDrag(e, component.id, pos)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(component.id);
           }}
-        >
-          <VisualComponent
-            component={component}
-            isSelected={isSelected}
-            zoom={zoom}
-            onMouseDown={(e) => startDrag(e, component.id, pos)}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect(component.id);
-            }}
-          />
-        </div>
-      );
-    });
+        />
+      </div>
+    );
   };
 
   return (
@@ -497,7 +529,7 @@ export function DocumentCanvas({
         {/* Grid overlay */}
         {showGrid && (
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none z-0"
             style={{
               backgroundImage: `
                 linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
@@ -508,11 +540,12 @@ export function DocumentCanvas({
           />
         )}
 
-        {/* Header Zone */}
+        {/* Zone Visual Guides (background only, components not inside) */}
+        {/* Header Zone Guide */}
         <div
           className={cn(
-            "canvas-zone absolute left-0 right-0 transition-colors",
-            dragOverZone === "header" && "bg-blue-50"
+            "canvas-zone absolute left-0 right-0 transition-colors pointer-events-auto z-0",
+            dragOverZone === "header" && "bg-blue-50/50"
           )}
           style={{
             top: 0,
@@ -524,19 +557,18 @@ export function DocumentCanvas({
           onDrop={(e) => handleDropOnZone(e, "header")}
         >
           <div
-            className="absolute top-1 left-2 text-[10px] font-medium uppercase tracking-wider text-blue-400"
+            className="absolute top-1 left-2 text-[10px] font-medium uppercase tracking-wider text-blue-400 pointer-events-none"
             style={{ fontSize: `${10 * zoom}px` }}
           >
             Header
           </div>
-          {renderZoneComponents(headerComponents, "header")}
         </div>
 
-        {/* Body Zone */}
+        {/* Body Zone Guide */}
         <div
           className={cn(
-            "canvas-zone absolute left-0 right-0 transition-colors",
-            dragOverZone === "body" && "bg-green-50"
+            "canvas-zone absolute left-0 right-0 transition-colors pointer-events-auto z-0",
+            dragOverZone === "body" && "bg-green-50/50"
           )}
           style={{
             top: `${bodyTop * SCALE * zoom}px`,
@@ -547,19 +579,18 @@ export function DocumentCanvas({
           onDrop={(e) => handleDropOnZone(e, "body")}
         >
           <div
-            className="absolute top-1 left-2 text-[10px] font-medium uppercase tracking-wider text-green-400"
+            className="absolute top-1 left-2 text-[10px] font-medium uppercase tracking-wider text-green-400 pointer-events-none"
             style={{ fontSize: `${10 * zoom}px` }}
           >
             Body
           </div>
-          {renderZoneComponents(bodyComponents, "body")}
         </div>
 
-        {/* Footer Zone */}
+        {/* Footer Zone Guide */}
         <div
           className={cn(
-            "canvas-zone absolute left-0 right-0 transition-colors",
-            dragOverZone === "footer" && "bg-orange-50"
+            "canvas-zone absolute left-0 right-0 transition-colors pointer-events-auto z-0",
+            dragOverZone === "footer" && "bg-orange-50/50"
           )}
           style={{
             bottom: 0,
@@ -571,17 +602,19 @@ export function DocumentCanvas({
           onDrop={(e) => handleDropOnZone(e, "footer")}
         >
           <div
-            className="absolute top-1 left-2 text-[10px] font-medium uppercase tracking-wider text-orange-400"
+            className="absolute top-1 left-2 text-[10px] font-medium uppercase tracking-wider text-orange-400 pointer-events-none"
             style={{ fontSize: `${10 * zoom}px` }}
           >
             Footer
           </div>
-          {renderZoneComponents(footerComponents, "footer")}
         </div>
+
+        {/* Render ALL components directly on canvas with absolute positioning */}
+        {components.map((component, index) => renderComponent(component, index))}
 
         {/* Empty state */}
         {components.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
             <div className="text-center text-muted-foreground">
               <p className="text-sm font-medium">Drag components here</p>
               <p className="text-xs mt-1">or click a component in the library to add it</p>

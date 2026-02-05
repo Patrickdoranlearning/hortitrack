@@ -6,13 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { emitMutation } from '@/lib/events/mutation-events';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Printer, FileText, Package, ClipboardList, History, Truck, Tag } from 'lucide-react';
+import { ArrowLeft, Printer, FileText, Package, ClipboardList, History, Truck, Tag, Layers } from 'lucide-react';
 import OrderSummaryCard from './OrderSummaryCard';
 import OrderItemsTable from './OrderItemsTable';
 import OrderInvoicePanel from './OrderInvoicePanel';
 import OrderHistoryPanel from './OrderHistoryPanel';
 import OrderStatusBadge from './OrderStatusBadge';
 import SaleLabelPrintWizard, { type SaleItemData } from './SaleLabelPrintWizard';
+import { AllocationTimeline } from '@/components/orders/AllocationTimeline';
 
 export interface OrderCustomer {
   id: string;
@@ -218,9 +219,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
       </div>
 
-      {/* Tabs - Simplified: Overview, Items, Invoice, History */}
+      {/* Tabs - Overview, Items, Allocations, Invoice, History */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="overview" className="gap-2">
             <Package className="h-4 w-4 hidden sm:inline" />
             Overview
@@ -228,6 +229,10 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           <TabsTrigger value="items" className="gap-2">
             <ClipboardList className="h-4 w-4 hidden sm:inline" />
             Items
+          </TabsTrigger>
+          <TabsTrigger value="allocations" className="gap-2">
+            <Layers className="h-4 w-4 hidden sm:inline" />
+            Allocations
           </TabsTrigger>
           <TabsTrigger value="invoice" className="gap-2">
             <FileText className="h-4 w-4 hidden sm:inline" />
@@ -245,12 +250,29 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           </TabsContent>
 
           <TabsContent value="items" className="mt-0">
-            <OrderItemsTable 
+            <OrderItemsTable
               orderId={order.id}
-              items={order.order_items} 
+              items={order.order_items}
               status={order.status}
               onItemsChange={handleOrderMutation}
             />
+          </TabsContent>
+
+          <TabsContent value="allocations" className="mt-0">
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Track stock allocations for this order. Tier 1 allocations reserve product-level stock;
+                  Tier 2 allocations reserve specific batches.
+                </p>
+              </div>
+              <AllocationTimeline
+                orderId={order.id}
+                title="Allocation Events"
+                collapsible={false}
+                initialLimit={20}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="invoice" className="mt-0">

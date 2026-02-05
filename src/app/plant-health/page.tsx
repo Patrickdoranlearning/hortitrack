@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import {
   FlaskConical,
   Repeat,
@@ -121,6 +122,7 @@ export default function PlantHealthDashboard() {
 
   return (
     <PageFrame moduleKey="plantHealth">
+      <ErrorBoundary>
       <div className="space-y-6">
         <ModulePageHeader
           title="Plant Health"
@@ -478,6 +480,7 @@ export default function PlantHealthDashboard() {
         </div>
       )}
       </div>
+      </ErrorBoundary>
     </PageFrame>
   );
 }

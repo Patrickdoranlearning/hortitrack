@@ -11,6 +11,7 @@ const OptionInputSchema = z.object({
   isActive: z.boolean().optional(),
   behavior: z.string().optional(),
   color: z.string().optional().nullable(),
+  category: z.string().optional().nullable(),
   sortOrder: z.number().int().optional(),
 });
 

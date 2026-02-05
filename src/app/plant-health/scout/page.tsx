@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import { ScoutWizard } from '@/components/plant-health/scout';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +90,7 @@ export default function ScoutPage() {
 
   return (
     <PageFrame moduleKey="plantHealth">
+      <ErrorBoundary>
       <div className="space-y-6">
         <ModulePageHeader
           title="Scout Mode"
@@ -288,6 +290,7 @@ export default function ScoutPage() {
           </TabsContent>
         </Tabs>
       </div>
+      </ErrorBoundary>
     </PageFrame>
   );
 }

@@ -18,6 +18,7 @@ import {
   Clock,
   Plus,
   ClipboardList,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { CustomerSummary } from "../types";
-import type { CustomerOrder, FavouriteProduct, LastOrderWeek, ExtendedCustomerStats, CustomerInteraction } from "./types";
+import type { CustomerOrder, FavouriteProduct, LastOrderWeek, ExtendedCustomerStats, CustomerInteraction, StoreWithMetricsAndPreferences } from "./types";
 import { CustomerSheet } from "../CustomerSheet";
 import { ActivityTimeline } from "@/components/customers/ActivityTimeline";
 import { FollowUpBanner } from "@/components/customers/FollowUpBanner";
@@ -40,8 +41,9 @@ import { MilestonesCard } from "@/components/customers/MilestonesCard";
 import { VisitPrepDialog } from "@/components/customers/VisitPrepDialog";
 import { OrderFrequencyChart } from "@/components/customers/OrderFrequencyChart";
 import { LogInteractionDialog } from "@/components/sales/dashboard/LogInteractionDialog";
+import { StoresTab } from "./StoresTab";
 
-type TabKey = "overview" | "orders" | "favourites" | "activity";
+type TabKey = "overview" | "orders" | "favourites" | "activity" | "stores";
 
 interface CustomerDetailClientProps {
   customer: CustomerSummary;
@@ -52,6 +54,7 @@ interface CustomerDetailClientProps {
   stats: ExtendedCustomerStats;
   priceLists: Array<{ id: string; name: string; currency: string }>;
   products: Array<{ id: string; name: string; skuCode: string | null }>;
+  stores: StoreWithMetricsAndPreferences[];
 }
 
 export default function CustomerDetailClient({
@@ -63,6 +66,7 @@ export default function CustomerDetailClient({
   stats,
   priceLists,
   products,
+  stores,
 }: CustomerDetailClientProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [editSheetOpen, setEditSheetOpen] = useState(false);
@@ -190,7 +194,11 @@ export default function CustomerDetailClient({
           </TabsTrigger>
           <TabsTrigger value="activity">
             <Clock className="mr-1 h-4 w-4" />
-            Activity ({interactions.length})
+            CRM ({interactions.length})
+          </TabsTrigger>
+          <TabsTrigger value="stores">
+            <Store className="mr-1 h-4 w-4" />
+            Stores ({stores.length})
           </TabsTrigger>
         </TabsList>
 
@@ -228,6 +236,14 @@ export default function CustomerDetailClient({
               emptyMessage="No interactions recorded yet. Log your first interaction to start tracking activity."
             />
           </div>
+        </TabsContent>
+
+        <TabsContent value="stores">
+          <StoresTab
+            customerId={customer.id}
+            stores={stores}
+            currency={customer.currency}
+          />
         </TabsContent>
       </Tabs>
 

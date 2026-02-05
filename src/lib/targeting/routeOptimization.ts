@@ -134,7 +134,7 @@ export function generateAppleMapsUrl(stops: RouteStop[]): string {
 
   // Apple Maps waypoints format
   const destination = stops[stops.length - 1];
-  let url = `maps://maps.apple.com/?daddr=${destination.lat},${destination.lng}`;
+  const url = `maps://maps.apple.com/?daddr=${destination.lat},${destination.lng}`;
 
   return url;
 }

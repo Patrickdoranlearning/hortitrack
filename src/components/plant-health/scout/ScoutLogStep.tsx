@@ -42,6 +42,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAttributeOptions } from '@/hooks/useAttributeOptions';
 import type { Batch } from './ScoutWizard';
+import { QualityPhotoSection, type QualityPhoto } from './QualityPhotoSection';
 
 export type LogData = {
   logType: 'issue' | 'reading';
@@ -59,6 +60,7 @@ export type LogData = {
   photoPreview?: string;
   selectedBatchIds: string[];
   locationId: string;
+  qualityPhotos?: QualityPhoto[];
 };
 
 const issueSchema = z.object({
@@ -100,6 +102,7 @@ export function ScoutLogStep({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [qualityPhotos, setQualityPhotos] = useState<QualityPhoto[]>([]);
 
   const camRef = useRef<HTMLInputElement>(null);
   const galRef = useRef<HTMLInputElement>(null);
@@ -185,6 +188,7 @@ export function ScoutLogStep({
         locationId,
         photoFile: photoFile || undefined,
         photoPreview: photoPreview || undefined,
+        qualityPhotos: qualityPhotos.length > 0 ? qualityPhotos : undefined,
       };
 
       onComplete(logData);
@@ -216,6 +220,7 @@ export function ScoutLogStep({
         locationId,
         photoFile: photoFile || undefined,
         photoPreview: photoPreview || undefined,
+        qualityPhotos: qualityPhotos.length > 0 ? qualityPhotos : undefined,
       };
 
       onComplete(logData);
@@ -483,6 +488,13 @@ export function ScoutLogStep({
                 )}
               </div>
 
+              {/* Quality Photos Section */}
+              <QualityPhotoSection
+                batches={batches}
+                photos={qualityPhotos}
+                onPhotosChange={setQualityPhotos}
+              />
+
               {/* Submit */}
               <Button type="submit" className="w-full gap-2" disabled={isSubmitting}>
                 {isSubmitting ? (
@@ -645,6 +657,13 @@ export function ScoutLogStep({
                   </div>
                 )}
               </div>
+
+              {/* Quality Photos Section */}
+              <QualityPhotoSection
+                batches={batches}
+                photos={qualityPhotos}
+                onPhotosChange={setQualityPhotos}
+              />
 
               {/* Submit */}
               <Button type="submit" className="w-full gap-2" disabled={isSubmitting}>

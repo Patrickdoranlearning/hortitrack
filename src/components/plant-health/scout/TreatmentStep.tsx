@@ -13,7 +13,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +27,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import {
   Loader2,
   Syringe,
@@ -38,14 +38,21 @@ import {
   AlertCircle,
   CheckCircle2,
   SkipForward,
+  Bug,
+  Clock,
+  Zap,
+  FlaskConical,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { listIpmProducts, type IpmProduct } from '@/app/actions/ipm';
+import { getRemedialProgramsForPest, applyRemedialProgram } from '@/app/actions/ipm-remedial';
+import type { IpmRemedialProgram } from '@/types/ipm-remedial';
 import type { LogData } from './ScoutLogStep';
 import type { Batch } from './ScoutWizard';
 
 export type TreatmentData = {
-  type: 'chemical' | 'mechanical' | 'feeding';
+  type: 'chemical' | 'mechanical' | 'feeding' | 'remedial_program';
   // Chemical
   productId?: string;
   productName?: string;
@@ -61,6 +68,9 @@ export type TreatmentData = {
   fertilizerName?: string;
   fertilizerRate?: number;
   fertilizerUnit?: string;
+  // Remedial Program
+  remedialProgramId?: string;
+  remedialProgramName?: string;
   // Common
   scheduledDate: string;
   notes?: string;
@@ -136,6 +146,7 @@ type TreatmentStepProps = {
   batches: Batch[];
   logData: LogData;
   suggestedType: 'chemical' | 'mechanical' | 'feeding' | null;
+  savedLogId?: string | null;
   onComplete: (data: TreatmentData) => void;
   onSkip: () => void;
   onBack: () => void;
@@ -143,10 +154,11 @@ type TreatmentStepProps = {
 
 export function TreatmentStep({
   locationId,
-  locationName,
+  locationName: _locationName,
   batches,
   logData,
   suggestedType,
+  savedLogId,
   onComplete,
   onSkip,
   onBack,
@@ -157,6 +169,11 @@ export function TreatmentStep({
   const [products, setProducts] = useState<IpmProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Remedial program suggestions
+  const [remedialPrograms, setRemedialPrograms] = useState<IpmRemedialProgram[]>([]);
+  const [loadingRemedial, setLoadingRemedial] = useState(false);
+  const [applyingProgram, setApplyingProgram] = useState<string | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -172,6 +189,19 @@ export function TreatmentStep({
       });
     }
   }, [treatmentType]);
+
+  // Load matching remedial programs when issue is logged
+  useEffect(() => {
+    if (logData.logType === 'issue' && logData.issue?.reason) {
+      setLoadingRemedial(true);
+      getRemedialProgramsForPest(logData.issue.reason, logData.issue.severity).then((result) => {
+        if (result.success && result.data) {
+          setRemedialPrograms(result.data);
+        }
+        setLoadingRemedial(false);
+      });
+    }
+  }, [logData]);
 
   // Forms
   const chemicalForm = useForm<ChemicalFormValues>({
@@ -220,6 +250,47 @@ export function TreatmentStep({
       : logData.reading?.ph !== undefined
         ? `pH reading: ${logData.reading.ph}`
         : 'Based on reading';
+
+  // Handle applying a remedial program
+  const handleApplyProgram = async (program: IpmRemedialProgram) => {
+    setApplyingProgram(program.id);
+
+    try {
+      // Determine target type and ID
+      const targetBatch = batches.length === 1 ? batches[0] : null;
+      const targetType = targetBatch ? 'batch' : 'location';
+
+      const result = await applyRemedialProgram({
+        programId: program.id,
+        triggeredByLogId: savedLogId || undefined,
+        targetType,
+        targetBatchId: targetBatch?.id,
+        targetLocationId: !targetBatch ? locationId : undefined,
+      });
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to apply program');
+        setApplyingProgram(null);
+        return;
+      }
+
+      // Return as a treatment completion
+      const data: TreatmentData = {
+        type: 'remedial_program',
+        remedialProgramId: program.id,
+        remedialProgramName: program.name,
+        scheduledDate: today,
+        notes: `Applied remedial program: ${program.name} for ${program.targetPestDisease}`,
+      };
+
+      onComplete(data);
+    } catch (error) {
+      console.error('Failed to apply program:', error);
+      toast.error('Failed to apply program');
+    } finally {
+      setApplyingProgram(null);
+    }
+  };
 
   async function onChemicalSubmit(values: ChemicalFormValues) {
     setIsSubmitting(true);
@@ -277,6 +348,9 @@ export function TreatmentStep({
     }
   }
 
+  const hasRemedialPrograms = remedialPrograms.length > 0;
+  const showRemedialSection = logData.logType === 'issue' && (loadingRemedial || hasRemedialPrograms);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -293,6 +367,101 @@ export function TreatmentStep({
           Skip
         </Button>
       </div>
+
+      {/* Remedial Program Suggestions */}
+      {showRemedialSection && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-orange-800">
+              <Bug className="h-4 w-4" />
+              Recommended for: {logData.issue?.reason}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {loadingRemedial ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading matching programs...
+              </div>
+            ) : remedialPrograms.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">
+                No remedial programs found for this issue. Create one in Programs or use custom treatment below.
+              </p>
+            ) : (
+              <>
+                {remedialPrograms.map((program) => (
+                  <div
+                    key={program.id}
+                    className="flex items-start justify-between p-3 bg-white rounded-lg border border-orange-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{program.name}</span>
+                        {program.treatmentUrgency === 'immediate' && (
+                          <Badge variant="destructive" className="text-[10px] gap-1">
+                            <Zap className="h-3 w-3" />
+                            Urgent
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {program.treatmentDurationDays} days
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FlaskConical className="h-3 w-3" />
+                          {program.steps?.length || 0} applications
+                        </span>
+                      </div>
+                      {program.productNames && program.productNames.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {program.productNames.slice(0, 3).map((name) => (
+                            <Badge key={name} variant="outline" className="text-[10px]">
+                              {name}
+                            </Badge>
+                          ))}
+                          {program.productNames.length > 3 && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              +{program.productNames.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApplyProgram(program)}
+                      disabled={applyingProgram !== null}
+                      className="ml-3"
+                    >
+                      {applyingProgram === program.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          Apply
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ))}
+
+                <div className="relative py-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-orange-50 px-2 text-muted-foreground">
+                      or create custom treatment
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Treatment Type Selector */}
       <div className="grid grid-cols-3 gap-2">
@@ -709,7 +878,7 @@ export function TreatmentStep({
                           <SelectContent>
                             <SelectItem value="g/L">g/L</SelectItem>
                             <SelectItem value="ml/L">ml/L</SelectItem>
-                            <SelectItem value="g/m²">g/m²</SelectItem>
+                            <SelectItem value="g/m2">g/m2</SelectItem>
                             <SelectItem value="kg/ha">kg/ha</SelectItem>
                           </SelectContent>
                         </Select>
@@ -776,4 +945,3 @@ export function TreatmentStep({
     </div>
   );
 }
-

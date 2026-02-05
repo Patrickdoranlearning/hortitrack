@@ -38,6 +38,9 @@ const nextConfig: NextConfig = {
     '@genkit-ai/next',
     'dotprompt',
     'handlebars',
+    // Sentry instrumentation packages
+    '@opentelemetry/instrumentation',
+    'require-in-the-middle',
   ],
   experimental: {
   },

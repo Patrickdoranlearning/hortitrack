@@ -115,21 +115,22 @@ export async function POST(
 
     if (dbError) throw dbError;
 
-    // Log the photo upload as a batch event
-    await supabase.from("batch_events").insert({
-      batch_id: batchId,
-      org_id: batch.org_id,
-      type: "PHOTO_UPLOAD",
-      by_user_id: user.id,
-      payload: {
-        photo_id: photoDoc.id,
-        photo_type: type,
-        url: publicUrl,
-      },
-    }).catch(() => {
+    // Log the photo upload as a batch event (non-critical)
+    try {
+      await supabase.from("batch_events").insert({
+        batch_id: batchId,
+        org_id: batch.org_id,
+        type: "PHOTO_UPLOAD",
+        by_user_id: user.id,
+        payload: {
+          photo_id: photoDoc.id,
+          photo_type: type,
+          url: publicUrl,
+        },
+      });
+    } catch {
       // Non-critical: don't fail the upload if event logging fails
-      console.warn("Failed to log photo upload event");
-    });
+    }
 
     return NextResponse.json({ ok: true, data: photoDoc }, { status: 201 });
 

@@ -15,7 +15,7 @@ export async function GET(
     const { orgId } = await getUserAndOrg();
     const scouts = await getFullBatchScoutHistory(batchId, orgId);
 
-    return NextResponse.json({ scouts }, { status: 200 });
+    return NextResponse.json({ logs: scouts }, { status: 200 });
   } catch (error) {
     console.error('[GET /scout-logs] error', error);
     return NextResponse.json(

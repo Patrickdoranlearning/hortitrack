@@ -22,6 +22,9 @@ export async function getBatchScoutHistory(
   // A more advanced query would also check location history, but the existing
   // plant_health API already captures batch-level scouts
 
+  // Query for scouts that either:
+  // 1. Have batch_id directly set to this batch
+  // 2. Have this batch in affected_batch_ids array
   const { data, error } = await supabase
     .from('plant_health_logs')
     .select(`
@@ -38,6 +41,7 @@ export async function getBatchScoutHistory(
       photo_url,
       ec_reading,
       ph_reading,
+      affected_batch_ids,
       batches!plant_health_logs_batch_id_fkey (
         batch_number,
         plant_varieties (name)
@@ -45,7 +49,7 @@ export async function getBatchScoutHistory(
     `)
     .eq('org_id', orgId)
     .eq('event_type', 'scout_flag')
-    .or(`batch_id.eq.${batchId}`)
+    .or(`batch_id.eq.${batchId},affected_batch_ids.cs.{${batchId}}`)
     .order('event_at', { ascending: false });
 
   if (error) {

@@ -24,9 +24,8 @@ import MoveForm from "@/components/batches/actions/MoveForm";
 import StatusForm from "@/components/batches/actions/StatusForm";
 import DumpForm from "@/components/batches/actions/DumpForm";
 import { TransplantIcon } from "@/components/icons";
-import { ActionMenuButton } from "@/components/actions/ActionMenuButton";
-import type { ActionMode } from "@/components/actions/types";
-import { PlayCircle, Truck } from "lucide-react";
+import { LogActionWizard } from "@/components/batches/LogActionWizard";
+import { PlayCircle, Truck, ClipboardList } from "lucide-react";
 import { ActualizeBatchDialog } from "@/components/batches/ActualizeBatchDialog";
 import { HealthIndicator } from "@/components/batch/HealthIndicator";
 import type { HealthStatusLevel } from "@/components/batch/HealthIndicator";
@@ -72,7 +71,7 @@ type BatchCardBatch = Batch & {
 type BatchCardProps = {
   batch: BatchCardBatch;
   onOpen?: (batch: BatchCardBatch) => void;
-  onLogAction?: (batch: BatchCardBatch, mode: ActionMode) => void;
+  onLogAction?: (batch: BatchCardBatch) => void; // Deprecated - wizard handles modes
   onHealthClick?: (batch: BatchCardBatch) => void;
   actionsSlot?: React.ReactNode;
   className?: string;
@@ -88,6 +87,7 @@ export function BatchCard({
 }: BatchCardProps) {
   const [open, setOpen] = useState(false);
   const [actualizeOpen, setActualizeOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const parentSummary = {
     id: batch.id,
@@ -207,15 +207,21 @@ export function BatchCard({
                 </TooltipContent>
               </Tooltip>
             )}
-            {onLogAction && !isGhostBatch && (
-              <ActionMenuButton
-                batch={batch}
-                onSelect={(mode) => onLogAction(batch, mode)}
-                variant="secondary"
-                size="sm"
-                className="sm:px-3"
-                hideLabelOnMobile
-              />
+            {!isGhostBatch && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="sm:px-3"
+                    onClick={() => setWizardOpen(true)}
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    <span className="hidden sm:inline ml-2">Log Action</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Log an action for this batch</TooltipContent>
+              </Tooltip>
             )}
             {!isGhostBatch && (
               <Dialog open={open} onOpenChange={setOpen}>
@@ -254,6 +260,25 @@ export function BatchCard({
             onSuccess={() => {
               setActualizeOpen(false);
               // Trigger a refresh - the parent should handle this
+            }}
+          />
+        )}
+
+        {/* Log Action Wizard */}
+        {!isGhostBatch && (
+          <LogActionWizard
+            open={wizardOpen}
+            onOpenChange={setWizardOpen}
+            batch={{
+              id: batch.id || '',
+              batchNumber: batch.batchNumber || '',
+              variety: batch.plantVariety?.toString(),
+              quantity: batch.quantity ?? 0,
+              saleableQuantity: (batch as any)?.saleableQuantity ?? 0,
+            }}
+            onSuccess={() => {
+              // Parent can handle refresh if needed
+              onLogAction?.(batch);
             }}
           />
         )}

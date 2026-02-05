@@ -20,13 +20,17 @@ export function ActionDialog({ open, onOpenChange, batch, locations = [], mode, 
   const resolvedLocations = React.useMemo(() => locations ?? [], [locations]);
   const hasLocations = resolvedLocations.length > 0;
 
+  // Defensive: ensure mode is valid
+  const safeMode = mode && ACTION_MODE_LABELS[mode] ? mode : "MOVE";
+  const modeConfig = ACTION_MODE_LABELS[safeMode];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg" aria-describedby="action-dialog-description">
         <DialogHeader>
-          <DialogTitle>{ACTION_MODE_LABELS[mode].title}</DialogTitle>
+          <DialogTitle>{modeConfig.title}</DialogTitle>
           <DialogDescription id="action-dialog-description">
-            {ACTION_MODE_LABELS[mode].description}
+            {modeConfig.description}
           </DialogDescription>
         </DialogHeader>
         
@@ -40,10 +44,10 @@ export function ActionDialog({ open, onOpenChange, batch, locations = [], mode, 
             <p>Add locations under Settings → Locations so moves can be logged.</p>
           </div>
         ) : (
-          <ActionForm 
-            batch={batch} 
+          <ActionForm
+            batch={batch}
             locations={resolvedLocations}
-            mode={mode}
+            mode={safeMode}
             onCancel={() => onOpenChange(false)}
             onSuccess={() => {
               onOpenChange(false);

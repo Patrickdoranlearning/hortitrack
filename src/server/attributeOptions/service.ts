@@ -28,7 +28,7 @@ export async function listAttributeOptions({
 
   const { data, error } = await sb
     .from("attribute_options")
-    .select("id, attribute_key, system_code, display_label, sort_order, is_active, behavior, color")
+    .select("id, attribute_key, system_code, display_label, sort_order, is_active, behavior, color, category")
     .eq("org_id", orgId)
     .eq("attribute_key", attributeKey)
     .order("sort_order", { ascending: true });
@@ -47,6 +47,7 @@ export async function listAttributeOptions({
           isActive: row.is_active ?? true,
           behavior: row.behavior as AttributeBehavior | null | undefined,
           color: row.color ?? null,
+          category: row.category ?? null,
           source: "custom",
         }) satisfies AttributeOption
     ) ?? [];
@@ -103,6 +104,7 @@ export async function saveAttributeOptions({ orgId, attributeKey, options, supab
           is_active: opt.isActive ?? true,
           behavior,
           color: opt.color ?? null,
+          category: opt.category ?? null,
         })
         .eq("id", existingId);
       if (updateErr) throw new Error(updateErr.message);
@@ -119,6 +121,7 @@ export async function saveAttributeOptions({ orgId, attributeKey, options, supab
           is_active: opt.isActive ?? true,
           behavior,
           color: opt.color ?? null,
+          category: opt.category ?? null,
         });
       if (insertErr) throw new Error(insertErr.message);
     }

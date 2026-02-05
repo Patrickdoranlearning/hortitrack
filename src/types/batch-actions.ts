@@ -12,13 +12,13 @@ import { z } from "zod";
 // Operational Action Categories
 // ============================================================================
 
-export type OperationalActionCategory = 'care' | 'operation';
+export type OperationalActionCategory = 'care' | 'operation' | 'log';
 
 /**
  * Simple care actions - no compliance burden
  * These are day-to-day maintenance activities
  */
-export type CareActionType = 'irrigation' | 'pruning' | 'grading' | 'mechanical';
+export type CareActionType = 'pruning' | 'weeding';
 
 /**
  * Batch operation actions - inventory/location changes
@@ -26,9 +26,14 @@ export type CareActionType = 'irrigation' | 'pruning' | 'grading' | 'mechanical'
 export type OperationActionType = 'move' | 'dump';
 
 /**
+ * Launcher actions - open other wizards
+ */
+export type LauncherActionType = 'scout' | 'saleable';
+
+/**
  * All operational actions (excludes regulated: chemical, fertilizer)
  */
-export type OperationalActionType = CareActionType | OperationActionType;
+export type OperationalActionType = CareActionType | OperationActionType | LauncherActionType;
 
 // ============================================================================
 // Sub-Types for Specific Actions
@@ -148,30 +153,20 @@ export const ACTION_META: Record<OperationalActionType, {
   category: OperationalActionCategory;
   description: string;
 }> = {
-  irrigation: {
-    label: 'Irrigation',
-    icon: 'Droplets',
-    category: 'care',
-    description: 'Water or adjust irrigation',
-  },
+  // Care actions
   pruning: {
     label: 'Pruning',
     icon: 'Scissors',
     category: 'care',
     description: 'Prune or trim plants',
   },
-  grading: {
-    label: 'Grading',
-    icon: 'Star',
+  weeding: {
+    label: 'Weeding',
+    icon: 'Leaf',
     category: 'care',
-    description: 'Grade batch quality',
+    description: 'Weed and tidy batch',
   },
-  mechanical: {
-    label: 'Mechanical',
-    icon: 'Wrench',
-    category: 'care',
-    description: 'Trimming, spacing, weeding',
-  },
+  // Operation actions
   move: {
     label: 'Move Batch',
     icon: 'MapPin',
@@ -179,10 +174,23 @@ export const ACTION_META: Record<OperationalActionType, {
     description: 'Move to different location',
   },
   dump: {
-    label: 'Log Dump/Loss',
+    label: 'Log Loss',
     icon: 'Trash2',
     category: 'operation',
     description: 'Record waste or loss',
+  },
+  // Launcher actions - open other wizards
+  scout: {
+    label: 'Scout',
+    icon: 'Search',
+    category: 'log',
+    description: 'Log observations & readings',
+  },
+  saleable: {
+    label: 'Saleable',
+    icon: 'DollarSign',
+    category: 'log',
+    description: 'Mark batch ready for sale',
   },
 };
 
@@ -224,13 +232,12 @@ export const GradingFormSchema = z.object({
 export type GradingFormInput = z.infer<typeof GradingFormSchema>;
 
 /**
- * Mechanical action form input
+ * Weeding form input
  */
-export const MechanicalFormSchema = z.object({
-  actionType: MechanicalActionTypeSchema,
+export const WeedingFormSchema = z.object({
   notes: z.string().max(500).optional(),
 });
-export type MechanicalFormInput = z.infer<typeof MechanicalFormSchema>;
+export type WeedingFormInput = z.infer<typeof WeedingFormSchema>;
 
 // ============================================================================
 // Combined Log Action Input
@@ -240,10 +247,8 @@ export type MechanicalFormInput = z.infer<typeof MechanicalFormSchema>;
  * Union type for all operational action inputs
  */
 export type LogActionInput =
-  | { actionType: 'irrigation'; data: IrrigationFormInput; batchId: string }
   | { actionType: 'pruning'; data: PruningFormInput; batchId: string }
-  | { actionType: 'grading'; data: GradingFormInput; batchId: string }
-  | { actionType: 'mechanical'; data: MechanicalFormInput; batchId: string }
+  | { actionType: 'weeding'; data: WeedingFormInput; batchId: string }
   | { actionType: 'move'; batchId: string; locationId: string; notes?: string }
   | { actionType: 'dump'; batchId: string; units: number; reason: string; notes?: string; archiveIfEmpty?: boolean };
 

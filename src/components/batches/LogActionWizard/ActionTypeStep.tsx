@@ -3,17 +3,16 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import {
-  Droplets,
   Scissors,
-  Star,
-  Wrench,
+  Leaf,
   MapPin,
   Trash2,
+  Search,
+  DollarSign,
   type LucideIcon,
 } from 'lucide-react';
 import {
   type OperationalActionType,
-  type OperationalActionCategory,
   ACTION_META,
 } from '@/types/batch-actions';
 
@@ -22,12 +21,12 @@ import {
 // ============================================================================
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  Droplets,
   Scissors,
-  Star,
-  Wrench,
+  Leaf,
   MapPin,
   Trash2,
+  Search,
+  DollarSign,
 };
 
 // ============================================================================
@@ -50,10 +49,13 @@ export function ActionTypeStep({ onSelect }: ActionTypeStepProps) {
   const operationActions = (Object.keys(ACTION_META) as OperationalActionType[]).filter(
     (key) => ACTION_META[key].category === 'operation'
   );
+  const logActions = (Object.keys(ACTION_META) as OperationalActionType[]).filter(
+    (key) => ACTION_META[key].category === 'log'
+  );
 
   const renderActionCard = (action: OperationalActionType) => {
     const meta = ACTION_META[action];
-    const Icon = ICON_MAP[meta.icon] || Wrench;
+    const Icon = ICON_MAP[meta.icon] || Leaf;
 
     return (
       <button
@@ -97,6 +99,16 @@ export function ActionTypeStep({ onSelect }: ActionTypeStepProps) {
         </h4>
         <div className="grid grid-cols-2 gap-3">
           {operationActions.map(renderActionCard)}
+        </div>
+      </div>
+
+      {/* Log Actions (Launchers) */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Log
+        </h4>
+        <div className="grid grid-cols-2 gap-3">
+          {logActions.map(renderActionCard)}
         </div>
       </div>
     </div>

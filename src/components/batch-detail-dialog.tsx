@@ -617,6 +617,7 @@ export function BatchDetailDialog({
           batchNumber: batch?.batchNumber || '',
           variety: batch?.plantVariety?.toString(),
           quantity: batch?.quantity ?? 0,
+          saleableQuantity: (batch as any)?.saleableQuantity ?? 0,
         }}
         onSuccess={() => {
           refreshStockMovements();

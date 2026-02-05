@@ -463,7 +463,7 @@ export async function fetchCustomerInteractions(
       outcome,
       created_at,
       user_id,
-      profiles:user_id (
+      profiles!customer_interactions_user_id_profiles_fkey (
         display_name,
         email
       )

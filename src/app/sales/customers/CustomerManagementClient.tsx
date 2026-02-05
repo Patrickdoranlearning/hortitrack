@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { emitMutation } from "@/lib/events/mutation-events";
 import {
   Plus,
@@ -40,6 +41,7 @@ type Props = CustomerManagementPayload;
 
 export default function CustomerManagementClient({ customers, priceLists, products }: Props) {
   const { toast } = useToast();
+  const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
@@ -467,14 +469,13 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                 </TableHeader>
               <TableBody>
                 {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
+                  <TableRow
+                    key={customer.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/sales/customers/${customer.id}`)}
+                  >
                     <TableCell className="font-medium">
-                      <Link
-                        href={`/sales/customers/${customer.id}`}
-                        className="hover:underline"
-                      >
-                        {customer.name}
-                      </Link>
+                      {customer.name}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{customer.code || "—"}</TableCell>
                     <TableCell className="hidden lg:table-cell">
@@ -483,6 +484,7 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                           <a
                             className="flex items-center gap-1 text-muted-foreground hover:underline"
                             href={`mailto:${customer.email}`}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Mail className="h-3 w-3" />
                             <span className="truncate max-w-[200px]">{customer.email}</span>
@@ -492,6 +494,7 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                           <a
                             className="flex items-center gap-1 text-muted-foreground hover:underline"
                             href={`tel:${customer.phone}`}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Phone className="h-3 w-3" />
                             {customer.phone}
@@ -516,7 +519,14 @@ export default function CustomerManagementClient({ customers, priceLists, produc
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(customer)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(customer);
+                        }}
+                      >
                         <Settings2 className="h-4 w-4 sm:mr-2" />
                         <span className="hidden sm:inline">Manage</span>
                       </Button>

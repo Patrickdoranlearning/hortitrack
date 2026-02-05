@@ -38,7 +38,7 @@ type SmartGalleryUploaderProps = {
   onUpload: (file: File) => Promise<void>;
   onDelete?: (imageId: string) => Promise<void>;
   onSetHero?: (imageId: string) => Promise<void>;
-  badgeType?: 'live_crop' | 'reference' | 'size_guide';
+  badgeType?: 'live_crop' | 'reference' | 'size_guide' | 'sales' | 'growing';
   maxImages?: number;
   disabled?: boolean;
   className?: string;
@@ -116,6 +116,10 @@ export function SmartGalleryUploader({
           return 'Reference';
         case 'size_guide':
           return 'Size Guide';
+        case 'sales':
+          return 'Sales Photo';
+        case 'growing':
+          return 'Grower Photo';
       }
     }
     switch (entityType) {

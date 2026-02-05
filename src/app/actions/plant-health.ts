@@ -4,6 +4,139 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 import { logError, logInfo } from '@/lib/log';
+import { z } from 'zod';
+
+// ============================================================================
+// Validation Schemas
+// ============================================================================
+
+const uuidSchema = z.string().uuid('Invalid ID format');
+
+const treatmentInputSchema = z.object({
+  locationId: uuidSchema,
+  productName: z.string().min(1, 'Product name is required').max(200, 'Product name too long'),
+  rate: z.number().positive('Rate must be positive'),
+  unit: z.string().min(1, 'Unit is required').max(50, 'Unit too long'),
+  method: z.string().min(1, 'Method is required').max(100, 'Method too long'),
+  reiHours: z.number().min(0, 'REI hours must be non-negative'),
+  notes: z.string().max(1000, 'Notes too long').optional(),
+  ipmProductId: uuidSchema.optional(),
+  bottleId: uuidSchema.optional(),
+  quantityUsedMl: z.number().positive('Quantity must be positive').optional(),
+});
+
+const measurementInputSchema = z.object({
+  locationId: uuidSchema,
+  ec: z.number().min(0, 'EC must be non-negative').max(10, 'EC must be 10 or less').optional(),
+  ph: z.number().min(0, 'pH must be non-negative').max(14, 'pH must be 14 or less').optional(),
+  notes: z.string().max(1000, 'Notes too long').optional(),
+  photoUrl: z.string().url('Invalid photo URL').optional(),
+}).refine(
+  (data) => data.ec !== undefined || data.ph !== undefined,
+  'At least one measurement (EC or pH) is required'
+);
+
+const flagLocationInputSchema = z.object({
+  locationId: uuidSchema,
+  issueReason: z.string().min(1, 'Issue reason is required').max(500, 'Issue reason too long'),
+  severity: z.enum(['low', 'medium', 'critical'], { errorMap: () => ({ message: 'Invalid severity level' }) }),
+  notes: z.string().max(1000, 'Notes too long').optional(),
+  photoUrl: z.string().url('Invalid photo URL').optional(),
+  affectedBatchIds: z.array(uuidSchema).optional(),
+});
+
+const scoutLogInputSchema = z.object({
+  locationId: uuidSchema.optional(),
+  batchId: uuidSchema.optional(),
+  logType: z.enum(['issue', 'reading'], { errorMap: () => ({ message: 'Invalid log type' }) }),
+  issueReason: z.string().min(1, 'Issue reason is required').max(500, 'Issue reason too long').optional(),
+  severity: z.enum(['low', 'medium', 'critical']).optional(),
+  ec: z.number().min(0).max(10).optional(),
+  ph: z.number().min(0).max(14).optional(),
+  notes: z.string().max(1000, 'Notes too long').optional(),
+  photoUrl: z.string().url('Invalid photo URL').optional(),
+  affectedBatchIds: z.array(uuidSchema).optional(),
+}).refine(
+  (data) => data.locationId || data.batchId,
+  'Either locationId or batchId is required'
+).refine(
+  (data) => {
+    if (data.logType === 'issue') {
+      return data.issueReason && data.issueReason.length > 0 && data.severity;
+    }
+    return true;
+  },
+  'Issue logs require issueReason and severity'
+).refine(
+  (data) => {
+    if (data.logType === 'reading') {
+      return data.ec !== undefined || data.ph !== undefined;
+    }
+    return true;
+  },
+  'Reading logs require at least one measurement (EC or pH)'
+);
+
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+const scheduleTreatmentInputSchema = z.object({
+  locationId: uuidSchema.optional(),
+  batchId: uuidSchema.optional(),
+  treatmentType: z.enum(['chemical', 'mechanical', 'feeding'], { errorMap: () => ({ message: 'Invalid treatment type' }) }),
+  productId: uuidSchema.optional(),
+  productName: z.string().min(1).max(200).optional(),
+  rate: z.number().positive('Rate must be positive').optional(),
+  rateUnit: z.string().max(50).optional(),
+  method: z.string().max(100).optional(),
+  applicationsTotal: z.number().int().positive('Applications must be positive').optional(),
+  applicationIntervalDays: z.number().int().positive('Interval must be positive').optional(),
+  mechanicalAction: z.enum(['trimming', 'spacing', 'weeding', 'removing']).optional(),
+  fertilizerName: z.string().max(200).optional(),
+  fertilizerRate: z.number().positive().optional(),
+  fertilizerUnit: z.string().max(50).optional(),
+  scheduledDate: z.string().regex(dateRegex, 'Invalid date format (use YYYY-MM-DD)'),
+  notes: z.string().max(1000, 'Notes too long').optional(),
+  triggeredByLogId: uuidSchema.optional(),
+}).refine(
+  (data) => data.locationId || data.batchId,
+  'Either locationId or batchId is required'
+).refine(
+  (data) => {
+    if (data.treatmentType === 'chemical') {
+      return data.productId || data.productName;
+    }
+    return true;
+  },
+  'Chemical treatments require a product'
+).refine(
+  (data) => {
+    if (data.treatmentType === 'mechanical') {
+      return data.mechanicalAction;
+    }
+    return true;
+  },
+  'Mechanical treatments require an action'
+).refine(
+  (data) => {
+    if (data.treatmentType === 'feeding') {
+      return data.fertilizerName;
+    }
+    return true;
+  },
+  'Feeding treatments require a fertilizer name'
+);
+
+const clearLocationInputSchema = z.object({
+  locationId: uuidSchema,
+  notes: z.string().max(1000, 'Notes too long').optional(),
+});
+
+const listScoutLogsInputSchema = z.object({
+  limit: z.number().int().positive().max(100).optional(),
+  offset: z.number().int().min(0).optional(),
+  locationId: uuidSchema.optional(),
+  logType: z.enum(['issue', 'reading']).optional(),
+});
 
 // ============================================================================
 // Types
@@ -58,7 +191,8 @@ export type ScoutLogInput = {
 };
 
 export type ScheduleTreatmentInput = {
-  locationId: string;
+  locationId?: string; // Optional - either locationId or batchId required
+  batchId?: string;    // Optional - for batch-only treatments
   treatmentType: 'chemical' | 'mechanical' | 'feeding';
   // Chemical
   productId?: string;
@@ -126,6 +260,12 @@ export type PlantHealthResult<T = void> =
 export async function applyLocationTreatment(
   input: TreatmentInput
 ): Promise<PlantHealthResult<{ count: number }>> {
+  // Validate input
+  const validation = treatmentInputSchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: validation.error.errors[0].message };
+  }
+
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -167,12 +307,14 @@ export async function applyLocationTreatment(
 export async function logMeasurement(
   input: MeasurementInput
 ): Promise<PlantHealthResult<{ logId: string }>> {
+  // Validate input
+  const validation = measurementInputSchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: validation.error.errors[0].message };
+  }
+
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
-
-    if (!input.ec && !input.ph) {
-      return { success: false, error: 'At least one measurement (EC or pH) is required' };
-    }
 
     const { data, error } = await supabase.from('plant_health_logs').insert({
       org_id: orgId,
@@ -208,6 +350,12 @@ export async function logMeasurement(
 export async function flagLocation(
   input: FlagLocationInput
 ): Promise<PlantHealthResult<{ logId: string }>> {
+  // Validate input
+  const validation = flagLocationInputSchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: validation.error.errors[0].message };
+  }
+
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -227,6 +375,22 @@ export async function flagLocation(
       return { success: false, error: rpcError.message };
     }
 
+    // Trigger critical alert if severity is critical
+    if (input.severity === 'critical') {
+      logInfo('[CRITICAL ALERT] Plant health issue flagged', {
+        locationId: input.locationId,
+        issueReason: input.issueReason,
+        logId: rpcResult.log_id,
+        orgId,
+        userId: user.id,
+        alertType: 'critical_plant_health_issue',
+      });
+
+      // Create audit entry for critical alert (using plant_health_logs audit trail)
+      // Future enhancement: Insert into notifications table for in-app alerts
+      // Future enhancement: Trigger email/SMS via webhook or edge function
+    }
+
     revalidatePath('/locations');
     revalidatePath('/plant-health');
     return { success: true, data: { logId: rpcResult.log_id } };
@@ -239,6 +403,12 @@ export async function flagLocation(
 export async function clearLocation(
   input: ClearLocationInput
 ): Promise<PlantHealthResult> {
+  // Validate input
+  const validation = clearLocationInputSchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: validation.error.errors[0].message };
+  }
+
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -270,19 +440,49 @@ export async function clearLocation(
 export async function createScoutLog(
   input: ScoutLogInput
 ): Promise<PlantHealthResult<{ logId: string }>> {
+  // Validate input
+  const validation = scoutLogInputSchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: validation.error.errors[0].message };
+  }
+
   try {
+    let locationId = input.locationId;
+
+    // If no locationId but batchId is provided, look up the batch's location
+    if (!locationId && input.batchId) {
+      const { supabase } = await getUserAndOrg();
+      const { data: batch, error: batchError } = await supabase
+        .from('batches')
+        .select('location_id')
+        .eq('id', input.batchId)
+        .single();
+
+      if (batchError || !batch?.location_id) {
+        logError('Failed to get batch location', { error: batchError?.message, batchId: input.batchId });
+        return { success: false, error: 'Could not find batch location' };
+      }
+      locationId = batch.location_id;
+    }
+
+    if (!locationId) {
+      return { success: false, error: 'Location is required' };
+    }
+
     if (input.logType === 'issue') {
+      // Already validated that issue logs have required fields
       return flagLocation({
-        locationId: input.locationId || '',
-        issueReason: input.issueReason || '',
-        severity: input.severity || 'medium',
+        locationId,
+        issueReason: input.issueReason!,
+        severity: input.severity!,
         notes: input.notes,
         photoUrl: input.photoUrl,
-        affectedBatchIds: input.affectedBatchIds
+        affectedBatchIds: input.affectedBatchIds || (input.batchId ? [input.batchId] : undefined)
       });
     } else {
+      // Reading log - already validated that at least one measurement exists
       return logMeasurement({
-        locationId: input.locationId || '',
+        locationId,
         ec: input.ec,
         ph: input.ph,
         notes: input.notes,
@@ -298,13 +498,23 @@ export async function createScoutLog(
 export async function scheduleTreatment(
   input: ScheduleTreatmentInput
 ): Promise<PlantHealthResult<{ treatmentId: string }>> {
+  // Validate input
+  const validation = scheduleTreatmentInputSchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: validation.error.errors[0].message };
+  }
+
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
-    const insertData: Record<string, any> = {
+    // Determine target type based on which ID is provided
+    const targetType = input.locationId ? 'location' : 'batch';
+
+    const insertData: Record<string, unknown> = {
       org_id: orgId,
-      target_type: 'location',
-      target_location_id: input.locationId,
+      target_type: targetType,
+      target_location_id: input.locationId || null,
+      target_batch_id: input.batchId || null,
       treatment_type: input.treatmentType,
       first_application_date: input.scheduledDate,
       applications_total: input.applicationsTotal || 1,
@@ -357,6 +567,12 @@ export async function scheduleTreatment(
 export async function listScoutLogs(
   input: ListScoutLogsInput = {}
 ): Promise<PlantHealthResult<{ logs: ScoutLogEntry[]; total: number }>> {
+  // Validate input
+  const validation = listScoutLogsInputSchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: validation.error.errors[0].message };
+  }
+
   try {
     const { orgId, supabase } = await getUserAndOrg();
     const { limit = 20, offset = 0, locationId, logType } = input;
@@ -456,6 +672,17 @@ export async function getLocationHealthLogs(
   severity?: string;
   notes?: string;
 }>>> {
+  // Validate input
+  const locationValidation = uuidSchema.safeParse(locationId);
+  if (!locationValidation.success) {
+    return { success: false, error: 'Invalid location ID format' };
+  }
+
+  const limitValidation = z.number().int().positive().max(100).safeParse(limit);
+  if (!limitValidation.success) {
+    return { success: false, error: 'Limit must be a positive integer up to 100' };
+  }
+
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
