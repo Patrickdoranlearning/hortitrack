@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { logError } from "@/lib/log";
 
 export async function getBatchesByIds(ids: string[]) {
   if (ids.length === 0) return [];
@@ -10,7 +11,7 @@ export async function getBatchesByIds(ids: string[]) {
     .in("id", ids);
 
   if (error) {
-    console.error("Error fetching batches:", error);
+    logError("Error fetching batches", { error: error.message });
     return [];
   }
 

@@ -1,6 +1,7 @@
 // src/server/sales/customers.server.ts
 import "server-only";
 import { z } from "zod";
+import { logError } from "@/lib/log";
 
 export const Customer = z.object({
   id: z.string(),
@@ -32,7 +33,7 @@ export async function listCustomers(limit = 100): Promise<Customer[]> {
       createdAt: d.created_at,
     }));
   } catch (e: any) {
-    console.error("Error listing customers:", e);
+    logError("Error listing customers", { error: e?.message || String(e) });
     return [];
   }
 }

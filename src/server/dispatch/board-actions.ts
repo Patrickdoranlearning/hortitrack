@@ -10,13 +10,17 @@ import {
   addOrderToDeliveryRun,
   createDeliveryRun
 } from "@/server/dispatch/queries.server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserAndOrg } from "@/server/auth/org";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import { logger, getErrorMessage } from "@/server/utils/logger";
+import { canTransition, type OrderStatus } from "@/server/sales/status";
 import type { DeliveryRunUpdate } from "@/lib/dispatch/db-types";
 
 export async function assignOrderToTeam(orderId: string, teamId: string | null) {
   try {
+    // Auth check - getUserAndOrg throws if not authenticated
+    await getUserAndOrg();
+
     const pickList = await getPickListForOrder(orderId);
     
     if (!pickList) {
@@ -45,9 +49,9 @@ export async function assignOrderToTeam(orderId: string, teamId: string | null) 
  */
 export async function assignOrderToPicker(orderId: string, pickerId: string | null) {
   try {
-    const supabase = await createClient();
+    const { orgId, supabase } = await getUserAndOrg();
     const pickList = await getPickListForOrder(orderId);
-    
+
     if (!pickList) {
       // Create pick list first if it doesn't exist
       const result = await createPickListFromOrder(orderId);
@@ -58,8 +62,9 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
         const { error } = await supabase
           .from("pick_lists")
           .update({ assigned_user_id: pickerId } as any)
-          .eq("id", result.pickList.id);
-        
+          .eq("id", result.pickList.id)
+          .eq("org_id", orgId);
+
         if (error) {
           // If column doesn't exist, log warning but don't fail
           if (error.code === "42703") {
@@ -75,8 +80,9 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
       const { error } = await supabase
         .from("pick_lists")
         .update({ assigned_user_id: pickerId } as any)
-        .eq("id", pickList.id);
-      
+        .eq("id", pickList.id)
+        .eq("org_id", orgId);
+
       if (error) {
         // If column doesn't exist, log warning but don't fail
         if (error.code === "42703") {
@@ -99,26 +105,28 @@ export async function assignOrderToPicker(orderId: string, pickerId: string | nu
 
 export async function assignOrderToRun(orderId: string, runId: string) {
   try {
-    const supabase = await createClient();
-    
+    const { orgId, supabase } = await getUserAndOrg();
+
     // Check for existing active delivery item
     const { data: existingItem } = await supabase
       .from("delivery_items")
       .select("id")
       .eq("order_id", orderId)
+      .eq("org_id", orgId)
       .in("status", ["pending", "loading", "in_transit"]) // Active statuses
       .maybeSingle(); // Use maybeSingle to avoid error if multiple (though shouldn't accept multiple active)
-      
+
     if (existingItem) {
         // Update existing
         const { error } = await supabase
             .from("delivery_items")
             .update({ delivery_run_id: runId })
-            .eq("id", existingItem.id);
-            
+            .eq("id", existingItem.id)
+            .eq("org_id", orgId);
+
         if (error) throw error;
     } else {
-        // Add new
+        // Add new (addOrderToDeliveryRun already handles org_id internally)
         await addOrderToDeliveryRun({
             deliveryRunId: runId,
             orderId: orderId,
@@ -138,6 +146,9 @@ export async function assignOrderToRun(orderId: string, runId: string) {
 
 export async function createRunAndAssign(orderId: string, haulierId: string, date: string) {
   try {
+    // Auth check - createDeliveryRun handles org_id internally via getUserAndOrg
+    await getUserAndOrg();
+
     // Create run (haulierId might be 'default' if no hauliers exist)
     // Status defaults to 'planned' in the database
     const runId = await createDeliveryRun({
@@ -163,12 +174,15 @@ export async function createRunAndAssign(orderId: string, haulierId: string, dat
  * Create a new empty delivery load (no orders assigned yet)
  */
 export async function createEmptyRoute(
-  date: string, 
-  haulierId?: string, 
+  date: string,
+  haulierId?: string,
   vehicleId?: string,
   loadCode?: string
 ) {
   try {
+    // Auth check - createDeliveryRun handles org_id internally via getUserAndOrg
+    await getUserAndOrg();
+
     const runId = await createDeliveryRun({
       runDate: date,
       haulierId: haulierId === 'default' ? undefined : haulierId,
@@ -196,6 +210,9 @@ export async function createLoadWithOrders(
   loadCode?: string
 ) {
   try {
+    // Auth check - createDeliveryRun handles org_id internally via getUserAndOrg
+    await getUserAndOrg();
+
     const runId = await createDeliveryRun({
       runDate: date,
       haulierId: haulierId === "default" ? undefined : haulierId,
@@ -217,22 +234,23 @@ export async function createLoadWithOrders(
  * Update a delivery load's details
  */
 export async function updateLoad(
-  loadId: string, 
+  loadId: string,
   updates: { loadCode?: string; haulierId?: string; vehicleId?: string; runDate?: string }
 ) {
   try {
-    const supabase = await createClient();
-    
+    const { orgId, supabase } = await getUserAndOrg();
+
     const dbUpdates: DeliveryRunUpdate = {};
     if (updates.loadCode !== undefined) dbUpdates.load_name = updates.loadCode;
     if (updates.haulierId !== undefined) dbUpdates.haulier_id = updates.haulierId || null;
     if (updates.vehicleId !== undefined) dbUpdates.vehicle_id = updates.vehicleId || null;
     if (updates.runDate !== undefined) dbUpdates.run_date = updates.runDate;
-    
+
     const { error } = await supabase
       .from("delivery_runs")
       .update(dbUpdates)
-      .eq("id", loadId);
+      .eq("id", loadId)
+      .eq("org_id", orgId);
       
     if (error) throw error;
     
@@ -250,14 +268,16 @@ export async function updateLoad(
  */
 export async function deleteLoad(loadId: string) {
   try {
-    logger.dispatch.info("Attempting to delete load", { loadId });
+    const { orgId } = await getUserAndOrg();
+    logger.dispatch.info("Attempting to delete load", { loadId, orgId });
 
-    // Use admin client to bypass any RLS issues
+    // Use admin client to bypass any RLS issues, but scope by org_id
     // Check if any orders are assigned to this load
     const { data: items, error: checkError } = await supabaseAdmin
       .from("delivery_items")
       .select("id")
       .eq("delivery_run_id", loadId)
+      .eq("org_id", orgId)
       .limit(1);
 
     if (checkError) {
@@ -271,11 +291,12 @@ export async function deleteLoad(loadId: string) {
       return { error: "Cannot delete load with assigned orders. Remove all orders first." };
     }
 
-    // Delete the load using admin client
+    // Delete the load using admin client, scoped by org_id
     const { error } = await supabaseAdmin
       .from("delivery_runs")
       .delete()
-      .eq("id", loadId);
+      .eq("id", loadId)
+      .eq("org_id", orgId);
 
     if (error) {
       logger.dispatch.error("Error deleting load", error, { loadId });
@@ -299,15 +320,16 @@ export async function deleteLoad(loadId: string) {
  */
 export async function reorderLoads(loadIds: string[]) {
   try {
-    const supabase = await createClient();
-    
-    // Update display_order for each load
+    const { orgId, supabase } = await getUserAndOrg();
+
+    // Update display_order for each load, scoped by org_id
     const results = await Promise.all(
-      loadIds.map((id, index) => 
+      loadIds.map((id, index) =>
         supabase
           .from("delivery_runs")
           .update({ display_order: index })
           .eq("id", id)
+          .eq("org_id", orgId)
       )
     );
     
@@ -331,23 +353,33 @@ export async function reorderLoads(loadIds: string[]) {
  */
 export async function removeOrderFromLoad(orderId: string) {
   try {
-    const supabase = await createClient();
-    
+    const { orgId, supabase } = await getUserAndOrg();
+
     // Delete only ACTIVE delivery items (not historical/completed ones)
     const { error } = await supabase
       .from("delivery_items")
       .delete()
       .eq("order_id", orderId)
+      .eq("org_id", orgId)
       .in("status", ["pending", "loading", "in_transit"]);
-      
+
     if (error) throw error;
-    
-    // Reset order status back to confirmed if it was packed (ready for dispatch)
-    await supabase
+
+    // Check current order status before transitioning back to confirmed
+    const { data: order } = await supabase
       .from("orders")
-      .update({ status: "confirmed" })
+      .select("status")
       .eq("id", orderId)
-      .eq("status", "packed");
+      .eq("org_id", orgId)
+      .single();
+
+    if (order && canTransition(order.status as OrderStatus, "confirmed")) {
+      await supabase
+        .from("orders")
+        .update({ status: "confirmed" })
+        .eq("id", orderId)
+        .eq("org_id", orgId);
+    }
     
     revalidatePath("/dispatch");
     revalidatePath("/dispatch/deliveries");
@@ -360,11 +392,12 @@ export async function removeOrderFromLoad(orderId: string) {
 
 export async function updateOrderDate(orderId: string, date: string) {
   try {
-    const supabase = await createClient();
+    const { orgId, supabase } = await getUserAndOrg();
     const { error } = await supabase
       .from("orders")
       .update({ requested_delivery_date: date })
-      .eq("id", orderId);
+      .eq("id", orderId)
+      .eq("org_id", orgId);
       
     if (error) throw error;
     
@@ -384,8 +417,8 @@ export async function updateOrderDate(orderId: string, date: string) {
  */
 export async function dispatchOrders(orderIds: string[], routeId?: string, haulierId?: string) {
   try {
-    const supabase = await createClient();
-    
+    const { orgId, supabase } = await getUserAndOrg();
+
     if (orderIds.length === 0) {
       return { error: "No orders provided" };
     }
@@ -395,13 +428,14 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
     // If no route specified, create a new one
     if (!targetRouteId) {
       if (!haulierId) {
-        // Get default haulier or first available
+        // Get default haulier or first available, scoped by org_id
         const { data: hauliers } = await supabase
           .from("hauliers")
           .select("id")
+          .eq("org_id", orgId)
           .eq("is_active", true)
           .limit(1);
-        
+
         haulierId = hauliers?.[0]?.id;
       }
 
@@ -419,7 +453,7 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
       return { error: "No delivery route available. Please create a haulier first or specify a route." };
     }
 
-    // Assign each order to the route
+    // Assign each order to the route, with status transition check
     const results = await Promise.allSettled(
       orderIds.map(async (orderId) => {
         await addOrderToDeliveryRun({
@@ -427,11 +461,21 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
           orderId: orderId,
           trolleysDelivered: 0,
         });
-        // Keep status at packed until the run goes in_transit
-        await supabase
+        // Check current status before transitioning to packed
+        const { data: order } = await supabase
           .from("orders")
-          .update({ status: "packed" })
-          .eq("id", orderId);
+          .select("status")
+          .eq("id", orderId)
+          .eq("org_id", orgId)
+          .single();
+
+        if (order && canTransition(order.status as OrderStatus, "packed")) {
+          await supabase
+            .from("orders")
+            .update({ status: "packed" })
+            .eq("id", orderId)
+            .eq("org_id", orgId);
+        }
       })
     );
 
@@ -464,7 +508,20 @@ export async function dispatchOrders(orderIds: string[], routeId?: string, hauli
  */
 export async function dispatchLoad(loadId: string) {
   try {
-    logger.dispatch.info("Dispatching load", { loadId });
+    const { orgId } = await getUserAndOrg();
+    logger.dispatch.info("Dispatching load", { loadId, orgId });
+
+    // Verify the load belongs to this org before dispatching
+    const { data: loadCheck, error: loadCheckError } = await supabaseAdmin
+      .from("delivery_runs")
+      .select("id")
+      .eq("id", loadId)
+      .eq("org_id", orgId)
+      .single();
+
+    if (loadCheckError || !loadCheck) {
+      return { error: "Load not found or access denied" };
+    }
 
     // Use atomic RPC function - handles all updates in single transaction
     const { data: result, error: rpcError } = await supabaseAdmin.rpc(
@@ -504,7 +561,20 @@ export async function dispatchLoad(loadId: string) {
  */
 export async function recallLoad(loadId: string) {
   try {
-    logger.dispatch.info("Recalling load", { loadId });
+    const { orgId } = await getUserAndOrg();
+    logger.dispatch.info("Recalling load", { loadId, orgId });
+
+    // Verify the load belongs to this org before recalling
+    const { data: loadCheck, error: loadCheckError } = await supabaseAdmin
+      .from("delivery_runs")
+      .select("id")
+      .eq("id", loadId)
+      .eq("org_id", orgId)
+      .single();
+
+    if (loadCheckError || !loadCheck) {
+      return { error: "Load not found or access denied" };
+    }
 
     // Use atomic RPC function - handles all updates in single transaction
     const { data: result, error: rpcError } = await supabaseAdmin.rpc(
@@ -540,8 +610,8 @@ export async function recallLoad(loadId: string) {
  */
 export async function updateLoadStatus(loadId: string, status: 'planned' | 'loading' | 'in_transit' | 'completed' | 'cancelled') {
   try {
-    const supabase = await createClient();
-    
+    const { orgId, supabase } = await getUserAndOrg();
+
     const dbUpdates: DeliveryRunUpdate = { status };
 
     // Set timestamps based on status changes
@@ -553,11 +623,12 @@ export async function updateLoadStatus(loadId: string, status: 'planned' | 'load
       dbUpdates.actual_departure_time = null;
       dbUpdates.actual_return_time = null;
     }
-    
+
     const { error } = await supabase
       .from("delivery_runs")
       .update(dbUpdates)
-      .eq("id", loadId);
+      .eq("id", loadId)
+      .eq("org_id", orgId);
 
     if (error) throw error;
 

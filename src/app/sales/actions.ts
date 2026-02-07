@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { Database } from '@/types/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logError, logInfo } from '@/lib/log';
+import { logError, logInfo, logWarning } from '@/lib/log';
+import { roundToTwo } from '@/lib/utils';
 import { z } from 'zod';
 import type { ActionResult } from '@/lib/errors';
 
@@ -170,6 +171,14 @@ export async function createOrder(data: CreateOrderInput) {
 
         const priceFromList = priceMap.get(productId);
         const unitPrice = line.unitPrice ?? priceFromList ?? 0;
+
+        if (unitPrice === 0 && !line.unitPrice) {
+          logWarning("Order line has zero price — no price found in any price list", {
+            productId,
+            productName: product.name,
+            customerId,
+          });
+        }
         
         const description = isGroupOrder
             ? (line.description || `[MIX] ${product.name || 'Product Group'}`)
@@ -426,7 +435,6 @@ export async function dispatchAndInvoice(orderId: string): Promise<ActionResult<
         .from('orders')
         .update({
             status: 'dispatched',
-            dispatch_email_sent_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -441,22 +449,13 @@ export async function dispatchAndInvoice(orderId: string): Promise<ActionResult<
         };
     }
 
-    await supabase.from('order_events').insert([
-        {
-            org_id: order.org_id,
-            order_id: orderId,
-            event_type: 'status_changed',
-            description: 'Order marked as dispatched',
-            created_by: user.id,
-        },
-        {
-            org_id: order.org_id,
-            order_id: orderId,
-            event_type: 'dispatch_email_sent',
-            description: `Dispatch notification sent to ${order.customer?.email || 'customer'}`,
-            created_by: user.id,
-        }
-    ]);
+    await supabase.from('order_events').insert({
+        org_id: order.org_id,
+        order_id: orderId,
+        event_type: 'status_changed',
+        description: 'Order dispatched and invoice generated',
+        created_by: user.id,
+    });
 
     revalidatePath('/sales/orders');
     revalidatePath(`/sales/orders/${orderId}`);
@@ -483,9 +482,6 @@ export async function getOrderDetails(orderId: string) {
     return { order };
 }
 
-function roundToTwo(value: number) {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
-}
 
 export async function getCustomerRecentOrders(customerId: string) {
     const supabase = await createClient();

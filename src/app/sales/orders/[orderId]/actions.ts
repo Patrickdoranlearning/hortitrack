@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 import { createPickListFromOrder, getPickListForOrder } from '@/server/sales/picking';
+import { logError } from '@/lib/log';
+import { roundToTwo } from '@/lib/utils';
 
 // ================================================
 // ORDER STATUS ACTIONS
@@ -92,7 +94,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
     .eq('id', orderId);
 
   if (updateError) {
-    console.error('Error updating order status:', updateError);
+    logError('Error updating order status', { error: updateError?.message || String(updateError) });
     return { error: 'Failed to update order status' };
   }
 
@@ -113,7 +115,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
         await createPickListFromOrder(orderId);
       }
     } catch (e) {
-      console.error('Failed to create pick list on order confirmation:', e);
+      logError('Failed to create pick list on order confirmation', { error: e instanceof Error ? e.message : String(e) });
       // Don't fail the status update if pick list creation fails
     }
   }
@@ -151,12 +153,12 @@ export async function voidOrder(orderId: string) {
   });
 
   if (rpcError) {
-    console.error('Error in void_order_with_allocations:', rpcError);
+    logError('Error in void_order_with_allocations', { error: rpcError?.message || String(rpcError) });
     return { error: rpcError.message || 'Failed to void order' };
   }
 
   if (!rpcResult?.success) {
-    console.error('void_order_with_allocations failed:', rpcResult?.error);
+    logError('void_order_with_allocations failed', { error: rpcResult?.error || 'Unknown error' });
     return { error: rpcResult?.error || 'Failed to void order' };
   }
 
@@ -235,8 +237,37 @@ export async function updateOrderItem(
     .eq('id', itemId);
 
   if (updateError) {
-    console.error('Error updating order item:', updateError);
+    logError('Error updating order item', { error: updateError?.message || String(updateError) });
     return { error: 'Failed to update order item' };
+  }
+
+  // If quantity was reduced, check if allocations exceed new quantity and release excess
+  if (updates.quantity !== undefined && updates.quantity < item.quantity) {
+    const { data: allocations } = await supabase
+      .from('batch_allocations')
+      .select('id, quantity, status')
+      .eq('order_item_id', itemId)
+      .in('status', ['reserved', 'allocated'])
+      .order('created_at', { ascending: false });
+
+    if (allocations && allocations.length > 0) {
+      const totalAllocated = allocations.reduce((sum, a) => sum + a.quantity, 0);
+      if (totalAllocated > quantity) {
+        let excess = totalAllocated - quantity;
+        for (const alloc of allocations) {
+          if (excess <= 0) break;
+          const { error: cancelError } = await supabase.rpc('fn_cancel_allocation', {
+            p_allocation_id: alloc.id,
+            p_reason: `Order item quantity reduced from ${item.quantity} to ${quantity}`,
+            p_actor_id: user.id,
+          });
+          if (cancelError) {
+            logError('Error cancelling excess allocation', { error: cancelError.message, allocationId: alloc.id, itemId });
+          }
+          excess -= alloc.quantity;
+        }
+      }
+    }
   }
 
   // Recalculate order totals
@@ -297,6 +328,26 @@ export async function deleteOrderItem(itemId: string) {
     return { error: 'Order cannot be edited in current status' };
   }
 
+  // Release any allocations for this item before deleting
+  const { data: allocations } = await supabase
+    .from('batch_allocations')
+    .select('id, quantity, status')
+    .eq('order_item_id', itemId)
+    .in('status', ['reserved', 'allocated']);
+
+  if (allocations && allocations.length > 0) {
+    for (const alloc of allocations) {
+      const { error: cancelError } = await supabase.rpc('fn_cancel_allocation', {
+        p_allocation_id: alloc.id,
+        p_reason: 'Order item deleted',
+        p_actor_id: user.id,
+      });
+      if (cancelError) {
+        logError('Error cancelling allocation on item delete', { error: cancelError.message, allocationId: alloc.id, itemId });
+      }
+    }
+  }
+
   // Delete item
   const { error: deleteError } = await supabase
     .from('order_items')
@@ -304,7 +355,7 @@ export async function deleteOrderItem(itemId: string) {
     .eq('id', itemId);
 
   if (deleteError) {
-    console.error('Error deleting order item:', deleteError);
+    logError('Error deleting order item', { error: deleteError?.message || String(deleteError) });
     return { error: 'Failed to delete order item' };
   }
 
@@ -507,7 +558,4 @@ async function recalculateOrderTotals(orderId: string) {
     .eq('id', orderId);
 }
 
-function roundToTwo(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
 

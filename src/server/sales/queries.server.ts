@@ -1,9 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import type { Supplier, Batch } from "@/lib/types";
+import type { Batch } from "@/lib/types";
 import type { Database } from "@/types/supabase";
-import { logError } from "@/lib/log";
+import { logError, logWarning } from "@/lib/log";
 
 // Type helpers for database queries
 type OrderRow = Database['public']['Tables']['orders']['Row'];
@@ -14,6 +14,14 @@ type CustomerAddressRow = Database['public']['Tables']['customer_addresses']['Ro
 interface OrderWithRelations extends OrderRow {
   customers?: Pick<CustomerRow, 'name'> | null;
   customer_addresses?: Pick<CustomerAddressRow, 'county' | 'city'> | null;
+}
+
+interface OrderLine {
+  id: string;
+  plantVariety: string;
+  size: string;
+  qty: number | null;
+  unitPrice: number | null;
 }
 
 export const OrderSchema = z.object({
@@ -51,7 +59,7 @@ export async function listOrders(params: {
   page: number;
   pageSize: number;
 }> {
-  const supabase = await createClient();
+  const { supabase, orgId } = await getUserAndOrg();
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.max(1, Math.min(params.pageSize ?? 20, 100));
   const from = (page - 1) * pageSize;
@@ -66,6 +74,7 @@ export async function listOrders(params: {
   let query = supabase
     .from("orders")
     .select("*, customers(name), customer_addresses!orders_ship_to_address_id_fkey(county, city)", { count: "estimated" })
+    .eq("org_id", orgId)
     .order(sortBy, { ascending })
     .range(from, to);
 
@@ -147,12 +156,13 @@ export async function createOrder(input: NewOrder): Promise<string> {
   if (error) throw error;
   return data.id;
 }
-export async function getOrderById(orderId: string): Promise<Order & { lines: any[] } | null> {
-  const supabase = await createClient();
+export async function getOrderById(orderId: string): Promise<Order & { lines: OrderLine[] } | null> {
+  const { supabase, orgId } = await getUserAndOrg();
   const { data: order, error: orderErr } = await supabase
     .from("orders")
     .select("*, customers(name)")
     .eq("id", orderId)
+    .eq("org_id", orgId)
     .single();
 
   if (orderErr || !order) return null;
@@ -183,18 +193,22 @@ export async function getOrderById(orderId: string): Promise<Order & { lines: an
 }
 
 
-export async function getCustomers(): Promise<Supplier[]> {
-  const supabase = await createClient();
+export async function getCustomers(): Promise<CustomerRow[]> {
+  const { supabase, orgId } = await getUserAndOrg();
   const { data, error } = await supabase
     .from("customers")
     .select("*")
+    .eq("org_id", orgId)
     .order("name");
 
   if (error) {
-    console.error("Error fetching customers:", error);
+    logError("Error fetching customers", {
+      message: error.message,
+      code: error.code,
+    });
     return [];
   }
-  return data as any[]; // Map to Supplier/Customer type if needed
+  return data ?? [];
 }
 
 export interface SaleableProduct {
@@ -242,7 +256,7 @@ export async function getSaleableProducts(): Promise<SaleableProduct[]> {
   }
 
   // Fallback to JS aggregation if RPC not available
-  console.warn("get_product_availability RPC not available, using fallback");
+  logWarning("get_product_availability RPC not available, using fallback", {});
   return getSaleableProductsFallback();
 }
 

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import type { ProductManagementPayload, ProductSummary, BatchMapping } from "./types";
+import { logError, logWarning } from "@/lib/log";
 
 type SupabaseServerClient = SupabaseClient<Database>;
 
@@ -233,7 +234,7 @@ export async function fetchProductManagementData(
       .order("batch_number", { ascending: true })
       .then(async (res) => {
         if (res.error) {
-          console.error("[fetchProductManagementData] batches query failed", {
+          logError("[fetchProductManagementData] batches query failed", {
             message: res.error.message,
             details: res.error.details,
             hint: res.error.hint,
@@ -265,15 +266,15 @@ export async function fetchProductManagementData(
         ]);
 
         if (varietiesRes.error) {
-          console.warn(
+          logWarning(
             "[fetchProductManagementData] plant_varieties lookup failed",
-            varietiesRes.error
+            { error: varietiesRes.error.message }
           );
         }
         if (sizesRes.error) {
-          console.warn(
+          logWarning(
             "[fetchProductManagementData] plant_sizes lookup failed",
-            sizesRes.error
+            { error: sizesRes.error.message }
           );
         }
 

@@ -201,7 +201,6 @@ export default function ProductGroupsClient({
   }
 
   async function handleSaveGroup() {
-    console.log('handleSaveGroup called', formData);
     if (!formData.name.trim()) {
       toast.error('Group name is required');
       return;
@@ -220,9 +219,7 @@ export default function ProductGroupsClient({
         matchSizeIds: formData.matchSizeIds.length > 0 ? formData.matchSizeIds : null,
         isActive: formData.isActive,
       };
-      console.log('Calling upsertProductGroupAction with:', payload);
       const result = await upsertProductGroupAction(payload);
-      console.log('Result:', result);
 
       if (result.success) {
         toast.success(formData.id ? 'Group updated' : 'Group created');

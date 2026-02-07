@@ -160,9 +160,28 @@ function parsePayload(raw: unknown): Record<string, unknown> | null {
   }
 }
 
-export async function buildBatchHistory(rootId: string): Promise<BatchHistory> {
+export async function buildBatchHistory(rootId: string, orgId?: string): Promise<BatchHistory> {
   if (!isValidDocId(rootId)) {
     throw new Error("Invalid batch ID provided.");
+  }
+
+  // If orgId is provided, verify the batch belongs to this org before returning data
+  if (orgId) {
+    const supabase = getSupabaseAdmin();
+    const { data: orgCheck, error: orgCheckError } = await supabase
+      .from("batches")
+      .select("id")
+      .eq("id", rootId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+
+    if (orgCheckError || !orgCheck) {
+      return {
+        batch: { id: rootId },
+        graph: { nodes: [], edges: [] },
+        logs: [],
+      };
+    }
   }
 
   const batch = await readBatch(rootId);

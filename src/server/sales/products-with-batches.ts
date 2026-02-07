@@ -1,4 +1,5 @@
 import { getSupabaseServerApp } from '@/server/db/supabase';
+import { logError } from '@/lib/log';
 
 export interface BatchInfo {
   id: string;
@@ -66,7 +67,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     .eq('is_active', true);
 
   if (productsError) {
-    console.error('Error fetching products:', productsError);
+    logError('Error fetching products', { error: productsError.message });
     return [];
   }
 
@@ -97,7 +98,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     .in('product_id', productIds);
 
   if (pbError) {
-    console.error('Error fetching product batches:', pbError);
+    logError('Error fetching product batches', { error: pbError.message });
   }
 
   // First get available status IDs (needed for all batch queries)
@@ -162,7 +163,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
         .gt('quantity', 0);
 
       if (matchBatchError) {
-        console.error('Error fetching family/genus-matched batches:', matchBatchError);
+        logError('Error fetching family/genus-matched batches', { error: matchBatchError.message });
       }
 
       // Group batches by family and genus (for quick lookup when building product->batch map)
@@ -231,7 +232,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
   const { data: batches, error: batchesError } = await batchQuery.order('planted_at', { ascending: true });
 
   if (batchesError) {
-    console.error('Error fetching batches:', batchesError);
+    logError('Error fetching batches', { error: batchesError.message });
     return [];
   }
 
@@ -271,7 +272,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     .in('product_id', productIds);
 
   if (aliasError) {
-    console.error('Error fetching product aliases:', aliasError);
+    logError('Error fetching product aliases', { error: aliasError.message });
   }
 
   // Fetch default prices from product_prices for products (join with price_lists to get default list)
@@ -284,7 +285,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
       .in('product_id', productIds);
 
     if (priceError) {
-      console.error('Error fetching price items:', priceError);
+      logError('Error fetching price items', { error: priceError.message });
     }
 
     // Create a map of default prices by product
@@ -326,7 +327,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     .in('orders.status', activeOrderStatuses);
 
   if (orderError) {
-    console.error('Error fetching order reservations:', orderError);
+    logError('Error fetching order reservations', { error: orderError.message });
   }
 
   // Calculate reserved quantity per product from confirmed orders
@@ -350,11 +351,13 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     .eq('is_active', true);
 
   if (groupsError) {
-    console.error('Error fetching product groups:', groupsError);
+    logError('Error fetching product groups', { error: groupsError.message });
   }
 
   // Map to track which groups each product belongs to
   const productGroupMembershipMap = new Map<string, { groupId: string; groupName: string }[]>();
+  // Track how many member products each group has (for proportional reservation)
+  const groupMemberCountMap = new Map<string, number>();
 
   // Get members for each group using the RPC function
   if (productGroups && productGroups.length > 0) {
@@ -364,7 +367,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
           .rpc('get_product_group_members', { p_group_id: group.id });
 
         if (error) {
-          console.error(`Error fetching members for group ${group.id}:`, error);
+          logError(`Error fetching members for group ${group.id}`, { error: error.message });
           return { group, members: [] };
         }
         return {
@@ -374,8 +377,9 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
       })
     );
 
-    // Build reverse mapping: product -> groups it belongs to
+    // Build reverse mapping: product -> groups it belongs to + member counts
     groupMemberResults.forEach(({ group, members }) => {
+      groupMemberCountMap.set(group.id, Math.max(1, members.length));
       members.forEach((member) => {
         if (!productGroupMembershipMap.has(member.product_id)) {
           productGroupMembershipMap.set(member.product_id, []);
@@ -401,7 +405,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
       .in('orders.status', activeOrderStatuses);
 
     if (groupOrderError) {
-      console.error('Error fetching group order reservations:', groupOrderError);
+      logError('Error fetching group order reservations', { error: groupOrderError.message });
     }
 
     groupOrderReservations?.forEach((item) => {
@@ -412,14 +416,15 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     });
   }
 
-  // Calculate group-level reservations per product
-  // A product's group reservation = sum of reservations for all groups it belongs to
-  // This is distributed across all products in the group (shown as indicator, not direct reduction)
+  // Calculate group-level reservations per product (proportional share)
+  // Each product gets its share = groupReservation / memberCount for each group it belongs to
   const productGroupReservedMap = new Map<string, number>();
   productGroupMembershipMap.forEach((groups, productId) => {
     let totalGroupReserved = 0;
     groups.forEach(({ groupId }) => {
-      totalGroupReserved += groupReservedMap.get(groupId) || 0;
+      const groupReserved = groupReservedMap.get(groupId) || 0;
+      const memberCount = groupMemberCountMap.get(groupId) || 1;
+      totalGroupReserved += Math.ceil(groupReserved / memberCount);
     });
     productGroupReservedMap.set(productId, totalGroupReserved);
   });
@@ -638,14 +643,14 @@ export async function getVarietiesWithBatches(orgId: string) {
 
   const { data: batches, error } = await supabase
     .from('batches')
-    .select('id, batch_number, quantity, status, status_id, phase, planted_at, plant_variety_id, size_id, location_id')
+    .select('id, batch_number, quantity, reserved_quantity, status, status_id, phase, planted_at, plant_variety_id, size_id, location_id')
     .eq('org_id', orgId)
     .in('status_id', availableStatusIds.length > 0 ? availableStatusIds : ['00000000-0000-0000-0000-000000000000'])
     .gt('quantity', 0)
     .order('planted_at', { ascending: true });
 
   if (error) {
-    console.error('Error fetching varieties with batches:', error);
+    logError('Error fetching varieties with batches', { error: error.message });
     return [];
   }
 
@@ -717,14 +722,15 @@ export async function getVarietiesWithBatches(orgId: string) {
     }
 
     const group = groupedMap.get(key)!;
-    group.totalQuantity += batch.quantity || 0;
+    const availableQty = Math.max(0, (batch.quantity || 0) - (batch.reserved_quantity || 0));
+    group.totalQuantity += availableQty;
     group.batches.push({
       id: batch.id,
       batchNumber: batch.batch_number || '',
       plantVariety: variety?.name || '',
       family: variety?.family || null,
       size: size?.name || '',
-      quantity: batch.quantity || 0,
+      quantity: availableQty,
       grade: qc?.grade ?? undefined,
       location: locationMap.get(batch.location_id),
       status: batch.status || '',

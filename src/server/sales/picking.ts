@@ -18,6 +18,176 @@ function extractName(joined: unknown): string | undefined {
 }
 
 // ================================================
+// ROW SHAPES (for Supabase query results)
+// ================================================
+
+/** Row shape from picking_teams with member count join */
+interface PickingTeamRow {
+  id: string;
+  org_id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  picking_team_members: Array<{ count: number }>;
+}
+
+/** Row shape from picking_team_members with profile join */
+interface TeamMemberRow {
+  id: string;
+  team_id: string;
+  user_id: string;
+  is_lead: boolean;
+  profiles: { display_name: string | null; email: string | null } | null;
+}
+
+/** Row shape from employees table */
+interface EmployeeRow {
+  id: string;
+  org_id: string;
+  name: string;
+  role: string | null;
+  phone: string | null;
+  email: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+/** Row shape from team_employees with employees join */
+interface TeamEmployeeRow {
+  id: string;
+  team_id: string;
+  employee_id: string;
+  is_lead: boolean;
+  employees: { name: string; role: string | null } | null;
+}
+
+/** Row shape from picking_team_members with picking_teams join */
+interface UserTeamJoinRow {
+  picking_teams: {
+    id: string;
+    org_id: string;
+    name: string;
+    description: string | null;
+    is_active: boolean;
+    created_at: string;
+  } | null;
+}
+
+/** Row shape from order_items for createPickList */
+interface OrderItemForPickRow {
+  id: string;
+  quantity: number;
+  skus: { plant_variety_id: string | null; size_id: string | null } | null;
+  product_id: string | null;
+}
+
+/** Row shape from pick_lists with orders/teams joins for mapPickListRow */
+interface PickListJoinRow {
+  id: string;
+  org_id: string;
+  order_id: string;
+  assigned_team_id: string | null;
+  assigned_user_id: string | null;
+  sequence: number;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  started_by: string | null;
+  completed_by: string | null;
+  notes: string | null;
+  created_at: string;
+  orders?: {
+    order_number: string;
+    status: string;
+    requested_delivery_date: string | null;
+    customer_id: string;
+    customers: { name: string } | null;
+    customer_addresses?: Array<{ county: string | null }> | { county: string | null } | null;
+  } | null;
+  picking_teams?: { name: string } | null;
+}
+
+/** Row shape from pick_items with deep joins */
+interface PickItemJoinRow {
+  id: string;
+  pick_list_id: string;
+  order_item_id: string;
+  target_qty: number;
+  picked_qty: number;
+  status: string;
+  original_batch_id: string | null;
+  picked_batch_id: string | null;
+  substitution_reason: string | null;
+  notes: string | null;
+  picked_at: string | null;
+  picked_by: string | null;
+  location_hint: string | null;
+  order_items?: {
+    description: string | null;
+    quantity: number;
+    product_group_id: string | null;
+    unit_price_ex_vat: number | null;
+    skus?: { code: string | null; plant_varieties?: { name: string | null } | null; plant_sizes?: { name: string | null } | null } | null;
+    products?: { name: string | null } | null;
+    product_groups?: { name: string | null } | null;
+  } | null;
+  original_batch?: { batch_number: string; nursery_locations?: { name: string } | null } | null;
+  picked_batch?: { batch_number: string; nursery_locations?: { name: string } | null } | null;
+}
+
+/** Row shape from pick_item_batches with batches join */
+interface BatchPickJoinRow {
+  id: string;
+  pick_item_id: string;
+  batch_id: string;
+  quantity: number;
+  picked_at: string | null;
+  picked_by: string | null;
+  batches: { batch_number: string; nursery_locations?: { name: string } | null } | null;
+}
+
+/** Row shape from pick_lists with order join for multi-list */
+interface PickListOrderJoinRow {
+  id: string;
+  orders: {
+    order_number: string;
+    customers: { name: string } | null;
+  } | null;
+}
+
+/** Row shape from order_items for getAvailableBatchesForItem */
+interface OrderItemForAvailableRow {
+  required_variety_id: string | null;
+  required_batch_id: string | null;
+  product_id: string | null;
+  product_group_id: string | null;
+  skus: { plant_variety_id: string | null; size_id: string | null } | null;
+}
+
+/** Row from get_product_group_members RPC */
+interface GroupMemberRpcRow {
+  product_id: string;
+}
+
+/** Row from product_batches with joins */
+interface ProductBatchJoinRow {
+  product_id: string;
+  products: { name: string | null; shelf_quantity_override: number | null; skus?: { plant_sizes?: { shelf_quantity: number | null } | null } | null } | null;
+  batches: { id: string; batch_number: string; quantity: number; status: string | null; planted_at?: string | null; nursery_locations?: { name: string } | null } | null;
+}
+
+/** Row from batches with nursery_locations join */
+interface BatchWithLocationRow {
+  id: string;
+  batch_number: string;
+  quantity: number;
+  status: string | null;
+  nursery_locations: { name: string } | null;
+}
+
+// ================================================
 // TYPES
 // ================================================
 
@@ -155,11 +325,11 @@ export async function getPickingTeams(orgId: string): Promise<PickingTeam[]> {
       return [];
     }
 
-    return (data || []).map((t: any) => ({
+    return ((data || []) as unknown as PickingTeamRow[]).map((t) => ({
       id: t.id,
       orgId: t.org_id,
       name: t.name,
-      description: t.description,
+      description: t.description ?? undefined,
       isActive: t.is_active,
       createdAt: t.created_at,
       memberCount: t.picking_team_members?.[0]?.count ?? 0,
@@ -263,13 +433,13 @@ export async function getTeamMembers(teamId: string): Promise<PickingTeamMember[
     return [];
   }
 
-  return (data || []).map((m: any) => ({
+  return ((data || []) as unknown as TeamMemberRow[]).map((m) => ({
     id: m.id,
     teamId: m.team_id,
     userId: m.user_id,
     isLead: m.is_lead,
-    displayName: m.profiles?.display_name,
-    email: m.profiles?.email,
+    displayName: m.profiles?.display_name ?? undefined,
+    email: m.profiles?.email ?? undefined,
   }));
 }
 
@@ -318,15 +488,15 @@ export async function getEmployees(orgId: string): Promise<Employee[]> {
       return [];
     }
 
-    return (data || []).map((e: any) => ({
+    return ((data || []) as unknown as EmployeeRow[]).map((e) => ({
       id: e.id,
       orgId: e.org_id,
       name: e.name,
-      role: e.role,
-      phone: e.phone,
-      email: e.email,
+      role: e.role ?? undefined,
+      phone: e.phone ?? undefined,
+      email: e.email ?? undefined,
       isActive: e.is_active,
-      notes: e.notes,
+      notes: e.notes ?? undefined,
       createdAt: e.created_at,
     }));
   } catch (e) {
@@ -421,13 +591,13 @@ export async function getTeamEmployees(teamId: string): Promise<TeamEmployee[]> 
       return [];
     }
 
-    return (data || []).map((m: any) => ({
+    return ((data || []) as unknown as TeamEmployeeRow[]).map((m) => ({
       id: m.id,
       teamId: m.team_id,
       employeeId: m.employee_id,
       isLead: m.is_lead,
       employeeName: m.employees?.name,
-      employeeRole: m.employees?.role,
+      employeeRole: m.employees?.role ?? undefined,
     }));
   } catch (e) {
     logError("Exception fetching team employees", { error: String(e), teamId });
@@ -501,15 +671,15 @@ export async function getUserTeams(userId: string): Promise<PickingTeam[]> {
       return [];
     }
 
-    return (data || [])
-      .filter((d: any) => d.picking_teams)
-      .map((d: any) => ({
-        id: d.picking_teams.id,
-        orgId: d.picking_teams.org_id,
-        name: d.picking_teams.name,
-        description: d.picking_teams.description,
-        isActive: d.picking_teams.is_active,
-        createdAt: d.picking_teams.created_at,
+    return ((data || []) as unknown as UserTeamJoinRow[])
+      .filter((d) => d.picking_teams)
+      .map((d) => ({
+        id: d.picking_teams!.id,
+        orgId: d.picking_teams!.org_id,
+        name: d.picking_teams!.name,
+        description: d.picking_teams!.description ?? undefined,
+        isActive: d.picking_teams!.is_active,
+        createdAt: d.picking_teams!.created_at,
       }));
   } catch (e) {
     logError("Exception fetching user teams", { error: String(e), userId });
@@ -578,10 +748,11 @@ export async function createPickList(
     `)
     .eq("order_id", input.orderId);
 
-  const totalQty = orderItems?.reduce((sum, oi: any) => sum + (oi.quantity || 0), 0) ?? 0;
+  const typedOrderItems = (orderItems || []) as unknown as OrderItemForPickRow[];
+  const totalQty = typedOrderItems.reduce((sum, oi) => sum + (oi.quantity || 0), 0);
 
-  if (orderItems && orderItems.length > 0) {
-    const orderItemIds = orderItems.map((oi: any) => oi.id);
+  if (typedOrderItems.length > 0) {
+    const orderItemIds = typedOrderItems.map((oi) => oi.id);
     const { data: allocations } = await supabase
       .from("batch_allocations")
       .select("order_item_id, batch_id, quantity")
@@ -609,7 +780,7 @@ export async function createPickList(
       }
     }
 
-    const pickItems = orderItems.map((oi: any) => {
+    const pickItems = typedOrderItems.map((oi) => {
       const batchId = allocationMap.get(oi.id);
       return {
         pick_list_id: data.id,
@@ -639,7 +810,7 @@ export async function createPickList(
       sourceRefType: "pick_list",
       sourceRefId: data.id,
       title: `Pick Order #${orderData?.order_number || "Unknown"} - ${customerName}`,
-      description: `Pick list for order ${orderData?.order_number}. ${orderItems?.length || 0} line items, ${totalQty} total units.`,
+      description: `Pick list for order ${orderData?.order_number}. ${typedOrderItems.length} line items, ${totalQty} total units.`,
       taskType: "picking",
       assignedTeamId: input.assignedTeamId,
       scheduledDate: orderData?.requested_delivery_date ?? undefined,
@@ -695,7 +866,7 @@ export async function getPickListsForTeam(
     return [];
   }
 
-  return (data || []).map(mapPickListRow);
+  return ((data || []) as unknown as PickListJoinRow[]).map(mapPickListRow);
 }
 
 export async function getPickListsForOrg(
@@ -745,7 +916,7 @@ export async function getPickListsForOrg(
       return [];
     }
 
-    return (data || []).map(mapPickListRow);
+    return ((data || []) as unknown as PickListJoinRow[]).map(mapPickListRow);
   } catch (e) {
     logError("Exception fetching pick lists", { error: String(e), orgId });
     return [];
@@ -846,24 +1017,24 @@ export async function getPickListById(pickListId: string): Promise<PickList | nu
     logError("Error fetching pick list", { error: error.message, pickListId });
     return null;
   }
-  return mapPickListRow(data);
+  return mapPickListRow(data as unknown as PickListJoinRow);
 }
 
-function mapPickListRow(row: any): PickList {
+function mapPickListRow(row: PickListJoinRow): PickList {
   const addresses = row.orders?.customer_addresses;
   const address = Array.isArray(addresses) ? addresses[0] : addresses;
   return {
     id: row.id, orgId: row.org_id, orderId: row.order_id,
-    assignedTeamId: row.assigned_team_id, assignedUserId: row.assigned_user_id,
-    sequence: row.sequence, status: row.status,
-    startedAt: row.started_at, completedAt: row.completed_at,
-    startedBy: row.started_by, completedBy: row.completed_by,
-    notes: row.notes, createdAt: row.created_at,
+    assignedTeamId: row.assigned_team_id ?? undefined, assignedUserId: row.assigned_user_id ?? undefined,
+    sequence: row.sequence, status: row.status as PickListStatus,
+    startedAt: row.started_at ?? undefined, completedAt: row.completed_at ?? undefined,
+    startedBy: row.started_by ?? undefined, completedBy: row.completed_by ?? undefined,
+    notes: row.notes ?? undefined, createdAt: row.created_at,
     orderNumber: row.orders?.order_number, orderStatus: row.orders?.status,
-    customerName: row.orders?.customers?.name,
-    requestedDeliveryDate: row.orders?.requested_delivery_date,
+    customerName: row.orders?.customers?.name ?? undefined,
+    requestedDeliveryDate: row.orders?.requested_delivery_date ?? undefined,
     teamName: row.picking_teams?.name,
-    county: address?.county,
+    county: address?.county ?? undefined,
   };
 }
 
@@ -957,12 +1128,16 @@ export async function updatePickListSequence(pickListId: string, newSequence: nu
 
 export async function reorderPickLists(orgId: string, teamId: string | null, orderedIds: string[]): Promise<{ error?: string }> {
   const supabase = await getSupabaseServerApp();
-  for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await supabase.from("pick_lists").update({ sequence: i + 1 }).eq("id", orderedIds[i]);
-    if (error) {
-      logError("Error reordering pick lists", { error: error.message, orgId });
-      return { error: error.message };
-    }
+  // Batch all updates in parallel to minimize partial-failure window
+  const results = await Promise.all(
+    orderedIds.map((id, i) =>
+      supabase.from("pick_lists").update({ sequence: i + 1 }).eq("id", id)
+    )
+  );
+  const firstError = results.find(r => r.error);
+  if (firstError?.error) {
+    logError("Error reordering pick lists", { error: firstError.error.message, orgId });
+    return { error: firstError.error.message };
   }
   return {};
 }
@@ -981,7 +1156,8 @@ export async function getPickItems(pickListId: string): Promise<PickItem[]> {
   }
 
   // Fetch batch picks for all items in this pick list
-  const pickItemIds = (data || []).map((row: any) => row.id);
+  const typedPickItems = (data || []) as unknown as PickItemJoinRow[];
+  const pickItemIds = typedPickItems.map((row) => row.id);
   const batchPicksMap = new Map<string, BatchPick[]>();
 
   if (pickItemIds.length > 0) {
@@ -996,13 +1172,13 @@ export async function getPickItems(pickListId: string): Promise<PickItem[]> {
     if (batchPicksError) {
       logWarning("Error fetching batch picks", { error: batchPicksError.message, pickListId });
     } else if (batchPicksData) {
-      for (const bp of batchPicksData) {
+      for (const bp of batchPicksData as unknown as BatchPickJoinRow[]) {
         const batchPick: BatchPick = {
           id: bp.id,
           batchId: bp.batch_id,
-          batchNumber: (bp.batches as any)?.batch_number || "",
+          batchNumber: bp.batches?.batch_number || "",
           quantity: bp.quantity,
-          location: (bp.batches as any)?.nursery_locations?.name,
+          location: bp.batches?.nursery_locations?.name,
           pickedAt: bp.picked_at || undefined,
           pickedBy: bp.picked_by || undefined,
         };
@@ -1013,23 +1189,23 @@ export async function getPickItems(pickListId: string): Promise<PickItem[]> {
     }
   }
 
-  return (data || []).map((row: any) => {
+  return typedPickItems.map((row) => {
     const isProductGroup = Boolean(row.order_items?.product_group_id);
     return {
       id: row.id, pickListId: row.pick_list_id, orderItemId: row.order_item_id,
-      targetQty: row.target_qty, pickedQty: row.picked_qty, status: row.status,
-      originalBatchId: row.original_batch_id, pickedBatchId: row.picked_batch_id,
-      substitutionReason: row.substitution_reason, notes: row.notes,
-      pickedAt: row.picked_at, pickedBy: row.picked_by, locationHint: row.location_hint,
-      productName: row.order_items?.products?.name || row.order_items?.description,
-      plantVariety: row.order_items?.skus?.plant_varieties?.name,
-      size: row.order_items?.skus?.plant_sizes?.name,
+      targetQty: row.target_qty, pickedQty: row.picked_qty, status: row.status as PickItemStatus,
+      originalBatchId: row.original_batch_id ?? undefined, pickedBatchId: row.picked_batch_id ?? undefined,
+      substitutionReason: row.substitution_reason ?? undefined, notes: row.notes ?? undefined,
+      pickedAt: row.picked_at ?? undefined, pickedBy: row.picked_by ?? undefined, locationHint: row.location_hint ?? undefined,
+      productName: row.order_items?.products?.name || row.order_items?.description || undefined,
+      plantVariety: row.order_items?.skus?.plant_varieties?.name ?? undefined,
+      size: row.order_items?.skus?.plant_sizes?.name ?? undefined,
       originalBatchNumber: row.original_batch?.batch_number,
       pickedBatchNumber: row.picked_batch?.batch_number,
       batchLocation: row.original_batch?.nursery_locations?.name || row.picked_batch?.nursery_locations?.name,
       unitPriceExVat: row.order_items?.unit_price_ex_vat ?? undefined,
-      isProductGroup, productGroupId: row.order_items?.product_group_id,
-      productGroupName: isProductGroup ? row.order_items?.product_groups?.name : undefined,
+      isProductGroup, productGroupId: row.order_items?.product_group_id ?? undefined,
+      productGroupName: isProductGroup ? row.order_items?.product_groups?.name ?? undefined : undefined,
       batchPicks: batchPicksMap.get(row.id) || [],
     };
   });
@@ -1044,8 +1220,8 @@ export async function getPickItemsForMultipleLists(pickListIds: string[]): Promi
 
   const { data: pickListsData } = await supabase.from("pick_lists").select(`id, orders(order_number, customers(name))`).in("id", pickListIds);
   const pickListMap = new Map<string, { orderNumber?: string; customerName?: string }>();
-  const pickLists = (pickListsData || []).map((pl: any) => {
-    const info = { id: pl.id, orderNumber: pl.orders?.order_number, customerName: pl.orders?.customers?.name };
+  const pickLists = ((pickListsData || []) as unknown as PickListOrderJoinRow[]).map((pl) => {
+    const info = { id: pl.id, orderNumber: pl.orders?.order_number, customerName: pl.orders?.customers?.name ?? undefined };
     pickListMap.set(pl.id, info);
     return info;
   });
@@ -1061,17 +1237,17 @@ export async function getPickItemsForMultipleLists(pickListIds: string[]): Promi
     return { items: [], pickLists };
   }
 
-  const items = (data || []).map((row: any) => {
+  const items = ((data || []) as unknown as PickItemJoinRow[]).map((row) => {
     const pickListInfo = pickListMap.get(row.pick_list_id);
     return {
       id: row.id, pickListId: row.pick_list_id, orderItemId: row.order_item_id,
-      targetQty: row.target_qty, pickedQty: row.picked_qty, status: row.status,
-      originalBatchId: row.original_batch_id, pickedBatchId: row.picked_batch_id,
-      substitutionReason: row.substitution_reason, notes: row.notes,
-      pickedAt: row.picked_at, pickedBy: row.picked_by, locationHint: row.location_hint,
-      productName: row.order_items?.products?.name || row.order_items?.description,
-      plantVariety: row.order_items?.skus?.plant_varieties?.name,
-      size: row.order_items?.skus?.plant_sizes?.name,
+      targetQty: row.target_qty, pickedQty: row.picked_qty, status: row.status as PickItemStatus,
+      originalBatchId: row.original_batch_id ?? undefined, pickedBatchId: row.picked_batch_id ?? undefined,
+      substitutionReason: row.substitution_reason ?? undefined, notes: row.notes ?? undefined,
+      pickedAt: row.picked_at ?? undefined, pickedBy: row.picked_by ?? undefined, locationHint: row.location_hint ?? undefined,
+      productName: row.order_items?.products?.name || row.order_items?.description || undefined,
+      plantVariety: row.order_items?.skus?.plant_varieties?.name ?? undefined,
+      size: row.order_items?.skus?.plant_sizes?.name ?? undefined,
       originalBatchNumber: row.original_batch?.batch_number,
       pickedBatchNumber: row.picked_batch?.batch_number,
       batchLocation: row.original_batch?.nursery_locations?.name || row.picked_batch?.nursery_locations?.name,
@@ -1187,7 +1363,7 @@ export async function getBatchPicksForItem(pickItemId: string): Promise<BatchPic
     return [];
   }
 
-  return (data || []).map((bp: any) => ({
+  return ((data || []) as unknown as BatchPickJoinRow[]).map((bp) => ({
     id: bp.id,
     batchId: bp.batch_id,
     batchNumber: bp.batches?.batch_number || "",
@@ -1202,7 +1378,7 @@ export async function getBatchPicksForItem(pickItemId: string): Promise<BatchPic
  * Remove a specific batch pick (for undo functionality)
  */
 export async function removeBatchPick(batchPickId: string): Promise<{ error?: string }> {
-  const { orgId } = await getUserAndOrg();
+  const { user, orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
   // Get the batch pick details first
@@ -1217,24 +1393,41 @@ export async function removeBatchPick(batchPickId: string): Promise<{ error?: st
     return { error: "Batch pick not found or access denied" };
   }
 
-  // Restore batch inventory
-  const { error: batchError } = await supabase
-    .from("batches")
-    .update({ quantity: supabase.rpc("increment_quantity", { row_id: batchPick.batch_id, amount: batchPick.quantity }) })
-    .eq("id", batchPick.batch_id);
-
-  // Note: The above won't work directly - we need a simple increment
-  // Let's use raw SQL via RPC or direct update
+  // Restore batch inventory — must succeed before deleting the pick record
   const { error: restoreError } = await supabase.rpc("restore_batch_quantity", {
     p_batch_id: batchPick.batch_id,
     p_quantity: batchPick.quantity,
   });
 
   if (restoreError) {
-    logWarning("Could not restore batch quantity", { error: restoreError.message, batchPickId });
+    logError("Failed to restore batch quantity — aborting pick removal", {
+      error: restoreError.message,
+      batchPickId,
+      batchId: batchPick.batch_id,
+      quantity: batchPick.quantity,
+    });
+    return { error: `Failed to restore batch quantity: ${restoreError.message}` };
   }
 
-  // Delete the batch pick
+  // Log a batch event for the quantity restoration (audit trail)
+  const { error: eventError } = await supabase.from("batch_events").insert({
+    batch_id: batchPick.batch_id,
+    org_id: orgId,
+    type: "PICK_REVERSED",
+    by_user_id: user?.id || null,
+    payload: {
+      pick_item_batch_id: batchPickId,
+      pick_item_id: batchPick.pick_item_id,
+      quantity_restored: batchPick.quantity,
+      reason: "Batch pick removed (undo)",
+    },
+  });
+
+  if (eventError) {
+    logWarning("Could not log PICK_REVERSED event", { error: eventError.message, batchPickId });
+  }
+
+  // Delete the batch pick record
   const { error: deleteError } = await supabase
     .from("pick_item_batches")
     .delete()
@@ -1294,7 +1487,7 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
   const supabase = await getSupabaseServerApp();
   const { data: pickItem } = await supabase.from("pick_items").select(`order_items(required_variety_id, required_batch_id, product_id, product_group_id, skus(plant_variety_id, size_id))`).eq("id", pickItemId).single();
   if (!pickItem?.order_items) return [];
-  const orderItem = pickItem.order_items as any;
+  const orderItem = pickItem.order_items as unknown as OrderItemForAvailableRow;
 
   // Helper to get shelf quantity for a product
   const getShelfQuantityForProduct = async (productId: string): Promise<number | undefined> => {
@@ -1323,15 +1516,14 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
   if (orderItem.product_group_id && !orderItem.product_id) {
     const { data: groupMembers } = await supabase.rpc('get_product_group_members', { p_group_id: orderItem.product_group_id });
     if (!groupMembers || groupMembers.length === 0) return [];
-    const childProductIds = groupMembers.map((m: any) => m.product_id);
+    const childProductIds = (groupMembers as unknown as GroupMemberRpcRow[]).map((m) => m.product_id);
     const { data: productBatches, error } = await supabase.from("product_batches").select(`product_id, products(name, shelf_quantity_override, skus(plant_sizes(shelf_quantity))), batches(id, batch_number, quantity, status, nursery_locations(name))`).in("product_id", childProductIds);
     if (error) { logError("Error fetching product group batches", { error: error.message, pickItemId }); return []; }
-    return (productBatches || []).filter((pb: any) => pb.batches && pb.batches.quantity > 0).map((pb: any) => {
-      const product = pb.products as { name?: string; shelf_quantity_override?: number | null; skus?: { plant_sizes?: { shelf_quantity?: number | null } } } | null;
-      const shelfQty = product?.shelf_quantity_override ?? product?.skus?.plant_sizes?.shelf_quantity ?? undefined;
+    return ((productBatches || []) as unknown as ProductBatchJoinRow[]).filter((pb) => pb.batches && pb.batches.quantity > 0).map((pb) => {
+      const shelfQty = pb.products?.shelf_quantity_override ?? pb.products?.skus?.plant_sizes?.shelf_quantity ?? undefined;
       return {
-        id: pb.batches.id, batchNumber: pb.batches.batch_number, quantity: pb.batches.quantity,
-        location: pb.batches.nursery_locations?.name || "Unknown", status: pb.batches.status, productName: product?.name,
+        id: pb.batches!.id, batchNumber: pb.batches!.batch_number, quantity: pb.batches!.quantity,
+        location: pb.batches!.nursery_locations?.name || "Unknown", status: pb.batches!.status ?? undefined, productName: pb.products?.name ?? undefined,
         shelfQuantity: shelfQty ?? undefined,
       };
     });
@@ -1343,7 +1535,7 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
     const plantSize = requiredBatch.plant_sizes as { shelf_quantity?: number | null } | null;
     return [{
       id: requiredBatch.id, batchNumber: requiredBatch.batch_number, quantity: requiredBatch.quantity,
-      location: (requiredBatch.nursery_locations as any)?.name || "Unknown", status: requiredBatch.status ?? undefined,
+      location: (requiredBatch.nursery_locations as { name?: string } | null)?.name || "Unknown", status: requiredBatch.status ?? undefined,
       shelfQuantity: plantSize?.shelf_quantity ?? undefined,
     }];
   }
@@ -1371,12 +1563,12 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
       const { data: productBatches, error } = await supabase.from("product_batches").select(`batches(id, batch_number, quantity, status, planted_at, nursery_locations(name))`).eq("product_id", orderItem.product_id);
       if (error) { logError("Error fetching product batches", { error: error.message, pickItemId }); return []; }
       // Filter by saleable status (Ready, Looking Good) and positive quantity, then sort by planted_at (FEFO)
-      return (productBatches || [])
-        .filter((pb: any) => pb.batches && pb.batches.quantity > 0 && ["Ready", "Looking Good"].includes(pb.batches.status))
-        .sort((a: any, b: any) => new Date(a.batches.planted_at || 0).getTime() - new Date(b.batches.planted_at || 0).getTime())
-        .map((pb: any) => ({
-          id: pb.batches.id, batchNumber: pb.batches.batch_number, quantity: pb.batches.quantity,
-          location: pb.batches.nursery_locations?.name || "Unknown", status: pb.batches.status,
+      return ((productBatches || []) as unknown as ProductBatchJoinRow[])
+        .filter((pb) => pb.batches && pb.batches.quantity > 0 && ["Ready", "Looking Good"].includes(pb.batches.status || ""))
+        .sort((a, b) => new Date(a.batches?.planted_at || 0).getTime() - new Date(b.batches?.planted_at || 0).getTime())
+        .map((pb) => ({
+          id: pb.batches!.id, batchNumber: pb.batches!.batch_number, quantity: pb.batches!.quantity,
+          location: pb.batches!.nursery_locations?.name || "Unknown", status: pb.batches!.status ?? undefined,
           shelfQuantity: finalShelfQuantity,
         }));
     }
@@ -1387,14 +1579,14 @@ export async function getAvailableBatchesForItem(pickItemId: string): Promise<{
   if (sizeId) query = query.eq("size_id", sizeId);
   const { data: batches, error } = await query;
   if (error) { logError("Error fetching available batches", { error: error.message, pickItemId }); return []; }
-  return (batches || []).map((b: any) => ({
+  return ((batches || []) as unknown as BatchWithLocationRow[]).map((b) => ({
     id: b.id, batchNumber: b.batch_number, quantity: b.quantity,
-    location: b.nursery_locations?.name || "Unknown", status: b.status,
+    location: b.nursery_locations?.name || "Unknown", status: b.status ?? undefined,
     shelfQuantity: finalShelfQuantity,
   }));
 }
 
-async function logPickListEvent(orgId: string, pickListId: string, pickItemId: string | null, eventType: string, description: string, metadata: Record<string, any> = {}) {
+async function logPickListEvent(orgId: string, pickListId: string, pickItemId: string | null, eventType: string, description: string, metadata: Record<string, unknown> = {}) {
   const { user } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
   await supabase.from("pick_list_events").insert({ org_id: orgId, pick_list_id: pickListId, pick_item_id: pickItemId, event_type: eventType, description, metadata, created_by: user?.id });
@@ -1408,7 +1600,7 @@ export async function getPickListForOrder(orderId: string): Promise<PickList | n
   const supabase = await getSupabaseServerApp();
   const { data, error } = await supabase.from("pick_lists").select(`*, orders(order_number, status, requested_delivery_date, customer_id, customers(name)), picking_teams(name)`).eq("order_id", orderId).single();
   if (error || !data) return null;
-  return mapPickListRow(data);
+  return mapPickListRow(data as unknown as PickListJoinRow);
 }
 
 export async function deletePickList(pickListId: string): Promise<{ error?: string }> {

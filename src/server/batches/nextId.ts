@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { getUserIdAndOrgId } from "@/server/auth/getUser"; // Assuming this helper exists or needs to be created
+import { getUserIdAndOrgId } from "@/server/auth/getUser";
+import { logError } from "@/lib/log"; // Assuming this helper exists or needs to be created
 
 /**
  * Batch IDs: <site>-<yyww>-<seq5>
@@ -43,7 +44,7 @@ export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
     });
 
     if (error) {
-      console.error("Error incrementing org counter:", error);
+      logError("Error incrementing org counter", { error: error.message });
       throw new Error(`Failed to generate batch ID: ${error.message}`);
     }
 
@@ -54,7 +55,7 @@ export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
     return { id: `${site}-${yww}-${String(newSeq).padStart(5, "0")}` };
 
   } catch (e) {
-    console.error("Failed to generate batch id via Supabase RPC:", e);
+    logError("Failed to generate batch id via Supabase RPC", { error: (e as Error)?.message || String(e) });
     throw e; // Re-throw the error after logging
   }
 }

@@ -20,6 +20,96 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { logError, logInfo } from '@/lib/log';
 
+// ---- RPC result shapes ----
+
+/** Shape returned by fn_confirm_order_with_allocations */
+interface ConfirmOrderRpcResult {
+  success: boolean;
+  error?: string;
+  has_oversell_warning?: boolean;
+  oversell_items?: Array<{
+    orderItemId: string;
+    productId: string;
+    quantity: number;
+    warning: string;
+  }>;
+}
+
+/** Shape returned by fn_start_picking_order */
+interface StartPickingRpcResult {
+  success: boolean;
+  error?: string;
+  pending_batch_selections?: PendingBatchSelection[];
+}
+
+/** Shape returned by fn_transition_to_batch_allocation */
+interface TransitionAllocationRpcResult {
+  success: boolean;
+  error?: string;
+  allocation_id?: string;
+  quantity?: number;
+}
+
+/** Shape returned by fn_mark_allocation_picked */
+interface MarkPickedRpcResult {
+  success: boolean;
+  error?: string;
+  picked_quantity?: number;
+  shortage?: number;
+}
+
+/** Shape returned by fn_cancel_allocation */
+interface CancelAllocationRpcResult {
+  success: boolean;
+  error?: string;
+  quantity_released?: number;
+}
+
+/** Shape returned by fn_get_allocation_candidates RPC */
+interface AllocationCandidateRow {
+  batch_id: string;
+  batch_number: string;
+  variety_name: string;
+  variety_id: string;
+  available_quantity: number;
+  location_id: string | null;
+  location_name: string | null;
+  growing_status: string | null;
+  sales_status: string | null;
+  age_weeks: number;
+  planted_at: string | null;
+}
+
+/** Shape of allocation_ledger rows with joins */
+interface AllocationLedgerRow {
+  id: string;
+  order_item_id: string;
+  product_id: string;
+  batch_id: string | null;
+  allocation_tier: string;
+  allocation_status: string;
+  quantity: number;
+  picked_quantity: number;
+  reserved_at: string;
+  allocated_at: string | null;
+  picked_at: string | null;
+  products: { name: string } | null;
+  batches: {
+    batch_number: string;
+    plant_varieties: { name: string } | null;
+  } | null;
+}
+
+/** Shape of inventory_events rows */
+interface InventoryEventRow {
+  id: string;
+  event_type: string;
+  quantity_change: number;
+  occurred_at: string;
+  metadata: Record<string, unknown> | null;
+  actor_id: string | null;
+}
+
 // Types for the two-tier allocation system
 export type AllocationTier = 'product' | 'batch';
 export type AllocationStatus = 'reserved' | 'allocated' | 'picked' | 'shipped' | 'cancelled';
@@ -182,7 +272,7 @@ export async function getAvailableBatches(
   }
 
   return {
-    data: (data || []).map((row: any) => ({
+    data: ((data || []) as unknown as AllocationCandidateRow[]).map((row) => ({
       batchId: row.batch_id,
       batchNumber: row.batch_number,
       varietyName: row.variety_name,
@@ -233,7 +323,7 @@ export async function confirmOrderWithAllocations(orderId: string): Promise<{
     return { success: false, error: error.message };
   }
 
-  const result = data as any;
+  const result = data as unknown as ConfirmOrderRpcResult | null;
 
   if (!result?.success) {
     return { success: false, error: result?.error || 'Failed to confirm order' };
@@ -296,7 +386,7 @@ export async function startPickingOrder(orderId: string): Promise<{
     return { success: false, error: error.message };
   }
 
-  const result = data as any;
+  const result = data as unknown as StartPickingRpcResult | null;
 
   if (!result?.success) {
     return { success: false, error: result?.error || 'Failed to start picking' };
@@ -358,7 +448,7 @@ export async function selectBatchForAllocation(
     return { success: false, error: error.message };
   }
 
-  const result = data as any;
+  const result = data as unknown as TransitionAllocationRpcResult | null;
 
   if (!result?.success) {
     return { success: false, error: result?.error || 'Failed to select batch' };
@@ -409,7 +499,7 @@ export async function markAllocationPicked(
     return { success: false, error: error.message };
   }
 
-  const result = data as any;
+  const result = data as unknown as MarkPickedRpcResult | null;
 
   if (!result?.success) {
     return { success: false, error: result?.error || 'Failed to mark as picked' };
@@ -457,7 +547,7 @@ export async function cancelAllocation(
     return { success: false, error: error.message };
   }
 
-  const result = data as any;
+  const result = data as unknown as CancelAllocationRpcResult | null;
 
   if (!result?.success) {
     return { success: false, error: result?.error || 'Failed to cancel allocation' };
@@ -535,7 +625,7 @@ export async function getOrderAllocations(orderId: string): Promise<{
   }
 
   return {
-    data: (data || []).map((row: any) => ({
+    data: ((data || []) as unknown as AllocationLedgerRow[]).map((row) => ({
       id: row.id,
       orderItemId: row.order_item_id,
       productId: row.product_id,
@@ -550,7 +640,7 @@ export async function getOrderAllocations(orderId: string): Promise<{
       product: row.products ? { name: row.products.name } : undefined,
       batch: row.batches ? {
         batchNumber: row.batches.batch_number,
-        varietyName: row.batches.plant_varieties?.name,
+        varietyName: row.batches.plant_varieties?.name ?? '',
       } : undefined,
     }))
   };
@@ -571,7 +661,7 @@ export async function getAllocationEvents(
     eventType: string;
     quantityChange: number;
     occurredAt: string;
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
     actorId: string | null;
   }>;
   error?: string;
@@ -601,7 +691,7 @@ export async function getAllocationEvents(
   }
 
   return {
-    data: (data || []).map((row: any) => ({
+    data: ((data || []) as unknown as InventoryEventRow[]).map((row) => ({
       id: row.id,
       eventType: row.event_type,
       quantityChange: row.quantity_change,

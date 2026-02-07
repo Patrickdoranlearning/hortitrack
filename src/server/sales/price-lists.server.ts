@@ -2,6 +2,7 @@
 import "server-only";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logError } from "@/lib/log";
 
 // =============================================================================
 // TYPES
@@ -105,7 +106,7 @@ export async function listPriceLists(): Promise<PriceList[]> {
     .order("name");
 
   if (error) {
-    console.error("[price-lists] Error listing:", error);
+    logError("[price-lists] Error listing", { error: error.message });
     throw new Error(error.message);
   }
 
@@ -157,7 +158,7 @@ export async function getPriceListById(id: string): Promise<PriceList | null> {
 
   if (error) {
     if (error.code === "PGRST116") return null;
-    console.error("[price-lists] Error fetching:", error);
+    logError("[price-lists] Error fetching", { error: error.message });
     throw new Error(error.message);
   }
 
@@ -170,15 +171,12 @@ export async function getPriceListById(id: string): Promise<PriceList | null> {
 export async function createPriceList(input: CreatePriceListInput): Promise<PriceList> {
   const { supabase, orgId } = await getUserAndOrg();
 
-  // If setting as default, unset other defaults first
-  if (input.isDefault) {
-    await supabase
-      .from("price_lists")
-      .update({ is_default: false })
-      .eq("org_id", orgId)
-      .eq("is_default", true);
+  // Validate date range
+  if (input.validFrom && input.validTo && input.validFrom > input.validTo) {
+    throw new Error("validFrom must be before or equal to validTo");
   }
 
+  // Insert first, then unset old defaults (prevents leaving org with no default if insert fails)
   const { data, error } = await supabase
     .from("price_lists")
     .insert({
@@ -193,8 +191,18 @@ export async function createPriceList(input: CreatePriceListInput): Promise<Pric
     .single();
 
   if (error) {
-    console.error("[price-lists] Error creating:", error);
+    logError("[price-lists] Error creating", { error: error.message });
     throw new Error(error.message);
+  }
+
+  // Unset other defaults AFTER successful insert
+  if (input.isDefault && data) {
+    await supabase
+      .from("price_lists")
+      .update({ is_default: false })
+      .eq("org_id", orgId)
+      .eq("is_default", true)
+      .neq("id", data.id);
   }
 
   return mapRowToPriceList(data);
@@ -206,16 +214,6 @@ export async function createPriceList(input: CreatePriceListInput): Promise<Pric
 export async function updatePriceList(id: string, input: UpdatePriceListInput): Promise<PriceList> {
   const { supabase, orgId } = await getUserAndOrg();
 
-  // If setting as default, unset other defaults first
-  if (input.isDefault) {
-    await supabase
-      .from("price_lists")
-      .update({ is_default: false })
-      .eq("org_id", orgId)
-      .eq("is_default", true)
-      .neq("id", id);
-  }
-
   const updateData: Record<string, unknown> = {};
   if (input.name !== undefined) updateData.name = input.name;
   if (input.currency !== undefined) updateData.currency = input.currency;
@@ -223,6 +221,7 @@ export async function updatePriceList(id: string, input: UpdatePriceListInput): 
   if (input.validFrom !== undefined) updateData.valid_from = input.validFrom;
   if (input.validTo !== undefined) updateData.valid_to = input.validTo;
 
+  // Update first, then unset old defaults (prevents leaving org with no default if update fails)
   const { data, error } = await supabase
     .from("price_lists")
     .update(updateData)
@@ -232,8 +231,18 @@ export async function updatePriceList(id: string, input: UpdatePriceListInput): 
     .single();
 
   if (error) {
-    console.error("[price-lists] Error updating:", error);
+    logError("[price-lists] Error updating", { error: error.message, id });
     throw new Error(error.message);
+  }
+
+  // Unset other defaults AFTER successful update
+  if (input.isDefault) {
+    await supabase
+      .from("price_lists")
+      .update({ is_default: false })
+      .eq("org_id", orgId)
+      .eq("is_default", true)
+      .neq("id", id);
   }
 
   return mapRowToPriceList(data);
@@ -252,7 +261,7 @@ export async function deletePriceList(id: string): Promise<void> {
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("[price-lists] Error deleting:", error);
+    logError("[price-lists] Error deleting", { error: error.message });
     throw new Error(error.message);
   }
 }
@@ -282,7 +291,7 @@ export async function listPriceListCustomers(priceListId: string): Promise<Price
     .eq("price_list_id", priceListId);
 
   if (error) {
-    console.error("[price-lists] Error listing customers:", error);
+    logError("[price-lists] Error listing customers", { error: error.message });
     throw new Error(error.message);
   }
 
@@ -321,7 +330,7 @@ export async function assignCustomerToPriceList(
     .single();
 
   if (error) {
-    console.error("[price-lists] Error assigning customer:", error);
+    logError("[price-lists] Error assigning customer", { error: error.message });
     throw new Error(error.message);
   }
 
@@ -348,7 +357,7 @@ export async function removeCustomerFromPriceList(assignmentId: string): Promise
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("[price-lists] Error removing customer:", error);
+    logError("[price-lists] Error removing customer", { error: error.message });
     throw new Error(error.message);
   }
 }

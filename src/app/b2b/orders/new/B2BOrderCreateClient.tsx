@@ -82,7 +82,7 @@ export function B2BOrderCreateClient({
             const product = products.find((p) => p.productId === item.product_id);
             if (!product) {
               // Product no longer available, skip
-              console.warn(`Product ${item.product_id} not found in catalog, skipping`);
+              // Product no longer in catalog - skip silently
               return null;
             }
 

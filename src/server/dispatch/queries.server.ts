@@ -5,6 +5,7 @@ import { listAttributeOptions } from "@/server/attributeOptions/service";
 import { getUserAndOrg } from "@/server/auth/org";
 import type { AttributeOption } from "@/lib/attributeOptions";
 import { logger, getErrorMessage } from "@/server/utils/logger";
+import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import type {
   DeliveryRunRow,
   DeliveryRunUpdate,
@@ -320,49 +321,65 @@ export async function getDeliveryRunWithItems(runId: string): Promise<DeliveryRu
 export async function createDeliveryRun(input: CreateDeliveryRun): Promise<string> {
   const { user, orgId, supabase } = await getUserAndOrg();
 
-  // Generate run number (format: DR-YYYYMMDD-NNN)
+  // Generate run number with retry to handle race conditions
+  // Unique constraint (org_id, run_number) prevents duplicates
   const datePart = input.runDate.replace(/-/g, "");
-  const { data: existingRuns } = await supabase
-    .from("delivery_runs")
-    .select("run_number")
-    .eq("org_id", orgId)
-    .like("run_number", `DR-${datePart}-%`)
-    .order("run_number", { ascending: false })
-    .limit(1);
+  const maxRetries = 3;
+  let data: { id: string } | null = null;
 
-  let sequence = 1;
-  if (existingRuns && existingRuns.length > 0) {
-    const lastNumber = existingRuns[0].run_number;
-    const lastSequence = parseInt(lastNumber.split("-").pop() || "0");
-    sequence = lastSequence + 1;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { data: existingRuns } = await supabase
+      .from("delivery_runs")
+      .select("run_number")
+      .eq("org_id", orgId)
+      .like("run_number", `DR-${datePart}-%`)
+      .order("run_number", { ascending: false })
+      .limit(1);
+
+    let sequence = 1;
+    if (existingRuns && existingRuns.length > 0) {
+      const lastNumber = existingRuns[0].run_number;
+      const lastSequence = parseInt(lastNumber.split("-").pop() || "0");
+      sequence = lastSequence + 1;
+    }
+    const runNumber = `DR-${datePart}-${sequence.toString().padStart(3, "0")}`;
+
+    const { data: insertData, error } = await supabase
+      .from("delivery_runs")
+      .insert({
+        id: generateId(),
+        org_id: orgId,
+        run_number: runNumber,
+        run_date: input.runDate,
+        load_name: input.loadCode,
+        haulier_id: input.haulierId,
+        vehicle_id: input.vehicleId,
+        driver_name: input.driverName,
+        vehicle_registration: input.vehicleRegistration,
+        vehicle_type: input.vehicleType,
+        planned_departure_time: input.plannedDepartureTime,
+        estimated_return_time: input.estimatedReturnTime,
+        route_notes: input.routeNotes,
+        status: "planned",
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (!error) {
+      data = insertData;
+      break;
+    }
+
+    // Retry on unique constraint violation (code 23505), otherwise throw
+    if (error.code !== "23505" || attempt === maxRetries - 1) {
+      logger.dispatch.error("Error creating delivery run", error, { runNumber });
+      throw error;
+    }
   }
-  const runNumber = `DR-${datePart}-${sequence.toString().padStart(3, "0")}`;
 
-  const { data, error } = await supabase
-    .from("delivery_runs")
-    .insert({
-      id: generateId(),
-      org_id: orgId,
-      run_number: runNumber,
-      run_date: input.runDate,
-      load_name: input.loadCode,
-      haulier_id: input.haulierId,
-      vehicle_id: input.vehicleId,
-      driver_name: input.driverName,
-      vehicle_registration: input.vehicleRegistration,
-      vehicle_type: input.vehicleType,
-      planned_departure_time: input.plannedDepartureTime,
-      estimated_return_time: input.estimatedReturnTime,
-      route_notes: input.routeNotes,
-      status: "planned",
-      created_by: user.id,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    logger.dispatch.error("Error creating delivery run", error, { runNumber });
-    throw error;
+  if (!data) {
+    throw new Error("Failed to create delivery run after retries");
   }
 
   // If orderIds provided, add them to the run
@@ -410,32 +427,22 @@ export async function updateDeliveryRun(
     throw error;
   }
 
-  // When a run goes out, mark linked orders as dispatched
+  // When a run goes out, use the atomic dispatch_load RPC to mark linked orders as dispatched
+  // This ensures all updates (run status, order statuses, timestamps) happen in a single transaction
   if (updates.status === "in_transit") {
-    const { data: items, error: itemsError } = await supabase
-      .from("delivery_items")
-      .select("order_id")
-      .eq("delivery_run_id", runId);
+    const { data: result, error: rpcError } = await supabaseAdmin.rpc(
+      "dispatch_load",
+      { p_load_id: runId }
+    );
 
-    if (itemsError) {
-      logger.dispatch.error("Error fetching delivery items for run", itemsError, { runId });
-      throw itemsError;
+    if (rpcError) {
+      logger.dispatch.error("RPC error dispatching load via updateDeliveryRun", rpcError, { runId });
+      throw rpcError;
     }
 
-    const orderIds = (items || [])
-      .map((i) => i.order_id)
-      .filter(Boolean);
-
-    if (orderIds.length > 0) {
-      const { error: orderError } = await supabase
-        .from("orders")
-        .update({ status: "dispatched" })
-        .in("id", orderIds as string[]);
-
-      if (orderError) {
-        logger.dispatch.error("Error updating orders to dispatched", orderError, { runId, orderIds });
-        throw orderError;
-      }
+    if (!result?.success) {
+      logger.dispatch.error("dispatch_load failed", null, { runId, error: result?.error });
+      throw new Error(result?.error || "Failed to dispatch load");
     }
   }
 }

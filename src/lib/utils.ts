@@ -22,3 +22,10 @@ export function snakeToCamel<T>(obj: T): any {
   }
   return obj;
 }
+
+/**
+ * Round a number to two decimal places (safe for currency/financial calculations).
+ */
+export function roundToTwo(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}

@@ -188,15 +188,28 @@ export async function getProductGroupsWithAvailability(
     }));
   }
 
-  // 2b. Get product prices for all member products
-  const { data: productPrices } = await supabase
-    .from('products')
-    .select('id, default_price_ex_vat')
-    .in('id', Array.from(allProductIds));
+  // 2b. Get product prices from product_prices joined with price_lists (default list)
+  const { data: priceItems, error: priceError } = await supabase
+    .from('product_prices')
+    .select('product_id, unit_price_ex_vat, price_list_id, price_lists!inner(is_default)')
+    .eq('org_id', orgId)
+    .in('product_id', Array.from(allProductIds));
 
+  if (priceError) {
+    logError('Error fetching product prices', { error: priceError.message });
+  }
+
+  // Build price map from default price list entries
   const productPriceMap = new Map<string, number | null>();
-  productPrices?.forEach((p) => {
-    productPriceMap.set(p.id, p.default_price_ex_vat);
+  type PriceItem = {
+    product_id: string;
+    unit_price_ex_vat: number | null;
+    price_lists: { is_default: boolean } | null;
+  };
+  (priceItems as PriceItem[] | null)?.forEach((item) => {
+    if (item.price_lists?.is_default && item.unit_price_ex_vat != null) {
+      productPriceMap.set(item.product_id, Number(item.unit_price_ex_vat));
+    }
   });
 
   // 3. Get product-batch mappings for all products
@@ -284,7 +297,7 @@ export async function getProductGroupsWithAvailability(
   const { data: specificOrders } = await supabase
     .from('order_items')
     .select('product_id, quantity, orders!inner(status)')
-    .eq('org_id', orgId)
+    .eq('orders.org_id', orgId)
     .in('product_id', Array.from(allProductIds))
     .in('orders.status', activeOrderStatuses);
 
@@ -292,7 +305,7 @@ export async function getProductGroupsWithAvailability(
   const { data: genericOrders } = await supabase
     .from('order_items')
     .select('product_group_id, quantity, orders!inner(status)')
-    .eq('org_id', orgId)
+    .eq('orders.org_id', orgId)
     .in('product_group_id', groupIds)
     .in('orders.status', activeOrderStatuses);
 

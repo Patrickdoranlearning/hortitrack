@@ -242,6 +242,29 @@ export async function createPropagationBatch(params: { input: PropagationInput; 
     .single();
   if (error) throw error;
 
+  // Log batch creation event for audit trail
+  const { error: eventError } = await supabase.from("batch_events").insert({
+    batch_id: data.id,
+    org_id: orgId,
+    type: "PROPAGATE",
+    by_user_id: params.userId || null,
+    payload: {
+      quantity,
+      variety_id: varietyId,
+      size_id: sizeId,
+      location_id: locationId,
+      supplier_id: input.supplierId ?? input.supplier_id ?? null,
+      source: "propagation",
+    },
+  });
+
+  if (eventError) {
+    logError("Failed to log PROPAGATE event for batch", {
+      error: eventError.message,
+      batchId: data.id,
+    });
+  }
+
   // Save planned materials if provided
   if (input.materials && input.materials.length > 0) {
     const materialInserts = input.materials.map((mat) => ({
@@ -376,6 +399,31 @@ export async function createCheckinBatch(params: { input: CheckinInput; userId: 
     .select("*")
     .single();
   if (error) throw error;
+
+  // Log batch check-in event for audit trail
+  const checkinQty = input.totalUnits ?? input.quantity ?? 0;
+  const { error: eventError } = await supabase.from("batch_events").insert({
+    batch_id: data.id,
+    org_id: orgId,
+    type: "CHECK_IN",
+    by_user_id: params.userId || null,
+    payload: {
+      quantity: checkinQty,
+      variety_id: varietyId,
+      size_id: sizeId,
+      location_id: locationId,
+      supplier_id: supplierId ?? null,
+      source: "checkin",
+    },
+  });
+
+  if (eventError) {
+    logError("Failed to log CHECK_IN event for batch", {
+      error: eventError.message,
+      batchId: data.id,
+    });
+  }
+
   return data;
 }
 

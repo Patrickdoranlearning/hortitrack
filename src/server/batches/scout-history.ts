@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { PlantHealthEvent } from '@/lib/history-types';
+import { logError } from '@/lib/log';
 
 /**
  * Get scout history for a batch
@@ -53,7 +54,7 @@ export async function getBatchScoutHistory(
     .order('event_at', { ascending: false });
 
   if (error) {
-    console.error('[getBatchScoutHistory] query failed', error);
+    logError('[getBatchScoutHistory] query failed', { error: error.message });
     throw new Error(error.message);
   }
 
@@ -127,7 +128,7 @@ export async function getBatchLocationScouts(
     .limit(20);
 
   if (error) {
-    console.error('[getBatchLocationScouts] query failed', error);
+    logError('[getBatchLocationScouts] query failed', { error: error.message });
     return [];
   }
 

@@ -2,8 +2,18 @@
 
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { isValidDocId } from "@/server/utils/ids";
-import type { StockMovement, StockMovementDestination } from "@/lib/history-types";
+import type { StockMovement, StockMovementDestination, StockMovementType } from "@/lib/history-types";
 import { isInEvent, isOutEvent } from "@/lib/history-types";
+
+/** Shape of the nested order_items join from batch_allocations query */
+interface AllocationOrderItem {
+  id: string;
+  orders: {
+    id: string;
+    order_number: string;
+    customers: { name: string } | null;
+  } | null;
+}
 
 type AnyDate = Date | string | number | null | undefined;
 
@@ -53,12 +63,26 @@ const CREATION_EVENT_TYPES = new Set([
 /**
  * Build stock movement history for a batch - shows all IN/OUT movements with destination details
  */
-export async function buildStockMovements(batchId: string): Promise<StockMovement[]> {
+export async function buildStockMovements(batchId: string, orgId?: string): Promise<StockMovement[]> {
   if (!isValidDocId(batchId)) {
     throw new Error("Invalid batch ID provided.");
   }
 
   const supabase = getSupabaseAdmin();
+
+  // If orgId is provided, verify the batch belongs to this org before returning data
+  if (orgId) {
+    const { data: orgCheck, error: orgCheckError } = await supabase
+      .from("batches")
+      .select("id")
+      .eq("id", batchId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+
+    if (orgCheckError || !orgCheck) {
+      return [];
+    }
+  }
 
   // Fetch batch info for initial quantity + plan/reservation info
   const { data: batch, error: batchError } = await supabase
@@ -79,7 +103,7 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
       .single();
 
     if (planData) {
-      pottingPlanLabel = (planData.guide_plans as any)?.name || 'Production Plan';
+      pottingPlanLabel = (planData.guide_plans as { name?: string } | null)?.name || 'Production Plan';
     }
   }
 
@@ -128,7 +152,7 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
   }>();
 
   for (const alloc of allocations || []) {
-    const orderItem = alloc.order_items as any;
+    const orderItem = alloc.order_items as unknown as AllocationOrderItem | null;
     const order = orderItem?.orders;
     if (order) {
       allocationLookup.set(alloc.id, {
@@ -387,7 +411,7 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
       id: evt.id,
       batchId,
       at: toDate(evt.at)?.toISOString() ?? new Date().toISOString(),
-      type: eventType as any,
+      type: eventType as StockMovementType,
       quantity,
       runningBalance,
       title,
@@ -413,7 +437,7 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
   // - 'allocated' status: Show as reserved (informational, doesn't affect balance)
   // - 'picked' status: Show as sold if no corresponding PICKED event exists
   for (const alloc of allocations || []) {
-    const orderItem = alloc.order_items as any;
+    const orderItem = alloc.order_items as unknown as AllocationOrderItem | null;
     const order = orderItem?.orders;
     if (!order) continue;
 
@@ -498,14 +522,24 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
   // Sort all movements by date
   movements.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
+  // Recalculate running balances after sort (allocation-sourced entries were appended
+  // out of chronological order, so pre-sort balances are wrong)
+  let recalcBalance = 0;
+  for (const m of movements) {
+    // Skip informational entries (allocations with undefined runningBalance)
+    if (m.runningBalance === undefined) continue;
+    recalcBalance += m.quantity;
+    m.runningBalance = recalcBalance;
+  }
+
   return movements;
 }
 
 /**
  * Get stock movements with enriched order/batch details for destination tracking
  */
-export async function getStockMovementsWithDetails(batchId: string) {
-  const movements = await buildStockMovements(batchId);
+export async function getStockMovementsWithDetails(batchId: string, orgId?: string) {
+  const movements = await buildStockMovements(batchId, orgId);
 
   // Calculate summary
   const summary = {

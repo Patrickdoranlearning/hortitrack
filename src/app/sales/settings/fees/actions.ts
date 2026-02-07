@@ -4,6 +4,7 @@ import { getSupabaseServerApp } from '@/server/db/supabase';
 import { revalidatePath } from 'next/cache';
 import { STANDARD_FEE_TYPES } from './constants';
 import type { Database } from '@/types/supabase';
+import { logError } from '@/lib/log';
 
 export type FeeUnit = 'per_unit' | 'flat' | 'per_km' | 'percentage';
 
@@ -70,7 +71,7 @@ export async function getOrgFees(): Promise<OrgFee[]> {
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.error('Error fetching org fees:', error);
+    logError('Error fetching org fees', { error: error?.message || String(error) });
     return [];
   }
 
@@ -143,7 +144,7 @@ export async function createOrgFee(input: CreateFeeInput): Promise<{ success: bo
     .single();
 
   if (error) {
-    console.error('Error creating org fee:', error);
+    logError('Error creating org fee', { error: error?.message || String(error) });
     if (error.code === '23505') {
       return { success: false, error: 'A fee with this type already exists' };
     }
@@ -180,7 +181,7 @@ export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promis
     .eq('id', feeId);
 
   if (error) {
-    console.error('Error updating org fee:', error);
+    logError('Error updating org fee', { error: error?.message || String(error) });
     return { success: false, error: error.message };
   }
 
@@ -199,7 +200,7 @@ export async function deleteOrgFee(feeId: string): Promise<{ success: boolean; e
     .eq('id', feeId);
 
   if (error) {
-    console.error('Error deleting org fee:', error);
+    logError('Error deleting org fee', { error: error?.message || String(error) });
     return { success: false, error: error.message };
   }
 
@@ -263,7 +264,7 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
   const { error } = await supabase.from('org_fees').insert(defaultFees);
 
   if (error) {
-    console.error('Error initializing default fees:', error);
+    logError('Error initializing default fees', { error: error?.message || String(error) });
     return { success: false, error: error.message };
   }
 

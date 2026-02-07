@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { logError } from '@/lib/log';
 
 export type CreditNoteStatus = 'draft' | 'issued' | 'void';
 
@@ -121,7 +122,7 @@ export async function createCreditNoteAction(input: CreateCreditNoteInput): Prom
     .single();
 
   if (creditNoteError || !creditNote) {
-    console.error('Error creating credit note:', creditNoteError);
+    logError('Error creating credit note', { error: creditNoteError?.message || String(creditNoteError) });
     return { error: 'Failed to create credit note' };
   }
 
@@ -142,7 +143,7 @@ export async function createCreditNoteAction(input: CreateCreditNoteInput): Prom
     .insert(creditNoteItems);
 
   if (itemsError) {
-    console.error('Error creating credit note items:', itemsError);
+    logError('Error creating credit note items', { error: itemsError?.message || String(itemsError) });
     // Delete the credit note if items failed
     await supabase.from('credit_notes').delete().eq('id', creditNote.id);
     return { error: 'Failed to create credit note items' };
@@ -206,7 +207,7 @@ export async function issueCreditNoteAction(creditNoteId: string): Promise<{
     .eq('id', creditNoteId);
 
   if (updateError) {
-    console.error('Error issuing credit note:', updateError);
+    logError('Error issuing credit note', { error: updateError?.message || String(updateError) });
     return { error: 'Failed to issue credit note' };
   }
 
@@ -313,7 +314,7 @@ export async function voidCreditNoteAction(creditNoteId: string, reason: string)
     .eq('id', creditNoteId);
 
   if (updateError) {
-    console.error('Error voiding credit note:', updateError);
+    logError('Error voiding credit note', { error: updateError?.message || String(updateError) });
     return { error: 'Failed to void credit note' };
   }
 
@@ -367,7 +368,7 @@ export async function getCreditNotesAction(): Promise<{
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching credit notes:', error);
+    logError('Error fetching credit notes', { error: error?.message || String(error) });
     return { error: 'Failed to fetch credit notes' };
   }
 

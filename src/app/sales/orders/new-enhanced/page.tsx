@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import EnhancedCreateOrderForm from '@/components/sales/EnhancedCreateOrderForm';
 import { getProductsWithBatches } from '@/server/sales/products-with-batches';
+import { logError } from '@/lib/log';
 
 async function getCustomers(orgId: string) {
   const supabase = await createClient();
@@ -32,7 +33,7 @@ async function getCustomers(orgId: string) {
     .order('name');
 
   if (error) {
-    console.error('Error fetching customers:', error);
+    logError('Error fetching customers', { error: error?.message || String(error) });
     return [];
   }
 

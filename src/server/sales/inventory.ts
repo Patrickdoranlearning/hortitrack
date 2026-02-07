@@ -1,5 +1,49 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logError } from "@/lib/log";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/** Shape returned by the `get_saleable_batches` RPC */
+interface SaleableBatchRpcRow {
+    id: string;
+    batch_number: string | null;
+    plant_variety: string | null;
+    size: string | null;
+    status: string | null;
+    qc_status: string | null;
+    quantity: number | null;
+    reserved_quantity: number | null;
+    available_quantity: number | null;
+    grade: string | null;
+    location: string | null;
+    planting_date: string | null;
+    created_at: string | null;
+    hidden: boolean | null;
+    category: string | null;
+    grower_photo_url: string | null;
+    sales_photo_url: string | null;
+}
+
+/** Shape returned by the fallback batches query with joins */
+interface FallbackBatchRow {
+    id: string;
+    batch_number: string | null;
+    quantity: number | null;
+    reserved_quantity: number | null;
+    grade: string | null;
+    planting_date: string | null;
+    created_at: string | null;
+    hidden: boolean | null;
+    category: string | null;
+    grower_photo_url: string | null;
+    sales_photo_url: string | null;
+    status: string | null;
+    qc_status: string | null;
+    plant_varieties: { name: string | null } | null;
+    plant_sizes: { name: string | null } | null;
+    nursery_locations: { name: string | null } | null;
+    attribute_options: { behavior: string | null; display_label: string | null } | null;
+}
 
 export type InventoryBatch = {
     id: string;
@@ -36,36 +80,36 @@ export async function getSaleableBatches(): Promise<InventoryBatch[]> {
     });
 
     if (error) {
-        console.error("Error fetching saleable batches:", error);
+        logError("Error fetching saleable batches", { error: error.message });
         // Fallback to direct query if RPC doesn't exist yet
         return getSaleableBatchesFallback(supabase);
     }
 
-    return (data || []).map((d: any) => ({
+    return (data || []).map((d: SaleableBatchRpcRow) => ({
         id: d.id,
-        batchNumber: d.batch_number,
-        plantVariety: d.plant_variety,
-        size: d.size,
-        status: d.status,
-        qcStatus: d.qc_status,
-        quantity: d.quantity,
-        reservedQuantity: d.reserved_quantity,
-        availableQuantity: d.available_quantity,
-        grade: d.grade,
-        location: d.location,
-        plantingDate: d.planting_date,
-        createdAt: d.created_at,
-        hidden: d.hidden,
-        category: d.category,
-        growerPhotoUrl: d.grower_photo_url,
-        salesPhotoUrl: d.sales_photo_url,
+        batchNumber: d.batch_number ?? undefined,
+        plantVariety: d.plant_variety ?? undefined,
+        size: d.size ?? undefined,
+        status: d.status ?? undefined,
+        qcStatus: d.qc_status ?? undefined,
+        quantity: d.quantity ?? undefined,
+        reservedQuantity: d.reserved_quantity ?? undefined,
+        availableQuantity: d.available_quantity ?? undefined,
+        grade: d.grade ?? undefined,
+        location: d.location ?? undefined,
+        plantingDate: d.planting_date ?? undefined,
+        createdAt: d.created_at ?? undefined,
+        hidden: d.hidden ?? undefined,
+        category: d.category ?? undefined,
+        growerPhotoUrl: d.grower_photo_url ?? undefined,
+        salesPhotoUrl: d.sales_photo_url ?? undefined,
     }));
 }
 
 /**
  * Fallback query for when RPC is not yet deployed
  */
-async function getSaleableBatchesFallback(supabase: any): Promise<InventoryBatch[]> {
+async function getSaleableBatchesFallback(supabase: SupabaseClient): Promise<InventoryBatch[]> {
     const { data, error } = await supabase
         .from("batches")
         .select(`
@@ -80,34 +124,34 @@ async function getSaleableBatchesFallback(supabase: any): Promise<InventoryBatch
         .gt("quantity", 0);
 
     if (error) {
-        console.error("Error fetching saleable batches (fallback):", error);
+        logError("Error fetching saleable batches (fallback)", { error: error.message });
         return [];
     }
 
     return (data || [])
-        .map((d: any) => {
+        .map((d: FallbackBatchRow) => {
             const quantity = d.quantity ?? 0;
             const reservedQuantity = d.reserved_quantity ?? 0;
             const availableQuantity = Math.max(0, quantity - reservedQuantity);
 
             return {
                 id: d.id,
-                batchNumber: d.batch_number,
-                plantVariety: d.plant_varieties?.name ?? null,
-                size: d.plant_sizes?.name ?? null,
-                status: d.attribute_options?.display_label ?? d.status,
-                qcStatus: d.qc_status,
+                batchNumber: d.batch_number ?? undefined,
+                plantVariety: d.plant_varieties?.name ?? undefined,
+                size: d.plant_sizes?.name ?? undefined,
+                status: d.attribute_options?.display_label ?? d.status ?? undefined,
+                qcStatus: d.qc_status ?? undefined,
                 quantity,
                 reservedQuantity,
                 availableQuantity,
-                grade: d.grade,
-                location: d.nursery_locations?.name ?? null,
-                plantingDate: d.planting_date,
-                createdAt: d.created_at,
-                hidden: d.hidden,
-                category: d.category,
-                growerPhotoUrl: d.grower_photo_url,
-                salesPhotoUrl: d.sales_photo_url,
+                grade: d.grade ?? undefined,
+                location: d.nursery_locations?.name ?? undefined,
+                plantingDate: d.planting_date ?? undefined,
+                createdAt: d.created_at ?? undefined,
+                hidden: d.hidden ?? undefined,
+                category: d.category ?? undefined,
+                growerPhotoUrl: d.grower_photo_url ?? undefined,
+                salesPhotoUrl: d.sales_photo_url ?? undefined,
             };
         })
         .filter((b: { availableQuantity: number }) => b.availableQuantity > 0);

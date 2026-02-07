@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { logError } from "@/lib/log";
 
 export type FlagKey = "isTopPerformer" | "quarantined" | "priority"; // extend as needed
 
@@ -24,11 +25,11 @@ export async function getFlags(batchId: string) {
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Error fetching flags:", error);
+    logError("Error fetching flags", { error: error.message });
     throw new Error("Failed to fetch flags");
   }
 
-  const flags: Record<string, any> = {};
+  const flags: Record<string, boolean | string | number> = {};
   const history: FlagEvent[] = [];
 
   for (const ev of data ?? []) {
@@ -49,7 +50,7 @@ export async function getFlags(batchId: string) {
   return { flags, history };
 }
 
-export async function setFlag(batchId: string, key: FlagKey, value: any, opts?: {
+export async function setFlag(batchId: string, key: FlagKey, value: boolean | string | number, opts?: {
   actor?: { id?: string; email?: string } | null;
   reason?: string | null;
   notes?: string | null;
@@ -86,7 +87,7 @@ export async function setFlag(batchId: string, key: FlagKey, value: any, opts?: 
   });
 
   if (error) {
-    console.error("Error setting flag:", error);
+    logError("Error setting flag", { error: error.message });
     throw error;
   }
 }

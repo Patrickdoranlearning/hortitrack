@@ -62,43 +62,44 @@ export async function allocateForProductLine(
     }
   }
 
-  // 3) If grade preference specified, prioritize that grade
+  // 3) FEFO sort: always apply FEFO within each group
+  const fefoSort = (a: InventoryBatch, b: InventoryBatch) => {
+    const ap = toTs(a.plantingDate);
+    const bp = toTs(b.plantingDate);
+    if (ap !== bp) return ap - bp;
+
+    const ac = toTs(a.createdAt);
+    const bc = toTs(b.createdAt);
+    if (ac !== bc) return ac - bc;
+
+    const ag = (a.grade || "Z");
+    const bg = (b.grade || "Z");
+    if (ag !== bg) return ag.localeCompare(bg);
+
+    const an = String(a.batchNumber || "");
+    const bn = String(b.batchNumber || "");
+    return an.localeCompare(bn);
+  };
+
+  // 4) If grade preference specified, prioritize that grade (FEFO within each group)
   if (gradePreference && !specificBatchId) {
-    const preferredGrade = saleable.filter(b => b.grade === gradePreference);
-    const otherGrades = saleable.filter(b => b.grade !== gradePreference);
+    const preferredGrade = saleable.filter(b => b.grade === gradePreference).sort(fefoSort);
+    const otherGrades = saleable.filter(b => b.grade !== gradePreference).sort(fefoSort);
     saleable = [...preferredGrade, ...otherGrades];
   }
 
-  // 4) If preferred batch numbers specified, prioritize those
+  // 5) If preferred batch numbers specified, prioritize those (FEFO within each group)
   if (preferredBatchNumbers && preferredBatchNumbers.length > 0 && !specificBatchId) {
     const preferred = saleable.filter(b =>
       b.batchNumber && preferredBatchNumbers.includes(b.batchNumber)
-    );
+    ).sort(fefoSort);
     const others = saleable.filter(b =>
       !b.batchNumber || !preferredBatchNumbers.includes(b.batchNumber)
-    );
+    ).sort(fefoSort);
     saleable = [...preferred, ...others];
-  } else {
-    // 5) Default sorting: FEFO with grade priority
-    saleable = saleable.sort((a, b) => {
-      // Prefer older plantingDate (FEFO-like), then createdAt; then grade; then batchNumber
-      const ap = toTs(a.plantingDate);
-      const bp = toTs(b.plantingDate);
-      if (ap !== bp) return ap - bp;
-
-      const ac = toTs(a.createdAt);
-      const bc = toTs(b.createdAt);
-      if (ac !== bc) return ac - bc;
-
-      // Grade A before B before C (descending)
-      const ag = (a.grade || "Z");
-      const bg = (b.grade || "Z");
-      if (ag !== bg) return ag.localeCompare(bg);
-
-      const an = String(a.batchNumber || "");
-      const bn = String(b.batchNumber || "");
-      return an.localeCompare(bn);
-    });
+  } else if (!gradePreference) {
+    // Default: full FEFO sort when no preferences specified
+    saleable = saleable.sort(fefoSort);
   }
 
   // 6) Split allocation across saleable batches until qty satisfied

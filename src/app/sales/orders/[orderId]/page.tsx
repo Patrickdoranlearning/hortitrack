@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PageFrame } from '@/ui/templates';
 import OrderDetailPage from '@/components/sales/OrderDetailPage';
 import type { OrderDetails } from '@/components/sales/OrderDetailPage';
+import { logError } from '@/lib/log';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
   // Validate orderId format (should be UUID)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(orderId)) {
-    console.error('Invalid order ID format:', orderId);
+    logError('Invalid order ID format', { orderId });
     notFound();
   }
 
@@ -40,12 +41,12 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
     .maybeSingle();
 
   if (error) {
-    console.error('Error fetching order:', error.message, error.code, error.details);
+    logError('Error fetching order', { error: error.message, code: error.code, details: error.details });
     notFound();
   }
 
   if (!order) {
-    console.error('Order not found:', orderId);
+    logError('Order not found', { orderId });
     notFound();
   }
 

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { logWarning } from "@/lib/log";
 
 type AnyDate = Date | string | number | null | undefined;
 const toDate = (v: AnyDate) => (v ? new Date(v as any) : null);
@@ -67,7 +68,7 @@ function isValidId(id: unknown): id is string {
 
 export async function buildBatchRoute(batchId: string, maxDepth = 3): Promise<BatchRoute> {
   if (!isValidId(batchId)) {
-    console.warn("[buildBatchRoute] invalid id:", batchId);
+    logWarning("[buildBatchRoute] invalid id", { batchId });
     return { ancestry: [], edges: [], nodes: {}, timeline: [], summary: { transplantWeek: null, previousProducedWeek: null, originBatchId: null, hops: 0 } };
   }
   const nodes: Record<string, BatchNode> = {};

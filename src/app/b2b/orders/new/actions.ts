@@ -7,6 +7,7 @@ import type { CartItem } from '@/lib/b2b/types';
 import { createPickListFromOrder } from '@/server/sales/picking';
 import { calculateTrolleysNeeded, type OrderLineForCalculation } from '@/lib/dispatch/trolley-calculation';
 import { getTrolleyCapacityConfigs, getShelfQuantitiesForSizes } from '@/server/dispatch/trolley-capacity.server';
+import { logError, logWarning } from '@/lib/log';
 
 type CreateB2BOrderInput = {
   customerId: string;
@@ -92,7 +93,7 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
   );
 
   if (rpcError || !rpcResult) {
-    console.error('Order creation error (RPC):', rpcError);
+    logError('Order creation error (RPC)', { error: rpcError?.message || String(rpcError) });
     // Parse specific error messages for better UX if possible
     const errorMsg = rpcError?.message || 'Failed to create order';
     if (errorMsg.includes('Insufficient stock')) {
@@ -132,14 +133,14 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
       }
     }
   } catch (err) {
-    console.warn('Failed to calculate trolleys estimate:', err);
+    logWarning('Failed to calculate trolleys estimate', { error: err instanceof Error ? err.message : String(err) });
   }
 
   // Auto-create pick list for confirmed orders
   try {
     await createPickListFromOrder(orderId);
   } catch (e) {
-    console.error('Failed to create pick list for B2B order:', e);
+    logError('Failed to create pick list for B2B order', { error: e instanceof Error ? e.message : String(e) });
   }
 
   // Revalidate paths

@@ -6,6 +6,7 @@ import { getProductsWithBatches } from '@/server/sales/products-with-batches';
 import { getProductGroupsWithAvailability } from '@/server/sales/product-groups-with-availability';
 import { getOrgFees } from '@/app/sales/settings/fees/actions';
 import { redirect } from 'next/navigation';
+import { logError } from '@/lib/log';
 
 async function getCustomers(orgId: string) {
   const supabase = await getSupabaseServerApp();
@@ -41,7 +42,7 @@ async function getCustomers(orgId: string) {
     .order('name');
 
   if (error) {
-    console.error('Error fetching customers:', error);
+    logError('Error fetching customers', { error: error?.message || String(error) });
     return [];
   }
 

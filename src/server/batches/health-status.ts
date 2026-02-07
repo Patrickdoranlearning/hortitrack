@@ -1,4 +1,5 @@
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logError } from "@/lib/log";
 
 export type HealthStatusLevel = "healthy" | "attention" | "critical" | "unknown";
 
@@ -36,7 +37,7 @@ export async function getBatchHealthStatus(
     .limit(20);
 
   if (error) {
-    console.error("[getBatchHealthStatus] error:", error);
+    logError("[getBatchHealthStatus] error", { error: error.message });
     return {
       batchId,
       level: "unknown",
@@ -138,7 +139,7 @@ export async function getBatchHealthStatuses(
     .order("event_at", { ascending: false });
 
   if (error) {
-    console.error("[getBatchHealthStatuses] error:", error);
+    logError("[getBatchHealthStatuses] error", { error: error.message });
     return result;
   }
 
@@ -223,7 +224,7 @@ export async function getProductionHealthSummary(orgId: string): Promise<{
     .gt("quantity", 0);
 
   if (batchError || !batches) {
-    console.error("[getProductionHealthSummary] batch error:", batchError);
+    logError("[getProductionHealthSummary] batch error", { error: batchError?.message || "unknown" });
     return {
       totalBatches: 0,
       healthyBatches: 0,
