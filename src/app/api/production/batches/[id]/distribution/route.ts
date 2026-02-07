@@ -271,11 +271,8 @@ export async function GET(
     // Sold quantity from events (for entries not covered by allocations)
     const soldFromEventsQty = soldFromEvents.reduce((sum, d) => sum + d.quantity, 0);
 
-    // Use reserved_quantity as fallback if no plan details exist
-    const pottingFromPlans = pottingDetails.reduce((sum, p) => sum + p.quantity, 0);
-    const allocatedPottingTotal = pottingFromPlans > 0
-      ? pottingFromPlans
-      : (batch?.reserved_quantity ?? 0);
+    // Use batch.reserved_quantity (per-batch amount), not plan's planned_quantity (total plan target)
+    const allocatedPottingTotal = batch?.reserved_quantity ?? 0;
     const allocatedSalesTotal = allAllocatedQty; // Use all allocations, not just ones with valid order data
     const soldTotal = soldFromAllocationsQty + soldFromEventsQty; // Combine both sources
     const dumpedTotal = dumpedDetails.reduce((sum, d) => sum + d.quantity, 0);

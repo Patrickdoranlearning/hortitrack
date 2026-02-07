@@ -60,14 +60,28 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
 
   const supabase = getSupabaseAdmin();
 
-  // Fetch batch info for initial quantity
+  // Fetch batch info for initial quantity + plan/reservation info
   const { data: batch, error: batchError } = await supabase
     .from("batches")
-    .select("id, initial_quantity, created_at")
+    .select("id, initial_quantity, created_at, batch_plan_id, reserved_quantity")
     .eq("id", batchId)
     .single();
 
   if (batchError) throw new Error(batchError.message);
+
+  // Fetch production plan name if batch is linked to a plan (for label only)
+  let pottingPlanLabel: string | null = null;
+  if (batch?.batch_plan_id && (batch.reserved_quantity ?? 0) > 0) {
+    const { data: planData } = await supabase
+      .from("batch_plans")
+      .select("id, guide_plans(name)")
+      .eq("id", batch.batch_plan_id)
+      .single();
+
+    if (planData) {
+      pottingPlanLabel = (planData.guide_plans as any)?.name || 'Production Plan';
+    }
+  }
 
   // Fetch batch events filtered to stock-related types
   const { data: events, error: eventsError } = await supabase
@@ -458,6 +472,27 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
         userName: null
       });
     }
+  }
+
+  // Add production plan allocation as informational reserved entry (matches distribution bar)
+  // Use batch.reserved_quantity (per-batch amount), not plan's planned_quantity (total plan target)
+  const pottingQty = batch?.reserved_quantity ?? 0;
+
+  if (pottingQty > 0) {
+    const planLabel = pottingPlanLabel || 'Production Plan';
+    movements.push({
+      id: `plan-reserve-${batchId}`,
+      batchId,
+      at: batch?.created_at ?? new Date().toISOString(),
+      type: 'allocated',
+      quantity: -pottingQty,
+      runningBalance: undefined,
+      title: `${pottingQty.toLocaleString()} units reserved for potting`,
+      details: planLabel,
+      destination: undefined,
+      userId: null,
+      userName: null
+    });
   }
 
   // Sort all movements by date
