@@ -9,6 +9,8 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// Worker login action intentionally does not check auth - unauthenticated workers need to call this
+// to authenticate. Auth checks happen on protected worker pages/actions after login succeeds.
 export async function workerLogin(formData: FormData) {
   const rawEmail = formData.get("email");
   const rawPassword = formData.get("password");

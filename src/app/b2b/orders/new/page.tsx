@@ -2,6 +2,7 @@ import { requireCustomerAuth } from '@/lib/auth/b2b-guard';
 import { B2BPortalLayout } from '@/components/b2b/B2BPortalLayout';
 import { B2BOrderCreateClient } from './B2BOrderCreateClient';
 import { createClient } from '@/lib/supabase/server';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import type { CustomerCatalogProduct, CustomerCatalogProductWithVarieties, VarietyInfo, VarietyBatchInfo, BatchImage } from '@/lib/b2b/types';
 import { calculateVarietyStatus } from '@/lib/b2b/varietyStatus';
 import { getLastUsedPricing } from '@/server/b2b/pricing-history';
@@ -266,16 +267,18 @@ export default async function B2BNewOrderPage() {
 
   return (
     <B2BPortalLayout authContext={authContext}>
-      <B2BOrderCreateClient
-        products={catalogProducts}
-        addresses={addresses || []}
-        categories={categories}
-        sizes={sizes}
-        families={families}
-        customerId={authContext.customerId}
-        pricingHints={pricingHints}
-        isAddressRestricted={authContext.isAddressRestricted}
-      />
+      <ErrorBoundary>
+        <B2BOrderCreateClient
+          products={catalogProducts}
+          addresses={addresses || []}
+          categories={categories}
+          sizes={sizes}
+          families={families}
+          customerId={authContext.customerId}
+          pricingHints={pricingHints}
+          isAddressRestricted={authContext.isAddressRestricted}
+        />
+      </ErrorBoundary>
     </B2BPortalLayout>
   );
 }

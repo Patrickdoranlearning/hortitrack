@@ -7,6 +7,7 @@ import {
   CreateOrderInput,
   CreateOrderSchema,
   CustomerAddress,
+  VarietyBreakdownMap,
 } from '@/lib/sales/types';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -21,7 +22,6 @@ import { CopyOrderDialog } from './CopyOrderDialog';
 import { createOrder, getOrderForCopy, getPricingHints, type PricingHint } from '@/app/sales/actions';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
 import type { ProductGroupWithAvailability } from '@/server/sales/product-groups-with-availability';
-import type { BatchAllocation } from '../BatchSelectionDialog';
 import type { OrgFee } from '@/app/sales/settings/fees/actions';
 
 export type SalesCustomer = {
@@ -47,8 +47,6 @@ type SalesOrderWizardProps = {
 const DEFAULT_LINE = {
   plantVariety: '',
   size: '',
-  requiredVarietyId: undefined as string | undefined,
-  requiredBatchId: undefined as string | undefined,
   qty: 1,
   allowSubstitute: true,
   unitPrice: undefined as number | undefined,
@@ -62,8 +60,8 @@ const DRAFT_STORAGE_KEY = 'hortitrack_sales_order_draft';
 
 type DraftData = {
   formValues: Partial<CreateOrderInput>;
+  varietyBreakdowns?: VarietyBreakdownMap;
   step: number;
-  lineAllocations: [number, BatchAllocation[]][];
   savedAt: number;
 };
 
@@ -105,6 +103,58 @@ const steps = [
   { id: 'pricing', label: 'Pricing & Review' },
 ];
 
+/**
+ * Expands product group lines that have variety breakdowns into separate order lines.
+ * Each specified variety becomes a productId line; any remainder becomes a productGroupId line.
+ */
+function expandVarietyBreakdowns(
+  values: CreateOrderInput,
+  breakdowns: VarietyBreakdownMap,
+  fieldIds: string[],
+): CreateOrderInput {
+  const expandedLines: CreateOrderInput['lines'] = [];
+
+  for (let i = 0; i < values.lines.length; i++) {
+    const line = values.lines[i];
+    const fieldId = fieldIds[i];
+    const breakdown = fieldId ? breakdowns[fieldId] : undefined;
+
+    // If not a product group line, or no breakdown specified, pass through unchanged
+    if (!line.productGroupId || !breakdown || breakdown.every(v => v.qty === 0)) {
+      expandedLines.push(line);
+      continue;
+    }
+
+    const specifiedVarieties = breakdown.filter(v => v.qty > 0);
+    const specifiedTotal = specifiedVarieties.reduce((sum, v) => sum + v.qty, 0);
+    const remainder = line.qty - specifiedTotal;
+
+    // Add one line per specified variety
+    for (const variety of specifiedVarieties) {
+      expandedLines.push({
+        ...line,
+        productId: variety.productId,
+        productGroupId: undefined,
+        qty: variety.qty,
+        description: variety.productName,
+      });
+    }
+
+    // Add Grower's Choice line for remainder (if any)
+    if (remainder > 0) {
+      expandedLines.push({
+        ...line,
+        qty: remainder,
+        description: line.description
+          ? `${line.description} (Grower's Choice)`
+          : "Grower's Choice",
+      });
+    }
+  }
+
+  return { ...values, lines: expandedLines };
+}
+
 export function SalesOrderWizard({ customers, products, productGroups = [], copyOrderId, fees = [] }: SalesOrderWizardProps) {
   // Draft state - loaded in useEffect to avoid hydration mismatch
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -116,9 +166,38 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false); // Prevent auto-save during/after submission
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
-  const [lineAllocations, setLineAllocations] = useState<Map<number, BatchAllocation[]>>(new Map());
   const [prefillPending, startPrefillTransition] = useTransition();
   const [pricingHints, setPricingHints] = useState<Record<string, PricingHint>>({});
+  const [varietyBreakdowns, setVarietyBreakdowns] = useState<VarietyBreakdownMap>({});
+
+  const handleVarietyQtyChange = useCallback(
+    (fieldId: string, productId: string, qty: number) => {
+      setVarietyBreakdowns((prev) => {
+        const lineBreakdown = [...(prev[fieldId] || [])];
+        const idx = lineBreakdown.findIndex((v) => v.productId === productId);
+        if (idx >= 0) {
+          lineBreakdown[idx] = { ...lineBreakdown[idx], qty };
+        }
+        return { ...prev, [fieldId]: lineBreakdown };
+      });
+    },
+    []
+  );
+
+  const initializeBreakdown = useCallback(
+    (fieldId: string, group: ProductGroupWithAvailability) => {
+      setVarietyBreakdowns((prev) => ({
+        ...prev,
+        [fieldId]: group.children.map((child) => ({
+          productId: child.productId,
+          productName: child.productName,
+          qty: 0,
+          availableStock: child.availableStock,
+        })),
+      }));
+    },
+    []
+  );
 
   const form = useForm<CreateOrderInput>({
     resolver: zodResolver(CreateOrderSchema),
@@ -154,10 +233,11 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
         shipToAddressId: draft.formValues.shipToAddressId,
         lines: draft.formValues.lines?.length ? draft.formValues.lines : [DEFAULT_LINE],
       });
-      // Restore step and allocations
+      // Restore step
       setStep(draft.step);
-      if (draft.lineAllocations) {
-        setLineAllocations(new Map(draft.lineAllocations));
+      // Restore variety breakdowns
+      if (draft.varietyBreakdowns) {
+        setVarietyBreakdowns(draft.varietyBreakdowns);
       }
       setHasDraft(true);
       setDraftLoaded(true);
@@ -216,8 +296,13 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
       setValue('shipToAddressId', undefined);
       setValue('deliveryAddress', '');
     }
-    setLineAllocations(new Map());
   }, [defaultShippingAddress, setValue]);
+
+  // Stable product ID string to avoid re-triggering when server action revalidates props
+  const filteredProductIds = useMemo(
+    () => filteredProducts.map((p) => p.id).sort().join(','),
+    [filteredProducts]
+  );
 
   // Fetch pricing hints when customer changes
   useEffect(() => {
@@ -225,13 +310,13 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
       setPricingHints({});
       return;
     }
-    const productIds = filteredProducts.map((p) => p.id);
+    const productIds = filteredProductIds.split(',').filter(Boolean);
     if (productIds.length === 0) return;
 
     getPricingHints(selectedCustomerId, productIds).then((hints) => {
       setPricingHints(hints);
     });
-  }, [selectedCustomerId, filteredProducts]);
+  }, [selectedCustomerId, filteredProductIds]);
 
   // Pre-fill from query string copyOrderId on first load
   useEffect(() => {
@@ -257,20 +342,20 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
 
     const draftData: DraftData = {
       formValues,
+      varietyBreakdowns,
       step,
-      lineAllocations: Array.from(lineAllocations.entries()),
       savedAt: Date.now(),
     };
     saveDraft(draftData);
     setHasDraft(true);
-  }, [formValues, step, lineAllocations, prefillPending]);
+  }, [formValues, step, prefillPending, varietyBreakdowns]);
 
   // Clear draft handler
   const handleClearDraft = useCallback(() => {
     clearDraft();
     setHasDraft(false);
+    setVarietyBreakdowns({});
     setStep(0);
-    setLineAllocations(new Map());
     form.reset({
       customerId: '',
       storeId: 'main',
@@ -317,30 +402,28 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
     setIsSubmitting(true);
     submittingRef.current = true; // Prevent auto-save from re-saving draft
     try {
-      // Merge user-specified lineAllocations into form values before submission
-      // No auto-allocation - pickers will allocate specific batches during fulfillment
-      const valuesWithAllocations = {
-        ...values,
-        lines: values.lines.map((line, index) => {
-          const userAllocations = lineAllocations.get(index);
-          const validUserAllocations = userAllocations?.filter(a => a.batchId && a.batchId.length > 0) || [];
-
-          if (validUserAllocations.length > 0) {
-            return {
-              ...line,
-              allocations: validUserAllocations.map(a => ({
-                batchId: a.batchId,
-                qty: a.qty,
-              })),
-            };
+      // Validate no over-allocation in variety breakdowns
+      const fieldIds = fields.map(f => f.id);
+      for (let i = 0; i < values.lines.length; i++) {
+        const line = values.lines[i];
+        const fieldId = fieldIds[i];
+        const breakdown = fieldId ? varietyBreakdowns[fieldId] : undefined;
+        if (line.productGroupId && breakdown) {
+          const specifiedTotal = breakdown.reduce((sum, v) => sum + v.qty, 0);
+          if (specifiedTotal > line.qty) {
+            setSubmitError(
+              `Variety quantities (${specifiedTotal}) exceed line total (${line.qty}). Please adjust before submitting.`
+            );
+            setIsSubmitting(false);
+            submittingRef.current = false;
+            return;
           }
+        }
+      }
 
-          // No allocations - order line will be fulfilled at pick time
-          return line;
-        }),
-      };
-
-      const result = await createOrder(valuesWithAllocations);
+      // Expand variety breakdowns into separate order lines
+      const expandedValues = expandVarietyBreakdowns(values, varietyBreakdowns, fieldIds);
+      const result = await createOrder(expandedValues);
       // If createOrder returns an error object, display it
       if (result && 'error' in result) {
         setSubmitError(result.error ?? 'Failed to create order');
@@ -398,6 +481,7 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
           }))
         : [DEFAULT_LINE];
 
+    setVarietyBreakdowns({});
     reset({
       customerId: payload.customerId,
       storeId: payload.shipToAddressId ?? 'main',
@@ -411,13 +495,6 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
       autoPrint: true,
       lines: nextLines,
     });
-    setLineAllocations(new Map());
-  };
-
-  const handleAllocationsChange = (index: number, allocations: BatchAllocation[]) => {
-    const next = new Map(lineAllocations);
-    next.set(index, allocations);
-    setLineAllocations(next);
   };
 
   const currentStep = steps[step];
@@ -508,10 +585,11 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
               fields={fields}
               append={append}
               remove={remove}
-              lineAllocations={lineAllocations}
-              onAllocationsChange={handleAllocationsChange}
               selectedCustomerId={selectedCustomerId}
               pricingHints={pricingHints}
+              varietyBreakdowns={varietyBreakdowns}
+              onVarietyQtyChange={handleVarietyQtyChange}
+              onInitBreakdown={initializeBreakdown}
             />
           )}
 

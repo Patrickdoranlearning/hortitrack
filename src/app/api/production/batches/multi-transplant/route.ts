@@ -5,6 +5,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplierId";
 import { nextBatchNumber } from "@/server/numbering/batches";
 import { resolveProductionStatus } from "@/server/batches/service";
+import { savePlannedMaterialsFromRules } from "@/server/materials/consumption";
 
 type Phase = "propagation" | "plug" | "potted";
 const PhaseMapToNumber: Record<Phase, 1 | 2 | 3> = { propagation: 1, plug: 2, potted: 3 };
@@ -177,6 +178,19 @@ export async function POST(req: NextRequest) {
       origin_country: org?.country_code ?? "IE",
       created_by_user_id: user.id,
     });
+
+    // Save planned materials so workers see them in the materials checklist
+    try {
+      await savePlannedMaterialsFromRules(
+        supabase,
+        orgId,
+        child.id,
+        payload.child.size_id,
+        requiredUnits
+      );
+    } catch {
+      // Non-blocking: planned materials are helpful but not critical
+    }
 
     return NextResponse.json(
       {

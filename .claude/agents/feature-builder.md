@@ -32,7 +32,7 @@ Jimmy routes to you when:
 You do NOT:
 - Design schemas (that's `data-engineer`)
 - Plan architecture (that's `planner`)
-- Deep debug complex issues (that's `ultrathink-debugger`)
+- Deep debug complex issues (Jimmy handles natively with Opus)
 - Review code quality (that's `module-reviewer`)
 
 ---
@@ -422,7 +422,7 @@ A feature is complete when:
 
 ## Escalation Rules
 
-**Route to `ultrathink-debugger`** if:
+**Escalate to Jimmy** if:
 - Bug is complex with unclear cause
 - Same issue recurring despite fixes
 - TypeScript errors don't make sense

@@ -20,7 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { SearchableSelect } from '@/components/ui/searchable-select';
+import { LocationComboboxGrouped } from '@/components/ui/location-combobox-grouped';
 import {
   Table,
   TableBody,
@@ -96,7 +96,6 @@ export function PlanPropagationStep({
   const [newNotes, setNewNotes] = useState('');
   const [varietyOpen, setVarietyOpen] = useState(false);
   const [sizeOpen, setSizeOpen] = useState(false);
-  const [locationOpen, setLocationOpen] = useState(false);
 
   const varieties = referenceData.varieties ?? [];
   const sizes = useMemo(() => {
@@ -115,11 +114,6 @@ export function PlanPropagationStep({
     () => sizes.find((s) => s.id === newSizeId),
     [sizes, newSizeId]
   );
-  const selectedLocation = useMemo(
-    () => locations.find((l) => l.id === newLocationId),
-    [locations, newLocationId]
-  );
-
   // Add planned batch
   const handleAddBatch = useCallback(() => {
     if (!newVarietyId || !newSizeId || !newQuantity) return;
@@ -266,19 +260,22 @@ export function PlanPropagationStep({
                       />
                     </TableCell>
                     <TableCell>
-                      <SearchableSelect
-                        className="h-8"
-                        options={locations.map((loc) => ({
-                          value: loc.id,
-                          label: loc.name,
+                      <LocationComboboxGrouped
+                        locations={locations.map((loc) => ({
+                          id: loc.id,
+                          name: loc.name,
+                          nursery_site: loc.nursery_site ?? '',
+                          is_virtual: loc.is_virtual ?? false,
                         }))}
                         value={batch.locationId ?? ''}
-                        onValueChange={(v) => updateBatchLocation(batch.id, v)}
+                        onSelect={(v) => updateBatchLocation(batch.id, v)}
                         createHref="/locations"
                         placeholder="TBD"
                         createLabel="Add new location"
                         emptyLabel="TBD"
                         emptyValue=""
+                        excludeVirtual
+                        triggerClassName="h-8"
                       />
                     </TableCell>
                     <TableCell>
@@ -452,65 +449,22 @@ export function PlanPropagationStep({
                   Location
                   <Badge variant="outline" className="ml-2 font-normal text-xs">Optional</Badge>
                 </Label>
-                <Popover open={locationOpen} onOpenChange={setLocationOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {selectedLocation ? (
-                        <span>{selectedLocation.name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Select location...</span>
-                      )}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search locations..." />
-                      <CommandList>
-                        <CommandEmpty>No location found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="none"
-                            onSelect={() => {
-                              setNewLocationId('');
-                              setLocationOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                !newLocationId ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                            <span className="text-muted-foreground">TBD</span>
-                          </CommandItem>
-                          {locations.map((l) => (
-                            <CommandItem
-                              key={l.id}
-                              value={l.name}
-                              onSelect={() => {
-                                setNewLocationId(l.id);
-                                setLocationOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  newLocationId === l.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              {l.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <LocationComboboxGrouped
+                  locations={locations.map((loc) => ({
+                    id: loc.id,
+                    name: loc.name,
+                    nursery_site: loc.nursery_site ?? '',
+                    is_virtual: loc.is_virtual ?? false,
+                  }))}
+                  value={newLocationId}
+                  onSelect={(v) => setNewLocationId(v)}
+                  createHref="/locations"
+                  placeholder="Select location..."
+                  createLabel="Add new location"
+                  emptyLabel="TBD"
+                  emptyValue=""
+                  excludeVirtual
+                />
               </div>
             </div>
 

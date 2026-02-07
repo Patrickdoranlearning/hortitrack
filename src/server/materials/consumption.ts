@@ -240,6 +240,96 @@ export async function previewConsumption(
 }
 
 // ============================================================================
+// Planned Batch Materials
+// ============================================================================
+
+export type PlannedBatchMaterial = {
+  id: string;
+  batchId: string;
+  materialId: string;
+  materialName: string;
+  materialPartNumber: string;
+  categoryCode: string;
+  baseUom: string;
+  quantityPlanned: number;
+  notes: string | null;
+};
+
+export async function getPlannedBatchMaterials(
+  supabase: SupabaseClient,
+  orgId: string,
+  batchId: string
+): Promise<PlannedBatchMaterial[]> {
+  const { data, error } = await supabase
+    .from("planned_batch_materials")
+    .select(`
+      id,
+      batch_id,
+      material_id,
+      quantity_planned,
+      notes,
+      material:materials (id, name, part_number, base_uom, category:material_categories (code))
+    `)
+    .eq("org_id", orgId)
+    .eq("batch_id", batchId);
+
+  if (error) throw new Error(`Failed to fetch planned materials: ${error.message}`);
+
+  return (data ?? []).map((row) => {
+    const material = extractJoin<Record<string, unknown>>(row.material);
+    const category = material ? extractJoin<Record<string, unknown>>(material.category) : null;
+    return {
+      id: row.id,
+      batchId: row.batch_id,
+      materialId: row.material_id,
+      materialName: material?.name as string ?? "Unknown",
+      materialPartNumber: material?.part_number as string ?? "",
+      categoryCode: category?.code as string ?? "",
+      baseUom: material?.base_uom as string ?? "each",
+      quantityPlanned: Number(row.quantity_planned) || 0,
+      notes: row.notes ?? null,
+    };
+  });
+}
+
+/**
+ * Auto-generate planned materials for a batch based on its size's consumption rules.
+ * Used by transplant flows where materials aren't manually selected in a form.
+ */
+export async function savePlannedMaterialsFromRules(
+  supabase: SupabaseClient,
+  orgId: string,
+  batchId: string,
+  sizeId: string,
+  quantity: number
+): Promise<void> {
+  const preview = await previewConsumption(supabase, orgId, sizeId, quantity);
+
+  if (preview.length === 0) return;
+
+  const inserts = preview.map((item) => ({
+    org_id: orgId,
+    batch_id: batchId,
+    material_id: item.materialId,
+    quantity_planned: item.quantityRequired,
+    notes: "Auto-planned from size rules",
+  }));
+
+  const { error } = await supabase
+    .from("planned_batch_materials")
+    .insert(inserts);
+
+  if (error) {
+    logError("Failed to save auto-planned materials for batch", {
+      error: error.message,
+      batchId,
+      sizeId,
+      materialCount: inserts.length,
+    });
+  }
+}
+
+// ============================================================================
 // Consumption Execution
 // ============================================================================
 

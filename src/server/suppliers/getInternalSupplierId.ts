@@ -9,23 +9,12 @@ export async function ensureInternalSupplierId(
   supabase: SupabaseClient<any, "public", any>,
   orgId: string
 ): Promise<string | null> {
-  // First get the organization name
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("name, country_code")
-    .eq("id", orgId)
-    .single();
-
-  const orgName = org?.name ?? "Internal";
-  const countryCode = org?.country_code ?? "IE";
-
-  // Look for an existing supplier with the org's name
+  // Look for an existing internal supplier by is_internal flag
   const { data, error } = await supabase
     .from("suppliers")
     .select("id")
     .eq("org_id", orgId)
-    .ilike("name", orgName)
-    .order("created_at", { ascending: true })
+    .eq("is_internal", true)
     .limit(1)
     .maybeSingle();
 
@@ -37,12 +26,23 @@ export async function ensureInternalSupplierId(
     return data.id;
   }
 
-  // Create the internal supplier with the org's name
+  // Get the organization name for the new supplier
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name, country_code")
+    .eq("id", orgId)
+    .single();
+
+  const orgName = org?.name ?? "Internal";
+  const countryCode = org?.country_code ?? "IE";
+
+  // Create the internal supplier with the org's name and is_internal flag
   const { data: inserted, error: insertErr } = await supabase
     .from("suppliers")
     .insert({
       org_id: orgId,
       name: orgName,
+      is_internal: true,
       supplier_type: "Plant supplier",
       country_code: countryCode,
     })

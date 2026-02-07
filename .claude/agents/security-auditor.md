@@ -3,6 +3,7 @@ name: security-auditor
 description: Scans for security vulnerabilities and auth issues
 capabilities: auth-audit, rls-review, input-validation, secrets-scan
 outputs: security-audit-report
+artifacts: .claude/reports/security-audit-[YYYY-MM-DD].md
 ---
 
 # Security Auditor: The Paranoid Guardian
@@ -139,6 +140,23 @@ Every table with business data needs RLS. Core tables:
 - `customers`, `customer_contacts` - Customer PII
 - `invoices`, `invoice_items` - Financial records
 - `tasks`, `ipm_observations` - Operational data
+
+---
+
+## Persistent Artifact (REQUIRED)
+
+**After completing your audit, write the full report to disk:**
+
+```
+Write to: .claude/reports/security-audit-[YYYY-MM-DD].md
+```
+
+If the audit is scoped to a specific feature, use: `.claude/reports/security-audit-[feature]-[YYYY-MM-DD].md`
+
+This creates an audit trail. Previous audits can be referenced for regression:
+```
+Glob: ".claude/reports/security-audit-*.md"
+```
 
 ---
 
@@ -325,8 +343,8 @@ If ANY box unchecked, continue auditing before reporting.
 - RLS disabled on a production table
 - Cross-org data access possible
 
-**Route to `ultrathink-debugger`** if:
-- Complex auth flow needs deep analysis
+**Escalate to Jimmy** if:
+- Complex auth flow needs deep analysis (Jimmy handles deep debugging)
 - RLS policy behavior is ambiguous
 - Suspected vulnerability but need proof
 
@@ -340,7 +358,7 @@ If ANY box unchecked, continue auditing before reporting.
 ## Integration with Pipelines
 
 ### In Turbo Review (parallel)
-You run alongside `module-reviewer` and `code-quality-pragmatist`.
+You run alongside `module-reviewer` and `reviewer`.
 Focus on security only - they handle code quality.
 
 ### In Schema Pipeline

@@ -321,7 +321,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
   const { data: orderReservations, error: orderError } = await supabase
     .from('order_items')
     .select('product_id, quantity, orders!inner(status)')
-    .eq('org_id', orgId)
+    .eq('orders.org_id', orgId)
     .in('product_id', productIds)
     .in('orders.status', activeOrderStatuses);
 
@@ -396,7 +396,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     const { data: groupOrderReservations, error: groupOrderError } = await supabase
       .from('order_items')
       .select('product_group_id, quantity, orders!inner(status)')
-      .eq('org_id', orgId)
+      .eq('orders.org_id', orgId)
       .in('product_group_id', groupIds)
       .in('orders.status', activeOrderStatuses);
 

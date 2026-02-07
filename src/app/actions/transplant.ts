@@ -3,7 +3,7 @@
 import { TransplantInputSchema, type TransplantInput } from "@/lib/domain/batch";
 import { getUserAndOrg } from "@/server/auth/org";
 import { revalidatePath } from "next/cache";
-import { consumeMaterialsForBatch } from "@/server/materials/consumption";
+import { consumeMaterialsForBatch, savePlannedMaterialsFromRules } from "@/server/materials/consumption";
 
 export type TransplantResult = {
   success: true;
@@ -86,6 +86,19 @@ export async function transplantBatchAction(input: TransplantInput): Promise<Tra
       };
       parent_new_quantity: number;
     };
+
+    // Save planned materials so workers see them in the materials checklist
+    try {
+      await savePlannedMaterialsFromRules(
+        supabase,
+        orgId,
+        result.child_batch.id,
+        validated.size_id,
+        result.child_batch.quantity
+      );
+    } catch (planErr) {
+      console.error("[transplantBatchAction] Planned materials save failed:", planErr);
+    }
 
     // Consume materials for the new child batch
     try {

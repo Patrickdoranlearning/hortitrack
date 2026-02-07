@@ -2,6 +2,19 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import type { Supplier, Batch } from "@/lib/types";
+import type { Database } from "@/types/supabase";
+import { logError } from "@/lib/log";
+
+// Type helpers for database queries
+type OrderRow = Database['public']['Tables']['orders']['Row'];
+type CustomerRow = Database['public']['Tables']['customers']['Row'];
+type CustomerAddressRow = Database['public']['Tables']['customer_addresses']['Row'];
+
+// Query result type with joined relations
+interface OrderWithRelations extends OrderRow {
+  customers?: Pick<CustomerRow, 'name'> | null;
+  customer_addresses?: Pick<CustomerAddressRow, 'county' | 'city'> | null;
+}
 
 export const OrderSchema = z.object({
   id: z.string(),
@@ -68,11 +81,16 @@ export async function listOrders(params: {
 
   const { data, error, count } = await query;
   if (error) {
-    console.error("Error listing orders:", error.message, error.code, error.details, error.hint);
+    logError("Error listing orders", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
     return { orders: [], total: 0, page, pageSize };
   }
 
-  const mapped = (data || []).map((d: any) => ({
+  const mapped = (data || []).map((d: OrderWithRelations) => ({
     id: d.id,
     org_id: d.org_id,
     order_number: d.order_number,

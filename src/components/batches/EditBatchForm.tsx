@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchableSelect } from "../ui/searchable-select";
+import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection } from "@/hooks/useCollection";
@@ -189,17 +189,18 @@ export default function EditBatchForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <SearchableSelect
-                        options={(locationsData ?? []).map((loc) => ({
-                          value: loc.id!,
-                          label: loc.name,
-                          description: loc.nurserySite ?? undefined,
+                      <LocationComboboxGrouped
+                        locations={(locationsData ?? []).map((loc) => ({
+                          id: loc.id!,
+                          name: loc.name,
+                          nursery_site: loc.nurserySite ?? "",
+                          is_virtual: false,
                         }))}
                         value={field.value ?? ""}
-                        onValueChange={field.onChange}
+                        onSelect={field.onChange}
                         createHref="/locations"
                         placeholder="Search locations..."
-                        createLabel="Add new location"
+                        excludeVirtual
                         disabled={!locationsData?.length}
                       />
                       <FormMessage />

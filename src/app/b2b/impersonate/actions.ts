@@ -26,25 +26,25 @@ export async function startImpersonation(formData: FormData) {
   }
 
   // Get user's org to verify customer belongs to same org
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('active_org_id')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  if (!profile?.active_org_id) {
+  if (profileError || !profile?.active_org_id) {
     return { error: 'No organization found' };
   }
 
   // Verify customer exists and belongs to org
-  const { data: customer } = await supabase
+  const { data: customer, error: customerError } = await supabase
     .from('customers')
     .select('id, org_id')
     .eq('id', customerId)
     .eq('org_id', profile.active_org_id)
-    .single();
+    .maybeSingle();
 
-  if (!customer) {
+  if (customerError || !customer) {
     return { error: 'Customer not found or access denied' };
   }
 

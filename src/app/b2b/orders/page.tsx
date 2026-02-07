@@ -2,6 +2,9 @@ import { requireCustomerAuth } from '@/lib/auth/b2b-guard';
 import { B2BPortalLayout } from '@/components/b2b/B2BPortalLayout';
 import { B2BOrdersClient } from './B2BOrdersClient';
 import { createClient } from '@/lib/supabase/server';
+import { ErrorState } from '@/components/ui/error-state';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { logError } from '@/lib/log';
 
 export default async function B2BOrdersPage() {
   const authContext = await requireCustomerAuth();
@@ -38,11 +41,31 @@ export default async function B2BOrdersPage() {
       .eq('created_by_user_id', authContext.user.id);
   }
 
-  const { data: orders } = await ordersQuery;
+  const { data: orders, error } = await ordersQuery;
+
+  if (error) {
+    logError('Failed to load B2B orders', {
+      error: error.message,
+      code: error.code,
+      customerId: authContext.customerId,
+    });
+
+    return (
+      <B2BPortalLayout authContext={authContext}>
+        <ErrorState
+          title="Unable to Load Orders"
+          message="We're having trouble loading your orders. Please try again in a moment."
+          error={process.env.NODE_ENV === 'development' ? error.message : undefined}
+        />
+      </B2BPortalLayout>
+    );
+  }
 
   return (
     <B2BPortalLayout authContext={authContext}>
-      <B2BOrdersClient orders={orders || []} customerId={authContext.customerId} />
+      <ErrorBoundary>
+        <B2BOrdersClient orders={orders || []} customerId={authContext.customerId} />
+      </ErrorBoundary>
     </B2BPortalLayout>
   );
 }

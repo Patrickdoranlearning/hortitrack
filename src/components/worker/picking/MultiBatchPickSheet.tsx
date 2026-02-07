@@ -16,6 +16,11 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   MapPin,
   Package,
   Check,
@@ -73,6 +78,7 @@ export function MultiBatchPickSheet({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const targetQty = item?.targetQty || 0;
 
@@ -106,8 +112,19 @@ export function MultiBatchPickSheet({
     if (!open) {
       setSelections(new Map());
       setExpandedBatchId(null);
+      setExpandedGroups(new Set());
     }
   }, [open]);
+
+  // Auto-expand all groups when batches load for product groups
+  useEffect(() => {
+    if (item?.productGroupId && batches.length > 0) {
+      const allVarieties = new Set(
+        batches.map((b) => b.productName || "Unknown")
+      );
+      setExpandedGroups(allVarieties);
+    }
+  }, [batches, item?.productGroupId]);
 
   // Auto-suggest optimal batch selection using FEFO
   const autoSuggestSelection = useCallback(
@@ -133,6 +150,45 @@ export function MultiBatchPickSheet({
     },
     []
   );
+
+  // Group batches by variety for product groups
+  const groupedBatches = useMemo(() => {
+    if (!item?.productGroupId) return null; // flat mode
+
+    const groups = new Map<
+      string,
+      { name: string; batches: AvailableBatch[]; totalAvailable: number }
+    >();
+    for (const batch of batches) {
+      const name = batch.productName || "Unknown";
+      const group = groups.get(name) || {
+        name,
+        batches: [],
+        totalAvailable: 0,
+      };
+      group.batches.push(batch);
+      group.totalAvailable += batch.quantity;
+      groups.set(name, group);
+    }
+    return Array.from(groups.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  }, [batches, item?.productGroupId]);
+
+  // Calculate variety subtotals for grouped view
+  const varietySubtotals = useMemo(() => {
+    if (!groupedBatches) return null;
+    const subtotals = new Map<string, number>();
+    groupedBatches.forEach((group) => {
+      let total = 0;
+      group.batches.forEach((b) => {
+        const sel = selections.get(b.id);
+        if (sel) total += sel.quantity;
+      });
+      subtotals.set(group.name, total);
+    });
+    return subtotals;
+  }, [groupedBatches, selections]);
 
   // Calculate totals
   const totalSelected = useMemo(() => {
@@ -236,6 +292,18 @@ export function MultiBatchPickSheet({
     }
   };
 
+  // Toggle variety group expansion
+  const toggleGroup = (varietyName: string) => {
+    vibrateTap();
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(varietyName)) {
+      newExpanded.delete(varietyName);
+    } else {
+      newExpanded.add(varietyName);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
   const handleConfirm = async () => {
     if (!canSubmit || !item) return;
 
@@ -328,7 +396,212 @@ export function MultiBatchPickSheet({
                   There are no batches with available stock
                 </p>
               </div>
+            ) : groupedBatches ? (
+              // Grouped View for Product Groups
+              <div className="space-y-3">
+                {groupedBatches.map((group) => {
+                  const isGroupExpanded = expandedGroups.has(group.name);
+                  const varietySelected = varietySubtotals?.get(group.name) || 0;
+
+                  return (
+                    <Collapsible
+                      key={group.name}
+                      open={isGroupExpanded}
+                      onOpenChange={() => toggleGroup(group.name)}
+                    >
+                      <Card className="overflow-hidden">
+                        {/* Variety Header */}
+                        <CollapsibleTrigger asChild>
+                          <button className="w-full p-4 flex items-center gap-3 text-left bg-muted/50 hover:bg-muted/70 transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-base mb-1">
+                                {group.name}
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Package className="h-3 w-3" />
+                                  {group.totalAvailable} available
+                                </span>
+                                {varietySelected > 0 && (
+                                  <Badge
+                                    variant="default"
+                                    className="text-xs bg-primary"
+                                  >
+                                    {varietySelected} selected
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            {isGroupExpanded ? (
+                              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </button>
+                        </CollapsibleTrigger>
+
+                        {/* Batches within Variety */}
+                        <CollapsibleContent>
+                          <div className="p-2 space-y-2">
+                            {group.batches.map((batch) => {
+                              const selection = selections.get(batch.id);
+                              const isSelected = !!selection;
+                              const qty = selection?.quantity || 0;
+                              const isExpanded = expandedBatchId === batch.id;
+
+                              return (
+                                <Card
+                                  key={batch.id}
+                                  className={cn(
+                                    "p-3 transition-all",
+                                    isSelected &&
+                                      "border-primary ring-1 ring-primary bg-primary/5"
+                                  )}
+                                >
+                                  {/* Batch Header - Tappable */}
+                                  <button
+                                    className="w-full flex items-center gap-3 text-left min-h-[48px]"
+                                    onClick={() => toggleBatch(batch)}
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => toggleBatch(batch)}
+                                      className="h-6 w-6"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-mono font-medium">
+                                          {batch.batchNumber}
+                                        </span>
+                                        {batch.status && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-[10px]"
+                                          >
+                                            {batch.status}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                        <span className="flex items-center gap-1">
+                                          <MapPin className="h-3 w-3" />
+                                          {batch.location}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          <Package className="h-3 w-3" />
+                                          {batch.quantity}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {isSelected && (
+                                      <div className="text-right">
+                                        <Badge
+                                          variant="default"
+                                          className={cn(
+                                            "text-sm px-3",
+                                            qty === batch.quantity && "bg-green-600"
+                                          )}
+                                        >
+                                          {qty}
+                                        </Badge>
+                                      </div>
+                                    )}
+                                  </button>
+
+                                  {/* Quantity Controls - Expandable */}
+                                  {isSelected && (
+                                    <div className="mt-3 pt-3 border-t">
+                                      <button
+                                        className="w-full flex items-center justify-between text-sm text-muted-foreground mb-2"
+                                        onClick={() =>
+                                          setExpandedBatchId(
+                                            isExpanded ? null : batch.id
+                                          )
+                                        }
+                                      >
+                                        <span>Adjust quantity</span>
+                                        {isExpanded ? (
+                                          <ChevronUp className="h-4 w-4" />
+                                        ) : (
+                                          <ChevronDown className="h-4 w-4" />
+                                        )}
+                                      </button>
+
+                                      {isExpanded && (
+                                        <div className="space-y-3">
+                                          {/* Stepper Controls */}
+                                          <div className="flex items-center justify-center gap-3">
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-14 w-14"
+                                              onClick={() => decrementQty(batch.id)}
+                                              disabled={qty <= 1}
+                                            >
+                                              <Minus className="h-5 w-5" />
+                                            </Button>
+                                            <Input
+                                              type="number"
+                                              value={qty}
+                                              onChange={(e) =>
+                                                updateQuantity(
+                                                  batch.id,
+                                                  parseInt(e.target.value) || 0
+                                                )
+                                              }
+                                              className="h-14 w-24 text-center text-xl font-medium"
+                                              min={1}
+                                              max={batch.quantity}
+                                            />
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-14 w-14"
+                                              onClick={() => incrementQty(batch.id)}
+                                              disabled={qty >= batch.quantity}
+                                            >
+                                              <Plus className="h-5 w-5" />
+                                            </Button>
+                                          </div>
+
+                                          {/* Quick Actions */}
+                                          <div className="flex gap-2">
+                                            <Button
+                                              variant="secondary"
+                                              className="flex-1 h-11"
+                                              onClick={() =>
+                                                updateQuantity(batch.id, batch.quantity)
+                                              }
+                                              disabled={qty === batch.quantity}
+                                            >
+                                              Max ({batch.quantity})
+                                            </Button>
+                                            {!isComplete && qty < batch.quantity && (
+                                              <Button
+                                                variant="secondary"
+                                                className="flex-1 h-11"
+                                                onClick={() => fillFromBatch(batch)}
+                                              >
+                                                Fill Remaining
+                                              </Button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  );
+                })}
+              </div>
             ) : (
+              // Flat View for Specific Products
               <div className="space-y-2">
                 {batches.map((batch) => {
                   const selection = selections.get(batch.id);
@@ -341,7 +614,8 @@ export function MultiBatchPickSheet({
                       key={batch.id}
                       className={cn(
                         "p-3 transition-all",
-                        isSelected && "border-primary ring-1 ring-primary bg-primary/5"
+                        isSelected &&
+                          "border-primary ring-1 ring-primary bg-primary/5"
                       )}
                     >
                       {/* Batch Header - Tappable */}

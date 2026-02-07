@@ -20,8 +20,6 @@ export const CreateOrderLineSchema = z
     // Product identity fallback (variety + size)
     plantVariety: z.string().optional(),
     size: z.string().optional(),
-    requiredVarietyId: z.string().uuid().optional(),
-    requiredBatchId: z.string().uuid().optional(),
     description: z.string().optional(),
     qty: z.coerce.number().int().positive().default(1),
     allowSubstitute: z.boolean().optional().default(true),
@@ -32,14 +30,6 @@ export const CreateOrderLineSchema = z
     // Multibuy pricing (e.g., "3 for €10")
     multibuyQty2: z.coerce.number().int().positive().optional(),
     multibuyPrice2: z.coerce.number().nonnegative().optional(),
-    // Batch-specific ordering
-    specificBatchId: z.string().uuid().optional(), // Request specific batch
-    gradePreference: z.enum(['A', 'B', 'C']).optional(), // Grade preference
-    preferredBatchNumbers: z.array(z.string()).optional(), // List of preferred batch numbers
-    allocations: z.array(z.object({
-      batchId: z.string().uuid(),
-      qty: z.number().int().positive(),
-    })).optional(),
   })
   .refine(
     (val) => Boolean(val.productId) || Boolean(val.productGroupId) || (Boolean(val.plantVariety) && Boolean(val.size)),
@@ -79,6 +69,18 @@ export type AllocatedLine = {
   unitPrice?: number;
   allocations: Allocation[]; // actual split across batches
 };
+
+// Variety breakdown for product group orders
+// Allows specifying per-variety quantities within a product group
+export type VarietyBreakdown = {
+  productId: string;       // child product ID
+  productName: string;     // display name (e.g., "Eline")
+  qty: number;             // specified quantity (0 = not specified)
+  availableStock: number;  // for display/validation
+};
+
+// Keyed by react-hook-form field.id for stable indexing
+export type VarietyBreakdownMap = Record<string, VarietyBreakdown[]>;
 
 export const SalesOrderDocSchema = z.object({
   id: z.string().optional(),

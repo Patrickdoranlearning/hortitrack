@@ -15,30 +15,17 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logBatchMove } from '@/app/actions/log-batch-action';
 import { logBatchHealthEvent } from '@/app/actions/batch-health';
+import { LocationComboboxGrouped, type LocationData } from '@/components/ui/location-combobox-grouped';
 
 // ============================================================================
 // Types
 // ============================================================================
-
-type Location = {
-  id: string;
-  name: string;
-  type?: string;
-  nurserySite?: string;
-};
 
 type MoveFormProps = {
   batchId: string;
@@ -75,7 +62,7 @@ export function MoveForm({
   setIsSubmitting,
 }: MoveFormProps) {
   const [loading, setLoading] = React.useState(false);
-  const [locations, setLocations] = React.useState<Location[]>([]);
+  const [locations, setLocations] = React.useState<LocationData[]>([]);
   const [locationsLoading, setLocationsLoading] = React.useState(true);
 
   // Fetch locations on mount
@@ -84,7 +71,9 @@ export function MoveForm({
       try {
         const res = await fetch('/api/locations?limit=200');
         const json = await res.json();
-        setLocations(json.data || json.items || []);
+        setLocations((json.data || json.items || []).map((l: any) => ({
+          id: l.id, name: l.name, nursery_site: l.nurserySite ?? l.nursery_site ?? "", is_virtual: l.isVirtual ?? l.is_virtual ?? false,
+        })));
       } catch (error) {
         toast.error('Failed to load locations');
       } finally {
@@ -198,20 +187,14 @@ export function MoveForm({
                   No nursery locations available. Add one in Settings &gt; Locations.
                 </p>
               ) : (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {locations.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <LocationComboboxGrouped
+                  locations={locations}
+                  value={field.value}
+                  onSelect={field.onChange}
+                  placeholder="Select location"
+                  createHref="/locations"
+                  excludeVirtual
+                />
               )}
               <FormMessage />
             </FormItem>

@@ -434,11 +434,11 @@ function mapTransaction(row: Record<string, unknown>): MaterialTransaction {
     orgId: row.org_id as string,
     materialId: row.material_id as string,
     material: material
-      ? {
+      ? ({
           id: material.id as string,
           name: material.name as string,
           partNumber: material.part_number as string,
-        } as Pick<Material, 'id' | 'name' | 'partNumber'>
+        } as Partial<Material> as Material)
       : undefined,
     transactionType: row.transaction_type as MaterialTransaction["transactionType"],
     quantity: Number(row.quantity) || 0,

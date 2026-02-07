@@ -1,4 +1,5 @@
 import { getSupabaseServerApp } from '@/server/db/supabase';
+import { logError } from '@/lib/log';
 
 export interface ProductGroupChild {
   productId: string;
@@ -67,7 +68,7 @@ export async function getProductGroupsWithAvailability(
     .eq('is_active', true);
 
   if (groupsError) {
-    console.error('Error fetching product groups:', groupsError);
+    logError('Error fetching product groups', { error: groupsError.message });
     return [];
   }
 
@@ -100,32 +101,72 @@ export async function getProductGroupsWithAvailability(
     });
   });
 
-  // 2. Get members for each group using the database function
-  const groupMembers = await Promise.all(
-    groups.map(async (group) => {
-      const { data: members, error } = await supabase
-        .rpc('get_product_group_members', { p_group_id: group.id });
+  // 2. Get members for ALL groups in a batch query (fix N+1 issue)
+  // Get explicit members first
+  const { data: explicitMembers } = await supabase
+    .from('product_group_members')
+    .select('group_id, product_id, products!inner(id, name)')
+    .in('group_id', groupIds);
 
-      if (error) {
-        console.error(`Error fetching members for group ${group.id}:`, error);
-        return { groupId: group.id, members: [] };
-      }
-      return {
-        groupId: group.id,
-        members: members as { product_id: string; product_name: string; inclusion_source: string }[],
-      };
-    })
+  // Build initial groupMembersMap with explicit members
+  const groupMembersMap = new Map<string, { product_id: string; product_name: string }[]>();
+  explicitMembers?.forEach((m) => {
+    const groupId = m.group_id;
+    if (!groupMembersMap.has(groupId)) {
+      groupMembersMap.set(groupId, []);
+    }
+    // Extract product name from the join
+    const products = m.products as any;
+    const productName = Array.isArray(products) ? products[0]?.name : products?.name;
+    groupMembersMap.get(groupId)!.push({
+      product_id: m.product_id,
+      product_name: productName || 'Unknown',
+    });
+  });
+
+  // For groups with match_family or match_size_ids, we still need the RPC
+  // But we can batch them more efficiently by checking if they have dynamic rules
+  const groupsWithDynamicRules = groups.filter(
+    (g) => (g.match_family && g.match_family.length > 0) || (g.match_size_ids && g.match_size_ids.length > 0)
   );
 
-  // Create a map of group -> product IDs
-  const groupMembersMap = new Map<string, { product_id: string; product_name: string }[]>();
-  groupMembers.forEach(({ groupId, members }) => {
-    groupMembersMap.set(groupId, members);
-  });
+  if (groupsWithDynamicRules.length > 0) {
+    // Call RPC for groups with dynamic rules
+    const dynamicResults = await Promise.all(
+      groupsWithDynamicRules.map(async (group) => {
+        const { data: members, error } = await supabase
+          .rpc('get_product_group_members', { p_group_id: group.id });
+
+        if (error) {
+          logError(`Error fetching members for group ${group.id}`, { error: error.message });
+          return { groupId: group.id, members: [] };
+        }
+        return {
+          groupId: group.id,
+          members: members as { product_id: string; product_name: string; inclusion_source: string }[],
+        };
+      })
+    );
+
+    // Merge dynamic members into the map
+    dynamicResults.forEach(({ groupId, members }) => {
+      if (!groupMembersMap.has(groupId)) {
+        groupMembersMap.set(groupId, []);
+      }
+      // Merge, avoiding duplicates
+      const existing = groupMembersMap.get(groupId)!;
+      const existingIds = new Set(existing.map((e) => e.product_id));
+      members.forEach((m) => {
+        if (!existingIds.has(m.product_id)) {
+          existing.push({ product_id: m.product_id, product_name: m.product_name });
+        }
+      });
+    });
+  }
 
   // Collect all unique product IDs
   const allProductIds = new Set<string>();
-  groupMembers.forEach(({ members }) => {
+  groupMembersMap.forEach((members) => {
     members.forEach((m) => allProductIds.add(m.product_id));
   });
 

@@ -466,6 +466,7 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
                   }
                   createHref="/locations"
                   placeholder="Select location"
+                  excludeVirtual
                 />
               </div>
 

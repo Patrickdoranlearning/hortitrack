@@ -54,7 +54,7 @@
 - Completed plans archived to `.claude/plans/completed/`
 - Use `jimmy dual-plan [X]` for complex features (RECOMMENDED)
 - Use `jimmy plan [X]` for standard features
-- Even smaller tasks get mini-plans via `jimmy new [X]` or `jimmy bugfix [X]`
+- Even smaller tasks get mini-plans via `jimmy build [X]` or `jimmy fix [X]`
 
 ### Dual-Plan (Recommended for Complex Features)
 ```
@@ -78,119 +78,110 @@ Runs two planners with different perspectives, then synthesizes the best approac
 
 | File | Purpose |
 |------|---------|
-| `FEATURES.md` | Source of truth for feature behavior (Tester Tim validates against this) |
+| `FEATURES.md` | Source of truth for feature behavior (tester validates against this) |
 | `.claude/plans/` | All active implementation plans |
 | `.claude/plans/completed/` | Archive of completed plans |
 | `REVIEW-STATUS.md` | Module review progress tracker |
 | `STATUS.md` | Session context handoff |
 | `.claude/agents/` | Specialized agent definitions |
+| `.claude/reports/` | Persistent agent reports (drift, security, test) — enables trend tracking |
 
 ---
 
-## Custom Agents
+## Custom Agents (12 Agents — Opus 4.6 Architecture)
 
 Available agents in `.claude/agents/`:
 
 ### Coordinator
-- `jimmy` - Lead coordinator & workflow architect
+- `jimmy` (Opus) - Lead coordinator, deep debugging, session sync
   - Routes tasks to specialized agents
-  - Manages pipelines and execution modes
+  - Handles complex debugging directly (no separate debugger)
+  - Manages session sync inline (no separate sync agent)
   - Guards database schema via `data-engineer`
   - See `.claude/jimmy-commands.md` for quick commands
 
-### Core Workflow Agents
-- `planner` - Architecture & implementation planning, writes to PLAN.md
-- `module-reviewer` - Systematic module review with manual testing checkpoints
+### Planning & Context
+- `planner` (Opus) - Architecture & implementation planning, writes to PLAN.md
+- `context-scout` (Haiku) - Fast context gathering before other agents start work
+
+### Building
 - `data-engineer` - Schema, migrations, RLS, queries
-- `security-auditor` - Security vulnerability scanning
 - `feature-builder` - Build features end-to-end
 - `verifier` - Run tests until green
-- `reviewer` - Code review before merge
-- `sync` - Context management
 
-### Quality & Validation Agents
-- `tester-tim` - Feature validation against FEATURES.md specifications
-- `ultrathink-debugger` - Deep debugging with systematic root cause analysis (uses Opus)
-- `karen` - Reality check: validates actual vs claimed completion status
-- `task-completion-validator` - Verifies features actually work end-to-end
-- `code-quality-pragmatist` - Identifies over-engineering, promotes simplicity
-- `ui-comprehensive-tester` - Thorough UI testing and validation
+### Reviewing
+- `reviewer` - Code review + quality pragmatism. `--wide` mode: Sonnet 1M context overview → Opus sharpening
+- `module-reviewer` - Systematic module review with manual testing checkpoints
+- `security-auditor` - Security vulnerability scanning, RLS audit
+
+### Validating
+- `tester` - Feature & UI testing against FEATURES.md specifications
+- `validator` - Reality check + completion validation + scope creep detection
+- `drift-detector` - Architectural consistency & tech debt radar
 
 ### Jimmy Quick Commands
 
-Commands organized by intent:
+6 core commands (Jimmy auto-detects scope — no need to pick the right variant):
 
 ```
-# === BUILDING ===
-jimmy new [X]        # Full feature: plan → build → test → review (5-6 agents)
-jimmy add [X]        # Quick add: build → verify → test (3-4 agents)
-jimmy feature [X]    # Complete lifecycle with max parallelism (8-10 agents)
-
-# === FIXING ===
-jimmy fix [X]        # Standard: explore → fix → verify → test
-jimmy hotfix [X]     # Urgent: fix → verify → ship (parallel)
-jimmy debug [X]      # Deep investigation: ultrathink + explore parallel
-jimmy bugfix [X]     # Complete lifecycle: investigate → fix → validate
-
-# === REVIEWING ===
-jimmy check          # Quick: 2 reviewers parallel
-jimmy audit          # Full: ALL 4 reviewers parallel
-jimmy turbo review   # Fast: 3 reviewers parallel
-
-# === SHIPPING ===
-jimmy ready          # Pre-merge: verifier → 3 reviewers parallel
-jimmy ship           # Full ship pipeline → sync
-jimmy release        # Maximum validation for releases
-
-# === PLANNING ===
-jimmy plan [X]       # Explore → planner → PLAN.md
-jimmy turbo plan [X] # 3 parallel explores → planner (faster!)
-jimmy dual-plan [X]  # 2 competing plans → synthesize best
-jimmy execute PLAN.md           # Run the plan
-jimmy execute PLAN.md --mode X  # thorough | paranoid
+# === CORE ===
+jimmy build [X]      # Build a feature (auto-detects scope)
+jimmy fix [X]        # Fix a bug (--urgent for hotfix)
+jimmy plan [X]       # Plan a feature (--dual for competing plans)
+jimmy review         # Code review (auto-scales depth, --wide for 1M context)
+jimmy ship           # Full ship pipeline (--wide for holistic review)
+jimmy audit          # Full codebase audit (4 agents parallel)
 
 # === MANAGING ===
 jimmy status         # Session summary
 jimmy pending        # Uncommitted changes, TODOs
-jimmy wrap up        # Validate → sync
+jimmy wrap up        # Validate → sync STATUS.md
 jimmy continue       # Resume from STATUS.md
 
 # === SPECIAL ===
 jimmy auto [task]    # Auto-detect workflow from description
 jimmy schema [X]     # DB changes (paranoid mode)
+jimmy debug [X]      # Deep investigation (Opus)
 jimmy test [X]       # Validate against FEATURES.md
+jimmy drift          # Codebase health check
 jimmy paranoid [X]   # Maximum caution mode
+jimmy execute PLAN.md           # Run the plan
+jimmy execute PLAN.md --mode X  # thorough | paranoid
 ```
 
 ### Usage Examples
 ```
-# Complete feature lifecycle (8-10 agents, heavily parallelized)
-jimmy feature customer-portal
+# Build a feature (Jimmy auto-detects scope)
+jimmy build customer-portal
 
-# Quick addition to existing functionality
-jimmy add export-button-to-reports
-
-# Bug fix with full investigation
-jimmy bugfix order-total-not-calculating
+# Fix a bug (auto-detects severity)
+jimmy fix order-total-not-calculating
 
 # Urgent production fix
-jimmy hotfix auth-session-expired
+jimmy fix auth-session-expired --urgent
 
-# Full audit before release (4 reviewers in parallel)
+# Full audit + codebase health
 jimmy audit
 
-# Ready to ship
+# Holistic review (Sonnet 1M context → Opus sharpening)
+jimmy review --wide
+
+# Ship it
 jimmy ship
+jimmy ship --wide                # Large release with holistic review
 
 # Let Jimmy figure out what to do
 jimmy auto: users can't see their order history
 
-# Deep debugging
+# Deep debugging (Opus-powered)
 jimmy debug intermittent-order-failures
 
 # Database changes (always paranoid mode)
 jimmy schema add-customer-notes
 
-# Two competing plans
+# Two competing plans (recommended for complex features)
 jimmy dual-plan reports --perspectives "MVP speed" "proper architecture"
+
+# Codebase health check
+jimmy drift
 ```

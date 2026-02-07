@@ -9,6 +9,8 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+// B2B login action intentionally does not check auth - unauthenticated customers need to call this
+// to authenticate. Auth checks happen via requireCustomerAuth() on protected B2B pages/actions.
 export async function loginCustomer(formData: FormData) {
   const supabase = await createClient();
 
@@ -42,13 +44,13 @@ export async function loginCustomer(formData: FormData) {
   }
 
   // Verify user has customer portal access
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('portal_role, customer_id')
     .eq('id', data.user.id)
-    .single();
+    .maybeSingle();
 
-  if (!profile) {
+  if (profileError || !profile) {
     await supabase.auth.signOut();
     return { error: 'Access denied. No profile found.' };
   }

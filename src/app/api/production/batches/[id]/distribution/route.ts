@@ -58,7 +58,7 @@ export async function GET(
         )
       `)
       .eq("batch_id", batchId)
-      .in("status", ["allocated", "reserved", "picked"]);
+      .in("status", ["allocated", "picked"]);
 
     if (salesAllocError) throw new Error(salesAllocError.message);
 
@@ -112,12 +112,12 @@ export async function GET(
 
     if (lossError) throw new Error(lossError.message);
 
-    // Get transplant events (children)
+    // Get transplant/move/consumed events (children) - includes transplants, partial moves, and actualized consumptions
     const { data: transplantEvents, error: transplantError } = await supabase
       .from("batch_events")
       .select("id, payload, at")
       .eq("batch_id", batchId)
-      .in("type", ["TRANSPLANT_OUT", "TRANSPLANT_TO"]);
+      .in("type", ["TRANSPLANT_OUT", "TRANSPLANT_TO", "MOVE", "CONSUMED"]);
 
     if (transplantError) throw new Error(transplantError.message);
 
@@ -134,7 +134,7 @@ export async function GET(
     // Sales allocations - split by status: "allocated"/"reserved" = reserved, "picked" = sold
     // Filter out orphaned allocations where order_items is null
     const salesDetails: OrderAllocationDetail[] = (salesAllocations || [])
-      .filter((a: any) => (a.status === 'allocated' || a.status === 'reserved') && a.order_items?.orders)
+      .filter((a: any) => a.status === 'allocated' && a.order_items?.orders)
       .map((a: any) => ({
         id: a.id,
         quantity: a.quantity,
@@ -233,18 +233,19 @@ export async function GET(
       dates: data.dates
     }));
 
-    // Transplanted details
+    // Transplanted details - match child batches with transplant/move/consumed events
     const transplantedDetails: TransplantedDetail[] = (childBatches || []).map((child: any) => {
       // Find matching event to get quantity
+      // TRANSPLANT_OUT uses to_batch_id, MOVE uses split_batch_id, CONSUMED uses consumedByBatch
       const matchingEvent = (transplantEvents || []).find((evt: any) => {
         const payload = typeof evt.payload === 'string' ? JSON.parse(evt.payload) : evt.payload;
-        return payload?.to_batch_id === child.id;
+        return payload?.to_batch_id === child.id || payload?.split_batch_id === child.id || payload?.consumedByBatch === child.id;
       });
 
       let quantity = 0;
       if (matchingEvent) {
         const payload = typeof matchingEvent.payload === 'string' ? JSON.parse(matchingEvent.payload) : matchingEvent.payload;
-        quantity = payload?.units_moved || payload?.quantity || payload?.qty || 0;
+        quantity = payload?.consumedQuantity || payload?.units_moved || payload?.quantity || payload?.qty || 0;
       }
 
       return {
@@ -259,7 +260,7 @@ export async function GET(
     // Calculate totals
     // Include ALL allocations (even orphaned ones) in totals for accurate distribution
     const allAllocatedQty = (salesAllocations || [])
-      .filter((a: any) => a.status === 'allocated' || a.status === 'reserved')
+      .filter((a: any) => a.status === 'allocated')
       .reduce((sum: number, a: any) => sum + (a.quantity || 0), 0);
     
     // Sold quantity from picked allocations (including orphaned ones)

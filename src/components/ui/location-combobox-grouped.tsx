@@ -8,6 +8,7 @@ export interface LocationData {
   id: string;
   name: string;
   nursery_site: string;
+  is_virtual?: boolean;
 }
 
 interface LocationComboboxGroupedProps {
@@ -35,6 +36,8 @@ interface LocationComboboxGroupedProps {
   emptyLabel?: string;
   /** Value to use for the empty option (defaults to empty string) */
   emptyValue?: string;
+  /** If true, excludes virtual/planning locations from the list */
+  excludeVirtual?: boolean;
 }
 
 /**
@@ -65,6 +68,7 @@ export function LocationComboboxGrouped({
   triggerClassName,
   emptyLabel,
   emptyValue = "",
+  excludeVirtual = false,
 }: LocationComboboxGroupedProps) {
   // Transform locations into grouped options
   const options: GroupedOption<LocationData>[] = useMemo(() => {
@@ -80,8 +84,13 @@ export function LocationComboboxGrouped({
       });
     }
 
+    // Filter out virtual locations if requested
+    const filtered = excludeVirtual
+      ? locations.filter((l) => !l.is_virtual)
+      : locations;
+
     // Add location options
-    const sortedLocations = locations
+    const sortedLocations = filtered
       .slice()
       .sort((a, b) => {
         // Sort by site first, then by name
@@ -100,7 +109,7 @@ export function LocationComboboxGrouped({
     }
 
     return opts;
-  }, [locations, emptyLabel, emptyValue]);
+  }, [locations, emptyLabel, emptyValue, excludeVirtual]);
 
   // Find selected location for display
   const selectedLocation = useMemo(

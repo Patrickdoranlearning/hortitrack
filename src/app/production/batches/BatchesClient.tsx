@@ -38,8 +38,8 @@ import { NewBatchButton } from '@/components/horti/NewBatchButton';
 import { TransplantMenuButton } from "@/components/horti/TransplantMenuButton";
 import ScannerDialog from '@/components/scan-and-act-dialog';
 import { ActionDialog } from '@/components/actions/ActionDialog';
-import { ActionMenuButton } from '@/components/actions/ActionMenuButton';
 import type { ActionMode } from "@/components/actions/types";
+import { LogActionWizard } from '@/components/batches/LogActionWizard';
 import { ProductionProtocolDialog } from "@/components/production-protocol-dialog";
 import { CareRecommendationsDialog } from "@/components/care-recommendations-dialog";
 import { IntelligenceDialog } from "@/components/ai/IntelligenceDialog";
@@ -98,6 +98,8 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const [isTransplantOpen, setIsTransplantOpen] = useState(false);
   const [isProtocolOpen, setIsProtocolOpen] = useState(false);
   const [isCareOpen, setIsCareOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardBatch, setWizardBatch] = useState<Batch | null>(null);
 
   // UseSWR for fetching batches from Supabase, with initialData from SSR
   const { data: batchesResult, error: batchesError, isLoading: isDataLoading, mutate: mutateBatches } = useSWR(
@@ -740,42 +742,53 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8"
+                                      className="h-9 w-9"
                                       onClick={() => handlePrintClick(batch)}
                                       aria-label="Print label"
                                     >
-                                      <Printer className="h-4 w-4" />
+                                      <Printer className="h-[18px] w-[18px]" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>Print Label</TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
-                              <ActionMenuButton
-                                batch={batch}
-                                onSelect={(mode) => handleLogAction(batch, mode)}
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                label=""
-                              />
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9"
+                                      onClick={() => {
+                                        setWizardBatch(batch);
+                                        setIsWizardOpen(true);
+                                      }}
+                                      aria-label="Log action"
+                                    >
+                                      <ClipboardList className="h-[18px] w-[18px]" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Log Action</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
                                       variant="default"
                                       size="icon"
-                                      className="h-8 w-8"
+                                      className="h-9 w-9"
                                       onClick={() => handleTransplantOpen(batch)}
                                       aria-label="Transplant"
                                     >
-                                      <TransplantIcon className="h-4 w-4" />
+                                      <TransplantIcon className="h-[18px] w-[18px]" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>Transplant</TooltipContent>
@@ -834,6 +847,25 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         mode={logActionMode}
         onSuccess={handleActionSuccess}
       />
+      {wizardBatch && (
+        <LogActionWizard
+          open={isWizardOpen}
+          onOpenChange={(open) => {
+            setIsWizardOpen(open);
+            if (!open) setWizardBatch(null);
+          }}
+          batch={{
+            id: wizardBatch.id || '',
+            batchNumber: wizardBatch.batchNumber || '',
+            variety: wizardBatch.plantVariety?.toString(),
+            quantity: wizardBatch.quantity ?? 0,
+            saleableQuantity: (wizardBatch as Record<string, unknown>)?.saleableQuantity as number ?? 0,
+          }}
+          onSuccess={() => {
+            mutateBatches();
+          }}
+        />
+      )}
       {selectedBatch && <BatchLabelPreview
         open={isPreviewOpen}
         onOpenChange={setIsPreviewOpen}

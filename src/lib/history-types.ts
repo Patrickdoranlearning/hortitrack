@@ -9,9 +9,17 @@
 export type StockMovementType =
   | 'initial'
   | 'checkin'
+  | 'check_in'
   | 'create'
   | 'transplant_in'
   | 'transplant_out'
+  | 'move_in'
+  | 'move'
+  | 'propagate'
+  | 'stock_received'
+  | 'batch_actualized'
+  | 'actualized'
+  | 'consumed'
   | 'allocated'
   | 'picked'
   | 'sale'
@@ -179,7 +187,10 @@ export interface SimpleDistribution {
 // ============================================================================
 
 export const STOCK_MOVEMENT_TYPES: Set<string> = new Set([
-  'initial', 'checkin', 'create', 'transplant_in', 'transplant_out',
+  'initial', 'checkin', 'check_in', 'create',
+  'transplant_in', 'transplant_out',
+  'move_in', 'move', 'propagate', 'stock_received', 'batch_actualized',
+  'actualized', 'consumed',
   'allocated', 'picked', 'sale', 'dispatch', 'loss', 'adjustment'
 ]);
 
@@ -198,12 +209,15 @@ export function isPlantHealthType(type: string): type is PlantHealthEventType {
 
 // IN events (positive quantity)
 export const IN_EVENT_TYPES: Set<string> = new Set([
-  'initial', 'checkin', 'create', 'transplant_in', 'transplant_from', 'propagation_in'
+  'initial', 'checkin', 'check_in', 'create',
+  'transplant_in', 'transplant_from', 'propagation_in',
+  'move_in', 'propagate', 'stock_received', 'batch_actualized', 'actualized'
 ]);
 
 // OUT events (negative quantity)
 export const OUT_EVENT_TYPES: Set<string> = new Set([
-  'transplant_out', 'transplant_to', 'picked', 'sale', 'dispatch', 'loss', 'dump'
+  'transplant_out', 'transplant_to', 'move', 'consumed',
+  'picked', 'sale', 'dispatch', 'loss', 'dump'
 ]);
 
 export function isInEvent(type: string): boolean {

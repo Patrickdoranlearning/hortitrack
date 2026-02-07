@@ -20,7 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { SearchableSelect } from "../ui/searchable-select";
+import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { useRefreshOnFocus } from "../../hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
+import { SearchableSelect } from "../ui/searchable-select";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 import { invalidateBatches } from "@/lib/swr/keys";
 import { useTodayDate, getTodayISO } from "@/lib/date-sync";
@@ -121,7 +122,7 @@ export default function TransplantForm({
 
   const sizes = React.useMemo(() => referenceData?.sizes ?? [], [referenceData]);
   const locations = React.useMemo(
-    () => referenceData?.locations ?? [],
+    () => (referenceData?.locations ?? []).filter((l: any) => !l.is_virtual),
     [referenceData]
   );
 
@@ -367,17 +368,13 @@ export default function TransplantForm({
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Nursery location</FormLabel>
-                    <SearchableSelect
-                      options={locations.map((loc) => ({
-                        value: loc.id,
-                        label: loc.name,
-                        description: loc.nursery_site ?? undefined,
-                      }))}
+                    <LocationComboboxGrouped
+                      locations={locations}
                       value={field.value ?? ""}
-                      onValueChange={field.onChange}
+                      onSelect={field.onChange}
                       createHref="/locations"
                       placeholder="Search locations..."
-                      createLabel="Add new location"
+                      excludeVirtual
                     />
                     <FormMessage />
                   </FormItem>

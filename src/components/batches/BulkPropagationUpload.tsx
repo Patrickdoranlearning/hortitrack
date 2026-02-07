@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, Download, RefreshCw, FileSpreadsheet, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "../ui/searchable-select";
+import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { invalidateBatches } from "@/lib/swr/keys";
 import { useTodayDate, getTodayISO } from "@/lib/date-sync";
@@ -410,14 +411,15 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <SearchableSelect
-                className="w-48"
-                options={referenceData.locations.map((loc) => ({
-                  value: loc.id!,
-                  label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+              <LocationComboboxGrouped
+                locations={(referenceData.locations ?? []).map((loc) => ({
+                  id: loc.id!,
+                  name: loc.name,
+                  nursery_site: loc.nursery_site ?? "",
+                  is_virtual: loc.is_virtual ?? false,
                 }))}
                 value={defaults.locationId ?? "none"}
-                onValueChange={(value) =>
+                onSelect={(value) =>
                   setDefaults((prev) => ({ ...prev, locationId: value === "none" ? undefined : value }))
                 }
                 createHref="/locations"
@@ -425,6 +427,8 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                 createLabel="Add new location"
                 emptyLabel="No default location"
                 emptyValue="none"
+                excludeVirtual
+                triggerClassName="w-48"
               />
 
               <SearchableSelect
@@ -498,14 +502,15 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-              <SearchableSelect
-                className="w-48"
-                options={referenceData.locations.map((loc) => ({
-                  value: loc.id!,
-                  label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+              <LocationComboboxGrouped
+                locations={(referenceData.locations ?? []).map((loc) => ({
+                  id: loc.id!,
+                  name: loc.name,
+                  nursery_site: loc.nursery_site ?? "",
+                  is_virtual: loc.is_virtual ?? false,
                 }))}
                 value={defaults.locationId ?? "none"}
-                onValueChange={(value) =>
+                onSelect={(value) =>
                   setDefaults((prev) => ({ ...prev, locationId: value === "none" ? undefined : value }))
                 }
                 createHref="/locations"
@@ -513,6 +518,8 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                 createLabel="Add new location"
                 emptyLabel="No default location"
                 emptyValue="none"
+                excludeVirtual
+                triggerClassName="w-48"
               />
 
               <SearchableSelect
@@ -617,13 +624,15 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                         />
                       </TableCell>
                       <TableCell className="max-w-[200px]">
-                        <SearchableSelect
-                          options={referenceData.locations.map((loc) => ({
-                            value: loc.id!,
-                            label: (loc.nursery_site ? `${loc.nursery_site} · ` : "") + loc.name,
+                        <LocationComboboxGrouped
+                          locations={(referenceData.locations ?? []).map((loc) => ({
+                            id: loc.id!,
+                            name: loc.name,
+                            nursery_site: loc.nursery_site ?? "",
+                            is_virtual: loc.is_virtual ?? false,
                           }))}
                           value={row.locationId ?? "none"}
-                          onValueChange={(value) => {
+                          onSelect={(value) => {
                             if (value === "none") {
                               updateRow(row.id, { locationId: undefined, locationName: "" });
                               return;
@@ -635,6 +644,7 @@ export default function BulkPropagationUpload({ onComplete }: Props) {
                           createLabel="Add new location"
                           emptyLabel="—"
                           emptyValue="none"
+                          excludeVirtual
                         />
                       </TableCell>
                       <TableCell>

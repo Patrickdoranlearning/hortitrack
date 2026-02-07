@@ -45,8 +45,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 import dynamic from 'next/dynamic';
 import { ActionDialog } from '../components/actions/ActionDialog';
-import { ActionMenuButton } from '../components/actions/ActionMenuButton';
 import type { ActionMode } from "@/components/actions/types";
+import { LogActionWizard } from '@/components/batches/LogActionWizard';
+import { ClipboardList } from 'lucide-react';
 import { BatchCard } from '../components/batch-card';
 import { BatchDetailDialog } from '../components/batch-detail-dialog';
 import { CareRecommendationsDialog } from '../components/care-recommendations-dialog';
@@ -175,6 +176,8 @@ export default function HomePageView({
   const [isPlanIncomingOpen, setIsPlanIncomingOpen] = React.useState(false);
   const [isPlanBatchesOpen, setIsPlanBatchesOpen] = React.useState(false);
   const [isActualizeOpen, setIsActualizeOpen] = React.useState(false);
+  const [isWizardOpen, setIsWizardOpen] = React.useState(false);
+  const [wizardBatch, setWizardBatch] = React.useState<Batch | null>(null);
 
   const [selectedBatch, setSelectedBatch] = React.useState<Batch | null>(null);
   const [editingBatch, setEditingBatch] = React.useState<Batch | null>(null);
@@ -1028,42 +1031,53 @@ export default function HomePageView({
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8"
+                                      className="h-9 w-9"
                                       onClick={() => handlePrintClick(batch)}
                                       aria-label="Print label"
                                     >
-                                      <Printer className="h-4 w-4" />
+                                      <Printer className="h-[18px] w-[18px]" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>Print Label</TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
-                              <ActionMenuButton
-                                batch={batch}
-                                onSelect={(mode) => handleLogAction(batch, mode)}
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                label=""
-                              />
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9"
+                                      onClick={() => {
+                                        setWizardBatch(batch);
+                                        setIsWizardOpen(true);
+                                      }}
+                                      aria-label="Log action"
+                                    >
+                                      <ClipboardList className="h-[18px] w-[18px]" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Log Action</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
                                       variant="default"
                                       size="icon"
-                                      className="h-8 w-8"
+                                      className="h-9 w-9"
                                       onClick={() => handleTransplantOpen(batch)}
                                       aria-label="Transplant"
                                     >
-                                      <TransplantIcon className="h-4 w-4" />
+                                      <TransplantIcon className="h-[18px] w-[18px]" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>Transplant</TooltipContent>
@@ -1148,7 +1162,26 @@ export default function HomePageView({
         mode={logActionMode}
         onSuccess={refreshSelectedBatch}
       />
-      
+      {wizardBatch && (
+        <LogActionWizard
+          open={isWizardOpen}
+          onOpenChange={(open) => {
+            setIsWizardOpen(open);
+            if (!open) setWizardBatch(null);
+          }}
+          batch={{
+            id: wizardBatch.id || '',
+            batchNumber: wizardBatch.batchNumber || '',
+            variety: wizardBatch.plantVariety?.toString(),
+            quantity: wizardBatch.quantity ?? 0,
+            saleableQuantity: (wizardBatch as Record<string, unknown>)?.saleableQuantity as number ?? 0,
+          }}
+          onSuccess={() => {
+            refreshSelectedBatch();
+          }}
+        />
+      )}
+
       <ProductionProtocolDialog
         open={isProtocolOpen}
         onOpenChange={setIsProtocolOpen}

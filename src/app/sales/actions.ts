@@ -7,6 +7,18 @@ import { redirect } from 'next/navigation';
 import type { Database } from '@/types/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logError, logInfo } from '@/lib/log';
+import { z } from 'zod';
+import type { ActionResult } from '@/lib/errors';
+
+// Validation schemas for actions
+const UUIDSchema = z.string().uuid('Invalid ID format');
+
+const LogInteractionSchema = z.object({
+    customerId: UUIDSchema,
+    type: z.enum(['call', 'email', 'visit', 'whatsapp', 'other']),
+    notes: z.string().min(1, 'Notes are required').max(5000, 'Notes too long'),
+    outcome: z.string().max(500, 'Outcome too long').optional(),
+});
 
 type ServerClient = SupabaseClient<Database>;
 
@@ -40,6 +52,20 @@ type CustomerOrgRow = {
     default_price_list_id: string | null;
 };
 
+/**
+ * Create a new sales order with items and allocations
+ *
+ * This action handles the complete order creation flow including:
+ * - Input validation via Zod schema
+ * - Product resolution (by ID or variety+size)
+ * - Product group handling (mix orders)
+ * - Price list resolution with customer-specific overrides
+ * - Atomic order creation via RPC with batch allocations
+ * - Automatic pick list generation
+ *
+ * @param data - Order creation input with customer, lines, delivery details
+ * @returns Redirects to /sales/orders on success, or returns error object
+ */
 export async function createOrder(data: CreateOrderInput) {
     const supabase = await createClient();
 
@@ -156,13 +182,10 @@ export async function createOrder(data: CreateOrderInput) {
             quantity: line.qty,
             unit_price: unitPrice,
             vat_rate: vatRate,
-            required_variety_id: line.requiredVarietyId ?? product.skus?.plant_variety_id ?? null,
-            required_batch_id: line.requiredBatchId ?? line.specificBatchId ?? null,
+            required_variety_id: null,
+            required_batch_id: null,
             rrp: line.rrp ?? null,
-            allocations: line.allocations?.filter(a => a.batchId).map(a => ({
-                batch_id: a.batchId,
-                qty: a.qty
-            })) || []
+            allocations: []
         });
     }
 
@@ -256,15 +279,51 @@ export async function createOrder(data: CreateOrderInput) {
     redirect('/sales/orders');
 }
 
-export async function generateInvoice(orderId: string) {
+/**
+ * Generate an invoice for an existing order
+ *
+ * Calls the generate_invoice_for_order RPC function which creates
+ * an invoice with all order items and calculates totals.
+ *
+ * @param orderId - UUID of the order to invoice
+ * @returns ActionResult with invoiceId on success
+ * @example
+ * const result = await generateInvoice(orderId);
+ * if (result.success) {
+ *   console.log('Invoice created:', result.data.invoiceId);
+ * }
+ */
+export async function generateInvoice(orderId: string): Promise<ActionResult<{ invoiceId: string }>> {
+    // Validate input
+    const validation = UUIDSchema.safeParse(orderId);
+    if (!validation.success) {
+        return {
+            success: false,
+            error: 'Invalid order ID',
+            code: 'VALIDATION_ERROR',
+        };
+    }
+
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
+    if (!user) {
+        return {
+            success: false,
+            error: 'Not authenticated',
+            code: 'AUTH_ERROR',
+        };
+    }
 
     // Get order to resolve orgId
-    const { data: order } = await supabase.from('orders').select('org_id').eq('id', orderId).single();
-    if (!order) return { error: 'Order not found' };
+    const { data: order, error: orderError } = await supabase.from('orders').select('org_id').eq('id', orderId).maybeSingle();
+    if (orderError || !order) {
+        return {
+            success: false,
+            error: 'Order not found',
+            code: 'NOT_FOUND',
+        };
+    }
 
     const { data: rpcResult, error: rpcError } = await supabase.rpc('generate_invoice_for_order', {
         p_org_id: order.org_id,
@@ -274,11 +333,22 @@ export async function generateInvoice(orderId: string) {
 
     if (rpcError) {
         logError('Error generating invoice via RPC', { error: rpcError.message, orderId });
-        return { error: `Failed to generate invoice: ${rpcError.message}` };
+        return {
+            success: false,
+            error: 'Failed to generate invoice',
+            code: 'RPC_ERROR',
+            details: process.env.NODE_ENV === 'development' ? rpcError.message : undefined,
+        };
     }
 
     const result = rpcResult as { success: boolean; error?: string; invoice_id?: string };
-    if (!result.success) return { error: result.error };
+    if (!result.success) {
+        return {
+            success: false,
+            error: result.error ?? 'Invoice generation failed',
+            code: 'GENERATION_FAILED',
+        };
+    }
 
     revalidatePath('/sales/invoices');
     revalidatePath('/sales/orders');
@@ -286,36 +356,75 @@ export async function generateInvoice(orderId: string) {
 
     return {
         success: true,
-        invoiceId: result.invoice_id
+        data: { invoiceId: result.invoice_id! }
     };
 }
 
-export async function dispatchAndInvoice(orderId: string) {
+/**
+ * Mark order as dispatched and generate invoice if needed
+ *
+ * This action:
+ * 1. Generates invoice if one doesn't exist
+ * 2. Updates order status to 'dispatched'
+ * 3. Records dispatch timestamp
+ * 4. Logs events for audit trail
+ *
+ * @param orderId - UUID of the order to dispatch
+ * @returns ActionResult with invoiceId
+ */
+export async function dispatchAndInvoice(orderId: string): Promise<ActionResult<{ invoiceId: string }>> {
+    // Validate input
+    const validation = UUIDSchema.safeParse(orderId);
+    if (!validation.success) {
+        return {
+            success: false,
+            error: 'Invalid order ID',
+            code: 'VALIDATION_ERROR',
+        };
+    }
+
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
+    if (!user) {
+        return {
+            success: false,
+            error: 'Not authenticated',
+            code: 'AUTH_ERROR',
+        };
+    }
 
     const { data: order, error: orderError } = await supabase
         .from('orders')
         .select(`*, invoices(id), customer:customers(name, email)`)
         .eq('id', orderId)
-        .single();
+        .maybeSingle();
 
-    if (orderError || !order) return { error: 'Order not found' };
+    if (orderError || !order) {
+        return {
+            success: false,
+            error: 'Order not found',
+            code: 'NOT_FOUND',
+        };
+    }
 
     let invoiceId = order.invoices?.[0]?.id;
     if (!invoiceId) {
         const invoiceResult = await generateInvoice(orderId);
-        if ('error' in invoiceResult && invoiceResult.error) {
-            return { error: `Failed to generate invoice: ${invoiceResult.error}` };
+        if (!invoiceResult.success) {
+            return {
+                success: false,
+                error: `Failed to generate invoice: ${invoiceResult.error}`,
+                code: 'INVOICE_GENERATION_FAILED',
+                details: invoiceResult.details,
+            };
         }
-        invoiceId = invoiceResult.invoiceId;
+        invoiceId = invoiceResult.data.invoiceId;
     }
 
     const { error: updateError } = await supabase
         .from('orders')
-        .update({ 
+        .update({
             status: 'dispatched',
             dispatch_email_sent_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -324,7 +433,12 @@ export async function dispatchAndInvoice(orderId: string) {
 
     if (updateError) {
         logError('Error updating order status to dispatched', { error: updateError.message, orderId });
-        return { error: 'Failed to update order status' };
+        return {
+            success: false,
+            error: 'Failed to update order status',
+            code: 'UPDATE_ERROR',
+            details: process.env.NODE_ENV === 'development' ? updateError.message : undefined,
+        };
     }
 
     await supabase.from('order_events').insert([
@@ -348,7 +462,10 @@ export async function dispatchAndInvoice(orderId: string) {
     revalidatePath(`/sales/orders/${orderId}`);
     revalidatePath('/sales/invoices');
 
-    return { success: true, invoiceId };
+    return {
+        success: true,
+        data: { invoiceId }
+    };
 }
 
 export async function getOrderDetails(orderId: string) {
@@ -357,10 +474,10 @@ export async function getOrderDetails(orderId: string) {
         .from('orders')
         .select(`*, order_items (*), invoices (*), pick_orders (*), sales_qc (*)`)
         .eq('id', orderId)
-        .single();
+        .maybeSingle();
 
-    if (error) {
-        logError('Error fetching order details', { error: error.message, orderId });
+    if (error || !order) {
+        logError('Error fetching order details', { error: error?.message, orderId });
         return { error: 'Failed to fetch order details' };
     }
     return { order };
@@ -534,20 +651,81 @@ function extractRelationName(relation?: { name: string | null } | Array<{ name: 
     return relation.name?.toLowerCase().trim();
 }
 
-export async function logInteraction(customerId: string, type: 'call' | 'email' | 'visit' | 'whatsapp' | 'other', notes: string, outcome?: string) {
+/**
+ * Log a customer interaction for CRM tracking
+ *
+ * Records interactions such as calls, emails, visits for sales targeting.
+ * Validates input length and requires notes.
+ *
+ * @param customerId - UUID of the customer
+ * @param type - Type of interaction (call, email, visit, whatsapp, other)
+ * @param notes - Description of the interaction (required, max 5000 chars)
+ * @param outcome - Optional outcome description (max 500 chars)
+ * @returns ActionResult with the created interaction record
+ */
+export async function logInteraction(
+    customerId: string,
+    type: 'call' | 'email' | 'visit' | 'whatsapp' | 'other',
+    notes: string,
+    outcome?: string
+): Promise<ActionResult<{ interaction: any }>> {
+    // Validate input
+    const validation = LogInteractionSchema.safeParse({ customerId, type, notes, outcome });
+    if (!validation.success) {
+        const firstError = validation.error.errors[0];
+        return {
+            success: false,
+            error: firstError?.message ?? 'Invalid input',
+            code: 'VALIDATION_ERROR',
+            details: validation.error.flatten(),
+        };
+    }
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    const { data: customer, error: customerError } = await supabase.from('customers').select('org_id').eq('id', customerId).single();
-    if (customerError || !customer) return { error: 'Customer not found' };
-    const { data: interaction, error } = await supabase.from('customer_interactions').insert({ org_id: customer.org_id, customer_id: customerId, user_id: user.id, type, notes, outcome: outcome || null }).select().single();
-    if (error) {
-        logError('Error logging interaction', { error: error.message, customerId });
-        return { error: 'Failed to log interaction' };
+    if (!user) {
+        return {
+            success: false,
+            error: 'Not authenticated',
+            code: 'AUTH_ERROR',
+        };
     }
+
+    const { data: customer, error: customerError } = await supabase.from('customers').select('org_id').eq('id', customerId).maybeSingle();
+    if (customerError || !customer) {
+        return {
+            success: false,
+            error: 'Customer not found',
+            code: 'NOT_FOUND',
+        };
+    }
+
+    const { data: interaction, error } = await supabase.from('customer_interactions').insert({
+        org_id: customer.org_id,
+        customer_id: customerId,
+        user_id: user.id,
+        type,
+        notes,
+        outcome: outcome || null
+    }).select().maybeSingle();
+
+    if (error || !interaction) {
+        logError('Error logging interaction', { error: error?.message, customerId });
+        return {
+            success: false,
+            error: 'Failed to log interaction',
+            code: 'INSERT_ERROR',
+            details: process.env.NODE_ENV === 'development' ? error?.message : undefined,
+        };
+    }
+
     revalidatePath('/sales/targets');
     revalidatePath(`/sales/customers/${customerId}`);
-    return { success: true, interaction };
+
+    return {
+        success: true,
+        data: { interaction }
+    };
 }
 
 export async function getSalesAdminTasks() {
@@ -579,10 +757,16 @@ export async function getSalesRepTargets() {
 }
 
 export async function sendOrderConfirmation(orderId: string) {
+    // Validate input
+    const validation = UUIDSchema.safeParse(orderId);
+    if (!validation.success) {
+        return { error: 'Invalid order ID' };
+    }
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: 'Not authenticated' };
-    const { data: order, error: orderError } = await supabase.from('orders').select(`*, customer:customers(name, email), order_items(*)`).eq('id', orderId).single();
+    const { data: order, error: orderError } = await supabase.from('orders').select(`*, customer:customers(name, email), order_items(*)`).eq('id', orderId).maybeSingle();
     if (orderError || !order) return { error: 'Order not found' };
     if (!order.customer?.email) return { error: 'Customer has no email address' };
     
@@ -600,13 +784,67 @@ export async function sendOrderConfirmation(orderId: string) {
     return { success: true, message: `Confirmation sent to ${order.customer.email}` };
 }
 
+/**
+ * Get recent customer interactions with org filtering
+ *
+ * Uses defense-in-depth approach: verifies customer belongs to user's
+ * org before querying interactions, then explicitly filters by org_id.
+ *
+ * @param customerId - UUID of the customer
+ * @param limit - Maximum number of interactions to return (default: 10)
+ * @returns Object with interactions array or error
+ */
 export async function getCustomerInteractions(customerId: string, limit = 10) {
+    // Validate input
+    const validation = UUIDSchema.safeParse(customerId);
+    if (!validation.success) {
+        return { error: 'Invalid customer ID', interactions: [] };
+    }
+
     const supabase = await createClient();
-    const { data: interactions, error } = await supabase.from('customer_interactions').select(`*, user:profiles(display_name, email)`).eq('customer_id', customerId).order('created_at', { ascending: false }).limit(limit);
+
+    // Defense in depth: verify customer belongs to user's org before querying interactions
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { error: 'Not authenticated', interactions: [] };
+    }
+
+    const activeOrgId = await resolveActiveOrgId(supabase, user.id);
+    if (!activeOrgId) {
+        return { error: 'No organization found', interactions: [] };
+    }
+
+    // First verify customer belongs to this org
+    const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('org_id')
+        .eq('id', customerId)
+        .maybeSingle();
+
+    if (customerError) {
+        logError('Error verifying customer ownership', { error: customerError.message, customerId });
+        return { error: 'Failed to verify customer', interactions: [] };
+    }
+
+    if (!customer || customer.org_id !== activeOrgId) {
+        logError('Customer not found or not owned by org', { customerId, activeOrgId });
+        return { error: 'Customer not found', interactions: [] };
+    }
+
+    // Now query interactions with explicit org_id filter
+    const { data: interactions, error } = await supabase
+        .from('customer_interactions')
+        .select(`*, user:profiles(display_name, email)`)
+        .eq('customer_id', customerId)
+        .eq('org_id', activeOrgId)  // Explicit org_id filter (defense in depth)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
     if (error) {
         logError('Error fetching interactions', { error: error.message, customerId });
         return { error: 'Failed to fetch interactions', interactions: [] };
     }
+
     return { interactions: interactions || [] };
 }
 

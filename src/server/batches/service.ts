@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { normalizeSystemCode } from "@/lib/attributeOptions";
+import { logError } from "@/lib/log";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -150,6 +151,12 @@ const PropagationServiceInputSchema = z.object({
   fullTrays: z.number().optional(),
   partialCells: z.number().optional(),
   sizeMultiple: z.number().optional(),
+  // Planned materials
+  materials: z.array(z.object({
+    material_id: z.string().uuid(),
+    quantity: z.number().positive(),
+    notes: z.string().optional(),
+  })).optional().default([]),
 });
 
 export type PropagationInput = z.infer<typeof PropagationServiceInputSchema>;
@@ -234,6 +241,30 @@ export async function createPropagationBatch(params: { input: PropagationInput; 
     .select("*")
     .single();
   if (error) throw error;
+
+  // Save planned materials if provided
+  if (input.materials && input.materials.length > 0) {
+    const materialInserts = input.materials.map((mat) => ({
+      org_id: orgId,
+      batch_id: data.id,
+      material_id: mat.material_id,
+      quantity_planned: mat.quantity,
+      notes: mat.notes || null,
+    }));
+
+    const { error: matError } = await supabase
+      .from("planned_batch_materials")
+      .insert(materialInserts);
+
+    if (matError) {
+      logError("Failed to save planned materials for batch", {
+        error: matError.message,
+        batchId: data.id,
+        materialCount: materialInserts.length,
+      });
+    }
+  }
+
   return data;
 }
 

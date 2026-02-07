@@ -25,6 +25,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LocationComboboxGrouped } from "@/components/ui/location-combobox-grouped";
+import { BatchMaterialsSection } from "@/components/batches/BatchMaterialsSection";
+import type { PlannedMaterialInput } from "@/app/production/forms/propagation-schema";
 
 interface PropagationClientProps {
     nurseryLocations: NurseryLocation[];
@@ -97,6 +100,7 @@ export default function PropagationClient({
     partialCells: 0,
     locationId: "",
     plantingDate: new Date().toISOString().split("T")[0],
+    materials: [],
   };
 
   const form = useForm<PropagationFormValues>({
@@ -105,12 +109,29 @@ export default function PropagationClient({
   });
 
   const selectedSizeId = form.watch("sizeId");
+  const watchedFullTrays = form.watch("fullTrays");
+  const watchedPartialCells = form.watch("partialCells");
+  const watchedSizeMultiple = form.watch("sizeMultiple");
+  const watchedMaterials = form.watch("materials");
+
+  const computedQuantity = React.useMemo(() => {
+    const multiple = watchedSizeMultiple || 1;
+    return (watchedFullTrays || 0) * multiple + (watchedPartialCells || 0);
+  }, [watchedFullTrays, watchedPartialCells, watchedSizeMultiple]);
+
   React.useEffect(() => {
     const match = sizeOptions.find((s) => s.id === selectedSizeId);
     if (match) {
       form.setValue("sizeMultiple", match.cellMultiple, { shouldDirty: true });
     }
   }, [selectedSizeId, sizeOptions, form]);
+
+  const handleMaterialsChange = React.useCallback(
+    (materials: PlannedMaterialInput[]) => {
+      form.setValue("materials", materials, { shouldDirty: true });
+    },
+    [form]
+  );
 
   const onSubmit = async (values: PropagationFormValues) => {
     const payload = {
@@ -242,24 +263,28 @@ export default function PropagationClient({
 
                 <div className="col-span-2">
                   <FormLabel>Location</FormLabel>
-                  <Select
+                  <LocationComboboxGrouped
+                    locations={locationOptions.map((loc) => ({
+                      id: loc.id,
+                      name: loc.name,
+                      nursery_site: loc.nurserySite ?? "",
+                    }))}
                     value={form.watch("locationId")}
-                    onValueChange={(value) => form.setValue("locationId", value, { shouldValidate: true })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locationOptions.map((loc) => (
-                        <SelectItem key={loc.id} value={loc.id}>
-                          {loc.nurserySite ? `${loc.nurserySite} · ` : ""}
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onSelect={(value) => form.setValue("locationId", value, { shouldValidate: true })}
+                    placeholder="Select a location"
+                    createHref="/locations"
+                    excludeVirtual
+                  />
                   <InlineFieldError msg={form.formState.errors.locationId?.message} />
                 </div>
+
+                {/* Materials Section */}
+                <BatchMaterialsSection
+                  sizeId={selectedSizeId}
+                  quantity={computedQuantity}
+                  materials={watchedMaterials ?? []}
+                  onChange={handleMaterialsChange}
+                />
               </div>
 
               <div className="flex justify-end gap-2">

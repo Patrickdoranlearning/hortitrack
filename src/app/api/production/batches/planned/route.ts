@@ -184,7 +184,7 @@ export async function POST(req: Request) {
         };
 
     const locationId =
-      payload.locationId ?? (await ensureVirtualLocation(supabase, orgId, "planning"));
+      payload.locationId ?? (await ensureVirtualLocation(supabase, orgId, "production"));
 
     const sizeMultiple = Number(size.cell_multiple ?? 1) || 1;
     const phase = inferPhase({

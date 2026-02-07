@@ -8,7 +8,7 @@ export class FirebaseCredentialError extends Error {
 }
 
 export function mapFirebaseAdminError(err: unknown): Error {
-  const msg = String((err as any)?.message ?? err);
+  const msg = String((err as Error | { message?: string })?.message ?? err);
   if (msg.includes("Could not refresh access token") || msg.includes("metadata from plugin failed")) {
     return new FirebaseCredentialError();
   }

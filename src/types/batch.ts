@@ -100,6 +100,15 @@ export const PropagationFormSchema = z.object({
   partialCells: z.number().int().min(0).default(0),
   locationId: z.string().uuid(),
   plantingDate: z.string(), // ISO
+  materials: z.array(z.object({
+    material_id: z.string().uuid(),
+    name: z.string(),
+    part_number: z.string(),
+    category_code: z.string(),
+    base_uom: z.string(),
+    quantity: z.number().positive(),
+    notes: z.string().optional(),
+  })).optional().default([]),
 });
 export type PropagationFormInput = z.infer<typeof PropagationFormSchema>;
 

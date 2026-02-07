@@ -98,7 +98,7 @@ export async function GET(
         if (!orgId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
         const { data: rows, error } = await supabase
           .from("lookup_locations")
-          .select("id, name, nursery_site, covered")
+          .select("id, name, nursery_site, covered, is_virtual")
           .eq("org_id", orgId)
           .order("name", { ascending: true })
           .limit(1000);

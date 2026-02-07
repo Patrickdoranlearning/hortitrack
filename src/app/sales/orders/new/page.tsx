@@ -137,11 +137,6 @@ export default async function CreateOrderPage({
     getOrgFees(),
   ]);
 
-  console.log('Customers found:', customers?.length || 0);
-  console.log('Products found:', products?.length || 0);
-  console.log('Product Groups found:', productGroups?.length || 0);
-  console.log('Fees found:', fees?.length || 0);
-
   if (!customers || customers.length === 0) {
     return (
       <PageFrame moduleKey="sales">

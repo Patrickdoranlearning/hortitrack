@@ -5618,6 +5618,7 @@ export type Database = {
           created_at: string
           health_status: string | null
           id: string
+          is_virtual: boolean
           name: string
           nursery_site: string
           org_id: string
@@ -5632,6 +5633,7 @@ export type Database = {
           created_at?: string
           health_status?: string | null
           id?: string
+          is_virtual?: boolean
           name: string
           nursery_site: string
           org_id: string
@@ -5646,6 +5648,7 @@ export type Database = {
           created_at?: string
           health_status?: string | null
           id?: string
+          is_virtual?: boolean
           name?: string
           nursery_site?: string
           org_id?: string
@@ -11733,6 +11736,7 @@ export type Database = {
         Row: {
           covered: boolean | null
           id: string | null
+          is_virtual: boolean | null
           name: string | null
           nursery_site: string | null
           org_id: string | null
@@ -11740,6 +11744,7 @@ export type Database = {
         Insert: {
           covered?: boolean | null
           id?: string | null
+          is_virtual?: boolean | null
           name?: string | null
           nursery_site?: string | null
           org_id?: string | null
@@ -11747,6 +11752,7 @@ export type Database = {
         Update: {
           covered?: boolean | null
           id?: string | null
+          is_virtual?: boolean | null
           name?: string | null
           nursery_site?: string | null
           org_id?: string | null

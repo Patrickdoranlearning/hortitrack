@@ -1,6 +1,7 @@
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import { Button } from '@/components/ui/button';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import Link from 'next/link';
 import SalesOrdersClient from './SalesOrdersClient';
 import { listOrders } from '@/server/sales/queries.server';
@@ -48,15 +49,17 @@ export default async function SalesOrdersPage(props: {
                     }
                 />
 
-                <SalesOrdersClient
-                    initialOrders={orders || []}
-                    total={total}
-                    page={currentPage}
-                    pageSize={currentPageSize}
-                    statusFilter={status}
-                    sortBy={sortBy}
-                    sortOrder={sortOrder}
-                />
+                <ErrorBoundary>
+                    <SalesOrdersClient
+                        initialOrders={orders || []}
+                        total={total}
+                        page={currentPage}
+                        pageSize={currentPageSize}
+                        statusFilter={status}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                    />
+                </ErrorBoundary>
             </div>
         </PageFrame>
     );

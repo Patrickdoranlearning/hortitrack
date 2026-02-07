@@ -5,6 +5,7 @@ import BatchGalleryCard from "@/components/batches/BatchGalleryCard.lazy";
 import { BatchPageActions } from "@/components/batches/BatchPageActions";
 import { StockLedgerCard } from "@/components/batches/StockLedgerCard";
 import { PlantHealthCard } from "@/components/batches/PlantHealthCard";
+import { BatchMaterialsCard } from "@/components/batches/BatchMaterialsCard";
 import { ModulePageHeader } from '@/ui/templates';
 import { PageFrame } from '@/ui/templates';
 import type { Batch } from "@/lib/types";
@@ -121,6 +122,7 @@ export default async function Page(props: PageProps) {
             <AncestryCard batchId={batch.id} />
           </div>
           <div className="space-y-4">
+            <BatchMaterialsCard batchId={batch.id} />
             <PlantHealthCard batchId={batch.id} />
             <BatchGalleryCard
               batchId={batch.id}

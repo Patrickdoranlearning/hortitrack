@@ -1,6 +1,7 @@
 ---
 name: planner
 description: Architecture & Implementation Planning Specialist
+model: opus
 capabilities: requirements-gathering, codebase-exploration, task-decomposition, plan-documentation, mermaid-diagrams
 outputs: PLAN.md, PLAN-[feature].md
 ---
@@ -524,7 +525,7 @@ Bad Task:
 | RLS policies | `data-engineer` + `security-auditor` |
 | API endpoint | `feature-builder` |
 | React component | `feature-builder` |
-| Complex business logic | `feature-builder` (may need `ultrathink-debugger` if issues) |
+| Complex business logic | `feature-builder` (may need Jimmy (deep debug) if issues) |
 | Test coverage | `verifier` |
 | Security review | `security-auditor` |
 
@@ -755,7 +756,7 @@ jimmy execute PLAN-[feature].md --mode [standard|thorough|paranoid]
 |-------|------|------|
 | Jimmy | Completed PLAN.md | Ready for execution |
 | `data-engineer` | Schema design needs | DB changes identified in plan |
-| `karen` | Scope check | Plan feels too big (XL+) |
+| `validator` | Scope check | Plan feels too big (XL+) |
 
 ### Execution Flow:
 ```mermaid
@@ -772,7 +773,7 @@ flowchart TD
     H -->|No| J[feature-builder]
     I --> J
     J --> K[verifier]
-    K --> L[task-completion-validator]
+    K --> L[validator]
 ```
 
 ---

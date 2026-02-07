@@ -39,8 +39,15 @@ function getNumber(payload: Record<string, unknown> | null, key: string): number
 
 // Stock-related event types
 const STOCK_EVENT_TYPES = new Set([
-  'CHECKIN', 'CREATE', 'TRANSPLANT_IN', 'TRANSPLANT_FROM', 'PROPAGATION_IN',
-  'TRANSPLANT_OUT', 'TRANSPLANT_TO', 'PICKED', 'SALE', 'DISPATCH', 'LOSS', 'DUMP', 'ADJUSTMENT'
+  'CHECKIN', 'CHECK_IN', 'CREATE', 'TRANSPLANT_IN', 'TRANSPLANT_FROM', 'PROPAGATION_IN',
+  'MOVE_IN', 'PROPAGATE', 'STOCK_RECEIVED', 'BATCH_ACTUALIZED', 'ACTUALIZED',
+  'TRANSPLANT_OUT', 'TRANSPLANT_TO', 'MOVE', 'CONSUMED',
+  'PICKED', 'SALE', 'DISPATCH', 'LOSS', 'DUMP', 'ADJUSTMENT'
+]);
+
+// Creation-type IN events that duplicate initial_quantity when it's already set
+const CREATION_EVENT_TYPES = new Set([
+  'CREATE', 'MOVE_IN', 'PROPAGATE', 'CHECK_IN', 'CHECKIN', 'STOCK_RECEIVED', 'BATCH_ACTUALIZED', 'ACTUALIZED'
 ]);
 
 /**
@@ -172,6 +179,8 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
       getNumber(payload, 'units_moved') ??
       getNumber(payload, 'units_received') ??
       getNumber(payload, 'computed_units') ??
+      getNumber(payload, 'consumedQuantity') ??  // CONSUMED events (transplant actualization)
+      getNumber(payload, 'actualQuantity') ??    // ACTUALIZED events (planned batch actualized)
       getNumber(payload, 'diff');
 
     if (rawQty !== null) {
@@ -188,9 +197,20 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
     // Skip if no quantity change
     if (quantity === null || quantity === 0) continue;
 
-    // Skip CREATE events if we already added initial stock (to avoid double-counting)
-    if (upperType === 'CREATE' && initialQty > 0) {
+    // Skip creation-type events if we already added initial stock (to avoid double-counting)
+    // These events represent the batch's initial stocking which is already captured by initial_quantity
+    if (CREATION_EVENT_TYPES.has(upperType) && initialQty > 0) {
       continue;
+    }
+
+    // Skip full MOVE events (location change only, no stock impact)
+    // Only partial moves (splits) actually change stock
+    if (upperType === 'MOVE') {
+      const isPartial = payload?.partial === true;
+      const hasSplitBatch = getString(payload, 'split_batch_id') !== null;
+      if (!isPartial && !hasSplitBatch) {
+        continue;
+      }
     }
 
     // Update running balance
@@ -202,6 +222,7 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
 
     switch (upperType) {
       case 'CHECKIN':
+      case 'CHECK_IN':
         title = `Checked in ${Math.abs(quantity)} units`;
         const supplier = getString(payload, 'supplier') ?? getString(payload, 'supplier_name');
         if (supplier) {
@@ -211,15 +232,20 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
         break;
 
       case 'CREATE':
+      case 'PROPAGATE':
+      case 'STOCK_RECEIVED':
+      case 'BATCH_ACTUALIZED':
+      case 'ACTUALIZED':
         title = `Batch created with ${Math.abs(quantity)} units`;
         break;
 
       case 'TRANSPLANT_IN':
       case 'TRANSPLANT_FROM':
       case 'PROPAGATION_IN':
+      case 'MOVE_IN': {
         const fromBatchNumber = getString(payload, 'from_batch_number');
         const fromBatchId = getString(payload, 'from_batch_id');
-        title = `${Math.abs(quantity)} units transplanted in`;
+        title = `${Math.abs(quantity)} units ${upperType === 'MOVE_IN' ? 'moved' : 'transplanted'} in`;
         if (fromBatchNumber) {
           title += ` from batch ${fromBatchNumber}`;
           destination = {
@@ -229,6 +255,7 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
           };
         }
         break;
+      }
 
       case 'TRANSPLANT_OUT':
       case 'TRANSPLANT_TO':
@@ -252,6 +279,24 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
           };
         }
         break;
+
+      case 'MOVE': {
+        const splitBatchNumber = getString(payload, 'split_batch_number');
+        const splitBatchId = getString(payload, 'split_batch_id');
+        const toLocationName = getString(payload, 'to_location_name');
+        title = `${Math.abs(quantity)} units moved out`;
+        if (splitBatchNumber) {
+          title += ` to batch ${splitBatchNumber}`;
+          destination = {
+            type: 'batch',
+            batchId: splitBatchId ?? undefined,
+            batchNumber: splitBatchNumber
+          };
+        } else if (toLocationName) {
+          title += ` to ${toLocationName}`;
+        }
+        break;
+      }
 
       case 'PICKED':
       case 'SALE':
@@ -277,6 +322,26 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
           if (notes) title += ` - ${notes}`;
         }
         break;
+
+      case 'CONSUMED': {
+        const consumedByBatchId = getString(payload, 'consumedByBatch');
+        title = `${Math.abs(quantity)} units consumed (transplant actualized)`;
+        if (consumedByBatchId && childBatchLookup.has(consumedByBatchId)) {
+          const childNumber = childBatchLookup.get(consumedByBatchId);
+          title = `${Math.abs(quantity)} units transplanted to batch ${childNumber}`;
+          destination = {
+            type: 'batch',
+            batchId: consumedByBatchId,
+            batchNumber: childNumber
+          };
+        } else if (consumedByBatchId) {
+          destination = {
+            type: 'batch',
+            batchId: consumedByBatchId
+          };
+        }
+        break;
+      }
 
       case 'LOSS':
       case 'DUMP':
@@ -344,7 +409,7 @@ export async function buildStockMovements(batchId: string): Promise<StockMovemen
 
     if (qty <= 0) continue;
 
-    if (alloc.status === 'allocated' || alloc.status === 'reserved') {
+    if (alloc.status === 'allocated') {
       // Show as reserved stock (informational entry)
       movements.push({
         id: `alloc-${alloc.id}`,

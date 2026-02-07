@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("nursery_locations")
-      .select("id, name, type, nursery_site, health_status")
+      .select("id, name, type, nursery_site, health_status, is_virtual")
       .eq("org_id", orgId)
       .order("name")
       .limit(limit);
@@ -35,6 +35,7 @@ export async function GET(request: Request) {
       type: loc.type,
       nurserySite: loc.nursery_site,
       healthStatus: loc.health_status,
+      isVirtual: loc.is_virtual,
     }));
     
     return NextResponse.json({ data: items, items }, { status: 200 });

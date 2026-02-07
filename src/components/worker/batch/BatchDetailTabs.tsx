@@ -2,14 +2,16 @@
 
 import * as React from "react";
 import { useState } from "react";
-import { Package, Heart, Search, History } from "lucide-react";
+import { Package, Heart, Search, History, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { vibrateTap } from "@/lib/haptics";
 import { StockLedgerView } from "./StockLedgerView";
 import { BatchHealthView } from "./BatchHealthView";
 import { BatchScoutHistory } from "./BatchScoutHistory";
+import { BatchMaterialsView, type ChecklistItem } from "./BatchMaterialsView";
+import { MaterialConfirmDialog } from "../batch-actions/MaterialConfirmDialog";
 
-type TabKey = "summary" | "stock" | "health" | "scout";
+type TabKey = "summary" | "stock" | "health" | "scout" | "materials";
 
 interface BatchDetailTabsProps {
   batchId: string;
@@ -26,6 +28,7 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   { key: "summary", label: "Summary", icon: History },
   { key: "stock", label: "Stock", icon: Package },
+  { key: "materials", label: "Materials", icon: Boxes },
   { key: "health", label: "Health", icon: Heart },
   { key: "scout", label: "Scout", icon: Search },
 ];
@@ -40,10 +43,21 @@ export function BatchDetailTabs({
   children,
 }: BatchDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const [confirmItem, setConfirmItem] = useState<ChecklistItem | null>(null);
+  const [materialsKey, setMaterialsKey] = useState(0);
 
   const handleTabChange = (key: TabKey) => {
     vibrateTap();
     setActiveTab(key);
+  };
+
+  const handleConfirmMaterial = (item: ChecklistItem) => {
+    setConfirmItem(item);
+  };
+
+  const handleConfirmSuccess = () => {
+    setConfirmItem(null);
+    setMaterialsKey((k) => k + 1);
   };
 
   return (
@@ -95,12 +109,33 @@ export function BatchDetailTabs({
           </div>
         )}
 
+        {activeTab === "materials" && (
+          <div className="p-4 animate-in fade-in duration-200">
+            <BatchMaterialsView
+              key={materialsKey}
+              batchId={batchId}
+              onConfirmMaterial={handleConfirmMaterial}
+            />
+          </div>
+        )}
+
         {activeTab === "scout" && (
           <div className="p-4 animate-in fade-in duration-200">
             <BatchScoutHistory batchId={batchId} />
           </div>
         )}
       </div>
+
+      {/* Material Confirmation Dialog */}
+      <MaterialConfirmDialog
+        open={!!confirmItem}
+        onOpenChange={(open) => {
+          if (!open) setConfirmItem(null);
+        }}
+        batchId={batchId}
+        material={confirmItem}
+        onSuccess={handleConfirmSuccess}
+      />
     </div>
   );
 }

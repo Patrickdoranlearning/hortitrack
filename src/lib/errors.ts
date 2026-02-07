@@ -8,7 +8,7 @@ export function toMessage(err: unknown): string {
     // Common Next/ServerAction objects or zod errors
     if (typeof err === "object") {
       // surface common fields if present
-      const anyErr = err as any;
+      const anyErr = err as Record<string, unknown>;
       if (anyErr.error && typeof anyErr.error === "string") return anyErr.error;
       if (anyErr.message && typeof anyErr.message === "string") return anyErr.message;
       return JSON.stringify(anyErr);
@@ -27,3 +27,41 @@ export function ensureError(e: unknown): Error {
     return new Error("Unknown error");
   }
 }
+
+// --- Server Action Error Pattern ---
+
+/**
+ * Standard error response for server actions
+ */
+export type ActionError = {
+  error: string;           // User-facing message
+  code?: string;           // Error code for programmatic handling
+  details?: unknown;       // Technical details (dev only)
+  field?: string;          // Field name if validation error
+};
+
+/**
+ * Standard result type for server actions
+ * Use this for consistent error handling across all actions
+ *
+ * @example
+ * async function createOrder(data: unknown): Promise<ActionResult<Order>> {
+ *   const validation = schema.safeParse(data);
+ *   if (!validation.success) {
+ *     return {
+ *       success: false,
+ *       error: 'Invalid input',
+ *       code: 'VALIDATION_ERROR',
+ *       details: validation.error.flatten(),
+ *     };
+ *   }
+ *
+ *   return {
+ *     success: true,
+ *     data: order,
+ *   };
+ * }
+ */
+export type ActionResult<T> =
+  | { success: true; data: T }
+  | ({ success: false } & ActionError);

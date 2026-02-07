@@ -6,21 +6,27 @@ type LocationPreset = {
   nurserySite: string;
 };
 
-const PRESETS: Record<"incoming" | "planning", LocationPreset> = {
+const PRESETS: Record<"incoming" | "production" | "delivery", LocationPreset> = {
   incoming: {
     name: "Transit – Incoming",
-    nurserySite: "Virtual Transit",
+    nurserySite: "Virtual",
   },
-  planning: {
-    name: "Planning Backlog",
-    nurserySite: "Virtual Planning",
+  production: {
+    name: "Production Backlog",
+    nurserySite: "Virtual",
+  },
+  delivery: {
+    name: "Delivery Backlog",
+    nurserySite: "Virtual",
   },
 };
+
+export type VirtualLocationPreset = keyof typeof PRESETS;
 
 export async function ensureVirtualLocation(
   supabase: SupabaseClient<Database>,
   orgId: string,
-  presetKey: "incoming" | "planning"
+  presetKey: VirtualLocationPreset
 ): Promise<string> {
   const preset = PRESETS[presetKey];
   const existing = await supabase
@@ -42,6 +48,7 @@ export async function ensureVirtualLocation(
       nursery_site: preset.nurserySite,
       covered: false,
       area: 0,
+      is_virtual: true,
     })
     .select("id")
     .single();

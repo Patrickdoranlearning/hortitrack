@@ -364,6 +364,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
                       onSelect={field.onChange}
                       createHref="/locations"
                       placeholder="Search locations..."
+                      excludeVirtual
                     />
                     <FormMessage />
                   </FormItem>

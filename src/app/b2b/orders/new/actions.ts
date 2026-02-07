@@ -19,7 +19,9 @@ type CreateB2BOrderInput = {
 export async function createB2BOrder(input: CreateB2BOrderInput) {
   const { customerId, cart, deliveryAddressId, deliveryDate, notes } = input;
 
-  // Validate auth
+  // B2B portal uses customer-level auth instead of staff auth
+  // requireCustomerAuth() verifies the customer is logged in via B2B portal
+  // and returns customerId, orgId, and optional addressId for store-level users
   const authContext = await requireCustomerAuth();
 
   if (authContext.customerId !== customerId) {
@@ -40,13 +42,13 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
   const supabase = await createClient();
 
   // Get customer details for order
-  const { data: customer } = await supabase
+  const { data: customer, error: customerError } = await supabase
     .from('customers')
     .select('org_id')
     .eq('id', customerId)
-    .single();
+    .maybeSingle();
 
-  if (!customer) {
+  if (customerError || !customer) {
     return { error: 'Customer not found' };
   }
 
@@ -55,10 +57,6 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
 
   // Prepare lines for the atomic RPC
   const rpcLines = cart.map((item) => {
-    const allocations = (item.batchAllocations && item.batchAllocations.length > 0)
-      ? item.batchAllocations.map(a => ({ batch_id: a.batchId, qty: a.qty }))
-      : (item.batchId ? [{ batch_id: item.batchId, qty: item.quantity }] : []);
-
     // Determine variety description
     const varietyDesc = item.requiredVarietyName || item.varietyName;
     const description = `${item.productName}${varietyDesc ? ` - ${varietyDesc}` : ''}${item.sizeName ? ` (${item.sizeName})` : ''}`;
@@ -70,9 +68,9 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
       unit_price: item.unitPriceExVat,
       vat_rate: item.vatRate,
       description,
-      required_variety_id: item.requiredVarietyId || null,
-      required_batch_id: item.requiredBatchId || item.batchId || null,
-      allocations
+      required_variety_id: null,
+      required_batch_id: null,
+      allocations: []
     };
   });
 

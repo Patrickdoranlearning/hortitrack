@@ -1097,13 +1097,6 @@ export async function updatePickItem(input: UpdatePickItemInput): Promise<{ erro
       const { data: pbMatch } = await supabase.from("product_batches").select("id").eq("product_id", current.order_items.product_id).eq("batch_id", input.pickedBatchId).maybeSingle();
       if (!pbMatch) return { error: "Picked batch does not belong to the ordered product" };
     }
-    if (current.order_items?.required_variety_id) {
-      const { data: batchRow } = await supabase.from("batches").select("plant_variety_id").eq("id", input.pickedBatchId).maybeSingle();
-      if (batchRow?.plant_variety_id !== current.order_items.required_variety_id) return { error: "Picked batch has wrong variety for this line" };
-    }
-    if (current.order_items?.required_batch_id && current.order_items.required_batch_id !== input.pickedBatchId) {
-      return { error: "This line requires a specific batch; scanned batch is different" };
-    }
   }
 
   const { data: rpcResult, error: rpcError } = await supabase.rpc("pick_item_atomic", {
@@ -1284,13 +1277,6 @@ export async function substituteBatch(pickItemId: string, newBatchId: string, re
   if (current.order_items?.product_id) {
     const { data: pbMatch } = await supabase.from("product_batches").select("id").eq("product_id", current.order_items.product_id).eq("batch_id", newBatchId).maybeSingle();
     if (!pbMatch) return { error: "Picked batch does not belong to the ordered product" };
-  }
-  if (current.order_items?.required_variety_id) {
-    const { data: batchRow } = await supabase.from("batches").select("plant_variety_id").eq("id", newBatchId).maybeSingle();
-    if (batchRow?.plant_variety_id !== current.order_items.required_variety_id) return { error: "Picked batch has wrong variety for this line" };
-  }
-  if (current.order_items?.required_batch_id && current.order_items.required_batch_id !== newBatchId) {
-    return { error: "This line requires a specific batch; scanned batch is different" };
   }
 
   const { error } = await supabase.from("pick_items").update({

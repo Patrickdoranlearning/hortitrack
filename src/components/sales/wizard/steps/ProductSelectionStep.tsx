@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { UseFieldArrayAppend, UseFieldArrayRemove, FieldArrayWithId, UseFormReturn } from 'react-hook-form';
-import type { CreateOrderInput } from '@/lib/sales/types';
+import type { CreateOrderInput, VarietyBreakdownMap } from '@/lib/sales/types';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
 import type { ProductGroupWithAvailability } from '@/server/sales/product-groups-with-availability';
 import { SalesProductAccordionRow, type PricingHint } from '../SalesProductAccordionRow';
@@ -11,8 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowUpDown, Filter, X } from 'lucide-react';
-import type { BatchAllocation } from '../../BatchSelectionDialog';
-
 type Props = {
   form: UseFormReturn<CreateOrderInput>;
   products: ProductWithBatches[];
@@ -20,10 +18,11 @@ type Props = {
   fields: FieldArrayWithId<CreateOrderInput, 'lines', 'id'>[];
   append: UseFieldArrayAppend<CreateOrderInput, 'lines'>;
   remove: UseFieldArrayRemove;
-  lineAllocations: Map<number, BatchAllocation[]>;
-  onAllocationsChange: (index: number, allocations: BatchAllocation[]) => void;
   selectedCustomerId?: string;
   pricingHints?: Record<string, PricingHint>;
+  varietyBreakdowns?: VarietyBreakdownMap;
+  onVarietyQtyChange?: (fieldId: string, productId: string, qty: number) => void;
+  onInitBreakdown?: (fieldId: string, group: ProductGroupWithAvailability) => void;
 };
 
 type SortOption = 'name' | 'family' | 'stock' | 'price';
@@ -35,10 +34,11 @@ export function ProductSelectionStep({
   fields,
   append,
   remove,
-  lineAllocations,
-  onAllocationsChange,
   selectedCustomerId,
   pricingHints = {},
+  varietyBreakdowns = {},
+  onVarietyQtyChange,
+  onInitBreakdown,
 }: Props) {
   const [search, setSearch] = useState('');
   const [showAllProducts, setShowAllProducts] = useState(false);
@@ -241,16 +241,18 @@ export function ProductSelectionStep({
           fields.map((field, index) => (
             <SalesProductAccordionRow
               key={field.id}
+              fieldId={field.id}
               index={index}
               form={form}
               products={products}
               productGroups={productGroups}
               filteredProducts={filteredProducts}
-              allocations={lineAllocations.get(index) || []}
-              onAllocationsChange={onAllocationsChange}
               onRemove={() => remove(index)}
               selectedCustomerId={selectedCustomerId}
               pricingHints={pricingHints}
+              varietyBreakdown={varietyBreakdowns[field.id]}
+              onVarietyQtyChange={onVarietyQtyChange ? (productId, qty) => onVarietyQtyChange(field.id, productId, qty) : undefined}
+              onInitBreakdown={onInitBreakdown ? (group) => onInitBreakdown(field.id, group) : undefined}
             />
           ))
         )}

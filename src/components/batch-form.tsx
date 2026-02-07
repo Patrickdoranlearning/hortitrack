@@ -241,7 +241,7 @@ export function BatchForm({
 
   const varieties = data?.varieties ?? [];
   const sizes = data?.sizes ?? [];
-  const locations = data?.locations ?? [];
+  const locations = (data?.locations ?? []).filter((l: any) => !l.is_virtual);
   const suppliers = data?.suppliers ?? [];
 
   const varietyOptions = varieties.map(v => ({ value: v.name, label: v.name }));

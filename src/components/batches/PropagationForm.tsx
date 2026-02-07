@@ -363,6 +363,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                       onSelect={field.onChange}
                       createHref="/locations"
                       placeholder="Search locations..."
+                      excludeVirtual
                     />
                     <FormMessage />
                   </FormItem>

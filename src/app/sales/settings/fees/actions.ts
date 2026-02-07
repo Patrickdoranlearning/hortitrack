@@ -3,6 +3,7 @@
 import { getSupabaseServerApp } from '@/server/db/supabase';
 import { revalidatePath } from 'next/cache';
 import { STANDARD_FEE_TYPES } from './constants';
+import type { Database } from '@/types/supabase';
 
 export type FeeUnit = 'per_unit' | 'flat' | 'per_km' | 'percentage';
 
@@ -40,18 +41,17 @@ export type CreateFeeInput = {
 
 export type UpdateFeeInput = Partial<CreateFeeInput>;
 
-// Helper to get supabase with any typing for org_fees table
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getOrgFeesTable(): Promise<any> {
-  const supabase = await getSupabaseServerApp();
-  // Cast to any to bypass type checking for tables not yet in generated types
-  return (supabase as unknown as { from: (table: string) => unknown }).from('org_fees');
-}
+// Type for org_fees table row from database
+type OrgFeeRow = Database['public']['Tables']['org_fees']['Row'];
+type OrgFeeInsert = Database['public']['Tables']['org_fees']['Insert'];
+type OrgFeeUpdate = Database['public']['Tables']['org_fees']['Update'];
 
 /**
  * Get all fees for the current organization
  */
 export async function getOrgFees(): Promise<OrgFee[]> {
+  // getSupabaseServerApp() creates a Supabase client with the current user's auth context
+  // It handles getCurrentUser() internally and returns a properly authenticated client
   const supabase = await getSupabaseServerApp();
   
   const { data: membership } = await supabase
@@ -63,8 +63,8 @@ export async function getOrgFees(): Promise<OrgFee[]> {
     return [];
   }
 
-  const orgFeesTable = await getOrgFeesTable();
-  const { data, error } = await orgFeesTable
+  const { data, error } = await supabase
+    .from('org_fees')
     .select('*')
     .eq('org_id', membership.org_id)
     .order('created_at', { ascending: true });
@@ -81,6 +81,8 @@ export async function getOrgFees(): Promise<OrgFee[]> {
  * Get a specific fee by type
  */
 export async function getOrgFeeByType(feeType: string): Promise<OrgFee | null> {
+  // getSupabaseServerApp() creates a Supabase client with the current user's auth context
+  // It handles getCurrentUser() internally and returns a properly authenticated client
   const supabase = await getSupabaseServerApp();
   
   const { data: membership } = await supabase
@@ -92,8 +94,8 @@ export async function getOrgFeeByType(feeType: string): Promise<OrgFee | null> {
     return null;
   }
 
-  const orgFeesTable = await getOrgFeesTable();
-  const { data, error } = await orgFeesTable
+  const { data, error } = await supabase
+    .from('org_fees')
     .select('*')
     .eq('org_id', membership.org_id)
     .eq('fee_type', feeType)
@@ -121,8 +123,8 @@ export async function createOrgFee(input: CreateFeeInput): Promise<{ success: bo
     return { success: false, error: 'No organization found' };
   }
 
-  const orgFeesTable = await getOrgFeesTable();
-  const { data, error } = await orgFeesTable
+  const { data, error } = await supabase
+    .from('org_fees')
     .insert({
       org_id: membership.org_id,
       fee_type: input.feeType,
@@ -171,8 +173,9 @@ export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promis
   if (input.maxAmount !== undefined) updateData.max_amount = input.maxAmount;
   if (input.metadata !== undefined) updateData.metadata = input.metadata;
 
-  const orgFeesTable = await getOrgFeesTable();
-  const { error } = await orgFeesTable
+  const supabase = await getSupabaseServerApp();
+  const { error } = await supabase
+    .from('org_fees')
     .update(updateData)
     .eq('id', feeId);
 
@@ -189,8 +192,9 @@ export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promis
  * Delete a fee configuration
  */
 export async function deleteOrgFee(feeId: string): Promise<{ success: boolean; error?: string }> {
-  const orgFeesTable = await getOrgFeesTable();
-  const { error } = await orgFeesTable
+  const supabase = await getSupabaseServerApp();
+  const { error } = await supabase
+    .from('org_fees')
     .delete()
     .eq('id', feeId);
 
@@ -219,8 +223,8 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
   }
 
   // Check if fees already exist
-  const orgFeesTable = await getOrgFeesTable();
-  const { data: existingFees } = await orgFeesTable
+  const { data: existingFees } = await supabase
+    .from('org_fees')
     .select('id')
     .eq('org_id', membership.org_id)
     .limit(1);
@@ -256,7 +260,7 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
     },
   ];
 
-  const { error } = await orgFeesTable.insert(defaultFees);
+  const { error } = await supabase.from('org_fees').insert(defaultFees);
 
   if (error) {
     console.error('Error initializing default fees:', error);
@@ -268,23 +272,22 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
 }
 
 // Helper to map database row to typed object
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapFeeRow(row: any): OrgFee {
+function mapFeeRow(row: OrgFeeRow): OrgFee {
   return {
-    id: row.id as string,
-    orgId: row.org_id as string,
-    feeType: row.fee_type as string,
-    name: row.name as string,
-    description: row.description as string | null,
-    amount: Number(row.amount),
+    id: row.id,
+    orgId: row.org_id,
+    feeType: row.fee_type,
+    name: row.name,
+    description: row.description,
+    amount: row.amount,
     unit: row.unit as FeeUnit,
-    vatRate: Number(row.vat_rate),
-    isActive: row.is_active as boolean,
-    isDefault: row.is_default as boolean,
-    minOrderValue: row.min_order_value ? Number(row.min_order_value) : null,
-    maxAmount: row.max_amount ? Number(row.max_amount) : null,
+    vatRate: row.vat_rate,
+    isActive: row.is_active,
+    isDefault: row.is_default,
+    minOrderValue: row.min_order_value,
+    maxAmount: row.max_amount,
     metadata: (row.metadata as Record<string, unknown>) || {},
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
   };
 }

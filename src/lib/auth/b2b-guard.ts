@@ -63,7 +63,7 @@ export async function requireCustomerAuth(): Promise<B2BAuthContext> {
     `)
     .eq('staff_user_id', user.id)
     .is('ended_at', null)
-    .single();
+    .maybeSingle();
 
   const impersonatedCustomer = extractCustomer(impersonation?.customers);
   if (impersonation && impersonatedCustomer) {
@@ -94,7 +94,7 @@ export async function requireCustomerAuth(): Promise<B2BAuthContext> {
       customer_addresses (*)
     `)
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   const profileCustomer = extractCustomer(profile?.customers);
   const profileAddress = extractAddress(profile?.customer_addresses);

@@ -7,7 +7,7 @@ import { ProductionAPI } from "@/lib/production/client";
 import { HttpError } from "@/lib/http/fetchJson";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { LocationComboboxGrouped, type LocationData } from "@/components/ui/location-combobox-grouped";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -16,15 +16,19 @@ const Schema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-type Location = { id: string; name: string };
-
 export default function MoveForm({ batchId, onDone }: { batchId: string; onDone?: () => void }) {
   const { toast } = useToast?.() ?? { toast: (x:any)=>alert(x?.title||x?.description||"OK") };
   const form = useForm<z.infer<typeof Schema>>({ resolver: zodResolver(Schema) });
-  const [locations, setLocations] = React.useState<Location[]>([]);
+  const [locations, setLocations] = React.useState<LocationData[]>([]);
   const [loading, setLoading] = React.useState(false);
 
-  React.useEffect(() => { fetch("/api/lookups/locations").then(r=>r.json()).then(j=>setLocations(j.data||[])); }, []);
+  React.useEffect(() => {
+    fetch("/api/lookups/locations")
+      .then(r => r.json())
+      .then(j => setLocations((j.data || []).map((l: any) => ({
+        id: l.id, name: l.name, nursery_site: l.nursery_site ?? "", is_virtual: l.is_virtual ?? false,
+      }))));
+  }, []);
 
   async function onSubmit(values: z.infer<typeof Schema>) {
     setLoading(true);
@@ -44,13 +48,13 @@ export default function MoveForm({ batchId, onDone }: { batchId: string; onDone?
         <FormField name="location_id" control={form.control} render={({ field }) => (
           <FormItem>
             <FormLabel>New location</FormLabel>
-            <SearchableSelect
-              options={locations.map(l => ({ value: l.id, label: l.name }))}
+            <LocationComboboxGrouped
+              locations={locations}
               value={field.value}
-              onValueChange={field.onChange}
+              onSelect={field.onChange}
               createHref="/locations"
               placeholder="Select location"
-              createLabel="Add new location"
+              excludeVirtual
             />
             <FormMessage />
           </FormItem>

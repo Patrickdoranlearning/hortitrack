@@ -1,5 +1,6 @@
 import { getUserAndOrg } from "@/server/auth/org";
 import { PageFrame } from '@/ui/templates';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import CustomerManagementClient from "./CustomerManagementClient";
 import { fetchCustomerManagementData, mapCustomers } from "./customer-data";
 import type { CustomerManagementPayload } from "./types";
@@ -27,7 +28,9 @@ export default async function CustomersPage() {
 
   return (
     <PageFrame moduleKey="sales">
-      <CustomerManagementClient {...payload} />
+      <ErrorBoundary>
+        <CustomerManagementClient {...payload} />
+      </ErrorBoundary>
     </PageFrame>
   );
 }
