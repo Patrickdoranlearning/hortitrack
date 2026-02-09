@@ -82,13 +82,13 @@ export function PickerTaskCard({ task, variant = "assigned" }: PickerTaskCardPro
   const actualPickListId = needsPickListCreation ? null : task.id;
 
   const handleStartPicking = async () => {
-    if (!needsPickListCreation && actualPickListId) {
-      // Has pick list, navigate directly
+    // Already assigned to this user — navigate directly
+    if (!needsPickListCreation && actualPickListId && variant !== "available") {
       router.push(`/dispatch/picking/${actualPickListId}/workflow`);
       return;
     }
 
-    // Need to create a pick list first
+    // Available task or needs pick list creation — assign to current user first
     setIsCreatingPickList(true);
     try {
       const res = await fetch("/api/dispatch/assign-picker", {
@@ -102,11 +102,11 @@ export function PickerTaskCard({ task, variant = "assigned" }: PickerTaskCardPro
         throw new Error(data.error || "Failed to create pick list");
       }
 
-      // Navigate to the new pick list
-      router.push(`/dispatch/picking/${data.pickListId}/workflow`);
-    } catch (error: any) {
-      console.error("Error creating pick list:", error);
-      toast.error(error.message || "Failed to start picking");
+      const pickListId = data.pickListId || actualPickListId;
+      router.push(`/dispatch/picking/${pickListId}/workflow`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to start picking";
+      toast.error(message);
       setIsCreatingPickList(false);
     }
   };

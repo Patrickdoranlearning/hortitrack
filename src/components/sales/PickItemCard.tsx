@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { PickItem } from '@/server/sales/picking';
 import SaleLabelPrintWizard from './SaleLabelPrintWizard';
-import MultiBatchPickDialog from './MultiBatchPickDialog';
+import { BatchPicker } from '@/components/picking/BatchPicker';
 
 interface PickItemCardProps {
   item: PickItem;
@@ -370,11 +370,11 @@ export default function PickItemCard({
         item={labelData}
       />
 
-      {/* Multi-Batch Pick Dialog - DEFAULT picking UI */}
-      <MultiBatchPickDialog
+      {/* Batch Picker - DEFAULT picking UI */}
+      <BatchPicker
         open={multiBatchDialogOpen}
         onOpenChange={setMultiBatchDialogOpen}
-        pickItemId={item.id}
+        itemId={item.id}
         pickListId={pickListId}
         productName={item.productName || `${item.plantVariety} - ${item.size}`}
         targetQty={item.targetQty}

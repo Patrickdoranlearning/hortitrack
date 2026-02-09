@@ -132,6 +132,7 @@ interface PickItemJoinRow {
     skus?: { code: string | null; plant_varieties?: { name: string | null } | null; plant_sizes?: { name: string | null } | null } | null;
     products?: { name: string | null } | null;
     product_groups?: { name: string | null } | null;
+    required_variety?: { name: string | null } | null;
   } | null;
   original_batch?: { batch_number: string; nursery_locations?: { name: string } | null } | null;
   picked_batch?: { batch_number: string; nursery_locations?: { name: string } | null } | null;
@@ -269,6 +270,7 @@ export interface PickItem {
   // Joined fields
   productName?: string;
   plantVariety?: string;
+  requiredVarietyName?: string;
   size?: string;
   originalBatchNumber?: string;
   pickedBatchNumber?: string;
@@ -1042,7 +1044,7 @@ export async function startPickList(pickListId: string): Promise<{ error?: strin
   const { user, orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("pick_lists").update({
-    status: "in_progress", started_at: new Date().toISOString(), started_by: user.id,
+    status: "in_progress", started_at: new Date().toISOString(), started_by: user.id, assigned_user_id: user.id,
   }).eq("id", pickListId).eq("status", "pending");
 
   if (error) {
@@ -1145,7 +1147,7 @@ export async function reorderPickLists(orgId: string, teamId: string | null, ord
 export async function getPickItems(pickListId: string): Promise<PickItem[]> {
   const supabase = await getSupabaseServerApp();
   const { data, error } = await supabase.from("pick_items").select(`
-      *, order_items(description, quantity, product_group_id, unit_price_ex_vat, skus(code, plant_varieties(name), plant_sizes(name)), products(name), product_groups(name)),
+      *, order_items(description, quantity, product_group_id, unit_price_ex_vat, skus(code, plant_varieties(name), plant_sizes(name)), products(name), product_groups(name), required_variety:required_variety_id(name)),
       original_batch:original_batch_id(batch_number, nursery_locations(name)),
       picked_batch:picked_batch_id(batch_number, nursery_locations(name))
     `).eq("pick_list_id", pickListId).order("created_at");
@@ -1199,6 +1201,7 @@ export async function getPickItems(pickListId: string): Promise<PickItem[]> {
       pickedAt: row.picked_at ?? undefined, pickedBy: row.picked_by ?? undefined, locationHint: row.location_hint ?? undefined,
       productName: row.order_items?.products?.name || row.order_items?.description || undefined,
       plantVariety: row.order_items?.skus?.plant_varieties?.name ?? undefined,
+      requiredVarietyName: row.order_items?.required_variety?.name ?? undefined,
       size: row.order_items?.skus?.plant_sizes?.name ?? undefined,
       originalBatchNumber: row.original_batch?.batch_number,
       pickedBatchNumber: row.picked_batch?.batch_number,
@@ -1227,7 +1230,7 @@ export async function getPickItemsForMultipleLists(pickListIds: string[]): Promi
   });
 
   const { data, error } = await supabase.from("pick_items").select(`
-      *, order_items(description, quantity, skus(code, plant_varieties(name), plant_sizes(name)), products(name)),
+      *, order_items(description, quantity, skus(code, plant_varieties(name), plant_sizes(name)), products(name), required_variety:required_variety_id(name)),
       original_batch:original_batch_id(batch_number, nursery_locations(name)),
       picked_batch:picked_batch_id(batch_number, nursery_locations(name))
     `).in("pick_list_id", pickListIds).order("created_at");
@@ -1247,6 +1250,7 @@ export async function getPickItemsForMultipleLists(pickListIds: string[]): Promi
       pickedAt: row.picked_at ?? undefined, pickedBy: row.picked_by ?? undefined, locationHint: row.location_hint ?? undefined,
       productName: row.order_items?.products?.name || row.order_items?.description || undefined,
       plantVariety: row.order_items?.skus?.plant_varieties?.name ?? undefined,
+      requiredVarietyName: row.order_items?.required_variety?.name ?? undefined,
       size: row.order_items?.skus?.plant_sizes?.name ?? undefined,
       originalBatchNumber: row.original_batch?.batch_number,
       pickedBatchNumber: row.picked_batch?.batch_number,

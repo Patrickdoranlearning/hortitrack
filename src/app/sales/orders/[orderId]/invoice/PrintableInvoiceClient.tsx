@@ -5,6 +5,34 @@ import { Printer } from 'lucide-react';
 import Image from 'next/image';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
+interface InvoiceItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+  total: number;
+  varietyName: string | null;
+  sizeName: string | null;
+  familyName: string | null;
+  batchNumber: string | null;
+  skuCode: string | null;
+  requiredVarietyName?: string | null;
+  productName?: string | null;
+}
+
+interface InvoiceFee {
+  id: string;
+  name: string;
+  feeType: string;
+  quantity: number;
+  unitAmount: number;
+  subtotal: number;
+  vatRate: number;
+  vatAmount: number;
+  totalAmount: number;
+}
+
 interface InvoiceData {
   invoiceNumber: string;
   status: string;
@@ -24,31 +52,8 @@ interface InvoiceData {
     email: string | null;
     vatNumber: string | null;
   };
-  items: Array<{
-    id: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    vatRate: number;
-    total: number;
-    // Enhanced fields
-    varietyName: string | null;
-    sizeName: string | null;
-    familyName: string | null;
-    batchNumber: string | null;
-    skuCode: string | null;
-  }>;
-  fees?: Array<{
-    id: string;
-    name: string;
-    feeType: string;
-    quantity: number;
-    unitAmount: number;
-    subtotal: number;
-    vatRate: number;
-    vatAmount: number;
-    totalAmount: number;
-  }>;
+  items: InvoiceItem[];
+  fees?: InvoiceFee[];
   vatSummary: Array<{
     rate: number;
     total: number;
@@ -78,6 +83,43 @@ interface PrintableInvoiceClientProps {
   invoice: InvoiceData;
 }
 
+/** Group items by product description, with variety sub-items */
+interface ItemGroup {
+  description: string;
+  items: InvoiceItem[];
+  totalQty: number;
+  totalAmount: number;
+  unitPrice: number;
+  vatRate: number;
+  hasVarieties: boolean;
+}
+
+function groupItemsByProduct(items: InvoiceItem[]): ItemGroup[] {
+  const groupMap = new Map<string, InvoiceItem[]>();
+
+  for (const item of items) {
+    const key = item.description;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, []);
+    }
+    groupMap.get(key)!.push(item);
+  }
+
+  return Array.from(groupMap.entries()).map(([description, groupItems]) => {
+    const hasVarieties = groupItems.length > 1 ||
+      groupItems.some(i => i.requiredVarietyName && i.requiredVarietyName !== i.varietyName);
+    return {
+      description,
+      items: groupItems,
+      totalQty: groupItems.reduce((s, i) => s + i.quantity, 0),
+      totalAmount: groupItems.reduce((s, i) => s + i.total, 0),
+      unitPrice: groupItems[0].unitPrice,
+      vatRate: groupItems[0].vatRate,
+      hasVarieties,
+    };
+  });
+}
+
 export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClientProps) {
   const handlePrint = () => {
     window.print();
@@ -88,11 +130,9 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
   const currency = (invoice.currency === 'GBP' ? 'GBP' : 'EUR') as CurrencyCode;
   const fc = (amount: number) => formatCurrency(amount, currency);
 
-  // Parse address into lines for display
   const addressLines = company.address ? company.address.split('\n').filter(Boolean) : [];
-
-  // Check if any items have enhanced plant details
   const hasPlantDetails = invoice.items.some(item => item.familyName || item.batchNumber);
+  const itemGroups = groupItemsByProduct(invoice.items);
 
   return (
     <>
@@ -120,7 +160,7 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
             background: white;
           }
         }
-        
+
         @media screen {
           .print-container {
             max-width: 800px;
@@ -131,7 +171,7 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
         }
       `}</style>
 
-      {/* Print Button - Fixed position on screen */}
+      {/* Print Button */}
       <div className="no-print fixed top-4 right-4 z-50">
         <Button onClick={handlePrint} className="gap-2 bg-green-600 hover:bg-green-700">
           <Printer className="h-4 w-4" />
@@ -212,7 +252,7 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
           </div>
         </div>
 
-        {/* Items Table - Enhanced with Family and Batch columns if available */}
+        {/* Items Table - Grouped by product with variety sub-lines */}
         <table className="w-full mb-8">
           <thead>
             <tr className="bg-green-600 text-white">
@@ -230,40 +270,64 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item, index) => (
-              <tr key={item.id} className={index % 2 === 1 ? 'bg-gray-50' : ''}>
-                <td className="py-3 px-3 border-b border-gray-200">
-                  <div className="font-medium">{item.description}</div>
-                  {item.skuCode && (
-                    <div className="text-xs text-gray-400">SKU: {item.skuCode}</div>
+            {itemGroups.map((group, groupIndex) => (
+              group.hasVarieties ? (
+                // Grouped display: product header + variety sub-lines
+                <GroupedItemRows
+                  key={group.description + groupIndex}
+                  group={group}
+                  hasPlantDetails={hasPlantDetails}
+                  fc={fc}
+                  isEven={groupIndex % 2 === 1}
+                />
+              ) : (
+                // Single item - no grouping needed
+                <tr key={group.items[0].id} className={groupIndex % 2 === 1 ? 'bg-gray-50' : ''}>
+                  <td className="py-3 px-3 border-b border-gray-200">
+                    <div className="font-medium">{group.description}</div>
+                    {group.items[0].skuCode && (
+                      <div className="text-xs text-gray-400">SKU: {group.items[0].skuCode}</div>
+                    )}
+                  </td>
+                  {hasPlantDetails && (
+                    <>
+                      <td className="py-3 px-3 border-b border-gray-200 text-sm text-gray-600">
+                        {group.items[0].familyName || '-'}
+                      </td>
+                      <td className="py-3 px-3 border-b border-gray-200 text-sm text-gray-600">
+                        {group.items[0].batchNumber || '-'}
+                      </td>
+                    </>
                   )}
-                </td>
-                {hasPlantDetails && (
-                  <>
-                    <td className="py-3 px-3 border-b border-gray-200 text-sm text-gray-600">
-                      {item.familyName || '-'}
-                    </td>
-                    <td className="py-3 px-3 border-b border-gray-200 text-sm text-gray-600">
-                      {item.batchNumber || '-'}
-                    </td>
-                  </>
-                )}
-                <td className="py-3 px-3 border-b border-gray-200 text-right">{item.quantity}</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(item.unitPrice)}</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">{item.vatRate}%</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(item.total)}</td>
-              </tr>
+                  <td className="py-3 px-3 border-b border-gray-200 text-right">{group.totalQty}</td>
+                  <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(group.unitPrice)}</td>
+                  <td className="py-3 px-3 border-b border-gray-200 text-right">{group.vatRate}%</td>
+                  <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(group.totalAmount)}</td>
+                </tr>
+              )
             ))}
-            {/* Fee lines (pre-pricing, delivery, etc.) */}
+
+            {/* Fee lines (delivery, pre-pricing, etc.) */}
             {invoice.fees?.map(fee => (
               <tr key={fee.id} className="bg-green-50/50">
                 <td className="py-3 px-3 border-b border-gray-200" colSpan={hasPlantDetails ? 3 : 1}>
-                  <div className="font-medium text-gray-700">{fee.name}</div>
+                  <div className="font-medium text-gray-700">
+                    {fee.name}
+                    {fee.totalAmount === 0 && (
+                      <span className="ml-2 text-xs font-normal text-green-700 bg-green-100 px-1.5 py-0.5 rounded">FOC</span>
+                    )}
+                  </div>
                 </td>
                 <td className="py-3 px-3 border-b border-gray-200 text-right">{fee.quantity}</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(fee.unitAmount)}</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">{fee.vatRate}%</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(fee.subtotal)}</td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">
+                  {fee.totalAmount === 0 ? '-' : fc(fee.unitAmount)}
+                </td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">
+                  {fee.totalAmount === 0 ? '-' : `${fee.vatRate}%`}
+                </td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">
+                  {fee.totalAmount === 0 ? 'FOC' : fc(fee.subtotal)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -299,6 +363,13 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
               <span>Subtotal (ex VAT)</span>
               <span>{fc(invoice.subtotalExVat)}</span>
             </div>
+            {/* Show fee breakdown in totals */}
+            {invoice.fees?.filter(f => f.totalAmount > 0).map(fee => (
+              <div key={fee.id} className="flex justify-between py-1 border-b border-gray-100 text-sm text-gray-600">
+                <span>{fee.name}</span>
+                <span>{fc(fee.subtotal)}</span>
+              </div>
+            ))}
             <div className="flex justify-between py-2 border-b border-gray-200">
               <span>VAT</span>
               <span>{fc(invoice.vatAmount)}</span>
@@ -316,7 +387,7 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
           </div>
         </div>
 
-        {/* Payment Info - Only show if bank details are configured */}
+        {/* Payment Info */}
         {hasBankInfo && (
           <div className="bg-green-50 p-4 rounded border-l-4 border-green-600 mb-6">
             <h4 className="font-semibold text-green-600 mb-2">Payment Information</h4>
@@ -343,12 +414,76 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
             <>
               <p>Thank you for your business!</p>
               {company.companyRegNumber && (
-                <p>{company.name} • Registered in Ireland • Company No. {company.companyRegNumber}</p>
+                <p>{company.name} - Registered in Ireland - Company No. {company.companyRegNumber}</p>
               )}
             </>
           )}
         </div>
       </div>
+    </>
+  );
+}
+
+/** Renders a product group header row + variety sub-rows */
+function GroupedItemRows({
+  group,
+  hasPlantDetails,
+  fc,
+  isEven,
+}: {
+  group: ItemGroup;
+  hasPlantDetails: boolean;
+  fc: (amount: number) => string;
+  isEven: boolean;
+}) {
+  const colCount = hasPlantDetails ? 7 : 4;
+  return (
+    <>
+      {/* Product header row */}
+      <tr className={isEven ? 'bg-gray-50' : ''}>
+        <td className="pt-3 pb-1 px-3 border-b-0" colSpan={colCount}>
+          <div className="font-semibold">{group.description}</div>
+        </td>
+      </tr>
+      {/* Variety sub-rows */}
+      {group.items.map((item, idx) => {
+        const varietyLabel = item.requiredVarietyName || item.varietyName || item.description;
+        const isLast = idx === group.items.length - 1;
+        return (
+          <tr key={item.id} className={isEven ? 'bg-gray-50' : ''}>
+            <td className={`py-1 px-3 pl-8 ${isLast ? 'border-b border-gray-200 pb-3' : ''}`}>
+              <div className="text-sm text-gray-600">
+                {varietyLabel}
+              </div>
+              {item.skuCode && (
+                <div className="text-xs text-gray-400">SKU: {item.skuCode}</div>
+              )}
+            </td>
+            {hasPlantDetails && (
+              <>
+                <td className={`py-1 px-3 text-sm text-gray-600 ${isLast ? 'border-b border-gray-200 pb-3' : ''}`}>
+                  {item.familyName || '-'}
+                </td>
+                <td className={`py-1 px-3 text-sm text-gray-600 ${isLast ? 'border-b border-gray-200 pb-3' : ''}`}>
+                  {item.batchNumber || '-'}
+                </td>
+              </>
+            )}
+            <td className={`py-1 px-3 text-right ${isLast ? 'border-b border-gray-200 pb-3' : ''}`}>
+              {item.quantity}
+            </td>
+            <td className={`py-1 px-3 text-right ${isLast ? 'border-b border-gray-200 pb-3' : ''}`}>
+              {fc(item.unitPrice)}
+            </td>
+            <td className={`py-1 px-3 text-right ${isLast ? 'border-b border-gray-200 pb-3' : ''}`}>
+              {item.vatRate}%
+            </td>
+            <td className={`py-1 px-3 text-right ${isLast ? 'border-b border-gray-200 pb-3' : ''}`}>
+              {fc(item.total)}
+            </td>
+          </tr>
+        );
+      })}
     </>
   );
 }

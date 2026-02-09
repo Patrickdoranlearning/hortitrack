@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,14 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import {
   Package,
@@ -41,14 +33,12 @@ import {
   MapPin,
   RefreshCw,
   X,
-  Keyboard,
   Loader2,
-  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePickingWizardStore } from '@/stores/use-picking-wizard-store';
 import ScannerClient from '@/components/Scanner/ScannerClient';
-import MultiBatchPickDialog from '@/components/sales/MultiBatchPickDialog';
+import { BatchPicker } from '@/components/picking/BatchPicker';
 import type { PickItem } from '@/server/sales/picking';
 
 interface SubstituteBatch {
@@ -56,14 +46,6 @@ interface SubstituteBatch {
   batchNumber: string;
   location?: string;
   availableQty: number;
-}
-
-interface SearchableBatch {
-  id: string;
-  batch_number: string;
-  quantity: number | null;
-  variety_name: string | null;
-  location_name: string | null;
 }
 
 export default function PickingStepPick() {
@@ -80,153 +62,25 @@ export default function PickingStepPick() {
     isLoading,
   } = usePickingWizardStore();
 
-  const [showScanner, setShowScanner] = useState(false);
-  const [showManualEntry, setShowManualEntry] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<PickItem | null>(null);
-  const [manualBatchCode, setManualBatchCode] = useState('');
-
-  // Multi-batch picking state
-  const [multiBatchItem, setMultiBatchItem] = useState<PickItem | null>(null);
+  // The item currently being picked (opens BatchPicker)
+  const [pickingItem, setPickingItem] = useState<PickItem | null>(null);
 
   // Substitution state
   const [showSubstitutionDialog, setShowSubstitutionDialog] = useState(false);
+  const [substitutionItem, setSubstitutionItem] = useState<PickItem | null>(null);
   const [substituteBatches, setSubstituteBatches] = useState<SubstituteBatch[]>([]);
   const [selectedSubstituteBatch, setSelectedSubstituteBatch] = useState<string>('');
   const [substitutionReason, setSubstitutionReason] = useState('');
   const [loadingBatches, setLoadingBatches] = useState(false);
   const [showSubstitutionScanner, setShowSubstitutionScanner] = useState(false);
 
-  // Batch search state for manual entry
-  const [batchSearchQuery, setBatchSearchQuery] = useState('');
-  const [batchSearchResults, setBatchSearchResults] = useState<SearchableBatch[]>([]);
-  const [searchingBatches, setSearchingBatches] = useState(false);
-  const [selectedSearchBatch, setSelectedSearchBatch] = useState<SearchableBatch | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Cleanup timeout on unmount to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // ALL useCallback hooks MUST be defined before any early return
-  const handleScan = useCallback(async (scannedText: string) => {
-    if (!selectedItem || !pickList) return;
-
-    setShowScanner(false);
-    setLoading(true);
-
-    try {
-      // Parse the scanned batch code
-      // Expected format might be "BATCH:xxx" or just "xxx"
-      const batchCode = scannedText.startsWith('BATCH:')
-        ? scannedText.slice(6)
-        : scannedText;
-
-      // Verify and confirm the pick
-      const res = await fetch(`/api/picking/${pickList.id}/items`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pickItemId: selectedItem.id,
-          pickedQty: selectedItem.targetQty,
-          scannedBatchCode: batchCode,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Scan Error',
-          description: data.error,
-        });
-        return;
-      }
-
-      // Update local state
-      updateItem(selectedItem.id, {
-        status: 'picked',
-        pickedQty: selectedItem.targetQty,
-        pickedBatchId: data.batchId,
-        pickedBatchNumber: batchCode,
-      });
-
-      toast({
-        title: 'Item Picked',
-        description: `${selectedItem.productName || selectedItem.plantVariety} confirmed`,
-      });
-
-      setSelectedItem(null);
-    } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to confirm pick',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedItem, pickList, updateItem, toast, setLoading]);
-
-  // Search for batches matching the item's variety
-  const searchBatchesForItem = useCallback(async (query: string, _item: PickItem) => {
-    if (!query || query.length < 2) {
-      setBatchSearchResults([]);
-      return;
-    }
-    setSearchingBatches(true);
-    try {
-      // Search batches - the API will filter by variety name if included in search
-      const res = await fetch(
-        `/api/production/batches/search?q=${encodeURIComponent(query)}&pageSize=10`
-      );
-      const data = await res.json();
-      setBatchSearchResults(data.items ?? []);
-    } catch {
-      setBatchSearchResults([]);
-    } finally {
-      setSearchingBatches(false);
-    }
-  }, []);
-
-  const handleBatchSearchChange = useCallback((value: string) => {
-    setBatchSearchQuery(value);
-    setManualBatchCode(value);
-    setSelectedSearchBatch(null);
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (selectedItem) {
-      searchTimeoutRef.current = setTimeout(() => {
-        searchBatchesForItem(value, selectedItem);
-      }, 300);
-    }
-  }, [selectedItem, searchBatchesForItem]);
-
-  const handleSelectSearchBatch = useCallback((batch: SearchableBatch) => {
-    setSelectedSearchBatch(batch);
-    setManualBatchCode(batch.batch_number);
-    setBatchSearchQuery(batch.batch_number);
-    setBatchSearchResults([]);
-  }, []);
-
-  // Handle scanning for substitution - find batch by barcode
+  // Handle scanning for substitution
   const handleSubstitutionScan = useCallback(async (scannedText: string) => {
     setShowSubstitutionScanner(false);
-
-    // Parse the scanned batch code
     const batchCode = scannedText.startsWith('BATCH:')
       ? scannedText.slice(6)
       : scannedText;
 
-    // Look for a matching batch in the available substitution batches
     const matchingBatch = substituteBatches.find(
       (b) => b.batchNumber.toLowerCase() === batchCode.toLowerCase()
     );
@@ -235,13 +89,13 @@ export default function PickingStepPick() {
       setSelectedSubstituteBatch(matchingBatch.id);
       toast({
         title: 'Batch Found',
-        description: `Selected batch ${matchingBatch.batchNumber} with ${matchingBatch.availableQty} available`,
+        description: `Selected ${matchingBatch.batchNumber} (${matchingBatch.availableQty} available)`,
       });
     } else {
       toast({
         variant: 'destructive',
         title: 'Batch Not Found',
-        description: `Scanned batch "${batchCode}" is not available for substitution. Please select from the dropdown.`,
+        description: `"${batchCode}" is not available for substitution`,
       });
     }
   }, [substituteBatches, toast]);
@@ -251,144 +105,57 @@ export default function PickingStepPick() {
   const pendingItems = items.filter((item) => item.status === 'pending');
   const completedItems = items.filter((item) => item.status !== 'pending');
 
-  // Early return AFTER all hooks are defined
   if (!pickList) {
     return null;
   }
 
-  // Regular async functions (not hooks) can be defined after early return
-  const handleConfirmPick = async (item: PickItem) => {
-    // If no pre-allocated batch, user must scan or manually select one
-    if (!item.originalBatchId) {
-      toast({
-        variant: 'destructive',
-        title: 'No Batch Selected',
-        description: 'Please scan or manually select a batch before confirming',
-      });
-      // Trigger manual entry flow
-      setSelectedItem(item);
-      setShowManualEntry(true);
-      return;
-    }
+  // === Item Actions ===
 
+  const handlePickConfirm = async (
+    item: PickItem,
+    batches: Array<{ batchId: string; quantity: number }>,
+    notes?: string
+  ) => {
     setLoading(true);
-
     try {
-      const res = await fetch(`/api/picking/${pickList.id}/items`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pickItemId: item.id,
-          pickedQty: item.targetQty,
-          pickedBatchId: item.originalBatchId,
-        }),
-      });
+      const res = await fetch(
+        `/api/picking/${pickList.id}/items/${item.id}/batches`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batches, notes }),
+        }
+      );
 
       const data = await res.json();
 
-      if (data.error) {
+      if (!res.ok || data.error) {
         toast({
           variant: 'destructive',
           title: 'Error',
-          description: data.error,
+          description: data.error || 'Failed to save picks',
         });
         return;
       }
 
+      const totalPicked = batches.reduce((sum, b) => sum + b.quantity, 0);
+
       updateItem(item.id, {
-        status: 'picked',
-        pickedQty: item.targetQty,
-        pickedBatchId: item.originalBatchId,
+        status: data.status || (totalPicked >= item.targetQty ? 'picked' : 'short'),
+        pickedQty: data.pickedQty || totalPicked,
       });
 
       toast({
         title: 'Item Picked',
-        description: `${item.productName || item.plantVariety} confirmed`,
+        description: `${item.productName || item.plantVariety} picked from ${batches.length} batch(es)`,
       });
+
+      setPickingItem(null);
     } catch {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to confirm pick',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubstitute = async (item: PickItem) => {
-    setSelectedItem(item);
-    setShowSubstitutionDialog(true);
-    setLoadingBatches(true);
-
-    try {
-      // Fetch available batches for substitution
-      const res = await fetch(`/api/picking/${pickList.id}/items/${item.id}/batches`);
-      const data = await res.json();
-
-      if (data.batches) {
-        setSubstituteBatches(data.batches);
-      }
-    } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to load available batches',
-      });
-    } finally {
-      setLoadingBatches(false);
-    }
-  };
-
-  const handleConfirmSubstitution = async () => {
-    if (!selectedItem || !selectedSubstituteBatch) return;
-    setLoading(true);
-
-    try {
-      const res = await fetch(`/api/picking/${pickList.id}/items/${selectedItem.id}/batches`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          batchId: selectedSubstituteBatch,
-          reason: substitutionReason,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: data.error,
-        });
-        return;
-      }
-
-      const selectedBatch = substituteBatches.find((b) => b.id === selectedSubstituteBatch);
-
-      updateItem(selectedItem.id, {
-        status: 'substituted',
-        pickedQty: selectedItem.targetQty,
-        pickedBatchId: selectedSubstituteBatch,
-        pickedBatchNumber: selectedBatch?.batchNumber,
-        substitutionReason,
-      });
-
-      toast({
-        title: 'Substitution Confirmed',
-        description: `Batch substituted for ${selectedItem.productName || selectedItem.plantVariety}`,
-      });
-
-      setShowSubstitutionDialog(false);
-      setSelectedItem(null);
-      setSelectedSubstituteBatch('');
-      setSubstitutionReason('');
-    } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to substitute batch',
+        description: 'Failed to save picks',
       });
     } finally {
       setLoading(false);
@@ -397,7 +164,6 @@ export default function PickingStepPick() {
 
   const handleMarkShort = async (item: PickItem) => {
     setLoading(true);
-
     try {
       const res = await fetch(`/api/picking/${pickList.id}/items`, {
         method: 'PATCH',
@@ -412,57 +178,87 @@ export default function PickingStepPick() {
       const data = await res.json();
 
       if (data.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: data.error,
-        });
+        toast({ variant: 'destructive', title: 'Error', description: data.error });
         return;
       }
 
-      updateItem(item.id, {
-        status: 'short',
-        pickedQty: 0,
-      });
-
+      updateItem(item.id, { status: 'short', pickedQty: 0 });
       toast({
         title: 'Marked Short',
         description: `${item.productName || item.plantVariety} marked as unavailable`,
         variant: 'destructive',
       });
     } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to mark item as short',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to mark short' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStartScan = (item: PickItem) => {
-    setSelectedItem(item);
-    setShowScanner(true);
+  const handleSubstitute = async (item: PickItem) => {
+    setSubstitutionItem(item);
+    setShowSubstitutionDialog(true);
+    setLoadingBatches(true);
+    setSelectedSubstituteBatch('');
+    setSubstitutionReason('');
+
+    try {
+      const res = await fetch(`/api/picking/${pickList.id}/items/${item.id}/batches`);
+      const data = await res.json();
+      if (data.batches) {
+        setSubstituteBatches(data.batches);
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load batches' });
+    } finally {
+      setLoadingBatches(false);
+    }
   };
 
-  const handleManualEntry = (item: PickItem) => {
-    setSelectedItem(item);
-    setShowManualEntry(true);
-    setManualBatchCode('');
-    setBatchSearchQuery('');
-    setBatchSearchResults([]);
-    setSelectedSearchBatch(null);
-  };
+  const handleConfirmSubstitution = async () => {
+    if (!substitutionItem || !selectedSubstituteBatch) return;
+    setLoading(true);
 
-  const handleManualSubmit = async () => {
-    if (!selectedItem || !manualBatchCode.trim()) return;
-    await handleScan(manualBatchCode.trim());
-    setShowManualEntry(false);
-    setManualBatchCode('');
-    setBatchSearchQuery('');
-    setBatchSearchResults([]);
-    setSelectedSearchBatch(null);
+    try {
+      const res = await fetch(
+        `/api/picking/${pickList.id}/items/${substitutionItem.id}/batches`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            batchId: selectedSubstituteBatch,
+            reason: substitutionReason,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (data.error) {
+        toast({ variant: 'destructive', title: 'Error', description: data.error });
+        return;
+      }
+
+      const selectedBatch = substituteBatches.find((b) => b.id === selectedSubstituteBatch);
+      updateItem(substitutionItem.id, {
+        status: 'substituted',
+        pickedQty: substitutionItem.targetQty,
+        pickedBatchId: selectedSubstituteBatch,
+        pickedBatchNumber: selectedBatch?.batchNumber,
+        substitutionReason,
+      });
+
+      toast({
+        title: 'Substitution Confirmed',
+        description: `Batch substituted for ${substitutionItem.productName || substitutionItem.plantVariety}`,
+      });
+
+      setShowSubstitutionDialog(false);
+      setSubstitutionItem(null);
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to substitute' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -483,7 +279,7 @@ export default function PickingStepPick() {
         </CardContent>
       </Card>
 
-      {/* Pending Items */}
+      {/* Pending Items — tappable cards */}
       {pendingItems.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-semibold flex items-center gap-2">
@@ -494,84 +290,60 @@ export default function PickingStepPick() {
 
           {pendingItems.map((item) => (
             <Card key={item.id} className="overflow-hidden">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">
-                      {item.productName || item.plantVariety || 'Unknown'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{item.size}</p>
-                    {item.batchLocation && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                        <MapPin className="h-3 w-3" />
-                        {item.batchLocation}
+              <CardContent className="p-0">
+                {/* Tappable main area — opens BatchPicker */}
+                <button
+                  onClick={() => setPickingItem(item)}
+                  className="w-full p-4 text-left active:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {item.productName || item.plantVariety || 'Unknown'}
                       </p>
-                    )}
-                    {item.originalBatchNumber && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Batch: {item.originalBatchNumber}
-                      </p>
-                    )}
+                      {item.requiredVarietyName && item.requiredVarietyName !== item.plantVariety && (
+                        <p className="text-sm text-primary/80 truncate">{item.requiredVarietyName}</p>
+                      )}
+                      <p className="text-sm text-muted-foreground">{item.size}</p>
+                      {item.batchLocation && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                          <MapPin className="h-3 w-3" />
+                          {item.batchLocation}
+                        </p>
+                      )}
+                      {item.originalBatchNumber && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Batch: {item.originalBatchNumber}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-lg px-3 py-1">
+                      x{item.targetQty}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="shrink-0 text-lg px-3 py-1">
-                    ×{item.targetQty}
-                  </Badge>
-                </div>
+                  <div className="mt-3 flex items-center gap-2 text-sm text-primary font-medium">
+                    <Camera className="h-4 w-4" />
+                    Tap to pick
+                  </div>
+                </button>
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 mt-4">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => handleStartScan(item)}
-                    className="flex-1"
-                  >
-                    <Camera className="h-4 w-4 mr-1" />
-                    Scan
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleManualEntry(item)}
-                  >
-                    <Keyboard className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setMultiBatchItem(item)}
-                    title="Pick from multiple batches"
-                  >
-                    <Layers className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleConfirmPick(item)}
-                    disabled={isLoading}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
+                {/* Secondary actions — smaller, in a border-top row */}
+                <div className="flex border-t divide-x">
+                  <button
                     onClick={() => handleSubstitute(item)}
-                    className="flex-1"
+                    className="flex-1 py-2.5 text-xs text-muted-foreground flex items-center justify-center gap-1 hover:bg-muted/50 transition-colors"
                   >
-                    <RefreshCw className="h-4 w-4 mr-1" />
+                    <RefreshCw className="h-3.5 w-3.5" />
                     Substitute
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
+                  </button>
+                  <button
                     onClick={() => handleMarkShort(item)}
+                    disabled={isLoading}
+                    className="flex-1 py-2.5 text-xs text-red-600 flex items-center justify-center gap-1 hover:bg-red-50 transition-colors"
                   >
-                    <X className="h-4 w-4 mr-1" />
+                    <X className="h-3.5 w-3.5" />
                     Short
-                  </Button>
+                  </button>
                 </div>
               </CardContent>
             </Card>
@@ -615,7 +387,7 @@ export default function PickingStepPick() {
                           ? 'Unavailable'
                           : item.status === 'substituted'
                           ? `Substituted: ${item.pickedBatchNumber}`
-                          : `Picked: ${item.pickedBatchNumber || item.originalBatchNumber}`}
+                          : `Picked: ${item.pickedBatchNumber || item.originalBatchNumber || 'multi-batch'}`}
                       </p>
                     </div>
                   </div>
@@ -643,94 +415,20 @@ export default function PickingStepPick() {
         </Card>
       )}
 
-      {/* Scanner Dialog */}
-      <Dialog open={showScanner} onOpenChange={setShowScanner}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Scan Batch</DialogTitle>
-            <DialogDescription>
-              Scan the batch label for {selectedItem?.productName || selectedItem?.plantVariety}
-            </DialogDescription>
-          </DialogHeader>
-          {showScanner && <ScannerClient onDecoded={handleScan} />}
-        </DialogContent>
-      </Dialog>
-
-      {/* Manual Entry Dialog */}
-      <Dialog open={showManualEntry} onOpenChange={setShowManualEntry}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Manual Entry</DialogTitle>
-            <DialogDescription>
-              Search or enter the batch code for {selectedItem?.productName || selectedItem?.plantVariety}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Batch Code</Label>
-              <Command className="rounded-lg border" shouldFilter={false}>
-                <CommandInput
-                  placeholder="Search by batch number, location..."
-                  value={batchSearchQuery}
-                  onValueChange={handleBatchSearchChange}
-                />
-                <CommandList className="max-h-[200px]">
-                  {searchingBatches ? (
-                    <div className="py-4 text-center text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                      Searching...
-                    </div>
-                  ) : batchSearchResults.length > 0 ? (
-                    <CommandGroup heading="Matching Batches">
-                      {batchSearchResults.map((batch) => (
-                        <CommandItem
-                          key={batch.id}
-                          value={batch.batch_number}
-                          onSelect={() => handleSelectSearchBatch(batch)}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex flex-col gap-0.5">
-                            <div className="font-medium">{batch.batch_number}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {batch.variety_name ?? '—'}
-                              {batch.quantity != null && ` • ${batch.quantity.toLocaleString()} avail`}
-                              {batch.location_name && ` • ${batch.location_name}`}
-                            </div>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  ) : batchSearchQuery.length >= 2 ? (
-                    <CommandEmpty>No batches found. You can still enter a code manually.</CommandEmpty>
-                  ) : batchSearchQuery.length > 0 ? (
-                    <div className="py-4 text-center text-xs text-muted-foreground">
-                      Type at least 2 characters to search
-                    </div>
-                  ) : null}
-                </CommandList>
-              </Command>
-              {selectedSearchBatch && (
-                <div className="rounded-md bg-muted/50 p-2 text-sm">
-                  <p className="font-medium">{selectedSearchBatch.batch_number}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedSearchBatch.variety_name}
-                    {selectedSearchBatch.location_name && ` • ${selectedSearchBatch.location_name}`}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowManualEntry(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleManualSubmit} disabled={!manualBatchCode.trim() || isLoading}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* BatchPicker — the unified pick flow */}
+      <BatchPicker
+        open={!!pickingItem}
+        onOpenChange={(open) => { if (!open) setPickingItem(null); }}
+        pickListId={pickList.id}
+        itemId={pickingItem?.id || ''}
+        productName={pickingItem?.productName || pickingItem?.plantVariety || 'Unknown'}
+        targetQty={pickingItem?.targetQty || 0}
+        onConfirm={async (batches, notes) => {
+          if (!pickingItem) return;
+          await handlePickConfirm(pickingItem, batches, notes);
+        }}
+        isSubmitting={isLoading}
+      />
 
       {/* Substitution Dialog */}
       <Dialog open={showSubstitutionDialog} onOpenChange={setShowSubstitutionDialog}>
@@ -738,7 +436,7 @@ export default function PickingStepPick() {
           <DialogHeader>
             <DialogTitle>Substitute Batch</DialogTitle>
             <DialogDescription>
-              Select an alternative batch for {selectedItem?.productName || selectedItem?.plantVariety}
+              Select an alternative batch for {substitutionItem?.productName || substitutionItem?.plantVariety}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -752,7 +450,6 @@ export default function PickingStepPick() {
               </p>
             ) : (
               <>
-                {/* Scan or Select */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Select Batch</Label>
@@ -825,67 +522,6 @@ export default function PickingStepPick() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Multi-Batch Pick Dialog */}
-      <MultiBatchPickDialog
-        open={!!multiBatchItem}
-        onOpenChange={(open) => {
-          if (!open) setMultiBatchItem(null);
-        }}
-        pickItemId={multiBatchItem?.id || ''}
-        pickListId={pickList.id}
-        productName={multiBatchItem?.productName || multiBatchItem?.plantVariety || 'Unknown'}
-        targetQty={multiBatchItem?.targetQty || 0}
-        onConfirm={async (batches, notes) => {
-          if (!multiBatchItem) return;
-
-          setLoading(true);
-          try {
-            const res = await fetch(
-              `/api/picking/${pickList.id}/items/${multiBatchItem.id}/batches`,
-              {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ batches, notes }),
-              }
-            );
-
-            const data = await res.json();
-
-            if (!res.ok || data.error) {
-              toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: data.error || 'Failed to save picks',
-              });
-              return;
-            }
-
-            // Calculate total picked
-            const totalPicked = batches.reduce((sum, b) => sum + b.quantity, 0);
-
-            updateItem(multiBatchItem.id, {
-              status: data.status || (totalPicked >= multiBatchItem.targetQty ? 'picked' : 'short'),
-              pickedQty: data.pickedQty || totalPicked,
-            });
-
-            toast({
-              title: 'Item Picked',
-              description: `${multiBatchItem.productName || multiBatchItem.plantVariety} picked from ${batches.length} batch(es)`,
-            });
-
-            setMultiBatchItem(null);
-          } catch (error) {
-            toast({
-              variant: 'destructive',
-              title: 'Error',
-              description: 'Failed to save picks',
-            });
-          } finally {
-            setLoading(false);
-          }
-        }}
-      />
 
       {/* Navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t safe-area-pb">

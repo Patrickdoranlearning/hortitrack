@@ -4,24 +4,19 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import {
   Sheet,
   SheetContent,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
   Camera,
-  Keyboard,
   Search,
   MapPin,
   Loader2,
@@ -30,9 +25,7 @@ import {
   Check,
   X,
   Package,
-  Info,
   AlertTriangle,
-  List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { vibrateTap, vibrateSuccess, vibrateError } from '@/lib/haptics';
@@ -74,10 +67,10 @@ export interface BatchPickerProps {
   isSubmitting?: boolean;
 }
 
-type InputMode = 'list' | 'scan' | 'type' | 'search';
+type PickTab = 'pick' | 'search';
 
 // ============================================================================
-// HOOK: useMediaQuery for responsive behavior
+// HOOK: useMediaQuery
 // ============================================================================
 
 function useMediaQuery(query: string): boolean {
@@ -99,7 +92,7 @@ function useMediaQuery(query: string): boolean {
 }
 
 // ============================================================================
-// COMPONENT: BatchPicker
+// COMPONENT: BatchPicker (Scan-first, one-batch-at-a-time)
 // ============================================================================
 
 export function BatchPicker({
@@ -116,52 +109,56 @@ export function BatchPicker({
   const isDesktop = useMediaQuery('(min-width: 768px)');
 
   // State
-  const [mode, setMode] = useState<InputMode>('list');
+  const [tab, setTab] = useState<PickTab>('pick');
   const [availableBatches, setAvailableBatches] = useState<AvailableBatch[]>([]);
   const [loadingBatches, setLoadingBatches] = useState(false);
-  const [manualBatchNumber, setManualBatchNumber] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBatches, setSelectedBatches] = useState<Map<string, BatchSelection>>(new Map());
+  const [confirmedBatches, setConfirmedBatches] = useState<Map<string, BatchSelection>>(new Map());
   const [error, setError] = useState<string | null>(null);
-  const [customQtyBatch, setCustomQtyBatch] = useState<AvailableBatch | null>(null);
-  const [customQtyValue, setCustomQtyValue] = useState('');
-  const [notes, setNotes] = useState('');
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Calculate totals
+  // One-at-a-time: the batch currently being confirmed
+  const [confirmingBatch, setConfirmingBatch] = useState<AvailableBatch | null>(null);
+  const [confirmQty, setConfirmQty] = useState('');
+
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const qtyInputRef = useRef<HTMLInputElement>(null);
+
+  // Calculate totals from confirmed batches
   const totalPicked = useMemo(() => {
     let sum = 0;
-    selectedBatches.forEach((s) => {
-      sum += s.quantity;
-    });
+    confirmedBatches.forEach((s) => { sum += s.quantity; });
     return sum;
-  }, [selectedBatches]);
+  }, [confirmedBatches]);
 
   const remaining = targetQty - totalPicked;
   const progress = targetQty > 0 ? Math.min(100, Math.round((totalPicked / targetQty) * 100)) : 0;
   const isShortPick = totalPicked > 0 && totalPicked < targetQty;
   const isComplete = totalPicked >= targetQty;
-  const isOverPick = totalPicked > targetQty;
 
-  // Initialize selected batches from current picks (for editing existing picks)
+  // Effective available qty for a batch (subtract already-confirmed qty)
+  const getEffectiveAvailable = useCallback((batch: AvailableBatch): number => {
+    const alreadyConfirmed = confirmedBatches.get(batch.id)?.quantity || 0;
+    return Math.max(0, batch.quantity - alreadyConfirmed);
+  }, [confirmedBatches]);
+
+  // Initialize from current picks (for re-editing)
   useEffect(() => {
     if (open && currentPicks.length > 0) {
-      const initialSelections = new Map<string, BatchSelection>();
+      const initial = new Map<string, BatchSelection>();
       for (const pick of currentPicks) {
-        initialSelections.set(pick.batchId, {
+        initial.set(pick.batchId, {
           batch: {
             id: pick.batchId,
             batchNumber: pick.batchNumber,
-            quantity: pick.quantity, // Available qty (would need to be fetched for accuracy)
+            quantity: pick.quantity,
             location: pick.location || '',
           },
           quantity: pick.quantity,
         });
       }
-      setSelectedBatches(initialSelections);
+      setConfirmedBatches(initial);
     } else if (open) {
-      // Always start with blank slate - no auto-fill FEFO
-      setSelectedBatches(new Map());
+      setConfirmedBatches(new Map());
     }
   }, [open, currentPicks]);
 
@@ -178,7 +175,6 @@ export function BatchPicker({
         setError(data.error);
       } else if (data.batches) {
         setAvailableBatches(data.batches);
-        // No auto-fill - user makes their own decisions
       }
     } catch {
       setError('Failed to load batches');
@@ -187,23 +183,30 @@ export function BatchPicker({
     }
   }, [pickListId, itemId]);
 
-  // Initial fetch when opened
+  // Reset state when opened
   useEffect(() => {
     if (open) {
       fetchAvailableBatches();
-      setMode('list');
-      setManualBatchNumber('');
+      setTab('pick');
       setSearchQuery('');
-      setNotes('');
       setError(null);
-      setCustomQtyBatch(null);
-      setCustomQtyValue('');
+      setConfirmingBatch(null);
+      setConfirmQty('');
     }
   }, [open, fetchAvailableBatches]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Search with debounce
   useEffect(() => {
-    if (mode !== 'search' || !searchQuery.trim()) return;
+    if (tab !== 'search' || !searchQuery.trim()) return;
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -239,13 +242,37 @@ export function BatchPicker({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, mode]);
+  }, [searchQuery, tab]);
+
+  // Focus quantity input when confirming batch changes
+  useEffect(() => {
+    if (confirmingBatch && qtyInputRef.current) {
+      // Small delay to ensure the input is rendered
+      setTimeout(() => qtyInputRef.current?.select(), 50);
+    }
+  }, [confirmingBatch]);
+
+  // === ACTIONS ===
+
+  // Select a batch for quantity confirmation
+  const selectBatch = useCallback((batch: AvailableBatch) => {
+    vibrateTap();
+    const effectiveAvail = getEffectiveAvailable(batch);
+    if (effectiveAvail <= 0) {
+      vibrateError();
+      setError(`Batch ${batch.batchNumber} has no remaining available stock`);
+      return;
+    }
+    const suggestedQty = Math.min(effectiveAvail, Math.max(remaining, 1));
+    setConfirmingBatch(batch);
+    setConfirmQty(String(suggestedQty));
+    setError(null);
+  }, [getEffectiveAvailable, remaining]);
 
   // Handle barcode scan
   const handleScan = useCallback(
     (scannedText: string) => {
       vibrateTap();
-      // Parse batch code - expected format: ht:batch:XXXX or BATCH:XXXX or just XXXX
       let batchNumber = scannedText;
       if (scannedText.startsWith('ht:batch:')) {
         batchNumber = scannedText.slice(9);
@@ -253,217 +280,177 @@ export function BatchPicker({
         batchNumber = scannedText.slice(6);
       }
 
-      // Find matching batch
       const matchingBatch = availableBatches.find(
         (b) => b.batchNumber.toLowerCase() === batchNumber.toLowerCase()
       );
 
       if (matchingBatch) {
         vibrateSuccess();
-        const qtyToAdd = Math.min(matchingBatch.quantity, Math.max(remaining, 1));
-        addBatch(matchingBatch, qtyToAdd);
-        setMode('list');
+        selectBatch(matchingBatch);
       } else {
         vibrateError();
         setError(`Batch ${batchNumber} not found or not available for this item`);
-        setMode('list');
       }
     },
-    [availableBatches, remaining]
+    [availableBatches, selectBatch]
   );
 
-  // Handle manual batch entry
-  const handleManualEntry = useCallback(() => {
-    if (!manualBatchNumber.trim()) return;
-    vibrateTap();
+  // Confirm the quantity for the currently selected batch
+  const confirmBatchPick = useCallback(() => {
+    if (!confirmingBatch) return;
+    const qty = parseInt(confirmQty, 10);
+    if (!qty || qty <= 0) return;
 
-    const matchingBatch = availableBatches.find(
-      (b) => b.batchNumber.toLowerCase() === manualBatchNumber.toLowerCase()
-    );
+    const effectiveAvail = getEffectiveAvailable(confirmingBatch);
+    const clampedQty = Math.min(qty, effectiveAvail);
+    if (clampedQty <= 0) return;
 
-    if (matchingBatch) {
-      vibrateSuccess();
-      const qtyToAdd = Math.min(matchingBatch.quantity, Math.max(remaining, 1));
-      addBatch(matchingBatch, qtyToAdd);
-      setManualBatchNumber('');
-      setMode('list');
-    } else {
-      vibrateError();
-      setError(`Batch ${manualBatchNumber} not found`);
-    }
-  }, [manualBatchNumber, availableBatches, remaining]);
-
-  // Add or update a batch selection
-  const addBatch = (batch: AvailableBatch, qty: number) => {
-    if (qty <= 0) return;
-    setSelectedBatches((prev) => {
+    vibrateSuccess();
+    setConfirmedBatches((prev) => {
       const next = new Map(prev);
-      const existing = next.get(batch.id);
+      const existing = next.get(confirmingBatch.id);
       if (existing) {
-        const newQty = Math.min(existing.quantity + qty, batch.quantity);
-        next.set(batch.id, { batch, quantity: newQty });
+        // Add to existing confirmed quantity
+        const newQty = Math.min(existing.quantity + clampedQty, confirmingBatch.quantity);
+        next.set(confirmingBatch.id, { batch: confirmingBatch, quantity: newQty });
       } else {
-        next.set(batch.id, { batch, quantity: Math.min(qty, batch.quantity) });
+        next.set(confirmingBatch.id, { batch: confirmingBatch, quantity: clampedQty });
       }
       return next;
     });
+
+    setConfirmingBatch(null);
+    setConfirmQty('');
     setError(null);
-  };
+  }, [confirmingBatch, confirmQty, getEffectiveAvailable]);
 
-  // Update quantity for a batch
-  const updateBatchQty = (batchId: string, delta: number) => {
+  // Remove a confirmed batch
+  const removeConfirmedBatch = useCallback((batchId: string) => {
     vibrateTap();
-    setSelectedBatches((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(batchId);
-      if (!existing) return prev;
-
-      const newQty = existing.quantity + delta;
-      if (newQty <= 0) {
-        next.delete(batchId);
-      } else {
-        const clampedQty = Math.min(newQty, existing.batch.quantity);
-        next.set(batchId, { ...existing, quantity: clampedQty });
-      }
-      return next;
-    });
-  };
-
-  // Set exact quantity for a batch
-  const setBatchQty = (batchId: string, qty: number) => {
-    vibrateTap();
-    setSelectedBatches((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(batchId);
-      if (!existing) return prev;
-
-      if (qty <= 0) {
-        next.delete(batchId);
-      } else {
-        const clampedQty = Math.min(qty, existing.batch.quantity);
-        next.set(batchId, { ...existing, quantity: clampedQty });
-      }
-      return next;
-    });
-  };
-
-  // Remove a batch
-  const removeBatch = (batchId: string) => {
-    vibrateTap();
-    setSelectedBatches((prev) => {
+    setConfirmedBatches((prev) => {
       const next = new Map(prev);
       next.delete(batchId);
       return next;
     });
-  };
+  }, []);
 
-  // Save selections
-  const handleSave = async () => {
-    if (selectedBatches.size === 0) {
-      setError('Please select at least one batch');
+  // Submit all confirmed batches
+  const handleSubmit = useCallback(async () => {
+    if (confirmedBatches.size === 0) {
+      setError('Please pick at least one batch');
       return;
     }
-
     vibrateTap();
-    const batches = Array.from(selectedBatches.values()).map((s) => ({
+    const batches = Array.from(confirmedBatches.values()).map((s) => ({
       batchId: s.batch.id,
       quantity: s.quantity,
     }));
+    await onConfirm(batches, undefined);
+  }, [confirmedBatches, onConfirm]);
 
-    await onConfirm(batches, notes || undefined);
+  // === RENDER HELPERS ===
+
+  const renderBatchCard = (batch: AvailableBatch) => {
+    const effectiveAvail = getEffectiveAvailable(batch);
+    const isAlreadyPicked = confirmedBatches.has(batch.id);
+    const pickedQty = confirmedBatches.get(batch.id)?.quantity || 0;
+
+    return (
+      <button
+        key={batch.id}
+        onClick={() => selectBatch(batch)}
+        disabled={effectiveAvail <= 0}
+        className={cn(
+          'w-full p-4 rounded-lg border text-left transition-colors active:scale-[0.98]',
+          isAlreadyPicked && 'border-green-300 bg-green-50',
+          effectiveAvail <= 0 && 'opacity-50',
+          !isAlreadyPicked && effectiveAvail > 0 && 'hover:border-primary hover:bg-primary/5 active:bg-primary/10'
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono text-sm">
+              {batch.batchNumber}
+            </Badge>
+            {batch.status && (
+              <Badge variant="secondary" className="text-[10px]">
+                {batch.status}
+              </Badge>
+            )}
+          </div>
+          <span className="text-sm font-medium">
+            {effectiveAvail > 0 ? `${effectiveAvail} avail` : 'Fully picked'}
+          </span>
+        </div>
+        {batch.location && (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+            <MapPin className="h-3.5 w-3.5" />
+            {batch.location}
+          </div>
+        )}
+        {isAlreadyPicked && (
+          <div className="flex items-center gap-1 text-sm text-green-600 mt-1">
+            <Check className="h-3.5 w-3.5" />
+            {pickedQty} picked
+          </div>
+        )}
+      </button>
+    );
   };
 
-  // Get the selected quantity for a batch (for display)
-  const getSelectedQty = (batchId: string): number => {
-    return selectedBatches.get(batchId)?.quantity || 0;
-  };
+  // === MAIN CONTENT ===
 
-  // Check if a batch is selected
-  const isSelected = (batchId: string): boolean => {
-    return selectedBatches.has(batchId);
-  };
-
-  // Render the picker content (shared between Sheet and Dialog)
   const renderContent = () => (
     <>
       {/* Header */}
       <div className="px-4 py-3 border-b shrink-0">
-        <div className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          <span className="font-semibold">Select Batches</span>
-        </div>
-        <div className="text-sm text-muted-foreground mt-1">
-          <span className="font-medium">{productName}</span>
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-          <span className="text-sm">Need: {targetQty}</span>
-          <span className="mx-1">|</span>
-          <span
-            className={cn(
-              'text-sm font-medium',
-              remaining > 0 && 'text-amber-600',
-              remaining === 0 && 'text-green-600',
-              remaining < 0 && 'text-red-600'
-            )}
-          >
-            Remaining: {remaining}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <Package className="h-5 w-5 shrink-0" />
+            <span className="font-semibold truncate">{productName}</span>
+          </div>
+          <span className="text-sm font-medium shrink-0 ml-2">
+            {totalPicked}/{targetQty}
           </span>
         </div>
-        {/* Progress Bar */}
         <Progress
           value={progress}
           className={cn(
             'h-2 mt-2',
             isComplete && '[&>div]:bg-green-500',
-            isShortPick && '[&>div]:bg-amber-500',
-            isOverPick && '[&>div]:bg-red-500'
+            isShortPick && '[&>div]:bg-amber-500'
           )}
         />
+        {remaining > 0 && (
+          <p className="text-sm text-amber-600 mt-1">{remaining} remaining</p>
+        )}
+        {isComplete && (
+          <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+            <Check className="h-3.5 w-3.5" />
+            Target met
+          </p>
+        )}
       </div>
 
-      {/* Mode Selection Tabs */}
+      {/* Tab Selection - Two tabs only */}
       <div className="flex border-b shrink-0">
         <button
-          onClick={() => setMode('list')}
+          onClick={() => { setTab('pick'); setConfirmingBatch(null); }}
           className={cn(
-            'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1',
-            mode === 'list'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground'
-          )}
-        >
-          <List className="h-4 w-4" />
-          Available
-        </button>
-        <button
-          onClick={() => setMode('scan')}
-          className={cn(
-            'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1',
-            mode === 'scan'
+            'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1.5',
+            tab === 'pick'
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground'
           )}
         >
           <Camera className="h-4 w-4" />
-          Scan
+          Pick
         </button>
         <button
-          onClick={() => setMode('type')}
+          onClick={() => { setTab('search'); setConfirmingBatch(null); }}
           className={cn(
-            'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1',
-            mode === 'type'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground'
-          )}
-        >
-          <Keyboard className="h-4 w-4" />
-          Type
-        </button>
-        <button
-          onClick={() => setMode('search')}
-          className={cn(
-            'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1',
-            mode === 'search'
+            'flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1.5',
+            tab === 'search'
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground'
           )}
@@ -485,332 +472,178 @@ export function BatchPicker({
           </div>
         )}
 
-        {/* Scan Mode */}
-        {mode === 'scan' && (
-          <div className="p-4">
-            <ScannerClient onDecoded={handleScan} />
-            <Button
-              variant="outline"
-              className="w-full mt-4"
-              onClick={() => setMode('list')}
-            >
-              Cancel Scan
-            </Button>
-          </div>
-        )}
-
-        {/* Type Mode */}
-        {mode === 'type' && (
-          <div className="p-4 space-y-4">
-            <div className="space-y-2">
-              <Label>Enter Batch Number</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={manualBatchNumber}
-                  onChange={(e) => setManualBatchNumber(e.target.value.toUpperCase())}
-                  placeholder="e.g., B2024-0892"
-                  className="flex-1 h-12 text-lg font-mono"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleManualEntry();
-                    }
-                  }}
-                />
-                <Button
-                  onClick={handleManualEntry}
-                  disabled={!manualBatchNumber.trim()}
-                  className="h-12 px-6"
-                >
-                  Add
-                </Button>
+        {/* Quantity Confirmation Overlay */}
+        {confirmingBatch && (
+          <div className="px-4 py-4 bg-primary/5 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <Badge variant="outline" className="font-mono">
+                    {confirmingBatch.batchNumber}
+                  </Badge>
+                </div>
+                {confirmingBatch.location && (
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {confirmingBatch.location}
+                  </p>
+                )}
               </div>
+              <span className="text-sm text-muted-foreground">
+                {getEffectiveAvailable(confirmingBatch)} available
+              </span>
             </div>
-          </div>
-        )}
 
-        {/* Search Mode */}
-        {mode === 'search' && (
-          <div className="p-4 space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium mb-2">How many?</p>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-14 w-14 shrink-0"
+                onClick={() => {
+                  vibrateTap();
+                  const current = parseInt(confirmQty, 10) || 0;
+                  if (current > 1) setConfirmQty(String(current - 1));
+                }}
+              >
+                <Minus className="h-5 w-5" />
+              </Button>
               <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by variety, batch number..."
-                className="pl-10 h-12"
-                autoFocus
+                ref={qtyInputRef}
+                type="number"
+                inputMode="numeric"
+                value={confirmQty}
+                onChange={(e) => setConfirmQty(e.target.value)}
+                className="h-14 text-center text-2xl font-bold flex-1"
+                min={1}
+                max={getEffectiveAvailable(confirmingBatch)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') confirmBatchPick();
+                }}
               />
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-14 w-14 shrink-0"
+                onClick={() => {
+                  vibrateTap();
+                  const current = parseInt(confirmQty, 10) || 0;
+                  const max = getEffectiveAvailable(confirmingBatch);
+                  if (current < max) setConfirmQty(String(current + 1));
+                }}
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="flex gap-2 mt-3">
+              <Button
+                variant="outline"
+                className="flex-1 h-14"
+                onClick={() => {
+                  setConfirmingBatch(null);
+                  setConfirmQty('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 h-14 text-base bg-green-600 hover:bg-green-700"
+                onClick={confirmBatchPick}
+                disabled={!confirmQty || parseInt(confirmQty, 10) <= 0}
+              >
+                <Check className="h-5 w-5 mr-2" />
+                Confirm {confirmQty || 0}
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Batch List (shown in list, search, and type modes) */}
-        {(mode === 'list' || mode === 'search' || mode === 'type') && (
-          <div className="px-4 pb-4">
-            {loadingBatches ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        {/* Pick Tab: Scanner + Batch List */}
+        {tab === 'pick' && !confirmingBatch && (
+          <div>
+            {/* Scanner */}
+            <div className="p-4 border-b">
+              <ScannerClient onDecoded={handleScan} />
+            </div>
+
+            {/* Divider */}
+            <div className="px-4 py-2 text-center text-xs text-muted-foreground border-b bg-muted/30">
+              or tap a batch below
+            </div>
+
+            {/* Available Batch List */}
+            <div className="px-4 py-3">
+              {loadingBatches ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : availableBatches.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <AlertTriangle className="h-10 w-10 text-amber-500 mb-2" />
+                  <p className="font-medium">No batches available</p>
+                  <p className="text-sm text-muted-foreground">
+                    No stock found for this item
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {availableBatches.map(renderBatchCard)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Search Tab */}
+        {tab === 'search' && !confirmingBatch && (
+          <div>
+            <div className="p-4 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by batch number, variety, location..."
+                  className="pl-10 h-12"
+                  autoFocus
+                />
               </div>
-            ) : availableBatches.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <AlertTriangle className="h-10 w-10 text-amber-500 mb-2" />
-                <p className="font-medium">No batches available</p>
-                <p className="text-sm text-muted-foreground">
-                  {mode === 'search' && searchQuery
-                    ? 'No batches found matching your search'
-                    : 'There are no batches with available stock for this item'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2 mt-2">
-                {availableBatches.map((batch) => {
-                  const selected = isSelected(batch.id);
-                  const selectedQty = getSelectedQty(batch.id);
-
-                  // Calculate shelf quantities
-                  const shelfQty = batch.shelfQuantity || 20;
-                  const halfShelfQty = Math.floor(shelfQty / 2);
-                  const effectiveRemaining = Math.max(0, remaining);
-                  const effectiveFullShelf = Math.min(
-                    shelfQty,
-                    batch.quantity,
-                    effectiveRemaining > 0 ? effectiveRemaining : batch.quantity
-                  );
-                  const effectiveHalfShelf = Math.min(
-                    halfShelfQty,
-                    batch.quantity,
-                    effectiveRemaining > 0 ? effectiveRemaining : batch.quantity
-                  );
-
-                  return (
-                    <div
-                      key={batch.id}
-                      className={cn(
-                        'p-3 rounded-lg border transition-colors',
-                        selected && 'border-primary bg-primary/5'
-                      )}
-                    >
-                      {/* Batch Header */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="font-mono text-sm">
-                            {batch.batchNumber}
-                          </Badge>
-                          {batch.status && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              {batch.status}
-                            </Badge>
-                          )}
-                        </div>
-                        <span className="text-sm text-muted-foreground">
-                          {batch.quantity} available
-                        </span>
-                      </div>
-
-                      {/* Location */}
-                      {batch.location && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {batch.location}
-                        </div>
-                      )}
-
-                      {/* Controls */}
-                      {selected ? (
-                        // Already selected - show quantity controls
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-10 w-10"
-                            onClick={() => updateBatchQty(batch.id, -1)}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <Input
-                            type="number"
-                            value={selectedQty}
-                            onChange={(e) =>
-                              setBatchQty(batch.id, parseInt(e.target.value) || 0)
-                            }
-                            className="h-10 w-20 text-center text-lg font-medium"
-                            min={1}
-                            max={batch.quantity}
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-10 w-10"
-                            onClick={() => updateBatchQty(batch.id, 1)}
-                            disabled={selectedQty >= batch.quantity}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 text-destructive hover:text-destructive"
-                            onClick={() => removeBatch(batch.id)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : customQtyBatch?.id === batch.id ? (
-                        // Custom quantity input mode
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            value={customQtyValue}
-                            onChange={(e) => setCustomQtyValue(e.target.value)}
-                            placeholder="Qty"
-                            className="h-10 w-24 text-center text-lg"
-                            autoFocus
-                            min={1}
-                            max={batch.quantity}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                const qty = parseInt(customQtyValue, 10);
-                                if (qty > 0 && qty <= batch.quantity) {
-                                  vibrateTap();
-                                  addBatch(batch, qty);
-                                  setCustomQtyBatch(null);
-                                  setCustomQtyValue('');
-                                }
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="default"
-                            className="h-10 flex-1"
-                            onClick={() => {
-                              const qty = parseInt(customQtyValue, 10);
-                              if (qty > 0 && qty <= batch.quantity) {
-                                vibrateTap();
-                                addBatch(batch, qty);
-                                setCustomQtyBatch(null);
-                                setCustomQtyValue('');
-                              }
-                            }}
-                            disabled={
-                              !customQtyValue || parseInt(customQtyValue, 10) <= 0
-                            }
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Add
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10"
-                            onClick={() => {
-                              setCustomQtyBatch(null);
-                              setCustomQtyValue('');
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        // Not selected - show quick pick buttons
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            className="flex-1 h-12"
-                            onClick={() => {
-                              vibrateTap();
-                              if (effectiveHalfShelf > 0) {
-                                addBatch(batch, effectiveHalfShelf);
-                              }
-                            }}
-                            disabled={batch.quantity <= 0 || effectiveHalfShelf <= 0}
-                          >
-                            <span className="text-xs leading-tight text-center">
-                              Half Shelf
-                              <br />
-                              <span className="font-semibold">{effectiveHalfShelf}</span>
-                            </span>
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            className="flex-1 h-12"
-                            onClick={() => {
-                              vibrateTap();
-                              if (effectiveFullShelf > 0) {
-                                addBatch(batch, effectiveFullShelf);
-                              }
-                            }}
-                            disabled={batch.quantity <= 0 || effectiveFullShelf <= 0}
-                          >
-                            <span className="text-xs leading-tight text-center">
-                              Full Shelf
-                              <br />
-                              <span className="font-semibold">{effectiveFullShelf}</span>
-                            </span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="flex-1 h-12"
-                            onClick={() => {
-                              vibrateTap();
-                              setCustomQtyBatch(batch);
-                              setCustomQtyValue('');
-                            }}
-                            disabled={batch.quantity <= 0}
-                          >
-                            <span className="text-xs leading-tight text-center">
-                              Custom
-                              <br />
-                              <span className="font-semibold">...</span>
-                            </span>
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            </div>
+            <div className="px-4 py-3">
+              {loadingBatches ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : availableBatches.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Search className="h-10 w-10 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {searchQuery ? 'No batches found' : 'Type to search batches'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {availableBatches.map(renderBatchCard)}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Selected Batches Summary */}
-      {selectedBatches.size > 0 && (
+      {/* Confirmed Picks Summary */}
+      {confirmedBatches.size > 0 && !confirmingBatch && (
         <div className="border-t px-4 py-3 bg-muted/50 shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <Label className="text-sm font-medium">Selected Batches</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <Info className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64">
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium">Batch Breakdown</p>
-                  {Array.from(selectedBatches.values()).map((s) => (
-                    <div key={s.batch.id} className="flex justify-between">
-                      <span className="font-mono text-xs">{s.batch.batchNumber}</span>
-                      <span>{s.quantity} units</span>
-                    </div>
-                  ))}
-                  <div className="border-t pt-2 flex justify-between font-medium">
-                    <span>Total</span>
-                    <span>{totalPicked} units</span>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Picked batches</p>
           <div className="flex flex-wrap gap-2">
-            {Array.from(selectedBatches.values()).map(({ batch, quantity }) => (
-              <Badge key={batch.id} variant="secondary" className="py-1 px-2 text-sm">
+            {Array.from(confirmedBatches.values()).map(({ batch, quantity }) => (
+              <Badge key={batch.id} variant="secondary" className="py-1.5 px-2.5 text-sm">
                 {batch.batchNumber}: {quantity}
                 <button
-                  onClick={() => removeBatch(batch.id)}
-                  className="ml-1 hover:text-destructive"
+                  onClick={() => removeConfirmedBatch(batch.id)}
+                  className="ml-1.5 hover:text-destructive"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -820,89 +653,61 @@ export function BatchPicker({
         </div>
       )}
 
-      {/* Notes Field (optional) */}
-      {selectedBatches.size > 0 && (
-        <div className="px-4 py-2 border-t shrink-0">
-          <Label className="text-sm font-medium mb-1.5 block">Notes (optional)</Label>
-          <Input
-            placeholder="Add any notes about this pick..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
+      {/* Footer */}
+      {!confirmingBatch && (
+        <div
+          className="border-t p-4 shrink-0 bg-background"
+          style={{ paddingBottom: isDesktop ? '1rem' : 'calc(1rem + env(safe-area-inset-bottom))' }}
+        >
+          {isShortPick && (
+            <div className="flex items-center gap-1 text-xs text-amber-600 mb-2">
+              <AlertTriangle className="h-3 w-3" />
+              Short pick — {remaining} units short
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1 h-14"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={cn(
+                'flex-1 h-14 text-base gap-2',
+                isComplete && 'bg-green-600 hover:bg-green-700',
+                isShortPick && 'bg-amber-600 hover:bg-amber-700'
+              )}
+              onClick={handleSubmit}
+              disabled={isSubmitting || confirmedBatches.size === 0}
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Check className="h-5 w-5" />
+              )}
+              {isComplete
+                ? `Done ${totalPicked}`
+                : isShortPick
+                ? `Short ${totalPicked}/${targetQty}`
+                : `Pick ${totalPicked}`}
+            </Button>
+          </div>
         </div>
       )}
-
-      {/* Bottom Action */}
-      <div
-        className="border-t p-4 shrink-0 bg-background"
-        style={{ paddingBottom: isDesktop ? '1rem' : 'calc(1rem + env(safe-area-inset-bottom))' }}
-      >
-        {/* Warnings */}
-        {isShortPick && (
-          <div className="flex items-center gap-1 text-xs text-amber-600 mb-2">
-            <AlertTriangle className="h-3 w-3" />
-            Short pick - {targetQty - totalPicked} units short
-          </div>
-        )}
-        {isOverPick && (
-          <div className="flex items-center gap-1 text-xs text-red-600 mb-2">
-            <AlertTriangle className="h-3 w-3" />
-            Over-picking by {totalPicked - targetQty} units
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm text-muted-foreground">
-            Total: {totalPicked} / {targetQty}
-          </span>
-          {isComplete && !isOverPick && (
-            <span className="text-sm text-green-600 flex items-center gap-1">
-              <Check className="h-4 w-4" />
-              Complete
-            </span>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-            className="flex-1"
-          >
-            Cancel
-          </Button>
-          <Button
-            size="lg"
-            className={cn(
-              'flex-1 gap-2',
-              isComplete && !isOverPick && 'bg-green-600 hover:bg-green-700',
-              isShortPick && 'bg-amber-600 hover:bg-amber-700'
-            )}
-            onClick={handleSave}
-            disabled={isSubmitting || selectedBatches.size === 0}
-          >
-            {isSubmitting ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Check className="h-5 w-5" />
-            )}
-            {isComplete && !isOverPick
-              ? 'Confirm Pick'
-              : isShortPick
-              ? `Confirm Short (${totalPicked})`
-              : `Pick ${totalPicked}`}
-          </Button>
-        </div>
-      </div>
     </>
   );
 
-  // Render as Sheet on mobile, Dialog on desktop
+  // Responsive: Sheet on mobile, Dialog on desktop
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <VisuallyHidden>
+            <DialogTitle>Pick batches for {productName}</DialogTitle>
+          </VisuallyHidden>
           {renderContent()}
         </DialogContent>
       </Dialog>

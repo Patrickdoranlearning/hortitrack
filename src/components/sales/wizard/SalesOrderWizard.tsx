@@ -214,17 +214,16 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
 
   const handleVarietyQtyChange = useCallback(
     (fieldId: string, key: string, qty: number) => {
-      let newTotal = 0;
-      setVarietyBreakdowns((prev) => {
-        const lineBreakdown = [...(prev[fieldId] || [])];
-        // Match by varietyId first (regular products), then by productId (product groups)
-        const idx = lineBreakdown.findIndex((v) => v.varietyId === key || v.productId === key);
-        if (idx >= 0) {
-          lineBreakdown[idx] = { ...lineBreakdown[idx], qty };
-        }
-        newTotal = lineBreakdown.reduce((sum, v) => sum + v.qty, 0);
-        return { ...prev, [fieldId]: lineBreakdown };
-      });
+      // Compute new total synchronously from current ref (don't rely on setState updater timing)
+      const currentBreakdown = varietyBreakdownsRef.current[fieldId] || [];
+      const updatedBreakdown = currentBreakdown.map((v) =>
+        (v.varietyId === key || v.productId === key) ? { ...v, qty } : v
+      );
+      const newTotal = updatedBreakdown.reduce((sum, v) => sum + v.qty, 0);
+
+      // Update breakdown state
+      setVarietyBreakdowns((prev) => ({ ...prev, [fieldId]: updatedBreakdown }));
+
       // Auto-sync: parent line qty = sum of variety quantities
       const lineIndex = fieldsRef.current.findIndex((f) => f.id === fieldId);
       if (lineIndex >= 0 && newTotal > 0) {

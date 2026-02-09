@@ -47,19 +47,22 @@ export default async function DispatchManagerPage() {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString();
 
-  // Fetch orders needing dispatch (confirmed, not yet picked/loaded)
-  const { data: pendingOrders, count: pendingCount } = await supabase
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .in("status", ["confirmed"]);
-
-  // Fetch orders being picked today
-  const { data: pickingOrders, count: pickingCount } = await supabase
-    .from("pick_lists")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .in("status", ["pending", "in_progress"]);
+  // Fetch pick lists awaiting start (pending) and actively being picked (in_progress)
+  const [
+    { count: pendingPickCount },
+    { count: pickingCount },
+  ] = await Promise.all([
+    supabase
+      .from("pick_lists")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "pending"),
+    supabase
+      .from("pick_lists")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "in_progress"),
+  ]);
 
   // Fetch orders awaiting QC
   const { data: qcOrders, count: qcCount } = await supabase
@@ -124,12 +127,12 @@ export default async function DispatchManagerPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Package className="h-4 w-4" />
-              Pending Orders
+              Pending Picks
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingCount || 0}</div>
-            <p className="text-xs text-muted-foreground">Need assignment</p>
+            <div className="text-2xl font-bold">{pendingPickCount || 0}</div>
+            <p className="text-xs text-muted-foreground">Awaiting picker</p>
           </CardContent>
         </Card>
 

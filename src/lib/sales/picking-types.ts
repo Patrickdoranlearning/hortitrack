@@ -65,6 +65,7 @@ export interface PickItem {
   // Joined fields
   productName?: string;
   plantVariety?: string;
+  requiredVarietyName?: string;
   size?: string;
   originalBatchNumber?: string;
   pickedBatchNumber?: string;

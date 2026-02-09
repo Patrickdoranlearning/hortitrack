@@ -75,6 +75,22 @@ export function PricingReviewStep({
     return initial;
   });
 
+  // Auto-populate RRP values when pre-pricing defaults to on but rrp is not yet set
+  useEffect(() => {
+    lines.forEach((_, index) => {
+      if (rrpEnabled[index] && watchedLines?.[index]?.rrp == null) {
+        const price = typeof watchedLines?.[index]?.unitPrice === 'number'
+          ? watchedLines[index].unitPrice
+          : Number(watchedLines?.[index]?.unitPrice) || 0;
+        if (price > 0) {
+          form.setValue(`lines.${index}.rrp`, price);
+        }
+      }
+    });
+  // Run once on mount to auto-fill RRP for lines defaulted to on
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Track selected delivery fee
   const [selectedDeliveryFeeId, setSelectedDeliveryFeeId] = useState<string>(() => {
     const defaultDelivery = deliveryFees.find(f => f.isDefault);

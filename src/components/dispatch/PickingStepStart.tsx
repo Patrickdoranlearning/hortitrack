@@ -135,6 +135,11 @@ export default function PickingStepStart() {
                   <p className="font-medium truncate">
                     {item.productName || item.plantVariety || 'Unknown'}
                   </p>
+                  {item.requiredVarietyName && item.requiredVarietyName !== item.plantVariety && (
+                    <p className="text-sm text-primary/80 truncate">
+                      {item.requiredVarietyName}
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {item.size}
                     {item.batchLocation && (

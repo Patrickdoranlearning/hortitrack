@@ -105,14 +105,14 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
   const skuIds = (orderItems || [])
     .map((item: { sku_id: string }) => item.sku_id)
     .filter(Boolean);
-  
+
   let skuMap: Record<string, { code: string | null; variety: string | null; size: string | null }> = {};
   if (skuIds.length > 0) {
     const { data: skus } = await supabase
       .from('skus')
       .select('id, code, plant_varieties(name), plant_sizes(name)')
       .in('id', skuIds);
-    
+
     if (skus) {
       skuMap = skus.reduce((acc: Record<string, { code: string | null; variety: string | null; size: string | null }>, sku: any) => {
         acc[sku.id] = {
@@ -120,6 +120,46 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
           variety: sku.plant_varieties?.name || null,
           size: sku.plant_sizes?.name || null,
         };
+        return acc;
+      }, {});
+    }
+  }
+
+  // Fetch specific variety names for items with required_variety_id
+  const varietyIds = (orderItems || [])
+    .map((item: { required_variety_id?: string | null }) => item.required_variety_id)
+    .filter(Boolean) as string[];
+
+  let varietyNameMap: Record<string, string> = {};
+  if (varietyIds.length > 0) {
+    const { data: varieties } = await supabase
+      .from('plant_varieties')
+      .select('id, name')
+      .in('id', varietyIds);
+
+    if (varieties) {
+      varietyNameMap = varieties.reduce((acc: Record<string, string>, v: { id: string; name: string }) => {
+        acc[v.id] = v.name;
+        return acc;
+      }, {});
+    }
+  }
+
+  // Fetch product names for items with product_id
+  const productIds = (orderItems || [])
+    .map((item: { product_id?: string | null }) => item.product_id)
+    .filter(Boolean) as string[];
+
+  let productNameMap: Record<string, string> = {};
+  if (productIds.length > 0) {
+    const { data: productRecords } = await supabase
+      .from('products')
+      .select('id, name')
+      .in('id', productIds);
+
+    if (productRecords) {
+      productNameMap = productRecords.reduce((acc: Record<string, string>, p: { id: string; name: string }) => {
+        acc[p.id] = p.name;
         return acc;
       }, {});
     }
@@ -157,6 +197,8 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
     } : null,
     order_items: (orderItems || []).map((item: any) => {
       const skuInfo = skuMap[item.sku_id];
+      const requiredVarietyName = item.required_variety_id ? varietyNameMap[item.required_variety_id] || null : null;
+      const productName = item.product_id ? productNameMap[item.product_id] || null : null;
       return {
         id: item.id,
         order_id: item.order_id,
@@ -170,7 +212,8 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
         line_total_ex_vat: item.line_total_ex_vat,
         line_vat_amount: item.line_vat_amount,
         rrp: item.rrp || null,
-        product: null,
+        required_variety_name: requiredVarietyName,
+        product: productName ? { name: productName } : null,
         sku: skuInfo ? {
           code: skuInfo.code,
           plant_varieties: skuInfo.variety ? { name: skuInfo.variety } : null,

@@ -42,6 +42,7 @@ export interface OrderItem {
   line_total_ex_vat: number;
   line_vat_amount: number;
   rrp?: number | null;
+  required_variety_name?: string | null;
   product?: {
     name: string | null;
   } | null;
@@ -271,6 +272,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               items={order.order_items}
               status={order.status}
               onItemsChange={handleOrderMutation}
+              currency={(order.currency === 'GBP' ? 'GBP' : 'EUR') as CurrencyCode}
+              fees={order.order_fees}
+              requiresPrePricing={requiresPrePricing}
             />
           </TabsContent>
 

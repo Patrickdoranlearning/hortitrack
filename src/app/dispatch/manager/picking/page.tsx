@@ -2,10 +2,9 @@ import { redirect } from "next/navigation";
 import { getUserAndOrg } from "@/server/auth/org";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Package, ClipboardList, Plus, Calendar, User } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { PickingQueueTable, PickingQueueItem } from "@/components/dispatch/manager/PickingQueueTable";
 
 /**
  * Picking Management Page - Shows real picking data with stats and queue
@@ -18,8 +17,9 @@ export default async function DispatchPickingPage() {
     const result = await getUserAndOrg();
     orgId = result.orgId;
     supabase = result.supabase;
-  } catch (error: any) {
-    if (error.message === "Unauthorized" || error.message === "Unauthenticated") {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "Unauthorized" || message === "Unauthenticated") {
       redirect("/login?next=/dispatch/manager/picking");
     }
     return (
@@ -36,55 +36,80 @@ export default async function DispatchPickingPage() {
   today.setHours(0, 0, 0, 0);
   const todayStr = today.toISOString();
 
-  // Fetch pick list stats
-  const { count: pendingCount } = await supabase
-    .from("pick_lists")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .eq("status", "pending");
-
-  const { count: inProgressCount } = await supabase
-    .from("pick_lists")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .eq("status", "in_progress");
-
-  const { count: completedTodayCount } = await supabase
-    .from("pick_lists")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .eq("status", "completed")
-    .gte("completed_at", todayStr);
-
-  // Fetch pending and in-progress pick lists with order info
-  const { data: pickLists, error } = await supabase
-    .from("pick_lists")
-    .select(`
-      id,
-      status,
-      sequence,
-      assigned_user_id,
-      created_at,
-      started_at,
-      order:orders(
+  // Fetch stats and pick lists in parallel
+  const [
+    { count: pendingCount },
+    { count: inProgressCount },
+    { count: completedTodayCount },
+    { data: pickLists, error: pickListsError },
+  ] = await Promise.all([
+    supabase
+      .from("pick_lists")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "pending"),
+    supabase
+      .from("pick_lists")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "in_progress"),
+    supabase
+      .from("pick_lists")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "completed")
+      .gte("completed_at", todayStr),
+    supabase
+      .from("pick_lists")
+      .select(`
         id,
-        order_number,
-        requested_delivery_date,
-        customer:customers(name)
-      )
-    `)
-    .eq("org_id", orgId)
-    .in("status", ["pending", "in_progress"])
-    .order("sequence", { ascending: true })
-    .limit(20);
+        status,
+        sequence,
+        assigned_user_id,
+        created_at,
+        started_at,
+        order:orders(
+          id,
+          order_number,
+          requested_delivery_date,
+          customer:customers(name)
+        )
+      `)
+      .eq("org_id", orgId)
+      .in("status", ["pending", "in_progress"])
+      .order("sequence", { ascending: true })
+      .limit(50),
+  ]);
 
-  if (error) {
-    console.error("Error fetching pick lists:", error.message || JSON.stringify(error));
+  if (pickListsError) {
+    console.error("Error fetching pick lists:", pickListsError.message || JSON.stringify(pickListsError));
   }
 
-  // Fetch picker names for assigned pick lists
+  // Batch fetch item counts + progress per pick list
+  const pickListIds = (pickLists || []).map((pl: Record<string, unknown>) => pl.id as string);
+  let itemStatsMap: Record<string, { totalItems: number; totalQty: number; pickedQty: number }> = {};
+
+  if (pickListIds.length > 0) {
+    const { data: pickItems } = await supabase
+      .from("pick_items")
+      .select("pick_list_id, target_qty, picked_qty")
+      .in("pick_list_id", pickListIds);
+
+    if (pickItems) {
+      for (const item of pickItems as Array<{ pick_list_id: string; target_qty: number; picked_qty: number }>) {
+        if (!itemStatsMap[item.pick_list_id]) {
+          itemStatsMap[item.pick_list_id] = { totalItems: 0, totalQty: 0, pickedQty: 0 };
+        }
+        itemStatsMap[item.pick_list_id].totalItems += 1;
+        itemStatsMap[item.pick_list_id].totalQty += item.target_qty || 0;
+        itemStatsMap[item.pick_list_id].pickedQty += item.picked_qty || 0;
+      }
+    }
+  }
+
+  // Batch fetch picker names
   const assignedUserIds = (pickLists || [])
-    .map((pl: any) => pl.assigned_user_id)
+    .map((pl: Record<string, unknown>) => pl.assigned_user_id as string | null)
     .filter(Boolean) as string[];
 
   let pickerMap: Record<string, string> = {};
@@ -95,12 +120,37 @@ export default async function DispatchPickingPage() {
       .in("id", [...new Set(assignedUserIds)]);
 
     if (profiles) {
-      pickerMap = profiles.reduce((acc: Record<string, string>, p: any) => {
-        acc[p.id] = p.display_name || p.email || "Unknown";
-        return acc;
-      }, {});
+      pickerMap = (profiles as Array<{ id: string; display_name: string | null; email: string | null }>).reduce(
+        (acc: Record<string, string>, p) => {
+          acc[p.id] = p.display_name || p.email || "Unknown";
+          return acc;
+        },
+        {}
+      );
     }
   }
+
+  // Transform data for the client component
+  const queueItems: PickingQueueItem[] = (pickLists || []).map((pl: Record<string, unknown>) => {
+    const order = pl.order as { id: string; order_number: string; requested_delivery_date: string | null; customer: { name: string } | null } | null;
+    const stats = itemStatsMap[pl.id as string] || { totalItems: 0, totalQty: 0, pickedQty: 0 };
+
+    return {
+      id: pl.id as string,
+      sequence: pl.sequence as number,
+      status: pl.status as 'pending' | 'in_progress',
+      assignedTo: pl.assigned_user_id ? pickerMap[pl.assigned_user_id as string] || null : null,
+      startedAt: pl.started_at as string | null,
+      createdAt: pl.created_at as string,
+      orderNumber: order?.order_number || "Unknown Order",
+      orderId: order?.id || "",
+      customerName: order?.customer?.name || "Unknown Customer",
+      deliveryDate: order?.requested_delivery_date || null,
+      totalItems: stats.totalItems,
+      totalQty: stats.totalQty,
+      pickedQty: stats.pickedQty,
+    };
+  });
 
   return (
     <div className="p-6">
@@ -120,7 +170,6 @@ export default async function DispatchPickingPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Stats Cards */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -158,80 +207,7 @@ export default async function DispatchPickingPage() {
         </Card>
       </div>
 
-      {/* Picking Queue */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
-            Picking Queue
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(!pickLists || pickLists.length === 0) ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No orders waiting to be picked</p>
-              <p className="text-sm mt-2">
-                Orders will appear here when confirmed and ready for picking
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {pickLists.map((pl: any) => {
-                const order = pl.order;
-                const pickerName = pl.assigned_user_id ? pickerMap[pl.assigned_user_id] : null;
-
-                return (
-                  <div key={pl.id} className="py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="text-sm font-mono text-muted-foreground w-8">
-                        #{pl.sequence}
-                      </div>
-                      <div>
-                        <div className="font-medium">
-                          <Link
-                            href={`/sales/orders/${order?.id}`}
-                            className="hover:underline text-primary"
-                          >
-                            {order?.order_number || "Unknown Order"}
-                          </Link>
-                        </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-3">
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {order?.customer?.name || "Unknown Customer"}
-                          </span>
-                          {order?.requested_delivery_date && (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {format(new Date(order.requested_delivery_date), "EEE, MMM d")}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {pickerName ? (
-                        <span className="text-sm text-muted-foreground">{pickerName}</span>
-                      ) : (
-                        <span className="text-sm text-amber-600">Unassigned</span>
-                      )}
-                      <Badge variant={pl.status === "in_progress" ? "default" : "secondary"}>
-                        {pl.status === "in_progress" ? "Picking" : "Pending"}
-                      </Badge>
-                      <Link href={`/dispatch/picking/${pl.id}/workflow`}>
-                        <Button size="sm" variant="outline">
-                          {pl.status === "in_progress" ? "Continue" : "Start"}
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <PickingQueueTable items={queueItems} />
     </div>
   );
 }

@@ -16,6 +16,8 @@ interface InvoiceItem {
   line_total_ex_vat: number;
   line_vat_amount: number;
   sku_id: string | null;
+  product_id: string | null;
+  required_variety_id: string | null;
 }
 
 interface InvoiceWithDetails {
@@ -89,7 +91,9 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
           vat_rate,
           line_total_ex_vat,
           line_vat_amount,
-          sku_id
+          sku_id,
+          product_id,
+          required_variety_id
         )
       )
     `)
@@ -166,6 +170,38 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
         };
         return acc;
       }, {} as Record<string, { varietyName: string | null; sizeName: string | null; familyName: string | null; code: string | null }>);
+    }
+  }
+
+  // Fetch required variety names for items with specific variety requests
+  const reqVarietyIds = items.map(item => (item as any).required_variety_id).filter(Boolean) as string[];
+  let reqVarietyNameMap: Record<string, string> = {};
+  if (reqVarietyIds.length > 0) {
+    const { data: varieties } = await supabase
+      .from('plant_varieties')
+      .select('id, name')
+      .in('id', reqVarietyIds);
+    if (varieties) {
+      reqVarietyNameMap = varieties.reduce((acc: Record<string, string>, v: { id: string; name: string }) => {
+        acc[v.id] = v.name;
+        return acc;
+      }, {});
+    }
+  }
+
+  // Fetch product names for items with product_id
+  const productIds = items.map(item => (item as any).product_id).filter(Boolean) as string[];
+  let productNameMap: Record<string, string> = {};
+  if (productIds.length > 0) {
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, name')
+      .in('id', productIds);
+    if (products) {
+      productNameMap = products.reduce((acc: Record<string, string>, p: { id: string; name: string }) => {
+        acc[p.id] = p.name;
+        return acc;
+      }, {});
     }
   }
 
@@ -281,14 +317,13 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
     items: items.map(item => {
       const skuDetails = item.sku_id ? skuDetailsMap[item.sku_id] : null;
       const batchNumber = batchMap[item.id] || null;
-      
-      // Build enhanced description: "Variety Name Size" or fall back to original description
-      let description = item.description || 'Product';
-      if (skuDetails?.varietyName && skuDetails?.sizeName) {
-        description = `${skuDetails.varietyName} ${skuDetails.sizeName}`;
-      } else if (skuDetails?.varietyName) {
-        description = skuDetails.varietyName;
-      }
+      const reqVarId = (item as any).required_variety_id as string | null;
+      const prodId = (item as any).product_id as string | null;
+      const requiredVarietyName = reqVarId ? reqVarietyNameMap[reqVarId] || null : null;
+      const productName = prodId ? productNameMap[prodId] || null : null;
+
+      // Build description: product name or description as primary
+      const description = productName || item.description || 'Product';
 
       return {
         id: item.id,
@@ -303,9 +338,11 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
         familyName: skuDetails?.familyName || null,
         batchNumber: batchNumber,
         skuCode: skuDetails?.code || null,
+        requiredVarietyName,
+        productName,
       };
     }),
-    fees: (orderFees || []).filter(f => f.total_amount > 0).map(fee => ({
+    fees: (orderFees || []).map(fee => ({
       id: fee.id,
       name: fee.name,
       feeType: fee.fee_type,

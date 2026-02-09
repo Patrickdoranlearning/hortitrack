@@ -183,7 +183,7 @@ export async function createOrder(data: CreateOrderInput) {
         
         const description = isGroupOrder
             ? (line.description || `[MIX] ${product.name || 'Product Group'}`)
-            : (product.name ?? line.plantVariety ?? 'Product');
+            : (line.description || (product.name ?? line.plantVariety ?? 'Product'));
 
         resolvedLines.push({
             sku_id: skuId,
