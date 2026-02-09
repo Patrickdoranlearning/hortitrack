@@ -341,6 +341,18 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
   // Resolve currency for display (from customer or form default)
   const orderCurrency = (selectedCustomer?.currency === 'GBP' ? 'GBP' : 'EUR') as import('@/lib/format-currency').CurrencyCode;
 
+  // Memoize to prevent infinite re-render loop (inline objects create new refs every render)
+  const customerPrePricing = useMemo(
+    () =>
+      selectedCustomer
+        ? {
+            prePricingFoc: selectedCustomer.prePricingFoc ?? false,
+            prePricingCostPerLabel: selectedCustomer.prePricingCostPerLabel ?? null,
+          }
+        : undefined,
+    [selectedCustomer]
+  );
+
   // Auto-populate delivery address and currency when customer changes
   useEffect(() => {
     if (defaultShippingAddress) {
@@ -390,24 +402,43 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
     });
   }, [copyOrderId]);
 
-  // Auto-save draft when form changes
-  const formValues = form.watch();
+  // Auto-save draft when form changes (subscription avoids re-rendering entire wizard)
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const varietyBreakdownsRef = useRef(varietyBreakdowns);
+  varietyBreakdownsRef.current = varietyBreakdowns;
+
   useEffect(() => {
-    // Don't save empty drafts or while loading copyOrderId
-    if (!formValues.customerId && step === 0) return;
-    if (prefillPending) return;
-    // Don't auto-save if we're submitting (prevents re-saving after clearDraft)
+    const subscription = form.watch((formValues) => {
+      if (!formValues.customerId && stepRef.current === 0) return;
+      if (submittingRef.current) return;
+
+      const draftData: DraftData = {
+        formValues: formValues as Partial<CreateOrderInput>,
+        varietyBreakdowns: varietyBreakdownsRef.current,
+        step: stepRef.current,
+        savedAt: Date.now(),
+      };
+      saveDraft(draftData);
+      setHasDraft(true);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  // Also save draft when step or breakdowns change (not form-driven)
+  useEffect(() => {
+    const values = form.getValues();
+    if (!values.customerId && step === 0) return;
     if (submittingRef.current) return;
 
-    const draftData: DraftData = {
-      formValues,
+    saveDraft({
+      formValues: values,
       varietyBreakdowns,
       step,
       savedAt: Date.now(),
-    };
-    saveDraft(draftData);
+    });
     setHasDraft(true);
-  }, [formValues, step, prefillPending, varietyBreakdowns]);
+  }, [step, varietyBreakdowns, form]);
 
   // Clear draft handler
   const handleClearDraft = useCallback(() => {
@@ -666,14 +697,7 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
               currency={orderCurrency}
               fees={fees}
               defaultShowRrp={selectedCustomer?.requiresPrePricing ?? false}
-              customerPrePricing={
-                selectedCustomer
-                  ? {
-                      prePricingFoc: selectedCustomer.prePricingFoc ?? false,
-                      prePricingCostPerLabel: selectedCustomer.prePricingCostPerLabel ?? null,
-                    }
-                  : undefined
-              }
+              customerPrePricing={customerPrePricing}
               onFeesChange={setOrderFees}
             />
           )}
