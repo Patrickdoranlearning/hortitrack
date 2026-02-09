@@ -196,6 +196,22 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
   const [varietyBreakdowns, setVarietyBreakdowns] = useState<VarietyBreakdownMap>({});
   const [orderFees, setOrderFees] = useState<OrderFeeInput[]>([]);
 
+  const form = useForm<CreateOrderInput>({
+    resolver: zodResolver(CreateOrderSchema),
+    defaultValues: {
+      customerId: '',
+      storeId: 'main',
+      deliveryAddress: '',
+      orderReference: '',
+      deliveryDate: new Date().toISOString().split('T')[0],
+      shipMethod: '',
+      notesCustomer: '',
+      notesInternal: '',
+      autoPrint: true,
+      lines: [DEFAULT_LINE],
+    },
+  });
+
   const handleVarietyQtyChange = useCallback(
     (fieldId: string, key: string, qty: number) => {
       let newTotal = 0;
@@ -248,22 +264,6 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
     },
     []
   );
-
-  const form = useForm<CreateOrderInput>({
-    resolver: zodResolver(CreateOrderSchema),
-    defaultValues: {
-      customerId: '',
-      storeId: 'main',
-      deliveryAddress: '',
-      orderReference: '',
-      deliveryDate: new Date().toISOString().split('T')[0],
-      shipMethod: '',
-      notesCustomer: '',
-      notesInternal: '',
-      autoPrint: true,
-      lines: [DEFAULT_LINE],
-    },
-  });
 
   // Load draft after mount to avoid hydration mismatch
   useEffect(() => {
