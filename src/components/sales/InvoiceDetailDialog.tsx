@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { Mail, Printer, FileText, Loader2 } from 'lucide-react';
 import { useCompanyName } from '@/lib/org/context';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { InvoiceWithCustomer } from '@/app/sales/invoices/InvoicesClient';
 
 interface InvoiceDetailDialogProps {
@@ -23,6 +24,7 @@ export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: Inv
 
   if (!invoice) return null;
 
+  const currency = (invoice.currency as CurrencyCode) || 'EUR';
   const customerEmail = invoice.customer?.email;
   const customerName = invoice.customer?.name || 'Customer';
 
@@ -124,25 +126,25 @@ export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: Inv
           <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal (ex VAT)</span>
-              <span>€{invoice.subtotal_ex_vat.toFixed(2)}</span>
+              <span>{formatCurrency(invoice.subtotal_ex_vat, currency)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">VAT</span>
-              <span>€{invoice.vat_amount.toFixed(2)}</span>
+              <span>{formatCurrency(invoice.vat_amount, currency)}</span>
             </div>
             <div className="flex justify-between font-semibold text-lg border-t pt-2">
               <span>Total</span>
-              <span>€{invoice.total_inc_vat.toFixed(2)}</span>
+              <span>{formatCurrency(invoice.total_inc_vat, currency)}</span>
             </div>
             {invoice.amount_credited > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Amount Credited</span>
-                <span>-€{invoice.amount_credited.toFixed(2)}</span>
+                <span>-{formatCurrency(invoice.amount_credited, currency)}</span>
               </div>
             )}
             <div className="flex justify-between font-semibold">
               <span>Balance Due</span>
-              <span>€{invoice.balance_due.toFixed(2)}</span>
+              <span>{formatCurrency(invoice.balance_due, currency)}</span>
             </div>
           </div>
 

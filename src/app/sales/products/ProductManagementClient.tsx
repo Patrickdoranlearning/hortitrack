@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { formatCurrency } from "@/lib/format-currency";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -1951,9 +1952,9 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
                     </p>
                     {(alias.unitPriceExVat !== null || alias.rrp !== null) && (
                       <p className="text-sm text-muted-foreground">
-                        {alias.unitPriceExVat !== null && `Price: €${alias.unitPriceExVat.toFixed(2)}`}
+                        {alias.unitPriceExVat !== null && `Price: ${formatCurrency(alias.unitPriceExVat)}`}
                         {alias.unitPriceExVat !== null && alias.rrp !== null && " • "}
-                        {alias.rrp !== null && `RRP: €${alias.rrp.toFixed(2)}`}
+                        {alias.rrp !== null && `RRP: ${formatCurrency(alias.rrp)}`}
                       </p>
                     )}
                     {alias.priceListName && (

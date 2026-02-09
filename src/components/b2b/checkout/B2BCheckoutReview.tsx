@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CartItem } from '@/lib/b2b/types';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type Props = {
   cart: CartItem[];
@@ -12,9 +13,10 @@ type Props = {
     deliveryDate?: string;
     notes?: string;
   };
+  currency?: CurrencyCode;
 };
 
-export function B2BCheckoutReview({ cart, deliverySummary }: Props) {
+export function B2BCheckoutReview({ cart, deliverySummary, currency = 'EUR' }: Props) {
   const subtotalExVat = cart.reduce((sum, item) => sum + item.quantity * item.unitPriceExVat, 0);
   const vatAmount = cart.reduce((sum, item) => {
     const lineTotal = item.quantity * item.unitPriceExVat;
@@ -66,15 +68,15 @@ export function B2BCheckoutReview({ cart, deliverySummary }: Props) {
                       Qty {item.quantity}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      €{item.unitPriceExVat.toFixed(2)} each
+                      {formatCurrency(item.unitPriceExVat, currency)} each
                     </span>
                   </div>
                   {item.rrp && (
-                    <div className="text-xs text-muted-foreground mt-1">RRP: €{item.rrp.toFixed(2)}</div>
+                    <div className="text-xs text-muted-foreground mt-1">RRP: {formatCurrency(item.rrp, currency)}</div>
                   )}
                   {item.multibuyQty2 && item.multibuyPrice2 && (
                     <div className="text-xs text-muted-foreground">
-                      Multi-buy: {item.multibuyQty2} for €{item.multibuyPrice2.toFixed(2)}
+                      Multi-buy: {item.multibuyQty2} for {formatCurrency(item.multibuyPrice2, currency)}
                     </div>
                   )}
                 </div>
@@ -91,15 +93,15 @@ export function B2BCheckoutReview({ cart, deliverySummary }: Props) {
         <CardContent className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal (ex VAT)</span>
-            <span>€{subtotalExVat.toFixed(2)}</span>
+            <span>{formatCurrency(subtotalExVat, currency)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">VAT</span>
-            <span>€{vatAmount.toFixed(2)}</span>
+            <span>{formatCurrency(vatAmount, currency)}</span>
           </div>
           <div className="flex justify-between font-semibold text-base">
             <span>Total (inc VAT)</span>
-            <span>€{totalIncVat.toFixed(2)}</span>
+            <span>{formatCurrency(totalIncVat, currency)}</span>
           </div>
         </CardContent>
       </Card>

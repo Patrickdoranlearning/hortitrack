@@ -13,12 +13,14 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { currencySymbol, type CurrencyCode } from '@/lib/format-currency';
 
 interface CreateOrderFormProps {
     customers: { id: string; name: string }[];
+    currency?: CurrencyCode;
 }
 
-export default function CreateOrderForm({ customers }: CreateOrderFormProps) {
+export default function CreateOrderForm({ customers, currency = 'EUR' }: CreateOrderFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const form = useForm<CreateOrderInput>({
@@ -167,7 +169,7 @@ export default function CreateOrderForm({ customers }: CreateOrderFormProps) {
                                         name={`lines.${index}.unitPrice`}
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="text-xs">Price (€)</FormLabel>
+                                                <FormLabel className="text-xs">Price ({currencySymbol(currency)})</FormLabel>
                                                 <FormControl>
                                                     <Input
                                                         type="number"

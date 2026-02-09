@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Printer, FileText, Truck } from 'lucide-react';
 import Image from 'next/image';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 interface DocumentItem {
   id: string;
@@ -25,6 +26,7 @@ interface DispatchDocumentsData {
     status: string;
     requestedDeliveryDate: string;
     notes: string | null;
+    currency?: string;
   };
   invoice: {
     invoiceNumber: string;
@@ -243,7 +245,8 @@ function Invoice({
   data: DispatchDocumentsData; 
   copyNumber: 1 | 2;
 }) {
-  const { company, customer, invoice, items, vatSummary, bank, invoiceSettings } = data;
+  const { company, customer, invoice, items, vatSummary, bank, invoiceSettings, order } = data;
+  const currency = (order.currency as CurrencyCode) || 'EUR';
   const addressLines = company.address ? company.address.split('\n').filter(Boolean) : [];
   const hasBankInfo = bank.bankName || bank.bankIban || bank.bankBic;
   const copyLabel = copyNumber === 1 ? 'Customer Copy' : 'Accounts Copy';
@@ -344,9 +347,9 @@ function Invoice({
                 <div className="font-medium">{item.description}</div>
               </td>
               <td className="py-1.5 px-2 border-b border-gray-200 text-right">{item.pickedQty}</td>
-              <td className="py-1.5 px-2 border-b border-gray-200 text-right">€{item.unitPrice.toFixed(2)}</td>
+              <td className="py-1.5 px-2 border-b border-gray-200 text-right">{formatCurrency(item.unitPrice, currency)}</td>
               <td className="py-1.5 px-2 border-b border-gray-200 text-right">{item.vatRate}%</td>
-              <td className="py-1.5 px-2 border-b border-gray-200 text-right">€{item.total.toFixed(2)}</td>
+              <td className="py-1.5 px-2 border-b border-gray-200 text-right">{formatCurrency(item.total, currency)}</td>
             </tr>
           ))}
         </tbody>
@@ -369,8 +372,8 @@ function Invoice({
               {vatSummary.map((vat) => (
                 <tr key={vat.rate}>
                   <td className="py-0.5 px-2">{vat.rate}%</td>
-                  <td className="py-0.5 px-2 text-right">€{vat.total.toFixed(2)}</td>
-                  <td className="py-0.5 px-2 text-right">€{vat.vat.toFixed(2)}</td>
+                  <td className="py-0.5 px-2 text-right">{formatCurrency(vat.total, currency)}</td>
+                  <td className="py-0.5 px-2 text-right">{formatCurrency(vat.vat, currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -381,20 +384,20 @@ function Invoice({
         <div className="w-56">
           <div className="flex justify-between py-1 border-b border-gray-200 text-sm">
             <span>Subtotal (ex VAT)</span>
-            <span>€{invoice.subtotalExVat.toFixed(2)}</span>
+            <span>{formatCurrency(invoice.subtotalExVat, currency)}</span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-200 text-sm">
             <span>VAT</span>
-            <span>€{invoice.vatAmount.toFixed(2)}</span>
+            <span>{formatCurrency(invoice.vatAmount, currency)}</span>
           </div>
           <div className="flex justify-between py-2 border-t-2 border-green-600 mt-1 font-bold">
             <span>Total</span>
-            <span>€{invoice.totalIncVat.toFixed(2)}</span>
+            <span>{formatCurrency(invoice.totalIncVat, currency)}</span>
           </div>
           {invoice.balanceDue > 0 && (
             <div className="flex justify-between py-2 bg-amber-100 -mx-2 px-2 rounded mt-1 text-sm">
               <span>Balance Due</span>
-              <span className="font-bold">€{invoice.balanceDue.toFixed(2)}</span>
+              <span className="font-bold">{formatCurrency(invoice.balanceDue, currency)}</span>
             </div>
           )}
         </div>

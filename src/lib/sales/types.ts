@@ -30,6 +30,8 @@ export const CreateOrderLineSchema = z
     // Multibuy pricing (e.g., "3 for €10")
     multibuyQty2: z.coerce.number().int().positive().optional(),
     multibuyPrice2: z.coerce.number().nonnegative().optional(),
+    // Variety constraint (for variety-specific order lines)
+    requiredVarietyId: z.string().uuid().optional(),
   })
   .refine(
     (val) => Boolean(val.productId) || Boolean(val.productGroupId) || (Boolean(val.plantVariety) && Boolean(val.size)),
@@ -39,18 +41,33 @@ export const CreateOrderLineSchema = z
     }
   );
 
+// Fee line for order creation (pre-pricing, delivery, etc.)
+export const OrderFeeSchema = z.object({
+  orgFeeId: z.string().uuid().optional(),
+  feeType: z.string(),
+  name: z.string(),
+  quantity: z.number().int().nonnegative().default(1),
+  unitAmount: z.number().nonnegative(),
+  unit: z.string().default('flat'),
+  vatRate: z.number().min(0).max(100).default(0),
+  isFoc: z.boolean().optional().default(false),
+});
+export type OrderFeeInput = z.infer<typeof OrderFeeSchema>;
+
 export const CreateOrderSchema = z.object({
   customerId: z.string().min(1),
   storeId: z.string().min(1).optional(),
   shipToAddressId: z.string().uuid().optional(), // The customer_addresses.id for shipping
   deliveryAddress: z.string().optional(),
   orderReference: z.string().optional(),
+  currency: z.enum(['EUR', 'GBP']).default('EUR'),
   deliveryDate: z.string().optional(), // ISO
   shipMethod: z.enum(["van", "haulier", "collection"]).optional().or(z.literal('')),
   notesCustomer: z.string().optional(),
   notesInternal: z.string().optional(),
   autoPrint: z.boolean().optional().default(true),
   lines: z.array(CreateOrderLineSchema).min(1),
+  fees: z.array(OrderFeeSchema).optional().default([]),
 });
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 
@@ -70,10 +87,11 @@ export type AllocatedLine = {
   allocations: Allocation[]; // actual split across batches
 };
 
-// Variety breakdown for product group orders
-// Allows specifying per-variety quantities within a product group
+// Variety breakdown for product group orders AND regular product variety selection
+// Allows specifying per-variety quantities within a product group or product
 export type VarietyBreakdown = {
-  productId: string;       // child product ID
+  productId: string;       // child product ID (groups) or parent product ID (regular products)
+  varietyId?: string;      // plant_variety UUID (for regular products only)
   productName: string;     // display name (e.g., "Eline")
   qty: number;             // specified quantity (0 = not specified)
   availableStock: number;  // for display/validation

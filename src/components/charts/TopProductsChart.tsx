@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatCurrency, currencySymbol } from '@/lib/format-currency';
 
 interface TopProduct {
   productId: string;
@@ -99,7 +100,7 @@ const TopProductsChart = ({ data }: TopProductsChartProps) => {
                 tick={{ fontSize: 10 }}
                 tickFormatter={(value) =>
                   sortBy === 'revenue'
-                    ? `€${(value / 1000).toFixed(0)}k`
+                    ? `${currencySymbol()}${(value / 1000).toFixed(0)}k`
                     : value.toLocaleString()
                 }
               />
@@ -121,7 +122,7 @@ const TopProductsChart = ({ data }: TopProductsChartProps) => {
                           <div key="content" className="text-xs">
                             <div className="font-medium">{item.fullName}</div>
                             <div>{Number(value).toLocaleString()} units</div>
-                            <div className="text-muted-foreground">€{item.revenue.toLocaleString()} revenue</div>
+                            <div className="text-muted-foreground">{formatCurrency(item.revenue)} revenue</div>
                           </div>,
                           '',
                         ];
@@ -129,7 +130,7 @@ const TopProductsChart = ({ data }: TopProductsChartProps) => {
                       return [
                         <div key="content" className="text-xs">
                           <div className="font-medium">{item.fullName}</div>
-                          <div>€{Number(value).toLocaleString()}</div>
+                          <div>{formatCurrency(Number(value))}</div>
                           <div className="text-muted-foreground">{item.quantitySold.toLocaleString()} units</div>
                         </div>,
                         '',

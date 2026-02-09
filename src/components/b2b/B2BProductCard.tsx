@@ -17,16 +17,18 @@ import { AlertTriangle, Plus, ImageIcon, Layers } from 'lucide-react';
 import type { CustomerCatalogProduct, CartItem, BatchAllocation } from '@/lib/b2b/types';
 import { B2BBatchSelectionDialog, type B2BBatch } from './B2BBatchSelectionDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatCurrency, currencySymbol, type CurrencyCode } from '@/lib/format-currency';
 
 type B2BProductCardProps = {
   product: CustomerCatalogProduct;
   onAddToTrolley: (item: CartItem) => void;
   viewMode?: 'card' | 'list';
+  currency?: CurrencyCode;
 };
 
 const LOW_STOCK_THRESHOLD = 100;
 
-export function B2BProductCard({ product, onAddToTrolley, viewMode = 'card' }: B2BProductCardProps) {
+export function B2BProductCard({ product, onAddToTrolley, viewMode = 'card', currency = 'EUR' }: B2BProductCardProps) {
   const [rrp, setRrp] = useState(product.suggestedRrp?.toString() || '');
   const [multibuyPrice2, setMultibuyPrice2] = useState('');
   const [multibuyQty2, setMultibuyQty2] = useState('');
@@ -302,7 +304,7 @@ export function B2BProductCard({ product, onAddToTrolley, viewMode = 'card' }: B
 
           {/* Price */}
           <div className="text-right shrink-0">
-            <span className="font-semibold">€{product.unitPriceExVat?.toFixed(2) || '0.00'}</span>
+            <span className="font-semibold">{formatCurrency(product.unitPriceExVat ?? 0, currency)}</span>
           </div>
 
           {/* Variety Selection */}
@@ -374,7 +376,7 @@ export function B2BProductCard({ product, onAddToTrolley, viewMode = 'card' }: B
           <div className="flex items-baseline justify-between">
             <span className="text-muted-foreground">Price:</span>
             <span className="text-lg font-semibold">
-              €{product.unitPriceExVat?.toFixed(2) || '0.00'}
+              {formatCurrency(product.unitPriceExVat ?? 0, currency)}
             </span>
           </div>
 
@@ -401,7 +403,7 @@ export function B2BProductCard({ product, onAddToTrolley, viewMode = 'card' }: B
               id={`rrp-${product.productId}`}
               type="number"
               step="0.01"
-              placeholder={product.suggestedRrp ? `Suggested: €${product.suggestedRrp.toFixed(2)}` : 'Enter RRP'}
+              placeholder={product.suggestedRrp ? `Suggested: ${formatCurrency(product.suggestedRrp, currency)}` : 'Enter RRP'}
               value={rrp}
               onChange={(e) => setRrp(e.target.value)}
               className="h-8"

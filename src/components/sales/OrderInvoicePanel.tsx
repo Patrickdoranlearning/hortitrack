@@ -19,6 +19,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { FileText, Printer, Plus, Receipt } from 'lucide-react';
 import { generateInvoice } from '@/app/sales/actions';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import CreditNoteWizard from './CreditNoteWizard';
 import type { OrderItem, OrderInvoice } from './OrderDetailPage';
 
@@ -33,6 +34,7 @@ interface OrderInvoicePanelProps {
   vat: number;
   total: number;
   onInvoiceGenerated: () => void;
+  currency?: CurrencyCode;
 }
 
 export default function OrderInvoicePanel({
@@ -46,6 +48,7 @@ export default function OrderInvoicePanel({
   vat,
   total,
   onInvoiceGenerated,
+  currency = 'EUR',
 }: OrderInvoicePanelProps) {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -150,7 +153,7 @@ export default function OrderInvoicePanel({
                   <div>
                     <p className="text-sm text-muted-foreground">Balance Due</p>
                     <p className="font-semibold text-lg">
-                      €{latestInvoice.balance_due.toFixed(2)}
+                      {formatCurrency(latestInvoice.balance_due, currency)}
                     </p>
                   </div>
                 </div>
@@ -161,15 +164,15 @@ export default function OrderInvoicePanel({
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>€{latestInvoice.subtotal_ex_vat.toFixed(2)}</span>
+                    <span>{formatCurrency(latestInvoice.subtotal_ex_vat, currency)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">VAT</span>
-                    <span>€{latestInvoice.vat_amount.toFixed(2)}</span>
+                    <span>{formatCurrency(latestInvoice.vat_amount, currency)}</span>
                   </div>
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span>€{latestInvoice.total_inc_vat.toFixed(2)}</span>
+                    <span>{formatCurrency(latestInvoice.total_inc_vat, currency)}</span>
                   </div>
                 </div>
 
@@ -243,7 +246,7 @@ export default function OrderInvoicePanel({
                       </TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
                       <TableCell className="text-right">
-                        €{item.line_total_ex_vat.toFixed(2)}
+                        {formatCurrency(item.line_total_ex_vat, currency)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -251,15 +254,15 @@ export default function OrderInvoicePanel({
                 <TableFooter>
                   <TableRow>
                     <TableCell colSpan={2} className="text-right">Subtotal</TableCell>
-                    <TableCell className="text-right">€{subtotal.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(subtotal, currency)}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell colSpan={2} className="text-right text-muted-foreground">VAT</TableCell>
-                    <TableCell className="text-right text-muted-foreground">€{vat.toFixed(2)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{formatCurrency(vat, currency)}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell colSpan={2} className="text-right font-bold">Total</TableCell>
-                    <TableCell className="text-right font-bold">€{total.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-bold">{formatCurrency(total, currency)}</TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>

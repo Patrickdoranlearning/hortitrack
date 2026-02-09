@@ -29,16 +29,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, Pencil, Trash2, Tag, Truck, Package, Zap } from 'lucide-react';
-import { 
-  type OrgFee, 
+import { toast } from 'sonner';
+import {
+  type OrgFee,
   type FeeUnit,
   type CreateFeeInput,
-  createOrgFee, 
-  updateOrgFee, 
+  createOrgFee,
+  updateOrgFee,
   deleteOrgFee,
 } from './actions';
 import { STANDARD_FEE_TYPES } from './constants';
 import { emitMutation } from '@/lib/events/mutation-events';
+import { formatCurrency, currencySymbol } from '@/lib/format-currency';
 
 type Props = {
   initialFees: OrgFee[];
@@ -87,28 +89,53 @@ export function FeeSettingsClient({ initialFees }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const handleToggleActive = async (fee: OrgFee) => {
-    startTransition(async () => {
-      const result = await updateOrgFee(fee.id, { isActive: !fee.isActive });
-      if (result.success) {
-        setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isActive: !f.isActive } : f));
+    const newValue = !fee.isActive;
+    // Optimistic update — flip immediately
+    setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isActive: newValue } : f));
+    try {
+      const result = await updateOrgFee(fee.id, { isActive: newValue });
+      if (!result.success) {
+        // Revert on failure
+        setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isActive: fee.isActive } : f));
+        toast.error(result.error || 'Failed to update fee');
       }
-    });
+    } catch {
+      // Revert on error
+      setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isActive: fee.isActive } : f));
+      toast.error('Failed to update fee');
+    }
   };
 
   const handleToggleDefault = async (fee: OrgFee) => {
-    startTransition(async () => {
-      const result = await updateOrgFee(fee.id, { isDefault: !fee.isDefault });
-      if (result.success) {
-        setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isDefault: !f.isDefault } : f));
+    const newValue = !fee.isDefault;
+    // Optimistic update — flip immediately
+    setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isDefault: newValue } : f));
+    try {
+      const result = await updateOrgFee(fee.id, { isDefault: newValue });
+      if (!result.success) {
+        // Revert on failure
+        setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isDefault: fee.isDefault } : f));
+        toast.error(result.error || 'Failed to update fee');
       }
-    });
+    } catch {
+      // Revert on error
+      setFees(prev => prev.map(f => f.id === fee.id ? { ...f, isDefault: fee.isDefault } : f));
+      toast.error('Failed to update fee');
+    }
   };
 
   const handleDelete = async (feeId: string) => {
     startTransition(async () => {
-      const result = await deleteOrgFee(feeId);
-      if (result.success) {
-        setFees(prev => prev.filter(f => f.id !== feeId));
+      try {
+        const result = await deleteOrgFee(feeId);
+        if (result.success) {
+          setFees(prev => prev.filter(f => f.id !== feeId));
+          toast.success('Fee deleted');
+        } else {
+          toast.error(result.error || 'Failed to delete fee');
+        }
+      } catch {
+        toast.error('Failed to delete fee');
       }
       setDeleteConfirm(null);
     });
@@ -116,18 +143,29 @@ export function FeeSettingsClient({ initialFees }: Props) {
 
   const handleSave = async (data: CreateFeeInput, existingId?: string) => {
     startTransition(async () => {
-      if (existingId) {
-        const result = await updateOrgFee(existingId, data);
-        if (result.success) {
-          emitMutation({ resource: 'reference-data', action: 'update' });
-          setEditingFee(null);
+      try {
+        if (existingId) {
+          const result = await updateOrgFee(existingId, data);
+          if (result.success) {
+            setFees(prev => prev.map(f => f.id === existingId ? { ...f, ...data, vatRate: data.vatRate ?? f.vatRate } : f));
+            emitMutation({ resource: 'reference-data', action: 'update' });
+            setEditingFee(null);
+            toast.success('Fee updated');
+          } else {
+            toast.error(result.error || 'Failed to update fee');
+          }
+        } else {
+          const result = await createOrgFee(data);
+          if (result.success && result.fee) {
+            setFees(prev => [...prev, result.fee!]);
+            setIsCreateOpen(false);
+            toast.success('Fee created');
+          } else {
+            toast.error(result.error || 'Failed to create fee');
+          }
         }
-      } else {
-        const result = await createOrgFee(data);
-        if (result.success && result.fee) {
-          setFees(prev => [...prev, result.fee!]);
-          setIsCreateOpen(false);
-        }
+      } catch {
+        toast.error('Failed to save fee');
       }
     });
   };
@@ -215,14 +253,14 @@ export function FeeSettingsClient({ initialFees }: Props) {
                           <p className="text-sm text-muted-foreground">{fee.description || info.description}</p>
                           <div className="flex items-center gap-4 mt-2 text-sm">
                             <span className="font-medium">
-                              €{fee.amount.toFixed(2)} {UNIT_LABELS[fee.unit]}
+                              {formatCurrency(fee.amount)} {UNIT_LABELS[fee.unit]}
                             </span>
                             {fee.vatRate > 0 && (
                               <span className="text-muted-foreground">+ {fee.vatRate}% VAT</span>
                             )}
                             {fee.minOrderValue && (
                               <span className="text-muted-foreground">
-                                Free over €{fee.minOrderValue}
+                                Free over {formatCurrency(fee.minOrderValue)}
                               </span>
                             )}
                           </div>
@@ -237,7 +275,6 @@ export function FeeSettingsClient({ initialFees }: Props) {
                             id={`active-${fee.id}`}
                             checked={fee.isActive}
                             onCheckedChange={() => handleToggleActive(fee)}
-                            disabled={isPending}
                           />
                         </div>
                         <div className="flex items-center gap-2 mr-4">
@@ -248,7 +285,7 @@ export function FeeSettingsClient({ initialFees }: Props) {
                             id={`default-${fee.id}`}
                             checked={fee.isDefault}
                             onCheckedChange={() => handleToggleDefault(fee)}
-                            disabled={isPending || !fee.isActive}
+                            disabled={!fee.isActive}
                           />
                         </div>
                         <Button
@@ -426,7 +463,7 @@ function FeeForm({
         {/* Amount and Unit */}
         <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="amount">Amount (€)</Label>
+            <Label htmlFor="amount">Amount ({currencySymbol()})</Label>
             <Input
               id="amount"
               type="number"
@@ -472,7 +509,7 @@ function FeeForm({
         {/* Min Order Value (for delivery) */}
         {(feeType.includes('delivery') || unit === 'flat') && (
           <div className="grid gap-2">
-            <Label htmlFor="minOrderValue">Free Above Order Value (€, optional)</Label>
+            <Label htmlFor="minOrderValue">Free Above Order Value ({currencySymbol()}, optional)</Label>
             <Input
               id="minOrderValue"
               type="number"
@@ -480,7 +517,7 @@ function FeeForm({
               min="0"
               value={minOrderValue}
               onChange={(e) => setMinOrderValue(e.target.value)}
-              placeholder="e.g., 500 for free delivery over €500"
+              placeholder={`e.g., 500 for free delivery over ${currencySymbol()}500`}
             />
             <p className="text-xs text-muted-foreground">
               Leave empty to always apply this fee

@@ -37,6 +37,7 @@ interface InvoiceWithDetails {
     notes: string | null;
     ship_to_address_id: string | null;
     customer_id: string | null;
+    currency: string | null;
     customer: {
       name: string;
       email: string | null;
@@ -73,6 +74,7 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
         notes,
         ship_to_address_id,
         customer_id,
+        currency,
         customer:customers(
           name,
           email,
@@ -202,6 +204,12 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
     return parts.length > 0 ? parts.join(', ') : 'No address on file';
   };
 
+  // Fetch order fees (pre-pricing, delivery, etc.)
+  const { data: orderFees } = await supabase
+    .from('order_fees')
+    .select('*')
+    .eq('order_id', orderId);
+
   // Group items by VAT rate for summary
   const vatSummary = items.reduce((acc, item) => {
     const rate = item.vat_rate;
@@ -212,6 +220,20 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
     acc[rate].vat += item.line_vat_amount;
     return acc;
   }, {} as Record<number, { rate: number; total: number; vat: number }>);
+
+  // Include fee VAT in the summary
+  if (orderFees) {
+    for (const fee of orderFees) {
+      if (fee.subtotal > 0 && fee.vat_rate) {
+        const rate = fee.vat_rate;
+        if (!vatSummary[rate]) {
+          vatSummary[rate] = { rate, total: 0, vat: 0 };
+        }
+        vatSummary[rate].total += fee.subtotal;
+        vatSummary[rate].vat += fee.vat_amount || 0;
+      }
+    }
+  }
 
   // Prepare organization data with defaults
   const orgData = org as Record<string, unknown> | null;
@@ -243,6 +265,7 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
     issueDate: format(new Date(typedInvoice.issue_date), 'PPP'),
     dueDate: typedInvoice.due_date ? format(new Date(typedInvoice.due_date), 'PPP') : 'On Receipt',
     orderNumber: typedInvoice.order?.order_number || '-',
+    currency: (typedInvoice.order as any)?.currency || 'EUR',
     subtotalExVat: typedInvoice.subtotal_ex_vat,
     vatAmount: typedInvoice.vat_amount,
     totalIncVat: typedInvoice.total_inc_vat,
@@ -282,6 +305,17 @@ export default async function PrintableInvoicePage({ params }: InvoicePageProps)
         skuCode: skuDetails?.code || null,
       };
     }),
+    fees: (orderFees || []).filter(f => f.total_amount > 0).map(fee => ({
+      id: fee.id,
+      name: fee.name,
+      feeType: fee.fee_type,
+      quantity: fee.quantity || 1,
+      unitAmount: fee.unit_amount,
+      subtotal: fee.subtotal,
+      vatRate: fee.vat_rate || 0,
+      vatAmount: fee.vat_amount || 0,
+      totalAmount: fee.total_amount,
+    })),
     vatSummary: Object.values(vatSummary),
     company: companyInfo,
     bank: bankInfo,

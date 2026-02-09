@@ -48,6 +48,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { DeliveryRunWithItems } from '@/lib/dispatch/types';
 import { dispatchLoad, recallLoad, deleteLoad } from '@/server/dispatch/board-actions';
 
@@ -437,7 +438,7 @@ export default function LoadDetailClient({
                       {item.trolleysDelivered || '—'}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      €{item.order.totalIncVat.toFixed(2)}
+                      {formatCurrency(item.order.totalIncVat, (item.order.currency as CurrencyCode) || 'EUR')}
                     </TableCell>
                     <TableCell>
                       <Link href={`/sales/orders/${item.orderId}`}>

@@ -5,14 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import type { OrderReadyForDispatch } from '@/lib/dispatch/types';
 import { format } from 'date-fns';
 import { Calendar, Package } from 'lucide-react';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import PackingStatusBadge from './PackingStatusBadge';
 
 interface OrderReadyCardProps {
   order: OrderReadyForDispatch;
   onClick?: () => void;
+  currency?: CurrencyCode;
 }
 
-export default function OrderReadyCard({ order, onClick }: OrderReadyCardProps) {
+export default function OrderReadyCard({ order, onClick, currency = 'EUR' }: OrderReadyCardProps) {
   return (
     <Card
       className="hover:shadow-md transition-shadow cursor-pointer"
@@ -25,7 +27,7 @@ export default function OrderReadyCard({ order, onClick }: OrderReadyCardProps) 
             <div className="text-sm text-muted-foreground">{order.customerName}</div>
           </div>
           <div className="text-right">
-            <div className="font-medium">€{order.totalIncVat.toFixed(2)}</div>
+            <div className="font-medium">{formatCurrency(order.totalIncVat, currency)}</div>
             {order.packingStatus && (
               <div className="mt-1">
                 <PackingStatusBadge status={order.packingStatus} />

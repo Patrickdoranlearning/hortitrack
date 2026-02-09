@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { formatCurrency, currencySymbol } from "@/lib/format-currency";
 import {
   Receipt,
   Truck,
@@ -59,11 +60,11 @@ function ClassicPreview({ type }: { type: string }) {
         <div className="px-2 py-1 flex border-t border-slate-100">
           <span className="flex-1 text-slate-600">Plant item</span>
           <span className="w-8 text-right">10</span>
-          <span className="w-12 text-right">€50</span>
+          <span className="w-12 text-right">{currencySymbol()}50</span>
         </div>
       </div>
       <div className="mt-2 text-right">
-        <span className="font-bold">Total: €50.00</span>
+        <span className="font-bold">Total: {formatCurrency(50)}</span>
       </div>
     </div>
   );
@@ -96,12 +97,12 @@ function ModernPreview({ type }: { type: string }) {
       <div className="space-y-1">
         <div className="flex justify-between py-1 border-b border-slate-100">
           <span>Plant item</span>
-          <span className="font-medium">€50.00</span>
+          <span className="font-medium">{formatCurrency(50)}</span>
         </div>
       </div>
       <div className="mt-3 pt-2 border-t-2 border-emerald-600 flex justify-between">
         <span className="font-bold">Total</span>
-        <span className="font-bold text-emerald-600">€50.00</span>
+        <span className="font-bold text-emerald-600">{formatCurrency(50)}</span>
       </div>
     </div>
   );
@@ -123,12 +124,12 @@ function MinimalPreview({ type }: { type: string }) {
       <div className="border-t border-b border-slate-100 py-2 my-2">
         <div className="flex justify-between">
           <span className="text-slate-500">Plant item × 10</span>
-          <span>€50.00</span>
+          <span>{formatCurrency(50)}</span>
         </div>
       </div>
       <div className="text-center mt-3">
         <div className="text-[6px] uppercase text-slate-400">Total Due</div>
-        <div className="text-[12px] font-light">€50.00</div>
+        <div className="text-[12px] font-light">{formatCurrency(50)}</div>
       </div>
     </div>
   );

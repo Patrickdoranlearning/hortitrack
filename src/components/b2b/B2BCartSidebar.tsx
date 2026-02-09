@@ -17,6 +17,7 @@ import { ShoppingCart, Calendar } from 'lucide-react';
 import { B2BCartLineItem } from './B2BCartLineItem';
 import type { CartItem } from '@/lib/b2b/types';
 import type { Database } from '@/types/supabase';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type CustomerAddress = Database['public']['Tables']['customer_addresses']['Row'];
 
@@ -25,9 +26,10 @@ type B2BCartSidebarProps = {
   addresses: CustomerAddress[];
   onUpdateCart: (cart: CartItem[]) => void;
   onSubmit: (deliveryAddressId: string, deliveryDate?: string, notes?: string) => Promise<void>;
+  currency?: CurrencyCode;
 };
 
-export function B2BCartSidebar({ cart, addresses, onUpdateCart, onSubmit }: B2BCartSidebarProps) {
+export function B2BCartSidebar({ cart, addresses, onUpdateCart, onSubmit, currency = 'EUR' }: B2BCartSidebarProps) {
   const [selectedAddressId, setSelectedAddressId] = useState(
     addresses.find((a) => a.is_default_shipping)?.id || addresses[0]?.id || ''
   );
@@ -92,6 +94,7 @@ export function B2BCartSidebar({ cart, addresses, onUpdateCart, onSubmit }: B2BC
                   item={item}
                   onUpdate={(updates) => updateLineItem(index, updates)}
                   onRemove={() => removeLineItem(index)}
+                  currency={currency}
                 />
               ))}
             </div>
@@ -148,15 +151,15 @@ export function B2BCartSidebar({ cart, addresses, onUpdateCart, onSubmit }: B2BC
             <div className="space-y-2 pt-4 border-t">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal (ex VAT):</span>
-                <span>€{subtotalExVat.toFixed(2)}</span>
+                <span>{formatCurrency(subtotalExVat, currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">VAT:</span>
-                <span>€{vatAmount.toFixed(2)}</span>
+                <span>{formatCurrency(vatAmount, currency)}</span>
               </div>
               <div className="flex justify-between text-lg font-semibold pt-2 border-t">
                 <span>Total (inc VAT):</span>
-                <span>€{totalIncVat.toFixed(2)}</span>
+                <span>{formatCurrency(totalIncVat, currency)}</span>
               </div>
             </div>
 

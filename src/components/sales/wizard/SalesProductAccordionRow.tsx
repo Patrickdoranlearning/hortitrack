@@ -11,6 +11,7 @@ import type { ProductWithBatches } from '@/server/sales/products-with-batches';
 import type { ProductGroupWithAvailability } from '@/server/sales/product-groups-with-availability';
 import type { CreateOrderInput, VarietyBreakdown } from '@/lib/sales/types';
 import { cn } from '@/lib/utils';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 export type PricingHint = {
   rrp?: number | null;
@@ -36,12 +37,14 @@ type Props = {
   filteredProducts: ProductWithBatches[];
   onRemove: () => void;
   selectedCustomerId?: string;
+  currency?: CurrencyCode;
   defaultExpanded?: boolean;
   pricingHints?: Record<string, PricingHint>;
   quickQty?: QuickQtyConfig;
   varietyBreakdown?: VarietyBreakdown[];
-  onVarietyQtyChange?: (productId: string, qty: number) => void;
+  onVarietyQtyChange?: (key: string, qty: number) => void;
   onInitBreakdown?: (group: ProductGroupWithAvailability) => void;
+  onInitProductBreakdown?: (product: ProductWithBatches, varieties: Array<{varietyId?: string; name: string; stock: number}>) => void;
 };
 
 export function SalesProductAccordionRow({
@@ -53,11 +56,13 @@ export function SalesProductAccordionRow({
   filteredProducts,
   onRemove,
   selectedCustomerId,
+  currency = 'EUR',
   pricingHints = {},
   quickQty = DEFAULT_quickQty,
   varietyBreakdown,
   onVarietyQtyChange,
   onInitBreakdown,
+  onInitProductBreakdown,
 }: Props) {
   const line = useWatch({ control: form.control, name: `lines.${index}` });
   const [isExpanded, setIsExpanded] = useState(false);
@@ -80,6 +85,26 @@ export function SalesProductAccordionRow({
       onInitBreakdown(selectedProductGroup);
     }
   }, [selectedProductGroup, varietyBreakdown, onInitBreakdown]);
+
+  // Auto-initialize variety breakdown for regular products with multiple varieties
+  useEffect(() => {
+    if (selectedProduct && !selectedProductGroup && onInitProductBreakdown && (!varietyBreakdown || varietyBreakdown.length === 0)) {
+      // Only initialize if product has 2+ varieties
+      const varieties = new Map<string, { varietyId?: string; name: string; stock: number }>();
+      for (const batch of selectedProduct.batches) {
+        const name = batch.plantVariety || '';
+        if (name) {
+          if (!varieties.has(name)) {
+            varieties.set(name, { varietyId: batch.plantVarietyId, name, stock: 0 });
+          }
+          varieties.get(name)!.stock += batch.quantity;
+        }
+      }
+      if (varieties.size >= 2) {
+        onInitProductBreakdown(selectedProduct, Array.from(varieties.values()));
+      }
+    }
+  }, [selectedProduct, selectedProductGroup, varietyBreakdown, onInitProductBreakdown]);
 
   // Determine the current selection value for the dropdown
   const selectValue = useMemo(() => {
@@ -150,6 +175,7 @@ export function SalesProductAccordionRow({
 
     const varietyMap = new Map<string, {
       name: string;
+      varietyId?: string;
       totalStock: number;
     }>();
 
@@ -160,6 +186,7 @@ export function SalesProductAccordionRow({
         if (!varietyMap.has(varietyName)) {
           varietyMap.set(varietyName, {
             name: varietyName,
+            varietyId: batch.plantVarietyId,
             totalStock: 0,
           });
         }
@@ -426,14 +453,14 @@ export function SalesProductAccordionRow({
 
         {/* Total */}
         <div className="hidden md:block md:col-span-1 text-right text-sm font-medium">
-          €{lineTotal.toFixed(2)}
+          {formatCurrency(lineTotal, currency)}
         </div>
 
         {/* Quick Qty, Expand/Collapse & Delete */}
-        <div className="col-span-5 md:col-span-4 flex items-center justify-end gap-1">
-          {/* Quick Qty Buttons - Show for all specific products */}
+        <div className="col-span-5 md:col-span-4 flex items-center gap-1">
+          {/* Quick Qty Buttons - anchored to left of column for alignment with variety rows */}
           {selectedProduct && (
-            <div className="hidden md:grid grid-cols-3 gap-1 w-[126px] mr-2">
+            <div className="hidden md:grid grid-cols-3 gap-1 w-[126px]">
               <Button
                 type="button"
                 variant="outline"
@@ -469,6 +496,8 @@ export function SalesProductAccordionRow({
               </Button>
             </div>
           )}
+          {/* Spacer pushes expand/delete to the right */}
+          <div className="flex-1" />
           {/* Expand/Collapse button for variety info */}
           {(selectedProduct || selectedProductGroup) && hasVarietiesToShow && (
             <Button
@@ -566,8 +595,122 @@ export function SalesProductAccordionRow({
         </div>
       )}
 
-      {/* Expanded Read-Only Varieties Panel (regular products only) */}
-      {isExpanded && selectedProduct && !selectedProductGroup && hasVarietiesToShow && (
+      {/* Expanded Varieties Panel with editable inputs (regular products) */}
+      {isExpanded && selectedProduct && !selectedProductGroup && varietyBreakdown && varietyBreakdown.length > 0 && (
+        <div className="bg-muted/20 border-t py-2">
+          {varietyBreakdown.map((variety) => {
+            const specifiedTotal = varietyBreakdown.reduce((sum, v) => sum + v.qty, 0);
+            return (
+              <div key={variety.varietyId || variety.productName} className="grid grid-cols-12 gap-1 md:gap-2 items-center py-1 px-2 md:px-3">
+                {/* Variety name + avail - spans left 8 columns (md) to match product+qty+price+vat+total */}
+                <div className="col-span-7 md:col-span-8 flex items-center gap-2 text-sm min-w-0">
+                  <span className="text-muted-foreground truncate">{variety.productName}</span>
+                  <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                    {variety.availableStock} avail
+                  </span>
+                </div>
+                {/* Quick qty + input - same col-span-4 as product row */}
+                <div className="col-span-5 md:col-span-4 flex items-center gap-1">
+                  <div className="hidden md:grid grid-cols-3 gap-1 w-[126px]">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-1 flex flex-col items-center justify-center leading-tight"
+                      onClick={() => onVarietyQtyChange?.(
+                        variety.varietyId || variety.productName,
+                        quickQtyValues.halfShelf
+                      )}
+                      title={`Half shelf (${quickQtyValues.halfShelf})`}
+                    >
+                      <span className="text-[10px] text-muted-foreground">½S</span>
+                      <span className="text-xs font-medium">{quickQtyValues.halfShelf}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-1 flex flex-col items-center justify-center leading-tight"
+                      onClick={() => onVarietyQtyChange?.(
+                        variety.varietyId || variety.productName,
+                        quickQtyValues.fullShelf
+                      )}
+                      title={`Full shelf (${quickQtyValues.fullShelf})`}
+                    >
+                      <span className="text-[10px] text-muted-foreground">1S</span>
+                      <span className="text-xs font-medium">{quickQtyValues.fullShelf}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-1 flex flex-col items-center justify-center leading-tight"
+                      onClick={() => onVarietyQtyChange?.(
+                        variety.varietyId || variety.productName,
+                        quickQtyValues.fullTrolley
+                      )}
+                      title={`Full trolley (${quickQtyValues.fullTrolley})`}
+                    >
+                      <span className="text-[10px] text-muted-foreground">1T</span>
+                      <span className="text-xs font-medium">{quickQtyValues.fullTrolley}</span>
+                    </Button>
+                  </div>
+                  <div className="flex-1" />
+                  <Input
+                    type="number"
+                    min={0}
+                    className={cn(
+                      "h-9 w-20 text-xs text-center shrink-0",
+                      variety.qty > variety.availableStock && "border-amber-400 bg-amber-50",
+                      specifiedTotal > displayQty && variety.qty > 0 && "border-red-400 bg-red-50"
+                    )}
+                    value={variety.qty || ''}
+                    onChange={(e) => onVarietyQtyChange?.(
+                      variety.varietyId || variety.productName,
+                      Math.max(0, parseInt(e.target.value) || 0)
+                    )}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Summary Bar */}
+          {(() => {
+            const specifiedTotal = varietyBreakdown.reduce((sum, v) => sum + v.qty, 0);
+            const remainder = displayQty - specifiedTotal;
+            return (
+              <div className="flex items-center justify-between pt-2 mx-2 md:mx-3 border-t text-xs">
+                <span className={cn(
+                  "font-medium",
+                  specifiedTotal > displayQty && "text-red-600"
+                )}>
+                  Specified: {specifiedTotal} of {displayQty}
+                </span>
+                {specifiedTotal > displayQty && (
+                  <span className="text-red-600 font-medium">
+                    Over-allocated by {specifiedTotal - displayQty}
+                  </span>
+                )}
+                {remainder > 0 && specifiedTotal > 0 && (
+                  <span className="text-muted-foreground">
+                    Grower&apos;s Choice: {remainder}
+                  </span>
+                )}
+                {remainder === 0 && specifiedTotal === displayQty && specifiedTotal > 0 && (
+                  <span className="text-green-600 font-medium">
+                    Fully specified
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Fallback: Regular product without breakdown data (read-only) */}
+      {isExpanded && selectedProduct && !selectedProductGroup && (!varietyBreakdown || varietyBreakdown.length === 0) && hasVarietiesToShow && (
         <div className="bg-muted/20 border-t px-3 py-2 space-y-1">
           {varietiesWithBatches.map(([key, variety]) => (
             <div key={key} className="flex items-center justify-between text-sm py-1">

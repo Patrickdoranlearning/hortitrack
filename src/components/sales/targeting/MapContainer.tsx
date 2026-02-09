@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { SmartTarget, ScheduledDelivery } from '@/lib/targeting/types';
 import { getProbabilityColor, getValueBasedRadius } from '@/lib/targeting/types';
+import { formatCurrency } from '@/lib/format-currency';
 
 interface MapContainerComponentProps {
   targets: SmartTarget[];
@@ -150,7 +151,7 @@ export default function MapContainerComponent({
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; font-size: 12px;">
             <div><span style="color: #94a3b8;">Orders:</span> <span style="font-weight: 500;">${target.total_orders || 0}</span></div>
-            <div><span style="color: #94a3b8;">Avg:</span> <span style="font-weight: 500;">${target.avg_order_value ? `€${Math.round(target.avg_order_value)}` : '-'}</span></div>
+            <div><span style="color: #94a3b8;">Avg:</span> <span style="font-weight: 500;">${target.avg_order_value ? formatCurrency(Math.round(target.avg_order_value)) : '-'}</span></div>
           </div>
           <div style="font-size: 12px; color: #475569; margin-top: 8px; font-style: italic;">${target.context_note}</div>
           ${target.phone ? `<a href="tel:${target.phone}" style="font-size: 12px; color: #2563eb; margin-top: 8px; display: block; font-weight: 500;">📞 ${target.phone}</a>` : ''}

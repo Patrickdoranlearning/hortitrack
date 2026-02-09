@@ -5,6 +5,7 @@ export interface BatchInfo {
   id: string;
   batchNumber: string;
   plantVariety: string;
+  plantVarietyId?: string;
   family?: string | null;
   size: string;
   quantity: number;
@@ -461,6 +462,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
           id: b.id,
           batchNumber: b.batch_number || '',
           plantVariety: variety?.name || '',
+          plantVarietyId: b.plant_variety_id || undefined,
           family: variety?.family || null,
           size: sizeMap.get(b.size_id)?.name || '',
           quantity: availableQty, // Use available quantity, not total
@@ -585,6 +587,7 @@ export async function getProductsWithBatches(orgId: string, customerId?: string 
     const enrichedBatches = productBatches.map(batch => ({
       ...batch,
       plantVariety: batch.plantVariety || productVariety,
+      plantVarietyId: batch.plantVarietyId || sku?.plant_variety_id || undefined,
       family: batch.family || productFamily,
       size: batch.size || productSize,
     }));

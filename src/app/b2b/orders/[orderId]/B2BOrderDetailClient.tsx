@@ -16,6 +16,7 @@ import {
 import { ArrowLeft, AlertCircle, Phone, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import { TrolleyReconciliationCard } from '@/components/shared/TrolleyReconciliationCard';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type Order = {
   id: string;
@@ -66,6 +67,7 @@ type B2BOrderDetailClientProps = {
   order: Order;
   items: OrderItem[];
   canEdit: boolean;
+  currency?: CurrencyCode;
 };
 
 // Order status enum: draft, confirmed, picking, ready (legacy), packed, dispatched, delivered, cancelled, void
@@ -82,7 +84,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
 
-export function B2BOrderDetailClient({ order, items, canEdit }: B2BOrderDetailClientProps) {
+export function B2BOrderDetailClient({ order, items, canEdit, currency = 'EUR' }: B2BOrderDetailClientProps) {
   const statusConfig = STATUS_CONFIG[order.status] || { label: order.status, variant: 'outline' };
   const address = order.customer_addresses;
 
@@ -173,15 +175,15 @@ export function B2BOrderDetailClient({ order, items, canEdit }: B2BOrderDetailCl
           <CardContent className="space-y-3">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal (ex VAT):</span>
-              <span className="font-medium">€{order.subtotal_ex_vat.toFixed(2)}</span>
+              <span className="font-medium">{formatCurrency(order.subtotal_ex_vat, currency)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">VAT:</span>
-              <span className="font-medium">€{order.vat_amount.toFixed(2)}</span>
+              <span className="font-medium">{formatCurrency(order.vat_amount, currency)}</span>
             </div>
             <div className="flex justify-between text-lg font-semibold pt-3 border-t">
               <span>Total (inc VAT):</span>
-              <span>€{order.total_inc_vat.toFixed(2)}</span>
+              <span>{formatCurrency(order.total_inc_vat, currency)}</span>
             </div>
 
             {/* Trolley Info */}
@@ -239,18 +241,18 @@ export function B2BOrderDetailClient({ order, items, canEdit }: B2BOrderDetailCl
                     <TableCell>{item.description}</TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
                     <TableCell className="hidden sm:table-cell text-right">
-                      €{item.unit_price_ex_vat.toFixed(2)}
+                      {formatCurrency(item.unit_price_ex_vat, currency)}
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-right text-sm text-muted-foreground">
-                      {item.rrp ? `€${item.rrp.toFixed(2)}` : '-'}
+                      {item.rrp ? formatCurrency(item.rrp, currency) : '-'}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-right text-sm text-muted-foreground">
                       {item.multibuy_qty_2 && item.multibuy_price_2
-                        ? `${item.multibuy_qty_2} for €${item.multibuy_price_2.toFixed(2)}`
+                        ? `${item.multibuy_qty_2} for ${formatCurrency(item.multibuy_price_2, currency)}`
                         : '-'}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      €{item.line_total_ex_vat.toFixed(2)}
+                      {formatCurrency(item.line_total_ex_vat, currency)}
                     </TableCell>
                   </TableRow>
                 ))}

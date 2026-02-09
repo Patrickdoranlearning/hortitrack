@@ -10,6 +10,7 @@ import { Package, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { B2BCartLineItem } from '../B2BCartLineItem';
 import { calculateB2BTrolleys, type B2BTrolleySuggestion } from '@/lib/b2b/trolley-calculation';
 import type { CartItem, CustomerCatalogProduct } from '@/lib/b2b/types';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type Props = {
   trolley: CartItem[];
@@ -17,9 +18,10 @@ type Props = {
   onRemoveItem: (index: number) => void;
   /** Catalog products for suggestions (optional) */
   products?: Array<Pick<CustomerCatalogProduct, 'sizeName' | 'trolleyQuantity'>>;
+  currency?: CurrencyCode;
 };
 
-export function B2BCheckoutTrolley({ trolley, onUpdateItem, onRemoveItem, products }: Props) {
+export function B2BCheckoutTrolley({ trolley, onUpdateItem, onRemoveItem, products, currency = 'EUR' }: Props) {
   const subtotalExVat = trolley.reduce((sum, item) => sum + item.quantity * item.unitPriceExVat, 0);
 
   // Calculate trolley fill using per-product trolleyQuantity
@@ -53,6 +55,7 @@ export function B2BCheckoutTrolley({ trolley, onUpdateItem, onRemoveItem, produc
                   item={item}
                   onUpdate={(updates) => onUpdateItem(index, updates)}
                   onRemove={() => onRemoveItem(index)}
+                  currency={currency}
                 />
               ))}
             </div>
@@ -62,7 +65,7 @@ export function B2BCheckoutTrolley({ trolley, onUpdateItem, onRemoveItem, produc
 
           <div className="flex justify-between text-sm font-medium">
             <span>Subtotal (ex VAT)</span>
-            <span>€{subtotalExVat.toFixed(2)}</span>
+            <span>{formatCurrency(subtotalExVat, currency)}</span>
           </div>
 
           {/* Trolley fill indicator */}

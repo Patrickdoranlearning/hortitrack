@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Package, FileText, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Database } from '@/types/supabase';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
 
@@ -42,6 +43,7 @@ type B2BDashboardClientProps = {
   customer: Customer;
   recentOrders: RecentOrder[];
   favorites: FavoriteProduct[];
+  currency?: CurrencyCode;
 };
 
 // Order status enum: draft, confirmed, picking, ready (legacy), packed, dispatched, delivered, cancelled, void
@@ -58,7 +60,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
 
-export function B2BDashboardClient({ customer, recentOrders, favorites }: B2BDashboardClientProps) {
+export function B2BDashboardClient({ customer, recentOrders, favorites, currency = 'EUR' }: B2BDashboardClientProps) {
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
@@ -139,7 +141,7 @@ export function B2BDashboardClient({ customer, recentOrders, favorites }: B2BDas
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <div className="font-semibold">
-                          €{order.total_inc_vat?.toFixed(2) || '0.00'}
+                          {formatCurrency(order.total_inc_vat ?? 0, currency)}
                         </div>
                         <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
                       </div>

@@ -265,6 +265,20 @@ export default function DataManagementPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Receipt /> Order Fees</CardTitle>
+              <CardDescription>Configure pre-pricing, delivery, and other fees applied to sales orders.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/fees">
+                  Manage Fees
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BadgeDollarSign /> Price Lists
               </CardTitle>

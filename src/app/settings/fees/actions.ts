@@ -17,6 +17,7 @@ export type OrgFee = {
   amount: number;
   unit: FeeUnit;
   vatRate: number;
+  currency: string;
   isActive: boolean;
   isDefault: boolean;
   minOrderValue: number | null;
@@ -33,6 +34,7 @@ export type CreateFeeInput = {
   amount: number;
   unit: FeeUnit;
   vatRate?: number;
+  currency?: string;
   isActive?: boolean;
   isDefault?: boolean;
   minOrderValue?: number;
@@ -134,6 +136,7 @@ export async function createOrgFee(input: CreateFeeInput): Promise<{ success: bo
       amount: input.amount,
       unit: input.unit,
       vat_rate: input.vatRate ?? 0,
+      currency: input.currency ?? 'EUR',
       is_active: input.isActive ?? true,
       is_default: input.isDefault ?? false,
       min_order_value: input.minOrderValue ?? null,
@@ -151,7 +154,7 @@ export async function createOrgFee(input: CreateFeeInput): Promise<{ success: bo
     return { success: false, error: error.message };
   }
 
-  revalidatePath('/sales/settings/fees');
+  revalidatePath('/settings/fees');
   return { success: true, fee: mapFeeRow(data) };
 }
 
@@ -173,6 +176,7 @@ export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promis
   if (input.minOrderValue !== undefined) updateData.min_order_value = input.minOrderValue;
   if (input.maxAmount !== undefined) updateData.max_amount = input.maxAmount;
   if (input.metadata !== undefined) updateData.metadata = input.metadata;
+  if ((input as any).currency !== undefined) updateData.currency = (input as any).currency;
 
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase
@@ -185,7 +189,7 @@ export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promis
     return { success: false, error: error.message };
   }
 
-  revalidatePath('/sales/settings/fees');
+  revalidatePath('/settings/fees');
   return { success: true };
 }
 
@@ -204,7 +208,7 @@ export async function deleteOrgFee(feeId: string): Promise<{ success: boolean; e
     return { success: false, error: error.message };
   }
 
-  revalidatePath('/sales/settings/fees');
+  revalidatePath('/settings/fees');
   return { success: true };
 }
 
@@ -241,9 +245,10 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
       fee_type: STANDARD_FEE_TYPES.PRE_PRICING,
       name: 'Pre-pricing (RRP Labels)',
       description: 'Cost per unit for printing retail prices on pot labels',
-      amount: 0.05, // 5 cents
+      amount: 0.05,
       unit: 'per_unit',
-      vat_rate: 23, // Standard VAT
+      vat_rate: 23,
+      currency: 'EUR',
       is_active: true,
       is_default: true,
     },
@@ -255,20 +260,26 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
       amount: 25.00,
       unit: 'flat',
       vat_rate: 23,
+      currency: 'EUR',
       is_active: true,
       is_default: false,
-      min_order_value: 500, // Free delivery over €500
+      min_order_value: 500,
     },
   ];
 
   const { error } = await supabase.from('org_fees').insert(defaultFees);
 
   if (error) {
-    logError('Error initializing default fees', { error: error?.message || String(error) });
+    logError('Error initializing default fees', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return { success: false, error: error.message };
   }
 
-  revalidatePath('/sales/settings/fees');
+  revalidatePath('/settings/fees');
   return { success: true };
 }
 
@@ -283,6 +294,7 @@ function mapFeeRow(row: OrgFeeRow): OrgFee {
     amount: row.amount,
     unit: row.unit as FeeUnit,
     vatRate: row.vat_rate,
+    currency: (row as any).currency ?? 'EUR',
     isActive: row.is_active,
     isDefault: row.is_default,
     minOrderValue: row.min_order_value,

@@ -28,6 +28,7 @@ import {
   formatOrderInterval,
 } from '@/lib/targeting/types';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/format-currency';
 
 interface SmartTargetCardProps {
   target: SmartTarget;
@@ -189,7 +190,7 @@ export function SmartTargetCard({ target, showScoreBreakdown = false }: SmartTar
             </div>
             <div className="text-center p-2 bg-slate-50 rounded">
               <div className="font-semibold text-slate-700">
-                {target.avg_order_value ? `€${Math.round(target.avg_order_value)}` : '-'}
+                {target.avg_order_value ? formatCurrency(Math.round(target.avg_order_value)) : '-'}
               </div>
               <div className="text-slate-500">Avg</div>
             </div>

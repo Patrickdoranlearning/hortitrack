@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 interface DocumentData {
   isOrderConfirmation: boolean;
@@ -58,9 +59,10 @@ interface DocumentData {
 
 interface B2BPrintableInvoiceClientProps {
   document: DocumentData;
+  currency?: CurrencyCode;
 }
 
-export function B2BPrintableInvoiceClient({ document }: B2BPrintableInvoiceClientProps) {
+export function B2BPrintableInvoiceClient({ document, currency = 'EUR' }: B2BPrintableInvoiceClientProps) {
   const handlePrint = () => {
     window.print();
   };
@@ -282,12 +284,12 @@ export function B2BPrintableInvoiceClient({ document }: B2BPrintableInvoiceClien
                 <td className="py-3 px-3 border-b border-gray-200">
                   <div className="font-medium">{item.description}</div>
                   {item.rrp && (
-                    <div className="text-xs text-gray-400">RRP: EUR{item.rrp.toFixed(2)}</div>
+                    <div className="text-xs text-gray-400">RRP: {formatCurrency(item.rrp, currency)}</div>
                   )}
                 </td>
                 <td className="py-3 px-3 border-b border-gray-200 text-right">{item.quantity}</td>
                 <td className="py-3 px-3 border-b border-gray-200 text-right">
-                  EUR{item.unitPrice.toFixed(2)}
+                  {formatCurrency(item.unitPrice, currency)}
                 </td>
                 {!isOrderConfirmation && (
                   <td className="py-3 px-3 border-b border-gray-200 text-right">
@@ -295,7 +297,7 @@ export function B2BPrintableInvoiceClient({ document }: B2BPrintableInvoiceClien
                   </td>
                 )}
                 <td className="py-3 px-3 border-b border-gray-200 text-right">
-                  EUR{item.total.toFixed(2)}
+                  {formatCurrency(item.total, currency)}
                 </td>
               </tr>
             ))}
@@ -318,8 +320,8 @@ export function B2BPrintableInvoiceClient({ document }: B2BPrintableInvoiceClien
                 {document.vatSummary.map((vat) => (
                   <tr key={vat.rate}>
                     <td className="py-1 px-2">{vat.rate}%</td>
-                    <td className="py-1 px-2 text-right">EUR{vat.total.toFixed(2)}</td>
-                    <td className="py-1 px-2 text-right">EUR{vat.vat.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-right">{formatCurrency(vat.total, currency)}</td>
+                    <td className="py-1 px-2 text-right">{formatCurrency(vat.vat, currency)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -332,20 +334,20 @@ export function B2BPrintableInvoiceClient({ document }: B2BPrintableInvoiceClien
           <div className="w-72">
             <div className="flex justify-between py-2 border-b border-gray-200">
               <span>Subtotal (ex VAT)</span>
-              <span>EUR{document.subtotalExVat.toFixed(2)}</span>
+              <span>{formatCurrency(document.subtotalExVat, currency)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-200">
               <span>VAT</span>
-              <span>EUR{document.vatAmount.toFixed(2)}</span>
+              <span>{formatCurrency(document.vatAmount, currency)}</span>
             </div>
             <div className="flex justify-between py-3 border-t-2 border-green-600 mt-2 text-lg font-bold">
               <span>Total</span>
-              <span>EUR{document.totalIncVat.toFixed(2)}</span>
+              <span>{formatCurrency(document.totalIncVat, currency)}</span>
             </div>
             {!isOrderConfirmation && document.balanceDue > 0 && (
               <div className="flex justify-between py-3 bg-amber-100 -mx-2 px-2 rounded mt-2">
                 <span>Balance Due</span>
-                <span className="font-bold">EUR{document.balanceDue.toFixed(2)}</span>
+                <span className="font-bold">{formatCurrency(document.balanceDue, currency)}</span>
               </div>
             )}
           </div>

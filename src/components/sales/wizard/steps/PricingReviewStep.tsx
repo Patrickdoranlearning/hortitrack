@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FieldArrayWithId, UseFormReturn, useWatch } from 'react-hook-form';
-import type { CreateOrderInput } from '@/lib/sales/types';
+import type { CreateOrderInput, OrderFeeInput } from '@/lib/sales/types';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
-import type { OrgFee } from '@/app/sales/settings/fees/actions';
+import type { OrgFee } from '@/app/settings/fees/actions';
 import { FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Truck, Tag, AlertTriangle } from 'lucide-react';
+import { Truck, Tag } from 'lucide-react';
+import { formatCurrency, currencySymbol, type CurrencyCode } from '@/lib/format-currency';
 
 type CustomerPrePricingSettings = {
   prePricingFoc: boolean;
@@ -24,9 +24,11 @@ type Props = {
   lines: FieldArrayWithId<CreateOrderInput, 'lines', 'id'>[];
   products: ProductWithBatches[];
   selectedCustomerId?: string;
+  currency?: CurrencyCode;
   defaultShowRrp?: boolean;
   fees?: OrgFee[];
   customerPrePricing?: CustomerPrePricingSettings;
+  onFeesChange?: (fees: OrderFeeInput[]) => void;
 };
 
 export function PricingReviewStep({
@@ -35,15 +37,20 @@ export function PricingReviewStep({
   lines,
   products,
   selectedCustomerId,
+  currency = 'EUR',
   defaultShowRrp = true,
   fees = [],
   customerPrePricing,
+  onFeesChange,
 }: Props) {
+  const fc = (amount: number) => formatCurrency(amount, currency);
+  const sym = currencySymbol(currency);
   const watchedLines = useWatch({ control: form.control, name: 'lines' });
   
-  // Get fee configurations
-  const prePricingFee = fees.find(f => f.feeType === 'pre_pricing' && f.isActive);
-  const deliveryFees = fees.filter(f => f.feeType.includes('delivery') && f.isActive);
+  // Get fee configurations — filter by currency match (or fees with no currency set)
+  const currencyFees = fees.filter(f => !f.currency || f.currency === currency);
+  const prePricingFee = currencyFees.find(f => f.feeType === 'pre_pricing' && f.isActive);
+  const deliveryFees = currencyFees.filter(f => f.feeType.includes('delivery') && f.isActive);
   
   // Track RRP toggle state separately for better UX
   const [rrpEnabled, setRrpEnabled] = useState<Record<number, boolean>>(() => {
@@ -125,6 +132,45 @@ export function PricingReviewStep({
     };
   }, [totals, prePricingInfo, deliveryInfo]);
 
+  // Surface computed fees to parent for order submission
+  useEffect(() => {
+    if (!onFeesChange) return;
+    const computedFees: OrderFeeInput[] = [];
+
+    // Pre-pricing fee
+    if (prePricingInfo.totalUnits > 0 && prePricingFee) {
+      computedFees.push({
+        orgFeeId: prePricingFee.id,
+        feeType: 'pre_pricing',
+        name: 'Pre-pricing (RRP Labels)',
+        quantity: prePricingInfo.totalUnits,
+        unitAmount: prePricingInfo.ratePerUnit,
+        unit: 'per_unit',
+        vatRate: prePricingFee.vatRate,
+        isFoc: prePricingInfo.isFoc,
+      });
+    }
+
+    // Delivery fee
+    if (selectedDeliveryFeeId && selectedDeliveryFeeId !== '__none__') {
+      const deliveryFee = deliveryFees.find(f => f.id === selectedDeliveryFeeId);
+      if (deliveryFee && !deliveryInfo.waived) {
+        computedFees.push({
+          orgFeeId: deliveryFee.id,
+          feeType: deliveryFee.feeType,
+          name: deliveryFee.name,
+          quantity: 1,
+          unitAmount: deliveryFee.amount,
+          unit: 'flat',
+          vatRate: deliveryFee.vatRate,
+          isFoc: false,
+        });
+      }
+    }
+
+    onFeesChange(computedFees);
+  }, [prePricingInfo, prePricingFee, deliveryInfo, selectedDeliveryFeeId, deliveryFees, onFeesChange]);
+
   const resolveProductName = (productId: string | undefined) => {
     if (!productId) return 'Product line';
     const product = products.find(p => p.id === productId);
@@ -141,33 +187,12 @@ export function PricingReviewStep({
     return product.name || `${product.plantVariety} - ${product.size}`;
   };
 
-  // Check for lines without specific variety selection
-  const linesWithoutVariety = useMemo(() => {
-    return (watchedLines || []).filter(
-      (line) => line?.productId && !line.requiredVarietyId && !line.requiredBatchId && !line.specificBatchId
-    );
-  }, [watchedLines]);
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Step 3: Pricing & Review</h2>
         <p className="text-sm text-muted-foreground">Confirm pricing, VAT, and pre-pricing (RRP) for pot labels.</p>
       </div>
-
-      {/* Variety selection warning */}
-      {linesWithoutVariety.length > 0 && (
-        <Alert variant="default" className="border-amber-200 bg-amber-50/50">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-800">Grower&apos;s Choice</AlertTitle>
-          <AlertDescription className="text-amber-700">
-            {linesWithoutVariety.length === 1
-              ? '1 line item'
-              : `${linesWithoutVariety.length} line items`}{' '}
-            will be fulfilled with available stock at pick time. Go back to Step 2 to select specific varieties or batches if needed.
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="space-y-3">
         {lines.map((line, index) => {
@@ -181,7 +206,6 @@ export function PricingReviewStep({
           
           const productName = watched?.description || resolveProductName(watched?.productId);
           const isRrpOn = rrpEnabled[index] ?? defaultShowRrp;
-          const isGrowersChoice = watched?.productId && !watched.requiredVarietyId && !watched.requiredBatchId && !watched.specificBatchId;
 
           return (
             <div key={line.id} className="border rounded-lg p-4 space-y-3">
@@ -192,14 +216,9 @@ export function PricingReviewStep({
                     {watched?.plantVariety && watched.plantVariety !== productName && (
                       <span className="text-muted-foreground">({watched.plantVariety})</span>
                     )}
-                    {isGrowersChoice && (
-                      <Badge variant="outline" className="text-amber-700 border-amber-400 text-xs">
-                        Grower&apos;s Choice
-                      </Badge>
-                    )}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Qty {qty} • VAT {vatRate}% • Line total €{total.toFixed(2)}
+                    Qty {qty} • VAT {vatRate}% • Line total {fc(total)}
                   </div>
                 </div>
               </div>
@@ -295,7 +314,7 @@ export function PricingReviewStep({
                           value={field.value ?? ''}
                           onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value))}
                         />
-                        <span className="text-sm text-muted-foreground whitespace-nowrap">for €</span>
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">for {sym}</span>
                       </div>
                     )}
                   />
@@ -316,7 +335,7 @@ export function PricingReviewStep({
                   />
                   {watched?.multibuyQty2 && watched?.multibuyPrice2 && (
                     <span className="text-xs text-muted-foreground ml-2">
-                      (saves €{((price * watched.multibuyQty2) - watched.multibuyPrice2).toFixed(2)})
+                      (saves {fc((price * watched.multibuyQty2) - watched.multibuyPrice2)})
                     </span>
                   )}
                 </div>
@@ -341,15 +360,15 @@ export function PricingReviewStep({
               <SelectItem value="__none__">No delivery charge (Collection)</SelectItem>
               {deliveryFees.map((fee) => (
                 <SelectItem key={fee.id} value={fee.id}>
-                  {fee.name} - €{fee.amount.toFixed(2)}
-                  {fee.minOrderValue && ` (free over €${fee.minOrderValue})`}
+                  {fee.name} - {fc(fee.amount)}
+                  {fee.minOrderValue && ` (free over ${fc(fee.minOrderValue)})`}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           {deliveryInfo.waived && (
             <p className="text-sm text-green-600">
-              ✓ Free delivery - order exceeds €{deliveryInfo.minValue}
+              ✓ Free delivery - order exceeds {fc(deliveryInfo.minValue ?? 0)}
             </p>
           )}
         </div>
@@ -362,7 +381,7 @@ export function PricingReviewStep({
         {/* Products */}
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Products</span>
-          <span className="font-medium">€{grandTotal.productsNet.toFixed(2)}</span>
+          <span className="font-medium">{fc(grandTotal.productsNet)}</span>
         </div>
         
         {/* Pre-pricing fee */}
@@ -377,14 +396,14 @@ export function PricingReviewStep({
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="text-[10px] font-normal">
-                  {prePricingInfo.totalUnits} × €{prePricingInfo.ratePerUnit.toFixed(2)}
+                  {prePricingInfo.totalUnits} × {fc(prePricingInfo.ratePerUnit)}
                 </Badge>
               )}
             </span>
             {prePricingInfo.isFoc ? (
               <span className="font-medium text-green-600">FOC</span>
             ) : (
-              <span className="font-medium">€{prePricingInfo.fee.toFixed(2)}</span>
+              <span className="font-medium">{fc(prePricingInfo.fee)}</span>
             )}
           </div>
         )}
@@ -399,24 +418,24 @@ export function PricingReviewStep({
             {deliveryInfo.waived ? (
               <span className="font-medium text-green-600">FREE</span>
             ) : (
-              <span className="font-medium">€{deliveryInfo.fee.toFixed(2)}</span>
+              <span className="font-medium">{fc(deliveryInfo.fee)}</span>
             )}
           </div>
         )}
 
         <div className="flex items-center justify-between text-sm pt-2 border-t">
           <span className="text-muted-foreground">Subtotal (excl. VAT)</span>
-          <span className="font-medium">€{grandTotal.totalNet.toFixed(2)}</span>
+          <span className="font-medium">{fc(grandTotal.totalNet)}</span>
         </div>
-        
+
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">VAT</span>
-          <span className="font-medium">€{grandTotal.totalVat.toFixed(2)}</span>
+          <span className="font-medium">{fc(grandTotal.totalVat)}</span>
         </div>
-        
+
         <div className="flex items-center justify-between text-lg font-semibold pt-2 border-t">
           <span>Grand Total</span>
-          <span>€{grandTotal.grandTotal.toFixed(2)}</span>
+          <span>{fc(grandTotal.grandTotal)}</span>
         </div>
       </div>
     </div>

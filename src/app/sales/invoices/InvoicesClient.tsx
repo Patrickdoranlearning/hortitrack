@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ViewToggle, useViewToggle } from '@/components/ui/view-toggle';
 import InvoiceDetailDialog from '@/components/sales/InvoiceDetailDialog';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import { useToast } from '@/hooks/use-toast';
 import {
   MoreHorizontal,
@@ -234,12 +235,12 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
                     <div className="flex items-center justify-between pt-2 border-t">
                       <div className="text-sm">
                         <span className="text-muted-foreground">Total: </span>
-                        <span className="font-semibold">€{invoice.total_inc_vat.toFixed(2)}</span>
+                        <span className="font-semibold">{formatCurrency(invoice.total_inc_vat, (invoice as any).currency as CurrencyCode)}</span>
                       </div>
                       <div className="text-sm">
                         {invoice.balance_due > 0 ? (
                           <span className={overdue ? 'text-red-600 font-semibold' : 'font-semibold'}>
-                            Due: €{invoice.balance_due.toFixed(2)}
+                            Due: {formatCurrency(invoice.balance_due, (invoice as any).currency as CurrencyCode)}
                           </span>
                         ) : (
                           <span className="text-green-600 font-semibold">Paid</span>
@@ -347,12 +348,12 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
                       )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      €{invoice.total_inc_vat.toFixed(2)}
+                      {formatCurrency(invoice.total_inc_vat, (invoice as any).currency as CurrencyCode)}
                     </TableCell>
                     <TableCell className="text-right hidden sm:table-cell">
                       {invoice.balance_due > 0 ? (
                         <span className={overdue ? 'text-red-600 font-medium' : 'font-medium'}>
-                          €{invoice.balance_due.toFixed(2)}
+                          {formatCurrency(invoice.balance_due, (invoice as any).currency as CurrencyCode)}
                         </span>
                       ) : (
                         <span className="text-green-600">Paid</span>
@@ -413,12 +414,12 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
           <div className="flex gap-4">
             <span>
               Total: <strong className="text-foreground">
-                €{filteredInvoices.reduce((sum, inv) => sum + inv.total_inc_vat, 0).toFixed(2)}
+                {formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.total_inc_vat, 0))}
               </strong>
             </span>
             <span>
               Outstanding: <strong className="text-foreground">
-                €{filteredInvoices.reduce((sum, inv) => sum + inv.balance_due, 0).toFixed(2)}
+                {formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.balance_due, 0))}
               </strong>
             </span>
           </div>

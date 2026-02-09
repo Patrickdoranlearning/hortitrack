@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Mail } from 'lucide-react';
 import { useCompanyName } from '@/lib/org/context';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { InvoiceWithCustomer } from '@/app/sales/invoices/InvoicesClient';
 
 interface InvoiceCardProps {
@@ -15,6 +16,7 @@ interface InvoiceCardProps {
 
 export default function InvoiceCard({ invoice, onOpen }: InvoiceCardProps) {
   const companyName = useCompanyName();
+  const currency = (invoice.currency as CurrencyCode) || 'EUR';
   const customerName = invoice.customer?.name || 'Unknown Customer';
   const customerEmail = invoice.customer?.email;
 
@@ -22,7 +24,7 @@ export default function InvoiceCard({ invoice, onOpen }: InvoiceCardProps) {
     e.stopPropagation();
     const subject = encodeURIComponent(`Invoice ${invoice.invoice_number} from ${companyName}`);
     const body = encodeURIComponent(
-      `Dear ${customerName},\n\nPlease find attached invoice ${invoice.invoice_number}.\n\nTotal: €${invoice.total_inc_vat.toFixed(2)}\nDue Date: ${invoice.due_date ? format(new Date(invoice.due_date), 'PPP') : 'N/A'}\n\nThank you for your business.\n\nKind regards,\n${companyName}`
+      `Dear ${customerName},\n\nPlease find attached invoice ${invoice.invoice_number}.\n\nTotal: ${formatCurrency(invoice.total_inc_vat, currency)}\nDue Date: ${invoice.due_date ? format(new Date(invoice.due_date), 'PPP') : 'N/A'}\n\nThank you for your business.\n\nKind regards,\n${companyName}`
     );
     const mailto = customerEmail
       ? `mailto:${customerEmail}?subject=${subject}&body=${body}`
@@ -57,7 +59,7 @@ export default function InvoiceCard({ invoice, onOpen }: InvoiceCardProps) {
         </div>
         <div className="text-sm font-medium mt-1">{customerName}</div>
         <div className="text-xl font-semibold mt-2">
-          €{invoice.total_inc_vat.toFixed(2)}
+          {formatCurrency(invoice.total_inc_vat, currency)}
         </div>
       </div>
       <div className="mt-4 flex items-center justify-between">

@@ -3,6 +3,7 @@
 import { Card } from '@/components/ui/card';
 import { format } from 'date-fns';
 import OrderStatusBadge from './OrderStatusBadge';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { SalesOrderWithCustomer } from '@/app/sales/orders/SalesOrdersClient';
 
 interface OrderCardProps {
@@ -26,7 +27,7 @@ export default function OrderCard({ order, onOpen, onCopy }: OrderCardProps) {
         </div>
         <div className="text-sm font-medium mt-1">{customerName}</div>
         <div className="text-xl font-semibold mt-2">
-          {order.total_inc_vat ? `€${order.total_inc_vat.toFixed(2)}` : '€0.00'}
+          {formatCurrency(order.total_inc_vat || 0, (order.currency as CurrencyCode) || 'EUR')}
         </div>
       </div>
       <div className="mt-4 flex items-center justify-between">

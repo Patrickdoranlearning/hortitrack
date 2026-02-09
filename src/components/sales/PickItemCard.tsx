@@ -23,6 +23,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { PickItem } from '@/server/sales/picking';
 import SaleLabelPrintWizard from './SaleLabelPrintWizard';
 import MultiBatchPickDialog from './MultiBatchPickDialog';
@@ -36,6 +37,7 @@ interface PickItemCardProps {
   isSubmitting?: boolean;
   readonly?: boolean;
   unitPrice?: number; // Optional price for label printing
+  currency?: CurrencyCode;
 }
 
 const statusConfig = {
@@ -70,6 +72,7 @@ export default function PickItemCard({
   isSubmitting = false,
   readonly = false,
   unitPrice,
+  currency = 'EUR',
 }: PickItemCardProps) {
   const [qty, setQty] = useState(item.targetQty);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -84,7 +87,7 @@ export default function PickItemCard({
   const labelData = {
     productTitle: item.productName || item.plantVariety || 'Unknown',
     size: item.size || '',
-    priceText: unitPrice != null ? `€${unitPrice.toFixed(2)}` : '',
+    priceText: unitPrice != null ? formatCurrency(unitPrice, currency) : '',
     lotNumber: item.pickedBatchNumber || item.originalBatchNumber,
     quantity: item.status === 'picked' ? item.pickedQty : item.targetQty,
   };

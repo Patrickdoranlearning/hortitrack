@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CartItem } from '@/lib/b2b/types';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 export type PricingHint = {
   rrp?: number | null;
@@ -18,9 +19,10 @@ type Props = {
   cart: CartItem[];
   pricingHints?: Record<string, PricingHint>; // keyed by productId
   onUpdateItem: (index: number, updates: Partial<CartItem>) => void;
+  currency?: CurrencyCode;
 };
 
-export function B2BCheckoutPricing({ cart, pricingHints, onUpdateItem }: Props) {
+export function B2BCheckoutPricing({ cart, pricingHints, onUpdateItem, currency = 'EUR' }: Props) {
   const subtotalExVat = useMemo(
     () => cart.reduce((sum, item) => sum + item.quantity * item.unitPriceExVat, 0),
     [cart]
@@ -57,7 +59,7 @@ export function B2BCheckoutPricing({ cart, pricingHints, onUpdateItem }: Props) 
                             onChange={(e) => onUpdateItem(index, { rrp: parseFloat(e.target.value) || 0 })}
                             placeholder={
                               hint?.rrp
-                                ? `Last used: €${Number(hint.rrp).toFixed(2)}`
+                                ? `Last used: ${formatCurrency(Number(hint.rrp), currency)}`
                                 : 'Enter RRP'
                             }
                             className="h-8 text-sm"
@@ -88,7 +90,7 @@ export function B2BCheckoutPricing({ cart, pricingHints, onUpdateItem }: Props) 
                             }
                             placeholder={
                               hint?.multibuyPrice2
-                                ? `€${Number(hint.multibuyPrice2).toFixed(2)}`
+                                ? formatCurrency(Number(hint.multibuyPrice2), currency)
                                 : 'e.g., 10.00'
                             }
                             className="h-8 text-sm"
@@ -109,7 +111,7 @@ export function B2BCheckoutPricing({ cart, pricingHints, onUpdateItem }: Props) 
           </ScrollArea>
 
           <div className="text-sm font-medium">
-            Order subtotal (ex VAT): €{subtotalExVat.toFixed(2)}
+            Order subtotal (ex VAT): {formatCurrency(subtotalExVat, currency)}
           </div>
         </>
       )}

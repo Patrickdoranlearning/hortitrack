@@ -11,7 +11,7 @@ type Symbology = "code128" | "ean13";
 export type SaleLabelInput = {
   productTitle: string;      // e.g., "Veronica 'Blue Bomb'"
   size: string;              // "10.5cm"
-  priceText: string;         // "€5.99"
+  priceText: string;         // e.g. "€5.99" or "£5.99"
   barcode: string;           // data-to-encode
   symbology?: Symbology;     // default code128
   footerSmall?: string;      // e.g., "Grown in Ireland – Doran Nurseries"

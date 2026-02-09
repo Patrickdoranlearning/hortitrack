@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Search, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type Invoice = {
   id: string;
@@ -34,6 +35,7 @@ type Invoice = {
 
 type B2BInvoicesClientProps = {
   invoices: Invoice[];
+  currency?: CurrencyCode;
 };
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -44,7 +46,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   overdue: { label: 'Overdue', variant: 'destructive' },
 };
 
-export function B2BInvoicesClient({ invoices }: B2BInvoicesClientProps) {
+export function B2BInvoicesClient({ invoices, currency = 'EUR' }: B2BInvoicesClientProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -170,15 +172,15 @@ export function B2BInvoicesClient({ invoices }: B2BInvoicesClientProps) {
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div>
                       <p className="text-sm text-muted-foreground">Subtotal (ex VAT)</p>
-                      <p className="font-medium">€{invoice.subtotal_ex_vat.toFixed(2)}</p>
+                      <p className="font-medium">{formatCurrency(invoice.subtotal_ex_vat, currency)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">VAT</p>
-                      <p className="font-medium">€{invoice.vat_amount.toFixed(2)}</p>
+                      <p className="font-medium">{formatCurrency(invoice.vat_amount, currency)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Total (inc VAT)</p>
-                      <p className="font-medium text-lg">€{invoice.total_inc_vat.toFixed(2)}</p>
+                      <p className="font-medium text-lg">{formatCurrency(invoice.total_inc_vat, currency)}</p>
                     </div>
                   </div>
 

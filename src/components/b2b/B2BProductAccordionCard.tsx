@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { StockStatusIndicator } from '@/components/sales/ProductATSBadge';
 import type { CustomerCatalogProductWithVarieties, CartItem } from '@/lib/b2b/types';
 import type { StockStatus } from '@/app/sales/allocation-actions';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 const LOW_STOCK_THRESHOLD = 100;
 
@@ -41,6 +42,7 @@ type B2BProductAccordionCardProps = {
   product: CustomerCatalogProductWithVarieties;
   onAddToTrolley: (items: CartItem | CartItem[]) => void;
   viewMode?: 'card' | 'list';
+  currency?: CurrencyCode;
 };
 
 /**
@@ -74,6 +76,7 @@ export function B2BProductAccordionCard({
   product,
   onAddToTrolley,
   viewMode = 'card',
+  currency = 'EUR',
 }: B2BProductAccordionCardProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string>('');
@@ -305,7 +308,7 @@ export function B2BProductAccordionCard({
                   {/* Price */}
                   <div className="text-right shrink-0">
                     <span className="font-bold text-lg">
-                      €{product.unitPriceExVat?.toFixed(2) || '0.00'}
+                      {formatCurrency(product.unitPriceExVat ?? 0, currency)}
                     </span>
                   </div>
 
@@ -521,7 +524,7 @@ export function B2BProductAccordionCard({
                     {/* Price & Stock */}
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-lg font-semibold">
-                        €{product.unitPriceExVat?.toFixed(2) || '0.00'}
+                        {formatCurrency(product.unitPriceExVat ?? 0, currency)}
                       </span>
                       <div className="flex items-center gap-1.5">
                         <StockStatusIndicator status={getStockStatus(product.totalAvailableQty)} size="sm" />

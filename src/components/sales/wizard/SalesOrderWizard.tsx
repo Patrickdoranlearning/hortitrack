@@ -7,6 +7,7 @@ import {
   CreateOrderInput,
   CreateOrderSchema,
   CustomerAddress,
+  OrderFeeInput,
   VarietyBreakdownMap,
 } from '@/lib/sales/types';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import { CopyOrderDialog } from './CopyOrderDialog';
 import { createOrder, getOrderForCopy, getPricingHints, type PricingHint } from '@/app/sales/actions';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
 import type { ProductGroupWithAvailability } from '@/server/sales/product-groups-with-availability';
-import type { OrgFee } from '@/app/sales/settings/fees/actions';
+import type { OrgFee } from '@/app/settings/fees/actions';
 
 export type SalesCustomer = {
   id: string;
@@ -119,36 +120,60 @@ function expandVarietyBreakdowns(
     const fieldId = fieldIds[i];
     const breakdown = fieldId ? breakdowns[fieldId] : undefined;
 
-    // If not a product group line, or no breakdown specified, pass through unchanged
-    if (!line.productGroupId || !breakdown || breakdown.every(v => v.qty === 0)) {
+    const hasSpecified = breakdown && breakdown.some(v => v.qty > 0);
+
+    // If no breakdown specified, pass through unchanged
+    if (!hasSpecified) {
       expandedLines.push(line);
       continue;
     }
 
-    const specifiedVarieties = breakdown.filter(v => v.qty > 0);
+    const specifiedVarieties = breakdown!.filter(v => v.qty > 0);
     const specifiedTotal = specifiedVarieties.reduce((sum, v) => sum + v.qty, 0);
     const remainder = line.qty - specifiedTotal;
 
-    // Add one line per specified variety
-    for (const variety of specifiedVarieties) {
-      expandedLines.push({
-        ...line,
-        productId: variety.productId,
-        productGroupId: undefined,
-        qty: variety.qty,
-        description: variety.productName,
-      });
-    }
+    if (line.productGroupId) {
+      // Product group line: expand into child product lines
+      for (const variety of specifiedVarieties) {
+        expandedLines.push({
+          ...line,
+          productId: variety.productId,
+          productGroupId: undefined,
+          qty: variety.qty,
+          description: variety.productName,
+        });
+      }
 
-    // Add Grower's Choice line for remainder (if any)
-    if (remainder > 0) {
-      expandedLines.push({
-        ...line,
-        qty: remainder,
-        description: line.description
-          ? `${line.description} (Grower's Choice)`
-          : "Grower's Choice",
-      });
+      if (remainder > 0) {
+        expandedLines.push({
+          ...line,
+          qty: remainder,
+          description: line.description
+            ? `${line.description} (Grower's Choice)`
+            : "Grower's Choice",
+        });
+      }
+    } else if (line.productId) {
+      // Regular product line with variety breakdown: create per-variety lines
+      for (const variety of specifiedVarieties) {
+        expandedLines.push({
+          ...line,
+          qty: variety.qty,
+          requiredVarietyId: variety.varietyId,
+          description: variety.productName,
+        });
+      }
+
+      if (remainder > 0) {
+        expandedLines.push({
+          ...line,
+          qty: remainder,
+          description: "Grower's Choice",
+        });
+      }
+    } else {
+      // Fallback: pass through unchanged
+      expandedLines.push(line);
     }
   }
 
@@ -169,19 +194,28 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
   const [prefillPending, startPrefillTransition] = useTransition();
   const [pricingHints, setPricingHints] = useState<Record<string, PricingHint>>({});
   const [varietyBreakdowns, setVarietyBreakdowns] = useState<VarietyBreakdownMap>({});
+  const [orderFees, setOrderFees] = useState<OrderFeeInput[]>([]);
 
   const handleVarietyQtyChange = useCallback(
-    (fieldId: string, productId: string, qty: number) => {
+    (fieldId: string, key: string, qty: number) => {
+      let newTotal = 0;
       setVarietyBreakdowns((prev) => {
         const lineBreakdown = [...(prev[fieldId] || [])];
-        const idx = lineBreakdown.findIndex((v) => v.productId === productId);
+        // Match by varietyId first (regular products), then by productId (product groups)
+        const idx = lineBreakdown.findIndex((v) => v.varietyId === key || v.productId === key);
         if (idx >= 0) {
           lineBreakdown[idx] = { ...lineBreakdown[idx], qty };
         }
+        newTotal = lineBreakdown.reduce((sum, v) => sum + v.qty, 0);
         return { ...prev, [fieldId]: lineBreakdown };
       });
+      // Auto-sync: parent line qty = sum of variety quantities
+      const lineIndex = fieldsRef.current.findIndex((f) => f.id === fieldId);
+      if (lineIndex >= 0 && newTotal > 0) {
+        form.setValue(`lines.${lineIndex}.qty`, newTotal);
+      }
     },
-    []
+    [form]
   );
 
   const initializeBreakdown = useCallback(
@@ -193,6 +227,22 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
           productName: child.productName,
           qty: 0,
           availableStock: child.availableStock,
+        })),
+      }));
+    },
+    []
+  );
+
+  const initializeProductVarietyBreakdown = useCallback(
+    (fieldId: string, product: ProductWithBatches, varieties: Array<{varietyId?: string; name: string; stock: number}>) => {
+      setVarietyBreakdowns((prev) => ({
+        ...prev,
+        [fieldId]: varieties.map((v) => ({
+          productId: product.id,
+          varietyId: v.varietyId,
+          productName: v.name,
+          qty: 0,
+          availableStock: v.stock,
         })),
       }));
     },
@@ -251,6 +301,10 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
     name: 'lines',
   });
 
+  // Ref to current fields for stable access inside callbacks
+  const fieldsRef = useRef(fields);
+  fieldsRef.current = fields;
+
   const selectedCustomerId = useWatch({ control, name: 'customerId' });
   const watchedLines = useWatch({ control, name: 'lines' });
 
@@ -284,7 +338,10 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
     [customerAddresses]
   );
 
-  // Auto-populate delivery address when customer changes
+  // Resolve currency for display (from customer or form default)
+  const orderCurrency = (selectedCustomer?.currency === 'GBP' ? 'GBP' : 'EUR') as import('@/lib/format-currency').CurrencyCode;
+
+  // Auto-populate delivery address and currency when customer changes
   useEffect(() => {
     if (defaultShippingAddress) {
       const formatted = formatAddress(defaultShippingAddress);
@@ -296,7 +353,9 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
       setValue('shipToAddressId', undefined);
       setValue('deliveryAddress', '');
     }
-  }, [defaultShippingAddress, setValue]);
+    // Set currency from customer preference
+    setValue('currency', orderCurrency);
+  }, [defaultShippingAddress, orderCurrency, setValue]);
 
   // Stable product ID string to avoid re-triggering when server action revalidates props
   const filteredProductIds = useMemo(
@@ -402,13 +461,13 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
     setIsSubmitting(true);
     submittingRef.current = true; // Prevent auto-save from re-saving draft
     try {
-      // Validate no over-allocation in variety breakdowns
+      // Validate no over-allocation in variety breakdowns (product groups and regular products)
       const fieldIds = fields.map(f => f.id);
       for (let i = 0; i < values.lines.length; i++) {
         const line = values.lines[i];
         const fieldId = fieldIds[i];
         const breakdown = fieldId ? varietyBreakdowns[fieldId] : undefined;
-        if (line.productGroupId && breakdown) {
+        if (breakdown && breakdown.some(v => v.qty > 0)) {
           const specifiedTotal = breakdown.reduce((sum, v) => sum + v.qty, 0);
           if (specifiedTotal > line.qty) {
             setSubmitError(
@@ -423,6 +482,8 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
 
       // Expand variety breakdowns into separate order lines
       const expandedValues = expandVarietyBreakdowns(values, varietyBreakdowns, fieldIds);
+      // Attach computed fees from PricingReviewStep
+      expandedValues.fees = orderFees;
       const result = await createOrder(expandedValues);
       // If createOrder returns an error object, display it
       if (result && 'error' in result) {
@@ -586,10 +647,12 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
               append={append}
               remove={remove}
               selectedCustomerId={selectedCustomerId}
+              currency={orderCurrency}
               pricingHints={pricingHints}
               varietyBreakdowns={varietyBreakdowns}
               onVarietyQtyChange={handleVarietyQtyChange}
               onInitBreakdown={initializeBreakdown}
+              onInitProductBreakdown={initializeProductVarietyBreakdown}
             />
           )}
 
@@ -600,6 +663,7 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
               lines={fields}
               products={filteredProducts}
               selectedCustomerId={selectedCustomerId}
+              currency={orderCurrency}
               fees={fees}
               defaultShowRrp={selectedCustomer?.requiresPrePricing ?? false}
               customerPrePricing={
@@ -610,6 +674,7 @@ export function SalesOrderWizard({ customers, products, productGroups = [], copy
                     }
                   : undefined
               }
+              onFeesChange={setOrderFees}
             />
           )}
 

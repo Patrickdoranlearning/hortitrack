@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { createPickListFromOrder, getPickListForOrder } from '@/server/sales/picking';
 import { logError } from '@/lib/log';
 import { roundToTwo } from '@/lib/utils';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 // ================================================
 // ORDER STATUS ACTIONS
@@ -278,7 +279,7 @@ export async function updateOrderItem(
     org_id: item.orders.org_id,
     order_id: item.order_id,
     event_type: 'item_updated',
-    description: `Item updated: qty ${quantity}, price €${unitPrice.toFixed(2)}`,
+    description: `Item updated: qty ${quantity}, price ${formatCurrency(unitPrice)}`,
     metadata: { itemId, quantity, unitPrice },
     created_by: user.id,
   });
@@ -492,7 +493,7 @@ export async function createCreditNote(
     org_id: order.org_id,
     order_id: orderId,
     event_type: 'credit_note_created',
-    description: `Credit note created for €${totalCreditAmount.toFixed(2)}: ${data.reason}`,
+    description: `Credit note created for ${formatCurrency(totalCreditAmount)}: ${data.reason}`,
     metadata: {
       invoiceId: invoice.id,
       reason: data.reason,

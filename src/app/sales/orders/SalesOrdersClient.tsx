@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import OrderStatusBadge from '@/components/sales/OrderStatusBadge';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import {
   Printer,
   Copy,
@@ -47,6 +48,7 @@ export interface SalesOrderWithCustomer {
   requested_delivery_date: string | null;
   notes: string | null;
   created_at: string;
+  currency?: string;
   updated_at: string;
   customer?: {
     name: string;
@@ -381,7 +383,7 @@ export default function SalesOrdersClient({
                             : 'No delivery date'}
                         </div>
                         <div className="font-semibold">
-                          €{(order.total_inc_vat || 0).toFixed(2)}
+                          {formatCurrency(order.total_inc_vat || 0, (order.currency as CurrencyCode) || 'EUR')}
                         </div>
                       </div>
                     </div>
@@ -481,7 +483,7 @@ export default function SalesOrdersClient({
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        €{(order.total_inc_vat || 0).toFixed(2)}
+                        {formatCurrency(order.total_inc_vat || 0, (order.currency as CurrencyCode) || 'EUR')}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">

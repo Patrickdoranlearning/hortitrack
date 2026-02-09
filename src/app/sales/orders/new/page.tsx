@@ -4,7 +4,7 @@ import { PageFrame } from '@/ui/templates';
 import { SalesOrderWizard } from '@/components/sales/wizard/SalesOrderWizard';
 import { getProductsWithBatches } from '@/server/sales/products-with-batches';
 import { getProductGroupsWithAvailability } from '@/server/sales/product-groups-with-availability';
-import { getOrgFees } from '@/app/sales/settings/fees/actions';
+import { getOrgFees } from '@/app/settings/fees/actions';
 import { redirect } from 'next/navigation';
 import { logError } from '@/lib/log';
 

@@ -87,6 +87,7 @@ import {
   updateCustomerDefaultPriceListAction,
 } from "./actions";
 import { emitMutation } from "@/lib/events/mutation-events";
+import { formatCurrency, type CurrencyCode } from "@/lib/format-currency";
 
 // =============================================================================
 // TYPES
@@ -337,6 +338,7 @@ export function CustomerSheet({
                 products={products}
                 priceLists={priceLists}
                 defaultPriceListId={form.defaultPriceListId}
+                currency={(form.currency as CurrencyCode) || 'EUR'}
                 onDefaultPriceListChange={(id) => setForm((p) => ({ ...p, defaultPriceListId: id }))}
                 onUpdated={() => emitMutation({ resource: 'customers', action: 'update', id: effectiveCustomerId })}
               />
@@ -1343,6 +1345,7 @@ function PricingTab({
   products,
   priceLists,
   defaultPriceListId,
+  currency,
   onDefaultPriceListChange,
   onUpdated,
 }: {
@@ -1350,6 +1353,7 @@ function PricingTab({
   products: CustomerSheetProps["products"];
   priceLists: CustomerSheetProps["priceLists"];
   defaultPriceListId: string;
+  currency: CurrencyCode;
   onDefaultPriceListChange: (id: string) => void;
   onUpdated: () => void;
 }) {
@@ -1481,10 +1485,10 @@ function PricingTab({
                   </TableCell>
                   <TableCell>{p.customerSkuCode || "—"}</TableCell>
                   <TableCell className="text-right">
-                    {p.unitPriceExVat != null ? `€${p.unitPriceExVat.toFixed(2)}` : "—"}
+                    {p.unitPriceExVat != null ? formatCurrency(p.unitPriceExVat, currency) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {p.rrp != null ? `€${p.rrp.toFixed(2)}` : "—"}
+                    {p.rrp != null ? formatCurrency(p.rrp, currency) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

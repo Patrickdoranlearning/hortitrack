@@ -31,10 +31,12 @@ import {
   Clock,
   Package,
   Send,
-  Check
+  Check,
+  Tag
 } from 'lucide-react';
 import { updateOrderStatus, voidOrder } from '@/app/sales/orders/[orderId]/actions';
 import type { OrderDetails } from './OrderDetailPage';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import { TrolleyReconciliationCard } from '@/components/shared/TrolleyReconciliationCard';
 import { CustomerTrolleyBadge } from '@/components/shared/CustomerTrolleyBadge';
 
@@ -72,6 +74,8 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
 export default function OrderSummaryCard({ order, onStatusChange }: OrderSummaryCardProps) {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const currency = (order.currency === 'GBP' ? 'GBP' : 'EUR') as CurrencyCode;
+  const fc = (amount: number) => formatCurrency(amount, currency);
 
   const customer = order.customer;
   const currentStatusIndex = STATUS_FLOW.findIndex(s => s.status === order.status);
@@ -244,16 +248,37 @@ export default function OrderSummaryCard({ order, onStatusChange }: OrderSummary
         <CardContent className="space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal (ex VAT)</span>
-            <span>€{order.subtotal_ex_vat.toFixed(2)}</span>
+            <span>{fc(order.subtotal_ex_vat)}</span>
           </div>
+
+          {/* Order fees (pre-pricing, delivery, etc.) */}
+          {order.order_fees?.map(fee => (
+            <div key={fee.id} className="flex justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                {fee.fee_type === 'pre_pricing' && <Tag className="h-3 w-3" />}
+                {fee.fee_type.includes('delivery') && <Truck className="h-3 w-3" />}
+                {fee.name}
+                {fee.total_amount === 0 && (
+                  <Badge variant="secondary" className="text-[10px] font-normal ml-1">FOC</Badge>
+                )}
+                {fee.quantity > 1 && fee.total_amount > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    ({fee.quantity} x {fc(fee.unit_amount)})
+                  </span>
+                )}
+              </span>
+              <span>{fee.total_amount === 0 ? 'FOC' : fc(fee.subtotal)}</span>
+            </div>
+          ))}
+
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">VAT</span>
-            <span>€{order.vat_amount.toFixed(2)}</span>
+            <span>{fc(order.vat_amount)}</span>
           </div>
           <Separator />
           <div className="flex justify-between font-semibold text-lg">
             <span>Total</span>
-            <span>€{order.total_inc_vat.toFixed(2)}</span>
+            <span>{fc(order.total_inc_vat)}</span>
           </div>
         </CardContent>
       </Card>

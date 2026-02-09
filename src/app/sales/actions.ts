@@ -51,6 +51,7 @@ type CustomerOrgRow = {
     id: string;
     org_id: string;
     default_price_list_id: string | null;
+    currency: string;
 };
 
 /**
@@ -76,7 +77,7 @@ export async function createOrder(data: CreateOrderInput) {
         return { error: 'Invalid form data', details: result.error.flatten() };
     }
 
-    const { customerId, lines, deliveryDate, notesInternal, notesCustomer, shipToAddressId, storeId } = result.data;
+    const { customerId, lines, deliveryDate, notesInternal, notesCustomer, shipToAddressId, storeId, fees: orderFees, currency: inputCurrency } = result.data;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -191,7 +192,7 @@ export async function createOrder(data: CreateOrderInput) {
             quantity: line.qty,
             unit_price: unitPrice,
             vat_rate: vatRate,
-            required_variety_id: null,
+            required_variety_id: line.requiredVarietyId ?? null,
             required_batch_id: null,
             rrp: line.rrp ?? null,
             allocations: []
@@ -220,6 +221,12 @@ export async function createOrder(data: CreateOrderInput) {
 
     const orderId = rpcResult.order_id as string;
 
+    // Set currency on order (from customer or explicit input)
+    const orderCurrency = inputCurrency || customerRecord.currency || 'EUR';
+    if (orderCurrency !== 'EUR') {
+        await supabase.from('orders').update({ currency: orderCurrency }).eq('id', orderId);
+    }
+
     await supabase.from('order_events').insert({
         org_id: orgId,
         order_id: orderId,
@@ -227,6 +234,34 @@ export async function createOrder(data: CreateOrderInput) {
         description: 'Order created via internal UI',
         created_by: user.id,
     });
+
+    // Persist order fees (pre-pricing, delivery, etc.)
+    if (orderFees && orderFees.length > 0) {
+        const feeInserts = orderFees.map(fee => {
+            const subtotal = fee.isFoc ? 0 : fee.quantity * fee.unitAmount;
+            const vatAmount = subtotal * (fee.vatRate / 100);
+            return {
+                order_id: orderId,
+                org_fee_id: fee.orgFeeId || null,
+                fee_type: fee.feeType,
+                name: fee.name,
+                quantity: fee.quantity,
+                unit_amount: fee.isFoc ? 0 : roundToTwo(fee.unitAmount),
+                unit: fee.unit,
+                subtotal: roundToTwo(subtotal),
+                vat_rate: fee.vatRate,
+                vat_amount: roundToTwo(vatAmount),
+                total_amount: roundToTwo(subtotal + vatAmount),
+            };
+        });
+
+        const { error: feeError } = await supabase.from('order_fees').insert(feeInserts);
+        if (feeError) {
+            logError('Failed to insert order fees', { error: feeError.message, orderId, feeCount: feeInserts.length });
+            // Non-fatal: order was created, fees failed to save
+            // The trigger on order_fees would have recalculated totals if successful
+        }
+    }
 
     // Update order items with product_group_id if needed
     if (productGroupLines.length > 0) {
@@ -578,7 +613,7 @@ async function resolveActiveOrgId(client: ServerClient, userId: string) {
 }
 
 async function fetchCustomerWithOrg(client: ServerClient, customerId: string): Promise<CustomerOrgRow | null> {
-    const { data, error } = await client.from('customers').select('id, org_id, default_price_list_id').eq('id', customerId).maybeSingle();
+    const { data, error } = await client.from('customers').select('id, org_id, default_price_list_id, currency').eq('id', customerId).maybeSingle();
     if (error) {
         logError('Failed to load customer', { error: error.message, customerId });
         return null;
@@ -848,31 +883,36 @@ export async function getPricingHints(customerId: string, productIds: string[]):
     if (!customerId || productIds.length === 0) return {};
     const supabase = await createClient();
     const hints: Record<string, PricingHint> = {};
-    const { data: orderItems, error: orderError } = await supabase.from('order_items').select(`product_id, rrp, multibuy_price_2, multibuy_qty_2, created_at, orders!inner(customer_id)`).eq('orders.customer_id', customerId).in('product_id', productIds).order('created_at', { ascending: false });
-    if (orderError) {
-        logError('Order history lookup failed for pricing hints', { error: orderError.message, customerId });
-    } else if (orderItems) {
-        for (const row of orderItems) {
-            const productId = row.product_id;
-            if (!productId || hints[productId]) continue;
-            if (row.rrp != null || row.multibuy_price_2 != null || row.multibuy_qty_2 != null) {
-                hints[productId] = { rrp: row.rrp, multibuyPrice2: row.multibuy_price_2, multibuyQty2: row.multibuy_qty_2 };
+
+    // Priority 1: Explicit defaults from product_aliases (customer Pricing tab)
+    const { data: aliases, error: aliasError } = await supabase.from('product_aliases').select('product_id, rrp').eq('customer_id', customerId).in('product_id', productIds).eq('is_active', true);
+    if (aliasError) {
+        logError('Alias lookup failed for pricing hints', { error: aliasError.message, customerId });
+    } else if (aliases) {
+        for (const alias of aliases) {
+            if (alias.product_id && alias.rrp != null) {
+                hints[alias.product_id] = { rrp: alias.rrp, multibuyPrice2: null, multibuyQty2: null };
             }
         }
     }
+
+    // Priority 2: Order history for products not covered by aliases
     const remainingProductIds = productIds.filter(id => !hints[id]);
     if (remainingProductIds.length > 0) {
-        const { data: aliases, error: aliasError } = await supabase.from('product_aliases').select('product_id, rrp').eq('customer_id', customerId).in('product_id', remainingProductIds).eq('is_active', true);
-        if (aliasError) {
-            logError('Alias lookup failed for pricing hints', { error: aliasError.message, customerId });
-        } else if (aliases) {
-            for (const alias of aliases) {
-                if (alias.product_id && alias.rrp != null && !hints[alias.product_id]) {
-                    hints[alias.product_id] = { rrp: alias.rrp, multibuyPrice2: null, multibuyQty2: null };
+        const { data: orderItems, error: orderError } = await supabase.from('order_items').select(`product_id, rrp, multibuy_price_2, multibuy_qty_2, created_at, orders!inner(customer_id)`).eq('orders.customer_id', customerId).in('product_id', remainingProductIds).order('created_at', { ascending: false });
+        if (orderError) {
+            logError('Order history lookup failed for pricing hints', { error: orderError.message, customerId });
+        } else if (orderItems) {
+            for (const row of orderItems) {
+                const productId = row.product_id;
+                if (!productId || hints[productId]) continue;
+                if (row.rrp != null || row.multibuy_price_2 != null || row.multibuy_qty_2 != null) {
+                    hints[productId] = { rrp: row.rrp, multibuyPrice2: row.multibuy_price_2, multibuyQty2: row.multibuy_qty_2 };
                 }
             }
         }
     }
+
     return hints;
 }
 

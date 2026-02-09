@@ -8,6 +8,7 @@ import { Search } from 'lucide-react';
 import { useOrderStore } from '@/stores/use-order-store';
 import { SaleableProduct } from '@/server/sales/queries.server';
 import Image from 'next/image';
+import { formatCurrency, currencySymbol } from '@/lib/format-currency';
 
 interface ProductCardProps {
   product: SaleableProduct;
@@ -52,14 +53,14 @@ const ProductCard = ({ product }: ProductCardProps) => {
         </div>
         <div>
           <p className="text-muted-foreground">COST</p>
-          <p>€{product.cost?.toFixed(2)}</p>
+          <p>{formatCurrency(product.cost || 0)}</p>
         </div>
       </div>
       <div className="flex-1 grid grid-cols-2 gap-4 items-center">
         <div>
           <label className="text-xs text-muted-foreground">RETAIL PRICE</label>
           <div className="relative">
-            <span className="absolute left-2 top-1/2 -translate-y-1/2">€</span>
+            <span className="absolute left-2 top-1/2 -translate-y-1/2">{currencySymbol()}</span>
             <Input type="number" step="0.01" value={orderItem?.retailPrice || ''} onChange={handlePriceChange} className="pl-6" />
           </div>
         </div>
@@ -84,7 +85,7 @@ const OrderSummaryFooter = () => {
       </div>
       <div className="flex items-center gap-6">
         <div className="text-2xl font-bold">
-          Order Total €{cost.toFixed(2)}
+          Order Total {formatCurrency(cost)}
         </div>
         <Button variant="secondary" className="bg-white text-green-800 hover:bg-gray-200">
           PROCEED WITH ORDER

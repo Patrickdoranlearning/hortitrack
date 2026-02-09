@@ -17,6 +17,7 @@ import {
   Clock
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { formatCurrency } from '@/lib/format-currency';
 import { LogInteractionDialog } from './LogInteractionDialog';
 
 export interface SalesTarget {
@@ -157,7 +158,7 @@ export function TargetList({ targets }: TargetListProps) {
                   {target.avg_order_value && (
                     <div>
                       Avg: <span className="font-medium text-slate-700">
-                        €{Math.round(target.avg_order_value)}
+                        {formatCurrency(Math.round(target.avg_order_value))}
                       </span>
                     </div>
                   )}

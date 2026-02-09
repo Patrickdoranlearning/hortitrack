@@ -8,6 +8,7 @@ import { renderDocumentPdf } from "@/server/documents/render";
 import { defaultLayoutFor } from "@/lib/documents/presets";
 import { sendEmail } from "@/server/email/send";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/format-currency";
 
 type RouteParams = {
   params: Promise<{ invoiceId: string }>;
@@ -225,7 +226,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
               </div>
               <div class="details-row total">
                 <span class="label">Total Amount:</span>
-                <span class="value">€${invoice.total_inc_vat.toFixed(2)}</span>
+                <span class="value">${formatCurrency(invoice.total_inc_vat)}</span>
               </div>
             </div>
 

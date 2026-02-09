@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/format-currency';
 
 type IconName = 'trending-up' | 'euro' | 'calculator' | 'shopping-cart' | 'package' | 'clock' | 'alert-circle';
 
@@ -49,7 +50,7 @@ export function SalesMetricCard({
 }: SalesMetricCardProps) {
   const formattedValue = typeof value === 'number'
     ? format === 'currency'
-      ? `€${value.toLocaleString()}`
+      ? formatCurrency(value)
       : value.toLocaleString()
     : value;
 

@@ -8,6 +8,7 @@ import { getCustomerRecentOrders } from '@/app/sales/actions';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type Props = {
   open: boolean;
@@ -24,6 +25,7 @@ type RecentOrder = {
   deliveryDate: string | null;
   status: string;
   lineCount: number;
+  currency?: string;
 };
 
 export function CopyOrderDialog({ open, onOpenChange, customerId, onCopy }: Props) {
@@ -94,7 +96,7 @@ export function CopyOrderDialog({ open, onOpenChange, customerId, onCopy }: Prop
                     <div className="text-sm text-muted-foreground">
                       {format(new Date(order.createdAt), 'PPP')} • {order.deliveryDate ? `Delivery ${order.deliveryDate}` : 'No delivery date'}
                     </div>
-                    <div className="text-sm font-medium">€{order.total.toFixed(2)}</div>
+                    <div className="text-sm font-medium">{formatCurrency(order.total, (order.currency as CurrencyCode) || 'EUR')}</div>
                   </div>
                   <Button size="sm" onClick={() => onCopy(order.id)}>
                     Copy Order

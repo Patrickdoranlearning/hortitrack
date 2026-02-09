@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { createCreditNote } from '@/app/sales/orders/[orderId]/actions';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { OrderItem } from './OrderDetailPage';
 
 interface CreditNoteDialogProps {
@@ -31,6 +32,7 @@ interface CreditNoteDialogProps {
   onOpenChange: (open: boolean) => void;
   orderId: string;
   orderItems: OrderItem[];
+  currency?: CurrencyCode;
   onCreditNoteCreated: () => void;
 }
 
@@ -47,6 +49,7 @@ export default function CreditNoteDialog({
   onOpenChange,
   orderId,
   orderItems,
+  currency = 'EUR',
   onCreditNoteCreated,
 }: CreditNoteDialogProps) {
   const { toast } = useToast();
@@ -135,7 +138,7 @@ export default function CreditNoteDialog({
       } else {
         toast({
           title: 'Credit Note Created',
-          description: `Credit note for €${calculateTotal().toFixed(2)} has been created`,
+          description: `Credit note for ${formatCurrency(calculateTotal(), currency)} has been created`,
         });
         onOpenChange(false);
         onCreditNoteCreated();
@@ -225,11 +228,11 @@ export default function CreditNoteDialog({
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        €{creditItem.unitPrice.toFixed(2)}
+                        {formatCurrency(creditItem.unitPrice, currency)}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {creditItem.selected
-                          ? `€${(creditItem.quantity * creditItem.unitPrice).toFixed(2)}`
+                          ? formatCurrency(creditItem.quantity * creditItem.unitPrice, currency)
                           : '-'}
                       </TableCell>
                     </TableRow>
@@ -244,7 +247,7 @@ export default function CreditNoteDialog({
             <div className="bg-muted p-4 rounded-lg">
               <div className="flex items-center justify-between gap-8">
                 <span className="text-muted-foreground">Total Credit Amount:</span>
-                <span className="text-xl font-bold">€{calculateTotal().toFixed(2)}</span>
+                <span className="text-xl font-bold">{formatCurrency(calculateTotal(), currency)}</span>
               </div>
             </div>
           </div>

@@ -10,6 +10,7 @@ import { Phone, Plus, MapPin, X, Navigation, TrendingUp } from 'lucide-react';
 import type { SmartTarget, ScheduledDelivery } from '@/lib/targeting/types';
 import { formatDaysSinceOrder, getProbabilityColor, getProbabilityLabel } from '@/lib/targeting/types';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/format-currency';
 
 // Ireland center coordinates
 const IRELAND_CENTER: [number, number] = [53.4129, -7.6921];
@@ -237,7 +238,7 @@ export function TargetMap({
                 </div>
                 <div className="bg-slate-50 rounded p-2">
                   <div className="font-semibold text-slate-900">
-                    {selectedTarget.avg_order_value ? `€${Math.round(selectedTarget.avg_order_value)}` : '-'}
+                    {selectedTarget.avg_order_value ? formatCurrency(Math.round(selectedTarget.avg_order_value)) : '-'}
                   </div>
                   <div className="text-slate-500">Avg Value</div>
                 </div>

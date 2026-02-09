@@ -19,6 +19,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { sendOrderConfirmation, generateInvoice } from '@/app/sales/actions';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import { formatCurrency } from '@/lib/format-currency';
 
 export interface AdminTask {
   reference_id: string;
@@ -164,7 +165,7 @@ export function SalesAdminInbox({ tasks }: SalesAdminInboxProps) {
                     </span>
                     {task.total_inc_vat && (
                       <span className="text-xs font-medium text-slate-600">
-                        €{task.total_inc_vat.toFixed(2)}
+                        {formatCurrency(task.total_inc_vat)}
                       </span>
                     )}
                     <span className="text-xs text-slate-400 flex items-center gap-1">

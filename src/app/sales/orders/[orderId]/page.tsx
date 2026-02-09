@@ -56,6 +56,12 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
     .select('*')
     .eq('order_id', orderId);
 
+  // Fetch order fees (pre-pricing, delivery, etc.)
+  const { data: orderFees } = await supabase
+    .from('order_fees')
+    .select('*')
+    .eq('order_id', orderId);
+
   // Fetch invoices separately
   const { data: invoices } = await supabase
     .from('invoices')
@@ -130,6 +136,7 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
     payment_status: order.payment_status,
     requested_delivery_date: order.requested_delivery_date,
     notes: order.notes,
+    currency: order.currency || 'EUR',
     subtotal_ex_vat: order.subtotal_ex_vat,
     vat_amount: order.vat_amount,
     total_inc_vat: order.total_inc_vat,
@@ -171,6 +178,17 @@ export default async function OrderDetailServerPage({ params }: OrderDetailServe
         } : null,
       };
     }),
+    order_fees: (orderFees || []).map((fee: any) => ({
+      id: fee.id,
+      fee_type: fee.fee_type,
+      name: fee.name,
+      quantity: fee.quantity || 1,
+      unit_amount: fee.unit_amount,
+      subtotal: fee.subtotal,
+      vat_rate: fee.vat_rate || 0,
+      vat_amount: fee.vat_amount || 0,
+      total_amount: fee.total_amount,
+    })),
     invoices: (invoices || []).map((inv: any) => ({
       id: inv.id,
       invoice_number: inv.invoice_number,

@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { formatCurrency } from '@/lib/format-currency';
 import {
   Card,
   CardContent,
@@ -671,7 +672,7 @@ export default function ProductGroupsClient({
                               <span>SKU: {alias.customer_sku_code}</span>
                             )}
                             {alias.unit_price_ex_vat && (
-                              <span>Price: €{alias.unit_price_ex_vat.toFixed(2)}</span>
+                              <span>Price: {formatCurrency(alias.unit_price_ex_vat)}</span>
                             )}
                           </div>
                         </div>

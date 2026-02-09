@@ -13,6 +13,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { formatCurrency, currencySymbol } from '@/lib/format-currency';
 
 interface WeeklySalesChartProps {
   data: Array<{
@@ -52,7 +53,7 @@ const WeeklySalesChart = ({ data }: WeeklySalesChartProps) => {
           />
           <YAxis
             tick={{ fontSize: 11 }}
-            tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
+            tickFormatter={(value) => `${currencySymbol()}${(value / 1000).toFixed(0)}k`}
             width={50}
           />
           <ChartTooltip
@@ -60,7 +61,7 @@ const WeeklySalesChart = ({ data }: WeeklySalesChartProps) => {
               <ChartTooltipContent
                 formatter={(value, name) => {
                   const label = name === 'currentYear' ? 'This Year' : 'Last Year';
-                  return [`€${Number(value).toLocaleString()}`, label];
+                  return [formatCurrency(Number(value)), label];
                 }}
               />
             }

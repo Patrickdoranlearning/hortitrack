@@ -70,6 +70,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { cn } from "@/lib/utils";
+import { currencySymbol, type CurrencyCode } from '@/lib/format-currency';
 
 // =============================================================================
 // TYPES
@@ -224,11 +225,10 @@ export default function PriceListsPage() {
   };
 
   const getCurrencySymbol = (currency: string) => {
+    if (currency === 'EUR' || currency === 'GBP') {
+      return currencySymbol(currency as CurrencyCode);
+    }
     switch (currency) {
-      case "EUR":
-        return "€";
-      case "GBP":
-        return "£";
       case "USD":
         return "$";
       default:

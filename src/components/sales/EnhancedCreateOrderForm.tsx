@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Plus, Trash2, Layers, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import { BatchSelectionDialog, BatchAllocation, Batch } from './BatchSelectionDialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -110,6 +111,8 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
     () => customers.find(c => c.id === selectedCustomerId),
     [customers, selectedCustomerId]
   );
+
+  const orderCurrency: CurrencyCode = (selectedCustomer?.currency as CurrencyCode) || 'EUR';
 
   const customerAddresses = useMemo(() => {
     return selectedCustomer?.addresses ?? [];
@@ -844,12 +847,12 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
 
                   {/* VAT Amount */}
                   <div className="col-span-1 text-right text-sm pt-2">
-                    €{lineVat.toFixed(2)}
+                    {formatCurrency(lineVat, orderCurrency)}
                   </div>
 
                   {/* Total */}
                   <div className="col-span-1 flex items-center justify-end gap-1">
-                    <span className="text-sm font-medium">€{lineTotal.toFixed(2)}</span>
+                    <span className="text-sm font-medium">{formatCurrency(lineTotal, orderCurrency)}</span>
                     <Button
                       type="button"
                       variant="ghost"
@@ -945,19 +948,19 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Discount</span>
-                  <span>€0.00</span>
+                  <span>{formatCurrency(0, orderCurrency)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Net</span>
-                  <span className="font-medium">€{totals.net.toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(totals.net, orderCurrency)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">VAT</span>
-                  <span className="font-medium">€{totals.vat.toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(totals.vat, orderCurrency)}</span>
                 </div>
                 <div className="border-t pt-3 flex items-center justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span>€{totals.total.toFixed(2)}</span>
+                  <span>{formatCurrency(totals.total, orderCurrency)}</span>
                 </div>
               </div>
 

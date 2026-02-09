@@ -4,6 +4,7 @@ import net from "net";
 import { ok, fail } from "@/server/utils/envelope";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import { buildSaleLabelZpl } from "@/server/labels/build-sale-label";
+import { formatCurrency } from "@/lib/format-currency";
 
 const PRINTER_HOST = process.env.PRINTER_HOST!;
 const PRINTER_PORT = Number(process.env.PRINTER_PORT || 9100);
@@ -88,7 +89,7 @@ export async function POST(
       const zpl = buildSaleLabelZpl({
         productTitle: varietyName,
         size: sizeName,
-        priceText: line.unit_price != null ? `€${Number(line.unit_price).toFixed(2)}` : "€0.00",
+        priceText: line.unit_price != null ? formatCurrency(Number(line.unit_price)) : formatCurrency(0),
         barcode,
         symbology: "code128",
         footerSmall: "Grown in Ireland – Doran Nurseries",

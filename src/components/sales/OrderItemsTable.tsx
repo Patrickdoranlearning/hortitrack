@@ -24,6 +24,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { Pencil, Trash2, Save, X } from 'lucide-react';
 import { updateOrderItem, deleteOrderItem } from '@/app/sales/orders/[orderId]/actions';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { OrderItem } from './OrderDetailPage';
 
 interface OrderItemsTableProps {
@@ -31,9 +32,10 @@ interface OrderItemsTableProps {
   items: OrderItem[];
   status: string;
   onItemsChange: () => void;
+  currency?: CurrencyCode;
 }
 
-export default function OrderItemsTable({ orderId, items, status, onItemsChange }: OrderItemsTableProps) {
+export default function OrderItemsTable({ orderId, items, status, onItemsChange, currency = 'EUR' }: OrderItemsTableProps) {
   const { toast } = useToast();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<number>(0);
@@ -200,14 +202,14 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange 
                             className="w-20 md:w-24 text-right ml-auto"
                           />
                         ) : (
-                          `€${item.unit_price_ex_vat.toFixed(2)}`
+                          formatCurrency(item.unit_price_ex_vat, currency)
                         )}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         {item.vat_rate}%
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        €{item.line_total_ex_vat.toFixed(2)}
+                        {formatCurrency(item.line_total_ex_vat, currency)}
                       </TableCell>
                       {canEdit && (
                         <TableCell>
@@ -267,7 +269,7 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange 
                     <TableCell colSpan={canEdit ? 4 : 3} className="text-right">
                       Subtotal (ex VAT)
                     </TableCell>
-                    <TableCell className="text-right">€{subtotal.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(subtotal, currency)}</TableCell>
                     {canEdit && <TableCell />}
                   </TableRow>
                   <TableRow>
@@ -275,7 +277,7 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange 
                       VAT
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
-                      €{totalVat.toFixed(2)}
+                      {formatCurrency(totalVat, currency)}
                     </TableCell>
                     {canEdit && <TableCell />}
                   </TableRow>
@@ -283,7 +285,7 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange 
                     <TableCell colSpan={canEdit ? 4 : 3} className="text-right font-semibold">
                       Total (inc VAT)
                     </TableCell>
-                    <TableCell className="text-right font-semibold">€{total.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatCurrency(total, currency)}</TableCell>
                     {canEdit && <TableCell />}
                   </TableRow>
                 </TableFooter>

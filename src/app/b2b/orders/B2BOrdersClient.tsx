@@ -17,6 +17,7 @@ import { Search, Package, RefreshCw } from 'lucide-react';
 import { reorderFromPastOrder } from './actions';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 type Order = {
   id: string;
@@ -40,6 +41,7 @@ type Order = {
 type B2BOrdersClientProps = {
   orders: Order[];
   customerId: string;
+  currency?: CurrencyCode;
 };
 
 // Order status enum: draft, confirmed, picking, ready (legacy), packed, dispatched, delivered, cancelled, void
@@ -56,7 +58,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
 
-export function B2BOrdersClient({ orders, customerId }: B2BOrdersClientProps) {
+export function B2BOrdersClient({ orders, customerId, currency = 'EUR' }: B2BOrdersClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -198,7 +200,7 @@ export function B2BOrdersClient({ orders, customerId }: B2BOrdersClientProps) {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Total</p>
-                      <p className="font-medium text-lg">€{order.total_inc_vat.toFixed(2)}</p>
+                      <p className="font-medium text-lg">{formatCurrency(order.total_inc_vat, currency)}</p>
                     </div>
                     <div className="flex items-end gap-2">
                       <Link href={`/b2b/orders/${order.id}`} className="flex-1">

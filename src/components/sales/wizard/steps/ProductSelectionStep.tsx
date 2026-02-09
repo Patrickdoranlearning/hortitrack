@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowUpDown, Filter, X } from 'lucide-react';
+import type { CurrencyCode } from '@/lib/format-currency';
 type Props = {
   form: UseFormReturn<CreateOrderInput>;
   products: ProductWithBatches[];
@@ -19,10 +20,12 @@ type Props = {
   append: UseFieldArrayAppend<CreateOrderInput, 'lines'>;
   remove: UseFieldArrayRemove;
   selectedCustomerId?: string;
+  currency?: CurrencyCode;
   pricingHints?: Record<string, PricingHint>;
   varietyBreakdowns?: VarietyBreakdownMap;
-  onVarietyQtyChange?: (fieldId: string, productId: string, qty: number) => void;
+  onVarietyQtyChange?: (fieldId: string, key: string, qty: number) => void;
   onInitBreakdown?: (fieldId: string, group: ProductGroupWithAvailability) => void;
+  onInitProductBreakdown?: (fieldId: string, product: ProductWithBatches, varieties: Array<{varietyId?: string; name: string; stock: number}>) => void;
 };
 
 type SortOption = 'name' | 'family' | 'stock' | 'price';
@@ -35,10 +38,12 @@ export function ProductSelectionStep({
   append,
   remove,
   selectedCustomerId,
+  currency = 'EUR',
   pricingHints = {},
   varietyBreakdowns = {},
   onVarietyQtyChange,
   onInitBreakdown,
+  onInitProductBreakdown,
 }: Props) {
   const [search, setSearch] = useState('');
   const [showAllProducts, setShowAllProducts] = useState(false);
@@ -249,10 +254,12 @@ export function ProductSelectionStep({
               filteredProducts={filteredProducts}
               onRemove={() => remove(index)}
               selectedCustomerId={selectedCustomerId}
+              currency={currency}
               pricingHints={pricingHints}
               varietyBreakdown={varietyBreakdowns[field.id]}
-              onVarietyQtyChange={onVarietyQtyChange ? (productId, qty) => onVarietyQtyChange(field.id, productId, qty) : undefined}
+              onVarietyQtyChange={onVarietyQtyChange ? (key, qty) => onVarietyQtyChange(field.id, key, qty) : undefined}
               onInitBreakdown={onInitBreakdown ? (group) => onInitBreakdown(field.id, group) : undefined}
+              onInitProductBreakdown={onInitProductBreakdown ? (product, varieties) => onInitProductBreakdown(field.id, product, varieties) : undefined}
             />
           ))
         )}

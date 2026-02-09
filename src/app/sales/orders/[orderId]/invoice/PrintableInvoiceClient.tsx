@@ -3,10 +3,12 @@
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 
 interface InvoiceData {
   invoiceNumber: string;
   status: string;
+  currency?: string;
   issueDate: string;
   dueDate: string;
   orderNumber: string;
@@ -35,6 +37,17 @@ interface InvoiceData {
     familyName: string | null;
     batchNumber: string | null;
     skuCode: string | null;
+  }>;
+  fees?: Array<{
+    id: string;
+    name: string;
+    feeType: string;
+    quantity: number;
+    unitAmount: number;
+    subtotal: number;
+    vatRate: number;
+    vatAmount: number;
+    totalAmount: number;
   }>;
   vatSummary: Array<{
     rate: number;
@@ -72,6 +85,8 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
 
   const { company, bank, invoiceSettings } = invoice;
   const hasBankInfo = bank.bankName || bank.bankIban || bank.bankBic;
+  const currency = (invoice.currency === 'GBP' ? 'GBP' : 'EUR') as CurrencyCode;
+  const fc = (amount: number) => formatCurrency(amount, currency);
 
   // Parse address into lines for display
   const addressLines = company.address ? company.address.split('\n').filter(Boolean) : [];
@@ -234,9 +249,21 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
                   </>
                 )}
                 <td className="py-3 px-3 border-b border-gray-200 text-right">{item.quantity}</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">€{item.unitPrice.toFixed(2)}</td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(item.unitPrice)}</td>
                 <td className="py-3 px-3 border-b border-gray-200 text-right">{item.vatRate}%</td>
-                <td className="py-3 px-3 border-b border-gray-200 text-right">€{item.total.toFixed(2)}</td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(item.total)}</td>
+              </tr>
+            ))}
+            {/* Fee lines (pre-pricing, delivery, etc.) */}
+            {invoice.fees?.map(fee => (
+              <tr key={fee.id} className="bg-green-50/50">
+                <td className="py-3 px-3 border-b border-gray-200" colSpan={hasPlantDetails ? 3 : 1}>
+                  <div className="font-medium text-gray-700">{fee.name}</div>
+                </td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">{fee.quantity}</td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(fee.unitAmount)}</td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">{fee.vatRate}%</td>
+                <td className="py-3 px-3 border-b border-gray-200 text-right">{fc(fee.subtotal)}</td>
               </tr>
             ))}
           </tbody>
@@ -257,8 +284,8 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
               {invoice.vatSummary.map((vat) => (
                 <tr key={vat.rate}>
                   <td className="py-1 px-2">{vat.rate}%</td>
-                  <td className="py-1 px-2 text-right">€{vat.total.toFixed(2)}</td>
-                  <td className="py-1 px-2 text-right">€{vat.vat.toFixed(2)}</td>
+                  <td className="py-1 px-2 text-right">{fc(vat.total)}</td>
+                  <td className="py-1 px-2 text-right">{fc(vat.vat)}</td>
                 </tr>
               ))}
             </tbody>
@@ -270,20 +297,20 @@ export default function PrintableInvoiceClient({ invoice }: PrintableInvoiceClie
           <div className="w-72">
             <div className="flex justify-between py-2 border-b border-gray-200">
               <span>Subtotal (ex VAT)</span>
-              <span>€{invoice.subtotalExVat.toFixed(2)}</span>
+              <span>{fc(invoice.subtotalExVat)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-200">
               <span>VAT</span>
-              <span>€{invoice.vatAmount.toFixed(2)}</span>
+              <span>{fc(invoice.vatAmount)}</span>
             </div>
             <div className="flex justify-between py-3 border-t-2 border-green-600 mt-2 text-lg font-bold">
               <span>Total</span>
-              <span>€{invoice.totalIncVat.toFixed(2)}</span>
+              <span>{fc(invoice.totalIncVat)}</span>
             </div>
             {invoice.balanceDue > 0 && (
               <div className="flex justify-between py-3 bg-amber-100 -mx-2 px-2 rounded mt-2">
                 <span>Balance Due</span>
-                <span className="font-bold">€{invoice.balanceDue.toFixed(2)}</span>
+                <span className="font-bold">{fc(invoice.balanceDue)}</span>
               </div>
             )}
           </div>

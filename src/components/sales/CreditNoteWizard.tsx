@@ -41,6 +41,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { createCreditNoteAction, issueCreditNoteAction } from '@/app/sales/credit-notes/actions';
+import { formatCurrency, currencySymbol, type CurrencyCode } from '@/lib/format-currency';
 import type { OrderItem } from './OrderDetailPage';
 
 interface CreditNoteWizardProps {
@@ -52,6 +53,7 @@ interface CreditNoteWizardProps {
   invoiceId?: string;
   invoiceNumber?: string;
   orderItems: OrderItem[];
+  currency?: CurrencyCode;
   onCreditNoteCreated: () => void;
 }
 
@@ -87,6 +89,7 @@ export default function CreditNoteWizard({
   invoiceId,
   invoiceNumber,
   orderItems,
+  currency = 'EUR',
   onCreditNoteCreated,
 }: CreditNoteWizardProps) {
   const router = useRouter();
@@ -228,7 +231,7 @@ export default function CreditNoteWizard({
       setStep('complete');
       toast({
         title: 'Credit Note Created',
-        description: `Credit note ${result.creditNumber} for €${totals.total.toFixed(2)} has been created`,
+        description: `Credit note ${result.creditNumber} for ${formatCurrency(totals.total, currency)} has been created`,
       });
       onCreditNoteCreated();
     } catch (error) {
@@ -371,13 +374,13 @@ export default function CreditNoteWizard({
                             />
                           </TableCell>
                           <TableCell className="text-right">
-                            €{creditItem.unitPrice.toFixed(2)}
+                            {formatCurrency(creditItem.unitPrice, currency)}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
                             {creditItem.vatRate}%
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            {creditItem.selected ? `€${lineTotal.toFixed(2)}` : '-'}
+                            {creditItem.selected ? formatCurrency(lineTotal, currency) : '-'}
                           </TableCell>
                         </TableRow>
                       );
@@ -391,11 +394,11 @@ export default function CreditNoteWizard({
                 <CardContent className="py-4">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Credit Total:</span>
-                    <span className="text-2xl font-bold">€{totals.total.toFixed(2)}</span>
+                    <span className="text-2xl font-bold">{formatCurrency(totals.total, currency)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                    <span>Subtotal: €{totals.subtotal.toFixed(2)}</span>
-                    <span>VAT: €{totals.vat.toFixed(2)}</span>
+                    <span>Subtotal: {formatCurrency(totals.subtotal, currency)}</span>
+                    <span>VAT: {formatCurrency(totals.vat, currency)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -459,15 +462,15 @@ export default function CreditNoteWizard({
                 <div className="border-t pt-3 space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal (ex VAT):</span>
-                    <span>€{totals.subtotal.toFixed(2)}</span>
+                    <span>{formatCurrency(totals.subtotal, currency)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">VAT:</span>
-                    <span>€{totals.vat.toFixed(2)}</span>
+                    <span>{formatCurrency(totals.vat, currency)}</span>
                   </div>
                   <div className="flex justify-between font-medium text-lg pt-2 border-t">
                     <span>Total Credit:</span>
-                    <span className="text-red-600">-€{totals.total.toFixed(2)}</span>
+                    <span className="text-red-600">-{formatCurrency(totals.total, currency)}</span>
                   </div>
                 </div>
               </div>
@@ -507,7 +510,7 @@ export default function CreditNoteWizard({
               <Card className="max-w-sm mx-auto">
                 <CardContent className="py-4">
                   <div className="text-3xl font-bold text-red-600">
-                    -€{totals.total.toFixed(2)}
+                    -{formatCurrency(totals.total, currency)}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {selectedItems.length} item(s) credited

@@ -7,6 +7,7 @@ import { emitMutation } from '@/lib/events/mutation-events';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Printer, FileText, Package, ClipboardList, History, Truck, Tag, Layers } from 'lucide-react';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import OrderSummaryCard from './OrderSummaryCard';
 import OrderItemsTable from './OrderItemsTable';
 import OrderInvoicePanel from './OrderInvoicePanel';
@@ -86,6 +87,18 @@ export interface OrderEvent {
   } | null;
 }
 
+export interface OrderFee {
+  id: string;
+  fee_type: string;
+  name: string;
+  quantity: number;
+  unit_amount: number;
+  subtotal: number;
+  vat_rate: number;
+  vat_amount: number;
+  total_amount: number;
+}
+
 export interface OrderDetails {
   id: string;
   org_id: string;
@@ -96,6 +109,7 @@ export interface OrderDetails {
   payment_status: string | null;
   requested_delivery_date: string | null;
   notes: string | null;
+  currency: string;
   subtotal_ex_vat: number;
   vat_amount: number;
   total_inc_vat: number;
@@ -104,6 +118,7 @@ export interface OrderDetails {
   updated_at: string;
   customer: OrderCustomer | null;
   order_items: OrderItem[];
+  order_fees: OrderFee[];
   invoices: OrderInvoice[];
   pick_lists: OrderPickList[];
   order_events: OrderEvent[];
@@ -137,7 +152,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const handlePrintPriceLabel = (item: OrderItem) => {
     // Use RRP if available, otherwise fall back to unit price with VAT
     const price = item.rrp ?? (item.unit_price_ex_vat * (1 + (item.vat_rate || 0.23)));
-    const priceText = `€${price.toFixed(2)}`;
+    const currency = (order.currency === 'GBP' ? 'GBP' : 'EUR') as CurrencyCode;
+    const priceText = formatCurrency(price, currency);
 
     const productName = item.sku?.plant_varieties?.name || item.description || 'Product';
     const size = item.sku?.plant_sizes?.name || '';

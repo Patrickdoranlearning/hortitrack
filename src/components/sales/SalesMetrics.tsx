@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, Target } from 'lucide-react';
+import { formatCurrency } from '@/lib/format-currency';
 
 export interface DashboardMetrics {
     currentWeekOrders: number;
@@ -24,7 +25,7 @@ export default function SalesMetrics({ metrics }: { metrics: DashboardMetrics })
                 <CardContent>
                     <div className="text-2xl font-bold">{metrics.currentWeekOrders}</div>
                     <p className="text-xs text-muted-foreground">
-                        €{metrics.currentWeekRevenue.toFixed(2)} revenue
+                        {formatCurrency(metrics.currentWeekRevenue)} revenue
                     </p>
                 </CardContent>
             </Card>
@@ -38,7 +39,7 @@ export default function SalesMetrics({ metrics }: { metrics: DashboardMetrics })
                 <CardContent>
                     <div className="text-2xl font-bold">{metrics.nextWeekOrders}</div>
                     <p className="text-xs text-muted-foreground">
-                        €{metrics.nextWeekRevenue.toFixed(2)} revenue
+                        {formatCurrency(metrics.nextWeekRevenue)} revenue
                     </p>
                 </CardContent>
             </Card>

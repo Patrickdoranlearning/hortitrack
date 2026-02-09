@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { generateInvoice, getOrderDetails } from '@/app/sales/actions';
 import { useToast } from '@/components/ui/use-toast';
 import { SalesOrder, Invoice } from '@/lib/sales/types';
+import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import { Printer, FileText, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
@@ -113,7 +114,7 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                             </div>
                                             <div>
                                                 <p className="text-sm text-muted-foreground">Total</p>
-                                                <p className="font-medium">€{(order?.total_inc_vat || 0).toFixed(2)}</p>
+                                                <p className="font-medium">{formatCurrency(order?.total_inc_vat || 0, (order?.currency as CurrencyCode) || 'EUR')}</p>
                                             </div>
                                             <div>
                                                 <p className="text-sm text-muted-foreground">Delivery Date</p>
@@ -142,10 +143,10 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                                                 <td className="py-2">{item.description || 'Product'}</td>
                                                                 <td className="py-2 text-right">{item.quantity}</td>
                                                                 <td className="py-2 text-right">
-                                                                    €{item.unit_price_ex_vat.toFixed(2)}
+                                                                    {formatCurrency(item.unit_price_ex_vat, (order?.currency as CurrencyCode) || 'EUR')}
                                                                 </td>
                                                                 <td className="py-2 text-right">
-                                                                    €{item.line_total_ex_vat.toFixed(2)}
+                                                                    {formatCurrency(item.line_total_ex_vat, (order?.currency as CurrencyCode) || 'EUR')}
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -156,7 +157,7 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                                                 Subtotal:
                                                             </td>
                                                             <td className="py-2 text-right">
-                                                                €{(order?.subtotal_ex_vat || 0).toFixed(2)}
+                                                                {formatCurrency(order?.subtotal_ex_vat || 0, (order?.currency as CurrencyCode) || 'EUR')}
                                                             </td>
                                                         </tr>
                                                         <tr>
@@ -164,7 +165,7 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                                                 VAT:
                                                             </td>
                                                             <td className="py-1 text-right text-muted-foreground">
-                                                                €{(order?.vat_amount || 0).toFixed(2)}
+                                                                {formatCurrency(order?.vat_amount || 0, (order?.currency as CurrencyCode) || 'EUR')}
                                                             </td>
                                                         </tr>
                                                         <tr className="font-semibold">
@@ -172,7 +173,7 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                                                 Total:
                                                             </td>
                                                             <td className="py-2 text-right">
-                                                                €{(order?.total_inc_vat || 0).toFixed(2)}
+                                                                {formatCurrency(order?.total_inc_vat || 0, (order?.currency as CurrencyCode) || 'EUR')}
                                                             </td>
                                                         </tr>
                                                     </tfoot>
@@ -232,7 +233,7 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                                             Status: {inv.status}
                                                         </div>
                                                         <div className="text-sm">
-                                                            Total: €{inv.total_inc_vat.toFixed(2)}
+                                                            Total: {formatCurrency(inv.total_inc_vat, (order?.currency as CurrencyCode) || 'EUR')}
                                                         </div>
                                                     </div>
                                                 ))}
