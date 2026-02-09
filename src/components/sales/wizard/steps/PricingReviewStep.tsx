@@ -46,11 +46,21 @@ export function PricingReviewStep({
   const fc = (amount: number) => formatCurrency(amount, currency);
   const sym = currencySymbol(currency);
   const watchedLines = useWatch({ control: form.control, name: 'lines' });
-  
+
   // Get fee configurations — filter by currency match (or fees with no currency set)
-  const currencyFees = fees.filter(f => !f.currency || f.currency === currency);
-  const prePricingFee = currencyFees.find(f => f.feeType === 'pre_pricing' && f.isActive);
-  const deliveryFees = currencyFees.filter(f => f.feeType.includes('delivery') && f.isActive);
+  // Memoize to prevent infinite re-render loops (new array refs trigger useEffect deps)
+  const currencyFees = useMemo(
+    () => fees.filter(f => !f.currency || f.currency === currency),
+    [fees, currency]
+  );
+  const prePricingFee = useMemo(
+    () => currencyFees.find(f => f.feeType === 'pre_pricing' && f.isActive),
+    [currencyFees]
+  );
+  const deliveryFees = useMemo(
+    () => currencyFees.filter(f => f.feeType.includes('delivery') && f.isActive),
+    [currencyFees]
+  );
   
   // Track RRP toggle state separately for better UX
   const [rrpEnabled, setRrpEnabled] = useState<Record<number, boolean>>(() => {
