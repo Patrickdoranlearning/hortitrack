@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 const SALEABLE_STATUSES = ["Ready", "Looking Good"] as const;
 
@@ -29,7 +30,7 @@ export async function GET() {
       .order("batch_number", { ascending: true });
 
     if (error) {
-      console.error("[linkable-batches] failed to load batches", error);
+      logger.sales.error("Failed to load linkable batches", error);
       return NextResponse.json(
         { error: "Unable to load saleable batches." },
         { status: 500 }
@@ -52,7 +53,7 @@ export async function GET() {
 
     return NextResponse.json({ batches });
   } catch (err) {
-    console.error("[linkable-batches] unexpected error", err);
+    logger.sales.error("Linkable batches unexpected error", err);
     return NextResponse.json(
       { error: "Unexpected error while loading batches." },
       { status: 500 }

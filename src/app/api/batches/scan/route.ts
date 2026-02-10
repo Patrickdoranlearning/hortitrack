@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/server/utils/logger";
 import { parseScanCode, candidateBatchNumbers } from '@/lib/scan/parse';
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
 import { getUserFromRequest } from "@/server/security/auth";
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
     };
     return NextResponse.json({ type: 'batch', batch: clean, summary }, { status: 200 });
   } catch (e: any) {
-    console.error("POST /api/batches/scan error:", e);
+    logger.api.error("POST /api/batches/scan failed", e);
     return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }

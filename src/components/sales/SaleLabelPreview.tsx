@@ -40,8 +40,8 @@ export default function SaleLabelPreview({
         textxalign: "center",
         textsize: 8,
       });
-    } catch (e) {
-      console.error("Barcode render failed:", e);
+    } catch {
+      // Barcode render failed silently
     }
   }, [barcode, isCompact]);
 

@@ -6,6 +6,7 @@ import { createHash } from "crypto";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { agentConnectionManager } from "@/server/labels/agent-connection-manager";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { logger } from "@/server/utils/logger";
 
 /**
  * WebSocket endpoint for print agent connections.
@@ -228,7 +229,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Request failed";
-    console.error("[api/print-agents/ws] POST error:", e);
+    logger.api.error("POST /api/print-agents/ws failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

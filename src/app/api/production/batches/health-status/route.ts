@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getBatchHealthStatuses } from "@/server/batches/health-status";
+import { logger } from "@/server/utils/logger";
 
 /**
  * GET /api/production/batches/health-status?batchIds=id1,id2,id3
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ statuses });
   } catch (error) {
-    console.error("[health-status] error:", error);
+    logger.production.error("Failed to fetch health statuses", error);
     return NextResponse.json(
       { error: "Failed to fetch health statuses" },
       { status: 500 }

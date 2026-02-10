@@ -33,8 +33,8 @@ export default function WorkerTeamPage() {
         const json = await res.json();
         setData(json);
       }
-    } catch (error) {
-      console.error("Failed to fetch team data:", error);
+    } catch {
+      // Error handled by empty state UI
     } finally {
       setLoading(false);
     }

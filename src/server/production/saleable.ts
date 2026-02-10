@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { getStatusCodesByBehavior, listAttributeOptions } from "@/server/attributeOptions/service";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Saleable Batches Service
@@ -93,7 +94,7 @@ export async function fetchSaleableBatches(orgId: string, options: FetchOptions 
       try {
         statuses = await getStatusCodesByBehavior(orgId, "available", supabase);
       } catch (err) {
-        console.warn("[fetchSaleableBatches] status lookup failed, falling back to defaults", err);
+        logger.production.warn("Status lookup failed for saleable batches, falling back to defaults", { orgId, error: err instanceof Error ? err.message : String(err) });
       }
       if (!statuses.length) {
         statuses = [...SALEABLE_STATUSES];
@@ -120,7 +121,7 @@ export async function fetchSaleableBatches(orgId: string, options: FetchOptions 
   const { data, error } = await query;
 
   if (error) {
-    console.error("[fetchSaleableBatches]", error);
+    logger.production.error("Failed to fetch saleable batches", error, { orgId });
     return [];
   }
 
@@ -152,13 +153,13 @@ export async function fetchSaleableBatches(orgId: string, options: FetchOptions 
   ]);
 
   if (varietiesRes.error) {
-    console.warn("[fetchSaleableBatches] plant varieties lookup failed", varietiesRes.error);
+    logger.production.warn("Plant varieties lookup failed for saleable batches", { error: varietiesRes.error.message });
   }
   if (sizesRes.error) {
-    console.warn("[fetchSaleableBatches] plant sizes lookup failed", sizesRes.error);
+    logger.production.warn("Plant sizes lookup failed for saleable batches", { error: sizesRes.error.message });
   }
   if (locationsRes.error) {
-    console.warn("[fetchSaleableBatches] nursery locations lookup failed", locationsRes.error);
+    logger.production.warn("Nursery locations lookup failed for saleable batches", { error: locationsRes.error.message });
   }
 
   const varietyMap = new Map(
@@ -218,7 +219,7 @@ export async function fetchLocations(orgId: string) {
     .order("name");
   
   if (error) {
-    console.error("[fetchLocations]", error);
+    logger.production.error("Failed to fetch locations", error, { orgId });
     return [];
   }
   return data ?? [];
@@ -239,7 +240,7 @@ export async function fetchVarieties(orgId: string) {
     .order("name");
   
   if (error) {
-    console.error("[fetchVarieties]", error);
+    logger.production.error("Failed to fetch varieties", error, { orgId });
     return [];
   }
   return data ?? [];

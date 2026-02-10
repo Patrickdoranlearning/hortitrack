@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error("[api/label-templates] GET error:", e);
+    logger.api.error("GET /api/label-templates failed", e);
     return NextResponse.json({ error: e?.message || "Failed to fetch templates" }, { status: 500 });
   }
 }
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error("[api/label-templates] POST error:", e);
+    logger.api.error("POST /api/label-templates failed", e);
     return NextResponse.json({ error: e?.message || "Failed to create template" }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerApp } from '@/server/db/supabase';
 import { resolveActiveOrgId } from '@/server/org/getActiveOrg';
 import { generateTrolleyLabelCode } from '@/server/labels/build-trolley-label';
+import { logger } from '@/server/utils/logger';
 
 /**
  * GET /api/labels/trolley/preview
@@ -286,7 +287,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('[Trolley Label Preview] Error:', error);
+    logger.api.error("Trolley label preview failed", error);
     return NextResponse.json(
       { error: error?.message || 'Failed to generate label preview' },
       { status: 500 }

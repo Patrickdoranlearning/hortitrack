@@ -77,7 +77,7 @@ import {
   dispatchLoad,
   recallLoad,
 } from '@/server/dispatch/board-actions';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 import OrderSummaryDialog from './OrderSummaryDialog';
 import { ListView, LoadsView, CardsView, EditLoadForm } from './manager';

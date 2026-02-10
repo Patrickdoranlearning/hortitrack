@@ -9,6 +9,7 @@ import { defaultLayoutFor } from "@/lib/documents/presets";
 import { sendEmail } from "@/server/email/send";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/format-currency";
+import { logger } from "@/server/utils/logger";
 
 type RouteParams = {
   params: Promise<{ invoiceId: string }>;
@@ -270,7 +271,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       messageId: result.messageId,
     });
   } catch (err: any) {
-    console.error("[sales/invoices] send-email failed:", err);
+    logger.sales.error("Invoice send-email failed", err);
     return NextResponse.json(
       { error: err?.message || "Failed to send invoice email" },
       { status: 500 }

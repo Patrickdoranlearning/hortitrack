@@ -17,7 +17,7 @@ import {
   Repeat,
   CheckCircle2,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ScanStep, type ScannedBatch } from './ScanStep';
 import { StatusPhotoStep, type StatusPhotoData } from './StatusPhotoStep';
 
@@ -166,7 +166,6 @@ export function SaleabilityWizard({ statusOptions, onComplete }: SaleabilityWiza
           resetWizard();
         }
       } catch (error: any) {
-        console.error('Failed to update batch', error);
         toast.error('Update failed', { description: error.message });
       } finally {
         setIsSaving(false);

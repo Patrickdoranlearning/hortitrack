@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { getAvailableLotsFifo } from "@/server/materials/lots";
 import { FifoLotsQuerySchema } from "@/lib/schemas/material-lots";
 
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error("[lots/fifo GET] Error:", error);
+    logger.materials.error("FIFO lots GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to get FIFO lots";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

@@ -6,6 +6,7 @@ import { ok, fail } from "@/server/utils/envelope";
 import { requireRoles } from "@/server/auth/roles";
 import { OrderStatus, canTransition } from "@/server/sales/status";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(
   _: NextRequest,
@@ -33,7 +34,7 @@ export async function GET(
       .select("*")
       .eq("order_id", orderId);
 
-    if (linesErr) console.error("Error fetching lines:", linesErr);
+    if (linesErr) logger.sales.error("Error fetching order lines", linesErr);
 
     return ok({ ...order, lines: lines || [] });
   } catch (e: unknown) {
@@ -41,7 +42,7 @@ export async function GET(
     if (/Unauthenticated/i.test(message)) {
       return fail(401, "unauthenticated", "Not authenticated.");
     }
-    console.error("[sales:order:GET]", e);
+    logger.sales.error("GET /api/sales/orders/[orderId] failed", e);
     return fail(500, "server_error", message || "Unexpected");
   }
 }
@@ -91,14 +92,14 @@ export async function PATCH(
 
     if (updateErr) throw new Error(updateErr.message);
 
-    console.info("[sales:order:PATCH] status", { id: orderId, from: current, to: target });
+    logger.sales.info("Order status updated", { orderId, from: current, to: target });
     return ok({ id: orderId, status: target });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {
       return fail(401, "unauthenticated", "Not authenticated.");
     }
-    console.error("[sales:order:PATCH]", e);
+    logger.sales.error("PATCH /api/sales/orders/[orderId] failed", e);
     return fail(500, "server_error", message || "Unexpected");
   }
 }

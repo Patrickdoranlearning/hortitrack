@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildBatchHistory } from "@/server/batches/history";
 import { renderHistoryPdf } from "@/server/history/pdf";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ export async function POST(
       },
     });
   } catch (e: any) {
-    console.error("[history/pdf] error", e);
+    logger.api.error("Batch history PDF generation failed", e);
     return NextResponse.json({ error: "Failed to render history" }, { status: 500 });
   }
 }

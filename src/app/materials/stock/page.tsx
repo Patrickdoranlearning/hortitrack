@@ -48,7 +48,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { fetchJson } from '@/lib/http/fetchJson';
 import type { MaterialCategory } from '@/lib/types/materials';
 
@@ -76,7 +76,6 @@ type CategoriesResponse = {
 type AdjustmentMode = 'adjust' | 'count' | 'transfer' | null;
 
 export default function StockDashboardPage() {
-  const { toast } = useToast();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -186,10 +185,7 @@ export default function StockDashboardPage() {
     try {
       if (adjustmentMode === 'transfer') {
         // Transfer would need additional location fields - simplified for now
-        toast({
-          title: 'Transfer feature',
-          description: 'Location-based transfers will be available in a future update.',
-        });
+        toast.info('Location-based transfers will be available in a future update.');
         setAdjustmentMode(null);
         return;
       }
@@ -204,20 +200,13 @@ export default function StockDashboardPage() {
         }),
       });
 
-      toast({
-        title: adjustmentMode === 'count' ? 'Count recorded' : 'Stock adjusted',
-        description: `${selectedMaterial.partNumber} updated successfully.`,
-      });
+      toast.success(`${selectedMaterial.partNumber} updated successfully.`);
 
       setAdjustmentMode(null);
       setSelectedMaterial(null);
       mutateStock();
     } catch (error) {
-      toast({
-        title: 'Failed to update stock',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSubmitting(false);
     }

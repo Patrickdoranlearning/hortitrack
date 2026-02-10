@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Mail, Printer, FileText, Loader2 } from 'lucide-react';
 import { useCompanyName } from '@/lib/org/context';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { InvoiceWithCustomer } from '@/app/sales/invoices/InvoicesClient';
 
@@ -19,7 +19,6 @@ interface InvoiceDetailDialogProps {
 
 export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDetailDialogProps) {
   const companyName = useCompanyName();
-  const { toast } = useToast();
   const [sendingEmail, setSendingEmail] = useState(false);
 
   if (!invoice) return null;
@@ -30,11 +29,7 @@ export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: Inv
 
   const handleEmailInvoice = async () => {
     if (!customerEmail) {
-      toast({
-        variant: 'destructive',
-        title: 'No email address',
-        description: 'Please add an email address for this customer first.',
-      });
+      toast.error('Please add an email address for this customer first.');
       return;
     }
 
@@ -50,17 +45,9 @@ export default function InvoiceDetailDialog({ invoice, open, onOpenChange }: Inv
         throw new Error(data.error || 'Failed to send email');
       }
 
-      toast({
-        title: 'Invoice sent',
-        description: `Invoice emailed to ${customerEmail}`,
-      });
+      toast.success(`Invoice emailed to ${customerEmail}`);
     } catch (err) {
-      console.error('Failed to send invoice email:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Failed to send email',
-        description: err instanceof Error ? err.message : 'An error occurred',
-      });
+      toast.error(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setSendingEmail(false);
     }

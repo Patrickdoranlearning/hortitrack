@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { Supplier, SupplierAddressSummary } from '@/lib/types';
 import { addSupplierAction, deleteSupplierAction, updateSupplierAction, listSupplierAddressesAction, deleteSupplierAddressAction } from '../actions';
@@ -64,7 +64,6 @@ const defaultQuickValues: QuickSupplierFormValues = {
 };
 
 export default function SuppliersPage() {
-  const { toast } = useToast();
   const [filterText, setFilterText] = useState('');
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -90,9 +89,9 @@ export default function SuppliersPage() {
     if (result.success) {
       setAddresses(result.data);
     } else {
-      toast({ variant: 'destructive', title: 'Failed to load addresses', description: result.error });
+      toast.error(result.error);
     }
-  }, [toast]);
+  }, []);
 
   const handleOpenAddressSheet = useCallback((supplier: Supplier) => {
     setAddressSheetSupplier(supplier);
@@ -120,15 +119,15 @@ export default function SuppliersPage() {
     startAddressTransition(async () => {
       const result = await deleteSupplierAddressAction(addressId);
       if (result.success) {
-        toast({ title: 'Address deleted' });
+        toast.success('Address deleted');
         if (addressSheetSupplier?.id) {
           loadAddresses(addressSheetSupplier.id);
         }
       } else {
-        toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+        toast.error(result.error);
       }
     });
-  }, [toast, addressSheetSupplier, loadAddresses]);
+  }, [addressSheetSupplier, loadAddresses]);
 
   const handleAddressSaved = useCallback(() => {
     if (addressSheetSupplier?.id) {
@@ -173,7 +172,7 @@ export default function SuppliersPage() {
   const handleQuickAdd = quickForm.handleSubmit(async (values) => {
     const duplicate = suppliers.find((supplier) => supplier.name.toLowerCase() === values.name.trim().toLowerCase());
     if (duplicate) {
-      toast({ variant: 'destructive', title: 'Duplicate name', description: 'This supplier already exists.' });
+      toast.error('This supplier already exists.');
       return;
     }
 
@@ -191,10 +190,10 @@ export default function SuppliersPage() {
     const result = await addSupplierAction(payload);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Supplier added', description: `"${values.name}" is now available.` });
+      toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
     } else {
-      toast({ variant: 'destructive', title: 'Add failed', description: result.error });
+      toast.error(result.error);
     }
   });
 
@@ -269,20 +268,20 @@ export default function SuppliersPage() {
       invalidateReferenceData();
     }
 
-    toast({
-      title: 'Import complete',
-      description: `${created} supplier${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
-      variant: failures.length ? 'destructive' : 'default',
-    });
+    if (failures.length) {
+      toast.error(`${created} supplier${created === 1 ? '' : 's'} imported. ${failures.length} failed.`);
+    } else {
+      toast.success(`${created} supplier${created === 1 ? '' : 's'} imported.`);
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
     const result = await deleteSupplierAction(id);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Supplier deleted', description: `"${name}" removed.` });
+      toast.success(`"${name}" removed.`);
     } else {
-      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+      toast.error(result.error);
     }
   };
 
@@ -365,14 +364,11 @@ export default function SuppliersPage() {
                     : addSupplierAction(values as Omit<Supplier, 'id'>));
                   if (result.success) {
                     invalidateReferenceData();
-                    toast({
-                      title: editingSupplier ? 'Supplier updated' : 'Supplier added',
-                      description: `"${result.data?.name ?? values.name}" saved successfully.`,
-                    });
+                    toast.success(`"${result.data?.name ?? values.name}" saved successfully.`);
                     setIsFormOpen(false);
                     setEditingSupplier(null);
                   } else {
-                    toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                    toast.error(result.error);
                   }
                 } finally {
                   setFormSaving(false);

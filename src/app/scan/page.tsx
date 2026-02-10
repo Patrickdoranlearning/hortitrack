@@ -2,14 +2,13 @@
 import { useRef, useState } from "react";
 import ScannerClient from "@/components/Scanner/ScannerClient";
 import { track } from "@/lib/telemetry";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { parseScanCode, visualize, type Parsed } from "@/lib/scan/parse.client";
 import { useOfflineBatches } from "@/offline/OfflineProvider";
 
 export default function ScanPage() {
   const [status, setStatus] = useState<"idle" | "found" | "not_found" | "error">("idle");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
   const inflight = useRef(false);
   const [decoded, setDecoded] = useState<string>("");
   const [parsed, setParsed] = useState<Parsed | null>(null);
@@ -29,10 +28,7 @@ export default function ScanPage() {
           if (local) {
             setStatus("found");
             track("scan_lookup_result", { result: "offline" });
-            toast({
-              title: "Batch Found (Offline)",
-              description: `#${local.batchNumber ?? local.id} — ${local.variety ?? "Unknown variety"}`,
-            });
+            toast.success(`Batch Found (Offline): #${local.batchNumber ?? local.id} — ${local.variety ?? "Unknown variety"}`);
             return;
           }
         }
@@ -50,29 +46,25 @@ export default function ScanPage() {
             const { batch, summary } = await res.json();
             setStatus("found");
             track("scan_lookup_result", { result: "found", by: summary?.by ?? "unknown" });
-            toast({ title: "Batch Found", description: `#${batch.batchNumber} - ${batch.plantVariety}` });
+            toast.success(`Batch Found: #${batch.batchNumber} - ${batch.plantVariety}`);
             window.location.href = `/?batch=${encodeURIComponent(batch.id)}`;
         } else if (res.status === 404) {
             setStatus("not_found");
             track("scan_lookup_result", { result: "not_found" });
-            toast({ variant: "destructive", title: "Not Found", description: "No batch found for the scanned code." });
+            toast.error("No batch found for the scanned code.");
         } else if (res.status === 422) {
             setStatus("error");
-            toast({ variant: "destructive", title: "Invalid Code", description: "The scanned code was not recognized." });
+            toast.error("The scanned code was not recognized.");
         } else {
             setStatus("error");
             track("scan_lookup_result", { result: "error", status: res.status });
-            toast({ variant: "destructive", title: "API Error", description: `An error occurred (${res.status}).` });
+            toast.error(`An error occurred (${res.status}).`);
         }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
         setStatus("error");
       track("scan_lookup_result", { result: "error", message });
-      toast({
-        variant: "destructive",
-        title: "Network Error",
-        description: "Could not connect to the server.",
-      });
+      toast.error("Could not connect to the server.");
     } finally {
         inflight.current = false;
     }
@@ -157,7 +149,7 @@ export default function ScanPage() {
       onDecoded(text);
     } catch {
       setStatus("error");
-      toast({ variant: 'destructive', title: 'Decode Failed', description: 'Could not decode the uploaded image.' });
+      toast.error("Could not decode the uploaded image.");
     } finally {
       if (e.target) e.target.value = "";
     }

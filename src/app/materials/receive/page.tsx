@@ -102,8 +102,8 @@ export default function ReceiveMaterialsPage() {
       const data = await res.json();
       setCreatedLots(data.lots);
       setStep(3);
-    } catch (error) {
-      console.error('Error receiving lots:', error);
+    } catch {
+      // Lot receive failed silently
     } finally {
       setSubmitting(false);
     }

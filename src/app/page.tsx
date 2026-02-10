@@ -1,7 +1,7 @@
 import HomePageContainer from '@/app/HomePageContainer';
 import SafeLanding from './safe-landing';
 import { getBatchesAction, getVarietiesAction, getLocationsAction, getSizesAction, getSuppliersAction } from "./actions";
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
+
 
 export const dynamic = "force-dynamic";
 

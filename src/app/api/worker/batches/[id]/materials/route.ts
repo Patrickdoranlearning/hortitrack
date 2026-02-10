@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { getPlannedBatchMaterials } from "@/server/materials/consumption";
 import { getBatchMaterialLots } from "@/server/materials/lots";
 import type { PlannedBatchMaterial } from "@/server/materials/consumption";
@@ -106,7 +107,7 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[api/worker/batches/[id]/materials] Error:", error);
+    logger.worker.error("Batch materials fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

@@ -258,7 +258,6 @@ export default function ScannerClient({ onDecoded, roiScale = 0.8 }: Props) {
   /** ---- COMMON: Handle decoded text with duplicate suppression ---- */
   function handleDecoded(text: string, format: string) {
     if (!text) return;
-    console.log("ScannerClient: Decoded raw text:", text); // LOG ADDED
     const now = Date.now();
     const prev = lastRef.current;
     setDecodedText(text); // Set the decoded text here

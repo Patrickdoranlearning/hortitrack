@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import {
   ChevronLeft,
@@ -180,8 +180,7 @@ export default function MeasurementPage() {
       } else {
         toast.error(result.error || 'Failed to save measurements');
       }
-    } catch (error) {
-      console.error('Failed to save measurements:', error);
+    } catch {
       toast.error('Failed to save measurements');
     } finally {
       setIsSubmitting(false);

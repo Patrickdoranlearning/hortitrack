@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLightweightAuth } from "@/lib/auth/lightweight";
 import { type CachedReferenceData } from "@/lib/cache/reference-data";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Returns reference data for the UI.
@@ -36,7 +37,7 @@ export async function GET(_req: NextRequest) {
       results.errors.push(e.message);
       return NextResponse.json(results, { status: 401 });
     }
-    console.error("[reference-data] error:", e);
+    logger.refdata.error("Reference data fetch failed", e);
     results.errors.push(e?.message ?? "Failed to fetch reference data");
   }
 
@@ -95,11 +96,11 @@ async function fetchReferenceDataWithUserSession(
   ]);
 
   // Log any errors for debugging
-  if (varietiesRes.error) console.warn("[reference-data] varieties error:", varietiesRes.error.message);
-  if (sizesRes.error) console.warn("[reference-data] sizes error:", sizesRes.error.message);
-  if (locationsRes.error) console.warn("[reference-data] locations error:", locationsRes.error.message);
-  if (suppliersRes.error) console.warn("[reference-data] suppliers error:", suppliersRes.error.message);
-  if (materialsRes.error) console.warn("[reference-data] materials error:", materialsRes.error.message);
+  if (varietiesRes.error) logger.refdata.warn("Varieties fetch error", { error: varietiesRes.error.message });
+  if (sizesRes.error) logger.refdata.warn("Sizes fetch error", { error: sizesRes.error.message });
+  if (locationsRes.error) logger.refdata.warn("Locations fetch error", { error: locationsRes.error.message });
+  if (suppliersRes.error) logger.refdata.warn("Suppliers fetch error", { error: suppliersRes.error.message });
+  if (materialsRes.error) logger.refdata.warn("Materials fetch error", { error: materialsRes.error.message });
 
   // Transform materials to flatten category info and filter to Containers + Growing Media
   const materials = (materialsRes.data ?? [])

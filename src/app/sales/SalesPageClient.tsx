@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   Grid,
   LogOut,
@@ -46,7 +46,6 @@ type Order = {
 
 export default function SalesPageClient() {
   const router = useRouter();
-  const { toast } = useToast();
   const { user, loading: authLoading, signOut: signOutSupabase } = useAuth();
 
   const [isFormOpen, setIsFormOpen] = React.useState(false);
@@ -96,10 +95,7 @@ export default function SalesPageClient() {
   const handleSignOut = async () => {
     await signOutSupabase();
     router.push('/login');
-    toast({
-      title: 'Signed Out',
-      description: 'You have been successfully signed out.',
-    });
+    toast.success('You have been successfully signed out.');
   };
   
   React.useEffect(() => {

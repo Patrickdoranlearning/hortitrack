@@ -18,7 +18,6 @@ export async function fetchStoreListWithMetrics(
     .order("order_count", { ascending: false });
 
   if (metricsError) {
-    console.error("Error fetching store metrics:", metricsError.message, metricsError.code);
     return [];
   }
 
@@ -82,7 +81,6 @@ export async function fetchStoreOrders(
     .limit(limit);
 
   if (error) {
-    console.error("Error fetching store orders:", error.message, error.code);
     return [];
   }
 
@@ -164,7 +162,6 @@ export async function fetchStoreTopProducts(
     .in("order_id", orderIds);
 
   if (error) {
-    console.error("Error fetching store products:", error.message, error.code);
     return [];
   }
 
@@ -250,7 +247,6 @@ export async function fetchStoreWithPreferences(
     .single();
 
   if (addrError || !address) {
-    console.error("Error fetching address:", addrError?.message);
     return null;
   }
 
@@ -296,7 +292,6 @@ export async function fetchStoreOrderFrequency(
     .order("created_at", { ascending: true });
 
   if (error || !orders) {
-    console.error("Error fetching store order frequency:", error?.message);
     return {
       ordersByMonth: generateEmptyMonths(),
       ordersLast12Months: 0,
@@ -350,7 +345,6 @@ export async function updateStorePreferences(
     .eq("id", addressId);
 
   if (error) {
-    console.error("Error updating store preferences:", error.message);
     return { success: false, error: error.message };
   }
 

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fail } from "@/server/utils/envelope";
+import { logger } from "@/server/utils/logger";
 import {
   startOfWeek,
   endOfWeek,
@@ -379,7 +380,7 @@ export async function GET() {
       topProducts,
     });
   } catch (err) {
-    console.error("[api:sales/dashboard][GET]", err);
+    logger.sales.error("GET /api/sales/dashboard failed", err);
     return NextResponse.json(
       { ok: false, error: String((err as any)?.message ?? err) },
       { status: 500 }

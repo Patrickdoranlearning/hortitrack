@@ -3,6 +3,7 @@ import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 import { requireRole } from "@/server/auth/getUser";
 import { createHash, randomBytes } from "crypto";
+import { logger } from "@/server/utils/logger";
 
 // Generate a secure API key with prefix
 function generateAgentKey(): { key: string; hash: string; prefix: string } {
@@ -33,7 +34,7 @@ export async function GET() {
     return NextResponse.json({ data });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to fetch print agents";
-    console.error("[api/print-agents] GET error:", e);
+    logger.api.error("GET /api/print-agents failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to create print agent";
-    console.error("[api/print-agents] POST error:", e);
+    logger.api.error("POST /api/print-agents failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 
 const Query = z.object({
   q: z.string().trim().min(0).max(100).optional(),
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
     // base select with estimated count for faster pagination
     let query = sb.from("v_batch_search")
       .select(
-        "id, org_id, batch_number, status, status_id, phase, quantity, ready_at, variety_name, family, category, size_name, location_name, supplier_name, behavior, saleable_quantity, sales_photo_url, grower_photo_url",
+        "id, org_id, batch_number, status, status_id, phase, quantity, ready_at, variety_name, family, category, size_name, location_name, location_site, supplier_name, behavior, saleable_quantity, sales_photo_url, grower_photo_url",
         { count: "planned" }
       )
       .order("ready_at", { ascending: true, nullsFirst: false })
@@ -60,8 +61,7 @@ export async function GET(req: Request) {
 
     const { data, error, count } = await query;
     if (error) {
-      // Log the full error server-side for debugging
-      console.error("[api/production/batches/search] Query error:", error);
+      logger.production.error("Batch search query failed", error);
       // Return generic message to client
       return NextResponse.json({ error: "Failed to search batches" }, { status: 400 });
     }
@@ -72,8 +72,7 @@ export async function GET(req: Request) {
       items: data ?? [],
     });
   } catch (e) {
-    // Log the full error server-side for debugging
-    console.error("[api/production/batches/search] Error:", e);
+    logger.production.error("Batch search failed", e);
     // Return generic message to client - don't expose internal details
     return NextResponse.json({ error: "An error occurred while searching batches" }, { status: 500 });
   }

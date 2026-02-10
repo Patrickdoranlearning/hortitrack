@@ -36,7 +36,7 @@ import {
   Zap,
   AlertTriangle,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import { ProgramWizard } from '@/components/plant-health/ipm/ProgramWizard';

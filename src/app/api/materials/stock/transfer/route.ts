@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { transferStock } from "@/server/materials/stock";
 import { StockTransferSchema } from "@/lib/schemas/materials";
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ transaction }, { status: 201 });
   } catch (error: unknown) {
-    console.error("[materials/stock/transfer POST] Error:", error);
+    logger.materials.error("Stock transfer failed", error);
     const message = error instanceof Error ? error.message : "Failed to transfer stock";
     const status = message.includes("Insufficient") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Worker Batch Scout History API
@@ -53,7 +54,7 @@ export async function GET(
       .limit(50);
 
     if (error) {
-      console.error("[api/worker/batches/[id]/scouts] Query error:", error);
+      logger.worker.error("Batch scouts query failed", error);
       return NextResponse.json(
         { error: "Failed to load scout logs" },
         { status: 500 }
@@ -90,7 +91,7 @@ export async function GET(
 
     return NextResponse.json({ logs });
   } catch (error) {
-    console.error("[api/worker/batches/[id]/scouts] Error:", error);
+    logger.worker.error("Batch scouts fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

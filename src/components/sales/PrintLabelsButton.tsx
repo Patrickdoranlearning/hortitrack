@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 export function PrintLabelsButton({ orderId }: { orderId: string }) {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
   async function onClick() {
@@ -14,9 +13,9 @@ export function PrintLabelsButton({ orderId }: { orderId: string }) {
       const res = await fetch(`/api/sales/orders/${orderId}/labels/print`, { method: "POST" });
       const j = await res.json();
       if (!res.ok || !j?.ok) throw new Error(j?.error?.message || "Print failed");
-      toast({ title: "Labels sent", description: `${j.data.printed} line(s)` });
+      toast.success(`${j.data.printed} line(s) sent to printer`);
     } catch (e: any) {
-      toast({ title: "Print error", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setLoading(false);
     }

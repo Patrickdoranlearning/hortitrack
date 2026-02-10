@@ -6,11 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { changePasswordAction } from "@/app/account/actions";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 export function PasswordChangeForm() {
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,16 +20,9 @@ export function PasswordChangeForm() {
     setIsLoading(false);
 
     if (result.error) {
-      toast({
-        title: "Error",
-        description: result.error,
-        variant: "destructive",
-      });
+      toast.error(result.error);
     } else {
-      toast({
-        title: "Success",
-        description: "Password changed successfully",
-      });
+      toast.success("Password changed successfully");
       // Reset the form
       event.currentTarget.reset();
     }

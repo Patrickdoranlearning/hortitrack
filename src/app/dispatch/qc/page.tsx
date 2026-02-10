@@ -106,9 +106,7 @@ export default async function QCQueuePage() {
     }
   }
 
-  if (error) {
-    console.error('Error fetching QC queue:', error.message, error.code, error.details);
-  }
+  // Error is non-fatal - empty state will show if no data
 
   // Fetch completed_by user names
   const completedByIds = (pickLists || [])

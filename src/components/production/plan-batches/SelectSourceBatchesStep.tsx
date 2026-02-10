@@ -125,7 +125,6 @@ export function SelectSourceBatchesStep({
 
         setBatches(mappedBatches);
       } catch (err: any) {
-        console.error('Failed to fetch batches:', err);
         setError(err.message);
       } finally {
         setLoading(false);

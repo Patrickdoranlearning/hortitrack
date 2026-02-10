@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
-import { getSupabaseServerApp, supabaseAdmin } from "@/server/db/supabase";
+import { getUserAndOrgAdmin } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 export async function PATCH(
   request: NextRequest,
@@ -8,20 +8,14 @@ export async function PATCH(
 ) {
   try {
     const { userId: targetUserId } = await params;
-    const { userId: requesterId, orgId } = await getUserIdAndOrgId();
-
-    if (!requesterId || !orgId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const supabase = await getSupabaseServerApp();
+    const { user, orgId, supabase } = await getUserAndOrgAdmin();
 
     // Check if requester is admin or owner
     const { data: requesterMembership } = await supabase
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
-      .eq("user_id", requesterId)
+      .eq("user_id", user.id)
       .single();
 
     if (!requesterMembership || !["owner", "admin"].includes(requesterMembership.role || "")) {
@@ -39,7 +33,7 @@ export async function PATCH(
         .eq("id", targetUserId);
 
       if (profileError) {
-        console.error("Error updating member name:", profileError);
+        logger.api.error("Failed to update member name", profileError, { targetUserId });
         return NextResponse.json({ error: "Failed to update member name" }, { status: 500 });
       }
 
@@ -91,14 +85,17 @@ export async function PATCH(
         .eq("user_id", targetUserId);
 
       if (error) {
-        console.error("Error updating member role:", error);
+        logger.api.error("Failed to update member role", error, { targetUserId });
         return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
       }
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error in PATCH /api/org/members/[userId]:", error);
+    if (error instanceof Error && error.message === "Unauthenticated") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    logger.api.error("PATCH /api/org/members/[userId] failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -109,21 +106,15 @@ export async function DELETE(
 ) {
   try {
     const { userId: targetUserId } = await params;
-    const { userId: requesterId, orgId } = await getUserIdAndOrgId();
-
-    if (!requesterId || !orgId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Use admin client to bypass RLS for these operations
-    // Auth is already verified via getUserIdAndOrgId
+    const { user, orgId, supabase } = await getUserAndOrgAdmin();
 
     // Check if requester is admin or owner
-    const { data: requesterMembership } = await supabaseAdmin
+    // supabase from getUserAndOrgAdmin bypasses RLS for admin operations
+    const { data: requesterMembership } = await supabase
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
-      .eq("user_id", requesterId)
+      .eq("user_id", user.id)
       .single();
 
     if (!requesterMembership || !["owner", "admin"].includes(requesterMembership.role || "")) {
@@ -131,7 +122,7 @@ export async function DELETE(
     }
 
     // Check if target user is the last owner
-    const { data: targetMembership } = await supabaseAdmin
+    const { data: targetMembership } = await supabase
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
@@ -140,7 +131,7 @@ export async function DELETE(
 
     if (targetMembership?.role === "owner") {
       // Count owners in the org
-      const { count } = await supabaseAdmin
+      const { count } = await supabase
         .from("org_memberships")
         .select("*", { count: "exact", head: true })
         .eq("org_id", orgId)
@@ -155,20 +146,23 @@ export async function DELETE(
     }
 
     // Remove the member
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from("org_memberships")
       .delete()
       .eq("org_id", orgId)
       .eq("user_id", targetUserId);
 
     if (error) {
-      console.error("Error removing member:", error);
+      logger.api.error("Failed to remove org member", error, { targetUserId });
       return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error in DELETE /api/org/members/[userId]:", error);
+    if (error instanceof Error && error.message === "Unauthenticated") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    logger.api.error("DELETE /api/org/members/[userId] failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

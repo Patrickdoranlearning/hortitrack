@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getUserFromRequest } from "@/server/security/auth";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
-import { jsonError } from "./responses";
+import { jsonError } from "@/server/utils/envelope";
 import type { UserSession } from "@/lib/types";
 import { logger } from "@/server/utils/logger";
 

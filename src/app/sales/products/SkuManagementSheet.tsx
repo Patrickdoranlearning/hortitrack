@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Plus, Search, Check, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { createSkuAction, updateSkuConfigAction } from "./actions";
 import type { ProductManagementPayload, ProductSkuOption } from "./types";
 
@@ -60,7 +60,6 @@ export default function SkuManagementSheet({
   plantSizes = [],
   onSkuCreated,
 }: Props) {
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"list" | "create">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState(defaultForm);
@@ -81,11 +80,11 @@ export default function SkuManagementSheet({
   const handleCreateSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.displayName.trim()) {
-      toast({ variant: "destructive", title: "Display name required" });
+      toast.error("Display name required");
       return;
     }
     if (!form.barcode.trim()) {
-      toast({ variant: "destructive", title: "Barcode required" });
+      toast.error("Barcode required");
       return;
     }
     startTransition(async () => {
@@ -97,14 +96,10 @@ export default function SkuManagementSheet({
         vatRate: Number(form.vatRate),
       });
       if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Failed to create SKU",
-          description: result.error,
-        });
+        toast.error(result.error);
         return;
       }
-      toast({ title: "SKU created successfully" });
+      toast.success("SKU created successfully");
       const displayName = result.data.display_name || result.data.code;
       const newSku: ProductSkuOption = {
         id: result.data.id,
@@ -138,13 +133,9 @@ export default function SkuManagementSheet({
         sizeId: sizeId,
       });
       if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Update failed",
-          description: result.error,
-        });
+        toast.error(result.error);
       } else {
-        toast({ title: "SKU updated" });
+        toast.success("SKU updated");
         emitMutation({ resource: 'products', action: 'update', id: skuId });
       }
       setEditingSkuId(null);

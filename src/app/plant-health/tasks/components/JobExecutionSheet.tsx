@@ -28,7 +28,7 @@ import {
   Printer,
   Calculator,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { IpmJob, JobLocation } from '@/types/ipm-jobs';
 import { getJobWithTasks, completeTaskInJob } from '@/app/actions/ipm-tasks';
 import { JobCompletionWizard } from './JobCompletionWizard';

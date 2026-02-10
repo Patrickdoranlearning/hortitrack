@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 const MEDIA_BUCKET = "batch-photos";
 
@@ -39,7 +40,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
         .remove([media.storage_path]);
 
       if (storageError) {
-        console.error("[media/delete] storage error:", storageError);
+        logger.api.error("Media delete storage error", storageError);
         // Continue anyway - might be already deleted
       }
     }
@@ -57,7 +58,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       .eq("id", mediaId);
 
     if (deleteError) {
-      console.error("[media/delete] delete error:", deleteError);
+      logger.api.error("Media delete record error", deleteError);
       return NextResponse.json(
         { error: "Failed to delete media" },
         { status: 500 }
@@ -66,7 +67,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[media/delete] error:", err);
+    logger.api.error("Media delete failed", err);
     return NextResponse.json(
       { error: "Unexpected error" },
       { status: 500 }

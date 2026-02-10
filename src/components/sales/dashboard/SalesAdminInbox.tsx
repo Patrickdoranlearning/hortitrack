@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { sendOrderConfirmation, generateInvoice } from '@/app/sales/actions';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { formatCurrency } from '@/lib/format-currency';
 

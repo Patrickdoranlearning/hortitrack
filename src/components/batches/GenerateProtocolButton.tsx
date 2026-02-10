@@ -31,7 +31,6 @@ export function GenerateProtocolButton({ batchId, defaultName }: { batchId: stri
       URL.revokeObjectURL(url);
     } catch (e: any) {
       alert(`Generate failed: ${e?.message || e}`);
-      console.error(e);
     } finally {
       setBusy(false);
     }

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Beaker, FlaskConical, MapPin, Leaf } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { TaskGroup } from '@/app/actions/ipm-tasks';
 import { createJob } from '@/app/actions/ipm-tasks';
 

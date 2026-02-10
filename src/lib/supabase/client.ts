@@ -3,6 +3,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { type SupabaseClient } from "@supabase/supabase-js";
 export type { SupabaseClient } from "@supabase/supabase-js";
+import { logError } from "@/lib/log";
 
 let client: SupabaseClient | undefined;
 
@@ -13,7 +14,7 @@ export function supabaseClient() {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey || url === "https://placeholder.supabase.co") {
-    console.error("Supabase environment variables are missing. Please check your .env file.");
+    logError("Supabase environment variables are missing. Please check your .env file.");
   }
 
   client = createBrowserClient(

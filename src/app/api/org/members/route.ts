@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
-import { getSupabaseServerApp } from "@/server/db/supabase";
+import { getUserAndOrg } from "@/server/auth/org";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { logger } from "@/server/utils/logger";
 
 export async function GET() {
   try {
-    const { userId, orgId } = await getUserIdAndOrgId();
-
-    if (!userId || !orgId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const supabase = await getSupabaseServerApp();
+    const { user, orgId, supabase } = await getUserAndOrg();
 
     // Check if user is admin or owner
     const { data: membership } = await supabase
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .single();
 
     if (!membership || !["owner", "admin"].includes(membership.role || "")) {
@@ -52,7 +46,7 @@ export async function GET() {
     if (membershipsError) {
       // Check for the specific schema cache error and provide a user-friendly message
       if (membershipsError.code === "PGRST200") {
-        console.error("Schema cache error fetching members:", membershipsError);
+        logger.api.error("Schema cache error fetching org members", membershipsError);
         return NextResponse.json(
           {
             error:
@@ -61,7 +55,7 @@ export async function GET() {
           { status: 500 }
         );
       }
-      console.error("Error fetching members:", membershipsError);
+      logger.api.error("Failed to fetch org members", membershipsError);
       return NextResponse.json(
         { error: "Failed to fetch members" },
         { status: 500 }
@@ -70,7 +64,10 @@ export async function GET() {
 
     return NextResponse.json({ members: membersWithEmail });
   } catch (error) {
-    console.error("Error in GET /api/org/members:", error);
+    if (error instanceof Error && error.message === "Unauthenticated") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    logger.api.error("GET /api/org/members failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -99,14 +96,10 @@ function generatePassword(length = 12): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, orgId } = await getUserIdAndOrgId();
-
-    if (!userId || !orgId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, orgId, supabase } = await getUserAndOrg();
 
     // Rate limit: 10 user creations per minute per user (prevents spam accounts)
-    const rlKey = `org:members:create:${requestKey(request, userId)}`;
+    const rlKey = `org:members:create:${requestKey(request, user.id)}`;
     const rl = await checkRateLimit({ key: rlKey, windowMs: 60_000, max: 10 });
     if (!rl.allowed) {
       return NextResponse.json(
@@ -115,14 +108,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await getSupabaseServerApp();
-
     // Check if user is admin or owner
     const { data: membership } = await supabase
       .from("org_memberships")
       .select("role")
       .eq("org_id", orgId)
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .single();
 
     if (!membership || !["owner", "admin"].includes(membership.role || "")) {
@@ -178,7 +169,7 @@ export async function POST(request: NextRequest) {
         });
 
       if (profileError) {
-        console.error("Error ensuring profile for existing user:", profileError);
+        logger.api.error("Failed to ensure profile for existing user", profileError, { email });
         return NextResponse.json(
           { error: "Failed to prepare user profile" },
           { status: 500 }
@@ -195,7 +186,7 @@ export async function POST(request: NextRequest) {
         });
 
       if (membershipError) {
-        console.error("Error adding existing user to org:", membershipError);
+        logger.api.error("Failed to add existing user to org", membershipError, { email, orgId });
         return NextResponse.json(
           { error: "Failed to add user to organization" },
           { status: 500 }
@@ -225,7 +216,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (createError) {
-      console.error("Error creating user:", createError);
+      logger.api.error("Failed to create user", createError, { email });
       return NextResponse.json(
         { error: createError.message || "Failed to create user" },
         { status: 500 }
@@ -252,7 +243,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (profileError) {
-      console.error("Error creating profile:", profileError);
+      logger.api.error("Failed to create user profile", profileError, { email });
       // Delete the auth user since we couldn't create profile
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
       return NextResponse.json(
@@ -271,7 +262,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (membershipError) {
-      console.error("Error creating org membership:", membershipError);
+      logger.api.error("Failed to create org membership", membershipError, { email, orgId });
       // Delete the auth user since we couldn't add them to the org
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
       return NextResponse.json(
@@ -289,7 +280,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error in POST /api/org/members:", error);
+    if (error instanceof Error && error.message === "Unauthenticated") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    logger.api.error("POST /api/org/members failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

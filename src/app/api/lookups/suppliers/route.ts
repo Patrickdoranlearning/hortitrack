@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ items: data ?? [] });
   } catch (e: any) {
     const status = /Unauthenticated/i.test(e?.message) ? 401 : 500;
-    console.error("[lookups/suppliers] error", e);
+    logger.api.error("Suppliers lookup failed", e);
     return NextResponse.json({ error: e?.message ?? "Lookup failed" }, { status });
   }
 }

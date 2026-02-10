@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   Dialog,
   DialogContent,
@@ -177,8 +177,7 @@ export function ApplyTreatmentDialog({
       form.reset();
       setSelectedBottle(null);
       onSuccess?.(count);
-    } catch (error) {
-      console.error('Treatment application failed', error);
+    } catch {
       toast.error('Failed to apply treatment');
     }
   }

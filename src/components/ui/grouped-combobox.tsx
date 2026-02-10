@@ -34,6 +34,8 @@ export interface GroupedComboboxProps<T = unknown> {
   searchPlaceholder?: string;
   emptyMessage?: string;
   disabled?: boolean;
+  /** Custom display text for the selected value in the trigger button */
+  displayValue?: string;
   /** Render custom content for each option */
   renderOption?: (option: GroupedOption<T>) => React.ReactNode;
   /** Render custom content for group headers */
@@ -60,6 +62,7 @@ export function GroupedCombobox<T = unknown>({
   searchPlaceholder = "Search...",
   emptyMessage = "No results found.",
   disabled = false,
+  displayValue,
   renderOption,
   renderGroupHeader,
   createAction,
@@ -82,8 +85,8 @@ export function GroupedCombobox<T = unknown>({
     const groups = new Map<string, GroupedOption<T>[]>();
 
     for (const option of options) {
-      // Filter by search term
-      if (searchLower && !option.label.toLowerCase().includes(searchLower)) {
+      // Filter by search term (match against label or group name)
+      if (searchLower && !option.label.toLowerCase().includes(searchLower) && !option.group.toLowerCase().includes(searchLower)) {
         continue;
       }
 
@@ -141,7 +144,7 @@ export function GroupedCombobox<T = unknown>({
           disabled={disabled}
         >
           <span className="truncate">
-            {selectedOption ? selectedOption.label : placeholder}
+            {selectedOption ? (displayValue || selectedOption.label) : placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

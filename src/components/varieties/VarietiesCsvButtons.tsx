@@ -5,10 +5,9 @@ import * as React from "react";
 import { emitMutation } from "@/lib/events/mutation-events";
 import { Button } from "../ui/button";
 import { Download, Upload } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 export function VarietiesCsvButtons() {
-  const { toast } = useToast();
   const [busy, setBusy] = React.useState<"down" | "up" | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -27,7 +26,7 @@ export function VarietiesCsvButtons() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Download failed", description: e?.message || String(e) });
+      toast.error(e?.message || "Download failed");
     } finally {
       setBusy(null);
     }
@@ -48,14 +47,11 @@ export function VarietiesCsvButtons() {
       try { json = JSON.parse(text); } catch { throw new Error(text); }
       if (!res.ok || json?.error) throw new Error(json?.error || "Import failed");
       const { summary } = json;
-      toast({
-        title: "Import complete",
-        description: `${summary.created} created, ${summary.updated} updated, ${summary.errors} errors.`
-      });
+      toast.success(`${summary.created} created, ${summary.updated} updated, ${summary.errors} errors.`);
       // Emit mutation to refresh variety data
       emitMutation({ resource: 'varieties', action: 'update' });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Upload failed", description: e?.message || String(e) });
+      toast.error(e?.message || "Upload failed");
     } finally {
       setBusy(null);
       if (fileRef.current) fileRef.current.value = "";

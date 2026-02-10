@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Worker Location Detail API
@@ -81,7 +82,7 @@ export async function GET(
           { status: 404 }
         );
       }
-      console.error("[api/worker/locations/[id]] Location query error:", locError);
+      logger.worker.error("Worker location query failed", locError);
       return NextResponse.json(
         { error: "Failed to fetch location" },
         { status: 500 }
@@ -115,7 +116,7 @@ export async function GET(
       .order("batch_number", { ascending: false });
 
     if (batchError) {
-      console.error("[api/worker/locations/[id]] Batches query error:", batchError);
+      logger.worker.error("Worker location batches query failed", batchError);
       return NextResponse.json(
         { error: "Failed to fetch batches" },
         { status: 500 }
@@ -225,7 +226,7 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[api/worker/locations/[id]] Error:", error);
+    logger.worker.error("Worker location detail fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

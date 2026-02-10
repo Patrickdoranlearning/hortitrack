@@ -40,7 +40,6 @@ export default async function DispatchPage() {
       throw error;
     }
 
-    console.error("Error determining dispatch role:", error);
     // Default to manager view on error
     redirect("/dispatch/manager");
   }

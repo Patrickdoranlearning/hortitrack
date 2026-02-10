@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { adjustStock, recordCount } from "@/server/materials/stock";
 import { StockAdjustmentSchema } from "@/lib/schemas/materials";
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ transaction }, { status: 201 });
   } catch (error: unknown) {
-    console.error("[materials/[id]/stock/adjust POST] Error:", error);
+    logger.materials.error("Stock adjustment failed", error);
     const message = error instanceof Error ? error.message : "Failed to adjust stock";
     return NextResponse.json({ error: message }, { status: 500 });
   }

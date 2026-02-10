@@ -5,6 +5,8 @@
  * https://open-meteo.com/
  */
 
+import { logError } from '@/lib/log';
+
 export interface WeatherData {
   temperature: number;
   humidity: number;
@@ -75,7 +77,7 @@ export async function getWeather(lat: number, lng: number): Promise<WeatherData>
   });
   
   if (!response.ok) {
-    console.error('[weather] Open-Meteo API error:', response.status, response.statusText);
+    logError('Open-Meteo API error', { status: response.status, statusText: response.statusText });
     // Return fallback data on error
     return {
       temperature: 15,

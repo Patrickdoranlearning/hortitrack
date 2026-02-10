@@ -67,7 +67,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { cn } from "@/lib/utils";
 import { currencySymbol, type CurrencyCode } from '@/lib/format-currency';
@@ -121,7 +121,6 @@ type FormValues = z.infer<typeof formSchema>;
 // =============================================================================
 
 export default function PriceListsPage() {
-  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingPriceList, setEditingPriceList] = React.useState<PriceList | null>(null);
   const [deletePriceList, setDeletePriceList] = React.useState<PriceList | null>(null);
@@ -177,23 +176,19 @@ export default function PriceListsPage() {
           method: "PATCH",
           body: JSON.stringify(values),
         });
-        toast({ title: "Price list updated" });
+        toast.success("Price list updated");
       } else {
         await fetchJson("/api/sales/price-lists", {
           method: "POST",
           body: JSON.stringify(values),
         });
-        toast({ title: "Price list created" });
+        toast.success("Price list created");
       }
       mutate();
       setIsDialogOpen(false);
       setEditingPriceList(null);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save price list",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to save price list");
     } finally {
       setIsSubmitting(false);
     }
@@ -206,14 +201,10 @@ export default function PriceListsPage() {
       await fetchJson(`/api/sales/price-lists/${deletePriceList.id}`, {
         method: "DELETE",
       });
-      toast({ title: "Price list deleted" });
+      toast.success("Price list deleted");
       mutate();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete price list",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to delete price list");
     } finally {
       setDeletePriceList(null);
     }

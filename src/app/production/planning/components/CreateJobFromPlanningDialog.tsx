@@ -33,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import type { PlanningBatch } from "@/lib/planning/types";
 
@@ -79,7 +79,6 @@ type Props = {
 };
 
 export function CreateJobFromPlanningDialog({ open, onOpenChange, selectedBatches, onSuccess }: Props) {
-  const { toast } = useToast();
   const [submitting, setSubmitting] = React.useState(false);
 
   // Calculate totals
@@ -130,16 +129,12 @@ export function CreateJobFromPlanningDialog({ open, onOpenChange, selectedBatche
           batchIds: selectedBatches.map((b) => b.id),
         }),
       });
-      toast({ title: "Job created successfully" });
+      toast.success("Job created successfully");
       form.reset();
       onOpenChange(false);
       onSuccess();
     } catch (error) {
-      toast({
-        title: "Failed to create job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setSubmitting(false);
     }

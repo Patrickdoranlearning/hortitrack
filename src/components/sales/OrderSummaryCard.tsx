@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import {
   User,
   MapPin,
@@ -72,7 +72,6 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
 };
 
 export default function OrderSummaryCard({ order, onStatusChange }: OrderSummaryCardProps) {
-  const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const currency = (order.currency === 'GBP' ? 'GBP' : 'EUR') as CurrencyCode;
   const fc = (amount: number) => formatCurrency(amount, currency);
@@ -99,24 +98,13 @@ export default function OrderSummaryCard({ order, onStatusChange }: OrderSummary
     try {
       const result = await updateOrderStatus(order.id, newStatus);
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'Status Updated',
-          description: `Order status changed to ${newStatus}`,
-        });
+        toast.success(`Order status changed to ${newStatus}`);
         onStatusChange();
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to update order status',
-        variant: 'destructive',
-      });
+      toast.error('Failed to update order status');
     } finally {
       setIsUpdating(false);
     }
@@ -127,24 +115,13 @@ export default function OrderSummaryCard({ order, onStatusChange }: OrderSummary
     try {
       const result = await voidOrder(order.id);
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'Order Voided',
-          description: 'The order has been voided',
-        });
+        toast.success('The order has been voided');
         onStatusChange();
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to void order',
-        variant: 'destructive',
-      });
+      toast.error('Failed to void order');
     } finally {
       setIsUpdating(false);
     }

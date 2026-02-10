@@ -81,7 +81,6 @@ export default async function QCReviewPage({ params }: QCReviewPageProps) {
     .single();
 
   if (error || !pickList) {
-    console.error('Pick list not found:', error);
     notFound();
   }
 

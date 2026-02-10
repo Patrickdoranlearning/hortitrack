@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -93,7 +93,6 @@ export default function CreditNoteWizard({
   onCreditNoteCreated,
 }: CreditNoteWizardProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [step, setStep] = useState<WizardStep>('items');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdCreditNoteId, setCreatedCreditNoteId] = useState<string | null>(null);
@@ -204,42 +203,27 @@ export default function CreditNoteWizard({
         })),
       });
 
-      if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+      if (!result.success) {
+        toast.error(result.error);
         return;
       }
 
-      setCreatedCreditNoteId(result.creditNoteId!);
-      setCreatedCreditNumber(result.creditNumber!);
+      setCreatedCreditNoteId(result.data.creditNoteId);
+      setCreatedCreditNumber(result.data.creditNumber);
 
       // If issue immediately is checked, issue the credit note
-      if (issueImmediately && result.creditNoteId) {
-        const issueResult = await issueCreditNoteAction(result.creditNoteId);
-        if (issueResult.error) {
-          toast({
-            title: 'Warning',
-            description: `Credit note created but could not be issued: ${issueResult.error}`,
-            variant: 'destructive',
-          });
+      if (issueImmediately) {
+        const issueResult = await issueCreditNoteAction(result.data.creditNoteId);
+        if (!issueResult.success) {
+          toast.warning(`Credit note created but could not be issued: ${issueResult.error}`);
         }
       }
 
       setStep('complete');
-      toast({
-        title: 'Credit Note Created',
-        description: `Credit note ${result.creditNumber} for ${formatCurrency(totals.total, currency)} has been created`,
-      });
+      toast.success(`Credit note ${result.data.creditNumber} for ${formatCurrency(totals.total, currency)} has been created`);
       onCreditNoteCreated();
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create credit note',
-        variant: 'destructive',
-      });
+      toast.error('Failed to create credit note');
     } finally {
       setIsSubmitting(false);
     }

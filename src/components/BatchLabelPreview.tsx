@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import LabelPreview from "./LabelPreview";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Printer, Settings2, Loader2, CheckCircle2, AlertCircle, Plus, Minus, Edit3, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
@@ -53,7 +53,6 @@ type Props = {
 };
 
 export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) {
-  const { toast } = useToast();
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string>("");
@@ -111,11 +110,7 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
 
   const printToZebra = async () => {
     if (!selectedPrinter && printers.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "No Printer Selected",
-        description: "Please select a printer before printing.",
-      });
+      toast.error("Please select a printer before printing.");
       return;
     }
 
@@ -143,20 +138,13 @@ export default function BatchLabelPreview({ open, onOpenChange, batch }: Props) 
         throw new Error(j?.error || res.statusText);
       }
       
-      toast({
-        title: "Print Job Sent",
-        description: copies > 1 
+      toast.success(copies > 1
           ? `${copies} labels have been sent to the printer.`
-          : "The label has been sent to the printer.",
-      });
+          : "The label has been sent to the printer.");
       onOpenChange(false);
 
     } catch (e: any) {
-       toast({
-        variant: "destructive",
-        title: "Print Failed",
-        description: e.message || "Could not connect to the printer.",
-      });
+       toast.error(e.message || "Could not connect to the printer.");
     } finally {
       setIsPrinting(false);
     }
@@ -390,7 +378,6 @@ function PrinterSettings({
   printers: Printer[];
   onRefresh: () => void;
 }) {
-  const { toast } = useToast();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [isTesting, setIsTesting] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -438,29 +425,17 @@ function PrinterSettings({
 
   const handleAddPrinter = async () => {
     if (!formData.name) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please enter a name for the printer.",
-      });
+      toast.error("Please enter a name for the printer.");
       return;
     }
 
     if (formData.connection_type === "network" && !formData.host) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please enter an IP address for the printer.",
-      });
+      toast.error("Please enter an IP address for the printer.");
       return;
     }
 
     if (formData.connection_type === "agent" && !formData.agent_id) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please select a print agent.",
-      });
+      toast.error("Please select a print agent.");
       return;
     }
 
@@ -493,20 +468,13 @@ function PrinterSettings({
         throw new Error(j?.error || "Failed to add printer");
       }
 
-      toast({
-        title: "Printer Added",
-        description: `${formData.name} has been added successfully.`,
-      });
+      toast.success(`${formData.name} has been added successfully.`);
 
       setAddDialogOpen(false);
       onRefresh();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to add printer";
-      toast({
-        variant: "destructive",
-        title: "Failed to Add Printer",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -524,17 +492,10 @@ function PrinterSettings({
         throw new Error(json?.error || "Test failed");
       }
 
-      toast({
-        title: "Test Successful",
-        description: "A test label has been sent to the printer.",
-      });
+      toast.success("A test label has been sent to the printer.");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Could not connect to the printer.";
-      toast({
-        variant: "destructive",
-        title: "Test Failed",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsTesting(null);
     }
@@ -553,17 +514,10 @@ function PrinterSettings({
       }
 
       onRefresh();
-      toast({
-        title: "Default Updated",
-        description: "Default printer has been changed.",
-      });
+      toast.success("Default printer has been changed.");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to update printer";
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: message,
-      });
+      toast.error(message);
     }
   };
 
@@ -580,17 +534,10 @@ function PrinterSettings({
       }
 
       onRefresh();
-      toast({
-        title: "Printer Deleted",
-        description: `${printerName} has been removed.`,
-      });
+      toast.success(`${printerName} has been removed.`);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to delete printer";
-      toast({
-        variant: "destructive",
-        title: "Delete Failed",
-        description: message,
-      });
+      toast.error(message);
     }
   };
 

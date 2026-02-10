@@ -1,12 +1,14 @@
+import { logger } from "@/server/utils/logger";
+
 const getRequiredEnvVar = (name: string, ...fallbackNames: string[]): string => {
   const allNames = [name, ...fallbackNames];
   for (const varName of allNames) {
     const value = process.env[varName];
     if (value) return value;
   }
-  const error = `Missing required environment variable: ${allNames.join(' or ')}`;
-  console.error(`[ENV] ${error}`);
-  throw new Error(error);
+  const message = `Missing required environment variable: ${allNames.join(' or ')}`;
+  logger.db.error(message);
+  throw new Error(message);
 };
 
 export const SUPABASE_URL = getRequiredEnvVar('SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');

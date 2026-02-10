@@ -65,8 +65,7 @@ export function BatchActionBar({
         // Defensive mapping to ensure `items` array is used
         const items = Array.isArray(json?.items) ? json.items : (Array.isArray(json) ? json : []);
         if (!canceled) setLocations(items);
-      } catch (e) {
-        console.error("Failed to load locations", e);
+      } catch {
         if (!canceled) setLocations([]);
       }
     })();

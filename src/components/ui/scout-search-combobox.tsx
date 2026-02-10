@@ -88,8 +88,7 @@ export function ScoutSearchCombobox({
       ];
 
       setResults(searchResults);
-    } catch (error) {
-      console.error("Search failed", error);
+    } catch {
       setResults([]);
     } finally {
       setSearching(false);

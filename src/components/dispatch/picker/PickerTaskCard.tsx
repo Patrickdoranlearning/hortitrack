@@ -19,7 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "@/components/dispatch/shared/StatusPill";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { PickerTask } from "@/lib/dispatch/types";
 
 type TaskVariant = "in_progress" | "assigned" | "available";

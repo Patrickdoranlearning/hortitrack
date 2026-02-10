@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { logger } from "@/server/utils/logger";
 
 const MEDIA_BUCKET = "batch-photos"; // existing public bucket for images
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      console.error("[media/upload] storage error:", uploadError);
+      logger.api.error("Media upload storage error", uploadError);
       return NextResponse.json(
         { error: "Failed to upload file" },
         { status: 500 }
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (mediaError || !mediaRecord) {
-      console.error("[media/upload] media_library insert error:", mediaError);
+      logger.api.error("Media library insert error", mediaError);
       // Clean up uploaded file
       await supabase.storage.from(MEDIA_BUCKET).remove([storagePath]);
       return NextResponse.json(
@@ -132,7 +133,7 @@ export async function POST(req: NextRequest) {
         });
 
       if (attachError) {
-        console.error("[media/upload] attachment error:", attachError);
+        logger.api.error("Media attachment error", attachError);
         // Don't fail the whole request, media is still uploaded
       }
     }
@@ -144,7 +145,7 @@ export async function POST(req: NextRequest) {
       bucket: MEDIA_BUCKET,
     });
   } catch (err) {
-    console.error("[media/upload] unexpected error:", err);
+    logger.api.error("Media upload unexpected error", err);
     return NextResponse.json(
       { error: "Unexpected error during upload" },
       { status: 500 }

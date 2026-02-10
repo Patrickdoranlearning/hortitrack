@@ -40,8 +40,8 @@ export default function WorkerMaterialDetailPage({ params }: PageProps) {
         const data = await res.json();
         setMaterial(data);
       }
-    } catch (error) {
-      console.error("Failed to fetch material:", error);
+    } catch {
+      // Error handled by empty state UI
     } finally {
       setLoading(false);
     }

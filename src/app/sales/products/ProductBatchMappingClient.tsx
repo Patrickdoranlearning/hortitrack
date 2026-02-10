@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   addProductBatchAction,
   removeProductBatchAction,
@@ -22,7 +22,6 @@ type Props = {
 };
 
 export default function ProductBatchMappingClient({ batches, products }: Props) {
-  const { toast } = useToast();
     const [filter, setFilter] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Record<string, string>>({});
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -43,15 +42,15 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
   const handleLink = async (batchId: string) => {
     const productId = selectedProduct[batchId];
     if (!productId) {
-      toast({ variant: "destructive", title: "Select a product first" });
+      toast.error("Select a product first");
       return;
     }
     setPendingId(batchId);
     const result = await addProductBatchAction({ productId, batchId });
     if (!result.success) {
-      toast({ variant: "destructive", title: "Failed to link batch", description: result.error });
+      toast.error(result.error);
     } else {
-      toast({ title: "Batch linked" });
+      toast.success("Batch linked");
       emitMutation({ resource: 'products', action: 'update' });
     }
     setPendingId(null);
@@ -60,19 +59,19 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
   const handleAutoLink = async (batch: BatchMapping) => {
     const match = findBestProductMatch(batch, products);
     if (!match) {
-      toast({ variant: "destructive", title: "No match found", description: "No product shares this variety & size." });
+      toast.error("No product shares this variety & size.");
       return;
     }
     if (batch.linkedProducts.some((entry) => entry.productId === match.id)) {
-      toast({ title: "Already linked", description: `${match.name} already includes this batch.` });
+      toast.success(`${match.name} already includes this batch.`);
       return;
     }
     setPendingId(batch.id);
     const result = await addProductBatchAction({ productId: match.id, batchId: batch.id });
     if (!result.success) {
-      toast({ variant: "destructive", title: "Auto-link failed", description: result.error });
+      toast.error(result.error);
     } else {
-      toast({ title: "Batch linked", description: `Mapped to ${match.name}` });
+      toast.success(`Mapped to ${match.name}`);
       emitMutation({ resource: 'products', action: 'update' });
     }
     setPendingId(null);
@@ -91,10 +90,10 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
         }
       }
       if (updated) {
-        toast({ title: `Auto-linked ${updated} batch${updated === 1 ? "" : "es"}` });
+        toast.success(`Auto-linked ${updated} batch${updated === 1 ? "" : "es"}`);
         emitMutation({ resource: 'products', action: 'update' });
       } else {
-        toast({ title: "No auto-links applied", description: "No eligible batches found." });
+        toast.success("No eligible batches found.");
       }
     });
   };
@@ -103,9 +102,9 @@ export default function ProductBatchMappingClient({ batches, products }: Props) 
     setPendingId(productBatchId);
     const result = await removeProductBatchAction(productBatchId);
     if (!result.success) {
-      toast({ variant: "destructive", title: "Failed to remove link", description: result.error });
+      toast.error(result.error);
     } else {
-      toast({ title: "Batch link removed" });
+      toast.success("Batch link removed");
       emitMutation({ resource: 'products', action: 'update' });
     }
     setPendingId(null);

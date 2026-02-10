@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { getMaterial } from "@/server/materials/service";
 import { getStockByMaterial } from "@/server/materials/stock";
 import { listMaterialLots } from "@/server/materials/lots";
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[api/worker/materials/[id]] Error:", error);
+    logger.worker.error("Worker material detail fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

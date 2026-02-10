@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import type { WorkerTask, TaskStats } from "@/lib/types/worker-tasks";
 
 /**
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
       .limit(50);
 
     if (error) {
-      console.error("[api/worker/plant-health-tasks] Query error:", error);
+      logger.worker.error("Plant health tasks query failed", error);
       return NextResponse.json(
         { error: "Failed to load tasks" },
         { status: 500 }
@@ -105,7 +106,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ tasks, stats });
   } catch (error) {
-    console.error("[api/worker/plant-health-tasks] Error:", error);
+    logger.worker.error("Plant health tasks fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

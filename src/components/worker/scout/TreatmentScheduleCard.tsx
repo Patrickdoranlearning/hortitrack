@@ -21,7 +21,7 @@ import { vibrateTap } from "@/lib/haptics";
 import { TreatmentComplianceForm } from "./TreatmentComplianceForm";
 import type { IpmTask, ComplianceData } from "@/app/actions/ipm-tasks";
 import { completeTasks } from "@/app/actions/ipm-tasks";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface TreatmentScheduleCardProps {
   task: IpmTask;

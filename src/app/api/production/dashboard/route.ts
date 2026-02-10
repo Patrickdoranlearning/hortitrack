@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { subDays, differenceInWeeks, format, startOfDay, parseISO } from "date-fns";
 
 export const runtime = "nodejs";
@@ -317,7 +318,7 @@ export async function GET() {
 
     return NextResponse.json(response);
   } catch (err) {
-    console.error("[production-dashboard] Error:", err);
+    logger.production.error("Dashboard data fetch failed", err);
     const message = err instanceof Error ? err.message : "Internal server error";
     const status = /Unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

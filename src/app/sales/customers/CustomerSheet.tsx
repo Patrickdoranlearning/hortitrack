@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import type {
   CustomerSummary,
   CustomerAddressSummary,
@@ -139,7 +139,6 @@ export function CustomerSheet({
   products,
   onSaved,
 }: CustomerSheetProps) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<TabKey>("account");
   const [currentCustomerId, setCurrentCustomerId] = useState<string | null>(customer?.id ?? null);
@@ -182,7 +181,7 @@ export function CustomerSheet({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast({ variant: "destructive", title: "Name required" });
+      toast.error("Name required");
       return;
     }
     startTransition(async () => {
@@ -208,10 +207,10 @@ export function CustomerSheet({
         prePricingCostPerLabel: form.prePricingCostPerLabel,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: mode === "create" ? "Customer created" : "Customer updated" });
+      toast.success(mode === "create" ? "Customer created" : "Customer updated");
 
       // Store the new customer ID for subsequent tabs
       if (result.data?.id) {
@@ -233,10 +232,10 @@ export function CustomerSheet({
     startTransition(async () => {
       const result = await deleteCustomerAction(customer.id);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Delete failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: "Customer deleted" });
+      toast.success("Customer deleted");
       onOpenChange(false);
       // Emit mutation event to trigger SWR cache invalidation
       if (result._mutated) {
@@ -640,7 +639,6 @@ function DeliveryAddressesTab({
   addresses: CustomerAddressSummary[];
   onUpdated: () => void;
 }) {
-  const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<CustomerAddressSummary | null>(null);
   const [addressType, setAddressType] = useState<'invoice' | 'delivery'>('delivery');
@@ -680,10 +678,10 @@ function DeliveryAddressesTab({
     startTransition(async () => {
       const result = await deleteCustomerAddressAction(addressId);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Delete failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: "Address deleted" });
+      toast.success("Address deleted");
       onUpdated();
     });
   };
@@ -853,7 +851,6 @@ function AddressDialog({
   addressType?: 'invoice' | 'delivery';
   onSaved: () => void;
 }) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     label: "",
@@ -915,7 +912,7 @@ function AddressDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.line1.trim()) {
-      toast({ variant: "destructive", title: "Address line 1 is required" });
+      toast.error("Address line 1 is required");
       return;
     }
     startTransition(async () => {
@@ -937,10 +934,10 @@ function AddressDialog({
         contactPhone: form.contactPhone || null,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: address ? "Address updated" : "Address added" });
+      toast.success(address ? "Address updated" : "Address added");
       onOpenChange(false);
       onSaved();
     });
@@ -1135,7 +1132,6 @@ function DeliveryPreferencesCard({
   initialPreferences: DeliveryPreferences | null;
   onUpdated: () => void;
 }) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [prefs, setPrefs] = useState<DeliveryPreferences>({
     preferredTrolleyType: initialPreferences?.preferredTrolleyType ?? undefined,
@@ -1155,11 +1151,11 @@ function DeliveryPreferencesCard({
       });
 
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error });
+        toast.error(result.error);
         return;
       }
 
-      toast({ title: "Delivery preferences saved" });
+      toast.success("Delivery preferences saved");
       onUpdated();
       // Mutation event emitted by onUpdated callback
     });
@@ -1357,7 +1353,6 @@ function PricingTab({
   onDefaultPriceListChange: (id: string) => void;
   onUpdated: () => void;
 }) {
-  const { toast } = useToast();
   const [pricing, setPricing] = useState<CustomerProductPricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1391,10 +1386,10 @@ function PricingTab({
     startTransition(async () => {
       const result = await deleteCustomerProductPricingAction(aliasId);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Delete failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: "Pricing removed" });
+      toast.success("Pricing removed");
       setPricing((prev) => prev.filter((p) => p.aliasId !== aliasId));
       onUpdated();
     });
@@ -1407,10 +1402,10 @@ function PricingTab({
         defaultPriceListId || null
       );
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed" });
+        toast.error("Save failed");
         return;
       }
-      toast({ title: "Default price list updated" });
+      toast.success("Default price list updated");
       onUpdated();
     });
   };
@@ -1549,7 +1544,6 @@ function ProductPricingDialog({
   existingProductIds: string[];
   onSaved: () => void;
 }) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     productId: "",
@@ -1589,7 +1583,7 @@ function ProductPricingDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.productId) {
-      toast({ variant: "destructive", title: "Please select a product" });
+      toast.error("Please select a product");
       return;
     }
     startTransition(async () => {
@@ -1603,10 +1597,10 @@ function ProductPricingDialog({
         notes: form.notes || null,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: pricing ? "Pricing updated" : "Pricing added" });
+      toast.success(pricing ? "Pricing updated" : "Pricing added");
       onOpenChange(false);
       onSaved();
     });
@@ -1718,7 +1712,6 @@ function ContactsTab({
   onNotesChange: (notes: string) => void;
   onUpdated: () => void;
 }) {
-  const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<CustomerContactSummary | null>(null);
   const [pending, startTransition] = useTransition();
@@ -1737,10 +1730,10 @@ function ContactsTab({
     startTransition(async () => {
       const result = await deleteCustomerContactAction(contactId);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Delete failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: "Contact deleted" });
+      toast.success("Contact deleted");
       onUpdated();
     });
   };
@@ -1756,10 +1749,10 @@ function ContactsTab({
         paymentTermsDays: 30,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed" });
+        toast.error("Save failed");
         return;
       }
-      toast({ title: "Notes saved" });
+      toast.success("Notes saved");
       onUpdated();
     });
   };
@@ -1878,7 +1871,6 @@ function ContactDialog({
   contact: CustomerContactSummary | null;
   onSaved: () => void;
 }) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     name: "",
@@ -1916,7 +1908,7 @@ function ContactDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast({ variant: "destructive", title: "Contact name is required" });
+      toast.error("Contact name is required");
       return;
     }
     startTransition(async () => {
@@ -1931,10 +1923,10 @@ function ContactDialog({
         isPrimary: form.isPrimary,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: contact ? "Contact updated" : "Contact added" });
+      toast.success(contact ? "Contact updated" : "Contact added");
       onOpenChange(false);
       onSaved();
     });
@@ -2043,7 +2035,6 @@ function ContactDialog({
 // =============================================================================
 
 function PortalAccessSection({ customerId }: { customerId: string }) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [portalEmail, setPortalEmail] = useState("");
   const [portalPassword, setPortalPassword] = useState("");
@@ -2051,11 +2042,7 @@ function PortalAccessSection({ customerId }: { customerId: string }) {
 
   const handleCreatePortalAccess = () => {
     if (!portalEmail.trim() || !portalPassword.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Email and password required",
-        description: "Please enter both email and password for portal access",
-      });
+      toast.error("Please enter both email and password for portal access");
       return;
     }
 
@@ -2069,18 +2056,11 @@ function PortalAccessSection({ customerId }: { customerId: string }) {
       });
 
       if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Failed to create portal access",
-          description: result.error,
-        });
+        toast.error(result.error);
         return;
       }
 
-      toast({
-        title: "Portal access created",
-        description: `Customer can now log in to the B2B portal with ${portalEmail}`,
-      });
+      toast.success(`Customer can now log in to the B2B portal with ${portalEmail}`);
 
       setPortalEmail("");
       setPortalPassword("");

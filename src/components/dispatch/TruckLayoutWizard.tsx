@@ -34,7 +34,7 @@ import {
   Package,
   Settings2,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 // Trolley dimensions in mm
 const TROLLEY_WIDTH_MM = 565;

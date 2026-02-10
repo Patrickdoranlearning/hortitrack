@@ -44,7 +44,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   saveMappingRuleAction,
   deleteMappingRuleAction,
@@ -89,7 +89,6 @@ export default function MappingRulesClient({
   genera,
   categories,
 }: Props) {
-  const { toast } = useToast();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<MappingRule | null>(null);
   const [formData, setFormData] = useState<Omit<MappingRuleInput, "productId"> & { productId: string }>(
@@ -131,22 +130,22 @@ export default function MappingRulesClient({
 
   const handleSave = () => {
     if (!formData.productId) {
-      toast({ variant: "destructive", title: "Select a product" });
+      toast.error("Select a product");
       return;
     }
     if (!formData.name.trim()) {
-      toast({ variant: "destructive", title: "Enter a rule name" });
+      toast.error("Enter a rule name");
       return;
     }
 
     startSaving(async () => {
       const result = await saveMappingRuleAction(formData);
       if (result.success) {
-        toast({ title: editingRule ? "Rule updated" : "Rule created" });
+        toast.success(editingRule ? "Rule updated" : "Rule created");
         setIsDialogOpen(false);
         emitMutation({ resource: 'products', action: 'update' });
       } else {
-        toast({ variant: "destructive", title: "Save failed", description: result.error });
+        toast.error(result.error);
       }
     });
   };
@@ -155,10 +154,10 @@ export default function MappingRulesClient({
     if (!confirm("Delete this rule?")) return;
     const result = await deleteMappingRuleAction(ruleId);
     if (result.success) {
-      toast({ title: "Rule deleted" });
+      toast.success("Rule deleted");
       emitMutation({ resource: 'products', action: 'update' });
     } else {
-      toast({ variant: "destructive", title: "Delete failed", description: result.error });
+      toast.error(result.error);
     }
   };
 
@@ -166,13 +165,10 @@ export default function MappingRulesClient({
     startRunning(async () => {
       const result = await runAutoLinkWithRulesAction();
       if (result.success) {
-        toast({
-          title: result.linked > 0 ? `Linked ${result.linked} batches` : "No new links",
-          description: result.message,
-        });
+        toast.success(result.message);
         emitMutation({ resource: 'products', action: 'update' });
       } else {
-        toast({ variant: "destructive", title: "Auto-link failed", description: result.error });
+        toast.error(result.error);
       }
     });
   };
@@ -193,7 +189,7 @@ export default function MappingRulesClient({
     if (result.success) {
       setPreviewMatches(result.matches);
     } else {
-      toast({ variant: "destructive", title: "Preview failed", description: result.error });
+      toast.error(result.error);
     }
   };
 

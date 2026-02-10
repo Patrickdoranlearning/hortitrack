@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "../ui/alert";
 import { Clipboard, Leaf, Printer, Loader2 } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
 import { copyToClipboard } from "@/lib/copy";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 type PassportDto = {
   batchId: string;
@@ -24,7 +24,6 @@ export function PlantPassportCard({ batchId }: { batchId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
-  const { toast } = useToast();
 
   const handlePrint = async (format: "compact" | "large" | "combined" = "compact") => {
     setIsPrinting(true);
@@ -38,16 +37,9 @@ export function PlantPassportCard({ batchId }: { batchId: string }) {
       if (!res.ok || !json.ok) {
         throw new Error(json.error || "Print failed");
       }
-      toast({
-        title: "Passport Label Sent",
-        description: "The plant passport label has been sent to the printer.",
-      });
+      toast.success("The plant passport label has been sent to the printer.");
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Print Failed",
-        description: e?.message || "Could not print passport label.",
-      });
+      toast.error(e?.message || "Could not print passport label.");
     } finally {
       setIsPrinting(false);
     }

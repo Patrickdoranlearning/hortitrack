@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { supabaseClient } from "@/lib/supabase/client";
 import ScannerDialog from "@/components/scan-and-act-dialog";
 import { candidateBatchNumbers } from "@/lib/scan/parse";
@@ -119,7 +119,6 @@ export default function SaleableBatchesClient({
   varieties = [],
   locations = [],
 }: Props) {
-  const { toast } = useToast();
   const [batches, setBatches] = useState(initialBatches);
   
   // Search and filter state
@@ -255,7 +254,7 @@ export default function SaleableBatchesClient({
   // Bulk status update
   const handleBulkStatusUpdate = async (statusOption: ProductionStatusOption) => {
     if (selectedIds.size === 0) {
-      toast({ variant: "destructive", title: "No batches selected" });
+      toast.error("No batches selected");
       return;
     }
 
@@ -292,17 +291,10 @@ export default function SaleableBatchesClient({
         })
       );
 
-      toast({
-        title: `Updated ${selectedIds.size} batch${selectedIds.size === 1 ? "" : "es"}`,
-        description: `Status set to "${statusOption.displayLabel}".`,
-      });
+      toast.success(`Status set to "${statusOption.displayLabel}" for ${selectedIds.size} batch${selectedIds.size === 1 ? "" : "es"}.`);
       clearSelection();
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description: error.message ?? String(error),
-      });
+      toast.error(error.message ?? String(error));
     } finally {
       setIsBulkUpdating(false);
     }
@@ -340,13 +332,9 @@ export default function SaleableBatchesClient({
         )
       );
 
-      toast({ title: "Status updated" });
+      toast.success("Status updated");
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description: error.message ?? String(error),
-      });
+      toast.error(error.message ?? String(error));
     }
   };
 
@@ -393,17 +381,9 @@ export default function SaleableBatchesClient({
         handleScanSubmit(undefined, scanMatches[0]);
         return;
       } else if (scanMatches.length > 1) {
-        toast({
-          variant: "destructive",
-          title: "Multiple batches match",
-          description: "Please select a batch from the dropdown.",
-        });
+        toast.error("Multiple batches match. Please select a batch from the dropdown.");
       } else {
-        toast({
-          variant: "destructive",
-          title: "No batch selected",
-          description: "Please select a batch from the dropdown.",
-        });
+        toast.error("Please select a batch from the dropdown.");
       }
       return;
     }
@@ -413,7 +393,7 @@ export default function SaleableBatchesClient({
     const targetStatus = productionStatusOptions.find(s => s.id === targetStatusId);
     
     if (!targetStatus) {
-      toast({ variant: "destructive", title: "No target status configured" });
+      toast.error("No target status configured");
       return;
     }
 
@@ -448,17 +428,14 @@ export default function SaleableBatchesClient({
         )
       );
 
-      toast({
-        title: `Marked as ${targetStatus.displayLabel}`,
-        description: `Batch #${targetBatch.batchNumber} updated.`,
-      });
+      toast.success(`Batch #${targetBatch.batchNumber} marked as ${targetStatus.displayLabel}.`);
       
       // Clear selection after successful update
       setSelectedScanBatch(null);
       setScanValue("");
       setSearch(targetBatch.batchNumber);
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Update failed", description: error.message });
+      toast.error(error.message);
     } finally {
       setIsScanning(false);
     }
@@ -477,11 +454,7 @@ export default function SaleableBatchesClient({
       handleScanSubmit(undefined, matchResult.batch);
     } else {
       setScanValue(text.trim());
-      toast({
-        variant: "destructive",
-        title: "Batch not found",
-        description: `No batch matches scanned code "${text.trim()}"`,
-      });
+      toast.error(`No batch matches scanned code "${text.trim()}"`);
     }
   };
   
@@ -518,9 +491,9 @@ export default function SaleableBatchesClient({
         prev.map((b) => (b.id === batchId ? { ...b, salesPhotoUrl: publicUrl } : b))
       );
 
-      toast({ title: "Photo uploaded", description: "Sales photo saved." });
+      toast.success("Sales photo saved.");
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Upload failed", description: error.message });
+      toast.error(error.message);
     } finally {
       setUploadingId(null);
       setPhotoTargetId(null);
@@ -695,7 +668,7 @@ export default function SaleableBatchesClient({
                   setPhotoTargetId(selectedScanBatch.id);
                   quickPhotoInputRef.current?.click();
                 } else {
-                  toast({ variant: "destructive", title: "Select a batch first", description: "Search and select a batch before adding a photo." });
+                  toast.error("Search and select a batch before adding a photo.");
                 }
               }}
               disabled={uploadingId !== null}

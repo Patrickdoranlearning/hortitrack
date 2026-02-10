@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateTemplatePdf } from "@/server/documents";
+import { logger } from "@/server/utils/logger";
 import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function POST(
@@ -28,7 +29,7 @@ export async function POST(
       },
     });
   } catch (err: unknown) {
-    console.error("[documents] pdf failed", err);
+    logger.documents.error("Document PDF generation failed", err);
     const message = err instanceof Error ? err.message : "Failed to generate PDF";
     const status = message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: message }, { status });

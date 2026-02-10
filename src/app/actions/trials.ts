@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
+import { logError } from '@/lib/log';
+import { ActionResult } from '@/lib/errors';
 import type {
   Trial,
   TrialGroup,
@@ -22,6 +24,7 @@ import type {
 // Types
 // ============================================================================
 
+/** @deprecated Use ActionResult from @/lib/errors instead */
 export type TrialResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string };
@@ -217,7 +220,7 @@ function normalizeTrialSummary(row: any): TrialSummary {
 export async function listTrials(filters?: {
   status?: string;
   varietyId?: string;
-}): Promise<TrialResult<TrialSummary[]>> {
+}): Promise<ActionResult<TrialSummary[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -233,7 +236,7 @@ export async function listTrials(filters?: {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[listTrials] query failed', error);
+      logError('listTrials query failed', { error });
       // Fallback to direct query if view doesn't exist yet
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('trials')
@@ -265,7 +268,7 @@ export async function listTrials(filters?: {
 
     return { success: true, data: (data || []).map(normalizeTrialSummary) };
   } catch (error) {
-    console.error('[listTrials] error', error);
+    logError('listTrials failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -273,7 +276,7 @@ export async function listTrials(filters?: {
   }
 }
 
-export async function getTrial(id: string): Promise<TrialResult<TrialWithRelations>> {
+export async function getTrial(id: string): Promise<ActionResult<TrialWithRelations>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -296,13 +299,13 @@ export async function getTrial(id: string): Promise<TrialResult<TrialWithRelatio
       .single();
 
     if (error) {
-      console.error('[getTrial] query failed', error);
+      logError('getTrial query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: normalizeTrialWithRelations(data) };
   } catch (error) {
-    console.error('[getTrial] error', error);
+    logError('getTrial failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -310,7 +313,7 @@ export async function getTrial(id: string): Promise<TrialResult<TrialWithRelatio
   }
 }
 
-export async function generateTrialNumber(): Promise<TrialResult<string>> {
+export async function generateTrialNumber(): Promise<ActionResult<string>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -319,7 +322,7 @@ export async function generateTrialNumber(): Promise<TrialResult<string>> {
     });
 
     if (error) {
-      console.error('[generateTrialNumber] rpc failed', error);
+      logError('generateTrialNumber rpc failed', { error });
       // Fallback to generating in JS
       const year = new Date().getFullYear();
       const { count } = await supabase
@@ -334,7 +337,7 @@ export async function generateTrialNumber(): Promise<TrialResult<string>> {
 
     return { success: true, data: data };
   } catch (error) {
-    console.error('[generateTrialNumber] error', error);
+    logError('generateTrialNumber failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -342,7 +345,7 @@ export async function generateTrialNumber(): Promise<TrialResult<string>> {
   }
 }
 
-export async function createTrial(input: TrialSetupInput): Promise<TrialResult<TrialWithRelations>> {
+export async function createTrial(input: TrialSetupInput): Promise<ActionResult<TrialWithRelations>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -377,7 +380,7 @@ export async function createTrial(input: TrialSetupInput): Promise<TrialResult<T
       .single();
 
     if (trialError) {
-      console.error('[createTrial] trial insert failed', trialError);
+      logError('createTrial trial insert failed', { error: trialError });
       return { success: false, error: trialError.message };
     }
 
@@ -401,7 +404,7 @@ export async function createTrial(input: TrialSetupInput): Promise<TrialResult<T
         .single();
 
       if (groupError) {
-        console.error('[createTrial] group insert failed', groupError);
+        logError('createTrial group insert failed', { error: groupError });
         // Rollback: delete the trial
         await supabase.from('trials').delete().eq('id', trial.id);
         return { success: false, error: groupError.message };
@@ -427,7 +430,7 @@ export async function createTrial(input: TrialSetupInput): Promise<TrialResult<T
           .insert(subjectsToInsert);
 
         if (subjectsError) {
-          console.error('[createTrial] subjects insert failed', subjectsError);
+          logError('createTrial subjects insert failed', { error: subjectsError });
           await supabase.from('trials').delete().eq('id', trial.id);
           return { success: false, error: subjectsError.message };
         }
@@ -444,7 +447,7 @@ export async function createTrial(input: TrialSetupInput): Promise<TrialResult<T
           .insert(autoSubjects);
 
         if (autoSubjectsError) {
-          console.error('[createTrial] auto subjects insert failed', autoSubjectsError);
+          logError('createTrial auto subjects insert failed', { error: autoSubjectsError });
           await supabase.from('trials').delete().eq('id', trial.id);
           return { success: false, error: autoSubjectsError.message };
         }
@@ -454,7 +457,7 @@ export async function createTrial(input: TrialSetupInput): Promise<TrialResult<T
     revalidatePath('/plant-health/trials');
     return getTrial(trial.id);
   } catch (error) {
-    console.error('[createTrial] error', error);
+    logError('createTrial failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -465,7 +468,7 @@ export async function createTrial(input: TrialSetupInput): Promise<TrialResult<T
 export async function updateTrial(
   id: string,
   input: Partial<TrialSetupInput>
-): Promise<TrialResult<TrialWithRelations>> {
+): Promise<ActionResult<TrialWithRelations>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -490,7 +493,7 @@ export async function updateTrial(
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[updateTrial] update failed', error);
+      logError('updateTrial update failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -498,7 +501,7 @@ export async function updateTrial(
     revalidatePath(`/plant-health/trials/${id}`);
     return getTrial(id);
   } catch (error) {
-    console.error('[updateTrial] error', error);
+    logError('updateTrial failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -509,7 +512,7 @@ export async function updateTrial(
 export async function updateTrialStatus(
   id: string,
   status: 'draft' | 'active' | 'paused' | 'completed' | 'archived'
-): Promise<TrialResult<TrialWithRelations>> {
+): Promise<ActionResult<TrialWithRelations>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -543,7 +546,7 @@ export async function updateTrialStatus(
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[updateTrialStatus] update failed', error);
+      logError('updateTrialStatus update failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -551,7 +554,7 @@ export async function updateTrialStatus(
     revalidatePath(`/plant-health/trials/${id}`);
     return getTrial(id);
   } catch (error) {
-    console.error('[updateTrialStatus] error', error);
+    logError('updateTrialStatus failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -559,7 +562,7 @@ export async function updateTrialStatus(
   }
 }
 
-export async function deleteTrial(id: string): Promise<TrialResult> {
+export async function deleteTrial(id: string): Promise<ActionResult<null>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -570,14 +573,14 @@ export async function deleteTrial(id: string): Promise<TrialResult> {
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[deleteTrial] delete failed', error);
+      logError('deleteTrial delete failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[deleteTrial] error', error);
+    logError('deleteTrial failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -599,7 +602,7 @@ export async function createTrialGroup(
     targetPlantCount?: number;
     labelColor?: string;
   }
-): Promise<TrialResult<TrialGroup>> {
+): Promise<ActionResult<TrialGroup>> {
   try {
     const { supabase } = await getUserAndOrg();
 
@@ -629,7 +632,7 @@ export async function createTrialGroup(
       .single();
 
     if (error) {
-      console.error('[createTrialGroup] insert failed', error);
+      logError('createTrialGroup insert failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -645,7 +648,7 @@ export async function createTrialGroup(
     revalidatePath(`/plant-health/trials/${trialId}`);
     return { success: true, data: normalizeGroup(data) };
   } catch (error) {
-    console.error('[createTrialGroup] error', error);
+    logError('createTrialGroup failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -661,7 +664,7 @@ export async function updateTrialGroup(
     strategy: GroupStrategy;
     labelColor: string;
   }>
-): Promise<TrialResult<TrialGroup>> {
+): Promise<ActionResult<TrialGroup>> {
   try {
     const { supabase } = await getUserAndOrg();
 
@@ -679,14 +682,14 @@ export async function updateTrialGroup(
       .single();
 
     if (error) {
-      console.error('[updateTrialGroup] update failed', error);
+      logError('updateTrialGroup update failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: normalizeGroup(data) };
   } catch (error) {
-    console.error('[updateTrialGroup] error', error);
+    logError('updateTrialGroup failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -694,7 +697,7 @@ export async function updateTrialGroup(
   }
 }
 
-export async function deleteTrialGroup(id: string): Promise<TrialResult> {
+export async function deleteTrialGroup(id: string): Promise<ActionResult<null>> {
   try {
     const { supabase } = await getUserAndOrg();
 
@@ -704,14 +707,14 @@ export async function deleteTrialGroup(id: string): Promise<TrialResult> {
       .eq('id', id);
 
     if (error) {
-      console.error('[deleteTrialGroup] delete failed', error);
+      logError('deleteTrialGroup delete failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[deleteTrialGroup] error', error);
+    logError('deleteTrialGroup failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -736,7 +739,7 @@ export async function updateTrialSubject(
     initialVigorScore: number;
     initialPhotoUrl: string;
   }>
-): Promise<TrialResult<TrialSubject>> {
+): Promise<ActionResult<TrialSubject>> {
   try {
     const { supabase } = await getUserAndOrg();
 
@@ -759,14 +762,14 @@ export async function updateTrialSubject(
       .single();
 
     if (error) {
-      console.error('[updateTrialSubject] update failed', error);
+      logError('updateTrialSubject update failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: normalizeSubject(data) };
   } catch (error) {
-    console.error('[updateTrialSubject] error', error);
+    logError('updateTrialSubject failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -777,7 +780,7 @@ export async function updateTrialSubject(
 export async function dropTrialSubject(
   id: string,
   reason: string
-): Promise<TrialResult<TrialSubject>> {
+): Promise<ActionResult<TrialSubject>> {
   try {
     const { supabase } = await getUserAndOrg();
 
@@ -794,14 +797,14 @@ export async function dropTrialSubject(
       .single();
 
     if (error) {
-      console.error('[dropTrialSubject] update failed', error);
+      logError('dropTrialSubject update failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: normalizeSubject(data) };
   } catch (error) {
-    console.error('[dropTrialSubject] error', error);
+    logError('dropTrialSubject failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -813,7 +816,7 @@ export async function dropTrialSubject(
 // Measurements
 // ============================================================================
 
-export async function createMeasurement(input: MeasurementInput): Promise<TrialResult<TrialMeasurement>> {
+export async function createMeasurement(input: MeasurementInput): Promise<ActionResult<TrialMeasurement>> {
   try {
     const { user, supabase } = await getUserAndOrg();
 
@@ -852,14 +855,14 @@ export async function createMeasurement(input: MeasurementInput): Promise<TrialR
       .single();
 
     if (error) {
-      console.error('[createMeasurement] insert failed', error);
+      logError('createMeasurement insert failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: normalizeMeasurement(data) };
   } catch (error) {
-    console.error('[createMeasurement] error', error);
+    logError('createMeasurement failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -869,7 +872,7 @@ export async function createMeasurement(input: MeasurementInput): Promise<TrialR
 
 export async function createBulkMeasurements(
   measurements: MeasurementInput[]
-): Promise<TrialResult<TrialMeasurement[]>> {
+): Promise<ActionResult<TrialMeasurement[]>> {
   try {
     const { user, supabase } = await getUserAndOrg();
 
@@ -909,14 +912,14 @@ export async function createBulkMeasurements(
       .select();
 
     if (error) {
-      console.error('[createBulkMeasurements] insert failed', error);
+      logError('createBulkMeasurements insert failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: (data || []).map(normalizeMeasurement) };
   } catch (error) {
-    console.error('[createBulkMeasurements] error', error);
+    logError('createBulkMeasurements failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -926,7 +929,7 @@ export async function createBulkMeasurements(
 
 export async function getMeasurementsForTrial(
   trialId: string
-): Promise<TrialResult<TrialMeasurement[]>> {
+): Promise<ActionResult<TrialMeasurement[]>> {
   try {
     const { supabase } = await getUserAndOrg();
 
@@ -947,13 +950,13 @@ export async function getMeasurementsForTrial(
       .order('subject_id');
 
     if (error) {
-      console.error('[getMeasurementsForTrial] query failed', error);
+      logError('getMeasurementsForTrial query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeMeasurement) };
   } catch (error) {
-    console.error('[getMeasurementsForTrial] error', error);
+    logError('getMeasurementsForTrial failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -978,7 +981,7 @@ export async function logTreatment(input: {
   method?: string;
   quantityApplied?: number;
   notes?: string;
-}): Promise<TrialResult<TrialTreatment>> {
+}): Promise<ActionResult<TrialTreatment>> {
   try {
     const { user, supabase } = await getUserAndOrg();
 
@@ -1003,14 +1006,14 @@ export async function logTreatment(input: {
       .single();
 
     if (error) {
-      console.error('[logTreatment] insert failed', error);
+      logError('logTreatment insert failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: normalizeTreatment(data) };
   } catch (error) {
-    console.error('[logTreatment] error', error);
+    logError('logTreatment failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1029,7 +1032,7 @@ export async function createFinding(input: {
   description: string;
   supportingData?: any;
   recommendedProtocolChanges?: any;
-}): Promise<TrialResult<TrialFinding>> {
+}): Promise<ActionResult<TrialFinding>> {
   try {
     const { user, supabase } = await getUserAndOrg();
 
@@ -1049,14 +1052,14 @@ export async function createFinding(input: {
       .single();
 
     if (error) {
-      console.error('[createFinding] insert failed', error);
+      logError('createFinding insert failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: normalizeFinding(data) };
   } catch (error) {
-    console.error('[createFinding] error', error);
+    logError('createFinding failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1068,7 +1071,7 @@ export async function updateFindingStatus(
   id: string,
   status: 'draft' | 'reviewed' | 'approved' | 'implemented',
   implementedProtocolId?: string
-): Promise<TrialResult<TrialFinding>> {
+): Promise<ActionResult<TrialFinding>> {
   try {
     const { user, supabase } = await getUserAndOrg();
 
@@ -1092,14 +1095,14 @@ export async function updateFindingStatus(
       .single();
 
     if (error) {
-      console.error('[updateFindingStatus] update failed', error);
+      logError('updateFindingStatus update failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/trials');
     return { success: true, data: normalizeFinding(data) };
   } catch (error) {
-    console.error('[updateFindingStatus] error', error);
+    logError('updateFindingStatus failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1111,7 +1114,7 @@ export async function updateFindingStatus(
 // Statistics
 // ============================================================================
 
-export async function getTrialStatistics(trialId: string): Promise<TrialResult<{
+export async function getTrialStatistics(trialId: string): Promise<ActionResult<{
   groupStats: Array<{
     groupId: string;
     groupName: string;
@@ -1160,7 +1163,7 @@ export async function getTrialStatistics(trialId: string): Promise<TrialResult<{
       .single();
 
     if (error) {
-      console.error('[getTrialStatistics] query failed', error);
+      logError('getTrialStatistics query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -1216,7 +1219,7 @@ export async function getTrialStatistics(trialId: string): Promise<TrialResult<{
       data: { groupStats, weeklyProgress },
     };
   } catch (error) {
-    console.error('[getTrialStatistics] error', error);
+    logError('getTrialStatistics failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

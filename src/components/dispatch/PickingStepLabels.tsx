@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   Printer,
   ArrowRight,
@@ -32,7 +32,6 @@ interface PrinterConfig {
 }
 
 export default function PickingStepLabels() {
-  const { toast } = useToast();
   const {
     pickList,
     items,
@@ -67,8 +66,8 @@ export default function PickingStepLabels() {
           }
         }
       })
-      .catch((err) => {
-        console.error('Failed to fetch printers:', err);
+      .catch(() => {
+        // Printer fetch failed silently
       })
       .finally(() => setLoadingPrinters(false));
   }, []);
@@ -117,16 +116,9 @@ export default function PickingStepLabels() {
       }
 
       setPriceLabelsPrinted(true);
-      toast({
-        title: 'Labels Sent',
-        description: `Price labels for ${items.length} items sent to printer.`,
-      });
+      toast.success(`Price labels for ${items.length} items sent to printer.`);
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Print Error',
-        description: error instanceof Error ? error.message : 'Failed to print price labels',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to print price labels');
     } finally {
       setLoading(false);
       setPrintingType(null);
@@ -163,16 +155,9 @@ export default function PickingStepLabels() {
       }
 
       setPlantLabelsPrinted(true);
-      toast({
-        title: 'Labels Sent',
-        description: `Plant labels for ${items.length} items sent to printer.`,
-      });
+      toast.success(`Plant labels for ${items.length} items sent to printer.`);
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Print Error',
-        description: error instanceof Error ? error.message : 'Failed to print plant labels',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to print plant labels');
     } finally {
       setLoading(false);
       setPrintingType(null);

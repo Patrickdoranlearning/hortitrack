@@ -18,7 +18,6 @@ export default async function PickerPage() {
     if (error.message === "Unauthenticated") {
       redirect("/login?next=/dispatch/picker");
     }
-    console.error("Error fetching picker tasks:", error);
     tasks = { myTasks: [], availableTasks: [] };
   }
 

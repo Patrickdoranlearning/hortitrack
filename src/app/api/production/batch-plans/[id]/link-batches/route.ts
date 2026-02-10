@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,7 +65,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       .select("id, batch_number");
 
     if (updateError) {
-      console.error("[link-batches POST] update failed:", updateError);
+      logger.production.error("Link batches update failed", updateError);
       throw new Error(updateError.message);
     }
 
@@ -94,7 +95,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       );
     }
     const message = error instanceof Error ? error.message : "Failed to link batches";
-    console.error("[link-batches POST] error:", message);
+    logger.production.error("Link batches POST failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -137,7 +138,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
       .select("id, batch_number");
 
     if (updateError) {
-      console.error("[link-batches DELETE] update failed:", updateError);
+      logger.production.error("Unlink batches update failed", updateError);
       throw new Error(updateError.message);
     }
 
@@ -167,7 +168,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
       );
     }
     const message = error instanceof Error ? error.message : "Failed to unlink batches";
-    console.error("[link-batches DELETE] error:", message);
+    logger.production.error("Unlink batches DELETE failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

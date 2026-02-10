@@ -105,8 +105,7 @@ export default function PrintLocationPage() {
           totalQuantity,
           batches: mappedBatches,
         });
-      } catch (err) {
-        console.error('Error fetching location:', err);
+      } catch {
         setError('Failed to load location data.');
       } finally {
         setLoading(false);
@@ -126,8 +125,8 @@ export default function PrintLocationPage() {
         scale: 4,
         includetext: false,
       });
-    } catch (e) {
-      console.error('DataMatrix render failed:', e);
+    } catch {
+      // DataMatrix render failed silently
     }
   }, [location]);
 

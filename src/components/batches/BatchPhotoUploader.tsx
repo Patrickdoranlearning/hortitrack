@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Camera, Images, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -19,7 +19,6 @@ export default function BatchPhotoUploader({ batchId, type, role, onUploaded, cl
   const camRef = useRef<HTMLInputElement>(null);
   const galRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const { toast } = useToast();
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -36,9 +35,9 @@ export default function BatchPhotoUploader({ batchId, type, role, onUploaded, cl
       const j = await res.json();
       if (!res.ok || !j?.ok) throw new Error(j?.error?.message || "Upload failed");
       onUploaded?.(j.data);
-      toast({ title: "Uploaded", description: `${type} photo added` });
+      toast.success(`${type} photo added`);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Upload failed", description: e?.message ?? "Error" });
+      toast.error(e?.message ?? "Upload failed");
     } finally {
       setBusy(false);
       if (camRef.current) camRef.current.value = "";

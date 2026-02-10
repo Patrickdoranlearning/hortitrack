@@ -17,7 +17,7 @@ import {
   MapPin,
   Package,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ScanStep } from './ScanStep';
 import { ScoutLogStep, type LogData } from './ScoutLogStep';
 import { TreatmentStep, type TreatmentData } from './TreatmentStep';
@@ -145,9 +145,8 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
           const path = `scouts/${targetId}/${timestamp}.${ext}`;
 
           photoUrl = await uploadPhoto(logData.photoFile, 'plant-health', path);
-        } catch (uploadError) {
-          // Log but don't fail - photo is optional
-          console.error('Photo upload failed:', uploadError);
+        } catch {
+          // Photo upload failed - don't fail the operation, photo is optional
           toast.warning('Photo upload failed - log will be saved without photo');
         }
       }
@@ -189,11 +188,9 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
 
             if (photoRes.ok) {
               uploadedCount++;
-            } else {
-              console.error('Quality photo upload failed:', await photoRes.text());
             }
-          } catch (uploadError) {
-            console.error('Quality photo upload error:', uploadError);
+          } catch {
+            // Quality photo upload failed silently
           }
         }
         if (uploadedCount > 0) {
@@ -214,8 +211,7 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
         onComplete?.();
         resetWizard();
       }
-    } catch (error) {
-      console.error('Failed to save scout log', error);
+    } catch {
       toast.error('Failed to save scout log');
     } finally {
       setIsSaving(false);
@@ -284,8 +280,7 @@ export function ScoutWizard({ onComplete }: ScoutWizardProps) {
       toast.success('Scout complete', { description: 'Treatment scheduled' });
       onComplete?.();
       resetWizard();
-    } catch (error) {
-      console.error('Failed to schedule treatment', error);
+    } catch {
       toast.error('Failed to schedule treatment');
     } finally {
       setIsSaving(false);

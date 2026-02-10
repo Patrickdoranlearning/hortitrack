@@ -8,6 +8,7 @@ import {
   type JobStatus,
   type ProcessType,
 } from "@/server/production/jobs";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ jobs, totalCount: jobs.length });
   } catch (error: unknown) {
-    console.error("[api/tasks/jobs] GET error:", error);
+    logger.api.error("Jobs list fetch failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch jobs";
     const status = /unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ job }, { status: 201 });
   } catch (error: unknown) {
-    console.error("[api/tasks/jobs] POST error:", error);
+    logger.api.error("Job creation failed", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request", issues: error.issues },

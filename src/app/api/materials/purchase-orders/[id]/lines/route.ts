@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import {
   addPurchaseOrderLine,
   removePurchaseOrderLine,
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ order });
   } catch (error: unknown) {
-    console.error("[purchase-orders/[id]/lines POST] Error:", error);
+    logger.materials.error("Purchase order add line failed", error);
     const message = error instanceof Error ? error.message : "Failed to add line";
     const status = message.includes("only add lines") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -61,7 +62,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ order });
   } catch (error: unknown) {
-    console.error("[purchase-orders/[id]/lines DELETE] Error:", error);
+    logger.materials.error("Purchase order remove line failed", error);
     const message = error instanceof Error ? error.message : "Failed to remove line";
     const status = message.includes("only remove lines") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

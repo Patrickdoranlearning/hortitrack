@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { logError } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
 
 export type CreditNoteStatus = 'draft' | 'issued' | 'void';
 
@@ -63,17 +64,12 @@ async function generateCreditNumber(supabase: Awaited<ReturnType<typeof createCl
 /**
  * Create a new credit note
  */
-export async function createCreditNoteAction(input: CreateCreditNoteInput): Promise<{
-  success?: boolean;
-  creditNoteId?: string;
-  creditNumber?: string;
-  error?: string;
-}> {
+export async function createCreditNoteAction(input: CreateCreditNoteInput): Promise<ActionResult<{ creditNoteId: string; creditNumber: string }>> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return { error: 'Not authenticated' };
+    return { success: false, error: 'Not authenticated' };
   }
 
   // Get user's org
@@ -84,7 +80,7 @@ export async function createCreditNoteAction(input: CreateCreditNoteInput): Prom
     .single();
 
   if (!membership) {
-    return { error: 'Organization not found' };
+    return { success: false, error: 'Organization not found' };
   }
 
   const orgId = membership.org_id;
@@ -123,7 +119,7 @@ export async function createCreditNoteAction(input: CreateCreditNoteInput): Prom
 
   if (creditNoteError || !creditNote) {
     logError('Error creating credit note', { error: creditNoteError?.message || String(creditNoteError) });
-    return { error: 'Failed to create credit note' };
+    return { success: false, error: 'Failed to create credit note' };
   }
 
   // Create credit note items
@@ -146,7 +142,7 @@ export async function createCreditNoteAction(input: CreateCreditNoteInput): Prom
     logError('Error creating credit note items', { error: itemsError?.message || String(itemsError) });
     // Delete the credit note if items failed
     await supabase.from('credit_notes').delete().eq('id', creditNote.id);
-    return { error: 'Failed to create credit note items' };
+    return { success: false, error: 'Failed to create credit note items' };
   }
 
   // If linked to an invoice, create allocation
@@ -163,23 +159,22 @@ export async function createCreditNoteAction(input: CreateCreditNoteInput): Prom
 
   return {
     success: true,
-    creditNoteId: creditNote.id,
-    creditNumber: creditNote.credit_number,
+    data: {
+      creditNoteId: creditNote.id,
+      creditNumber: creditNote.credit_number,
+    },
   };
 }
 
 /**
  * Issue a credit note (change status from draft to issued)
  */
-export async function issueCreditNoteAction(creditNoteId: string): Promise<{
-  success?: boolean;
-  error?: string;
-}> {
+export async function issueCreditNoteAction(creditNoteId: string): Promise<ActionResult<null>> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return { error: 'Not authenticated' };
+    return { success: false, error: 'Not authenticated' };
   }
 
   // Get the credit note
@@ -190,11 +185,11 @@ export async function issueCreditNoteAction(creditNoteId: string): Promise<{
     .single();
 
   if (fetchError || !creditNote) {
-    return { error: 'Credit note not found' };
+    return { success: false, error: 'Credit note not found' };
   }
 
   if (creditNote.status !== 'draft') {
-    return { error: 'Credit note is not in draft status' };
+    return { success: false, error: 'Credit note is not in draft status' };
   }
 
   // Update status to issued
@@ -208,7 +203,7 @@ export async function issueCreditNoteAction(creditNoteId: string): Promise<{
 
   if (updateError) {
     logError('Error issuing credit note', { error: updateError?.message || String(updateError) });
-    return { error: 'Failed to issue credit note' };
+    return { success: false, error: 'Failed to issue credit note' };
   }
 
   // If there are allocations, update the invoice balance
@@ -242,21 +237,18 @@ export async function issueCreditNoteAction(creditNoteId: string): Promise<{
   revalidatePath('/sales/invoices');
   revalidatePath(`/sales/credit-notes/${creditNoteId}`);
 
-  return { success: true };
+  return { success: true, data: null };
 }
 
 /**
  * Void a credit note
  */
-export async function voidCreditNoteAction(creditNoteId: string, reason: string): Promise<{
-  success?: boolean;
-  error?: string;
-}> {
+export async function voidCreditNoteAction(creditNoteId: string, reason: string): Promise<ActionResult<null>> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return { error: 'Not authenticated' };
+    return { success: false, error: 'Not authenticated' };
   }
 
   // Get the credit note
@@ -267,11 +259,11 @@ export async function voidCreditNoteAction(creditNoteId: string, reason: string)
     .single();
 
   if (fetchError || !creditNote) {
-    return { error: 'Credit note not found' };
+    return { success: false, error: 'Credit note not found' };
   }
 
   if (creditNote.status === 'void') {
-    return { error: 'Credit note is already voided' };
+    return { success: false, error: 'Credit note is already voided' };
   }
 
   // If it was issued, reverse the invoice credits
@@ -315,28 +307,25 @@ export async function voidCreditNoteAction(creditNoteId: string, reason: string)
 
   if (updateError) {
     logError('Error voiding credit note', { error: updateError?.message || String(updateError) });
-    return { error: 'Failed to void credit note' };
+    return { success: false, error: 'Failed to void credit note' };
   }
 
   revalidatePath('/sales/credit-notes');
   revalidatePath('/sales/invoices');
   revalidatePath(`/sales/credit-notes/${creditNoteId}`);
 
-  return { success: true };
+  return { success: true, data: null };
 }
 
 /**
  * Get all credit notes for the organization
  */
-export async function getCreditNotesAction(): Promise<{
-  creditNotes?: CreditNote[];
-  error?: string;
-}> {
+export async function getCreditNotesAction(): Promise<ActionResult<CreditNote[]>> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return { error: 'Not authenticated' };
+    return { success: false, error: 'Not authenticated' };
   }
 
   const { data: membership } = await supabase
@@ -346,7 +335,7 @@ export async function getCreditNotesAction(): Promise<{
     .single();
 
   if (!membership) {
-    return { error: 'Organization not found' };
+    return { success: false, error: 'Organization not found' };
   }
 
   const { data, error } = await supabase
@@ -369,7 +358,7 @@ export async function getCreditNotesAction(): Promise<{
 
   if (error) {
     logError('Error fetching credit notes', { error: error?.message || String(error) });
-    return { error: 'Failed to fetch credit notes' };
+    return { success: false, error: 'Failed to fetch credit notes' };
   }
 
   const creditNotes: CreditNote[] = (data || []).map((cn: unknown) => {
@@ -399,7 +388,7 @@ export async function getCreditNotesAction(): Promise<{
     };
   });
 
-  return { creditNotes };
+  return { success: true, data: creditNotes };
 }
 
 

@@ -147,7 +147,6 @@ export function TreatmentComplianceForm({
       onOpenChange(false);
     } catch (error) {
       vibrateError();
-      console.error("Failed to complete treatment", error);
     } finally {
       setIsSubmitting(false);
     }

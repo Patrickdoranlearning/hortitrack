@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { previewConsumption } from "@/server/materials/consumption";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ preview });
   } catch (error: unknown) {
-    console.error("[materials/consumption/preview GET] Error:", error);
+    logger.materials.error("Consumption preview failed", error);
     const message = error instanceof Error ? error.message : "Failed to preview consumption";
     return NextResponse.json({ error: message }, { status: 500 });
   }

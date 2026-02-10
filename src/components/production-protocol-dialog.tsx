@@ -14,7 +14,7 @@ import type { ProductionProtocolOutput } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileText, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 
@@ -33,8 +33,6 @@ export function ProductionProtocolDialog({
   const [protocol, setProtocol] =
     useState<ProductionProtocolOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-
   useEffect(() => {
     if (open && batchId) {
       setLoading(true);
@@ -47,18 +45,14 @@ export function ProductionProtocolDialog({
           setProtocol(result.data);
         } else {
           setError(result.error);
-          toast({
-            variant: "destructive",
-            title: "AI Error",
-            description: result.error,
-          });
+          toast.error(result.error);
         }
         setLoading(false);
       };
 
       fetchProtocol();
     }
-  }, [open, batchId, toast]);
+  }, [open, batchId]);
 
   const handleOpenChange = (isOpen: boolean) => {
     onOpenChange(isOpen);

@@ -17,8 +17,8 @@ export default async function DriverPage({ searchParams }: PageProps) {
   try {
     await getUserAndOrg();
     activeRuns = await getActiveDeliveryRuns();
-  } catch (error) {
-    console.error('Error fetching driver data:', error);
+  } catch {
+    // Error handled by empty state UI
   }
 
   return (

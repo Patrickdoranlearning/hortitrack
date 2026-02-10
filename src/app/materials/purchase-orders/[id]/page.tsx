@@ -50,7 +50,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { fetchJson } from '@/lib/http/fetchJson';
 import type { PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus } from '@/lib/types/materials';
 
@@ -72,7 +72,6 @@ export default function PurchaseOrderDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
 
   const showReceiveDialog = searchParams.get('receive') === 'true';
 
@@ -172,14 +171,10 @@ export default function PurchaseOrderDetailPage({
       await fetchJson(`/api/materials/purchase-orders/${id}/submit`, {
         method: 'POST',
       });
-      toast({ title: 'Purchase order submitted' });
+      toast.success('Purchase order submitted');
       mutateOrder();
     } catch (error) {
-      toast({
-        title: 'Failed to submit',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSubmitting(false);
     }
@@ -190,14 +185,10 @@ export default function PurchaseOrderDetailPage({
       await fetchJson(`/api/materials/purchase-orders/${id}`, {
         method: 'DELETE',
       });
-      toast({ title: 'Purchase order cancelled' });
+      toast.success('Purchase order cancelled');
       router.push('/materials/purchase-orders');
     } catch (error) {
-      toast({
-        title: 'Failed to cancel',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     }
     setShowCancelDialog(false);
   };
@@ -205,7 +196,7 @@ export default function PurchaseOrderDetailPage({
   const handleReceive = async () => {
     const linesToReceive = receiveLines.filter((l) => l.quantityReceived > 0);
     if (linesToReceive.length === 0) {
-      toast({ title: 'Enter quantities to receive', variant: 'destructive' });
+      toast.error('Enter quantities to receive');
       return;
     }
 
@@ -218,16 +209,12 @@ export default function PurchaseOrderDetailPage({
           notes: receiveNotes || undefined,
         }),
       });
-      toast({ title: 'Goods received successfully' });
+      toast.success('Goods received successfully');
       setShowReceiving(false);
       setReceiveNotes('');
       mutateOrder();
     } catch (error) {
-      toast({
-        title: 'Failed to receive goods',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSubmitting(false);
     }

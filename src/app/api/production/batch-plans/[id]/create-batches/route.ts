@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { nextBatchNumber } from "@/server/numbering/batches";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -300,7 +301,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       );
     }
     const message = error instanceof Error ? error.message : "Failed to create batches from plan";
-    console.error("[batch-plans/[id]/create-batches POST] error:", message);
+    logger.production.error("Create batches from plan failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

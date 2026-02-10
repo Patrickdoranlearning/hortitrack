@@ -30,7 +30,7 @@ import {
   updateIpmProgram,
   createIpmAssignment,
 } from '@/app/actions/ipm';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 const mockListIpmProducts = listIpmProducts as jest.Mock;
 const mockCreateIpmProgram = createIpmProgram as jest.Mock;

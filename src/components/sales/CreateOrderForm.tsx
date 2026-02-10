@@ -12,7 +12,7 @@ import { createOrder } from '@/app/sales/actions';
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { currencySymbol, type CurrencyCode } from '@/lib/format-currency';
 
 interface CreateOrderFormProps {

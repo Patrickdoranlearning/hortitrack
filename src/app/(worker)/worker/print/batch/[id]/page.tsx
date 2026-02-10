@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { vibrateTap, vibrateSuccess } from "@/lib/haptics";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   LabelPrintView,
   type BatchLabelData,
@@ -45,7 +45,6 @@ interface BatchPrintData {
 export default function BatchLabelPrintPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const batchId = params.id as string;
 
   const [batch, setBatch] = useState<BatchPrintData | null>(null);
@@ -116,10 +115,7 @@ export default function BatchLabelPrintPage() {
     window.print();
     vibrateSuccess();
 
-    toast({
-      title: "Print dialog opened",
-      description: `Printing ${copies} label${copies > 1 ? "s" : ""} for batch #${batch?.batchNumber}`,
-    });
+    toast.success(`Printing ${copies} label${copies > 1 ? "s" : ""} for batch #${batch?.batchNumber}`);
   };
 
   const incrementCopies = () => {

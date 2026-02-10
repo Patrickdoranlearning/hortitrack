@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { formatCurrency, currencySymbol } from "@/lib/format-currency";
 import {
@@ -250,7 +250,6 @@ type Props = {
 };
 
 export function TemplatePicker({ initialSelections, onSave }: Props) {
-  const { toast } = useToast();
   const [selectedType, setSelectedType] = useState<DocumentType>("invoice");
   const [selections, setSelections] = useState<Record<DocumentType, string>>(
     initialSelections || {
@@ -285,16 +284,9 @@ export function TemplatePicker({ initialSelections, onSave }: Props) {
         });
         if (!res.ok) throw new Error("Failed to save");
       }
-      toast({
-        title: "Templates saved",
-        description: "Your document templates have been updated.",
-      });
+      toast.success("Your document templates have been updated.");
     } catch {
-      toast({
-        variant: "destructive",
-        title: "Save failed",
-        description: "Could not save template preferences.",
-      });
+      toast.error("Could not save template preferences.");
     } finally {
       setSaving(false);
     }

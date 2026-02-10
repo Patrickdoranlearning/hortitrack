@@ -4,6 +4,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { buildBatchPlanProgress } from "@/lib/planning/guide-plan-types";
 import type { BatchPlanWithProgress } from "@/lib/planning/guide-plan-types";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
       .single();
 
     if (error || !bp) {
-      console.error("[batch-plans/[id] GET] not found:", error);
+      logger.production.error("Batch plan not found", error);
       return NextResponse.json({ error: "Batch plan not found" }, { status: 404 });
     }
 
@@ -106,7 +107,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     return NextResponse.json({ batchPlan, batches: bpBatches });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load batch plan";
-    console.error("[batch-plans/[id] GET] error:", message);
+    logger.production.error("Batch plan GET failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -178,7 +179,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       .single();
 
     if (error || !data) {
-      console.error("[batch-plans/[id] PATCH] update failed:", error);
+      logger.production.error("Batch plan update failed", error);
       if (error?.code === "PGRST116") {
         return NextResponse.json({ error: "Batch plan not found" }, { status: 404 });
       }
@@ -213,7 +214,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
     }
     const message = error instanceof Error ? error.message : "Failed to update batch plan";
-    console.error("[batch-plans/[id] PATCH] error:", message);
+    logger.production.error("Batch plan PATCH failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -249,14 +250,14 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
       .eq("org_id", orgId);
 
     if (error) {
-      console.error("[batch-plans/[id] DELETE] failed:", error);
+      logger.production.error("Batch plan delete failed", error);
       throw new Error(error.message);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete batch plan";
-    console.error("[batch-plans/[id] DELETE] error:", message);
+    logger.production.error("Batch plan DELETE failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

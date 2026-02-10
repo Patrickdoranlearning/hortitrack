@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getUserFromRequest } from '@/server/security/auth';
+import { logger } from "@/server/utils/logger";
 
 export async function GET(
   req: NextRequest,
@@ -40,7 +41,7 @@ export async function GET(
       .order('batch_number');
 
     if (error) {
-      console.error('[GET /api/locations/[locationId]/batches] query error', error);
+      logger.api.error("Location batches query failed", error);
       return NextResponse.json({ error: 'Failed to fetch batches' }, { status: 500 });
     }
 
@@ -57,7 +58,7 @@ export async function GET(
 
     return NextResponse.json({ batches: normalizedBatches });
   } catch (error) {
-    console.error('[GET /api/locations/[locationId]/batches] error', error);
+    logger.api.error("Location batches fetch failed", error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

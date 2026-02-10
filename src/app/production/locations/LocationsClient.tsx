@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import ScannerDialog from '@/components/scan-and-act-dialog';
@@ -57,7 +57,6 @@ export default function LocationsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlLocation = searchParams.get('location');
-  const { toast } = useToast();
 
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [searchQuery, setSearchQuery] = useState('');
@@ -170,18 +169,14 @@ export default function LocationsClient() {
         if (loc) {
           handleViewLocation(loc);
         } else {
-          toast({
-            variant: 'destructive',
-            title: 'Location not found',
-            description: 'Could not find a location matching the scanned code.',
-          });
+          toast.error('Could not find a location matching the scanned code.');
         }
       } else {
         // Might be a batch code - redirect to batch scan
         router.push(`/?batch=${encodeURIComponent(text)}`);
       }
     },
-    [locations, router, toast]
+    [locations, router]
   );
 
   const handleCloseDetail = () => {

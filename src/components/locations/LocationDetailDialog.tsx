@@ -40,7 +40,7 @@ import { useBatchDetailDialog } from '@/stores/useBatchDetailDialog';
 import { TreatmentDialog, MeasurementDialog, SpotTreatmentDialog } from '@/components/plant-health';
 import { getLocationHealthLogs, clearLocation } from '@/app/actions/plant-health';
 import { listIpmAssignments, listIpmSpotTreatments, type IpmAssignment, type IpmSpotTreatment } from '@/app/actions/ipm';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 type LocationWithBatches = NurseryLocation & {
   batches: Batch[];

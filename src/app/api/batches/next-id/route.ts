@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { generateNextBatchId } from "@/server/batches/nextId";
+import { logger } from "@/server/utils/logger";
 
 const Query = z.object({ phase: z.enum(["PROPAGATION", "PLUGS", "POTTING"]) });
 
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
     const { id, seq, yyww } = await generateNextBatchId(parsed.phase);
     return NextResponse.json({ ok: true, id, seq, yyww });
   } catch (e: any) {
-    console.error("[api/batches/next-id] error", { message: e?.message });
+    logger.api.error("GET /api/batches/next-id failed", e);
     return NextResponse.json({ ok: false, error: e?.message ?? "failed" }, { status: 400 });
   }
 }

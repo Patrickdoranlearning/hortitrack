@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Plus, Copy, CheckCircle2, Key } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +44,6 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
   const [createdUser, setCreatedUser] = useState<CreatedUser | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [touched, setTouched] = useState<{ fullName?: boolean; email?: boolean }>({});
-  const { toast } = useToast();
 
   // Validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -102,25 +101,15 @@ export function AddUserDialog({ onUserAdded }: AddUserDialogProps) {
           password: data.credentials.password,
           name: fullName,
         });
-        toast({
-          title: "User Created",
-          description: "Share the login credentials with your team member.",
-        });
+        toast.success("Share the login credentials with your team member.");
         onUserAdded();
       } else {
-        toast({
-          title: "Success",
-          description: data.message || "User invited successfully",
-        });
+        toast.success(data.message || "User invited successfully");
         handleClose();
         onUserAdded();
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create user",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to create user");
     } finally {
       setIsLoading(false);
     }

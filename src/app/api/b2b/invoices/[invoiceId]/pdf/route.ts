@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 import { renderDocumentPdf } from "@/server/documents/render";
 import { defaultLayoutFor } from "@/lib/documents/presets";
 import { format } from "date-fns";
@@ -175,7 +176,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (err: any) {
-    console.error("[b2b/invoices] PDF generation failed:", err);
+    logger.b2b.error("B2B invoice PDF generation failed", err);
     return NextResponse.json(
       { error: err?.message || "Failed to generate PDF" },
       { status: 500 }

@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   Loader2,
   Save,
@@ -114,7 +114,6 @@ const PRESET_SIZES = [
 const SCALE = 3; // pixels per mm for canvas
 
 export default function TemplateEditor({ open, onOpenChange, template }: Props) {
-  const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("design");
@@ -193,11 +192,7 @@ export default function TemplateEditor({ open, onOpenChange, template }: Props) 
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Template name is required",
-      });
+      toast.error("Template name is required");
       return;
     }
 
@@ -230,17 +225,10 @@ export default function TemplateEditor({ open, onOpenChange, template }: Props) 
         throw new Error(json?.error || "Failed to save template");
       }
 
-      toast({
-        title: template ? "Template Updated" : "Template Created",
-        description: `"${name}" has been saved`,
-      });
+      toast.success(`"${name}" has been saved`);
       onOpenChange(false, true);
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: e.message,
-      });
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }

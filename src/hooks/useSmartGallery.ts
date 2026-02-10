@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import type { GalleryImage } from '@/components/media/SmartGalleryUploader';
+import { logError } from '@/lib/log';
 
 type EntityType = 'batch' | 'variety' | 'product';
 
@@ -49,7 +50,7 @@ export function useSmartGallery({
           }))
         );
       } catch (err) {
-        console.error('Error fetching gallery:', err);
+        logError('Error fetching gallery', { error: err });
         setError('Failed to load images');
       } finally {
         setLoading(false);

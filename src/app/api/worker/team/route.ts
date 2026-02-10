@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import type { TeamMember, CompletedTask, TeamActivityResponse } from "@/types/worker";
 
 /**
@@ -36,7 +37,7 @@ export async function GET(_req: NextRequest) {
       .eq("org_id", orgId);
 
     if (usersError) {
-      console.error("[api/worker/team] Users error:", usersError);
+      logger.worker.error("Team users query failed", usersError);
       return NextResponse.json(
         { error: "Failed to fetch team members" },
         { status: 500 }
@@ -76,7 +77,7 @@ export async function GET(_req: NextRequest) {
       .not("started_at", "is", null);
 
     if (ipError) {
-      console.error("[api/worker/team] In-progress error:", ipError);
+      logger.worker.error("Team in-progress tasks query failed", ipError);
     }
 
     // Build right now list
@@ -134,7 +135,7 @@ export async function GET(_req: NextRequest) {
       .limit(20);
 
     if (ctError) {
-      console.error("[api/worker/team] Completed error:", ctError);
+      logger.worker.error("Team completed tasks query failed", ctError);
     }
 
     // Build completed today list
@@ -185,7 +186,7 @@ export async function GET(_req: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[api/worker/team] Error:", error);
+    logger.worker.error("Team activity fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

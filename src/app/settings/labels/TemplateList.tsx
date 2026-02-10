@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   Plus,
   MoreVertical,
@@ -63,7 +63,6 @@ const LABEL_TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType
 
 export default function TemplateList() {
   const router = useRouter();
-  const { toast } = useToast();
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
@@ -82,17 +81,12 @@ export default function TemplateList() {
       if (json.data) {
         setTemplates(json.data);
       }
-    } catch (e) {
-      console.error("Failed to fetch templates:", e);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load templates",
-      });
+    } catch {
+      toast.error("Failed to load templates");
     } finally {
       setLoading(false);
     }
-  }, [filterType, toast]);
+  }, [filterType]);
 
   useEffect(() => {
     fetchTemplates();
@@ -129,17 +123,10 @@ export default function TemplateList() {
         throw new Error(json?.error || "Failed to duplicate");
       }
 
-      toast({
-        title: "Template Duplicated",
-        description: `Created "${template.name} (Copy)"`,
-      });
+      toast.success(`Created "${template.name} (Copy)"`);
       fetchTemplates();
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: e.message,
-      });
+      toast.error(e.message);
     }
   };
 
@@ -155,17 +142,10 @@ export default function TemplateList() {
         throw new Error("Failed to set default");
       }
 
-      toast({
-        title: "Default Updated",
-        description: `"${template.name}" is now the default for ${LABEL_TYPE_CONFIG[template.label_type]?.label || template.label_type} labels`,
-      });
+      toast.success(`"${template.name}" is now the default for ${LABEL_TYPE_CONFIG[template.label_type]?.label || template.label_type} labels`);
       fetchTemplates();
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: e.message,
-      });
+      toast.error(e.message);
     }
   };
 
@@ -182,19 +162,12 @@ export default function TemplateList() {
         throw new Error("Failed to delete template");
       }
 
-      toast({
-        title: "Template Deleted",
-        description: `"${templateToDelete.name}" has been removed`,
-      });
+      toast.success(`"${templateToDelete.name}" has been removed`);
       setDeleteDialogOpen(false);
       setTemplateToDelete(null);
       fetchTemplates();
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: e.message,
-      });
+      toast.error(e.message);
     } finally {
       setIsDeleting(false);
     }

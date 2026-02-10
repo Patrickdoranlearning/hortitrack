@@ -56,7 +56,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { fetchJson } from '@/lib/http/fetchJson';
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types/materials';
 
@@ -76,7 +76,6 @@ const STATUS_OPTIONS: { value: PurchaseOrderStatus | 'all'; label: string }[] = 
 ];
 
 export default function PurchaseOrdersPage() {
-  const { toast } = useToast();
   const router = useRouter();
 
   const [search, setSearch] = useState('');
@@ -130,14 +129,10 @@ export default function PurchaseOrdersPage() {
       await fetchJson(`/api/materials/purchase-orders/${order.id}/submit`, {
         method: 'POST',
       });
-      toast({ title: 'Purchase order submitted', description: order.poNumber });
+      toast.success(`Purchase order submitted: ${order.poNumber}`);
       mutateOrders();
     } catch (error) {
-      toast({
-        title: 'Failed to submit',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSubmitting(false);
     }
@@ -149,15 +144,11 @@ export default function PurchaseOrdersPage() {
       await fetchJson(`/api/materials/purchase-orders/${cancellingPO.id}`, {
         method: 'DELETE',
       });
-      toast({ title: 'Purchase order cancelled' });
+      toast.success('Purchase order cancelled');
       setCancellingPO(null);
       mutateOrders();
     } catch (error) {
-      toast({
-        title: 'Failed to cancel',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     }
   };
 

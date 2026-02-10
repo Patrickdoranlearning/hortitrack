@@ -5,6 +5,7 @@ import {
   updateTask,
   deleteTask,
 } from "@/server/tasks/service";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ export async function GET(req: Request, { params }: RouteParams) {
 
     return NextResponse.json({ task });
   } catch (error: unknown) {
-    console.error("[api/tasks/[id]] GET error:", error);
+    logger.api.error("Task fetch failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch task";
     const status = /unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -49,7 +50,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     return NextResponse.json({ task });
   } catch (error: unknown) {
-    console.error("[api/tasks/[id]] PATCH error:", error);
+    logger.api.error("Task update failed", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request", issues: error.issues },
@@ -69,7 +70,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
 
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    console.error("[api/tasks/[id]] DELETE error:", error);
+    logger.api.error("Task deletion failed", error);
     const message = error instanceof Error ? error.message : "Failed to delete task";
     const status = /unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

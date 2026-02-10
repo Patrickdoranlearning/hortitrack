@@ -2,6 +2,7 @@ import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
 import { computeRouteSchedule } from "@/lib/planning/schedule";
 import type { ProductionProtocolRoute } from "@/lib/protocol-types";
+import { logger } from "@/server/utils/logger";
 
 export type ProductionTaskStage = {
   id: string;
@@ -111,7 +112,7 @@ export async function getProductionTasks(filter: TasksFilter = {}): Promise<Prod
   const { data, error } = await query;
 
   if (error) {
-    console.error("[tasks] Error fetching production tasks:", error);
+    logger.tasks.error("Failed to fetch production tasks", error);
     throw new Error(error.message);
   }
 

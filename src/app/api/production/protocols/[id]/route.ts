@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ProductionProtocolRouteSchema, ProductionProtocolStepSchema, ProductionTargetsSchema } from "@/lib/protocol-types";
 import { getUserAndOrg } from "@/server/auth/org";
 import { rowToProtocolSummary, type ProtocolRow } from "@/server/planning/service";
+import { logger } from "@/server/utils/logger";
 
 const ProtocolUpdateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -78,7 +79,7 @@ export async function PATCH(
       .single();
 
     if (error || !data) {
-      console.error("[protocols PATCH] error:", error);
+      logger.production.error("Protocol update failed", error);
       return NextResponse.json(
         { error: error?.code === "PGRST116" ? "Protocol not found" : "Failed to update protocol" },
         { status: error?.code === "PGRST116" ? 404 : 500 }
@@ -88,7 +89,7 @@ export async function PATCH(
     const protocol = rowToProtocolSummary(data as ProtocolRow);
     return NextResponse.json({ protocol });
   } catch (error) {
-    console.error("[protocols PATCH] exception:", error);
+    logger.production.error("Protocol PATCH exception", error);
     if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json({ error: "Invalid payload", issues: (error as z.ZodError).issues }, { status: 400 });
     }
@@ -112,13 +113,13 @@ export async function DELETE(
       .eq("org_id", orgId);
 
     if (error) {
-      console.error("[protocols DELETE] error:", error);
+      logger.production.error("Protocol delete failed", error);
       return NextResponse.json({ error: "Failed to delete protocol" }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[protocols DELETE] exception:", error);
+    logger.production.error("Protocol DELETE exception", error);
     const message = error instanceof Error ? error.message : "";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: status === 401 ? "Unauthorized" : "Failed to delete protocol" }, { status });

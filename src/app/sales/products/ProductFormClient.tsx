@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { emitMutation } from "@/lib/events/mutation-events";
 import ProductSkuSheet from "./ProductSkuSheet";
 import { deleteProductAction } from "./actions";
@@ -45,7 +45,6 @@ type Props = {
 
 export default function ProductFormClient({ mode, product, skus, batches, priceLists, customers, plantVarieties, plantSizes }: Props) {
   const router = useRouter();
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
   const [productId, setProductId] = useState<string | null>(product?.id ?? null);
   const [skuSheetOpen, setSkuSheetOpen] = useState(false);
@@ -64,14 +63,10 @@ export default function ProductFormClient({ mode, product, skus, batches, priceL
     startDeleting(async () => {
       const result = await deleteProductAction(product.id);
       if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Delete failed",
-          description: result.error ?? "Unable to delete product.",
-        });
+        toast.error(result.error ?? "Unable to delete product.");
         return;
       }
-      toast({ title: "Product deleted" });
+      toast.success("Product deleted");
       emitMutation({ resource: "products", action: "delete", id: product.id });
       router.push("/sales/products");
     });
@@ -104,10 +99,7 @@ export default function ProductFormClient({ mode, product, skus, batches, priceL
               onForcedSkuApplied={() => setLastCreatedSkuId(null)}
               plantSizes={plantSizes}
               onSaved={(id) => {
-                toast({
-                  title: mode === "create" ? "Product created" : "Product updated",
-                  description: "Product details have been saved successfully.",
-                });
+                toast.success(mode === "create" ? "Product created" : "Product updated");
                 if (mode === "create" && id) {
                   // Redirect to edit page so inventory/pricing/aliases tabs work
                   router.push(`/sales/products/${id}`);
@@ -209,10 +201,7 @@ export default function ProductFormClient({ mode, product, skus, batches, priceL
           setSkuOptions((prev) => [sku, ...prev]);
           setLastCreatedSkuId(sku.id);
           setSkuSheetOpen(false);
-          toast({
-            title: "SKU created",
-            description: `${sku.code} has been added.`,
-          });
+          toast.success(`${sku.code} has been added.`);
         }}
       />
     </Card>

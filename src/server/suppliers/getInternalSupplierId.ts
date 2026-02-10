@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Ensures we have a supplier row representing the internal/own nursery
@@ -19,7 +20,7 @@ export async function ensureInternalSupplierId(
     .maybeSingle();
 
   if (error) {
-    console.error("[suppliers] failed to lookup internal supplier", error);
+    logger.suppliers.error("Failed to lookup internal supplier", error, { orgId });
   }
 
   if (data?.id) {
@@ -50,7 +51,7 @@ export async function ensureInternalSupplierId(
     .single();
 
   if (insertErr) {
-    console.error("[suppliers] failed to create internal supplier", insertErr);
+    logger.suppliers.error("Failed to create internal supplier", insertErr, { orgId });
     return null;
   }
 

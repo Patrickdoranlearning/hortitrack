@@ -6,6 +6,7 @@ import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { logError } from "@/lib/log"
 
 type DialogFormProps<Schema extends ZodTypeAny> = {
   title: string
@@ -47,7 +48,7 @@ export function DialogForm<Schema extends ZodTypeAny>({
       setOpen(false)
       form.reset(defaultValues) // reset after success to avoid dirty state next open
     } catch (e: any) {
-      console.error("DialogForm submit failed", e)
+      logError("DialogForm submit failed", { error: e })
       setError(e?.message ?? "Something went wrong")
     } finally {
       setBusy(false)

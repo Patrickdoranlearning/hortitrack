@@ -173,7 +173,7 @@ export type CompleteRemedialStepInput = {
 // ============================================================================
 
 /**
- * Standard result type for remedial program operations
+ * @deprecated Use ActionResult from @/lib/errors instead
  */
 export type IpmRemedialResult<T = void> =
   | { success: true; data?: T }

@@ -99,8 +99,7 @@ export default function TrolleyFillIndicator({
       } else {
         setError(data.error || 'Calculation failed');
       }
-    } catch (err) {
-      console.error('Trolley calculation error:', err);
+    } catch {
       setError('Failed to calculate trolleys');
     } finally {
       setLoading(false);

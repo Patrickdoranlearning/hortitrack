@@ -2,7 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isAllowedOrigin } from "@/lib/security/origin";
-import { jsonError } from "@/server/http/responses";
+import { jsonError } from "@/server/utils/envelope";
+import { logWarning } from "@/lib/log";
 
 // Matcher for paths to apply middleware to
 export const config = {
@@ -75,7 +76,7 @@ export async function middleware(request: NextRequest) {
         path: pathname,
         method: request.method,
       };
-      console.warn("[middleware] blocked Bad Origin", details);
+      logWarning("Blocked bad origin", details);
       return jsonError("Bad Origin", { status: 403, details });
     }
   }

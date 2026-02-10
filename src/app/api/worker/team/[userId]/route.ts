@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import type { TeamMemberDetail } from "@/types/worker";
 
 /**
@@ -166,7 +167,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[api/worker/team/[userId]] Error:", error);
+    logger.worker.error("Team member detail fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

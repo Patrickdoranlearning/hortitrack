@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import {
   MaterialSearchSheet,
@@ -59,7 +59,6 @@ const UNIT_TYPES = [
 ] as const;
 
 export default function WorkerReceiveMaterialsPage() {
-  const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [materialSheetOpen, setMaterialSheetOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialSearchResult | null>(
@@ -125,11 +124,7 @@ export default function WorkerReceiveMaterialsPage() {
       setStep(3);
     } catch (error) {
       vibrateError();
-      toast({
-        title: "Failed to receive materials",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to receive materials");
     } finally {
       setSubmitting(false);
     }

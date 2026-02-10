@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SubmitButton } from "@/components/ui/SubmitButton";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import type { Batch, NurseryLocation } from "@/lib/types";
 import BatchPhotoUploader from "@/components/batches/BatchPhotoUploader";
 import { fetchJson } from "@/lib/http";
@@ -104,7 +104,6 @@ export function ActionForm({
   onSuccess?: () => void;
   onCancel?: () => void;
 }) {
-  const { toast } = useToast();
   const [uploaded, setUploaded] = useState<{ url: string; path?: string }[]>([]);
   const [spaced, setSpaced] = useState(false);
   const [partialMove, setPartialMove] = useState(false);
@@ -228,11 +227,7 @@ export function ActionForm({
     try {
       if (partialMove && (!values.quantity || values.quantity <= 0)) {
         moveForm.setError("quantity", { message: "Enter how many units to move" });
-        toast({
-          variant: "destructive",
-          title: "Missing quantity",
-          description: "Specify the portion you're moving when partial move is enabled.",
-        });
+        toast.error("Specify the portion you're moving when partial move is enabled.");
         return;
       }
 
@@ -250,19 +245,16 @@ export function ActionForm({
       };
       const result = await submit(payload, "MOVE");
       const createdBatch = result?.splitBatchNumber;
-      toast({
-        title: partialMove ? "Partial move logged" : "Move logged",
-        description: createdBatch
+      toast.success(createdBatch
           ? `Created new batch ${createdBatch} for the moved portion.`
-          : "Destination set.",
-      });
+          : "Move logged. Destination set.");
       setPartialMove(false);
       setConditionNotes("");
       onSuccess?.();
     } catch (e: any) {
       const msg = String(e.message || e);
       if (/destination/i.test(msg)) moveForm.setError("toLocationId", { message: msg });
-      toast({ variant: "destructive", title: "Move failed", description: msg });
+      toast.error(msg);
     }
   }
   async function onSubmitDump(values: DumpForm) {
@@ -273,13 +265,13 @@ export function ActionForm({
         quantity: values.quantity ?? max, // default full dump if blank
       };
       await submit(payload, "DUMP");
-      toast({ title: "Dump logged", description: `Quantity adjusted.` });
+      toast.success("Dump logged. Quantity adjusted.");
       onSuccess?.();
     } catch (e: any) {
       const msg = String(e.message || e);
       if (/exceeds/i.test(msg)) dumpForm.setError("quantity", { message: msg });
       if (/reason/i.test(msg)) dumpForm.setError("reason", { message: msg });
-      toast({ variant: "destructive", title: "Dump failed", description: msg });
+      toast.error(msg);
     }
   }
   const photoRequiredStatuses = ["Ready for Sale", "Looking Good"];
@@ -294,12 +286,7 @@ export function ActionForm({
         checkForm.setError("status", {
           message: "Add at least one photo when marking as saleable or looking good.",
         });
-        toast({
-          variant: "destructive",
-          title: "Photo required",
-          description:
-            "Please take a sales photo when setting status to Looking Good or Ready for Sale.",
-        });
+        toast.error("Please take a sales photo when setting status to Looking Good or Ready for Sale.");
         return;
       }
 
@@ -310,10 +297,10 @@ export function ActionForm({
         flags: values.flags ?? [],
       };
       await submit(payload, "CHECKIN");
-      toast({ title: "Check-in saved" });
+      toast.success("Check-in saved");
       onSuccess?.();
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Check-in failed", description: String(e.message || e) });
+      toast.error(String(e.message || e));
     }
   }
 

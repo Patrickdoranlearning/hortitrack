@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { transplantBatch, TransplantInput } from "@/server/batches/service";
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
+import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,13 +48,7 @@ export async function POST(
 ) {
   try {
     const { batchId } = await params;
-    const { userId } = await getUserIdAndOrgId();
-    if (!userId) {
-       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401, headers: corsHeaders(req) }
-      );
-    }
+    const { user } = await getUserAndOrg();
 
     const body = await req.json();
     const parsed = Input.safeParse(body);
@@ -82,20 +77,26 @@ export async function POST(
         notes: input.notes,
     };
 
-    const result = await transplantBatch(batchId, transplantInput, userId);
+    const result = await transplantBatch(batchId, transplantInput, user.id);
 
     return NextResponse.json(
       { ok: true, newBatch: result },
       { status: 201, headers: corsHeaders(req) }
     );
-  } catch (e: any) {
-    const msg = e?.message ?? "unknown error";
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    if (msg === "Unauthenticated") {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: corsHeaders(req) }
+      );
+    }
     const status = /not found/.test(msg)
       ? 404
       : /exceeds/.test(msg)
       ? 400
       : 500;
-    console.error("Error in transplant route:", e);
+    logger.api.error("Transplant route failed", e);
     return NextResponse.json(
       { error: msg },
       { status, headers: corsHeaders(req) }

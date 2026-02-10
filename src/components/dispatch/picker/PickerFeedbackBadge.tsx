@@ -59,8 +59,8 @@ export function PickerFeedbackBadge() {
         setFeedback(data.feedback || []);
         setUnacknowledgedCount(data.unacknowledgedCount || 0);
       }
-    } catch (error) {
-      console.error('Failed to fetch feedback:', error);
+    } catch {
+      // Feedback fetch failed silently
     } finally {
       setIsLoading(false);
     }
@@ -76,8 +76,8 @@ export function PickerFeedbackBadge() {
       if (res.ok) {
         fetchFeedback(); // Refresh the list
       }
-    } catch (error) {
-      console.error('Failed to acknowledge feedback:', error);
+    } catch {
+      // Acknowledge failed silently
     }
   };
 

@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Loader2, Syringe } from 'lucide-react';
 import { logTreatment } from '@/app/actions/trials';
 import type { TrialGroupWithSubjects } from '@/types/trial';

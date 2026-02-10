@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerApp } from '@/server/db/supabaseServerApp';
 import { getUserAndOrg } from '@/server/auth/org';
+import { logger } from '@/server/utils/logger';
 
 interface RouteContext {
   params: Promise<{ batchId: string }>;
@@ -99,7 +100,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     
     return NextResponse.json({ batch: result });
   } catch (error: any) {
-    console.error('Error fetching bulk pick batch:', error);
+    logger.picking.error("Error fetching bulk pick batch", error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -271,7 +272,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
   } catch (error: any) {
-    console.error('Error updating bulk pick batch:', error);
+    logger.picking.error("Error updating bulk pick batch", error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -325,7 +326,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     
     return NextResponse.json({ success: true, action: 'deleted' });
   } catch (error: any) {
-    console.error('Error deleting bulk pick batch:', error);
+    logger.picking.error("Error deleting bulk pick batch", error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

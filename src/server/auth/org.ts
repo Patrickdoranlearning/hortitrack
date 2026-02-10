@@ -6,6 +6,13 @@ import { logError, logInfo } from "@/lib/log";
 
 import { DEV_USER_ID, IS_DEV } from "@/server/auth/dev-bypass";
 
+/**
+ * Returns the authenticated user, their active org ID, and a **regular** Supabase
+ * client that enforces Row Level Security.  Use this for all standard operations.
+ *
+ * If you genuinely need to bypass RLS (e.g. admin user management, cross-org
+ * reporting), use `getUserAndOrgAdmin()` instead and document why.
+ */
 export async function getUserAndOrg() {
   const supabase = await createClient();
   const admin = getSupabaseAdmin();
@@ -26,8 +33,36 @@ export async function getUserAndOrg() {
   if (!user) throw new Error("Unauthenticated");
 
   const orgId = await resolveActiveOrgId({ supabase, admin, user });
-  // Return admin client for server-side queries to bypass RLS
-  // Security is maintained by always filtering by orgId in queries
+  // Return the regular SSR client — RLS enforces org isolation
+  return { user, orgId, supabase };
+}
+
+/**
+ * Same as `getUserAndOrg()` but returns an **admin** Supabase client that
+ * bypasses RLS.  Only use this when you have a documented reason:
+ *   - Admin-only user / org management operations
+ *   - Cross-org reporting queries
+ *   - Operations that need to read/write across RLS boundaries
+ */
+export async function getUserAndOrgAdmin() {
+  const supabase = await createClient();
+  const admin = getSupabaseAdmin();
+
+  const {
+    data: { user: fetchedUser },
+    error: uerr,
+  } = await supabase.auth.getUser();
+
+  let user = fetchedUser;
+
+  if (IS_DEV && (!user || uerr)) {
+    const { data } = await admin.auth.admin.getUserById(DEV_USER_ID);
+    user = data.user;
+  }
+
+  if (!user) throw new Error("Unauthenticated");
+
+  const orgId = await resolveActiveOrgId({ supabase, admin, user });
   return { user, orgId, supabase: admin };
 }
 

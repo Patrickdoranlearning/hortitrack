@@ -1,5 +1,4 @@
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
-import { getSupabaseServerApp } from "@/server/db/supabase";
+import { getUserAndOrg } from "@/server/auth/org";
 import { redirect } from "next/navigation";
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
@@ -11,26 +10,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 
 export default async function TeamPage() {
-  const { userId, orgId } = await getUserIdAndOrgId();
-
-  if (!userId) {
-    redirect("/login");
-  }
-
-  const supabase = await getSupabaseServerApp();
+  const { user, orgId, supabase } = await getUserAndOrg();
 
   // Check if user is admin or owner
-  let isAdminOrOwner = false;
-  if (orgId) {
-    const { data: membership } = await supabase
-      .from("org_memberships")
-      .select("role")
-      .eq("org_id", orgId)
-      .eq("user_id", userId)
-      .single();
+  const { data: membership } = await supabase
+    .from("org_memberships")
+    .select("role")
+    .eq("org_id", orgId)
+    .eq("user_id", user.id)
+    .single();
 
-    isAdminOrOwner = membership?.role === "admin" || membership?.role === "owner";
-  }
+  const isAdminOrOwner = membership?.role === "admin" || membership?.role === "owner";
 
   if (!isAdminOrOwner) {
     redirect("/settings");

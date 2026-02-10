@@ -43,7 +43,7 @@ import { LogActionWizard } from '@/components/batches/LogActionWizard';
 import { ProductionProtocolDialog } from "@/components/production-protocol-dialog";
 import { CareRecommendationsDialog } from "@/components/care-recommendations-dialog";
 import { IntelligenceDialog } from "@/components/ai/IntelligenceDialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -86,7 +86,6 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'batchNumber', direction: 'desc' });
 
-  const { toast } = useToast();
 
   // State for dialogs
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -145,22 +144,8 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
   }, [locationsData, batches]);
   
   useEffect(() => {
-    if (batchesError && process.env.NODE_ENV === "development") {
-      // Development-only logging for batch fetch errors
-      console.error("[BatchesClient] Error fetching batches:", batchesError);
-    }
-  }, [batchesError]);
-
-  useEffect(() => {
     if (locationsError) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("[BatchesClient] Error loading locations:", locationsError);
-      }
-      toast({
-        variant: "destructive",
-        title: "Locations unavailable",
-        description: "Could not load nursery locations. Please refresh and try again.",
-      });
+      toast.error("Could not load nursery locations. Please refresh and try again.");
     }
   }, [locationsError, toast]);
 
@@ -348,11 +333,7 @@ export default function BatchesClient({ initialBatches }: { initialBatches: Batc
         router.push(`/?batch=${encodeURIComponent(text)}`);
         setIsScanOpen(false);
       } catch (err) {
-        toast({
-          variant: "destructive",
-          title: "Scan failed",
-          description: err instanceof Error ? err.message : "Could not look up that batch.",
-        });
+        toast.error(err instanceof Error ? err.message : "Could not look up that batch.");
       }
     },
     [router, toast]

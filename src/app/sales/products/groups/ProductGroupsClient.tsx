@@ -59,7 +59,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { ProductGroup } from '../types';
 import {
   upsertProductGroupAction,
@@ -194,8 +194,8 @@ export default function ProductGroupsClient({
       if (aliasesRes.success) {
         setAliases(aliasesRes.data as GroupAlias[]);
       }
-    } catch (error) {
-      console.error('Failed to load group details', error);
+    } catch {
+      // Error handled by empty state UI
     } finally {
       setIsLoadingDetails(false);
     }
@@ -229,8 +229,7 @@ export default function ProductGroupsClient({
       } else {
         toast.error(result.error || 'Failed to save group');
       }
-    } catch (error) {
-      console.error('handleSaveGroup error:', error);
+    } catch {
       toast.error('Failed to save group');
     } finally {
       setIsSaving(false);

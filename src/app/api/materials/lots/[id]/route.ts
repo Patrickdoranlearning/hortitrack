@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import {
   getMaterialLot,
   adjustLotQuantity,
@@ -46,7 +47,7 @@ export async function GET(req: Request, { params }: RouteParams) {
 
     return NextResponse.json({ lot, transactions });
   } catch (error: unknown) {
-    console.error("[lot GET] Error:", error);
+    logger.materials.error("Lot GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch lot";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -166,7 +167,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         );
     }
   } catch (error: unknown) {
-    console.error("[lot PATCH] Error:", error);
+    logger.materials.error("Lot PATCH failed", error);
     const message = error instanceof Error ? error.message : "Failed to update lot";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

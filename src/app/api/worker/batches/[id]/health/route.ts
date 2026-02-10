@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Worker Batch Health API
@@ -39,7 +40,7 @@ export async function GET(
       .limit(50);
 
     if (error) {
-      console.error("[api/worker/batches/[id]/health] Query error:", error);
+      logger.worker.error("Batch health query failed", error);
       return NextResponse.json(
         { error: "Failed to load health logs" },
         { status: 500 }
@@ -48,7 +49,7 @@ export async function GET(
 
     return NextResponse.json({ logs: data || [] });
   } catch (error) {
-    console.error("[api/worker/batches/[id]/health] Error:", error);
+    logger.worker.error("Batch health fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

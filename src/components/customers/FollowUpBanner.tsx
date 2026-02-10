@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getCustomerFollowUpsAction, completeFollowUpAction } from '@/app/sales/customers/actions';
 import { emitMutation } from '@/lib/events/mutation-events';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { CustomerFollowUp } from '@/app/sales/customers/[customerId]/types';
 
 interface FollowUpBannerProps {
@@ -128,8 +128,8 @@ export function FollowUpBanner({ customerId, initialFollowUps = [] }: FollowUpBa
     setIsLoading(true);
     try {
       const result = await getCustomerFollowUpsAction(customerId, false);
-      if (result.success) {
-        setFollowUps(result.followUps);
+      if (result.success && result.data) {
+        setFollowUps(result.data);
       }
     } finally {
       setIsLoading(false);

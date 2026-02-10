@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { captureProtocolPerformance } from "@/server/production/protocol-performance";
+import { logger } from "@/server/utils/logger";
 
 const ActualizeSchema = z.object({
   quantity: z.number().int().positive(),
@@ -66,7 +67,7 @@ export async function POST(
         .single();
 
       if (parentErr) {
-        console.error("[actualize] Failed to fetch parent batch:", parentErr);
+        logger.api.error("Actualize failed to fetch parent batch", parentErr, { batchId });
         return NextResponse.json(
           { error: "Failed to fetch parent batch for quantity update" },
           { status: 500 }
@@ -93,7 +94,7 @@ export async function POST(
           .eq("org_id", orgId);
 
         if (parentUpdateErr) {
-          console.error("[actualize] Failed to update parent batch:", parentUpdateErr);
+          logger.api.error("Actualize failed to update parent batch", parentUpdateErr, { batchId });
           // FAIL the operation to maintain data integrity
           return NextResponse.json(
             { error: "Failed to update parent batch quantities. Please try again." },
@@ -176,7 +177,7 @@ export async function POST(
       .single();
 
     if (updateError) {
-      console.error("[actualize] update error", updateError);
+      logger.api.error("Actualize batch update failed", updateError, { batchId });
       return NextResponse.json(
         { error: updateError.message },
         { status: 500 }
@@ -205,23 +206,23 @@ export async function POST(
       });
       
       if (eventError) {
-          console.error("[actualize] event log error", eventError);
+          logger.api.warn("Actualize event log failed", { batchId, error: eventError.message });
           // Continue anyway
       }
     } catch (evtErr) {
-      console.error("[actualize] unexpected event log error", evtErr);
+      logger.api.warn("Actualize unexpected event log error", { batchId, error: evtErr instanceof Error ? evtErr.message : String(evtErr) });
     }
 
     // Capture protocol performance when batch reaches Ready status
     if (payload.status === "Ready") {
       captureProtocolPerformance(supabase, orgId, batchId).catch((err) => {
-        console.error("[actualize] Failed to capture protocol performance:", err);
+        logger.api.warn("Failed to capture protocol performance during actualize", { batchId, error: err instanceof Error ? err.message : String(err) });
       });
     }
 
     return NextResponse.json({ batch: updated }, { status: 200 });
   } catch (err: any) {
-    console.error("[actualize] error", err);
+    logger.api.error("Actualize route failed", err, { batchId: "unknown" });
     if (err instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request", details: err.errors },

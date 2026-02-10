@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http";
 import type { ProtocolSummary } from "@/lib/planning/types";
 import { ProtocolDrawer } from "../planning/components/ProtocolDrawer";
@@ -50,7 +50,6 @@ type Props = {
 };
 
 export default function RecipesClient({ initialProtocols }: Props) {
-  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProtocolSummary | null>(null);
@@ -86,14 +85,10 @@ export default function RecipesClient({ initialProtocols }: Props) {
       await fetchJson(`/api/production/protocols/${deleteTarget.id}`, {
         method: "DELETE",
       });
-      toast({ title: "Recipe deleted" });
+      toast.success("Recipe deleted");
       mutate();
     } catch (error: any) {
-      toast({
-        title: "Failed to delete",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Unknown error");
     } finally {
       setDeleteTarget(null);
     }
@@ -105,14 +100,10 @@ export default function RecipesClient({ initialProtocols }: Props) {
         method: "PATCH",
         body: JSON.stringify({ isActive: !protocol.isActive }),
       });
-      toast({ title: protocol.isActive ? "Recipe archived" : "Recipe activated" });
+      toast.success(protocol.isActive ? "Recipe archived" : "Recipe activated");
       mutate();
     } catch (error: any) {
-      toast({
-        title: "Failed to update",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Unknown error");
     }
   };
 
@@ -132,14 +123,10 @@ export default function RecipesClient({ initialProtocols }: Props) {
           isActive: true,
         }),
       });
-      toast({ title: "Recipe duplicated" });
+      toast.success("Recipe duplicated");
       mutate();
     } catch (error: any) {
-      toast({
-        title: "Failed to duplicate",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Unknown error");
     }
   };
 

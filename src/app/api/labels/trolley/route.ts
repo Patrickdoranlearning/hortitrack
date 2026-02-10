@@ -9,6 +9,7 @@ import {
 import { getSupabaseServerApp } from '@/server/db/supabase';
 import { resolveActiveOrgId } from '@/server/org/getActiveOrg';
 import { sendToPrinter } from '@/server/labels/send-to-printer';
+import { logger } from '@/server/utils/logger';
 
 /**
  * POST /api/labels/trolley
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
-      console.warn('[api/labels/trolley] Failed to save label record:', insertError);
+      logger.api.warn("Failed to save trolley label record", { error: insertError.message });
       // Continue with printing even if DB save fails
     }
 
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Print failed';
-    console.error('[api/labels/trolley] error:', e);
+    logger.api.error("Trolley label print failed", e);
     return NextResponse.json(
       { ok: false, error: message },
       { status: 500 }
@@ -247,7 +248,7 @@ export async function GET(req: NextRequest) {
       pickList: trolleyLabel.pick_lists,
     });
   } catch (e: any) {
-    console.error('[api/labels/trolley] GET error:', e);
+    logger.api.error("Trolley label scan failed", e);
     return NextResponse.json(
       { ok: false, error: e?.message || 'Scan failed' },
       { status: 500 }

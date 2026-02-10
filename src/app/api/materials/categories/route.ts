@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 import { listCategories } from "@/server/materials/service";
 
 export const runtime = "nodejs";
@@ -24,7 +25,7 @@ export async function GET() {
       }
     );
   } catch (error: unknown) {
-    console.error("[materials/categories GET] Error:", error);
+    logger.materials.error("Categories GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch categories";
     return NextResponse.json({ error: message }, { status: 500 });
   }

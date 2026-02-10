@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, FileDown, Plus, Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 type DataToolbarProps = {
@@ -28,7 +28,6 @@ export function DataToolbar({
   extraActions,
 }: DataToolbarProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
   const [busy, setBusy] = React.useState({
     template: false,
     download: false,
@@ -41,11 +40,7 @@ export function DataToolbar({
     try {
       await onDownloadTemplate();
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Template download failed',
-        description: error?.message || 'Could not prepare the template.',
-      });
+      toast.error(error?.message || 'Could not prepare the template.');
     } finally {
       setBusy((prev) => ({ ...prev, template: false }));
     }
@@ -57,11 +52,7 @@ export function DataToolbar({
     try {
       await onDownloadData();
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Export failed',
-        description: error?.message || 'Could not export the filtered rows.',
-      });
+      toast.error(error?.message || 'Could not export the filtered rows.');
     } finally {
       setBusy((prev) => ({ ...prev, download: false }));
     }
@@ -81,11 +72,7 @@ export function DataToolbar({
     try {
       await onUploadCsv(file);
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Upload failed',
-        description: error?.message || 'Could not import that CSV file.',
-      });
+      toast.error(error?.message || 'Could not import that CSV file.');
     } finally {
       setBusy((prev) => ({ ...prev, upload: false }));
       if (fileInputRef.current) {

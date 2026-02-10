@@ -4,6 +4,7 @@ import { ProductionProtocolRouteSchema, ProductionProtocolStepSchema, Production
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { listProtocols, rowToProtocolSummary, type ProtocolRow } from "@/server/planning/service";
+import { logger } from "@/server/utils/logger";
 
 const ProtocolPayloadSchema = z.object({
   name: z.string().min(2),
@@ -45,11 +46,11 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (membershipError) {
-      console.error("[protocols POST] membership check failed:", membershipError);
+      logger.production.error("Protocol POST membership check failed", membershipError);
     }
 
     if (!membership) {
-      console.error("[protocols POST] user has no membership for org:", { userId: user.id, orgId });
+      logger.production.warn("User has no membership for org", { userId: user.id, orgId });
       return NextResponse.json(
         { error: "You don't have permission to create protocols in this organization" },
         { status: 403 }
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
       .single();
 
     if (error || !data) {
-      console.error("[protocols POST] insert failed:", error);
+      logger.production.error("Protocol insert failed", error);
       throw new Error(error?.message ?? "Failed to create protocol");
     }
 
@@ -107,7 +108,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
     }
     const message = error instanceof Error ? error.message : "Failed to create protocol";
-    console.error("[protocols POST] error:", message);
+    logger.production.error("Protocol POST failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -61,8 +61,7 @@ export interface ItemIssue {
 
 export default function QCReviewClient({ order, userId }: QCReviewClientProps) {
   const router = useRouter();
-  const { toast } = useToast();
-  
+
   const [checklist, setChecklist] = useState<QCChecklistState>({
     qtyCorrect: false,
     varietyCorrect: false,
@@ -116,24 +115,13 @@ export default function QCReviewClient({ order, userId }: QCReviewClientProps) {
       });
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'QC Approved',
-          description: `Order ${order.orderNumber} has passed QC and is ready for dispatch.`,
-        });
+        toast.success(`Order ${order.orderNumber} has passed QC and is ready for dispatch.`);
         router.push('/dispatch/qc');
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to submit QC approval',
-        variant: 'destructive',
-      });
+      toast.error('Failed to submit QC approval');
     } finally {
       setIsSubmitting(false);
       setShowApproveDialog(false);
@@ -142,11 +130,7 @@ export default function QCReviewClient({ order, userId }: QCReviewClientProps) {
 
   const handleReject = async () => {
     if (!rejectReason.trim() && itemIssues.length === 0) {
-      toast({
-        title: 'Reason required',
-        description: 'Please provide a reason or mark specific item issues',
-        variant: 'destructive',
-      });
+      toast.error('Please provide a reason or mark specific item issues');
       return;
     }
 
@@ -160,24 +144,13 @@ export default function QCReviewClient({ order, userId }: QCReviewClientProps) {
       });
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'Returned for Re-pick',
-          description: `Order ${order.orderNumber} has been returned to the picking queue.`,
-        });
+        toast.success(`Order ${order.orderNumber} has been returned to the picking queue.`);
         router.push('/dispatch/qc');
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to reject and return for re-pick',
-        variant: 'destructive',
-      });
+      toast.error('Failed to reject and return for re-pick');
     } finally {
       setIsSubmitting(false);
       setShowRejectDialog(false);

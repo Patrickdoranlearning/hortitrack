@@ -38,7 +38,7 @@ import { LocationComboboxGrouped } from "@/components/ui/location-combobox-group
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { AlertCircle } from "lucide-react";
 import type { FieldErrors } from "react-hook-form";
 
@@ -131,7 +131,6 @@ type Props = {
 
 export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
   const { data: refData } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
 
   // Default to current week + 4 weeks ahead for incoming stock
   const now = new Date();
@@ -159,7 +158,6 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
 
   // Handle validation errors
   function onInvalid(errors: FieldErrors<FormValues>) {
-    console.error("[IncomingBatchDialog] Validation failed:", errors);
     // Show toast for validation errors
     const errorMessages: string[] = [];
     
@@ -188,18 +186,10 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
     }
     
     if (errorMessages.length > 0) {
-      toast({
-        title: "Please fix form errors",
-        description: errorMessages.join(". "),
-        variant: "destructive",
-      });
+      toast.error(errorMessages.join(". "));
     } else {
       // Fallback message if we still can't determine the error
-      toast({
-        title: "Form validation failed",
-        description: "Please check all required fields are filled in correctly.",
-        variant: "destructive",
-      });
+      toast.error("Please check all required fields are filled in correctly.");
     }
   }
 
@@ -223,7 +213,7 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
           notes: values.notes || undefined,
         }),
       });
-      toast({ title: "Incoming batch captured" });
+      toast.success("Incoming batch captured");
       form.reset({
         plantVarietyId: "",
         sizeId: "",
@@ -239,11 +229,7 @@ export function IncomingBatchDialog({ open, onOpenChange, onSuccess }: Props) {
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: "Failed to save",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Unknown error");
     } finally {
       setSubmitting(false);
     }

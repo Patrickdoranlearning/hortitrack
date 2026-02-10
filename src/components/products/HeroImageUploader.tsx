@@ -13,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 
 type HeroImageUploaderProps = {
   value: string | null;
@@ -32,7 +32,6 @@ export function HeroImageUploader({
   disabled = false,
   className,
 }: HeroImageUploaderProps) {
-  const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,19 +55,14 @@ export function HeroImageUploader({
 
         const data = await response.json();
         onChange(data.filePath);
-        toast({ title: 'Image uploaded' });
+        toast.success('Image uploaded');
       } catch (err) {
-        console.error('Upload failed:', err);
-        toast({
-          variant: 'destructive',
-          title: 'Upload failed',
-          description: err instanceof Error ? err.message : 'Unable to upload image',
-        });
+        toast.error(err instanceof Error ? err.message : 'Unable to upload image');
       } finally {
         setUploading(false);
       }
     },
-    [onChange, toast]
+    [onChange]
   );
 
   const onDrop = useCallback(

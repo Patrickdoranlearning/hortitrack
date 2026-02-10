@@ -24,7 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   LayoutGrid,
@@ -313,7 +313,6 @@ function makeComponent(
 }
 
 export function DocumentDesigner() {
-  const { toast } = useToast();
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
 
   // Use undo/redo hook for layout history
@@ -477,17 +476,13 @@ export function DocumentDesigner() {
         const json = await res.json();
         setTemplates(json.templates ?? []);
       } catch (err: any) {
-        toast({
-          variant: "destructive",
-          title: "Failed to load templates",
-          description: err?.message,
-        });
+        toast.error(err?.message || "Failed to load templates");
       } finally {
         setIsLoading(false);
       }
     };
     load();
-  }, [toast]);
+  }, []);
 
   const selectTemplate = async (id: string) => {
     setIsLoading(true);
@@ -520,11 +515,7 @@ export function DocumentDesigner() {
       mainContentRef.current?.focus();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast({
-        variant: "destructive",
-        title: "Failed to load template",
-        description: errorMessage,
-      });
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -558,10 +549,10 @@ export function DocumentDesigner() {
       const tpl: DocumentTemplate = json.template;
       setTemplates((prev) => [tpl, ...prev]);
       await selectTemplate(tpl.id);
-      toast({ title: "Template created", description: `Using ${styleName} style` });
+      toast.success(`Template created using ${styleName} style`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast({ variant: "destructive", title: "Create failed", description: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -587,10 +578,10 @@ export function DocumentDesigner() {
       const tpl: DocumentTemplate = json.template;
       setTemplates((prev) => [tpl, ...prev]);
       await selectTemplate(tpl.id);
-      toast({ title: "Template created" });
+      toast.success("Template created");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast({ variant: "destructive", title: "Create failed", description: errorMessage });
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -709,7 +700,7 @@ export function DocumentDesigner() {
       setHasUnsavedChanges(false);
       // Clear pending save on success
       setPendingSave(null);
-      toast({ title: "Draft saved" });
+      toast.success("Draft saved");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       // Store the failed save for recovery
@@ -718,20 +709,7 @@ export function DocumentDesigner() {
         state: saveState,
       });
       setSaveError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Save failed",
-        description: errorMessage,
-        action: (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleSaveDraft(true)}
-          >
-            Retry
-          </Button>
-        ),
-      });
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -756,9 +734,9 @@ export function DocumentDesigner() {
         return [tpl, ...others];
       });
       setHasUnsavedChanges(false);
-      toast({ title: "Template published" });
+      toast.success("Template published");
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Publish failed", description: err?.message });
+      toast.error(err?.message || "Publish failed");
     } finally {
       setIsSaving(false);
     }
@@ -783,7 +761,7 @@ export function DocumentDesigner() {
       const json = await res.json();
       setPreviewHtml(json.html ?? "");
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Preview failed", description: err?.message });
+      toast.error(err?.message || "Preview failed");
     } finally {
       setIsPreviewing(false);
     }
@@ -811,15 +789,15 @@ export function DocumentDesigner() {
       a.download = `${state.name.replace(/\s+/g, "_") || "document"}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-      toast({ title: "PDF downloaded" });
+      toast.success("PDF downloaded");
     } catch (err: any) {
-      toast({ variant: "destructive", title: "PDF failed", description: err?.message });
+      toast.error(err?.message || "PDF download failed");
     }
   };
 
   const handleSendEmail = async () => {
     if (!emailTo) {
-      toast({ variant: "destructive", title: "Add recipient email first" });
+      toast.error("Add recipient email first");
       return;
     }
     if (!state.id) {
@@ -840,9 +818,9 @@ export function DocumentDesigner() {
       if (!res.ok || json.sent === false) {
         throw new Error(json.error ?? "Send failed");
       }
-      toast({ title: "Test email queued" });
+      toast.success("Test email queued");
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Send failed", description: err?.message });
+      toast.error(err?.message || "Send failed");
     }
   };
 
@@ -1881,7 +1859,7 @@ export function DocumentDesigner() {
                       className="w-full rounded-md border px-2 py-1.5 text-xs bg-background hover:bg-muted/50 hover:border-primary/50 transition-colors text-left"
                       onClick={() => {
                         navigator.clipboard.writeText(f.path);
-                        toast({ title: "Copied!", description: `${f.path} copied to clipboard` });
+                        toast.success(`${f.path} copied to clipboard`);
                       }}
                     >
                       <div className="font-medium">{f.label}</div>

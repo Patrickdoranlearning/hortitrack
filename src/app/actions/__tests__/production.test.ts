@@ -17,9 +17,9 @@ jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn(() => Promise.resolve(mockSupabase)),
 }));
 
-const mockGetUserIdAndOrgId = jest.fn();
-jest.mock('@/server/auth/getUser', () => ({
-  getUserIdAndOrgId: () => mockGetUserIdAndOrgId(),
+const mockGetUserAndOrg = jest.fn();
+jest.mock('@/server/auth/org', () => ({
+  getUserAndOrg: () => mockGetUserAndOrg(),
 }));
 
 const mockCreatePropagationBatch = jest.fn();
@@ -65,9 +65,10 @@ const createMockBatch = (overrides: Record<string, unknown> = {}) => ({
 describe('production actions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetUserIdAndOrgId.mockResolvedValue({
-      userId: mockUser.id,
+    mockGetUserAndOrg.mockResolvedValue({
+      user: mockUser,
       orgId: mockOrgId,
+      supabase: mockSupabase,
     });
     mockCreatePropagationBatch.mockResolvedValue(createMockBatch());
   });
@@ -126,16 +127,13 @@ describe('production actions', () => {
       });
     });
 
-    it('should return unauthorized error when userId is null', async () => {
-      mockGetUserIdAndOrgId.mockResolvedValue({
-        userId: null,
-        orgId: null,
-      });
+    it('should return error when user is unauthenticated', async () => {
+      mockGetUserAndOrg.mockRejectedValue(new Error('Unauthenticated'));
 
       const result = await createPropagationBatchAction(createValidInput());
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result.error).toBe('Unauthenticated');
       expect(mockCreatePropagationBatch).not.toHaveBeenCalled();
     });
 
@@ -258,8 +256,8 @@ describe('production actions', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should handle getUserIdAndOrgId throwing an error', async () => {
-      mockGetUserIdAndOrgId.mockRejectedValue(new Error('Auth service unavailable'));
+    it('should handle getUserAndOrg throwing an error', async () => {
+      mockGetUserAndOrg.mockRejectedValue(new Error('Auth service unavailable'));
 
       const result = await createPropagationBatchAction(createValidInput());
 

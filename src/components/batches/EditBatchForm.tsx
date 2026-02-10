@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { useCollection } from "@/hooks/useCollection";
 import { Card } from "@/components/ui/card";
 import {
@@ -66,7 +66,6 @@ export default function EditBatchForm({
   batch: Batch | null;
   onSubmitSuccess?: (res: any) => void;
 }) {
-  const { toast } = useToast();
   const { data: locationsData } = useCollection<NurseryLocation>(
     "nursery_locations"
   );
@@ -143,24 +142,17 @@ export default function EditBatchForm({
     }
 
     if (!Object.keys(payload).length) {
-      toast({
-        title: "No changes detected",
-        description: "Adjust a field before saving.",
-      });
+      toast.success("No changes detected. Adjust a field before saving.");
       return;
     }
 
     setSaving(true);
     try {
       await ProductionAPI.updateBatch(batch.id!, payload);
-      toast({ title: "Batch updated", description: "Changes were saved." });
+      toast.success("Changes were saved.");
       onSubmitSuccess?.({ ok: true });
     } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description: err?.message ?? "Unable to save changes.",
-      });
+      toast.error(err?.message ?? "Unable to save changes.");
     } finally {
       setSaving(false);
     }

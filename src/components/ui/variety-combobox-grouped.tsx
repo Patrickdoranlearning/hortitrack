@@ -107,10 +107,11 @@ export function VarietyComboboxGrouped({
       options={options}
       value={value}
       onSelect={(option) => onSelect(option.value)}
-      placeholder={
+      placeholder={placeholder}
+      displayValue={
         selectedVariety
           ? `${selectedVariety.name}${selectedVariety.family ? ` - ${selectedVariety.family}` : ""}`
-          : placeholder
+          : undefined
       }
       searchPlaceholder={searchPlaceholder}
       emptyMessage={emptyMessage}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(
   _req: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error("[api/printers/[id]] GET error:", e);
+    logger.api.error("GET /api/printers/[id] failed", e);
     return NextResponse.json({ error: e?.message || "Failed to fetch printer" }, { status: 500 });
   }
 }
@@ -109,7 +110,7 @@ export async function PUT(
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error("[api/printers/[id]] PUT error:", e);
+    logger.api.error("PUT /api/printers/[id] failed", e);
     return NextResponse.json({ error: e?.message || "Failed to update printer" }, { status: 500 });
   }
 }
@@ -137,7 +138,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (e: any) {
-    console.error("[api/printers/[id]] DELETE error:", e);
+    logger.api.error("DELETE /api/printers/[id] failed", e);
     return NextResponse.json({ error: e?.message || "Failed to delete printer" }, { status: 500 });
   }
 }

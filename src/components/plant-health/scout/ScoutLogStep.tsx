@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -186,8 +186,7 @@ export function ScoutLogStep({
       };
 
       onComplete(logData);
-    } catch (error) {
-      console.error('Issue logging failed', error);
+    } catch {
       toast.error('Failed to prepare issue data');
     } finally {
       setIsSubmitting(false);
@@ -218,8 +217,7 @@ export function ScoutLogStep({
       };
 
       onComplete(logData);
-    } catch (error) {
-      console.error('Measurement logging failed', error);
+    } catch {
       toast.error('Failed to prepare measurement data');
     } finally {
       setIsSubmitting(false);

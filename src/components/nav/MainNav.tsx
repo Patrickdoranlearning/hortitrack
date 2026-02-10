@@ -21,8 +21,7 @@ async function fetchRoles(): Promise<string[] | null> {
     const j = await res.json();
     // Ensure we have an array, even if the API response is malformed.
     return Array.isArray(j?.roles) ? j.roles : [];
-  } catch (e) {
-    console.error("[MainNav] fetchRoles failed:", e);
+  } catch {
     return null; // Return null on network error
   }
 }

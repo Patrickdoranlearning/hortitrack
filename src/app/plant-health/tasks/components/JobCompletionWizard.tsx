@@ -29,7 +29,7 @@ import {
   Droplets,
   PenLine,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { IpmJob } from '@/types/ipm-jobs';
 import { completeJob } from '@/app/actions/ipm-tasks';
 import { getAvailableBottles, type IpmBottle } from '@/app/actions/ipm-stock';

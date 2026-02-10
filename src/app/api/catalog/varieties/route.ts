@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 
 const Query = z.object({
   q: z.string().trim().optional(),
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await query;
   if (error) {
-    console.error("[catalog.varieties] select error", error);
+    logger.api.error("Catalog varieties select failed", error);
     return NextResponse.json({ error: "Failed to load varieties" }, { status: 500 });
   }
 

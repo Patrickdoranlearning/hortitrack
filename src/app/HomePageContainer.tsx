@@ -7,7 +7,6 @@ export default async function HomePageContainer() {
   const { success, data, error } = await getBatchesAction();
 
   if (!success) {
-    console.error("[HomePageContainer] Error from getBatchesAction:", error);
     // If auth-related error, redirect to login
     if (error?.includes('Unauthenticated') || error?.includes('No active org')) {
       redirect('/login');

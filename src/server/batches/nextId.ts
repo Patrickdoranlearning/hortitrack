@@ -1,6 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
+import { getUserAndOrg } from "@/server/auth/org";
 import { logError } from "@/lib/log"; // Assuming this helper exists or needs to be created
 
 /**
@@ -22,12 +21,7 @@ function isoWeek(date: Date) {
 }
 
 export async function generateNextBatchId(opts: GenerateBatchIdOptions = {}) {
-  const supabase = await createClient();
-  const { orgId } = await getUserIdAndOrgId(); // Get orgId from current user's session
-
-  if (!orgId) {
-    throw new Error("User must be associated with an organization to generate batch IDs.");
-  }
+  const { orgId, supabase } = await getUserAndOrg();
 
   const site = String(opts.siteCode ?? "1");
   const now = opts.when ?? new Date();

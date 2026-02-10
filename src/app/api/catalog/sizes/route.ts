@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 
 const Q = z.object({
   q: z.string().trim().optional(),
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await query;
   if (error) {
-    console.error("[catalog.sizes] select error", error);
+    logger.api.error("Catalog sizes select failed", error);
     return NextResponse.json([]); // keep 200 for resilience
   }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(req: Request) {
   try {
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
       .eq("product_id", productId);
 
     if (error) {
-      console.error("[available-varieties] query error", error);
+      logger.sales.error("Available varieties query failed", error);
       return NextResponse.json({ error: "Failed to load varieties" }, { status: 500 });
     }
 
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
       varieties: Array.from(aggregates.values()).filter((v) => v.availableQty > 0),
     });
   } catch (err) {
-    console.error("[available-varieties] unexpected error", err);
+    logger.sales.error("Available varieties unexpected error", err);
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
   }
 }

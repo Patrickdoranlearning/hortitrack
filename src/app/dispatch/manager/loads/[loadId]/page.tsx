@@ -25,7 +25,6 @@ export default async function LoadDetailPage({ params }: PageProps) {
     if (error.message === "Unauthorized") {
       redirect("/login?next=/dispatch/manager/orders");
     }
-    console.error("Error fetching load data:", error);
     notFound();
   }
 

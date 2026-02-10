@@ -13,7 +13,7 @@ import {
   Loader2,
   Camera,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import ScannerClient from '@/components/Scanner/ScannerClient';
 import { parseScanCode } from '@/lib/scan/parse.client';
 import { ScoutSearchCombobox, type ScoutSearchResult } from '@/components/ui/scout-search-combobox';
@@ -87,8 +87,7 @@ export function ScanStep({ onTargetSelected }: ScanStepProps) {
         onTargetSelected(target);
         toast.success('Batch found', { description: batch.batchNumber || batch.batch_number });
       }
-    } catch (error) {
-      console.error('Scan error', error);
+    } catch {
       toast.error('Scan failed', { description: 'Network error' });
     } finally {
       setLoading(false);
@@ -117,8 +116,7 @@ export function ScanStep({ onTargetSelected }: ScanStepProps) {
       };
       onTargetSelected(target);
       toast.success('Location found', { description: locationName });
-    } catch (error) {
-      console.error('Failed to load location', error);
+    } catch {
       toast.error('Failed to load location details');
     } finally {
       setLoading(false);

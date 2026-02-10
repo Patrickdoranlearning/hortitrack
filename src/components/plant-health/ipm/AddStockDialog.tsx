@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   Dialog,
   DialogContent,
@@ -128,8 +128,7 @@ export function AddStockDialog({
           description: 'Ready to print labels',
         });
       }
-    } catch (error) {
-      console.error('Stock creation failed', error);
+    } catch {
       toast.error('Failed to create stock');
     }
   }

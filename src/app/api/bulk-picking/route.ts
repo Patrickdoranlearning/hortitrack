@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerApp } from '@/server/db/supabaseServerApp';
 import { getUserAndOrg } from '@/server/auth/org';
 import { nanoid } from 'nanoid';
+import { logger } from '@/server/utils/logger';
 
 // GET /api/bulk-picking - List bulk pick batches
 export async function GET(req: NextRequest) {
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     
     if (error) {
-      console.error('Error fetching bulk pick batches:', error);
+      logger.picking.error("Error fetching bulk pick batches", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json({ batches });
   } catch (error: any) {
-    console.error('Error in bulk picking GET:', error);
+    logger.picking.error("Bulk picking GET failed", error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
       .single();
     
     if (batchError) {
-      console.error('Error creating bulk pick batch:', batchError);
+      logger.picking.error("Error creating bulk pick batch", batchError);
       return NextResponse.json({ error: batchError.message }, { status: 500 });
     }
     
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
       .insert(batchOrders);
     
     if (ordersError) {
-      console.error('Error adding orders to batch:', ordersError);
+      logger.picking.error("Error adding orders to bulk pick batch", ordersError);
       // Clean up the batch if order insertion fails
       await supabase.from('bulk_pick_batches').delete().eq('id', batch.id);
       return NextResponse.json({ error: ordersError.message }, { status: 500 });
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
         .insert(bulkItems);
       
       if (itemsError) {
-        console.error('Error creating bulk pick items:', itemsError);
+        logger.picking.error("Error creating bulk pick items", itemsError);
         // Non-fatal, batch is still created
       }
     }
@@ -204,7 +205,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Error in bulk picking POST:', error);
+    logger.picking.error("Bulk picking POST failed", error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

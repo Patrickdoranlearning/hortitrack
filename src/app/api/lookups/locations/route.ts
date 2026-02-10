@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLightweightAuth } from "@/lib/auth/lightweight";
+import { logger } from "@/server/utils/logger";
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
       .order("name");
 
     if (error) {
-      console.error("[lookups/locations] query error:", error);
+      logger.api.error("Locations lookup query failed", error);
       throw error;
     }
 
@@ -28,7 +29,7 @@ export async function GET() {
     );
   } catch (e: any) {
     const status = /Unauthenticated|No organization/i.test(e?.message) ? 401 : 500;
-    console.error("[lookups/locations] error", e);
+    logger.api.error("Locations lookup failed", e);
     return NextResponse.json({ error: e?.message ?? "Lookup failed" }, { status });
   }
 }

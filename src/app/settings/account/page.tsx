@@ -1,6 +1,4 @@
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
-import { getSupabaseServerApp } from "@/server/db/supabase";
-import { redirect } from "next/navigation";
+import { getUserAndOrg } from "@/server/auth/org";
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
 import { ProfileForm } from "@/components/account/ProfileForm";
@@ -10,19 +8,13 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default async function AccountSettingsPage() {
-  const { userId, email } = await getUserIdAndOrgId();
-
-  if (!userId) {
-    redirect("/login");
-  }
-
-  const supabase = await getSupabaseServerApp();
+  const { user, supabase } = await getUserAndOrg();
 
   // Get user profile (email comes from auth, not profiles table)
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name")
-    .eq("id", userId)
+    .eq("id", user.id)
     .single();
 
   return (
@@ -44,7 +36,7 @@ export default async function AccountSettingsPage() {
         <div className="space-y-6">
           <ProfileForm
             initialName={profile?.full_name || null}
-            email={email || null}
+            email={user.email || null}
           />
           <PasswordChangeForm />
         </div>

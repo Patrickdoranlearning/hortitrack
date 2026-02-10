@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { PageFrame } from '@/ui/templates';
 import { ModulePageHeader } from '@/ui/templates';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   ChevronLeft,
   Plus,

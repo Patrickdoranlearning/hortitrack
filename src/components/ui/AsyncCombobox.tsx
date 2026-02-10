@@ -51,7 +51,6 @@ export default function AsyncCombobox<TFormValues>({
           setError(e?.message ?? String(e));
           setItems([]);
         }
-        console.error(`[AsyncCombobox:${resource}] load error`, e);
       }
     })();
     return () => { cancelled = true; };

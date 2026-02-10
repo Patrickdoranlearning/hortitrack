@@ -12,6 +12,7 @@ import { sendToPrinter } from "@/server/labels/send-to-printer";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 import { z } from "zod";
+import { logger } from "@/server/utils/logger";
 
 const PassportPrintSchema = z.object({
   batchId: z.string().uuid(),
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
       jobId,
     });
   } catch (error: any) {
-    console.error("[print-passport] Error:", error);
+    logger.api.error("Passport label print failed", error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -274,7 +275,7 @@ export async function GET(request: NextRequest) {
       format,
     });
   } catch (error: any) {
-    console.error("[print-passport] Preview error:", error);
+    logger.api.error("Passport label preview failed", error);
     return NextResponse.json(
       { error: error.message || "Failed to generate passport label" },
       { status: 500 }

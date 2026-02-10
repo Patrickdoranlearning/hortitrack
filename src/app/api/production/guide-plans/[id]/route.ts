@@ -4,6 +4,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { buildGuidePlanProgress } from "@/lib/planning/guide-plan-types";
 import type { GuidePlanWithProgress } from "@/lib/planning/guide-plan-types";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
       .single();
 
     if (error || !gp) {
-      console.error("[guide-plans/[id] GET] not found:", error);
+      logger.production.error("Guide plan not found", error);
       return NextResponse.json({ error: "Guide plan not found" }, { status: 404 });
     }
 
@@ -179,7 +180,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     return NextResponse.json({ guidePlan, batchPlans: transformedBatchPlans });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load guide plan";
-    console.error("[guide-plans/[id] GET] error:", message);
+    logger.production.error("Guide plan GET failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -250,7 +251,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       .single();
 
     if (error || !data) {
-      console.error("[guide-plans/[id] PATCH] update failed:", error);
+      logger.production.error("Guide plan update failed", error);
       if (error?.code === "PGRST116") {
         return NextResponse.json({ error: "Guide plan not found" }, { status: 404 });
       }
@@ -283,7 +284,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
     }
     const message = error instanceof Error ? error.message : "Failed to update guide plan";
-    console.error("[guide-plans/[id] PATCH] error:", message);
+    logger.production.error("Guide plan PATCH failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -319,14 +320,14 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
       .eq("org_id", orgId);
 
     if (error) {
-      console.error("[guide-plans/[id] DELETE] failed:", error);
+      logger.production.error("Guide plan delete failed", error);
       throw new Error(error.message);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete guide plan";
-    console.error("[guide-plans/[id] DELETE] error:", message);
+    logger.production.error("Guide plan DELETE failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

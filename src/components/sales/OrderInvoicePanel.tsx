@@ -16,7 +16,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { FileText, Printer, Plus, Receipt } from 'lucide-react';
 import { generateInvoice } from '@/app/sales/actions';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
@@ -50,7 +50,6 @@ export default function OrderInvoicePanel({
   onInvoiceGenerated,
   currency = 'EUR',
 }: OrderInvoicePanelProps) {
-  const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [creditNoteWizardOpen, setCreditNoteWizardOpen] = useState(false);
 
@@ -63,24 +62,13 @@ export default function OrderInvoicePanel({
     try {
       const result = await generateInvoice(orderId);
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'Invoice Generated',
-          description: `Invoice ${result.invoice?.invoice_number} has been created`,
-        });
+        toast.success(`Invoice ${result.invoice?.invoice_number} has been created`);
         onInvoiceGenerated();
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to generate invoice',
-        variant: 'destructive',
-      });
+      toast.error('Failed to generate invoice');
     } finally {
       setIsGenerating(false);
     }

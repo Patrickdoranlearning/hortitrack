@@ -19,7 +19,7 @@ import {
 import { getUpcomingMilestonesAction, deleteMilestoneAction } from '@/app/sales/customers/actions';
 import { AddMilestoneDialog } from './AddMilestoneDialog';
 import { emitMutation } from '@/lib/events/mutation-events';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { CustomerMilestone, MilestoneType } from '@/app/sales/customers/[customerId]/types';
 
 interface MilestonesCardProps {
@@ -146,8 +146,8 @@ export function MilestonesCard({ customerId, initialMilestones = [] }: Milestone
     setIsLoading(true);
     try {
       const result = await getUpcomingMilestonesAction(customerId, 90);
-      if (result.success) {
-        setMilestones(result.milestones);
+      if (result.success && result.data) {
+        setMilestones(result.data);
       }
     } finally {
       setIsLoading(false);

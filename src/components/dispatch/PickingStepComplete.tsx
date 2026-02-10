@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   CheckCircle2,
   Package,
@@ -26,7 +26,6 @@ interface PickingStepCompleteProps {
 }
 
 export default function PickingStepComplete({ onComplete }: PickingStepCompleteProps) {
-  const { toast } = useToast();
   const {
     pickList,
     items,
@@ -78,11 +77,7 @@ export default function PickingStepComplete({ onComplete }: PickingStepCompleteP
       const data = await res.json();
 
       if (data.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: data.error,
-        });
+        toast.error(data.error);
         return;
       }
 
@@ -101,26 +96,15 @@ export default function PickingStepComplete({ onComplete }: PickingStepCompleteP
 
       if (!packingRes.ok) {
         const packingData = await packingRes.json().catch(() => ({}));
-        toast({
-          variant: 'destructive',
-          title: 'Warning',
-          description: packingData.error || 'Failed to update packing record',
-        });
+        toast.error(packingData.error || 'Failed to update packing record');
         // Continue anyway since the pick list was completed successfully
       }
 
       setIsCompleted(true);
 
-      toast({
-        title: 'Order Complete!',
-        description: `Order #${pickList.orderNumber} is ready for dispatch.`,
-      });
+      toast.success(`Order #${pickList.orderNumber} is ready for dispatch.`);
     } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to complete order',
-      });
+      toast.error('Failed to complete order');
     } finally {
       setIsSubmitting(false);
       setLoading(false);

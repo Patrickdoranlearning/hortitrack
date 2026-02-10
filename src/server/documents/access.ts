@@ -1,5 +1,6 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 export type DocumentAccessContext = {
   supabase: Awaited<ReturnType<typeof getUserAndOrg>>["supabase"];
@@ -17,7 +18,7 @@ export async function requireDocumentAccess(): Promise<DocumentAccessContext> {
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) {
-    console.error("[documents] membership lookup failed", error);
+    logger.documents.error("Membership lookup failed", error);
   }
   if (!membership) {
     throw new Error("Forbidden");

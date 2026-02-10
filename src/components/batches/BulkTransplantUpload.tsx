@@ -8,7 +8,7 @@ import { fetchJson, HttpError } from "@/lib/http/fetchJson";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Upload, Download, RefreshCw, FileSpreadsheet, AlertCircle, CheckCircle2, Copy, Search, Trash2 } from "lucide-react";
@@ -71,7 +71,6 @@ type Props = {
 
 export default function BulkTransplantUpload({ onComplete }: Props) {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
   // Use hydration-safe date to prevent server/client mismatch
   const today = useTodayDate();
   const [rows, setRows] = React.useState<TransplantRow[]>([]);
@@ -145,8 +144,7 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
         `/api/production/batches/search?q=${encodeURIComponent(query)}&status=Growing&pageSize=20`
       );
       setBatchSearchResults(res.items ?? []);
-    } catch (err) {
-      console.error("[BulkTransplant] batch search error", err);
+    } catch {
       setBatchSearchResults([]);
     } finally {
       setBatchSearchLoading(false);
@@ -163,8 +161,7 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
         b.batch_number.toLowerCase() === batchNumber.toLowerCase()
       );
       return match ?? null;
-    } catch (err) {
-      console.error("[BulkTransplant] batch lookup error", err);
+    } catch {
       return null;
     }
   }, []);
@@ -257,19 +254,10 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
       });
       setRows(parsedRows);
       if (!parsedRows.length) {
-        toast({
-          variant: "destructive",
-          title: "No rows found",
-          description: "The CSV file was empty or missing data rows.",
-        });
+        toast.error("The CSV file was empty or missing data rows.");
       }
     } catch (err: any) {
-      console.error("[BulkTransplantUpload] parse error", err);
-      toast({
-        variant: "destructive",
-        title: "Failed to parse CSV",
-        description: err?.message ?? "Please check the file and try again.",
-      });
+      toast.error(err?.message ?? "Please check the file and try again.");
     } finally {
       setBusy(null);
     }
@@ -313,13 +301,12 @@ export default function BulkTransplantUpload({ onComplete }: Props) {
       }
     }
 
-    toast({
-      title: "Bulk transplant finished",
-      description: `${created} batch${created === 1 ? "" : "es"} created${
-        failed ? `, ${failed} failed.` : "."
-      }`,
-      variant: failed ? "destructive" : "default",
-    });
+    const msg = `${created} batch${created === 1 ? "" : "es"} created${failed ? `, ${failed} failed.` : "."}`;
+    if (failed) {
+      toast.error(msg);
+    } else {
+      toast.success(msg);
+    }
 
     setBusy(null);
     if (created > 0) {

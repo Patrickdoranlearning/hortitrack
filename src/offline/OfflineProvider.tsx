@@ -3,6 +3,7 @@
 import React from "react";
 import { supabaseClient } from "@/lib/supabase/client";
 import { useActiveOrg } from "@/lib/org/context";
+import { logWarning } from "@/lib/log";
 import { parseScanCode, type Parsed } from "@/lib/scan/parse.client";
 import {
   getOfflineDb,
@@ -80,7 +81,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       // Log error but don't break the UI if offline sync fails (expected when truly offline)
       const message = err instanceof Error ? err.message : String(err);
-      console.warn("[offline-sync] sync failed (you may be offline):", message);
+      logWarning("Offline sync failed (you may be offline)", { error: message });
       // Only set visible error state if we haven't successfully synced yet
       if (!ready) {
         setError(message || "Offline sync failed");

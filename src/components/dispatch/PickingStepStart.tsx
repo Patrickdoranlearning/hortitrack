@@ -44,8 +44,8 @@ export default function PickingStepStart() {
         });
       }
       nextStep();
-    } catch (error) {
-      console.error('Error starting pick list:', error);
+    } catch {
+      // Pick list start failed silently
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import 'server-only';
 import { createClient } from "@/lib/supabase/server";
 import { buildBatchRoute } from "@/server/batches/route";
 import { getBatchById } from "@/server/batches/service";
+import { logger } from "@/server/utils/logger";
 
 export async function createProtocolFromBatch(batchId: string, opts?: { name?: string; publish?: boolean }) {
   const batch = await getBatchById(batchId);
@@ -48,7 +49,7 @@ export async function createProtocolFromBatch(batchId: string, opts?: { name?: s
   try {
     routePayload = await buildBatchRoute(batchId, 3);
   } catch (e) {
-    console.warn("[createProtocolFromBatch] route build failed", e);
+    logger.protocols.warn("Route build failed when creating protocol from batch", { batchId, error: e instanceof Error ? e.message : String(e) });
   }
 
   const supabase = await createClient();

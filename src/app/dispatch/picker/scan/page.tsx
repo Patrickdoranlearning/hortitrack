@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Scan, Camera, Keyboard, ArrowLeft, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import ScannerClient from "@/components/Scanner/ScannerClient";
 
 /**

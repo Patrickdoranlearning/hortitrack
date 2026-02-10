@@ -68,27 +68,12 @@ export default async function DispatchOrdersPage() {
     .order("created_at", { ascending: false })
     .limit(500);
 
-  if (error) {
-    console.error("Error fetching orders:", error.message || JSON.stringify(error));
-  }
-
-  // Debug: Log orders with their pick_lists to verify data is being fetched
   // Note: pick_lists can be a single object (UNIQUE constraint) or array
   const getPickListFromOrder = (pl: any) => {
     if (!pl) return null;
     if (Array.isArray(pl)) return pl[0] || null;
     return pl;
   };
-  console.log('[Dispatch Orders] Orders count:', orders?.length);
-  console.log('[Dispatch Orders] Sample orders with pick_lists:', orders?.slice(0, 5).map((o: any) => {
-    const pickList = getPickListFromOrder(o.pick_lists);
-    return {
-      order_number: o.order_number,
-      pick_lists: o.pick_lists,
-      has_assigned_user: !!pickList?.assigned_user_id,
-      assigned_user_id: pickList?.assigned_user_id,
-    };
-  }));
 
   // Fetch all available pickers (org members who can be pickers)
   // Valid org_role enum values: owner, admin, grower, sales, viewer
@@ -98,9 +83,7 @@ export default async function DispatchOrdersPage() {
     .eq("org_id", orgId)
     .in("role", ["grower", "admin", "owner", "sales"]);
 
-  if (membersError) {
-    console.error("Error fetching org members:", membersError.message || JSON.stringify(membersError));
-  }
+  // membersError is non-fatal - empty pickers list will show
 
   const availablePickers: Array<{ id: string; name: string }> = (orgMembers || [])
     .filter((m: any) => m.profiles) // Filter out members without profiles

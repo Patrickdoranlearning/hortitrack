@@ -9,7 +9,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { getBatchAncestry, getBatchSummary } from "@/lib/api/batches";
 import { AncestryNode, BatchSummary } from "@/types/batch";
 import { AncestryTab } from "@/components/batch/AncestryTab";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { ChevronLeft } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { logError, logInfo } from "@/lib/log";
@@ -37,7 +37,6 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
   const { stayOnAncestry, setStayOnAncestry } = useAncestryNavPreference();
   const headerRef = React.useRef<HTMLHeadingElement | null>(null);
   const liveRef = React.useRef<HTMLDivElement | null>(null);
-  const { toast } = useToast();
 
   const headerTitle = summary
   ? `${summary.batchNumber}${summary.variety ? ` — ${summary.variety}` : ""}`
@@ -78,7 +77,7 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
         logInfo("dialog_batch_loaded", { batch: activeBatch, nodes: a.length });
       } catch (e) {
         logError("dialog_batch_load_failed", { batch: activeBatch, error: String(e) });
-        toast({ title: "Couldn’t open that batch. Please try again.", variant: "destructive" });
+        toast.error("Couldn't open that batch. Please try again.");
       } finally {
         setLoadingToId(null);
       }
@@ -86,7 +85,7 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
 
     run();
     return () => { cancelled = true; };
-  }, [activeBatch, toast]);
+  }, [activeBatch]);
 
   function handleBack() {
     const prev = history[history.length - 1];
@@ -98,7 +97,7 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
 
   async function openBatchInDialog(toBatch: string, cardIndex: number) {
     if (toBatch === activeBatch) {
-      toast({ title: "Already viewing this batch." });
+      toast.info("Already viewing this batch.");
       return;
     }
     // optimistic UI: pressed state + spinner on card
@@ -116,7 +115,7 @@ export function BatchDetailDialog({ open, onOpenChange, batchNumber }: Props) {
       setHistory((h) => h.slice(0, -1));
       setLoadingToId(null);
       logError("ancestry_nav_failed", { toBatch, error: String(e) });
-      toast({ title: "Couldn’t open that batch. Please try again.", variant: "destructive" });
+      toast.error("Couldn't open that batch. Please try again.");
     }
   }
 

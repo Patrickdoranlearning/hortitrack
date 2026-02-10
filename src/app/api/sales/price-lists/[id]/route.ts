@@ -6,6 +6,7 @@ import {
   deletePriceList,
   UpdatePriceListInput,
 } from "@/server/sales/price-lists.server";
+import { logger } from "@/server/utils/logger";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -23,7 +24,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     
     return NextResponse.json({ ok: true, priceList });
   } catch (error) {
-    console.error("[api:sales/price-lists/[id]][GET]", error);
+    logger.sales.error("GET /api/sales/price-lists/[id] failed", error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to fetch price list" },
       { status: 500 }
@@ -39,7 +40,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const priceList = await updatePriceList(id, input);
     return NextResponse.json({ ok: true, priceList });
   } catch (error) {
-    console.error("[api:sales/price-lists/[id]][PATCH]", error);
+    logger.sales.error("PATCH /api/sales/price-lists/[id] failed", error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to update price list" },
       { status: 400 }
@@ -53,7 +54,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     await deletePriceList(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[api:sales/price-lists/[id]][DELETE]", error);
+    logger.sales.error("DELETE /api/sales/price-lists/[id] failed", error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to delete price list" },
       { status: 400 }

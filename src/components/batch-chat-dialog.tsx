@@ -14,7 +14,7 @@ import type { Batch } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MessageSquare, AlertTriangle, Send, User, Bot } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
@@ -43,7 +43,6 @@ export function BatchChatDialog({
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
-  const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,11 +76,7 @@ export function BatchChatDialog({
         const botMessage: ChatMsg = { id: crypto.randomUUID(), role: 'bot', text: result.data.response };
         setMessages(prev => [...prev, botMessage]);
     } else {
-        toast({
-            variant: "destructive",
-            title: "AI Chat Error",
-            description: result.error,
-        });
+        toast.error(result.error);
         const errorMessage: ChatMsg = { id: crypto.randomUUID(), role: 'bot', text: "Sorry, I couldn't get a response. Please try again." };
         setMessages(prev => [...prev, errorMessage]);
     }

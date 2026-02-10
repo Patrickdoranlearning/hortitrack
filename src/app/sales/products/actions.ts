@@ -4,6 +4,22 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getUserAndOrg } from '@/server/auth/org';
 import { getSupabaseServerApp, supabaseAdmin } from '@/server/db/supabase';
+import { logError, logInfo } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+function cleanString(value?: string | null) {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+// ---------------------------------------------------------------------------
+// Schemas
+// ---------------------------------------------------------------------------
 
 const productDetailsSchema = z.object({
   id: z.string().uuid().optional(),
@@ -61,13 +77,25 @@ const productAliasSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-function cleanString(value?: string | null) {
-  if (value === undefined || value === null) return null;
-  const trimmed = value.trim();
-  return trimmed === '' ? null : trimmed;
-}
+// ---------------------------------------------------------------------------
+// Product CRUD
+// ---------------------------------------------------------------------------
 
-export async function upsertProductAction(input: z.infer<typeof productDetailsSchema>) {
+type MutatedMeta = {
+  _mutated: {
+    resource: 'products';
+    action: 'create' | 'update' | 'delete';
+    id?: string;
+  };
+};
+
+type UpsertProductResult =
+  | ({ success: true; data: Record<string, unknown> } & MutatedMeta)
+  | { success: false; error: string; code: string };
+
+export async function upsertProductAction(
+  input: z.infer<typeof productDetailsSchema>,
+): Promise<UpsertProductResult> {
   const parsed = productDetailsSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -105,21 +133,25 @@ export async function upsertProductAction(input: z.infer<typeof productDetailsSc
   }
 
   if (error) {
-    console.error('[upsertProductAction] error', error);
-    return { success: false, error: error.message };
+    logError('upsertProductAction failed', { error: error.message, productId: parsed.id });
+    return { success: false, error: error.message, code: 'UPSERT_PRODUCT_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return {
     success: true,
-    data,
+    data: data as Record<string, unknown>,
     _mutated: {
       resource: 'products' as const,
-      action: parsed.id ? 'update' as const : 'create' as const,
+      action: parsed.id ? ('update' as const) : ('create' as const),
       id: data?.id,
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Product Matching
+// ---------------------------------------------------------------------------
 
 const productMatchingSchema = z.object({
   productId: z.string().uuid(),
@@ -127,7 +159,13 @@ const productMatchingSchema = z.object({
   matchGenera: z.array(z.string()).nullable(),
 });
 
-export async function updateProductMatchingAction(input: z.infer<typeof productMatchingSchema>) {
+type UpdateMatchingResult =
+  | ({ success: true; data: Record<string, unknown> } & MutatedMeta)
+  | { success: false; error: string; code: string };
+
+export async function updateProductMatchingAction(
+  input: z.infer<typeof productMatchingSchema>,
+): Promise<UpdateMatchingResult> {
   const parsed = productMatchingSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -145,14 +183,14 @@ export async function updateProductMatchingAction(input: z.infer<typeof productM
     .maybeSingle();
 
   if (error) {
-    console.error('[updateProductMatchingAction] error', error);
-    return { success: false, error: error.message };
+    logError('updateProductMatchingAction failed', { error: error.message, productId: parsed.productId });
+    return { success: false, error: error.message, code: 'UPDATE_MATCHING_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return {
     success: true,
-    data,
+    data: data as Record<string, unknown>,
     _mutated: {
       resource: 'products' as const,
       action: 'update' as const,
@@ -161,7 +199,15 @@ export async function updateProductMatchingAction(input: z.infer<typeof productM
   };
 }
 
-export async function deleteProductAction(productId: string) {
+// ---------------------------------------------------------------------------
+// Delete Product
+// ---------------------------------------------------------------------------
+
+type DeleteProductResult =
+  | ({ success: true } & MutatedMeta)
+  | { success: false; error: string; code: string };
+
+export async function deleteProductAction(productId: string): Promise<DeleteProductResult> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase
@@ -170,8 +216,8 @@ export async function deleteProductAction(productId: string) {
     .eq('id', productId)
     .eq('org_id', orgId);
   if (error) {
-    console.error('[deleteProductAction]', error);
-    return { success: false, error: error.message };
+    logError('deleteProductAction failed', { error: error.message, productId });
+    return { success: false, error: error.message, code: 'DELETE_PRODUCT_FAILED' };
   }
   revalidatePath('/sales/products');
   return {
@@ -180,7 +226,15 @@ export async function deleteProductAction(productId: string) {
   };
 }
 
-export async function addProductBatchAction(input: z.infer<typeof productBatchSchema>) {
+// ---------------------------------------------------------------------------
+// Product Batches
+// ---------------------------------------------------------------------------
+
+type SimpleResult = { success: true } | { success: false; error: string; code: string };
+
+export async function addProductBatchAction(
+  input: z.infer<typeof productBatchSchema>,
+): Promise<SimpleResult> {
   const parsed = productBatchSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -192,27 +246,37 @@ export async function addProductBatchAction(input: z.infer<typeof productBatchSc
     available_quantity_override: parsed.availableQuantityOverride ?? null,
   });
   if (error) {
-    console.error('[addProductBatchAction]', error);
-    return { success: false, error: error.message };
+    logError('addProductBatchAction failed', { error: error.message, productId: parsed.productId });
+    return { success: false, error: error.message, code: 'ADD_PRODUCT_BATCH_FAILED' };
   }
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function removeProductBatchAction(productBatchId: string) {
+export async function removeProductBatchAction(productBatchId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('product_batches').delete().eq('id', productBatchId);
   if (error) {
-    console.error('[removeProductBatchAction]', error);
-    return { success: false, error: error.message };
+    logError('removeProductBatchAction failed', { error: error.message, productBatchId });
+    return { success: false, error: error.message, code: 'REMOVE_PRODUCT_BATCH_FAILED' };
   }
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function autoLinkProductBatchesAction(productId: string) {
+// ---------------------------------------------------------------------------
+// Auto-Link Batches
+// ---------------------------------------------------------------------------
+
+type AutoLinkResult =
+  | { success: true; linked: number; message?: string }
+  | { success: false; error: string; code: string };
+
+export async function autoLinkProductBatchesAction(
+  productId: string,
+): Promise<AutoLinkResult> {
   if (!productId) {
-    return { success: false, error: 'Product is required.' };
+    return { success: false, error: 'Product is required.', code: 'MISSING_PRODUCT_ID' };
   }
 
   const { orgId } = await getUserAndOrg();
@@ -239,8 +303,11 @@ export async function autoLinkProductBatchesAction(productId: string) {
     .maybeSingle();
 
   if (productError || !product) {
-    console.error('[autoLinkProductBatchesAction] product lookup failed', productError);
-    return { success: false, error: 'Unable to load product details.' };
+    logError('autoLinkProductBatchesAction product lookup failed', {
+      error: productError?.message,
+      productId,
+    });
+    return { success: false, error: 'Unable to load product details.', code: 'PRODUCT_LOOKUP_FAILED' };
   }
 
   const skuVarietyId = product.skus?.plant_variety_id;
@@ -249,6 +316,7 @@ export async function autoLinkProductBatchesAction(productId: string) {
     return {
       success: false,
       error: 'The product SKU is missing a size, so matching batches cannot be found.',
+      code: 'SKU_MISSING_SIZE',
     };
   }
 
@@ -259,8 +327,11 @@ export async function autoLinkProductBatchesAction(productId: string) {
     .eq('product_id', productId);
 
   if (existingError) {
-    console.error('[autoLinkProductBatchesAction] existing links lookup failed', existingError);
-    return { success: false, error: 'Unable to inspect current batch links.' };
+    logError('autoLinkProductBatchesAction existing links lookup failed', {
+      error: existingError.message,
+      productId,
+    });
+    return { success: false, error: 'Unable to inspect current batch links.', code: 'EXISTING_LINKS_LOOKUP_FAILED' };
   }
 
   const existingIds = new Set(existingLinks?.map((entry) => entry.batch_id));
@@ -271,7 +342,7 @@ export async function autoLinkProductBatchesAction(productId: string) {
   // Check if family or genus matching is configured
   const matchFamilies = product.match_families as string[] | null;
   const matchGenera = product.match_genera as string[] | null;
-  
+
   if ((matchFamilies && matchFamilies.length > 0) || (matchGenera && matchGenera.length > 0)) {
     // Family/Genus-based matching: find all batches with matching family/genus + size
     const { data: batchesWithTaxonomy, error: batchError } = await supabase
@@ -285,24 +356,27 @@ export async function autoLinkProductBatchesAction(productId: string) {
       .gt('quantity', 0);
 
     if (batchError) {
-      console.error('[autoLinkProductBatchesAction] taxonomy batch lookup failed', batchError);
-      return { success: false, error: 'Unable to load matching batches.' };
+      logError('autoLinkProductBatchesAction taxonomy batch lookup failed', {
+        error: batchError.message,
+        productId,
+      });
+      return { success: false, error: 'Unable to load matching batches.', code: 'TAXONOMY_BATCH_LOOKUP_FAILED' };
     }
 
     // Filter by families and/or genera (case-insensitive)
     const lowerFamilies = (matchFamilies ?? []).map((f) => f.toLowerCase());
     const lowerGenera = (matchGenera ?? []).map((g) => g.toLowerCase());
-    
+
     candidates = (batchesWithTaxonomy ?? [])
       .filter((b) => {
         const variety = b.plant_variety as { family: string | null; genus: string | null } | null;
         const family = variety?.family?.toLowerCase();
         const genus = variety?.genus?.toLowerCase();
-        
+
         // Match if family matches OR genus matches
         const familyMatch = family && lowerFamilies.includes(family);
         const genusMatch = genus && lowerGenera.includes(genus);
-        
+
         return familyMatch || genusMatch;
       })
       .map((b) => ({ id: b.id }));
@@ -325,8 +399,11 @@ export async function autoLinkProductBatchesAction(productId: string) {
       .eq('is_active', true);
 
     if (linkedVarietiesError) {
-      console.error('[autoLinkProductBatchesAction] linked varieties lookup failed', linkedVarietiesError);
-      return { success: false, error: 'Unable to load product varieties.' };
+      logError('autoLinkProductBatchesAction linked varieties lookup failed', {
+        error: linkedVarietiesError.message,
+        productId,
+      });
+      return { success: false, error: 'Unable to load product varieties.', code: 'LINKED_VARIETIES_LOOKUP_FAILED' };
     }
 
     // Build variety IDs to match: use linked varieties if any, otherwise fall back to SKU variety
@@ -339,6 +416,7 @@ export async function autoLinkProductBatchesAction(productId: string) {
       return {
         success: false,
         error: 'No families, genera, or varieties configured. Add matching in the Batches tab.',
+        code: 'NO_MATCHING_CRITERIA',
       };
     }
 
@@ -352,8 +430,11 @@ export async function autoLinkProductBatchesAction(productId: string) {
       .gt('quantity', 0);
 
     if (candidateError) {
-      console.error('[autoLinkProductBatchesAction] batch lookup failed', candidateError);
-      return { success: false, error: 'Unable to load matching batches.' };
+      logError('autoLinkProductBatchesAction batch lookup failed', {
+        error: candidateError.message,
+        productId,
+      });
+      return { success: false, error: 'Unable to load matching batches.', code: 'BATCH_LOOKUP_FAILED' };
     }
 
     candidates = varietyCandidates ?? [];
@@ -379,15 +460,25 @@ export async function autoLinkProductBatchesAction(productId: string) {
 
   const { error: insertError } = await supabase.from('product_batches').insert(insertPayload);
   if (insertError) {
-    console.error('[autoLinkProductBatchesAction] insert failed', insertError);
-    return { success: false, error: insertError.message };
+    logError('autoLinkProductBatchesAction insert failed', {
+      error: insertError.message,
+      productId,
+      count: insertPayload.length,
+    });
+    return { success: false, error: insertError.message, code: 'AUTO_LINK_INSERT_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true, linked: batchIdsToLink.length };
 }
 
-export async function upsertProductPriceAction(input: z.infer<typeof productPriceSchema>) {
+// ---------------------------------------------------------------------------
+// Product Prices
+// ---------------------------------------------------------------------------
+
+export async function upsertProductPriceAction(
+  input: z.infer<typeof productPriceSchema>,
+): Promise<SimpleResult> {
   const parsed = productPriceSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -405,7 +496,7 @@ export async function upsertProductPriceAction(input: z.infer<typeof productPric
 
   let recordId = parsed.id ?? null;
   if (!recordId) {
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from('product_prices')
       .select('id')
       .eq('product_id', parsed.productId)
@@ -413,6 +504,13 @@ export async function upsertProductPriceAction(input: z.infer<typeof productPric
       .is('valid_from', payload.valid_from)
       .is('valid_to', payload.valid_to)
       .maybeSingle();
+    if (lookupError) {
+      logError('upsertProductPriceAction existing price lookup failed', {
+        error: lookupError.message,
+        productId: parsed.productId,
+      });
+      return { success: false, error: lookupError.message, code: 'PRICE_LOOKUP_FAILED' };
+    }
     if (existing) {
       recordId = existing.id;
     }
@@ -436,37 +534,51 @@ export async function upsertProductPriceAction(input: z.infer<typeof productPric
   }
 
   if (error) {
-    console.error('[upsertProductPriceAction]', error);
-    return { success: false, error: error.message };
+    logError('upsertProductPriceAction failed', { error: error.message, productId: parsed.productId });
+    return { success: false, error: error.message, code: 'UPSERT_PRICE_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function deleteProductPriceAction(priceId: string) {
+export async function deleteProductPriceAction(priceId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('product_prices').delete().eq('id', priceId);
   if (error) {
-    console.error('[deleteProductPriceAction]', error);
-    return { success: false, error: error.message };
+    logError('deleteProductPriceAction failed', { error: error.message, priceId });
+    return { success: false, error: error.message, code: 'DELETE_PRICE_FAILED' };
   }
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function upsertPriceListCustomerAction(input: z.infer<typeof priceListCustomerSchema>) {
+// ---------------------------------------------------------------------------
+// Price List Customers
+// ---------------------------------------------------------------------------
+
+export async function upsertPriceListCustomerAction(
+  input: z.infer<typeof priceListCustomerSchema>,
+): Promise<SimpleResult> {
   const parsed = priceListCustomerSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
   // Check if assignment already exists for this customer
-  const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from('price_list_customers')
     .select('id')
     .eq('org_id', orgId)
     .eq('customer_id', parsed.customerId)
     .maybeSingle();
+
+  if (lookupError) {
+    logError('upsertPriceListCustomerAction lookup failed', {
+      error: lookupError.message,
+      customerId: parsed.customerId,
+    });
+    return { success: false, error: lookupError.message, code: 'PRICE_LIST_CUSTOMER_LOOKUP_FAILED' };
+  }
 
   let error;
   if (existing) {
@@ -492,40 +604,49 @@ export async function upsertPriceListCustomerAction(input: z.infer<typeof priceL
   }
 
   if (error) {
-    console.error('[upsertPriceListCustomerAction]', error);
-    return { success: false, error: error.message };
+    logError('upsertPriceListCustomerAction failed', { error: error.message, customerId: parsed.customerId });
+    return { success: false, error: error.message, code: 'UPSERT_PRICE_LIST_CUSTOMER_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function deletePriceListCustomerAction(recordId: string) {
+export async function deletePriceListCustomerAction(recordId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('price_list_customers').delete().eq('id', recordId);
   if (error) {
-    console.error('[deletePriceListCustomerAction]', error);
-    return { success: false, error: error.message };
+    logError('deletePriceListCustomerAction failed', { error: error.message, recordId });
+    return { success: false, error: error.message, code: 'DELETE_PRICE_LIST_CUSTOMER_FAILED' };
   }
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function setCustomerDefaultPriceListAction(customerId: string, priceListId: string | null) {
+export async function setCustomerDefaultPriceListAction(
+  customerId: string,
+  priceListId: string | null,
+): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase
     .from('customers')
     .update({ default_price_list_id: priceListId })
     .eq('id', customerId);
   if (error) {
-    console.error('[setCustomerDefaultPriceListAction]', error);
-    return { success: false, error: error.message };
+    logError('setCustomerDefaultPriceListAction failed', { error: error.message, customerId });
+    return { success: false, error: error.message, code: 'SET_DEFAULT_PRICE_LIST_FAILED' };
   }
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function upsertProductAliasAction(input: z.infer<typeof productAliasSchema>) {
+// ---------------------------------------------------------------------------
+// Product Aliases
+// ---------------------------------------------------------------------------
+
+export async function upsertProductAliasAction(
+  input: z.infer<typeof productAliasSchema>,
+): Promise<SimpleResult> {
   const parsed = productAliasSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -553,24 +674,28 @@ export async function upsertProductAliasAction(input: z.infer<typeof productAlia
   }
 
   if (error) {
-    console.error('[upsertProductAliasAction]', error);
-    return { success: false, error: error.message };
+    logError('upsertProductAliasAction failed', { error: error.message, productId: parsed.productId });
+    return { success: false, error: error.message, code: 'UPSERT_ALIAS_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function deleteProductAliasAction(aliasId: string) {
+export async function deleteProductAliasAction(aliasId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('product_aliases').delete().eq('id', aliasId);
   if (error) {
-    console.error('[deleteProductAliasAction]', error);
-    return { success: false, error: error.message };
+    logError('deleteProductAliasAction failed', { error: error.message, aliasId });
+    return { success: false, error: error.message, code: 'DELETE_ALIAS_FAILED' };
   }
   revalidatePath('/sales/products');
   return { success: true };
 }
+
+// ---------------------------------------------------------------------------
+// SKUs
+// ---------------------------------------------------------------------------
 
 const createSkuSchema = z.object({
   code: z.string().trim().min(1).max(64).optional(),
@@ -586,7 +711,9 @@ const updateSkuConfigSchema = z.object({
   sizeId: z.string().uuid().nullable(),
 });
 
-export async function createSkuAction(input: z.infer<typeof createSkuSchema>) {
+export async function createSkuAction(
+  input: z.infer<typeof createSkuSchema>,
+): Promise<ActionResult<Record<string, unknown>>> {
   const parsed = createSkuSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -596,12 +723,15 @@ export async function createSkuAction(input: z.infer<typeof createSkuSchema>) {
     skuCode = await generateSkuCode(supabase);
   }
   if (parsed.code) {
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from('skus')
       .select('id')
       .eq('org_id', orgId)
       .eq('code', skuCode)
       .maybeSingle();
+    if (lookupError) {
+      logError('createSkuAction code uniqueness check failed', { error: lookupError.message });
+    }
     if (existing) {
       skuCode = `${skuCode}-${Date.now().toString(36).toUpperCase()}`;
     }
@@ -623,15 +753,17 @@ export async function createSkuAction(input: z.infer<typeof createSkuSchema>) {
     .single();
 
   if (error) {
-    console.error('[createSkuAction]', error);
-    return { success: false, error: error.message };
+    logError('createSkuAction failed', { error: error.message });
+    return { success: false, error: error.message, code: 'CREATE_SKU_FAILED' };
   }
 
   revalidatePath('/sales/products');
-  return { success: true, data };
+  return { success: true, data: data as Record<string, unknown> };
 }
 
-export async function updateSkuConfigAction(input: z.infer<typeof updateSkuConfigSchema>) {
+export async function updateSkuConfigAction(
+  input: z.infer<typeof updateSkuConfigSchema>,
+): Promise<SimpleResult> {
   const parsed = updateSkuConfigSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -647,8 +779,8 @@ export async function updateSkuConfigAction(input: z.infer<typeof updateSkuConfi
     .eq('org_id', orgId);
 
   if (error) {
-    console.error('[updateSkuConfigAction]', error);
-    return { success: false, error: error.message };
+    logError('updateSkuConfigAction failed', { error: error.message, skuId: parsed.skuId });
+    return { success: false, error: error.message, code: 'UPDATE_SKU_CONFIG_FAILED' };
   }
 
   revalidatePath('/sales/products');
@@ -657,16 +789,15 @@ export async function updateSkuConfigAction(input: z.infer<typeof updateSkuConfi
 
 async function generateSkuCode(supabase: Awaited<ReturnType<typeof getSupabaseServerApp>>) {
   const { data, error } = await supabase.rpc('next_sku_code');
-  console.log('[generateSkuCode] rpc result', { data, error, typeofData: typeof data });
   if (error) {
-    console.error('[generateSkuCode] rpc error, fallback to timestamp', error);
+    logError('generateSkuCode rpc failed, falling back to timestamp', { error: error.message });
     const fallback = Date.now().toString(36).toUpperCase();
     return `SKU-${fallback}`;
   }
   // data comes back as number or bigint from the sequence
   const seq = Number(data);
   if (Number.isNaN(seq)) {
-    console.error('[generateSkuCode] invalid sequence value', data);
+    logError('generateSkuCode received invalid sequence value', { data: String(data) });
     const fallback = Date.now().toString(36).toUpperCase();
     return `SKU-${fallback}`;
   }
@@ -674,9 +805,9 @@ async function generateSkuCode(supabase: Awaited<ReturnType<typeof getSupabaseSe
   return `SKU-${padded}`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Product Mapping Rules Actions
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 const mappingRuleSchema = z.object({
   id: z.string().uuid().optional(),
@@ -696,7 +827,11 @@ const mappingRuleSchema = z.object({
 
 export type MappingRuleInput = z.infer<typeof mappingRuleSchema>;
 
-export async function fetchMappingRulesAction() {
+type FetchListResult<T> =
+  | { success: true; data: T[] }
+  | { success: false; error: string; code: string; data: T[] };
+
+export async function fetchMappingRulesAction(): Promise<FetchListResult<Record<string, unknown>>> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -712,17 +847,17 @@ export async function fetchMappingRulesAction() {
     .order('priority', { ascending: true });
 
   if (error) {
-    console.error('[fetchMappingRulesAction]', error);
-    return { success: false, error: error.message, data: [] };
+    logError('fetchMappingRulesAction failed', { error: error.message });
+    return { success: false, error: error.message, code: 'FETCH_MAPPING_RULES_FAILED', data: [] };
   }
 
-  return { success: true, data: data ?? [] };
+  return { success: true, data: (data ?? []) as Record<string, unknown>[] };
 }
 
-export async function saveMappingRuleAction(input: MappingRuleInput) {
+export async function saveMappingRuleAction(input: MappingRuleInput): Promise<SimpleResult> {
   const parsed = mappingRuleSchema.safeParse(input);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0]?.message ?? 'Validation failed' };
+    return { success: false, error: parsed.error.errors[0]?.message ?? 'Validation failed', code: 'VALIDATION_ERROR' };
   }
 
   const { orgId } = await getUserAndOrg();
@@ -754,8 +889,8 @@ export async function saveMappingRuleAction(input: MappingRuleInput) {
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[saveMappingRuleAction] update error', error);
-      return { success: false, error: error.message };
+      logError('saveMappingRuleAction update failed', { error: error.message, ruleId: parsed.data.id });
+      return { success: false, error: error.message, code: 'SAVE_MAPPING_RULE_FAILED' };
     }
   } else {
     // Insert new
@@ -764,8 +899,8 @@ export async function saveMappingRuleAction(input: MappingRuleInput) {
       .insert(ruleData);
 
     if (error) {
-      console.error('[saveMappingRuleAction] insert error', error);
-      return { success: false, error: error.message };
+      logError('saveMappingRuleAction insert failed', { error: error.message });
+      return { success: false, error: error.message, code: 'SAVE_MAPPING_RULE_FAILED' };
     }
   }
 
@@ -773,7 +908,7 @@ export async function saveMappingRuleAction(input: MappingRuleInput) {
   return { success: true };
 }
 
-export async function deleteMappingRuleAction(ruleId: string) {
+export async function deleteMappingRuleAction(ruleId: string): Promise<SimpleResult> {
   const { orgId } = await getUserAndOrg();
 
   // Use admin client to bypass RLS issues
@@ -784,15 +919,19 @@ export async function deleteMappingRuleAction(ruleId: string) {
     .eq('org_id', orgId);
 
   if (error) {
-    console.error('[deleteMappingRuleAction]', error);
-    return { success: false, error: error.message };
+    logError('deleteMappingRuleAction failed', { error: error.message, ruleId });
+    return { success: false, error: error.message, code: 'DELETE_MAPPING_RULE_FAILED' };
   }
 
   revalidatePath('/sales/products/mapping');
   return { success: true };
 }
 
-export async function runAutoLinkWithRulesAction() {
+type RunAutoLinkResult =
+  | { success: true; linked: number; message?: string }
+  | { success: false; error: string; code: string; linked: number };
+
+export async function runAutoLinkWithRulesAction(): Promise<RunAutoLinkResult> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -805,8 +944,8 @@ export async function runAutoLinkWithRulesAction() {
     .order('priority', { ascending: true });
 
   if (rulesError) {
-    console.error('[runAutoLinkWithRulesAction] rules fetch error', rulesError);
-    return { success: false, error: rulesError.message, linked: 0 };
+    logError('runAutoLinkWithRulesAction rules fetch failed', { error: rulesError.message });
+    return { success: false, error: rulesError.message, code: 'RULES_FETCH_FAILED', linked: 0 };
   }
 
   if (!rules?.length) {
@@ -830,14 +969,19 @@ export async function runAutoLinkWithRulesAction() {
     .gt('quantity', 0);
 
   if (batchError) {
-    console.error('[runAutoLinkWithRulesAction] batch fetch error', batchError);
-    return { success: false, error: batchError.message, linked: 0 };
+    logError('runAutoLinkWithRulesAction batch fetch failed', { error: batchError.message });
+    return { success: false, error: batchError.message, code: 'BATCH_FETCH_FAILED', linked: 0 };
   }
 
   // Fetch existing product_batches to avoid duplicates
-  const { data: existingLinks } = await supabase
+  const { data: existingLinks, error: existingLinksError } = await supabase
     .from('product_batches')
     .select('product_id, batch_id');
+
+  if (existingLinksError) {
+    logError('runAutoLinkWithRulesAction existing links fetch failed', { error: existingLinksError.message });
+    return { success: false, error: existingLinksError.message, code: 'EXISTING_LINKS_FETCH_FAILED', linked: 0 };
+  }
 
   const existingSet = new Set(
     (existingLinks ?? []).map(l => `${l.product_id}:${l.batch_id}`)
@@ -856,25 +1000,25 @@ export async function runAutoLinkWithRulesAction() {
     for (const rule of rules) {
       // Check family match
       if (rule.match_family && variety?.family?.toLowerCase() !== rule.match_family.toLowerCase()) continue;
-      
+
       // Check genus match
       if (rule.match_genus && variety?.genus?.toLowerCase() !== rule.match_genus.toLowerCase()) continue;
-      
+
       // Check category match
       if (rule.match_category && variety?.category?.toLowerCase() !== rule.match_category.toLowerCase()) continue;
-      
+
       // Check size match
       if (rule.match_size_id && batch.size_id !== rule.match_size_id) continue;
-      
+
       // Check location match
       if (rule.match_location_id && batch.location_id !== rule.match_location_id) continue;
-      
+
       // Check min age
       if (rule.min_age_weeks != null && (batchAgeWeeks == null || batchAgeWeeks < rule.min_age_weeks)) continue;
-      
+
       // Check max age
       if (rule.max_age_weeks != null && (batchAgeWeeks == null || batchAgeWeeks > rule.max_age_weeks)) continue;
-      
+
       // Check status match (if rule specifies specific statuses)
       if (rule.match_status_ids?.length && !rule.match_status_ids.includes(batch.status_id)) continue;
 
@@ -885,7 +1029,7 @@ export async function runAutoLinkWithRulesAction() {
         existingSet.add(linkKey); // Prevent duplicates within this run
         linkedCount++;
       }
-      
+
       // Only link to first matching rule (highest priority)
       break;
     }
@@ -898,8 +1042,11 @@ export async function runAutoLinkWithRulesAction() {
       .insert(linksToInsert);
 
     if (insertError) {
-      console.error('[runAutoLinkWithRulesAction] insert error', insertError);
-      return { success: false, error: insertError.message, linked: 0 };
+      logError('runAutoLinkWithRulesAction insert failed', {
+        error: insertError.message,
+        count: linksToInsert.length,
+      });
+      return { success: false, error: insertError.message, code: 'AUTO_LINK_RULES_INSERT_FAILED', linked: 0 };
     }
   }
 
@@ -908,7 +1055,23 @@ export async function runAutoLinkWithRulesAction() {
   return { success: true, linked: linkedCount };
 }
 
-export async function previewRuleMatchesAction(ruleInput: Omit<MappingRuleInput, 'id' | 'productId' | 'name' | 'priority' | 'isActive'>) {
+type PreviewMatch = {
+  id: string;
+  batchNumber: string;
+  quantity: number;
+  status: string;
+  varietyName: string;
+  sizeName: string;
+  locationName: string;
+};
+
+type PreviewResult =
+  | { success: true; matches: PreviewMatch[] }
+  | { success: false; error: string; code: string; matches: PreviewMatch[] };
+
+export async function previewRuleMatchesAction(
+  ruleInput: Omit<MappingRuleInput, 'id' | 'productId' | 'name' | 'priority' | 'isActive'>,
+): Promise<PreviewResult> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -941,18 +1104,18 @@ export async function previewRuleMatchesAction(ruleInput: Omit<MappingRuleInput,
   const { data: batches, error } = await query.limit(50);
 
   if (error) {
-    console.error('[previewRuleMatchesAction]', error);
-    return { success: false, error: error.message, matches: [] };
+    logError('previewRuleMatchesAction failed', { error: error.message });
+    return { success: false, error: error.message, code: 'PREVIEW_MATCHES_FAILED', matches: [] };
   }
 
   // Filter by variety attributes (family, genus, category) in memory
   const matches = (batches ?? []).filter(batch => {
     const variety = batch.plant_variety as { family?: string; genus?: string; category?: string } | null;
-    
+
     if (ruleInput.matchFamily && variety?.family?.toLowerCase() !== ruleInput.matchFamily.toLowerCase()) return false;
     if (ruleInput.matchGenus && variety?.genus?.toLowerCase() !== ruleInput.matchGenus.toLowerCase()) return false;
     if (ruleInput.matchCategory && variety?.category?.toLowerCase() !== ruleInput.matchCategory.toLowerCase()) return false;
-    
+
     // Check age constraints
     if (ruleInput.minAgeWeeks != null || ruleInput.maxAgeWeeks != null) {
       if (!batch.planted_at) return false;
@@ -960,7 +1123,7 @@ export async function previewRuleMatchesAction(ruleInput: Omit<MappingRuleInput,
       if (ruleInput.minAgeWeeks != null && ageWeeks < ruleInput.minAgeWeeks) return false;
       if (ruleInput.maxAgeWeeks != null && ageWeeks > ruleInput.maxAgeWeeks) return false;
     }
-    
+
     return true;
   });
 
@@ -978,9 +1141,9 @@ export async function previewRuleMatchesAction(ruleInput: Omit<MappingRuleInput,
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Product Varieties Actions
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 const productVarietySchema = z.object({
   id: z.string().uuid().optional(),
@@ -989,7 +1152,9 @@ const productVarietySchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export async function addProductVarietyAction(input: z.infer<typeof productVarietySchema>) {
+export async function addProductVarietyAction(
+  input: z.infer<typeof productVarietySchema>,
+): Promise<SimpleResult> {
   const parsed = productVarietySchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -1002,28 +1167,30 @@ export async function addProductVarietyAction(input: z.infer<typeof productVarie
   });
 
   if (error) {
-    console.error('[addProductVarietyAction]', error);
-    return { success: false, error: error.message };
+    logError('addProductVarietyAction failed', { error: error.message, productId: parsed.productId });
+    return { success: false, error: error.message, code: 'ADD_PRODUCT_VARIETY_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function removeProductVarietyAction(productVarietyId: string) {
+export async function removeProductVarietyAction(productVarietyId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('product_varieties').delete().eq('id', productVarietyId);
 
   if (error) {
-    console.error('[removeProductVarietyAction]', error);
-    return { success: false, error: error.message };
+    logError('removeProductVarietyAction failed', { error: error.message, productVarietyId });
+    return { success: false, error: error.message, code: 'REMOVE_PRODUCT_VARIETY_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function fetchProductVarietiesAction(productId: string) {
+export async function fetchProductVarietiesAction(
+  productId: string,
+): Promise<FetchListResult<Record<string, unknown>>> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -1042,16 +1209,16 @@ export async function fetchProductVarietiesAction(productId: string) {
     .eq('product_id', productId);
 
   if (error) {
-    console.error('[fetchProductVarietiesAction]', error);
-    return { success: false, error: error.message, data: [] };
+    logError('fetchProductVarietiesAction failed', { error: error.message, productId });
+    return { success: false, error: error.message, code: 'FETCH_PRODUCT_VARIETIES_FAILED', data: [] };
   }
 
-  return { success: true, data: data ?? [] };
+  return { success: true, data: (data ?? []) as Record<string, unknown>[] };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Product Groups Actions
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 const productGroupSchema = z.object({
   id: z.string().uuid().optional(),
@@ -1068,7 +1235,7 @@ const productGroupSchema = z.object({
 
 export type ProductGroupInput = z.infer<typeof productGroupSchema>;
 
-export async function fetchProductGroupsAction() {
+export async function fetchProductGroupsAction(): Promise<FetchListResult<Record<string, unknown>>> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -1091,14 +1258,14 @@ export async function fetchProductGroupsAction() {
     .order('name');
 
   if (error) {
-    console.error('[fetchProductGroupsAction]', error);
-    return { success: false, error: error.message, data: [] };
+    logError('fetchProductGroupsAction failed', { error: error.message });
+    return { success: false, error: error.message, code: 'FETCH_PRODUCT_GROUPS_FAILED', data: [] };
   }
 
-  return { success: true, data: data ?? [] };
+  return { success: true, data: (data ?? []) as Record<string, unknown>[] };
 }
 
-export async function upsertProductGroupAction(input: ProductGroupInput) {
+export async function upsertProductGroupAction(input: ProductGroupInput): Promise<SimpleResult> {
   const parsed = productGroupSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -1136,15 +1303,15 @@ export async function upsertProductGroupAction(input: ProductGroupInput) {
   }
 
   if (error) {
-    console.error('[upsertProductGroupAction]', error);
-    return { success: false, error: error.message };
+    logError('upsertProductGroupAction failed', { error: error.message, groupId: parsed.id });
+    return { success: false, error: error.message, code: 'UPSERT_PRODUCT_GROUP_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function deleteProductGroupAction(groupId: string) {
+export async function deleteProductGroupAction(groupId: string): Promise<SimpleResult> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -1155,15 +1322,17 @@ export async function deleteProductGroupAction(groupId: string) {
     .eq('org_id', orgId);
 
   if (error) {
-    console.error('[deleteProductGroupAction]', error);
-    return { success: false, error: error.message };
+    logError('deleteProductGroupAction failed', { error: error.message, groupId });
+    return { success: false, error: error.message, code: 'DELETE_PRODUCT_GROUP_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function getProductGroupMembersAction(groupId: string) {
+export async function getProductGroupMembersAction(
+  groupId: string,
+): Promise<FetchListResult<Record<string, unknown>>> {
   const supabase = await getSupabaseServerApp();
 
   const { data, error } = await supabase.rpc('get_product_group_members', {
@@ -1171,16 +1340,16 @@ export async function getProductGroupMembersAction(groupId: string) {
   });
 
   if (error) {
-    console.error('[getProductGroupMembersAction]', error);
-    return { success: false, error: error.message, data: [] };
+    logError('getProductGroupMembersAction failed', { error: error.message, groupId });
+    return { success: false, error: error.message, code: 'GET_GROUP_MEMBERS_FAILED', data: [] };
   }
 
-  return { success: true, data: data ?? [] };
+  return { success: true, data: (data ?? []) as Record<string, unknown>[] };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Product Group Members Actions (manual include/exclude)
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 const productGroupMemberSchema = z.object({
   id: z.string().uuid().optional(),
@@ -1190,17 +1359,27 @@ const productGroupMemberSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 
-export async function upsertProductGroupMemberAction(input: z.infer<typeof productGroupMemberSchema>) {
+export async function upsertProductGroupMemberAction(
+  input: z.infer<typeof productGroupMemberSchema>,
+): Promise<SimpleResult> {
   const parsed = productGroupMemberSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
-  const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from('product_group_members')
     .select('id')
     .eq('group_id', parsed.groupId)
     .eq('product_id', parsed.productId)
     .maybeSingle();
+
+  if (lookupError) {
+    logError('upsertProductGroupMemberAction lookup failed', {
+      error: lookupError.message,
+      groupId: parsed.groupId,
+    });
+    return { success: false, error: lookupError.message, code: 'GROUP_MEMBER_LOOKUP_FAILED' };
+  }
 
   const payload = {
     inclusion_type: parsed.inclusionType,
@@ -1224,30 +1403,30 @@ export async function upsertProductGroupMemberAction(input: z.infer<typeof produ
   }
 
   if (error) {
-    console.error('[upsertProductGroupMemberAction]', error);
-    return { success: false, error: error.message };
+    logError('upsertProductGroupMemberAction failed', { error: error.message, groupId: parsed.groupId });
+    return { success: false, error: error.message, code: 'UPSERT_GROUP_MEMBER_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function removeProductGroupMemberAction(memberId: string) {
+export async function removeProductGroupMemberAction(memberId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('product_group_members').delete().eq('id', memberId);
 
   if (error) {
-    console.error('[removeProductGroupMemberAction]', error);
-    return { success: false, error: error.message };
+    logError('removeProductGroupMemberAction failed', { error: error.message, memberId });
+    return { success: false, error: error.message, code: 'REMOVE_GROUP_MEMBER_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Product Group Aliases Actions
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 const productGroupAliasSchema = z.object({
   id: z.string().uuid().optional(),
@@ -1263,7 +1442,9 @@ const productGroupAliasSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 
-export async function fetchProductGroupAliasesAction(groupId: string) {
+export async function fetchProductGroupAliasesAction(
+  groupId: string,
+): Promise<FetchListResult<Record<string, unknown>>> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -1290,14 +1471,16 @@ export async function fetchProductGroupAliasesAction(groupId: string) {
     .eq('group_id', groupId);
 
   if (error) {
-    console.error('[fetchProductGroupAliasesAction]', error);
-    return { success: false, error: error.message, data: [] };
+    logError('fetchProductGroupAliasesAction failed', { error: error.message, groupId });
+    return { success: false, error: error.message, code: 'FETCH_GROUP_ALIASES_FAILED', data: [] };
   }
 
-  return { success: true, data: data ?? [] };
+  return { success: true, data: (data ?? []) as Record<string, unknown>[] };
 }
 
-export async function upsertProductGroupAliasAction(input: z.infer<typeof productGroupAliasSchema>) {
+export async function upsertProductGroupAliasAction(
+  input: z.infer<typeof productGroupAliasSchema>,
+): Promise<SimpleResult> {
   const parsed = productGroupAliasSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
@@ -1325,30 +1508,30 @@ export async function upsertProductGroupAliasAction(input: z.infer<typeof produc
   }
 
   if (error) {
-    console.error('[upsertProductGroupAliasAction]', error);
-    return { success: false, error: error.message };
+    logError('upsertProductGroupAliasAction failed', { error: error.message, groupId: parsed.groupId });
+    return { success: false, error: error.message, code: 'UPSERT_GROUP_ALIAS_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-export async function deleteProductGroupAliasAction(aliasId: string) {
+export async function deleteProductGroupAliasAction(aliasId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('product_group_aliases').delete().eq('id', aliasId);
 
   if (error) {
-    console.error('[deleteProductGroupAliasAction]', error);
-    return { success: false, error: error.message };
+    logError('deleteProductGroupAliasAction failed', { error: error.message, aliasId });
+    return { success: false, error: error.message, code: 'DELETE_GROUP_ALIAS_FAILED' };
   }
 
   revalidatePath('/sales/products');
   return { success: true };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Order Item Preferences Actions
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 const orderItemPreferenceSchema = z.object({
   id: z.string().uuid().optional(),
@@ -1360,7 +1543,9 @@ const orderItemPreferenceSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 
-export async function fetchOrderItemPreferencesAction(orderItemId: string) {
+export async function fetchOrderItemPreferencesAction(
+  orderItemId: string,
+): Promise<FetchListResult<Record<string, unknown>>> {
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -1383,20 +1568,22 @@ export async function fetchOrderItemPreferencesAction(orderItemId: string) {
     .eq('order_item_id', orderItemId);
 
   if (error) {
-    console.error('[fetchOrderItemPreferencesAction]', error);
-    return { success: false, error: error.message, data: [] };
+    logError('fetchOrderItemPreferencesAction failed', { error: error.message, orderItemId });
+    return { success: false, error: error.message, code: 'FETCH_PREFERENCES_FAILED', data: [] };
   }
 
-  return { success: true, data: data ?? [] };
+  return { success: true, data: (data ?? []) as Record<string, unknown>[] };
 }
 
-export async function upsertOrderItemPreferenceAction(input: z.infer<typeof orderItemPreferenceSchema>) {
+export async function upsertOrderItemPreferenceAction(
+  input: z.infer<typeof orderItemPreferenceSchema>,
+): Promise<SimpleResult> {
   const parsed = orderItemPreferenceSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
   if (!parsed.productId && !parsed.varietyId) {
-    return { success: false, error: 'Either productId or varietyId must be provided' };
+    return { success: false, error: 'Either productId or varietyId must be provided', code: 'VALIDATION_ERROR' };
   }
 
   const payload = {
@@ -1418,28 +1605,31 @@ export async function upsertOrderItemPreferenceAction(input: z.infer<typeof orde
   }
 
   if (error) {
-    console.error('[upsertOrderItemPreferenceAction]', error);
-    return { success: false, error: error.message };
+    logError('upsertOrderItemPreferenceAction failed', { error: error.message, orderItemId: parsed.orderItemId });
+    return { success: false, error: error.message, code: 'UPSERT_PREFERENCE_FAILED' };
   }
 
   revalidatePath('/sales/orders');
   return { success: true };
 }
 
-export async function deleteOrderItemPreferenceAction(preferenceId: string) {
+export async function deleteOrderItemPreferenceAction(preferenceId: string): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from('order_item_preferences').delete().eq('id', preferenceId);
 
   if (error) {
-    console.error('[deleteOrderItemPreferenceAction]', error);
-    return { success: false, error: error.message };
+    logError('deleteOrderItemPreferenceAction failed', { error: error.message, preferenceId });
+    return { success: false, error: error.message, code: 'DELETE_PREFERENCE_FAILED' };
   }
 
   revalidatePath('/sales/orders');
   return { success: true };
 }
 
-export async function updatePreferenceFulfilledQtyAction(preferenceId: string, fulfilledQty: number) {
+export async function updatePreferenceFulfilledQtyAction(
+  preferenceId: string,
+  fulfilledQty: number,
+): Promise<SimpleResult> {
   const supabase = await getSupabaseServerApp();
 
   const { error } = await supabase
@@ -1451,17 +1641,17 @@ export async function updatePreferenceFulfilledQtyAction(preferenceId: string, f
     .eq('id', preferenceId);
 
   if (error) {
-    console.error('[updatePreferenceFulfilledQtyAction]', error);
-    return { success: false, error: error.message };
+    logError('updatePreferenceFulfilledQtyAction failed', { error: error.message, preferenceId });
+    return { success: false, error: error.message, code: 'UPDATE_FULFILLED_QTY_FAILED' };
   }
 
   revalidatePath('/sales/orders');
   return { success: true };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Bulk add preferences (for WhatsApp breakdown)
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 const bulkPreferencesSchema = z.object({
   orderItemId: z.string().uuid(),
@@ -1475,19 +1665,32 @@ const bulkPreferencesSchema = z.object({
   ),
 });
 
-export async function bulkAddOrderItemPreferencesAction(input: z.infer<typeof bulkPreferencesSchema>) {
+export async function bulkAddOrderItemPreferencesAction(
+  input: z.infer<typeof bulkPreferencesSchema>,
+): Promise<SimpleResult> {
   const parsed = bulkPreferencesSchema.parse(input);
   const { orgId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
   for (const pref of parsed.preferences) {
     if (!pref.productId && !pref.varietyId) {
-      return { success: false, error: 'Each preference must have either productId or varietyId' };
+      return { success: false, error: 'Each preference must have either productId or varietyId', code: 'VALIDATION_ERROR' };
     }
   }
 
   // Delete existing preferences for this order item
-  await supabase.from('order_item_preferences').delete().eq('order_item_id', parsed.orderItemId);
+  const { error: deleteError } = await supabase
+    .from('order_item_preferences')
+    .delete()
+    .eq('order_item_id', parsed.orderItemId);
+
+  if (deleteError) {
+    logError('bulkAddOrderItemPreferencesAction delete failed', {
+      error: deleteError.message,
+      orderItemId: parsed.orderItemId,
+    });
+    return { success: false, error: deleteError.message, code: 'BULK_DELETE_PREFERENCES_FAILED' };
+  }
 
   // Insert new preferences
   const inserts = parsed.preferences.map((pref) => ({
@@ -1503,11 +1706,14 @@ export async function bulkAddOrderItemPreferencesAction(input: z.infer<typeof bu
   const { error } = await supabase.from('order_item_preferences').insert(inserts);
 
   if (error) {
-    console.error('[bulkAddOrderItemPreferencesAction]', error);
-    return { success: false, error: error.message };
+    logError('bulkAddOrderItemPreferencesAction insert failed', {
+      error: error.message,
+      orderItemId: parsed.orderItemId,
+      count: inserts.length,
+    });
+    return { success: false, error: error.message, code: 'BULK_INSERT_PREFERENCES_FAILED' };
   }
 
   revalidatePath('/sales/orders');
   return { success: true };
 }
-

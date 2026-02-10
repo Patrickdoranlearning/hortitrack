@@ -67,7 +67,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import OrderStatusBadge from '@/components/sales/OrderStatusBadge';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import TrolleyLabelPrintDialog from '@/components/dispatch/TrolleyLabelPrintDialog';
 import { useTodayDate, getTodayISO } from '@/lib/date-sync';
 import { dispatchLoad } from '@/server/dispatch/board-actions';
@@ -347,16 +347,7 @@ export default function DispatchOrdersClient({
 
       const data = await response.json();
 
-      console.log('[Assign Picker] Response:', {
-        ok: data.ok,
-        pickListId: data.pickListId,
-        pickerId: data.pickerId,
-        created: data.created,
-        requestedPickerId: pickerId === 'unassign' ? null : pickerId,
-      });
-
       if (!response.ok || !data.ok) {
-        console.error('[Assign Picker] Error:', data);
         throw new Error(data.error || 'Failed to assign picker');
       }
 
@@ -378,7 +369,6 @@ export default function DispatchOrdersClient({
 
       toast.success(pickerId === 'unassign' ? 'Picker unassigned' : 'Picker assigned');
     } catch (error: any) {
-      console.error('[Assign Picker] Error:', error);
       toast.error(error?.message || 'Failed to assign picker');
     } finally {
       setUpdatingPicker(null);

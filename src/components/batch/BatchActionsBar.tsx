@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MoveRight, ScanLine, Scissors, ClipboardList, Pencil, Archive, Printer, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 type Props = {
   batchId: string;
@@ -20,8 +20,6 @@ type Props = {
 export default function BatchActionsBar({ batchId, batchNumber, disabled }: Props) {
   const q = `?batchId=${encodeURIComponent(batchId)}`;
   const [isPrinting, setIsPrinting] = useState(false);
-  const { toast } = useToast();
-
   const handlePrintLabel = async () => {
     setIsPrinting(true);
     try {
@@ -34,16 +32,9 @@ export default function BatchActionsBar({ batchId, batchNumber, disabled }: Prop
       if (!res.ok || !json.ok) {
         throw new Error(json.error || "Print failed");
       }
-      toast({
-        title: "Label Sent",
-        description: "The batch label has been sent to the printer.",
-      });
+      toast.success("The batch label has been sent to the printer.");
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Print Failed",
-        description: e?.message || "Could not print batch label.",
-      });
+      toast.error(e?.message || "Could not print batch label.");
     } finally {
       setIsPrinting(false);
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json({ locations, batches });
   } catch (e: any) {
-    console.error("[api/scout-search] error", e);
+    logger.api.error("Scout search failed", e);
     return NextResponse.json({ locations: [], batches: [], error: e?.message }, { status: 500 });
   }
 }

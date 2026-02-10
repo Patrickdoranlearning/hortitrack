@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 const LOSS_REASONS = [
   { value: "disease", label: "Disease" },
@@ -50,7 +50,6 @@ export function RecordLossDialog({
   maxQuantity,
   onSuccess,
 }: RecordLossDialogProps) {
-  const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
@@ -71,20 +70,12 @@ export function RecordLossDialog({
 
   const handleSubmit = async () => {
     if (!reason) {
-      toast({
-        variant: "destructive",
-        title: "Select reason",
-        description: "Please select a reason for the loss",
-      });
+      toast.error("Please select a reason for the loss");
       return;
     }
 
     if (quantity < 1 || quantity > maxQuantity) {
-      toast({
-        variant: "destructive",
-        title: "Invalid quantity",
-        description: `Quantity must be between 1 and ${maxQuantity}`,
-      });
+      toast.error(`Quantity must be between 1 and ${maxQuantity}`);
       return;
     }
 
@@ -115,11 +106,7 @@ export function RecordLossDialog({
       setReason("");
       setNotes("");
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Record failed",
-        description: error instanceof Error ? error.message : "Failed to record loss",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to record loss");
     } finally {
       setSubmitting(false);
     }

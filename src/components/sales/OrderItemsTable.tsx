@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { Pencil, Trash2, Save, X, Tag, Truck } from 'lucide-react';
 import { updateOrderItem, deleteOrderItem } from '@/app/sales/orders/[orderId]/actions';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
@@ -39,7 +39,6 @@ interface OrderItemsTableProps {
 }
 
 export default function OrderItemsTable({ orderId, items, status, onItemsChange, currency = 'EUR', fees = [], requiresPrePricing = false }: OrderItemsTableProps) {
-  const { toast } = useToast();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<number>(0);
   const [editPrice, setEditPrice] = useState<number>(0);
@@ -85,25 +84,14 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange,
       });
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'Item Updated',
-          description: 'Order item has been updated',
-        });
+        toast.success('Order item has been updated');
         setEditingItemId(null);
         onItemsChange();
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to update item',
-        variant: 'destructive',
-      });
+      toast.error('Failed to update item');
     } finally {
       setIsUpdating(false);
     }
@@ -117,24 +105,13 @@ export default function OrderItemsTable({ orderId, items, status, onItemsChange,
       const result = await deleteOrderItem(itemToDelete.id);
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'Item Deleted',
-          description: 'Order item has been removed',
-        });
+        toast.success('Order item has been removed');
         onItemsChange();
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete item',
-        variant: 'destructive',
-      });
+      toast.error('Failed to delete item');
     } finally {
       setIsUpdating(false);
       setDeleteDialogOpen(false);

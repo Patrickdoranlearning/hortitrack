@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, type FormEvent } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,6 @@ type Props = {
 };
 
 export default function BulkSaleableClient({ initialBatches, statusOptions }: Props) {
-  const { toast } = useToast();
   const [batches, setBatches] = useState(initialBatches);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>(statusOptions);
@@ -119,11 +118,7 @@ export default function BulkSaleableClient({ initialBatches, statusOptions }: Pr
       (batch) => (batch.batchNumber ?? "").toString().toLowerCase() === cleaned
     );
     if (!match) {
-      toast({
-        variant: "destructive",
-        title: "Batch not found",
-        description: `No batch matches #${scanValue}.`,
-      });
+      toast.error(`No batch matches #${scanValue}.`);
       return;
     }
 
@@ -131,10 +126,7 @@ export default function BulkSaleableClient({ initialBatches, statusOptions }: Pr
     setSearch(cleaned);
     setLastScannedId(match.id);
     setLastScannedNumber(match.batchNumber);
-    toast({
-      title: "Batch selected",
-      description: `#${match.batchNumber} is ready for status or photo updates.`,
-    });
+    toast.success(`#${match.batchNumber} is ready for status or photo updates.`);
     setScanValue("");
   };
 
@@ -173,18 +165,11 @@ export default function BulkSaleableClient({ initialBatches, statusOptions }: Pr
           : b
       ));
 
-      toast({
-        title: "Photo uploaded",
-        description: "Sales photo updated successfully."
-      });
+      toast.success("Sales photo updated successfully.");
 
-    } catch (error: any) {
-      console.error("Upload failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Upload failed",
-        description: error.message || "Could not upload photo"
-      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Could not upload photo";
+      toast.error(message);
     } finally {
       setUploadingId(null);
     }
@@ -192,19 +177,11 @@ export default function BulkSaleableClient({ initialBatches, statusOptions }: Pr
 
   const handleSubmit = async () => {
     if (!status) {
-      toast({
-        variant: "destructive",
-        title: "Status required",
-        description: "Choose the status you want to apply.",
-      });
+      toast.error("Choose the status you want to apply.");
       return;
     }
     if (selectedCount === 0) {
-      toast({
-        variant: "destructive",
-        title: "Select batches first",
-        description: "Pick at least one batch to update.",
-      });
+      toast.error("Pick at least one batch to update.");
       return;
     }
     setSubmitting(true);
@@ -222,10 +199,7 @@ export default function BulkSaleableClient({ initialBatches, statusOptions }: Pr
       if (!response.ok) {
         throw new Error(data?.error || "Bulk update failed.");
       }
-      toast({
-        title: "Status updated",
-        description: `Updated ${data.updated ?? selectedCount} batches.`,
-      });
+      toast.success(`Updated ${data.updated ?? selectedCount} batches.`);
 
       setBatches((prev) =>
         prev.map((batch) =>
@@ -241,11 +215,7 @@ export default function BulkSaleableClient({ initialBatches, statusOptions }: Pr
       setSelected(new Set());
       setNote("");
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Bulk update failed",
-        description: error.message ?? String(error),
-      });
+      toast.error(error.message ?? String(error));
     } finally {
       setSubmitting(false);
     }
@@ -253,11 +223,7 @@ export default function BulkSaleableClient({ initialBatches, statusOptions }: Pr
 
   const handleQuickPhoto = (file: File) => {
     if (!lastScannedId) {
-      toast({
-        variant: "destructive",
-        title: "Scan a batch first",
-        description: "Scan or select a batch before adding a quick photo.",
-      });
+      toast.error("Scan or select a batch before adding a quick photo.");
       return;
     }
     handlePhotoUpload(lastScannedId, file);

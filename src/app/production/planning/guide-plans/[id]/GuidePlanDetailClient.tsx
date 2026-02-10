@@ -63,7 +63,7 @@ import type {
   GuidePlanWithProgress,
   BatchPlanWithProgress,
 } from '@/lib/planning/guide-plan-types';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 
 type GuidePlanDetailResponse = {
   guidePlan: GuidePlanWithProgress;
@@ -83,7 +83,6 @@ type Props = {
 
 export function GuidePlanDetailClient({ guidePlanId }: Props) {
   const router = useRouter();
-  const { toast } = useToast();
 
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [batchPlanDialogOpen, setBatchPlanDialogOpen] = React.useState(false);
@@ -166,15 +165,11 @@ export function GuidePlanDetailClient({ guidePlanId }: Props) {
       await fetchJson(`/api/production/batch-plans/${deletingBatchPlan.id}`, {
         method: 'DELETE',
       });
-      toast({ title: 'Batch plan deleted' });
+      toast.success('Batch plan deleted');
       mutate();
       onBatchPlanChange();
     } catch (error: any) {
-      toast({
-        title: 'Failed to delete batch plan',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to delete batch plan');
     } finally {
       setDeleteDialogOpen(false);
       setDeletingBatchPlan(null);
@@ -186,15 +181,11 @@ export function GuidePlanDetailClient({ guidePlanId }: Props) {
       await fetchJson(`/api/production/guide-plans/${guidePlanId}`, {
         method: 'DELETE',
       });
-      toast({ title: 'Guide plan deleted' });
+      toast.success('Guide plan deleted');
       onGuidePlanChange();
       router.push('/production/planning/guide-plans');
     } catch (error: any) {
-      toast({
-        title: 'Failed to delete guide plan',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to delete guide plan');
     } finally {
       setDeleteGuidePlanDialogOpen(false);
     }

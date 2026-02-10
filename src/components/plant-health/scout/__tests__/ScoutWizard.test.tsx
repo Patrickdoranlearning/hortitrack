@@ -154,7 +154,7 @@ jest.mock('../TreatmentStep', () => ({
 
 import { ScoutWizard } from '../ScoutWizard';
 import { createScoutLog, scheduleTreatment } from '@/app/actions/plant-health';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 const mockCreateScoutLog = createScoutLog as jest.Mock;
 const mockScheduleTreatment = scheduleTreatment as jest.Mock;

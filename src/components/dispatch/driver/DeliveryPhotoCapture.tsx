@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Camera, X, Check, RotateCcw, Loader2, Upload } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 interface DeliveryPhotoCaptureProps {
@@ -58,7 +58,6 @@ export function DeliveryPhotoCapture({
         await videoRef.current.play();
       }
     } catch (err: any) {
-      console.error('Camera error:', err);
       const message = err.name === 'NotAllowedError'
         ? 'Camera access denied. Please allow camera permissions.'
         : err.name === 'NotFoundError'
@@ -152,7 +151,6 @@ export function DeliveryPhotoCapture({
       onPhotoCaptured?.(data.photoUrl);
       setIsOpen(false);
     } catch (error: any) {
-      console.error('Upload error:', error);
       toast.error(error.message || 'Failed to upload photo');
     } finally {
       setIsUploading(false);

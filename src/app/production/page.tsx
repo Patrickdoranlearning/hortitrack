@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DialogForm } from '@/ui/templates';
 import { createPropagationBatchAction } from "@/app/actions/production";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   Select,
   SelectContent,
@@ -43,7 +43,6 @@ type ProductionStats = {
 };
 
 export default function ProductionHome() {
-  const { toast } = useToast();
   const { data: refData, loading: refLoading } = React.useContext(ReferenceDataContext);
 
   // Fetch production stats
@@ -115,26 +114,14 @@ export default function ProductionHome() {
               });
 
               if (res.success) {
-                toast({
-                  title: "Batch Created",
-                  description: `Batch ${res.data?.batch_number} started successfully.`
-                });
+                toast.success(`Batch ${res.data?.batch_number} started successfully.`);
                 return true; // Close dialog on success
               } else {
-                toast({
-                  title: "Error creating batch",
-                  description: res.error || "Failed to create batch. Please try again.",
-                  variant: "destructive"
-                });
+                toast.error(res.error || "Failed to create batch. Please try again.");
                 return false; // Keep dialog open on error
               }
             } catch (error: any) {
-              console.error("[ProductionHome] Error creating batch:", error);
-              toast({
-                title: "Error",
-                description: error?.message || "An unexpected error occurred. Please try again.",
-                variant: "destructive"
-              });
+              toast.error(error?.message || "An unexpected error occurred. Please try again.");
               return false;
             }
           }}

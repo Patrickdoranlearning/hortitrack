@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/server/db/supabaseAdmin';
 import { getOrgForUserByEmail } from '@/server/org/getOrgForUser';
 import { z } from "zod";
+import { logger } from "@/server/utils/logger";
 
 const TableParam = z.enum(['nursery_locations', 'suppliers', 'plant_varieties', 'plant_sizes']);
 type Table = z.infer<typeof TableParam>;
@@ -81,7 +82,7 @@ export async function GET(
 
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   } catch (e: any) {
-    console.error('[collections] GET failed:', { message: e?.message });
+    logger.api.error("GET /api/collections failed", e);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

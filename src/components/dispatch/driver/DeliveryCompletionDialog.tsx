@@ -13,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Camera, Check, RotateCcw, Loader2, Truck, Package } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 interface DeliveryCompletionDialogProps {
   deliveryItemId: string;
@@ -65,7 +65,6 @@ export function DeliveryCompletionDialog({
         await videoRef.current.play();
       }
     } catch (err: any) {
-      console.error('Camera error:', err);
       const message = err.name === 'NotAllowedError'
         ? 'Camera access denied. Please allow camera permissions.'
         : err.name === 'NotFoundError'
@@ -169,7 +168,6 @@ export function DeliveryCompletionDialog({
       onCompleted?.({ photoUrl: data.photoUrl, trolleysReturned });
       setIsOpen(false);
     } catch (error: any) {
-      console.error('Delivery completion error:', error);
       toast.error(error.message || 'Failed to complete delivery');
     } finally {
       setIsSubmitting(false);

@@ -10,6 +10,7 @@ import {
   ADJUSTMENT_REASON_LABELS,
   LOSS_REASON_LABELS,
 } from '@/lib/shared/batch-stock-constants';
+import type { ActionResult } from '@/lib/errors';
 
 // Note: Types should be imported directly from '@/lib/shared/batch-stock-constants'
 // by consumers, not re-exported from this 'use server' file
@@ -32,6 +33,7 @@ export type LossRecordInput = {
   notes?: string;
 };
 
+/** @deprecated Use ActionResult from '@/lib/errors' instead */
 export type BatchStockResult<T = void> =
   | { success: true; data?: T; newQuantity?: number }
   | { success: false; error: string };
@@ -46,7 +48,7 @@ export type BatchStockResult<T = void> =
  */
 export async function adjustBatchStock(
   input: StockAdjustmentInput
-): Promise<BatchStockResult<{ eventId: string }>> {
+): Promise<ActionResult<{ eventId: string; newQuantity: number }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -129,8 +131,7 @@ export async function adjustBatchStock(
 
     return {
       success: true,
-      data: { eventId: event?.id || '' },
-      newQuantity: newQty,
+      data: { eventId: event?.id || '', newQuantity: newQty },
     };
   } catch (error) {
     logError('Error in adjustBatchStock', { error: String(error) });
@@ -148,7 +149,7 @@ export async function adjustBatchStock(
  */
 export async function recordBatchLoss(
   input: LossRecordInput
-): Promise<BatchStockResult<{ eventId: string }>> {
+): Promise<ActionResult<{ eventId: string; newQuantity: number }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -255,8 +256,7 @@ export async function recordBatchLoss(
 
     return {
       success: true,
-      data: { eventId: event?.id || '' },
-      newQuantity: newQty,
+      data: { eventId: event?.id || '', newQuantity: newQty },
     };
   } catch (error) {
     logError('Error in recordBatchLoss', { error: String(error) });
@@ -268,7 +268,7 @@ export async function recordBatchLoss(
 // Get Batch Current Stock
 // ============================================================================
 
-export async function getBatchStock(batchId: string): Promise<BatchStockResult<{
+export async function getBatchStock(batchId: string): Promise<ActionResult<{
   quantity: number;
   reservedQuantity: number;
   availableQuantity: number;

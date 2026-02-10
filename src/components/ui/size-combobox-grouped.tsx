@@ -116,17 +116,18 @@ export function SizeComboboxGrouped({
     return `${group} (${count})`;
   };
 
-  // Build placeholder text
-  const displayPlaceholder = selectedSize
+  // Build display text for selected value (includes cell count for clarity)
+  const selectedDisplayValue = selectedSize
     ? `${selectedSize.name}${selectedSize.cell_multiple > 1 ? ` (${selectedSize.cell_multiple} cells)` : ""}`
-    : placeholder;
+    : undefined;
 
   return (
     <GroupedCombobox<SizeData>
       options={options}
       value={value}
       onSelect={(option) => onSelect(option.value)}
-      placeholder={displayPlaceholder}
+      placeholder={placeholder}
+      displayValue={selectedDisplayValue}
       searchPlaceholder={searchPlaceholder}
       emptyMessage={emptyMessage}
       disabled={disabled}

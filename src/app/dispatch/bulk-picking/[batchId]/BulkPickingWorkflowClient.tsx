@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -116,8 +116,7 @@ const QC_ITEMS = [
 
 export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkPickingWorkflowClientProps) {
   const router = useRouter();
-  const { toast } = useToast();
-  
+
   const [batch, setBatch] = useState(initialBatch);
   const [items, setItems] = useState<BulkPickItem[]>(initialBatch.items);
   const [phase, setPhase] = useState<WorkflowPhase>(
@@ -169,9 +168,9 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
       }
       
       setBatch((prev) => ({ ...prev, status: 'in_progress' }));
-      toast({ title: 'Picking Started', description: 'Begin picking items' });
+      toast.success('Begin picking items');
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -203,12 +202,9 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
         )
       );
       
-      toast({
-        title: 'Item Picked',
-        description: `${item.productName} - ${qty || item.totalQty} units`,
-      });
+      toast.success(`${item.productName} - ${qty || item.totalQty} units`);
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -238,13 +234,9 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
         )
       );
       
-      toast({
-        variant: 'destructive',
-        title: 'Marked Short',
-        description: `${item.productName} - only ${pickedQty} available`,
-      });
+      toast.error(`${item.productName} - only ${pickedQty} available`);
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -266,12 +258,9 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
       
       setBatch((prev) => ({ ...prev, status: 'picked' }));
       setPhase('packing');
-      toast({
-        title: 'Picking Complete',
-        description: 'Move to packing station to break down orders',
-      });
+      toast.success('Move to packing station to break down orders');
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -292,9 +281,9 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
       }
       
       setBatch((prev) => ({ ...prev, status: 'packing' }));
-      toast({ title: 'Packing Started', description: 'Begin packing orders' });
+      toast.success('Begin packing orders');
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -357,12 +346,9 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
       }));
       
       setPackingComplete(true);
-      toast({
-        title: 'Order Packed',
-        description: `Order #${packingOrder.orderNumber} is ready for dispatch`,
-      });
+      toast.success(`Order #${packingOrder.orderNumber} is ready for dispatch`);
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -378,13 +364,10 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
   
   const handleScan = useCallback((scannedText: string) => {
     // Handle scanned batch code
-    toast({
-      title: 'Scanned',
-      description: scannedText,
-    });
+    toast.success(scannedText);
     setShowScanner(false);
     // Match with item and pick it
-  }, [toast]);
+  }, []);
   
   const handleExit = () => {
     router.push('/dispatch/bulk-picking');

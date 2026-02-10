@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 interface Location {
   id: string;
@@ -37,7 +37,6 @@ export function MoveLocationDialog({
   currentLocation,
   onSuccess,
 }: MoveLocationDialogProps) {
-  const { toast } = useToast();
   const [locations, setLocations] = useState<Location[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -64,11 +63,7 @@ export function MoveLocationDialog({
         }));
         setLocations(locs);
       } catch {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load locations",
-        });
+        toast.error("Failed to load locations");
       } finally {
         setLoadingLocations(false);
       }
@@ -77,7 +72,7 @@ export function MoveLocationDialog({
     if (open) {
       fetchLocations();
     }
-  }, [open, toast]);
+  }, [open]);
 
   const filteredLocations = locations.filter((loc) =>
     loc.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -85,11 +80,7 @@ export function MoveLocationDialog({
 
   const handleSubmit = async () => {
     if (!selectedLocationId) {
-      toast({
-        variant: "destructive",
-        title: "Select location",
-        description: "Please select a destination location",
-      });
+      toast.error("Please select a destination location");
       return;
     }
 
@@ -119,11 +110,7 @@ export function MoveLocationDialog({
       setNotes("");
       setSearchQuery("");
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Move failed",
-        description: error instanceof Error ? error.message : "Failed to move batch",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to move batch");
     } finally {
       setSubmitting(false);
     }

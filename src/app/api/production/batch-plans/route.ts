@@ -4,6 +4,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { buildBatchPlanProgress } from "@/lib/planning/guide-plan-types";
 import type { BatchPlanWithProgress } from "@/lib/planning/guide-plan-types";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,7 +65,7 @@ export async function GET(req: Request) {
     const { data: batchPlans, error } = await query;
 
     if (error) {
-      console.error("[batch-plans GET] query failed:", error);
+      logger.production.error("Batch plans GET query failed", error);
       throw new Error(error.message);
     }
 
@@ -118,7 +119,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ batchPlans: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load batch plans";
-    console.error("[batch-plans GET] error:", message);
+    logger.production.error("Batch plans GET failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -203,7 +204,7 @@ export async function POST(req: Request) {
       .single();
 
     if (error || !data) {
-      console.error("[batch-plans POST] insert failed:", error);
+      logger.production.error("Batch plan insert failed", error);
       throw new Error(error?.message ?? "Failed to create batch plan");
     }
 
@@ -236,7 +237,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
     }
     const message = error instanceof Error ? error.message : "Failed to create batch plan";
-    console.error("[batch-plans POST] error:", message);
+    logger.production.error("Batch plan POST failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

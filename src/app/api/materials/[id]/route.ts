@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { requireRole } from "@/server/auth/getUser";
+import { logger } from "@/server/utils/logger";
 import { getMaterial, updateMaterial, deleteMaterial } from "@/server/materials/service";
 import { UpdateMaterialSchema } from "@/lib/schemas/materials";
 
@@ -28,7 +29,7 @@ export async function GET(req: Request, context: RouteContext) {
 
     return NextResponse.json({ material });
   } catch (error: unknown) {
-    console.error("[materials/[id] GET] Error:", error);
+    logger.materials.error("Material GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch material";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -63,7 +64,7 @@ export async function PUT(req: Request, context: RouteContext) {
 
     return NextResponse.json({ material });
   } catch (error: unknown) {
-    console.error("[materials/[id] PUT] Error:", error);
+    logger.materials.error("Material update failed", error);
     const message = error instanceof Error ? error.message : "Failed to update material";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -96,7 +97,7 @@ export async function DELETE(req: Request, context: RouteContext) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error("[materials/[id] DELETE] Error:", error);
+    logger.materials.error("Material delete failed", error);
     const message = error instanceof Error ? error.message : "Failed to delete material";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

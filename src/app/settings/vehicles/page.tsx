@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { HaulierVehicle, Haulier } from '@/lib/types';
 import { addVehicleAction, deleteVehicleAction, updateVehicleAction, getVehiclesAction } from '@/app/actions';
@@ -32,7 +32,6 @@ type VehicleWithHaulier = HaulierVehicle & { haulierName?: string };
 type SortableKey = 'name' | 'haulierName' | 'registration' | 'vehicleType' | 'trolleyCapacity';
 
 export default function VehiclesPage() {
-  const { toast } = useToast();
   const [filterText, setFilterText] = useState('');
   const [editingVehicle, setEditingVehicle] = useState<VehicleWithHaulier | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -66,7 +65,7 @@ export default function VehiclesPage() {
     if (result.success) {
       setVehicles(result.data as VehicleWithHaulier[]);
     } else {
-      toast({ variant: 'destructive', title: 'Error', description: result.error });
+      toast.error(result.error);
     }
     setLoading(false);
   };
@@ -111,9 +110,9 @@ export default function VehiclesPage() {
     const result = await deleteVehicleAction(id);
     if (result.success) {
       setVehicles((prev) => prev.filter((v) => v.id !== id));
-      toast({ title: 'Vehicle deleted', description: `"${name}" removed.` });
+      toast.success(`"${name}" removed.`);
     } else {
-      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+      toast.error(result.error);
     }
   };
 
@@ -124,15 +123,12 @@ export default function VehiclesPage() {
       : await addVehicleAction(values as Omit<HaulierVehicle, 'id'>);
 
     if (result.success) {
-      toast({
-        title: isUpdate ? 'Vehicle updated' : 'Vehicle added',
-        description: `"${values.name}" saved successfully.`,
-      });
+      toast.success(`"${values.name}" saved successfully.`);
       setIsFormOpen(false);
       setEditingVehicle(null);
       fetchVehicles();
     } else {
-      toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+      toast.error(result.error);
     }
   };
 

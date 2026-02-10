@@ -131,8 +131,8 @@ export function GroupConfigDialog({ open, onOpenChange, group, onSaved, batches 
       }
 
       onSaved();
-    } catch (error) {
-      console.error("Failed to save group:", error);
+    } catch {
+      // Group save failed silently
     } finally {
       setLoading(false);
     }

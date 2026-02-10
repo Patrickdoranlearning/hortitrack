@@ -65,7 +65,6 @@ export const GET = withApiGuard({
   method: "GET",
   requireRole: "user",
   async handler({ user }) {
-    // console.log("Stats API Handler reached. User:", user ? user.uid : "no-user");
     const orgId = user?.orgId;
 
     if (!orgId) {

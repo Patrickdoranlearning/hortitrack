@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import type { ProtocolSummary, PlanningBatch } from "@/lib/planning/types";
 import { AlertTriangle, Info, QrCode, AlertCircle } from "lucide-react";
 import ScannerDialog from "@/components/scan-and-act-dialog";
@@ -135,7 +135,6 @@ type Props = {
 
 export function FutureAllocationDialog({ open, onOpenChange, parents, protocols, onSuccess }: Props) {
   const { data: refData } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
   const [submitting, setSubmitting] = React.useState(false);
   const [isScanOpen, setIsScanOpen] = React.useState(false);
 
@@ -258,20 +257,12 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
       const available = matchedParent.quantity - (matchedParent.reservedQuantity ?? 0);
       if (available > 0) {
         handleParentChange(matchedParent.id);
-        toast({ title: "Batch found", description: `Selected ${matchedParent.batchNumber}` });
+        toast.success(`Selected ${matchedParent.batchNumber}`);
       } else {
-        toast({ 
-          variant: "destructive", 
-          title: "No stock available", 
-          description: `${matchedParent.batchNumber} has no available stock` 
-        });
+        toast.error(`${matchedParent.batchNumber} has no available stock`);
       }
     } else {
-      toast({ 
-        variant: "destructive", 
-        title: "Batch not found", 
-        description: "No matching batch found for scanned code" 
-      });
+      toast.error("No matching batch found for scanned code");
     }
     
     setIsScanOpen(false);
@@ -290,10 +281,6 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
       },
       {}
     );
-    console.warn("[FutureAllocationDialog] Validation failed", {
-      errors: summarizedErrors,
-      values: form.getValues(),
-    });
     // Show toast for validation errors
     const errorMessages: string[] = [];
     
@@ -322,18 +309,10 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
     }
     
     if (errorMessages.length > 0) {
-      toast({
-        title: "Please fix form errors",
-        description: errorMessages.join(". "),
-        variant: "destructive",
-      });
+      toast.error(errorMessages.join(". "));
     } else {
       // Fallback message if we still can't determine the error
-      toast({
-        title: "Form validation failed",
-        description: "Please check all required fields are filled in correctly.",
-        variant: "destructive",
-      });
+      toast.error("Please check all required fields are filled in correctly.");
     }
   }
 
@@ -357,7 +336,7 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
           notes: values.notes || undefined,
         }),
       });
-      toast({ title: "Planned batch saved" });
+      toast.success("Planned batch saved");
       onOpenChange(false);
       form.reset({
         parentBatchId: "",
@@ -374,11 +353,7 @@ export function FutureAllocationDialog({ open, onOpenChange, parents, protocols,
       });
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: "Failed to save allocation",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Unknown error");
     } finally {
       setSubmitting(false);
     }

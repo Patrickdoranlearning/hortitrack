@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   Select,
   SelectContent,
@@ -137,7 +137,6 @@ type Props = {
 
 export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
   const { data: refData } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
   const [saving, setSaving] = React.useState(false);
   const [expandedConditions, setExpandedConditions] = React.useState<Set<string>>(new Set());
 
@@ -279,7 +278,6 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
 
   // Handle validation errors
   function onInvalid(errors: FieldErrors<FormValues>) {
-    console.error("[ProtocolDrawer] Validation failed:", errors);
     // Show toast for validation errors
     const errorMessages: string[] = [];
     
@@ -305,24 +303,16 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
     }
     
     if (errorMessages.length > 0) {
-      toast({
-        title: "Please fix form errors",
-        description: errorMessages.join(". "),
-        variant: "destructive",
-      });
+      toast.error(errorMessages.join(". "));
     } else {
       // Fallback message if we still can't determine the error
-      toast({
-        title: "Form validation failed",
-        description: "Please check all required fields are filled in correctly.",
-        variant: "destructive",
-      });
+      toast.error("Please check all required fields are filled in correctly.");
     }
   }
 
   async function onSubmit(values: FormValues) {
     if (sizeFlow.length < 2) {
-      toast({ title: "Need at least start and end stages", variant: "destructive" });
+      toast.error("Need at least start and end stages");
       return;
     }
 
@@ -389,7 +379,7 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
         }),
       });
 
-      toast({ title: "Recipe created" });
+      toast.success("Recipe created");
       onSuccess?.();
       onOpenChange(false);
       
@@ -400,11 +390,7 @@ export function ProtocolDrawer({ open, onOpenChange, onSuccess }: Props) {
       ]);
       setExpandedConditions(new Set());
     } catch (error: any) {
-      toast({
-        title: "Failed to create recipe",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Unknown error");
     } finally {
       setSaving(false);
     }

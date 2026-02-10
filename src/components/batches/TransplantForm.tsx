@@ -27,7 +27,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { SearchableSelect } from "../ui/searchable-select";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
 import { invalidateBatches } from "@/lib/swr/keys";
@@ -85,13 +85,6 @@ export default function TransplantForm({
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
   
-  const toastImpl = (useToast?.() as any) || null;
-  const toast =
-    toastImpl?.toast ??
-    ((v: any) => {
-      alert(v?.title || v?.description || "OK");
-    });
-
   // Use hydration-safe date to prevent server/client mismatch
   const today = useTodayDate();
 
@@ -250,13 +243,11 @@ export default function TransplantForm({
         });
       }
 
-      toast({
-        title: "Transplant created",
-        description:
-          remainderToWriteOff > 0
-            ? `Batch ${child_batch.batchNumber} created. ${remainderToWriteOff.toLocaleString()} remaining units written off.`
-            : `Batch ${child_batch.batchNumber} created.`,
-      });
+      toast.success(
+        remainderToWriteOff > 0
+          ? `Batch ${child_batch.batchNumber} created. ${remainderToWriteOff.toLocaleString()} remaining units written off.`
+          : `Batch ${child_batch.batchNumber} created.`
+      );
       // Invalidate batch caches to trigger refresh across all components
       invalidateBatches();
       form.reset({
@@ -273,11 +264,7 @@ export default function TransplantForm({
       void loadParent();
     } catch (err) {
       const e = err instanceof Error ? err : new Error("Unknown error");
-      toast({
-        title: "Failed to transplant",
-        description: e.message,
-        variant: "destructive",
-      });
+      toast.error(e.message);
     } finally {
       setSubmitting(false);
     }

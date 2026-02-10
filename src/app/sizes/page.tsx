@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { INITIAL_PLANT_SIZES } from '@/lib/constants';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import type { PlantSize } from '@/lib/types';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -86,7 +86,6 @@ export default function SizesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSize, setEditingSize] = useState<PlantSize | null>(null);
   const [formSaving, setFormSaving] = useState(false);
-  const { toast } = useToast();
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
   const [filterText, setFilterText] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableSizeKey; direction: 'asc' | 'desc' }>({
@@ -194,9 +193,9 @@ export default function SizesPage() {
     const result = await deleteSizeAction(sizeId);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Size deleted', description: `Removed "${sizeToDelete.name}".` });
+      toast.success(`Removed "${sizeToDelete.name}".`);
     } else {
-      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+      toast.error(result.error);
     }
   };
 
@@ -210,18 +209,11 @@ export default function SizesPage() {
 
       if (result.success) {
         invalidateReferenceData();
-        toast({
-          title: isEditing ? 'Size updated' : 'Size added',
-          description: `Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`,
-        });
+        toast.success(`Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`);
         setIsFormOpen(false);
         setEditingSize(null);
       } else {
-        toast({
-          variant: 'destructive',
-          title: isEditing ? 'Update failed' : 'Add failed',
-          description: result.error,
-        });
+        toast.error(result.error);
       }
     } finally {
       setFormSaving(false);
@@ -235,11 +227,7 @@ export default function SizesPage() {
         (size) => size.name && size.name.trim().toLowerCase() === normalizedName
       )
     ) {
-      toast({
-        variant: 'destructive',
-        title: 'Duplicate size',
-        description: `"${values.name}" already exists. Edit the existing row instead.`,
-      });
+      toast.error(`"${values.name}" already exists. Edit the existing row instead.`);
       return;
     }
 
@@ -260,11 +248,11 @@ export default function SizesPage() {
     const result = await addSizeAction(payload);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Size added', description: `"${values.name}" is now available.` });
+      toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
       nameFieldRef.current?.focus();
     } else {
-      toast({ variant: 'destructive', title: 'Add failed', description: result.error });
+      toast.error(result.error);
     }
   });
 
@@ -394,11 +382,11 @@ export default function SizesPage() {
       description += ` Failed to import ${failures.length} row${failures.length === 1 ? '' : 's'}.`;
     }
 
-    toast({
-      title: 'Import complete',
-      description,
-      variant: failures.length ? 'destructive' : 'default',
-    });
+    if (failures.length) {
+      toast.error(description);
+    } else {
+      toast.success(description);
+    }
   };
 
   const focusQuickRow = () => nameFieldRef.current?.focus();

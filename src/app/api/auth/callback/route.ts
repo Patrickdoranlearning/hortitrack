@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
         tags: { component: "auth-callback", type: type ?? "unknown" },
         extra: { hasCode: !!code, next },
       });
-      console.error("[auth/callback] Code exchange failed:", error.message);
+      logger.auth.error("Code exchange failed in auth callback", error);
     }
 
     if (!error && data.user) {

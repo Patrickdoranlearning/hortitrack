@@ -10,7 +10,7 @@ import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { useAttributeOptions } from "@/lib/swr/keys";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -22,7 +22,6 @@ const Schema = z.object({
 });
 
 export default function DumpForm({ batchId, available, onDone }: { batchId: string; available: number; onDone?: (newQty: number)=>void }) {
-  const { toast } = useToast?.() ?? { toast: (x:any)=>alert(x?.title||x?.description||"OK") };
   const form = useForm<z.infer<typeof Schema>>({ resolver: zodResolver(Schema), defaultValues: { archive_if_empty: true } });
   const [loading, setLoading] = React.useState(false);
   const units = Number(form.watch("units") || 0);
@@ -35,11 +34,11 @@ export default function DumpForm({ batchId, available, onDone }: { batchId: stri
     setLoading(true);
     try {
       const { new_quantity } = await ProductionAPI.dump(batchId, values);
-      toast({ title: "Dump recorded", description: `${values.units} unit(s) removed` });
+      toast.success(`${values.units} unit(s) removed`);
       onDone?.(new_quantity);
     } catch (e) {
       const er = e as HttpError;
-      toast({ title: "Dump failed", description: er.message, variant: "destructive" });
+      toast.error(er.message);
     } finally { setLoading(false); }
   }
 

@@ -249,12 +249,9 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
     setSubmitSuccess(false);
 
     try {
-      console.log('Submitting order:', data);
-
       // Double-check validation
       const validation = CreateOrderSchema.safeParse(data);
       if (!validation.success) {
-        console.error('Zod validation failed:', validation.error.flatten());
         const errors = validation.error.flatten();
         const errorMessages: string[] = [];
         Object.entries(errors.fieldErrors).forEach(([field, msgs]) => {
@@ -272,7 +269,6 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
 
       const result = await createOrder(validation.data);
       if (result?.error) {
-        console.error('Order creation error:', result.error, result.details);
         const detailsStr = result.details
           ? JSON.stringify(result.details, null, 2)
           : undefined;
@@ -287,10 +283,9 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
         // Success message will show briefly before redirect (if redirect happens)
       }
     } catch (error) {
-      console.error('Failed to create order', error);
       setSubmitError({
         message: 'Failed to create order',
-        details: error instanceof Error ? error.message : 'An unexpected error occurred. Check console for details.'
+        details: error instanceof Error ? error.message : 'An unexpected error occurred.'
       });
     } finally {
       setIsSubmitting(false);
@@ -303,12 +298,9 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
     setSubmitSuccess(false);
 
     const values = form.getValues();
-    console.log('Manual submit - form values:', values);
-
     // Validate with Zod directly
     const validation = CreateOrderSchema.safeParse(values);
     if (!validation.success) {
-      console.error('Manual validation failed:', validation.error.flatten());
       const errors = validation.error.flatten();
       const messages: string[] = [];
 
@@ -330,9 +322,6 @@ export default function EnhancedCreateOrderForm({ customers, products }: Enhance
 
   // Log validation errors when they occur
   const onInvalid = useCallback((errors: any) => {
-    console.error('Form validation errors:', errors);
-    console.error('Current form values:', form.getValues());
-
     // Manually validate to get better error messages
     const values = form.getValues();
     const messages: string[] = [];

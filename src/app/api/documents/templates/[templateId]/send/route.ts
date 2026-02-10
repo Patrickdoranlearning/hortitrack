@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { sendDocumentEmail } from "@/server/documents/email";
+import { logger } from "@/server/utils/logger";
 import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function POST(
@@ -27,7 +28,7 @@ export async function POST(
     });
     return NextResponse.json(result, { status: result.sent ? 200 : 202 });
   } catch (err: any) {
-    console.error("[documents] send failed", err);
+    logger.documents.error("Document send failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to send document" }, { status });
   }

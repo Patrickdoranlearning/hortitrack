@@ -7,6 +7,8 @@
  * them when the connection is restored.
  */
 
+import { logWarning } from '@/lib/log';
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -113,7 +115,7 @@ function saveActions(actions: PendingAction[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(actions));
   } catch (error) {
     // Storage quota exceeded or other error - log but don't throw
-    console.warn('[task-queue] Failed to save actions:', error);
+    logWarning('Failed to save offline actions', { error });
   }
 }
 

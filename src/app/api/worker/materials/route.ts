@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { getStockSummary } from "@/server/materials/stock";
 
 /**
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
       items,
     });
   } catch (error) {
-    console.error("[api/worker/materials] Error:", error);
+    logger.worker.error("Worker materials fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

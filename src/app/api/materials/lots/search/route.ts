@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import {
   getMaterialLotByNumber,
   getMaterialLotByBarcode,
@@ -68,7 +69,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ lots });
   } catch (error: unknown) {
-    console.error("[lots/search GET] Error:", error);
+    logger.materials.error("Lot search failed", error);
     const message = error instanceof Error ? error.message : "Failed to search lots";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

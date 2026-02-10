@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { logBatchMove } from '@/app/actions/log-batch-action';
 import { logBatchHealthEvent } from '@/app/actions/batch-health';
 import { LocationComboboxGrouped, type LocationData } from '@/components/ui/location-combobox-grouped';

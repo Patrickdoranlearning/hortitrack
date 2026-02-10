@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { createCreditNote } from '@/app/sales/orders/[orderId]/actions';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { OrderItem } from './OrderDetailPage';
@@ -52,7 +52,6 @@ export default function CreditNoteDialog({
   currency = 'EUR',
   onCreditNoteCreated,
 }: CreditNoteDialogProps) {
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState('');
   const [creditItems, setCreditItems] = useState<CreditLineItem[]>(() =>
@@ -101,20 +100,12 @@ export default function CreditNoteDialog({
     const selectedItems = creditItems.filter((item) => item.selected && item.quantity > 0);
 
     if (selectedItems.length === 0) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please select at least one item to credit',
-        variant: 'destructive',
-      });
+      toast.error('Please select at least one item to credit');
       return;
     }
 
     if (!reason.trim()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please provide a reason for the credit note',
-        variant: 'destructive',
-      });
+      toast.error('Please provide a reason for the credit note');
       return;
     }
 
@@ -130,16 +121,9 @@ export default function CreditNoteDialog({
       });
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'Credit Note Created',
-          description: `Credit note for ${formatCurrency(calculateTotal(), currency)} has been created`,
-        });
+        toast.success(`Credit note for ${formatCurrency(calculateTotal(), currency)} has been created`);
         onOpenChange(false);
         onCreditNoteCreated();
         // Reset form
@@ -155,11 +139,7 @@ export default function CreditNoteDialog({
         );
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to create credit note',
-        variant: 'destructive',
-      });
+      toast.error('Failed to create credit note');
     } finally {
       setIsSubmitting(false);
     }

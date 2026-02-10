@@ -19,7 +19,7 @@ import {
   Sprout,
   MapPin,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import ScannerClient from '@/components/Scanner/ScannerClient';
 import { parseScanCode } from '@/lib/scan/parse.client';
 
@@ -107,8 +107,8 @@ export function ScanStep({ onBatchSelected }: ScanStepProps) {
       }));
 
       setSearchResults(results);
-    } catch (error) {
-      console.error('Search failed', error);
+    } catch {
+      // Search failed silently
     } finally {
       setSearching(false);
     }
@@ -158,8 +158,7 @@ export function ScanStep({ onBatchSelected }: ScanStepProps) {
         salesPhotoUrl: batch.salesPhotoUrl || batch.sales_photo_url,
         growerPhotoUrl: batch.growerPhotoUrl || batch.grower_photo_url,
       };
-    } catch (error) {
-      console.error('Failed to load batch', error);
+    } catch {
       return null;
     }
   };
@@ -216,8 +215,7 @@ export function ScanStep({ onBatchSelected }: ScanStepProps) {
       } else {
         toast.error('Batch not found');
       }
-    } catch (error) {
-      console.error('Scan error', error);
+    } catch {
       toast.error('Scan failed', { description: 'Network error' });
     } finally {
       setLoading(false);

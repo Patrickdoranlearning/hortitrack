@@ -34,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   addProductBatchAction,
   autoLinkProductBatchesAction,
@@ -69,7 +69,6 @@ type SortColumn = "name" | "sku" | "status" | "inventory" | "priceLists";
 type SortDirection = "asc" | "desc";
 
 export default function ProductManagementClient(props: ProductManagementPayload) {
-  const { toast } = useToast();
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
@@ -408,7 +407,7 @@ export default function ProductManagementClient(props: ProductManagementPayload)
         plantSizes={props.plantSizes}
         onSkuCreated={(newSku) => {
           setSkuOptions((prev) => [newSku, ...prev]);
-          toast({ title: "SKU created", description: `${newSku.code} has been added.` });
+          toast.success(`${newSku.code} has been added.`);
         }}
       />
     </div>
@@ -430,7 +429,6 @@ type ComposerProps = {
 };
 
 function ProductComposerSheet({ open, onOpenChange, mode, product, products, skus, batches, priceLists, customers, plantVarieties, onProductSaved }: ComposerProps) {
-  const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<"details" | "inventory" | "pricing">("details");
   const [currentProductId, setCurrentProductId] = useState<string | null>(product?.id ?? null);
   const [isDeleting, startDeleting] = useTransition();
@@ -445,10 +443,10 @@ function ProductComposerSheet({ open, onOpenChange, mode, product, products, sku
     startDeleting(async () => {
       const result = await deleteProductAction(product.id);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Delete failed", description: result.error ?? "Unable to delete product." });
+        toast.error(result.error ?? "Unable to delete product.");
         return;
       }
-      toast({ title: "Product deleted" });
+      toast.success("Product deleted");
       onProductSaved(null);
       onOpenChange(false);
       emitMutation({ resource: 'products', action: 'update' });
@@ -604,7 +602,6 @@ export function ProductDetailsSection({
   onForcedSkuApplied,
   plantSizes = [],
 }: ProductDetailsSectionProps) {
-  const { toast } = useToast();
     const [pending, startTransition] = useTransition();
   const [skuConfigPending, startSkuConfigTransition] = useTransition();
   const [formState, setFormState] = useState(() => ({
@@ -655,7 +652,7 @@ export function ProductDetailsSection({
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formState.name.trim() || !formState.skuId) {
-      toast({ variant: "destructive", title: "Missing fields", description: "Name and SKU are required." });
+      toast.error("Name and SKU are required.");
       return;
     }
     startTransition(async () => {
@@ -675,14 +672,11 @@ export function ProductDetailsSection({
         matchGenera: formState.matchGenera.length > 0 ? formState.matchGenera : null,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to save product." });
+        toast.error(result.error ?? "Unable to save product.");
         return;
       }
       const savedId = result.data?.id ?? product?.id ?? null;
-      toast({
-        title: mode === "create" ? "Product created" : "Product updated",
-        description: mode === "create" ? "You can now assign inventory and pricing." : undefined,
-      });
+      toast.success(mode === "create" ? "Product created. You can now assign inventory and pricing." : "Product updated");
       onSaved(savedId);
       emitMutation({ resource: 'products', action: 'update' });
     });
@@ -759,10 +753,10 @@ export function ProductDetailsSection({
                       sizeId: sizeId,
                     });
                     if (!result.success) {
-                      toast({ variant: "destructive", title: "Update failed", description: result.error });
+                      toast.error(result.error);
                       return;
                     }
-                    toast({ title: "Pot size updated" });
+                    toast.success("Pot size updated");
                     emitMutation({ resource: 'products', action: 'update' });
                   });
                 }}
@@ -924,7 +918,6 @@ type BatchMatchingSectionProps = {
 };
 
 export function BatchMatchingSection({ productId, matchFamilies, matchGenera, plantVarieties }: BatchMatchingSectionProps) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [localFamilies, setLocalFamilies] = useState<string[]>(matchFamilies ?? []);
   const [localGenera, setLocalGenera] = useState<string[]>(matchGenera ?? []);
@@ -975,10 +968,10 @@ export function BatchMatchingSection({ productId, matchFamilies, matchGenera, pl
         matchGenera: localGenera.length > 0 ? localGenera : null,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to update matching." });
+        toast.error(result.error ?? "Unable to update matching.");
         return;
       }
-      toast({ title: "Batch matching updated" });
+      toast.success("Batch matching updated");
       emitMutation({ resource: "products", action: "update" });
     });
   };
@@ -1129,7 +1122,6 @@ type ProductInventorySectionProps = {
 };
 
 export function ProductInventorySection({ productId, linkedBatches, availableBatches }: ProductInventorySectionProps) {
-  const { toast } = useToast();
     const [batchOptions, setBatchOptions] = useState(availableBatches);
   const [selectedBatchId, setSelectedBatchId] = useState<string>(availableBatches[0]?.id ?? "");
   const [overrideQty, setOverrideQty] = useState<string>("");
@@ -1167,15 +1159,11 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      toast({
-        variant: "destructive",
-        title: "Failed to load batches",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsRefreshingBatches(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     if (availableBatches.length === 0) {
@@ -1185,7 +1173,7 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
 
   const handleAdd = () => {
     if (!selectedBatchId) {
-      toast({ variant: "destructive", title: "Select a batch first" });
+      toast.error("Select a batch first");
       return;
     }
     startTransition(async () => {
@@ -1195,10 +1183,10 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
         availableQuantityOverride: overrideQty ? Number(overrideQty) : null,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Link failed", description: result.error ?? "Unable to link batch." });
+        toast.error(result.error ?? "Unable to link batch.");
         return;
       }
-      toast({ title: "Batch linked" });
+      toast.success("Batch linked");
       emitMutation({ resource: 'products', action: 'update' });
       setOverrideQty("");
       await refreshSelectableBatches();
@@ -1209,10 +1197,10 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
     startTransition(async () => {
       const result = await removeProductBatchAction(productBatchId);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Remove failed", description: result.error ?? "Unable to remove batch." });
+        toast.error(result.error ?? "Unable to remove batch.");
         return;
       }
-      toast({ title: "Batch removed" });
+      toast.success("Batch removed");
       emitMutation({ resource: 'products', action: 'update' });
       await refreshSelectableBatches();
     });
@@ -1222,24 +1210,15 @@ export function ProductInventorySection({ productId, linkedBatches, availableBat
     startTransition(async () => {
       const result = await autoLinkProductBatchesAction(productId);
       if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Auto-link failed",
-          description: result.error ?? "Unable to link matching batches.",
-        });
+        toast.error(result.error ?? "Unable to link matching batches.");
         return;
       }
       const linkedCount = result.linked ?? 0;
-      toast({
-        title:
+      toast.success(
           linkedCount > 0
-            ? `Linked ${linkedCount} batch${linkedCount === 1 ? "" : "es"}`
-            : "No matching batches found",
-        description:
-          linkedCount > 0
-            ? "Matched on SKU variety and size."
-            : result.message ?? "Update the SKU variety/size to enable matching.",
-      });
+            ? `Linked ${linkedCount} batch${linkedCount === 1 ? "" : "es"}. Matched on SKU variety and size.`
+            : result.message ?? "Update the SKU variety/size to enable matching."
+      );
       emitMutation({ resource: 'products', action: 'update' });
       await refreshSelectableBatches();
     });
@@ -1400,7 +1379,6 @@ type ProductPricingSectionProps = {
 };
 
 export function ProductPricingSection({ productId, priceLists, prices }: ProductPricingSectionProps) {
-  const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const priceMap = useMemo(() => {
@@ -1470,11 +1448,11 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
       const parsedMinQty = Number(draft.minQty || 1);
 
       if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
-        toast({ variant: "destructive", title: `Invalid price for ${pl.name}` });
+        toast.error(`Invalid price for ${pl.name}`);
         return;
       }
       if (Number.isNaN(parsedMinQty) || parsedMinQty < 1) {
-        toast({ variant: "destructive", title: `Invalid min qty for ${pl.name}` });
+        toast.error(`Invalid min qty for ${pl.name}`);
         return;
       }
 
@@ -1487,7 +1465,7 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
     }
 
     if (toSave.length === 0) {
-      toast({ title: "No changes to save" });
+      toast.success("No changes to save");
       return;
     }
 
@@ -1509,13 +1487,9 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
     const failures = results.filter((r) => !r.success);
 
     if (failures.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "Some prices failed to save",
-        description: `${failures.length} of ${toSave.length} prices failed.`,
-      });
+      toast.error(`${failures.length} of ${toSave.length} prices failed.`);
     } else {
-      toast({ title: `${toSave.length} price${toSave.length > 1 ? "s" : ""} saved` });
+      toast.success(`${toSave.length} price${toSave.length > 1 ? "s" : ""} saved`);
       emitMutation({ resource: 'products', action: 'update' });
     }
 
@@ -1526,9 +1500,9 @@ export function ProductPricingSection({ productId, priceLists, prices }: Product
     setPendingDeleteId(priceId);
     deleteProductPriceAction(priceId).then((result) => {
       if (!result.success) {
-        toast({ variant: "destructive", title: "Delete failed", description: result.error ?? "Unable to remove price." });
+        toast.error(result.error ?? "Unable to remove price.");
       } else {
-        toast({ title: "Price removed" });
+        toast.success("Price removed");
         emitMutation({ resource: 'products', action: 'update' });
       }
       setPendingDeleteId(null);
@@ -1620,7 +1594,6 @@ type AssignmentsCardProps = {
 };
 
 export function PriceListAssignmentsCard({ priceLists, customers, assignments }: AssignmentsCardProps) {
-  const { toast } = useToast();
     const [assignmentForm, setAssignmentForm] = useState(() => ({
     priceListId: priceLists[0]?.id ?? "",
     customerId: customers[0]?.id ?? "",
@@ -1638,7 +1611,7 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
   const handleAssign = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!assignmentForm.priceListId || !assignmentForm.customerId) {
-      toast({ variant: "destructive", title: "Select a customer and price list" });
+      toast.error("Select a customer and price list");
       return;
     }
     startAssign(async () => {
@@ -1647,14 +1620,10 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
         customerId: assignmentForm.customerId,
       });
       if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Assignment failed",
-          description: result.error ?? "Unable to assign price list.",
-        });
+        toast.error(result.error ?? "Unable to assign price list.");
         return;
       }
-      toast({ title: "Price list assigned" });
+      toast.success("Price list assigned");
       emitMutation({ resource: 'products', action: 'update' });
     });
   };
@@ -1663,10 +1632,10 @@ export function PriceListAssignmentsCard({ priceLists, customers, assignments }:
     startAssign(async () => {
       const result = await deletePriceListCustomerAction(id);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Remove failed", description: result.error ?? "Unable to remove entry." });
+        toast.error(result.error ?? "Unable to remove entry.");
         return;
       }
-      toast({ title: "Assignment removed" });
+      toast.success("Assignment removed");
       emitMutation({ resource: 'products', action: 'update' });
     });
   };
@@ -1769,7 +1738,6 @@ type ProductAliasesSectionProps = {
 };
 
 export function ProductAliasesSection({ productId, aliases, customers, priceLists }: ProductAliasesSectionProps) {
-  const { toast } = useToast();
     const [form, setForm] = useState({
     aliasName: "",
     customerId: "",
@@ -1785,7 +1753,7 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.aliasName.trim()) {
-      toast({ variant: "destructive", title: "Alias name required" });
+      toast.error("Alias name required");
       return;
     }
     startTransition(async () => {
@@ -1801,10 +1769,10 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
         notes: form.notes || null,
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Save failed", description: result.error ?? "Unable to save alias." });
+        toast.error(result.error ?? "Unable to save alias.");
         return;
       }
-      toast({ title: "Alias saved" });
+      toast.success("Alias saved");
       setForm({
         aliasName: "",
         customerId: "",
@@ -1823,10 +1791,10 @@ export function ProductAliasesSection({ productId, aliases, customers, priceList
     startTransition(async () => {
       const result = await deleteProductAliasAction(aliasId);
       if (!result.success) {
-        toast({ variant: "destructive", title: "Delete failed", description: result.error ?? "Unable to delete alias." });
+        toast.error(result.error ?? "Unable to delete alias.");
         return;
       }
-      toast({ title: "Alias removed" });
+      toast.success("Alias removed");
       emitMutation({ resource: 'products', action: 'update' });
     });
   };

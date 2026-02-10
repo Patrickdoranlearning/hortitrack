@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import {
   getPurchaseOrder,
   updatePurchaseOrder,
@@ -29,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ order });
   } catch (error: unknown) {
-    console.error("[purchase-orders/[id] GET] Error:", error);
+    logger.materials.error("Purchase order GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch purchase order";
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -58,7 +59,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ order });
   } catch (error: unknown) {
-    console.error("[purchase-orders/[id] PUT] Error:", error);
+    logger.materials.error("Purchase order update failed", error);
     const message = error instanceof Error ? error.message : "Failed to update purchase order";
     const status = message.includes("only edit draft") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -79,7 +80,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ order });
   } catch (error: unknown) {
-    console.error("[purchase-orders/[id] DELETE] Error:", error);
+    logger.materials.error("Purchase order cancel failed", error);
     const message = error instanceof Error ? error.message : "Failed to cancel purchase order";
     const status = message.includes("Cannot cancel") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

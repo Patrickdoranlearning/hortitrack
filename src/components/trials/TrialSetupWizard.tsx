@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -246,8 +246,7 @@ export function TrialSetupWizard() {
       } else {
         toast.error(result.error || 'Failed to create trial');
       }
-    } catch (error) {
-      console.error('Failed to create trial:', error);
+    } catch {
       toast.error('Failed to create trial');
     } finally {
       setIsSubmitting(false);

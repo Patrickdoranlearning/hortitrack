@@ -2,7 +2,7 @@
 "use client";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { updateActiveOrgAction } from "@/app/actions/auth";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 
 export type OrgContextValue = {
   orgId: string | null;
@@ -26,7 +26,6 @@ export function OrgProvider({
 }) {
   const [orgId, setOrgId] = useState<string | null>(initialOrgId);
   const [companyName, setCompanyName] = useState<string>(initialCompanyName);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (!orgId && typeof window !== "undefined") {
@@ -48,11 +47,7 @@ export function OrgProvider({
 
     const res = await updateActiveOrgAction(newOrgId);
     if (!res.success) {
-      toast({
-        title: "Failed to switch organization",
-        description: res.error,
-        variant: "destructive",
-      });
+      toast.error(res.error || "Failed to switch organization");
       // Revert if needed, but for now just warn
     }
   };

@@ -46,7 +46,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { fetchJson } from '@/lib/http/fetchJson';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { GuidePlanWithProgress } from '@/lib/planning/guide-plan-types';
@@ -99,7 +99,6 @@ type Props = {
 
 export function GuidePlanDialog({ open, onOpenChange, guidePlan, onSuccess }: Props) {
   const { data: refData } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
   const [submitting, setSubmitting] = React.useState(false);
   const [familyOpen, setFamilyOpen] = React.useState(false);
   const [protocols, setProtocols] = React.useState<Array<{ id: string; name: string }>>([]);
@@ -207,23 +206,19 @@ export function GuidePlanDialog({ open, onOpenChange, guidePlan, onSuccess }: Pr
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
-        toast({ title: 'Guide plan updated' });
+        toast.success('Guide plan updated');
       } else {
         await fetchJson('/api/production/guide-plans', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        toast({ title: 'Guide plan created' });
+        toast.success('Guide plan created');
       }
 
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: 'Failed to save guide plan',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to save guide plan');
     } finally {
       setSubmitting(false);
     }

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { Haulier } from '@/lib/types';
 import { addHaulierAction, deleteHaulierAction, updateHaulierAction } from '@/app/actions';
@@ -39,7 +39,6 @@ const defaultQuickValues: QuickHaulierValues = {
 };
 
 export default function HauliersPage() {
-  const { toast } = useToast();
   const [filterText, setFilterText] = useState('');
   const [editingHaulier, setEditingHaulier] = useState<Haulier | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -89,7 +88,7 @@ export default function HauliersPage() {
   const handleQuickAdd = quickForm.handleSubmit(async (values) => {
     const duplicate = hauliers.find((haulier) => haulier.name.toLowerCase() === values.name.trim().toLowerCase());
     if (duplicate) {
-      toast({ variant: 'destructive', title: 'Duplicate name', description: 'That haulier already exists.' });
+      toast.error('That haulier already exists.');
       return;
     }
 
@@ -104,10 +103,10 @@ export default function HauliersPage() {
     const result = await addHaulierAction(payload);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Haulier added', description: `"${values.name}" is now available.` });
+      toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
     } else {
-      toast({ variant: 'destructive', title: 'Add failed', description: result.error });
+      toast.error(result.error);
     }
   });
 
@@ -174,20 +173,20 @@ export default function HauliersPage() {
       invalidateReferenceData();
     }
 
-    toast({
-      title: 'Import complete',
-      description: `${created} haulier${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
-      variant: failures.length ? 'destructive' : 'default',
-    });
+    if (failures.length) {
+      toast.error(`${created} haulier${created === 1 ? '' : 's'} imported. ${failures.length} failed.`);
+    } else {
+      toast.success(`${created} haulier${created === 1 ? '' : 's'} imported.`);
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
     const result = await deleteHaulierAction(id);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Haulier deleted', description: `"${name}" removed.` });
+      toast.success(`"${name}" removed.`);
     } else {
-      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+      toast.error(result.error);
     }
   };
 
@@ -259,14 +258,11 @@ export default function HauliersPage() {
                     : addHaulierAction(values as Omit<Haulier, 'id'>));
                   if (result.success) {
                     invalidateReferenceData();
-                    toast({
-                      title: editingHaulier ? 'Haulier updated' : 'Haulier added',
-                      description: `"${result.data?.name ?? values.name}" saved successfully.`,
-                    });
+                    toast.success(`"${result.data?.name ?? values.name}" saved successfully.`);
                     setIsFormOpen(false);
                     setEditingHaulier(null);
                   } else {
-                    toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                    toast.error(result.error);
                   }
                 } finally {
                   setFormSaving(false);

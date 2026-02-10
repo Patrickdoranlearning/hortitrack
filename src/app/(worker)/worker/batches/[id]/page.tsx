@@ -23,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { vibrateTap, vibrateSuccess } from "@/lib/haptics";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import type { WorkerBatchDetail } from "@/types/worker";
 import { MoveLocationDialog } from "@/components/worker/batch-actions/MoveLocationDialog";
 import { RecordLossDialog } from "@/components/worker/batch-actions/RecordLossDialog";
@@ -35,7 +35,6 @@ type LogActionType = "spray" | "water" | "feed" | "observation";
 export default function WorkerBatchDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const batchId = params.id as string;
 
   const [batch, setBatch] = useState<WorkerBatchDetail | null>(null);
@@ -86,10 +85,7 @@ export default function WorkerBatchDetailPage() {
 
   const handleActionSuccess = (message: string) => {
     vibrateSuccess();
-    toast({
-      title: "Success",
-      description: message,
-    });
+    toast.success(message);
     fetchBatch(); // Refresh batch data
   };
 

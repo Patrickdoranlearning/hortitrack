@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ protocols: data ?? [] });
   } catch (e) {
-    console.error("protocol list error", e);
+    logger.production.error("Protocol list error", e);
     return NextResponse.json({ error: "Failed to list protocols" }, { status: 500 });
   }
 }

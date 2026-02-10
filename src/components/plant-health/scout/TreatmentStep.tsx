@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -284,8 +284,7 @@ export function TreatmentStep({
       };
 
       onComplete(data);
-    } catch (error) {
-      console.error('Failed to apply program:', error);
+    } catch {
       toast.error('Failed to apply program');
     } finally {
       setApplyingProgram(null);

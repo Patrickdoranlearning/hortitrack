@@ -81,9 +81,7 @@ export default async function DispatchPickingPage() {
       .limit(50),
   ]);
 
-  if (pickListsError) {
-    console.error("Error fetching pick lists:", pickListsError.message || JSON.stringify(pickListsError));
-  }
+  // pickListsError is non-fatal - empty state will show
 
   // Batch fetch item counts + progress per pick list
   const pickListIds = (pickLists || []).map((pl: Record<string, unknown>) => pl.id as string);

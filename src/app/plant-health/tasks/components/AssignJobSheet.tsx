@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, UserCheck, Beaker, FlaskConical, MapPin, Leaf } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { IpmJob, JobPriority } from '@/types/ipm-jobs';
 import { assignJob } from '@/app/actions/ipm-tasks';
 import { createClient } from '@/lib/supabase/client';

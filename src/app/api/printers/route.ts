@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { logger } from "@/server/utils/logger";
 
 export async function GET() {
   try {
@@ -23,7 +24,7 @@ export async function GET() {
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error("[api/printers] GET error:", e);
+    logger.api.error("GET /api/printers failed", e);
     return NextResponse.json({ error: e?.message || "Failed to fetch printers" }, { status: 500 });
   }
 }
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to create printer";
-    console.error("[api/printers] POST error:", e);
+    logger.api.error("POST /api/printers failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

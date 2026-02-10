@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   Droplets,
   Scissors,
@@ -70,7 +70,6 @@ export function AddHealthLogDialog({
   batchNumber,
   onSuccess,
 }: AddHealthLogDialogProps) {
-  const { toast } = useToast();
   const [eventType, setEventType] = React.useState<EventType>("irrigation");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -102,18 +101,15 @@ export function AddHealthLogDialog({
       const result = await logBatchHealthEvent(input);
 
       if (result.success) {
-        toast({
-          title: "Care event logged",
-          description: `${EVENT_TYPE_META[eventType].label} recorded for batch`
-        });
+        toast.success(`${EVENT_TYPE_META[eventType].label} recorded for batch`);
         resetForm();
         onOpenChange(false);
         onSuccess?.();
       } else {
-        toast({ variant: "destructive", title: "Failed to log event", description: result.error });
+        toast.error(result.error || "Failed to log event");
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: String(error) });
+      toast.error(String(error));
     } finally {
       setIsSubmitting(false);
     }

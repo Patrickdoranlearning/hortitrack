@@ -22,7 +22,7 @@ import {
   ScanLine,
   Search,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { vibrateTap, vibrateSuccess } from "@/lib/haptics";
 import { parseLotScanCode } from "@/lib/scan/parse";
 import { LotSelectionCombobox, type AvailableLot } from "@/components/materials/LotSelectionCombobox";
@@ -79,7 +79,6 @@ export function MaterialConfirmDialog({
   material,
   onSuccess,
 }: MaterialConfirmDialogProps) {
-  const { toast } = useToast();
   const [mode, setMode] = useState<InputMode>("choose");
   const [scanState, setScanState] = useState<ScanState>({ status: "idle" });
   const [selectedLot, setSelectedLot] = useState<AvailableLot | null>(null);
@@ -187,20 +186,12 @@ export function MaterialConfirmDialog({
     }
 
     if (!lotId) {
-      toast({
-        title: "No lot selected",
-        description: "Please scan or select a lot first.",
-        variant: "destructive",
-      });
+      toast.error("Please scan or select a lot first.");
       return;
     }
 
     if (quantity <= 0) {
-      toast({
-        title: "Invalid quantity",
-        description: "Quantity must be greater than 0.",
-        variant: "destructive",
-      });
+      toast.error("Quantity must be greater than 0.");
       return;
     }
 
@@ -222,21 +213,14 @@ export function MaterialConfirmDialog({
       }
 
       vibrateSuccess();
-      toast({
-        title: "Material Confirmed",
-        description: `${material.materialName}: ${quantity} ${material.baseUom} confirmed.`,
-      });
+      toast.success(`${material.materialName}: ${quantity} ${material.baseUom} confirmed.`);
       onSuccess();
     } catch (err) {
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to confirm",
-        variant: "destructive",
-      });
+      toast.error(err instanceof Error ? err.message : "Failed to confirm");
     } finally {
       setSubmitting(false);
     }
-  }, [material, batchId, mode, scanState, selectedLot, quantity, toast, onSuccess]);
+  }, [material, batchId, mode, scanState, selectedLot, quantity, onSuccess]);
 
   if (!material) return null;
 

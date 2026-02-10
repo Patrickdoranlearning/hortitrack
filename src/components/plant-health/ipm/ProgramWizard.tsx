@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   Dialog,
   DialogContent,
@@ -403,8 +403,7 @@ export function ProgramWizard({
       }
       onSuccess?.();
       onOpenChange(false);
-    } catch (error) {
-      console.error('Failed to create program:', error);
+    } catch {
       toast.error('Failed to create program');
     } finally {
       setIsSubmitting(false);

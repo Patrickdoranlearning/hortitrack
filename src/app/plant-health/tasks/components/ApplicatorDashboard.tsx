@@ -15,7 +15,7 @@ import {
   Calendar,
   RefreshCw,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { IpmJob } from '@/types/ipm-jobs';
 import { startJob } from '@/app/actions/ipm-tasks';
 import { JobExecutionSheet } from './JobExecutionSheet';

@@ -32,7 +32,7 @@ import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -82,13 +82,6 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
   
-  const toastImpl = useToast?.();
-  const toast =
-    toastImpl?.toast ??
-    ((v: any) => {
-      alert(v?.title || v?.description || "OK");
-    });
-
   // Use hydration-safe date to prevent server/client mismatch
   const today = useTodayDate();
 
@@ -204,10 +197,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
     setSubmitting(true);
     try {
       const { batch } = await ProductionAPI.checkIn(values);
-      toast({
-        title: "Batch checked in",
-        description: `Batch ${batch?.batch_number ?? ""} created`,
-      });
+      toast.success(`Batch ${batch?.batch_number ?? ""} created`);
       form.reset({
         phase: "propagation",
         containers: 1,
@@ -219,11 +209,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
       onSubmitSuccess?.(batch);
     } catch (err) {
       const e = err as HttpError;
-      toast({
-        title: e.status === 401 ? "Please sign in" : "Failed to check in",
-        description: e.requestId ? `${e.message} (ref ${e.requestId})` : e.message,
-        variant: "destructive",
-      });
+      toast.error(e.requestId ? `${e.message} (ref ${e.requestId})` : e.message);
     } finally {
       setSubmitting(false);
     }

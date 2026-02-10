@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { logger } from "@/server/utils/logger";
 
 type RouteContext = {
   params: Promise<{ agentId: string }>;
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ data });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to fetch print agent";
-    console.error("[api/print-agents/[agentId]] GET error:", e);
+    logger.api.error("GET /api/print-agents/[agentId] failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -81,7 +82,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ data });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to update print agent";
-    console.error("[api/print-agents/[agentId]] PUT error:", e);
+    logger.api.error("PUT /api/print-agents/[agentId] failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -120,7 +121,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ success: true });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to delete print agent";
-    console.error("[api/print-agents/[agentId]] DELETE error:", e);
+    logger.api.error("DELETE /api/print-agents/[agentId] failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { logger } from "@/server/utils/logger";
 
 const promoteSchema = z.object({
   photoId: z.string().uuid(),
@@ -78,7 +79,7 @@ export async function POST(
       .eq('id', productId);
 
     if (updateError) {
-      console.error('Error updating product hero image:', updateError);
+      logger.api.error("Failed to update product hero image", updateError, { productId });
       return NextResponse.json({ ok: false, error: 'Failed to update product' }, { status: 500 });
     }
 
@@ -89,7 +90,7 @@ export async function POST(
       newHeroUrl: batchPhoto.url,
     });
   } catch (error) {
-    console.error('Error promoting batch photo:', error);
+    logger.api.error("Failed to promote batch photo", error);
     return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });
   }
 }

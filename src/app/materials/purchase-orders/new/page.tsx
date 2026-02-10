@@ -42,7 +42,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { fetchJson } from '@/lib/http/fetchJson';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import type { Material } from '@/lib/types/materials';
@@ -63,7 +63,6 @@ type MaterialsResponse = {
 
 export default function NewPurchaseOrderPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const { data: refData } = useContext(ReferenceDataContext);
 
   const suppliers = refData?.suppliers ?? [];
@@ -132,11 +131,11 @@ export default function NewPurchaseOrderPage() {
 
   const handleSubmit = async (asDraft: boolean) => {
     if (!supplierId) {
-      toast({ title: 'Please select a supplier', variant: 'destructive' });
+      toast.error('Please select a supplier');
       return;
     }
     if (lines.length === 0) {
-      toast({ title: 'Please add at least one line item', variant: 'destructive' });
+      toast.error('Please add at least one line item');
       return;
     }
 
@@ -168,18 +167,11 @@ export default function NewPurchaseOrderPage() {
         });
       }
 
-      toast({
-        title: asDraft ? 'Purchase order saved as draft' : 'Purchase order submitted',
-        description: order.poNumber,
-      });
+      toast.success(`${asDraft ? 'Purchase order saved as draft' : 'Purchase order submitted'}: ${order.poNumber}`);
 
       router.push('/materials/purchase-orders');
     } catch (error) {
-      toast({
-        title: 'Failed to create purchase order',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSubmitting(false);
     }

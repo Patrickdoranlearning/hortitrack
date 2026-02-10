@@ -82,7 +82,6 @@ export function DataMatrixScanner({ onScan, onError, className }: DataMatrixScan
 
       return true;
     } catch (err: any) {
-      console.error('Camera init error:', err);
       const errorMessage = err.name === 'NotAllowedError'
         ? 'Camera access denied. Please allow camera access to scan labels.'
         : err.name === 'NotFoundError'
@@ -150,7 +149,6 @@ export function DataMatrixScanner({ onScan, onError, className }: DataMatrixScan
       }
       setIsScanning(false);
 
-      console.log('[Scanner] Decoded:', result.text, result.format);
       onScan(result.text);
     }
     // Silently ignore decode failures (normal when no barcode in view)
@@ -182,7 +180,6 @@ export function DataMatrixScanner({ onScan, onError, className }: DataMatrixScan
           startScanning();
         }
       } catch (err: any) {
-        console.error('Scanner init error:', err);
         setError(err.message || 'Failed to initialize scanner');
       } finally {
         if (mounted) {
@@ -225,8 +222,8 @@ export function DataMatrixScanner({ onScan, onError, className }: DataMatrixScan
         advanced: [{ torch: newTorchState }],
       });
       setTorchOn(newTorchState);
-    } catch (err) {
-      console.error('Failed to toggle torch:', err);
+    } catch {
+      // Torch toggle failed silently
     }
   };
 

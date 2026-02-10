@@ -184,8 +184,8 @@ export default function ExecutionClient({ initialGroups, initialBatches }: Props
         method: "DELETE",
       });
       refreshGroups();
-    } catch (error) {
-      console.error("Failed to delete group:", error);
+    } catch {
+      // Group delete failed silently
     }
   };
 
@@ -198,8 +198,8 @@ export default function ExecutionClient({ initialGroups, initialBatches }: Props
         method: "POST",
       });
       refreshGroups();
-    } catch (error) {
-      console.error("Failed to reset groups:", error);
+    } catch {
+      // Group reset failed silently
     }
   };
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerApp } from '@/server/db/supabaseServerApp';
 import { getUserAndOrg } from '@/server/auth/org';
+import { logger } from '@/server/utils/logger';
 
 interface RouteContext {
   params: Promise<{ batchId: string; orderId: string }>;
@@ -114,7 +115,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
   } catch (error: any) {
-    console.error('Error updating order packing:', error);
+    logger.picking.error("Error updating order packing", error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

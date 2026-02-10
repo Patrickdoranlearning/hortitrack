@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +83,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     const { data: batches, error: batchError } = await query;
 
     if (batchError) {
-      console.error("[matching-batches GET] query failed:", batchError);
+      logger.production.error("Batch plan matching-batches query failed", batchError);
       throw new Error(batchError.message);
     }
 
@@ -123,7 +124,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to find matching batches";
-    console.error("[matching-batches GET] error:", message);
+    logger.production.error("Batch plan matching-batches failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

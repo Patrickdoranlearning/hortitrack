@@ -33,8 +33,8 @@ export default function LabelPreview({
         scale: 3,
         includetext: false,
       });
-    } catch (e) {
-      console.error("DataMatrix render failed:", e);
+    } catch {
+      // DataMatrix render failed silently
     }
   }, [batchNumber, dataMatrixPayload]);
 

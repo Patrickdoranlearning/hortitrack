@@ -10,6 +10,7 @@ import type { Database } from '@/types/supabase';
 import { declassify } from '@/server/utils/declassify';
 import { snakeToCamel } from '@/lib/utils';
 import { getOrgDetails, getUserAndOrg } from '@/server/auth/org';
+import { logError } from '@/lib/log';
 
 async function getSupabaseForApp() {
   return createClient();
@@ -30,6 +31,7 @@ function transformVBatchSearchData(data: VBatchSearchRow): Batch {
         plantFamily: camelCaseData.family ?? camelCaseData.varietyFamily ?? null,
         size: camelCaseData.sizeName ?? '',
         location: camelCaseData.locationName ?? null,
+        locationSite: camelCaseData.locationSite ?? null,
         supplier: camelCaseData.supplierName ?? null,
         initialQuantity: camelCaseData.initialQuantity ?? camelCaseData.quantity ?? 0,
         reservedQuantity: camelCaseData.reservedQuantity ?? 0,
@@ -54,7 +56,7 @@ async function getBatchById(batchId: string): Promise<Batch | null> {
         .maybeSingle();
     
     if (error) {
-        console.error('[getBatchById] Supabase error from v_batch_search:', error);
+        logError('[getBatchById] Supabase error from v_batch_search', { error: error.message });
         return null;
     }
     return data ? transformVBatchSearchData(data as VBatchSearchRow) : null;
@@ -369,7 +371,7 @@ export async function getBatchesAction(options: GetBatchesOptions = {}) {
         const { data: batches, error, count } = await query;
 
         if (error) {
-            console.error('[getBatchesAction] Supabase error from v_batch_search:', error);
+            logError('[getBatchesAction] Supabase error from v_batch_search', { error: error.message });
             throw error;
         }
         
@@ -383,7 +385,7 @@ export async function getBatchesAction(options: GetBatchesOptions = {}) {
             total: count ?? 0,
         };
     } catch (error: unknown) {
-        console.error('[getBatchesAction] Error in action:', error);
+        logError('[getBatchesAction] Error in action', { error: error instanceof Error ? error.message : String(error) });
         const message = error instanceof Error ? error.message : 'Unknown error';
         return { success: false, error: 'Failed to fetch batches: ' + message };
     }
@@ -399,7 +401,7 @@ export async function getProductionProtocolAction(batchId: string) {
     const protocol = await productionProtocol(batch);
     return { success: true, data: protocol };
   } catch (error) {
-    console.error('Error getting production protocol:', error);
+    logError('[getProductionProtocolAction] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: 'Failed to generate AI production protocol.',
@@ -434,7 +436,7 @@ export async function getCareRecommendationsAction(batchId: string) {
     const recommendations = await careRecommendations(input);
     return { success: true, data: recommendations };
   } catch (error: any) {
-    console.error('Error getting care recommendations:', error);
+    logError('[getCareRecommendationsAction] error', { error: error instanceof Error ? error.message : String(error) });
     const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
@@ -454,7 +456,7 @@ export async function batchChatAction(batchId: string, query: string) {
     const result = await batchChat(input);
     return { success: true, data: result };
   } catch (error: any) {
-    console.error('Error in batch chat action:', error);
+    logError('[batchChatAction] error', { error: error instanceof Error ? error.message : String(error) });
     return { success: false, error: 'Failed to get AI response.' };
   }
 }
@@ -944,7 +946,7 @@ export async function askIntelligenceAction(query: string) {
     const response = await askNurseryIntelligence(query);
     return { success: true, data: response };
   } catch (error: any) {
-    console.error('Error asking nursery intelligence:', error);
+    logError('[askIntelligenceAction] error', { error: error instanceof Error ? error.message : String(error) });
     return { success: false, error: error.message || 'Failed to get a response from AI.' };
   }
 }

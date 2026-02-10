@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { getUserAndOrg } from "@/server/auth/org";
 import { z } from "zod";
 import { captureProtocolPerformance } from "@/server/production/protocol-performance";
+import { logger } from "@/server/utils/logger";
 
 const Allowed = ["Growing", "Ready", "Archived", "Sold"] as const;
 const Schema = z.object({
@@ -51,7 +52,7 @@ export async function POST(
     if (input.status === "Ready" || input.status === "Archived") {
       // Fire and forget - don't block the response
       captureProtocolPerformance(supabase, orgId, batch.id).catch((err) => {
-        console.error("[status-change] Failed to capture protocol performance:", err);
+        logger.production.error("Failed to capture protocol performance", err);
       });
     }
 

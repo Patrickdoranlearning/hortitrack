@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   Loader2,
   RefreshCw,
@@ -61,7 +61,6 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; co
 };
 
 export default function PrintHistory() {
-  const { toast } = useToast();
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
@@ -78,17 +77,12 @@ export default function PrintHistory() {
       if (json.data) {
         setJobs(json.data);
       }
-    } catch (e) {
-      console.error("Failed to fetch print jobs:", e);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load print history",
-      });
+    } catch {
+      toast.error("Failed to load print history");
     } finally {
       setLoading(false);
     }
-  }, [filterType, toast]);
+  }, [filterType]);
 
   useEffect(() => {
     fetchJobs();
@@ -119,10 +113,7 @@ export default function PrintHistory() {
         throw new Error(json?.error || "Reprint failed");
       }
 
-      toast({
-        title: "Reprint Sent",
-        description: `${job.copies} label(s) sent to printer`,
-      });
+      toast.success(`${job.copies} label(s) sent to printer`);
 
       // Log the reprint as a new job
       await fetch("/api/print-jobs", {
@@ -140,11 +131,7 @@ export default function PrintHistory() {
 
       fetchJobs();
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Reprint Failed",
-        description: e.message,
-      });
+      toast.error(e.message);
     } finally {
       setReprintingJob(null);
     }

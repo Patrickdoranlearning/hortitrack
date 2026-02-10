@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { parse } from "csv-parse/sync";
 import { randomUUID } from "crypto";
+import { logger } from "@/server/utils/logger";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { withApiGuard } from "@/server/http/guard";
@@ -195,7 +196,7 @@ export const POST = withApiGuard({
       return NextResponse.json({ ok: true, summary, results });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error("[varieties/import] error", message);
+      logger.api.error("Plant varieties import failed", message);
       return NextResponse.json(
         { error: "Failed to import CSV", details: message },
         { status: 500 }

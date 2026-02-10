@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, format } from "date-fns";
+import { logger } from "@/server/utils/logger";
 
 export interface DashboardStats {
   // Production metrics
@@ -235,7 +236,7 @@ export async function GET() {
 
     return NextResponse.json(stats);
   } catch (err) {
-    console.error("[dashboard-stats] Error:", err);
+    logger.api.error("Dashboard stats fetch failed", err);
     const message = err instanceof Error ? err.message : "Internal server error";
     const status = /Unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { listMaterials, createMaterial } from "@/server/materials/service";
 import { MaterialsQuerySchema, CreateMaterialSchema } from "@/lib/schemas/materials";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
       offset: params.data.offset,
     });
   } catch (error: unknown) {
-    console.error("[materials GET] Error:", error);
+    logger.materials.error("Materials GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch materials";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ material }, { status: 201 });
   } catch (error: unknown) {
-    console.error("[materials POST] Error:", error);
+    logger.materials.error("Material create failed", error);
     const message = error instanceof Error ? error.message : "Failed to create material";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

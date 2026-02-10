@@ -14,7 +14,7 @@ import type { CareRecommendationsOutput } from '@/ai/flows/care-recommendations'
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sparkles, AlertTriangle, CheckCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 
 interface CareRecommendationsDialogProps {
   open: boolean;
@@ -31,8 +31,6 @@ export function CareRecommendationsDialog({
   const [recommendations, setRecommendations] =
     useState<CareRecommendationsOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-
   useEffect(() => {
     if (open && batchId) {
       setLoading(true);
@@ -45,18 +43,14 @@ export function CareRecommendationsDialog({
           setRecommendations(result.data);
         } else {
           setError(result.error);
-          toast({
-            variant: "destructive",
-            title: "AI Error",
-            description: result.error,
-          });
+          toast.error(result.error);
         }
         setLoading(false);
       };
 
       fetchRecommendations();
     }
-  }, [open, batchId, toast]);
+  }, [open, batchId]);
 
   const handleOpenChange = (isOpen: boolean) => {
     onOpenChange(isOpen);

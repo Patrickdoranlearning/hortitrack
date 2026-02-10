@@ -64,7 +64,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { cn } from "@/lib/utils";
 import type {
@@ -122,7 +122,6 @@ type ChecklistItemInput = {
 type TemplatesResponse = { templates: ChecklistTemplate[] };
 
 export default function ChecklistSettingsPage() {
-  const { toast } = useToast();
   const [activeModule, setActiveModule] = React.useState<SourceModule>("production");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingTemplate, setEditingTemplate] = React.useState<ChecklistTemplate | null>(null);
@@ -224,11 +223,7 @@ export default function ChecklistSettingsPage() {
 
   const handleSubmit = async (values: FormValues) => {
     if (items.length === 0) {
-      toast({
-        title: "Add checklist items",
-        description: "A checklist needs at least one item.",
-        variant: "destructive",
-      });
+      toast.error("A checklist needs at least one item.");
       return;
     }
 
@@ -249,7 +244,7 @@ export default function ChecklistSettingsPage() {
             })),
           }),
         });
-        toast({ title: "Template updated" });
+        toast.success("Template updated");
       } else {
         await fetchJson("/api/settings/checklists", {
           method: "POST",
@@ -262,17 +257,13 @@ export default function ChecklistSettingsPage() {
             })),
           }),
         });
-        toast({ title: "Template created" });
+        toast.success("Template created");
       }
       mutate();
       setIsDialogOpen(false);
       setEditingTemplate(null);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save template",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to save template");
     } finally {
       setIsSubmitting(false);
     }
@@ -285,14 +276,10 @@ export default function ChecklistSettingsPage() {
       await fetchJson(`/api/settings/checklists/${deleteTemplate.id}`, {
         method: "DELETE",
       });
-      toast({ title: "Template deleted" });
+      toast.success("Template deleted");
       mutate();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete template",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to delete template");
     } finally {
       setDeleteTemplate(null);
     }
@@ -306,11 +293,7 @@ export default function ChecklistSettingsPage() {
       });
       mutate();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update template",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to update template");
     }
   };
 

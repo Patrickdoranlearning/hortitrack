@@ -4,7 +4,7 @@ import { useState, useCallback, useContext } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { Truck, Package, ClipboardCheck, Check, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { Button } from '@/components/ui/button';
 import { SupplierExpectedDateStep, type SupplierExpectedDateData } from './SupplierExpectedDateStep';
@@ -136,8 +136,6 @@ export function PlanIncomingWizard({ onComplete, onCancel }: PlanIncomingWizardP
           })),
         };
 
-        console.log('[PlanIncomingWizard] Submitting payload:', JSON.stringify(payload, null, 2));
-
         const response = await fetch('/api/production/batches/plan-incoming', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -146,7 +144,6 @@ export function PlanIncomingWizard({ onComplete, onCancel }: PlanIncomingWizardP
 
         if (!response.ok) {
           const errData = await response.json();
-          console.error('[PlanIncomingWizard] API error response:', errData);
           let errorMessage = errData.error ?? 'Failed to plan incoming batches';
           if (errData.errors && Array.isArray(errData.errors) && errData.errors.length > 0) {
             errorMessage += ': ' + errData.errors.join('; ');
@@ -162,7 +159,6 @@ export function PlanIncomingWizard({ onComplete, onCancel }: PlanIncomingWizardP
 
         onComplete?.(result);
       } catch (error: any) {
-        console.error('Planning failed:', error);
         toast.error('Planning failed', { description: error.message });
       } finally {
         setIsSaving(false);

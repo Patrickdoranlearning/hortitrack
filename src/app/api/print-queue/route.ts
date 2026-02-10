@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to fetch print queue";
-    console.error("[api/print-queue] GET error:", e);
+    logger.api.error("GET /api/print-queue failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

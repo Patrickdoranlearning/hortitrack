@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { receiveGoods } from "@/server/materials/purchase-orders";
 import { ReceiveGoodsSchema } from "@/lib/schemas/materials";
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ order });
   } catch (error: unknown) {
-    console.error("[purchase-orders/[id]/receive POST] Error:", error);
+    logger.materials.error("Purchase order goods receipt failed", error);
     const message = error instanceof Error ? error.message : "Failed to receive goods";
     const status = message.includes("Cannot receive") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

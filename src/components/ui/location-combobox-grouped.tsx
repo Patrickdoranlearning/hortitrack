@@ -126,19 +126,20 @@ export function LocationComboboxGrouped({
     return `${group} (${count})`;
   };
 
-  // Build placeholder text
-  const displayPlaceholder = isEmptySelected
+  // Build display text for selected value (includes site name for disambiguation)
+  const selectedDisplayValue = isEmptySelected
     ? emptyLabel
     : selectedLocation
       ? `${selectedLocation.nursery_site ? `${selectedLocation.nursery_site} · ` : ""}${selectedLocation.name}`
-      : placeholder;
+      : undefined;
 
   return (
     <GroupedCombobox<LocationData>
       options={options}
       value={value}
       onSelect={(option) => onSelect(option.value)}
-      placeholder={displayPlaceholder}
+      placeholder={placeholder}
+      displayValue={selectedDisplayValue}
       searchPlaceholder={searchPlaceholder}
       emptyMessage={emptyMessage}
       disabled={disabled}

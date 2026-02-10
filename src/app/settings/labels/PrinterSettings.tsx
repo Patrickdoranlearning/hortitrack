@@ -27,7 +27,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   Plus,
   Printer,
@@ -80,7 +80,6 @@ type PrintAgent = {
 };
 
 export default function PrinterSettings() {
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("printers");
 
   // Printers state
@@ -135,17 +134,12 @@ export default function PrinterSettings() {
       if (json.data) {
         setPrinters(json.data);
       }
-    } catch (e) {
-      console.error("Failed to fetch printers:", e);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load printers",
-      });
+    } catch {
+      toast.error("Failed to load printers");
     } finally {
       setLoadingPrinters(false);
     }
-  }, [toast]);
+  }, []);
 
   // Fetch agents
   const fetchAgents = useCallback(async () => {
@@ -156,17 +150,12 @@ export default function PrinterSettings() {
       if (json.data) {
         setAgents(json.data);
       }
-    } catch (e) {
-      console.error("Failed to fetch agents:", e);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load print agents",
-      });
+    } catch {
+      toast.error("Failed to load print agents");
     } finally {
       setLoadingAgents(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     fetchPrinters();
@@ -216,29 +205,17 @@ export default function PrinterSettings() {
 
   const handleSavePrinter = async () => {
     if (!formData.name) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Printer name is required",
-      });
+      toast.error("Printer name is required");
       return;
     }
 
     if (formData.connection_type === "network" && !formData.host) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "IP address is required for network printers",
-      });
+      toast.error("IP address is required for network printers");
       return;
     }
 
     if (formData.connection_type === "agent" && !formData.agent_id) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Please select a print agent",
-      });
+      toast.error("Please select a print agent");
       return;
     }
 
@@ -285,19 +262,12 @@ export default function PrinterSettings() {
         throw new Error(json?.error || "Failed to save printer");
       }
 
-      toast({
-        title: editingPrinter ? "Printer Updated" : "Printer Added",
-        description: `"${formData.name}" has been saved`,
-      });
+      toast.success(`"${formData.name}" has been saved`);
       setAddDialogOpen(false);
       fetchPrinters();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to save printer";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsSavingPrinter(false);
     }
@@ -315,17 +285,10 @@ export default function PrinterSettings() {
         throw new Error(json?.error || "Test failed");
       }
 
-      toast({
-        title: "Test Successful",
-        description: "A test label has been sent to the printer.",
-      });
+      toast.success("A test label has been sent to the printer.");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Could not connect to the printer.";
-      toast({
-        variant: "destructive",
-        title: "Test Failed",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setTestingPrinter(null);
     }
@@ -343,18 +306,11 @@ export default function PrinterSettings() {
         throw new Error("Failed to update printer");
       }
 
-      toast({
-        title: "Default Updated",
-        description: `"${printer.name}" is now the default printer`,
-      });
+      toast.success(`"${printer.name}" is now the default printer`);
       fetchPrinters();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to set default";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: message,
-      });
+      toast.error(message);
     }
   };
 
@@ -371,20 +327,13 @@ export default function PrinterSettings() {
         throw new Error("Failed to delete printer");
       }
 
-      toast({
-        title: "Printer Deleted",
-        description: `"${printerToDelete.name}" has been removed`,
-      });
+      toast.success(`"${printerToDelete.name}" has been removed`);
       setDeleteDialogOpen(false);
       setPrinterToDelete(null);
       fetchPrinters();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to delete printer";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsDeletingPrinter(false);
     }
@@ -399,11 +348,7 @@ export default function PrinterSettings() {
 
   const handleSaveAgent = async () => {
     if (!agentName.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Agent name is required",
-      });
+      toast.error("Agent name is required");
       return;
     }
 
@@ -422,18 +367,11 @@ export default function PrinterSettings() {
 
       // Show the API key
       setNewAgentKey(json.agentKey);
-      toast({
-        title: "Agent Created",
-        description: "Copy the API key now - it won't be shown again!",
-      });
+      toast.success("Copy the API key now - it won't be shown again!");
       fetchAgents();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to create agent";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsSavingAgent(false);
     }
@@ -459,18 +397,11 @@ export default function PrinterSettings() {
       setAgentToRegenerate(null);
       setAddAgentDialogOpen(true); // Reuse the dialog to show the key
       setAgentName(json.data.name);
-      toast({
-        title: "Key Regenerated",
-        description: "Copy the new API key now - it won't be shown again!",
-      });
+      toast.success("Copy the new API key now - it won't be shown again!");
       fetchAgents();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to regenerate key";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsSavingAgent(false);
     }
@@ -489,21 +420,14 @@ export default function PrinterSettings() {
         throw new Error("Failed to delete agent");
       }
 
-      toast({
-        title: "Agent Deleted",
-        description: `"${agentToDelete.name}" has been removed`,
-      });
+      toast.success(`"${agentToDelete.name}" has been removed`);
       setDeleteAgentDialogOpen(false);
       setAgentToDelete(null);
       fetchAgents();
       fetchPrinters(); // Refresh printers as some may have lost their agent
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to delete agent";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: message,
-      });
+      toast.error(message);
     } finally {
       setIsDeletingAgent(false);
     }
@@ -512,16 +436,9 @@ export default function PrinterSettings() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast({
-        title: "Copied",
-        description: "API key copied to clipboard",
-      });
+      toast.success("API key copied to clipboard");
     } catch {
-      toast({
-        variant: "destructive",
-        title: "Copy Failed",
-        description: "Please select and copy the key manually",
-      });
+      toast.error("Please select and copy the key manually");
     }
   };
 

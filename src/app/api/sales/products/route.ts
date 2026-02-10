@@ -1,6 +1,7 @@
 // src/app/api/sales/products/route.ts
 import { NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 export async function GET() {
   try {
@@ -24,7 +25,7 @@ export async function GET() {
     }));
     return NextResponse.json({ ok: true, products });
   } catch (e) {
-    console.error("[api:sales/products][GET]", e);
+    logger.sales.error("GET /api/sales/products failed", e);
     return NextResponse.json({ ok: false, error: "Failed to fetch products" }, { status: 500 });
   }
 }

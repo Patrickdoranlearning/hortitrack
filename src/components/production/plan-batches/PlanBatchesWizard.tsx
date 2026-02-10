@@ -13,7 +13,7 @@ import {
   LayoutList,
   Boxes,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { Button } from '@/components/ui/button';
 import { PlanTypeStep, type PlanType } from './PlanTypeStep';
@@ -232,8 +232,6 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
             job_name: finalState.review?.jobName || undefined,
           };
 
-          console.log('[PlanBatchesWizard] Submitting propagation payload:', JSON.stringify(payload, null, 2));
-
           const response = await fetch('/api/production/batches/plan-propagation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -244,12 +242,10 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
             let errData: any = {};
             try {
               const text = await response.text();
-              console.error('[PlanBatchesWizard] API error response text:', text);
               errData = text ? JSON.parse(text) : {};
-            } catch (parseErr) {
-              console.error('[PlanBatchesWizard] Failed to parse error response:', parseErr);
+            } catch {
+              // Failed to parse error response
             }
-            console.error('[PlanBatchesWizard] API error:', errData, 'status:', response.status);
             let errorMessage = errData.error ?? `Failed to plan propagation batches (${response.status})`;
             if (errData.issues?.length) {
               errorMessage += ': ' + errData.issues.map((i: any) => i.message).join('; ');
@@ -299,8 +295,6 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
             job_name: finalState.review?.jobName || undefined,
           };
 
-          console.log('[PlanBatchesWizard] Submitting transplant payload:', JSON.stringify(payload, null, 2));
-
           const response = await fetch('/api/production/batches/plan-transplant', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -311,12 +305,10 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
             let errData: any = {};
             try {
               const text = await response.text();
-              console.error('[PlanBatchesWizard] API error response text:', text);
               errData = text ? JSON.parse(text) : {};
-            } catch (parseErr) {
-              console.error('[PlanBatchesWizard] Failed to parse error response:', parseErr);
+            } catch {
+              // Failed to parse error response
             }
-            console.error('[PlanBatchesWizard] API error:', errData, 'status:', response.status);
             let errorMessage = errData.error ?? `Failed to plan transplants (${response.status})`;
             if (errData.errors?.length) {
               errorMessage += ': ' + errData.errors.join('; ');
@@ -334,7 +326,6 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
           onComplete?.(result);
         }
       } catch (error: any) {
-        console.error('Planning failed:', error);
         toast.error('Planning failed', { description: error.message });
       } finally {
         setIsSaving(false);

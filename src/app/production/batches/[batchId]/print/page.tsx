@@ -53,8 +53,7 @@ export default function PrintBatchPage() {
         } else {
           setError('Batch not found.');
         }
-      } catch (err) {
-        console.error('Error fetching batch:', err);
+      } catch {
         setError('Failed to load batch data.');
       } finally {
         setLoading(false);

@@ -32,7 +32,7 @@ import {
   FlaskConical,
   RefreshCw,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { IpmJob, JobsByStatus } from '@/types/ipm-jobs';
 import type { TaskGroup } from '@/app/actions/ipm-tasks';
 import { createJob, assignJob } from '@/app/actions/ipm-tasks';

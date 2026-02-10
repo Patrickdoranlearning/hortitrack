@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Printer, Loader2, Plus, Minus, MapPin, Edit3, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import type { NurseryLocation, Batch } from '@/lib/types';
@@ -46,7 +46,6 @@ type LocationLabelPreviewProps = {
 };
 
 export function LocationLabelPreview({ open, onOpenChange, location }: LocationLabelPreviewProps) {
-  const { toast } = useToast();
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string>('');
   const [copies, setCopies] = useState<number>(1);
@@ -72,18 +71,14 @@ export function LocationLabelPreview({ open, onOpenChange, location }: LocationL
           setSelectedPrinter(json.data[0].id);
         }
       }
-    } catch (e) {
-      console.error('Failed to fetch printers:', e);
+    } catch {
+      // Printer fetch failed silently
     }
   };
 
   const printToZebra = async () => {
     if (!selectedPrinter && printers.length > 0) {
-      toast({
-        variant: 'destructive',
-        title: 'No Printer Selected',
-        description: 'Please select a printer before printing.',
-      });
+      toast.error('Please select a printer before printing.');
       return;
     }
 
@@ -117,20 +112,14 @@ export function LocationLabelPreview({ open, onOpenChange, location }: LocationL
         throw new Error(j?.error || res.statusText);
       }
 
-      toast({
-        title: 'Print Job Sent',
-        description:
-          copies > 1
-            ? `${copies} labels have been sent to the printer.`
-            : 'The label has been sent to the printer.',
-      });
+      toast.success(
+        copies > 1
+          ? `${copies} labels have been sent to the printer.`
+          : 'The label has been sent to the printer.'
+      );
       onOpenChange(false);
     } catch (e: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Print Failed',
-        description: e.message || 'Could not connect to the printer.',
-      });
+      toast.error(e.message || 'Could not connect to the printer.');
     } finally {
       setIsPrinting(false);
     }
@@ -284,8 +273,8 @@ function LocationLabel({ location }: { location: LocationWithBatches }) {
         scale: 3,
         includetext: false,
       });
-    } catch (e) {
-      console.error('DataMatrix render failed:', e);
+    } catch {
+      // DataMatrix render failed silently
     }
   }, [location.id]);
 

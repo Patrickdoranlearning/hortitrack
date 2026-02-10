@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +16,12 @@ export async function GET() {
     const { data: dbTime, error } = await supabase.rpc("now"); 
 
     if (error) {
-      console.error("[api/debug/which-db] Supabase error:", error);
+      logger.db.error("Debug which-db Supabase error", error);
       return NextResponse.json({ db: "supabase", error: error.message }, { status: 500 });
     }
     return NextResponse.json({ db: "supabase", time: dbTime }, { status: 200 });
   } catch (e: any) {
-    console.error("[api/debug/which-db] Error:", e);
+    logger.db.error("Debug which-db error", e);
     return NextResponse.json({ db: "supabase", error: e?.message || "unknown" }, { status: 500 });
   }
 }

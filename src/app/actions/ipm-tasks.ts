@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getUserAndOrg } from '@/server/auth/org';
 import { createTask, updateTask, getTaskBySourceRef } from '@/server/tasks/service';
 import { logError, logWarning } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
 
 export type IpmTask = {
   id: string;
@@ -66,12 +67,8 @@ export type TaskGroup = {
   totalBatches: number;
 };
 
-type TaskResult<T = void> = {
-  success: boolean;
-  data?: T;
-  error?: string;
-  warning?: string; // For non-fatal issues that should be surfaced to the user
-};
+// Extended result type for completeTasks that may include a non-fatal warning
+type ActionResultWithWarning<T> = ActionResult<T> & { warning?: string };
 
 function normalizeTask(row: any): IpmTask {
   return {
@@ -125,7 +122,7 @@ function normalizeTask(row: any): IpmTask {
 export async function generateTasksForBatch(
   batchId: string,
   pottingDate: string
-): Promise<TaskResult<{ tasksCreated: number }>> {
+): Promise<ActionResult<{ tasksCreated: number }>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -185,7 +182,7 @@ export async function generateTasksForBatch(
       .eq('is_active', true);
 
     if (assignError) {
-      console.error('[generateTasksForBatch] assignment query failed', assignError);
+      logError('[generateTasksForBatch] assignment query failed', { error: assignError.message });
       return { success: false, error: assignError.message };
     }
 
@@ -254,14 +251,14 @@ export async function generateTasksForBatch(
       .insert(tasksToInsert);
 
     if (insertError) {
-      console.error('[generateTasksForBatch] insert failed', insertError);
+      logError('[generateTasksForBatch] insert failed', { error: insertError.message });
       return { success: false, error: insertError.message };
     }
 
     revalidatePath('/plant-health');
     return { success: true, data: { tasksCreated: tasksToInsert.length } };
   } catch (error) {
-    console.error('[generateTasksForBatch] error', error);
+    logError('[generateTasksForBatch] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -274,7 +271,7 @@ export async function generateTasksForBatch(
  */
 export async function generateTasksForSpotTreatment(
   spotTreatmentId: string
-): Promise<TaskResult<{ tasksCreated: number }>> {
+): Promise<ActionResult<{ tasksCreated: number }>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -330,14 +327,14 @@ export async function generateTasksForSpotTreatment(
       .insert(tasksToInsert);
 
     if (insertError) {
-      console.error('[generateTasksForSpotTreatment] insert failed', insertError);
+      logError('[generateTasksForSpotTreatment] insert failed', { error: insertError.message });
       return { success: false, error: insertError.message };
     }
 
     revalidatePath('/plant-health');
     return { success: true, data: { tasksCreated: tasksToInsert.length } };
   } catch (error) {
-    console.error('[generateTasksForSpotTreatment] error', error);
+    logError('[generateTasksForSpotTreatment] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -354,7 +351,7 @@ export async function getGroupedTasks(options?: {
   fromDate?: string;
   toDate?: string;
   productId?: string;
-}): Promise<TaskResult<TaskGroup[]>> {
+}): Promise<ActionResult<TaskGroup[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -389,7 +386,7 @@ export async function getGroupedTasks(options?: {
     const { data: tasks, error } = await query;
 
     if (error) {
-      console.error('[getGroupedTasks] query failed', error);
+      logError('[getGroupedTasks] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
@@ -463,7 +460,7 @@ export async function getGroupedTasks(options?: {
 
     return { success: true, data: groups };
   } catch (error) {
-    console.error('[getGroupedTasks] error', error);
+    logError('[getGroupedTasks] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -480,7 +477,7 @@ export async function getTasks(options?: {
   toDate?: string;
   batchId?: string;
   locationId?: string;
-}): Promise<TaskResult<IpmTask[]>> {
+}): Promise<ActionResult<IpmTask[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -518,13 +515,13 @@ export async function getTasks(options?: {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[getTasks] query failed', error);
+      logError('[getTasks] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeTask) };
   } catch (error) {
-    console.error('[getTasks] error', error);
+    logError('[getTasks] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -559,7 +556,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export async function completeTasks(
   taskIds: string[],
   completionData?: ComplianceData
-): Promise<TaskResult> {
+): Promise<ActionResultWithWarning<null>> {
   // Rate limiting: Prevent bulk operations from overwhelming the database
   if (taskIds.length > BULK_RATE_LIMIT) {
     return {
@@ -594,7 +591,7 @@ export async function completeTasks(
       .eq('org_id', orgId);
 
     if (fetchError) {
-      console.error('[completeTasks] fetch failed', fetchError);
+      logError('[completeTasks] fetch failed', { error: fetchError.message });
       return { success: false, error: fetchError.message };
     }
 
@@ -624,7 +621,7 @@ export async function completeTasks(
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[completeTasks] update failed', error);
+      logError('[completeTasks] update failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
@@ -676,7 +673,8 @@ export async function completeTasks(
           revalidatePath('/batches');
           revalidatePath('/tasks');
           return {
-            success: true,
+            success: true as const,
+            data: null,
             warning: 'Tasks completed but audit log failed to save. Please verify treatment records.',
           };
         }
@@ -714,9 +712,9 @@ export async function completeTasks(
     revalidatePath('/plant-health');
     revalidatePath('/batches');
     revalidatePath('/tasks');
-    return { success: true };
+    return { success: true as const, data: null };
   } catch (error) {
-    console.error('[completeTasks] error', error);
+    logError('[completeTasks] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -730,7 +728,7 @@ export async function completeTasks(
 export async function skipTask(
   taskId: string,
   reason: string
-): Promise<TaskResult> {
+): Promise<ActionResult<null>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -747,14 +745,14 @@ export async function skipTask(
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[skipTask] update failed', error);
+      logError('[skipTask] update failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[skipTask] error', error);
+    logError('[skipTask] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -765,7 +763,7 @@ export async function skipTask(
 /**
  * Update overdue tasks
  */
-export async function markOverdueTasks(): Promise<TaskResult<{ count: number }>> {
+export async function markOverdueTasks(): Promise<ActionResult<{ count: number }>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
     const today = new Date().toISOString().split('T')[0];
@@ -782,13 +780,13 @@ export async function markOverdueTasks(): Promise<TaskResult<{ count: number }>>
       .select('id');
 
     if (error) {
-      console.error('[markOverdueTasks] update failed', error);
+      logError('[markOverdueTasks] update failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: { count: data?.length || 0 } };
   } catch (error) {
-    console.error('[markOverdueTasks] error', error);
+    logError('[markOverdueTasks] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -821,7 +819,7 @@ function getWeekStartDate(dateStr: string): string {
 export async function bulkGenerateTasks(options?: {
   clearExisting?: boolean;
   familyFilter?: string;
-}): Promise<TaskResult<{ batchesProcessed: number; tasksCreated: number }>> {
+}): Promise<ActionResult<{ batchesProcessed: number; tasksCreated: number }>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -861,7 +859,7 @@ export async function bulkGenerateTasks(options?: {
       .eq('is_active', true);
 
     if (assignError) {
-      console.error('[bulkGenerateTasks] assignment query failed', assignError);
+      logError('[bulkGenerateTasks] assignment query failed', { error: assignError.message });
       return { success: false, error: assignError.message };
     }
 
@@ -905,7 +903,7 @@ export async function bulkGenerateTasks(options?: {
     const { data: batches, error: batchError } = await batchQuery;
 
     if (batchError) {
-      console.error('[bulkGenerateTasks] batch query failed', batchError);
+      logError('[bulkGenerateTasks] batch query failed', { error: batchError.message });
       return { success: false, error: batchError.message };
     }
 
@@ -990,7 +988,7 @@ export async function bulkGenerateTasks(options?: {
     revalidatePath('/plant-health/tasks');
     return { success: true, data: { batchesProcessed, tasksCreated } };
   } catch (error) {
-    console.error('[bulkGenerateTasks] error', error);
+    logError('[bulkGenerateTasks] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1017,7 +1015,7 @@ export async function createIpmSummaryTask(options: {
   locationName?: string;
   batchCount: number;
   assignedTo?: string;
-}): Promise<TaskResult<{ taskId: string }>> {
+}): Promise<ActionResult<{ taskId: string }>> {
   try {
     // Create a composite reference ID for linking back to IPM tasks
     const sourceRefId = `ipm-${options.productId}-week${options.calendarWeek}`;
@@ -1044,7 +1042,7 @@ export async function createIpmSummaryTask(options: {
 
     return { success: true, data: { taskId: task.id } };
   } catch (error) {
-    console.error('[createIpmSummaryTask] error', error);
+    logError('[createIpmSummaryTask] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1058,7 +1056,7 @@ export async function createIpmSummaryTask(options: {
 export async function completeIpmSummaryTask(options: {
   productId: string;
   calendarWeek: number;
-}): Promise<TaskResult> {
+}): Promise<ActionResult<null>> {
   try {
     const sourceRefId = `ipm-${options.productId}-week${options.calendarWeek}`;
     const task = await getTaskBySourceRef('plant_health', 'ipm_summary', sourceRefId);
@@ -1067,9 +1065,9 @@ export async function completeIpmSummaryTask(options: {
       await updateTask(task.id, { status: 'completed' });
     }
 
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[completeIpmSummaryTask] error', error);
+    logError('[completeIpmSummaryTask] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1088,7 +1086,7 @@ export async function assignIpmWork(options: {
   assignedTo: string;
   batchCount: number;
   locationName?: string;
-}): Promise<TaskResult<{ taskId: string }>> {
+}): Promise<ActionResult<{ taskId: string }>> {
   try {
     const sourceRefId = `ipm-${options.productId}-week${options.calendarWeek}`;
 
@@ -1108,7 +1106,7 @@ export async function assignIpmWork(options: {
     // Create new task
     return createIpmSummaryTask(options);
   } catch (error) {
-    console.error('[assignIpmWork] error', error);
+    logError('[assignIpmWork] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1222,7 +1220,7 @@ function normalizeJob(row: any, tasks?: any[]): IpmJob {
 /**
  * Create a job from a task group
  */
-export async function createJob(input: CreateJobInput): Promise<TaskResult<{ job: IpmJob }>> {
+export async function createJob(input: CreateJobInput): Promise<ActionResult<{ job: IpmJob }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -1284,7 +1282,7 @@ export async function createJob(input: CreateJobInput): Promise<TaskResult<{ job
     revalidatePath('/plant-health/tasks');
     return { success: true, data: { job: normalizeJob(job) } };
   } catch (error) {
-    logError('[createJob] error', { error });
+    logError('[createJob] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1295,7 +1293,7 @@ export async function createJob(input: CreateJobInput): Promise<TaskResult<{ job
 /**
  * Assign a job to an applicator
  */
-export async function assignJob(input: AssignJobInput): Promise<TaskResult<{ job: IpmJob }>> {
+export async function assignJob(input: AssignJobInput): Promise<ActionResult<{ job: IpmJob }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -1325,7 +1323,7 @@ export async function assignJob(input: AssignJobInput): Promise<TaskResult<{ job
     revalidatePath('/plant-health/tasks');
     return { success: true, data: { job: normalizeJob(job) } };
   } catch (error) {
-    logError('[assignJob] error', { error });
+    logError('[assignJob] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1336,7 +1334,7 @@ export async function assignJob(input: AssignJobInput): Promise<TaskResult<{ job
 /**
  * Start a job (mark as in_progress)
  */
-export async function startJob(jobId: string): Promise<TaskResult<{ job: IpmJob }>> {
+export async function startJob(jobId: string): Promise<ActionResult<{ job: IpmJob }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -1359,7 +1357,7 @@ export async function startJob(jobId: string): Promise<TaskResult<{ job: IpmJob 
     revalidatePath('/plant-health/tasks');
     return { success: true, data: { job: normalizeJob(job) } };
   } catch (error) {
-    logError('[startJob] error', { error });
+    logError('[startJob] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1370,7 +1368,7 @@ export async function startJob(jobId: string): Promise<TaskResult<{ job: IpmJob 
 /**
  * Complete a job with compliance data
  */
-export async function completeJob(input: CompleteJobInput): Promise<TaskResult> {
+export async function completeJob(input: CompleteJobInput): Promise<ActionResult<null>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -1433,9 +1431,9 @@ export async function completeJob(input: CompleteJobInput): Promise<TaskResult> 
     }
 
     revalidatePath('/plant-health/tasks');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    logError('[completeJob] error', { error });
+    logError('[completeJob] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1446,7 +1444,7 @@ export async function completeJob(input: CompleteJobInput): Promise<TaskResult> 
 /**
  * Get all jobs for a specific week, grouped by status (for Scout Kanban view)
  */
-export async function getJobsForWeek(calendarWeek: number): Promise<TaskResult<{ jobs: JobsByStatus; taskGroups: TaskGroup[] }>> {
+export async function getJobsForWeek(calendarWeek: number): Promise<ActionResult<{ jobs: JobsByStatus; taskGroups: TaskGroup[] }>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -1517,15 +1515,19 @@ export async function getJobsForWeek(calendarWeek: number): Promise<TaskResult<{
       fromDate: getWeekStartDate(new Date().toISOString()),
     });
 
+    const taskGroups = taskGroupsResult.success
+      ? taskGroupsResult.data.filter(g => g.calendarWeek === calendarWeek)
+      : [];
+
     return {
       success: true,
       data: {
         jobs: jobsByStatus,
-        taskGroups: taskGroupsResult.data?.filter(g => g.calendarWeek === calendarWeek) || [],
+        taskGroups,
       },
     };
   } catch (error) {
-    logError('[getJobsForWeek] error', { error });
+    logError('[getJobsForWeek] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1536,7 +1538,7 @@ export async function getJobsForWeek(calendarWeek: number): Promise<TaskResult<{
 /**
  * Get jobs assigned to current user (for Applicator view)
  */
-export async function getMyJobs(): Promise<TaskResult<{ jobs: IpmJob[] }>> {
+export async function getMyJobs(): Promise<ActionResult<{ jobs: IpmJob[] }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -1583,7 +1585,7 @@ export async function getMyJobs(): Promise<TaskResult<{ jobs: IpmJob[] }>> {
 
     return { success: true, data: { jobs: normalizedJobs } };
   } catch (error) {
-    logError('[getMyJobs] error', { error });
+    logError('[getMyJobs] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1594,7 +1596,7 @@ export async function getMyJobs(): Promise<TaskResult<{ jobs: IpmJob[] }>> {
 /**
  * Get a single job with all its tasks (for execution view)
  */
-export async function getJobWithTasks(jobId: string): Promise<TaskResult<{ job: IpmJob }>> {
+export async function getJobWithTasks(jobId: string): Promise<ActionResult<{ job: IpmJob }>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -1626,7 +1628,7 @@ export async function getJobWithTasks(jobId: string): Promise<TaskResult<{ job: 
 
     return { success: true, data: { job: normalizeJob(job, tasks || []) } };
   } catch (error) {
-    logError('[getJobWithTasks] error', { error });
+    logError('[getJobWithTasks] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1637,7 +1639,7 @@ export async function getJobWithTasks(jobId: string): Promise<TaskResult<{ job: 
 /**
  * Complete a specific task within a job (for per-location checkoff)
  */
-export async function completeTaskInJob(taskId: string): Promise<TaskResult> {
+export async function completeTaskInJob(taskId: string): Promise<ActionResult<null>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -1656,9 +1658,9 @@ export async function completeTaskInJob(taskId: string): Promise<TaskResult> {
     }
 
     revalidatePath('/plant-health/tasks');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    logError('[completeTaskInJob] error', { error });
+    logError('[completeTaskInJob] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1669,7 +1671,7 @@ export async function completeTaskInJob(taskId: string): Promise<TaskResult> {
 /**
  * Cancel a job
  */
-export async function cancelJob(jobId: string): Promise<TaskResult> {
+export async function cancelJob(jobId: string): Promise<ActionResult<null>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -1690,9 +1692,9 @@ export async function cancelJob(jobId: string): Promise<TaskResult> {
       .eq('job_id', jobId);
 
     revalidatePath('/plant-health/tasks');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    logError('[cancelJob] error', { error });
+    logError('[cancelJob] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

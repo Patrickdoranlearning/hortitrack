@@ -2,6 +2,8 @@
 
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
+import { logError } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
 
 // ============================================================================
 // Types
@@ -76,9 +78,7 @@ export type RecordUsageInput = {
   notes?: string;
 };
 
-export type StockResult<T = void> =
-  | { success: true; data?: T }
-  | { success: false; error: string };
+// Using ActionResult<T> from @/lib/errors as the standard result type
 
 // ============================================================================
 // Bottle Normalization
@@ -148,7 +148,7 @@ function normalizeStockSummary(row: any): IpmStockSummary {
 export async function listBottles(filters?: {
   productId?: string;
   status?: string;
-}): Promise<StockResult<IpmBottle[]>> {
+}): Promise<ActionResult<IpmBottle[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -164,13 +164,13 @@ export async function listBottles(filters?: {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[listBottles] query failed', error);
+      logError('[listBottles] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeBottle) };
   } catch (error) {
-    console.error('[listBottles] error', error);
+    logError('[listBottles] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -178,7 +178,7 @@ export async function listBottles(filters?: {
   }
 }
 
-export async function getBottleByCode(bottleCode: string): Promise<StockResult<IpmBottle>> {
+export async function getBottleByCode(bottleCode: string): Promise<ActionResult<IpmBottle>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -193,13 +193,13 @@ export async function getBottleByCode(bottleCode: string): Promise<StockResult<I
       if (error.code === 'PGRST116') {
         return { success: false, error: 'Bottle not found' };
       }
-      console.error('[getBottleByCode] query failed', error);
+      logError('[getBottleByCode] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: normalizeBottle(data) };
   } catch (error) {
-    console.error('[getBottleByCode] error', error);
+    logError('[getBottleByCode] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -210,7 +210,7 @@ export async function getBottleByCode(bottleCode: string): Promise<StockResult<I
 export async function createBottles(
   input: CreateBottleInput,
   quantity: number = 1
-): Promise<StockResult<IpmBottle[]>> {
+): Promise<ActionResult<IpmBottle[]>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -222,7 +222,7 @@ export async function createBottles(
         .rpc('generate_bottle_code', { p_org_id: orgId, p_product_id: input.productId });
 
       if (codeError) {
-        console.error('[createBottles] code generation failed', codeError);
+        logError('[createBottles] code generation failed', { error: codeError.message });
         return { success: false, error: 'Failed to generate bottle code' };
       }
 
@@ -247,14 +247,14 @@ export async function createBottles(
       .select(`*, ipm_products (id, name)`);
 
     if (error) {
-      console.error('[createBottles] insert failed', error);
+      logError('[createBottles] insert failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/products');
     return { success: true, data: (data || []).map(normalizeBottle) };
   } catch (error) {
-    console.error('[createBottles] error', error);
+    logError('[createBottles] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -262,7 +262,7 @@ export async function createBottles(
   }
 }
 
-export async function disposeBottle(bottleId: string, notes?: string): Promise<StockResult> {
+export async function disposeBottle(bottleId: string, notes?: string): Promise<ActionResult<null>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -298,14 +298,14 @@ export async function disposeBottle(bottleId: string, notes?: string): Promise<S
       .eq('org_id', orgId);
 
     if (updateError) {
-      console.error('[disposeBottle] update failed', updateError);
+      logError('[disposeBottle] update failed', { error: updateError.message });
       return { success: false, error: updateError.message };
     }
 
     revalidatePath('/plant-health/products');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[disposeBottle] error', error);
+    logError('[disposeBottle] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -317,7 +317,7 @@ export async function disposeBottle(bottleId: string, notes?: string): Promise<S
 // Stock Movements
 // ============================================================================
 
-export async function recordUsage(input: RecordUsageInput): Promise<StockResult<IpmStockMovement>> {
+export async function recordUsage(input: RecordUsageInput): Promise<ActionResult<IpmStockMovement>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -370,14 +370,14 @@ export async function recordUsage(input: RecordUsageInput): Promise<StockResult<
       .single();
 
     if (error) {
-      console.error('[recordUsage] insert failed', error);
+      logError('[recordUsage] insert failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/products');
     return { success: true, data: normalizeMovement(data) };
   } catch (error) {
-    console.error('[recordUsage] error', error);
+    logError('[recordUsage] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -389,7 +389,7 @@ export async function adjustBottleLevel(
   bottleId: string,
   newRemainingMl: number,
   notes?: string
-): Promise<StockResult> {
+): Promise<ActionResult<null>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -420,14 +420,14 @@ export async function adjustBottleLevel(
     });
 
     if (error) {
-      console.error('[adjustBottleLevel] insert failed', error);
+      logError('[adjustBottleLevel] insert failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/products');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[adjustBottleLevel] error', error);
+    logError('[adjustBottleLevel] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -435,7 +435,7 @@ export async function adjustBottleLevel(
   }
 }
 
-export async function getMovementsForBottle(bottleId: string): Promise<StockResult<IpmStockMovement[]>> {
+export async function getMovementsForBottle(bottleId: string): Promise<ActionResult<IpmStockMovement[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -447,13 +447,13 @@ export async function getMovementsForBottle(bottleId: string): Promise<StockResu
       .order('recorded_at', { ascending: false });
 
     if (error) {
-      console.error('[getMovementsForBottle] query failed', error);
+      logError('[getMovementsForBottle] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeMovement) };
   } catch (error) {
-    console.error('[getMovementsForBottle] error', error);
+    logError('[getMovementsForBottle] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -465,7 +465,7 @@ export async function getMovementsForBottle(bottleId: string): Promise<StockResu
 // Stock Summary
 // ============================================================================
 
-export async function getStockSummary(): Promise<StockResult<IpmStockSummary[]>> {
+export async function getStockSummary(): Promise<ActionResult<IpmStockSummary[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -475,13 +475,13 @@ export async function getStockSummary(): Promise<StockResult<IpmStockSummary[]>>
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[getStockSummary] query failed', error);
+      logError('[getStockSummary] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeStockSummary) };
   } catch (error) {
-    console.error('[getStockSummary] error', error);
+    logError('[getStockSummary] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -489,7 +489,7 @@ export async function getStockSummary(): Promise<StockResult<IpmStockSummary[]>>
   }
 }
 
-export async function getProductStockSummary(productId: string): Promise<StockResult<IpmStockSummary>> {
+export async function getProductStockSummary(productId: string): Promise<ActionResult<IpmStockSummary>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -520,13 +520,13 @@ export async function getProductStockSummary(productId: string): Promise<StockRe
           },
         };
       }
-      console.error('[getProductStockSummary] query failed', error);
+      logError('[getProductStockSummary] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: normalizeStockSummary(data) };
   } catch (error) {
-    console.error('[getProductStockSummary] error', error);
+    logError('[getProductStockSummary] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -534,7 +534,7 @@ export async function getProductStockSummary(productId: string): Promise<StockRe
   }
 }
 
-export async function getLowStockProducts(): Promise<StockResult<IpmStockSummary[]>> {
+export async function getLowStockProducts(): Promise<ActionResult<IpmStockSummary[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -545,13 +545,13 @@ export async function getLowStockProducts(): Promise<StockResult<IpmStockSummary
       .eq('is_low_stock', true);
 
     if (error) {
-      console.error('[getLowStockProducts] query failed', error);
+      logError('[getLowStockProducts] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeStockSummary) };
   } catch (error) {
-    console.error('[getLowStockProducts] error', error);
+    logError('[getLowStockProducts] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -563,7 +563,7 @@ export async function getLowStockProducts(): Promise<StockResult<IpmStockSummary
 // Available Bottles for Treatment
 // ============================================================================
 
-export async function getAvailableBottles(productId: string): Promise<StockResult<IpmBottle[]>> {
+export async function getAvailableBottles(productId: string): Promise<ActionResult<IpmBottle[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -578,13 +578,13 @@ export async function getAvailableBottles(productId: string): Promise<StockResul
       .order('remaining_ml', { ascending: true }); // Use nearly empty ones first
 
     if (error) {
-      console.error('[getAvailableBottles] query failed', error);
+      logError('[getAvailableBottles] query failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeBottle) };
   } catch (error) {
-    console.error('[getAvailableBottles] error', error);
+    logError('[getAvailableBottles] error', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

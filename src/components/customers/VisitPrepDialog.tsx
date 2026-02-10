@@ -78,11 +78,11 @@ export function VisitPrepDialog({
         getUpcomingMilestonesAction(customer.id, 30),
       ]);
 
-      if (followUpsResult.success) {
-        setFollowUps(followUpsResult.followUps);
+      if (followUpsResult.success && followUpsResult.data) {
+        setFollowUps(followUpsResult.data);
       }
-      if (milestonesResult.success) {
-        setMilestones(milestonesResult.milestones);
+      if (milestonesResult.success && milestonesResult.data) {
+        setMilestones(milestonesResult.data);
       }
     } finally {
       setIsLoading(false);

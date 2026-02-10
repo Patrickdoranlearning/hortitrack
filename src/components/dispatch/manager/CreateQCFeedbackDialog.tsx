@@ -21,7 +21,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 interface PickItem {
   id: string;
@@ -95,8 +95,7 @@ export function CreateQCFeedbackDialog({
       } else {
         toast.error(data.error || 'Failed to create feedback');
       }
-    } catch (error) {
-      console.error('Failed to create feedback:', error);
+    } catch {
       toast.error('Failed to create feedback');
     } finally {
       setIsSubmitting(false);

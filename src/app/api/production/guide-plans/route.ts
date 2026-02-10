@@ -4,6 +4,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { buildGuidePlanProgress } from "@/lib/planning/guide-plan-types";
 import type { GuidePlanWithProgress } from "@/lib/planning/guide-plan-types";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[guide-plans GET] query failed:", error);
+      logger.production.error("Guide plans GET query failed", error);
       throw new Error(error.message);
     }
 
@@ -125,7 +126,7 @@ export async function GET() {
     return NextResponse.json({ guidePlans: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load guide plans";
-    console.error("[guide-plans GET] error:", message);
+    logger.production.error("Guide plans GET failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -191,7 +192,7 @@ export async function POST(req: Request) {
       .single();
 
     if (error || !data) {
-      console.error("[guide-plans POST] insert failed:", error);
+      logger.production.error("Guide plan insert failed", error);
       throw new Error(error?.message ?? "Failed to create guide plan");
     }
 
@@ -223,7 +224,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload", issues: error.issues }, { status: 400 });
     }
     const message = error instanceof Error ? error.message : "Failed to create guide plan";
-    console.error("[guide-plans POST] error:", message);
+    logger.production.error("Guide plan POST failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

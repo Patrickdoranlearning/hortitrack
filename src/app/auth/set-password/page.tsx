@@ -84,8 +84,7 @@ export default function SetPasswordPage() {
 
       if (!response.ok) {
         const data = await response.json();
-        console.error("Onboarding error:", data.error);
-        // Don't fail here - the password was set successfully
+        // Onboarding failed but don't block - the password was set successfully
       }
 
       setSuccess(true);
@@ -95,7 +94,6 @@ export default function SetPasswordPage() {
         router.push("/");
       }, 2000);
     } catch (err) {
-      console.error("Set password error:", err);
       setError(err instanceof Error ? err.message : "Failed to set password");
       setLoading(false);
     }

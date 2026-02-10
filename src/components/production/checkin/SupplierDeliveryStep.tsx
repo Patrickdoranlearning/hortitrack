@@ -62,12 +62,6 @@ export function SupplierDeliveryStep({
 
   const suppliers = referenceData.suppliers ?? [];
 
-  // Debug logging for suppliers
-  useEffect(() => {
-    console.log('[SupplierDeliveryStep] referenceData:', referenceData);
-    console.log('[SupplierDeliveryStep] suppliers:', suppliers);
-  }, [referenceData, suppliers]);
-
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === supplierId),
     [suppliers, supplierId]

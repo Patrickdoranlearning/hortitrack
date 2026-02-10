@@ -8,6 +8,7 @@ import { allocateForProductLine } from "@/server/sales/allocation";
 import { getSaleableBatches } from "@/server/sales/inventory";
 import { calculateTrolleysNeeded, type OrderLineForCalculation } from "@/lib/dispatch/trolley-calculation";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(req: Request) {
   try {
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, orders });
   } catch (err) {
-    console.error("[api:sales/orders][GET]", err);
+    logger.sales.error("GET /api/sales/orders failed", err);
     return NextResponse.json({ ok: false, error: String((err as any)?.message ?? err) }, { status: 500 });
   }
 }
@@ -229,7 +230,7 @@ export async function POST(req: Request) {
     );
 
     if (rpcErr) {
-      console.error("[api:sales/orders][POST] RPC error:", rpcErr);
+      logger.sales.error("POST /api/sales/orders RPC error", rpcErr);
       // Parse specific error messages for better UX
       if (rpcErr.message.includes("Insufficient stock")) {
         return fail(400, "insufficient_stock", rpcErr.message);
@@ -300,7 +301,7 @@ export async function POST(req: Request) {
         }
       }
     } catch (trolleyErr) {
-      console.warn('Failed to calculate trolleys estimate:', trolleyErr);
+      logger.sales.warn("Failed to calculate trolleys estimate", { error: String(trolleyErr) });
       // Don't fail order creation if trolley calculation fails
     }
 
@@ -308,13 +309,13 @@ export async function POST(req: Request) {
     try {
       await createPickListFromOrder(orderId);
     } catch (e) {
-      console.error('Failed to create pick list:', e);
+      logger.sales.error("Failed to create pick list for order", e);
       // Don't fail the order creation if pick list fails
     }
 
     return NextResponse.json({ ok: true, id: orderId }, { status: 201 });
   } catch (err) {
-    console.error("[api:sales/orders][POST]", err);
+    logger.sales.error("POST /api/sales/orders failed", err);
     return NextResponse.json({ ok: false, error: "Failed to create order" }, { status: 500 });
   }
 }

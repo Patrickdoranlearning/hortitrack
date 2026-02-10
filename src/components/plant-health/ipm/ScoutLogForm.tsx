@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -143,8 +143,7 @@ export function ScoutLogForm({
       });
 
       onSuccess?.();
-    } catch (error) {
-      console.error('Issue logging failed', error);
+    } catch {
       toast.error('Failed to log issue');
     }
   }
@@ -173,8 +172,7 @@ export function ScoutLogForm({
       });
 
       onSuccess?.();
-    } catch (error) {
-      console.error('Measurement logging failed', error);
+    } catch {
       toast.error('Failed to log measurement');
     }
   }

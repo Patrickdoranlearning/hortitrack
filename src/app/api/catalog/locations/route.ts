@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 import { getActiveOrgId } from "@/server/auth/org";
 import { safeIlikePattern } from "@/server/db/sanitize";
 
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
 
     const { data, error } = await query;
     if (error) {
-      console.error("[catalog.locations] select error", error);
+      logger.api.error("Catalog locations select failed", error);
       return NextResponse.json({ error: "Failed to load locations" }, { status: 500 });
     }
 
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
     if (e.message.includes("Unauthenticated") || e.message.includes("No active org")) {
       return NextResponse.json({ error: e.message }, { status: 401 });
     }
-    console.error("[catalog.locations] unhandled error", e);
+    logger.api.error("Catalog locations unhandled error", e);
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
   }
 }

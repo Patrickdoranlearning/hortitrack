@@ -8,6 +8,7 @@ import { ok, fail } from "@/server/utils/envelope";
 import { withApiGuard } from "@/server/http/guard";
 import { getUserAndOrg } from "@/server/auth/org";
 import { resolveProductionStatus } from "@/server/batches/service";
+import { logger } from "@/server/utils/logger";
 
 // GET - Search batches
 export async function GET(request: Request) {
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
           location_id,
           phase,
           plant_variety:plant_varieties(id, name, family),
-          location:nursery_locations(id, name)
+          location:nursery_locations(id, name, nursery_site)
         `)
         .eq("org_id", orgId)
         .not("status", "in", '("Archived","Shipped")')
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
         .limit(limit);
 
       if (error) {
-        console.error("[api/batches GET] query error", error);
+        logger.api.error("GET /api/batches query failed", error);
         // Don't expose database error details to clients
         return NextResponse.json({ data: [], error: "Failed to fetch batches" }, { status: 500 });
       }
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
         variety: b.plant_variety?.name,
         family: b.plant_variety?.family,
         locationName: b.location?.name,
+        locationSite: b.location?.nursery_site ?? null,
     }));
 
       return NextResponse.json({ data: items }, { status: 200 });
@@ -80,7 +82,7 @@ export async function GET(request: Request) {
         status,
         location_id,
         plant_variety:plant_varieties(id, name, family),
-        location:nursery_locations(id, name)
+        location:nursery_locations(id, name, nursery_site)
       `)
       .eq("org_id", orgId)
       .not("status", "in", '("Archived","Shipped")')
@@ -113,7 +115,7 @@ export async function GET(request: Request) {
           location_id,
           phase,
           plant_variety:plant_varieties(id, name, family),
-          location:nursery_locations(id, name)
+          location:nursery_locations(id, name, nursery_site)
         `)
         .eq("org_id", orgId)
         .not("status", "in", '("Archived","Shipped")')
@@ -148,11 +150,12 @@ export async function GET(request: Request) {
       variety: b.plant_variety?.name,
       family: b.plant_variety?.family,
       locationName: b.location?.name,
+      locationSite: b.location?.nursery_site ?? null,
     }));
 
     return NextResponse.json({ data: items }, { status: 200 });
   } catch (e: unknown) {
-    console.error("[api/batches GET] 500", e);
+    logger.api.error("GET /api/batches failed", e);
     // Don't expose internal error details to clients
     return NextResponse.json({ data: [], error: "Failed to search batches" }, { status: 500 });
   }
@@ -232,7 +235,7 @@ export const POST = withApiGuard({
       return ok(result.body, result.status);
 
     } catch (err: unknown) {
-      console.error("[/api/batches POST] failed", { err: String(err) });
+      logger.api.error("POST /api/batches failed", err);
       const msg = err instanceof Error ? err.message : "Server error";
       if (msg === "Unauthenticated") return fail(401, "UNAUTHORIZED", "Not authenticated");
       if (msg === "No active org selected") return fail(400, "NO_ORG", "No active organization found");

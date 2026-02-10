@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getOrgPlantHealthHistory } from "@/server/batches/plant-health-history";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (e) {
-    console.error("[api/plant-health/history] error", e);
+    logger.api.error("Plant health history fetch failed", e);
     const message = e instanceof Error ? e.message : "Server error";
     const status = /Unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

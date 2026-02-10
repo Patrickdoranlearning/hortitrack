@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { vibrateTap, vibrateSuccess } from "@/lib/haptics";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 interface Variety {
   id: string;
@@ -53,7 +53,6 @@ interface ReferenceData {
 
 export default function WorkerBatchCreatePage() {
   const router = useRouter();
-  const { toast } = useToast();
 
   // Reference data
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
@@ -102,18 +101,14 @@ export default function WorkerBatchCreatePage() {
           setLocationId(data.locations[0].id);
         }
       } catch {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load varieties, sizes, and locations",
-        });
+        toast.error("Failed to load varieties, sizes, and locations");
       } finally {
         setLoadingRef(false);
       }
     }
 
     fetchReferenceData();
-  }, [toast]);
+  }, []);
 
   // Get selected items
   const selectedVariety = referenceData?.varieties.find((v) => v.id === varietyId);
@@ -149,11 +144,7 @@ export default function WorkerBatchCreatePage() {
 
   const handleSubmit = async () => {
     if (!varietyId || !sizeId || !locationId) {
-      toast({
-        variant: "destructive",
-        title: "Missing fields",
-        description: "Please select variety, size, and location",
-      });
+      toast.error("Please select variety, size, and location");
       return;
     }
 
@@ -194,11 +185,7 @@ export default function WorkerBatchCreatePage() {
       setVarietySearch("");
       setSizeSearch("");
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Creation failed",
-        description: error instanceof Error ? error.message : "Failed to create batch",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to create batch");
     } finally {
       setSubmitting(false);
     }

@@ -3,13 +3,14 @@
 import { getUserAndOrg } from '@/server/auth/org';
 import { requireOrgRole, isPermissionError } from '@/server/auth/permissions';
 import { revalidatePath } from 'next/cache';
+import { logError } from '@/lib/log';
+import { ActionResult } from '@/lib/errors';
 import type {
   IpmRemedialProgram,
   IpmRemedialStep,
   IpmRemedialApplication,
   IpmRemedialApplicationStep,
   IpmRemedialProgramInput,
-  IpmRemedialResult,
   ApplyRemedialProgramInput,
   RemedialProgramFilters,
   RemedialApplicationFilters,
@@ -132,7 +133,7 @@ function normalizeApplication(row: Record<string, unknown>): IpmRemedialApplicat
  */
 export async function listRemedialPrograms(
   filters?: RemedialProgramFilters
-): Promise<IpmRemedialResult<IpmRemedialProgram[]>> {
+): Promise<ActionResult<IpmRemedialProgram[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -162,7 +163,7 @@ export async function listRemedialPrograms(
     const { data, error } = await query;
 
     if (error) {
-      console.error('[listRemedialPrograms] query failed', error);
+      logError('listRemedialPrograms query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -177,7 +178,7 @@ export async function listRemedialPrograms(
 
     return { success: true, data: programs };
   } catch (error) {
-    console.error('[listRemedialPrograms] error', error);
+    logError('listRemedialPrograms failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -192,7 +193,7 @@ export async function listRemedialPrograms(
 export async function getRemedialProgramsForPest(
   pest: string,
   severity?: string
-): Promise<IpmRemedialResult<IpmRemedialProgram[]>> {
+): Promise<ActionResult<IpmRemedialProgram[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -212,7 +213,7 @@ export async function getRemedialProgramsForPest(
       .order('name');
 
     if (error) {
-      console.error('[getRemedialProgramsForPest] query failed', error);
+      logError('getRemedialProgramsForPest query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -227,7 +228,7 @@ export async function getRemedialProgramsForPest(
 
     return { success: true, data: programs };
   } catch (error) {
-    console.error('[getRemedialProgramsForPest] error', error);
+    logError('getRemedialProgramsForPest failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -238,7 +239,7 @@ export async function getRemedialProgramsForPest(
 /**
  * Get a single remedial program by ID
  */
-export async function getRemedialProgram(id: string): Promise<IpmRemedialResult<IpmRemedialProgram>> {
+export async function getRemedialProgram(id: string): Promise<ActionResult<IpmRemedialProgram>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -256,13 +257,13 @@ export async function getRemedialProgram(id: string): Promise<IpmRemedialResult<
       .single();
 
     if (error) {
-      console.error('[getRemedialProgram] query failed', error);
+      logError('getRemedialProgram query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: normalizeProgram(data as Record<string, unknown>) };
   } catch (error) {
-    console.error('[getRemedialProgram] error', error);
+    logError('getRemedialProgram failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -275,7 +276,7 @@ export async function getRemedialProgram(id: string): Promise<IpmRemedialResult<
  */
 export async function createRemedialProgram(
   input: IpmRemedialProgramInput
-): Promise<IpmRemedialResult<IpmRemedialProgram>> {
+): Promise<ActionResult<IpmRemedialProgram>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -297,7 +298,7 @@ export async function createRemedialProgram(
       .single();
 
     if (programError) {
-      console.error('[createRemedialProgram] program insert failed', programError);
+      logError('createRemedialProgram program insert failed', { error: programError });
       return { success: false, error: programError.message };
     }
 
@@ -319,7 +320,7 @@ export async function createRemedialProgram(
         .insert(stepsToInsert);
 
       if (stepsError) {
-        console.error('[createRemedialProgram] steps insert failed', stepsError);
+        logError('createRemedialProgram steps insert failed', { error: stepsError });
         // Clean up the program
         await supabase.from('ipm_remedial_programs').delete().eq('id', program.id);
         return { success: false, error: stepsError.message };
@@ -331,7 +332,7 @@ export async function createRemedialProgram(
     // Re-fetch the complete program with steps
     return getRemedialProgram(program.id);
   } catch (error) {
-    console.error('[createRemedialProgram] error', error);
+    logError('createRemedialProgram failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -345,7 +346,7 @@ export async function createRemedialProgram(
 export async function updateRemedialProgram(
   id: string,
   input: Partial<IpmRemedialProgramInput>
-): Promise<IpmRemedialResult<IpmRemedialProgram>> {
+): Promise<ActionResult<IpmRemedialProgram>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -365,7 +366,7 @@ export async function updateRemedialProgram(
       .eq('org_id', orgId);
 
     if (programError) {
-      console.error('[updateRemedialProgram] update failed', programError);
+      logError('updateRemedialProgram update failed', { error: programError });
       return { success: false, error: programError.message };
     }
 
@@ -392,7 +393,7 @@ export async function updateRemedialProgram(
           .insert(stepsToInsert);
 
         if (stepsError) {
-          console.error('[updateRemedialProgram] steps insert failed', stepsError);
+          logError('updateRemedialProgram steps insert failed', { error: stepsError });
           return { success: false, error: stepsError.message };
         }
       }
@@ -401,7 +402,7 @@ export async function updateRemedialProgram(
     revalidatePath('/plant-health/programs');
     return getRemedialProgram(id);
   } catch (error) {
-    console.error('[updateRemedialProgram] error', error);
+    logError('updateRemedialProgram failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -412,7 +413,7 @@ export async function updateRemedialProgram(
 /**
  * Delete a remedial program (admin only)
  */
-export async function deleteRemedialProgram(id: string): Promise<IpmRemedialResult> {
+export async function deleteRemedialProgram(id: string): Promise<ActionResult<null>> {
   try {
     // RBAC: Only admin or owner can delete programs
     const { orgId } = await requireOrgRole(['admin', 'owner']);
@@ -440,14 +441,14 @@ export async function deleteRemedialProgram(id: string): Promise<IpmRemedialResu
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[deleteRemedialProgram] delete failed', error);
+      logError('deleteRemedialProgram delete failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/programs');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[deleteRemedialProgram] error', error);
+    logError('deleteRemedialProgram failed', { error });
     if (isPermissionError(error)) {
       return { success: false, error: 'You do not have permission to delete programs' };
     }
@@ -468,7 +469,7 @@ export async function deleteRemedialProgram(id: string): Promise<IpmRemedialResu
  */
 export async function applyRemedialProgram(
   input: ApplyRemedialProgramInput
-): Promise<IpmRemedialResult<IpmRemedialApplication>> {
+): Promise<ActionResult<IpmRemedialApplication>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -484,7 +485,7 @@ export async function applyRemedialProgram(
       .single();
 
     if (programError || !program) {
-      console.error('[applyRemedialProgram] program not found', programError);
+      logError('applyRemedialProgram program not found', { error: programError });
       return { success: false, error: 'Program not found' };
     }
 
@@ -519,7 +520,7 @@ export async function applyRemedialProgram(
       .single();
 
     if (appError || !application) {
-      console.error('[applyRemedialProgram] application insert failed', appError);
+      logError('applyRemedialProgram application insert failed', { error: appError });
       return { success: false, error: appError?.message || 'Failed to create application' };
     }
 
@@ -540,7 +541,7 @@ export async function applyRemedialProgram(
         .insert(applicationSteps);
 
       if (stepsError) {
-        console.error('[applyRemedialProgram] application steps insert failed', stepsError);
+        logError('applyRemedialProgram application steps insert failed', { error: stepsError });
         // Clean up the application
         await supabase.from('ipm_remedial_applications').delete().eq('id', application.id);
         return { success: false, error: stepsError.message };
@@ -553,7 +554,7 @@ export async function applyRemedialProgram(
     // Re-fetch the complete application
     return getRemedialApplication(application.id);
   } catch (error) {
-    console.error('[applyRemedialProgram] error', error);
+    logError('applyRemedialProgram failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -566,7 +567,7 @@ export async function applyRemedialProgram(
  */
 export async function getRemedialApplication(
   id: string
-): Promise<IpmRemedialResult<IpmRemedialApplication>> {
+): Promise<ActionResult<IpmRemedialApplication>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -590,13 +591,13 @@ export async function getRemedialApplication(
       .single();
 
     if (error) {
-      console.error('[getRemedialApplication] query failed', error);
+      logError('getRemedialApplication query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: normalizeApplication(data as Record<string, unknown>) };
   } catch (error) {
-    console.error('[getRemedialApplication] error', error);
+    logError('getRemedialApplication failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -609,7 +610,7 @@ export async function getRemedialApplication(
  */
 export async function listRemedialApplications(
   filters?: RemedialApplicationFilters
-): Promise<IpmRemedialResult<IpmRemedialApplication[]>> {
+): Promise<ActionResult<IpmRemedialApplication[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -647,7 +648,7 @@ export async function listRemedialApplications(
     const { data, error } = await query;
 
     if (error) {
-      console.error('[listRemedialApplications] query failed', error);
+      logError('listRemedialApplications query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -656,7 +657,7 @@ export async function listRemedialApplications(
       data: (data || []).map((row) => normalizeApplication(row as Record<string, unknown>)),
     };
   } catch (error) {
-    console.error('[listRemedialApplications] error', error);
+    logError('listRemedialApplications failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -667,7 +668,7 @@ export async function listRemedialApplications(
 /**
  * Get active remedial applications (for dashboard)
  */
-export async function getActiveRemedialApplications(): Promise<IpmRemedialResult<IpmRemedialApplication[]>> {
+export async function getActiveRemedialApplications(): Promise<ActionResult<IpmRemedialApplication[]>> {
   return listRemedialApplications({ status: 'active' });
 }
 
@@ -677,7 +678,7 @@ export async function getActiveRemedialApplications(): Promise<IpmRemedialResult
 export async function completeRemedialStep(
   applicationStepId: string,
   notes?: string
-): Promise<IpmRemedialResult<IpmRemedialApplicationStep>> {
+): Promise<ActionResult<IpmRemedialApplicationStep>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -719,7 +720,7 @@ export async function completeRemedialStep(
       .single();
 
     if (updateError) {
-      console.error('[completeRemedialStep] update failed', updateError);
+      logError('completeRemedialStep update failed', { error: updateError });
       return { success: false, error: updateError.message };
     }
 
@@ -727,7 +728,7 @@ export async function completeRemedialStep(
 
     return { success: true, data: normalizeApplicationStep(updated as Record<string, unknown>) };
   } catch (error) {
-    console.error('[completeRemedialStep] error', error);
+    logError('completeRemedialStep failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -738,7 +739,7 @@ export async function completeRemedialStep(
 /**
  * Cancel a remedial application
  */
-export async function cancelRemedialApplication(id: string): Promise<IpmRemedialResult> {
+export async function cancelRemedialApplication(id: string): Promise<ActionResult<null>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -752,14 +753,14 @@ export async function cancelRemedialApplication(id: string): Promise<IpmRemedial
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[cancelRemedialApplication] update failed', error);
+      logError('cancelRemedialApplication update failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[cancelRemedialApplication] error', error);
+    logError('cancelRemedialApplication failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -776,7 +777,7 @@ export async function cancelRemedialApplication(id: string): Promise<IpmRemedial
  */
 export async function getUpcomingRemedialSteps(
   days: number = 7
-): Promise<IpmRemedialResult<IpmRemedialApplicationStep[]>> {
+): Promise<ActionResult<IpmRemedialApplicationStep[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -807,7 +808,7 @@ export async function getUpcomingRemedialSteps(
       .order('due_date');
 
     if (error) {
-      console.error('[getUpcomingRemedialSteps] query failed', error);
+      logError('getUpcomingRemedialSteps query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -822,7 +823,7 @@ export async function getUpcomingRemedialSteps(
       data: filteredData.map((row) => normalizeApplicationStep(row as Record<string, unknown>)),
     };
   } catch (error) {
-    console.error('[getUpcomingRemedialSteps] error', error);
+    logError('getUpcomingRemedialSteps failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -838,7 +839,7 @@ export type PestOption = {
 /**
  * Get list of unique pest/disease values for dropdown (simple string array)
  */
-export async function getRemedialPestOptions(): Promise<IpmRemedialResult<string[]>> {
+export async function getRemedialPestOptions(): Promise<ActionResult<string[]>> {
   const result = await getRemedialPestOptionsGrouped();
   if (!result.success) return result;
   return { success: true, data: result.data!.map((opt) => opt.label) };
@@ -847,7 +848,7 @@ export async function getRemedialPestOptions(): Promise<IpmRemedialResult<string
 /**
  * Get list of pest/disease options with categories for grouped dropdown
  */
-export async function getRemedialPestOptionsGrouped(): Promise<IpmRemedialResult<PestOption[]>> {
+export async function getRemedialPestOptionsGrouped(): Promise<ActionResult<PestOption[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -862,7 +863,7 @@ export async function getRemedialPestOptionsGrouped(): Promise<IpmRemedialResult
       .order('sort_order');
 
     if (error) {
-      console.error('[getRemedialPestOptionsGrouped] query failed', error);
+      logError('getRemedialPestOptionsGrouped query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -882,7 +883,7 @@ export async function getRemedialPestOptionsGrouped(): Promise<IpmRemedialResult
 
     return { success: true, data: options };
   } catch (error) {
-    console.error('[getRemedialPestOptionsGrouped] error', error);
+    logError('getRemedialPestOptionsGrouped failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

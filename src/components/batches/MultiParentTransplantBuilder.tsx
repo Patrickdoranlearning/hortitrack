@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,8 +56,6 @@ type ParentRow = {
 
 export default function MultiParentTransplantBuilder() {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
-
   // Use hydration-safe date to prevent server/client mismatch
   const today = useTodayDate();
   const [child, setChild] = React.useState({
@@ -191,18 +189,11 @@ export default function MultiParentTransplantBuilder() {
         })),
       };
       const res = await ProductionAPI.multiTransplant(payload);
-      toast({
-        title: "Multi-parent transplant created",
-        description: `Batch ${res.child_batch?.batch_number ?? ""} assembled successfully.`,
-      });
+      toast.success(`Batch ${res.child_batch?.batch_number ?? ""} assembled successfully.`);
       setRows([]);
       addRow();
     } catch (err) {
-      toast({
-        title: "Failed to create transplant",
-        description: err instanceof Error ? err.message : "Check the inputs and try again.",
-        variant: "destructive",
-      });
+      toast.error(err instanceof Error ? err.message : "Check the inputs and try again.");
     } finally {
       setBusy(null);
     }

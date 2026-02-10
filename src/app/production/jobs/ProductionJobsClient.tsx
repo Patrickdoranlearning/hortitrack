@@ -18,7 +18,7 @@ import { CreateJobDialog } from "@/app/tasks/components/CreateJobDialog";
 import { TaskWizard } from "@/app/tasks/components/TaskWizard";
 import { ActualizeWizardDialog } from "@/components/production/actualize";
 import type { PlannedBatch } from "@/components/production/actualize";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import type { StaffMember } from "@/server/tasks/service";
 import type { ProductionJob, JobBatch } from "@/server/production/jobs";
@@ -33,7 +33,6 @@ type JobsResponse = { jobs: ProductionJob[] };
 type BatchesResponse = { batches: JobBatch[] };
 
 export default function ProductionJobsClient({ initialJobs, staff, availableBatches: initialBatches }: Props) {
-  const { toast } = useToast();
   const [isCreateJobOpen, setIsCreateJobOpen] = React.useState(false);
   const [selectedJob, setSelectedJob] = React.useState<ProductionJob | null>(null);
   const [selectedJobBatches, setSelectedJobBatches] = React.useState<JobBatch[]>([]);
@@ -129,15 +128,11 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
         method: "POST",
         body: JSON.stringify(values),
       });
-      toast({ title: "Job created successfully" });
+      toast.success("Job created successfully");
       mutateJobs();
       mutateBatches();
     } catch (error) {
-      toast({
-        title: "Failed to create job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
       throw error;
     }
   };
@@ -148,43 +143,31 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
         method: "POST",
         body: JSON.stringify({ assignedTo: staffId }),
       });
-      toast({ title: "Job assigned" });
+      toast.success("Job assigned");
       mutateJobs();
     } catch (error) {
-      toast({
-        title: "Failed to assign job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     }
   };
 
   const handleStartJob = async (job: ProductionJob) => {
     try {
       await fetchJson(`/api/tasks/jobs/${job.id}/start`, { method: "POST" });
-      toast({ title: "Job started" });
+      toast.success("Job started");
       mutateJobs();
     } catch (error) {
-      toast({
-        title: "Failed to start job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     }
   };
 
   const handleCompleteJob = async (job: ProductionJob) => {
     try {
       await fetchJson(`/api/tasks/jobs/${job.id}/complete`, { method: "POST" });
-      toast({ title: "Job completed" });
+      toast.success("Job completed");
       mutateJobs();
       mutateBatches();
     } catch (error) {
-      toast({
-        title: "Failed to complete job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     }
   };
 
@@ -192,15 +175,11 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
     if (!confirm(`Delete job "${job.name}"? This cannot be undone.`)) return;
     try {
       await fetchJson(`/api/tasks/jobs/${job.id}`, { method: "DELETE" });
-      toast({ title: "Job deleted" });
+      toast.success("Job deleted");
       mutateJobs();
       mutateBatches();
     } catch (error) {
-      toast({
-        title: "Failed to delete job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     }
   };
 
@@ -212,8 +191,7 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
       );
       setSelectedJobBatches(response.batches);
       setIsWizardOpen(true);
-    } catch (error) {
-      console.error("Failed to fetch job details:", error);
+    } catch {
       setSelectedJobBatches([]);
       setIsWizardOpen(true);
     }
@@ -239,12 +217,7 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
       setActualizeJobBatches(plannedBatches);
       setIsActualizeWizardOpen(true);
     } catch (error) {
-      console.error("Failed to start job execution:", error);
-      toast({
-        title: "Failed to start job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     }
   };
 
@@ -270,11 +243,7 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
       mutateJobs();
       mutateBatches();
     } catch (error) {
-      toast({
-        title: "Failed to complete job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     }
   };
 
@@ -297,11 +266,7 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
       mutateJobs();
       mutateBatches();
     } catch (error) {
-      toast({
-        title: "Failed to complete job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
       throw error;
     }
   };
@@ -313,17 +278,13 @@ export default function ProductionJobsClient({ initialJobs, staff, availableBatc
         method: "POST",
         body: JSON.stringify({ assignedTo: staffId }),
       });
-      toast({ title: "Job assigned" });
+      toast.success("Job assigned");
       mutateJobs();
       // Update selected job state
       const assignee = staff.find((s) => s.id === staffId);
       setSelectedJob((prev) => prev ? { ...prev, assignedTo: staffId, assignedToName: assignee?.name ?? null, status: "assigned" } : null);
     } catch (error) {
-      toast({
-        title: "Failed to assign job",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     }
   };
 

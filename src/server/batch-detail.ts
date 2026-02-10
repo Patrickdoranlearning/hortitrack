@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 
 export const BatchDetailSchema = z.object({
   id: z.string(),
@@ -39,7 +40,7 @@ export async function getBatchDetail(batchId: string): Promise<BatchDetail | nul
     .maybeSingle();
 
   if (error) {
-    console.error("Error fetching batch detail from v_batch_search:", error);
+    logger.production.error("Failed to fetch batch detail from v_batch_search", error, { batchId });
     throw new Error("DB(Supabase): " + error.message);
   }
 

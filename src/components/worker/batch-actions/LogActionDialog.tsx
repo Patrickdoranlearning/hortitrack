@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 type ActionType = "spray" | "water" | "feed" | "observation";
 
@@ -90,7 +90,6 @@ export function LogActionDialog({
   actionType,
   onSuccess,
 }: LogActionDialogProps) {
-  const { toast } = useToast();
   const [productName, setProductName] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -108,11 +107,7 @@ export function LogActionDialog({
   const handleSubmit = async () => {
     // Validate notes if required
     if (config.notesRequired && !notes.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Notes required",
-        description: "Please add a note describing your observation",
-      });
+      toast.error("Please add a note describing your observation");
       return;
     }
 
@@ -145,11 +140,7 @@ export function LogActionDialog({
       const data = await response.json();
       onSuccess(data.message || `${config.title} recorded`);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Log failed",
-        description: error instanceof Error ? error.message : `Failed to log ${actionType}`,
-      });
+      toast.error(error instanceof Error ? error.message : `Failed to log ${actionType}`);
     } finally {
       setSubmitting(false);
     }

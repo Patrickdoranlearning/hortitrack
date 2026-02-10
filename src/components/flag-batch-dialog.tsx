@@ -84,9 +84,8 @@ export default function FlagBatchDialog({
         
         onDone?.();
         onOpenChange(false);
-    } catch (e) {
-        console.error("Failed to save flags", e);
-        // Optionally show a toast error
+    } catch {
+        // Flag save failed silently
     }
   };
 

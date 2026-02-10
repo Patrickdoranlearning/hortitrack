@@ -77,7 +77,6 @@ export async function fetchCustomerManagementData(
   priceLists: Array<{ id: string; name: string; currency: string; is_default: boolean | null }>;
   products: ProductOption[];
 }> {
-  console.log("[fetchCustomerManagementData] Fetching for orgId:", orgId);
   const [customerRows, priceListRows, productRows] = await Promise.all([
     supabase
       .from("customers")
@@ -141,13 +140,7 @@ export async function fetchCustomerManagementData(
       )
       .eq("org_id", orgId)
       .order("name", { ascending: true })
-      .then((res) => {
-        if (res.error) {
-          console.error("[fetchCustomerManagementData] customers error:", res.error);
-        }
-        console.log("[fetchCustomerManagementData] customers count:", res.data?.length ?? 0, "for org:", orgId);
-        return res.data ?? [];
-      }),
+      .then((res) => res.data ?? []),
     supabase
       .from("price_lists")
       .select("id, name, currency, is_default")

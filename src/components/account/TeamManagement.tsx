@@ -38,7 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { AddUserDialog } from "./AddUserDialog";
 import { Trash2, Pencil } from "lucide-react";
 
@@ -63,7 +63,6 @@ export function TeamManagement() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const { toast } = useToast();
 
   async function fetchMembers() {
     try {
@@ -76,11 +75,7 @@ export function TeamManagement() {
 
       setMembers(data.members || []);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to fetch members",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to fetch members");
     } finally {
       setIsLoading(false);
     }
@@ -104,18 +99,11 @@ export function TeamManagement() {
         throw new Error(data.error || "Failed to update role");
       }
 
-      toast({
-        title: "Success",
-        description: "User role updated successfully",
-      });
+      toast.success("User role updated successfully");
 
       fetchMembers();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update role",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to update role");
     }
   }
 
@@ -133,18 +121,11 @@ export function TeamManagement() {
         throw new Error(data.error || "Failed to remove member");
       }
 
-      toast({
-        title: "Success",
-        description: "User removed from organization",
-      });
+      toast.success("User removed from organization");
 
       fetchMembers();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to remove member",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to remove member");
     } finally {
       setDeleteUserId(null);
     }
@@ -172,19 +153,12 @@ export function TeamManagement() {
         throw new Error(data.error || "Failed to update name");
       }
 
-      toast({
-        title: "Success",
-        description: "Team member updated successfully",
-      });
+      toast.success("Team member updated successfully");
 
       fetchMembers();
       setEditingMember(null);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update name",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to update name");
     } finally {
       setIsSaving(false);
     }

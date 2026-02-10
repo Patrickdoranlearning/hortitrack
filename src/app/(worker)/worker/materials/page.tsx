@@ -55,8 +55,8 @@ export default function WorkerMaterialsPage() {
         });
         setLowStockItems(data.items);
       }
-    } catch (error) {
-      console.error("Failed to fetch materials data:", error);
+    } catch {
+      // Error handled by empty state UI
     } finally {
       setLoading(false);
     }

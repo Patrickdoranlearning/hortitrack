@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import { cn } from "@/lib/utils";
 import { PrintWorksheetFromSaved } from "./PrintWorksheet";
@@ -45,7 +45,6 @@ type Props = {
 };
 
 export function WorksheetDetail({ worksheet, onDeleted, onRefresh }: Props) {
-  const { toast } = useToast();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
@@ -57,17 +56,10 @@ export function WorksheetDetail({ worksheet, onDeleted, onRefresh }: Props) {
       await fetchJson(`/api/production/execution-worksheets/${worksheet.id}`, {
         method: "DELETE",
       });
-      toast({
-        title: "Worksheet deleted",
-        description: `"${worksheet.name}" has been deleted.`,
-      });
+      toast.success(`"${worksheet.name}" has been deleted.`);
       onDeleted();
     } catch (error) {
-      toast({
-        title: "Failed to delete worksheet",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -81,20 +73,14 @@ export function WorksheetDetail({ worksheet, onDeleted, onRefresh }: Props) {
         method: "PATCH",
         body: JSON.stringify({ action }),
       });
-      toast({
-        title: action === "complete" ? "Worksheet completed" : "Worksheet reopened",
-        description:
-          action === "complete"
-            ? `"${worksheet.name}" marked as complete.`
-            : `"${worksheet.name}" has been reopened.`,
-      });
+      toast.success(
+        action === "complete"
+          ? `"${worksheet.name}" marked as complete.`
+          : `"${worksheet.name}" has been reopened.`
+      );
       onRefresh();
     } catch (error) {
-      toast({
-        title: "Failed to update worksheet",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setIsUpdatingStatus(false);
     }

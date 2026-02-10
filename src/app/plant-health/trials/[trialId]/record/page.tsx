@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { PageFrame } from '@/ui/templates';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   ChevronLeft,
   ChevronRight,
@@ -142,19 +142,15 @@ export default function QuickRecordPage() {
         return;
       }
 
-      console.log('[QuickRecord] Saving measurements:', measurementsToCreate);
       const result = await createBulkMeasurements(measurementsToCreate);
-      console.log('[QuickRecord] Result:', result);
 
       if (result.success) {
         toast.success(`Recorded measurements for ${trial.groups?.length} groups`);
         router.push(`/plant-health/trials/${trialId}`);
       } else {
-        console.error('[QuickRecord] Failed:', result.error);
         toast.error(result.error || 'Failed to save measurements');
       }
-    } catch (error) {
-      console.error('Failed to save measurements:', error);
+    } catch {
       toast.error('Failed to save measurements');
     } finally {
       setIsSubmitting(false);

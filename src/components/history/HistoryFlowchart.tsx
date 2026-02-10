@@ -66,8 +66,7 @@ export default function HistoryFlowchart({ batchId, data }: Props) {
       // @ts-ignore
       .then(() => layoutGraph(sanitizedGraph))
       .then(setLayout)
-      .catch((e) => {
-        console.error("HistoryFlowchart layout error:", e);
+      .catch(() => {
         setErrorMsg("Failed to render flow. The graph will be shown as a list instead.");
         setLayout(null);
       });

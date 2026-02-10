@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { VarietyComboboxGrouped } from "@/components/ui/variety-combobox-grouped";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { calculateTotalPlants } from "@/lib/shared";
@@ -75,7 +75,6 @@ export function PropagationForm({
   onCancel,
 }: PropagationFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
 
   // Form state
   const [varietyId, setVarietyId] = useState<string>("");
@@ -173,10 +172,7 @@ export function PropagationForm({
       }
 
       vibrateSuccess();
-      toast({
-        title: "Propagation created",
-        description: `Batch ${result.batch.batchNumber} created with ${totalUnits.toLocaleString()} plants`,
-      });
+      toast.success(`Batch ${result.batch.batchNumber} created with ${totalUnits.toLocaleString()} plants`);
 
       if (onSuccess) {
         onSuccess(result.batch);
@@ -187,11 +183,7 @@ export function PropagationForm({
       vibrateError();
       const message =
         error instanceof Error ? error.message : "Failed to create propagation";
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +196,6 @@ export function PropagationForm({
     plantedAt,
     notes,
     totalUnits,
-    toast,
     router,
     onSuccess,
   ]);

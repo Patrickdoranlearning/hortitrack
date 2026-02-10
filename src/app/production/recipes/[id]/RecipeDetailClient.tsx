@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { PageFrame } from '@/ui/templates';
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import type { ProtocolSummary } from "@/lib/planning/types";
@@ -148,7 +148,6 @@ type Props = {
 };
 
 export default function RecipeDetailClient({ protocol }: Props) {
-  const { toast } = useToast();
   const { data: refData } = React.useContext(ReferenceDataContext);
   const [saving, setSaving] = React.useState(false);
   const [expandedStages, setExpandedStages] = React.useState<Set<string>>(new Set());
@@ -351,7 +350,7 @@ export default function RecipeDetailClient({ protocol }: Props) {
 
   async function onSubmit(values: FormValues) {
     if (nodes.length < 2) {
-      toast({ title: "Need at least start and end stages", variant: "destructive" });
+      toast.error("Need at least start and end stages");
       return;
     }
 
@@ -421,14 +420,10 @@ export default function RecipeDetailClient({ protocol }: Props) {
         }),
       });
 
-      toast({ title: "Recipe saved" });
+      toast.success("Recipe saved");
       emitMutation({ resource: 'reference-data', action: 'update', id: protocol.id });
     } catch (error: any) {
-      toast({
-        title: "Failed to save",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Failed to save");
     } finally {
       setSaving(false);
     }

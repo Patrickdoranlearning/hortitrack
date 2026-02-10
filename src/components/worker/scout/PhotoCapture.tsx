@@ -55,8 +55,8 @@ export function PhotoCapture({
           vibrateSuccess();
           onPhotosChange([...photos, ...newPhotos]);
         }
-      } catch (error) {
-        console.error("Error processing photo:", error);
+      } catch {
+        // Photo processing failed silently
       } finally {
         setIsProcessing(false);
         // Clear input values to allow re-selecting same file

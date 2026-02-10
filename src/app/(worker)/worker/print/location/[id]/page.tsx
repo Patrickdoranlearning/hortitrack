@@ -25,7 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { vibrateTap, vibrateSuccess } from "@/lib/haptics";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   LabelPrintView,
   type LocationLabelData,
@@ -51,7 +51,6 @@ interface LocationPrintData {
 export default function LocationLabelPrintPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const locationId = params.id as string;
 
   const [location, setLocation] = useState<LocationPrintData | null>(null);
@@ -123,10 +122,7 @@ export default function LocationLabelPrintPage() {
     window.print();
     vibrateSuccess();
 
-    toast({
-      title: "Print dialog opened",
-      description: `Printing ${copies} label${copies > 1 ? "s" : ""} for ${location?.name}`,
-    });
+    toast.success(`Printing ${copies} label${copies > 1 ? "s" : ""} for ${location?.name}`);
   };
 
   const incrementCopies = () => {

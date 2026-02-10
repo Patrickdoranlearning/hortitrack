@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { safeIlikePattern } from "@/server/db/sanitize";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(request: Request) {
   try {
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("[api/locations] query error", error);
+      logger.api.error("Locations query failed", error);
       return NextResponse.json({ data: [], error: error.message }, { status: 500 });
     }
 
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ data: items, items }, { status: 200 });
   } catch (e: any) {
-    console.error("[api/locations] 500", e);
+    logger.api.error("Locations fetch failed", e);
     return NextResponse.json({ data: [], items: [], error: e?.message || "Failed to fetch locations" }, { status: 500 });
   }
 }

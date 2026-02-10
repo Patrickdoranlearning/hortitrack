@@ -39,7 +39,7 @@ import {
   type LocationBasic,
 } from '@/app/actions/ipm';
 import { bulkGenerateTasks, getGroupedTasks, type TaskGroup } from '@/app/actions/ipm-tasks';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export default function PlantHealthDashboard() {
   const [programs, setPrograms] = useState<IpmProgram[]>([]);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { nextBatchNumber } from "@/server/numbering/batches";
+import { logger } from "@/server/utils/logger";
 
 const DateOnly = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -183,7 +184,7 @@ export async function POST(req: Request) {
             .insert(materialInserts);
 
           if (matError) {
-            console.warn(`[plan-propagation] Failed to save materials for batch ${batch.id}:`, matError.message);
+            logger.production.warn(`Failed to save materials for planned propagation batch`, { batchId: batch.id, error: matError.message });
             // Don't fail the batch creation, just log the warning
           }
         }

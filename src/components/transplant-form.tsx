@@ -17,7 +17,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SubmitButton } from "@/components/ui/SubmitButton";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -80,7 +80,6 @@ export function TransplantForm({
 }: Props) {
   const { data } = useContext(ReferenceDataContext);
   const sizesSafe = (plantSizes && plantSizes.length ? plantSizes : data?.sizes ?? []) as Array<PlantSize>;
-  const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<PlantSize | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 

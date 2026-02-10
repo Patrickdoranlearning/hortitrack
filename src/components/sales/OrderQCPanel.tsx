@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { AlertCircle, Plus, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { addQCNote } from '@/app/sales/orders/[orderId]/actions';
 
@@ -37,7 +37,6 @@ const SEVERITIES = [
 ];
 
 export default function OrderQCPanel({ orderId }: OrderQCPanelProps) {
-  const { toast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [issueType, setIssueType] = useState<string>('');
@@ -48,11 +47,7 @@ export default function OrderQCPanel({ orderId }: OrderQCPanelProps) {
     e.preventDefault();
     
     if (!issueType || !description.trim()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please fill in all required fields',
-        variant: 'destructive',
-      });
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -65,16 +60,9 @@ export default function OrderQCPanel({ orderId }: OrderQCPanelProps) {
       });
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast.error(result.error);
       } else {
-        toast({
-          title: 'QC Note Added',
-          description: 'Quality control note has been recorded',
-        });
+        toast.success('Quality control note has been recorded');
         // Reset form
         setIssueType('');
         setSeverity('low');
@@ -82,11 +70,7 @@ export default function OrderQCPanel({ orderId }: OrderQCPanelProps) {
         setIsAdding(false);
       }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to add QC note',
-        variant: 'destructive',
-      });
+      toast.error('Failed to add QC note');
     } finally {
       setIsSubmitting(false);
     }

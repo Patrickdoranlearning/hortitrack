@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/ui/signature-pad";
 import { Camera, Loader2, FileSignature, Check, AlertTriangle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 interface SignatureCaptureDialogProps {
   open: boolean;
@@ -47,7 +47,6 @@ export function SignatureCaptureDialog({
   deliveryRunId,
   onComplete,
 }: SignatureCaptureDialogProps) {
-  const { toast } = useToast();
   const [mode, setMode] = useState<CaptureMode>("form");
   const [signerName, setSignerName] = useState("");
   const [notes, setNotes] = useState("");
@@ -93,7 +92,6 @@ export function SignatureCaptureDialog({
         await videoRef.current.play();
       }
     } catch (err: any) {
-      console.error("Camera error:", err);
       const message =
         err.name === "NotAllowedError"
           ? "Camera access denied. Please allow camera permissions."
@@ -137,11 +135,7 @@ export function SignatureCaptureDialog({
   // Submit the signed docket
   const handleSubmit = async () => {
     if (!signatureData) {
-      toast({
-        variant: "destructive",
-        title: "Signature required",
-        description: "Please capture the customer's signature.",
-      });
+      toast.error("Please capture the customer's signature.");
       return;
     }
 
@@ -204,17 +198,13 @@ export function SignatureCaptureDialog({
         });
 
         if (!transferRes.ok) {
-          console.error("Failed to request balance transfer");
-          // Don't fail the whole operation - the signed docket is still recorded
+          // Balance transfer failed - don't fail the whole operation, signed docket is still recorded
         }
       }
 
-      toast({
-        title: "Signed docket recorded",
-        description: haulierId
+      toast.success(haulierId
           ? "Balance transfer request sent for manager approval."
-          : "The signed docket has been saved.",
-      });
+          : "The signed docket has been saved.");
 
       onComplete?.({
         signedDocketUrl: uploadData.signedDocketUrl,
@@ -224,12 +214,7 @@ export function SignatureCaptureDialog({
 
       handleOpenChange(false);
     } catch (error: any) {
-      console.error("Submit error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to save signed docket",
-      });
+      toast.error(error.message || "Failed to save signed docket");
     } finally {
       setIsSubmitting(false);
     }

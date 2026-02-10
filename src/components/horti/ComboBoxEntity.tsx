@@ -141,7 +141,6 @@ export function ComboBoxEntity(props: Props) {
         e && typeof e === "object"
           ? { code: e.code, message: e.message, details: e.details, hint: e.hint }
           : { message: String(e) };
-      console.error(`[ComboBoxEntity] ${table} fetch failed`, normalized);
       setError(normalized.message || "Fetch failed");
     } finally {
       if (mounted.current) setLoading(false);

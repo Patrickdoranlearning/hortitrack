@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ActiveDeliveryRunSummary } from '@/lib/dispatch/types';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import TruckVisualization, { TruckLayout, DEFAULT_LAYOUTS } from '@/components/dispatch/TruckVisualization';
 import { TrolleySlotData } from '@/components/dispatch/TruckSlot';
 import DeliveryStopCard, { DeliveryStop, DeliveryStopListItem } from '@/components/dispatch/DeliveryStopCard';
@@ -211,8 +211,7 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
       // Set truck layout - use default for now, vehicle layout can be added later
       // TODO: Add truck_layout column to haulier_vehicles and fetch here
       setTruckLayout(DEFAULT_LAYOUTS.van);
-    } catch (error) {
-      console.error('Failed to load delivery details:', error);
+    } catch {
       toast.error('Failed to load delivery details');
     } finally {
       setIsLoading(false);
@@ -580,7 +579,6 @@ export default function DriverViewClient({ activeRuns, initialRunId }: DriverVie
               }))}
               onSave={async (assignments) => {
                 // TODO: Save slot assignments to database
-                console.log('Saving assignments:', assignments);
                 // Update trolleys state to reflect assignments
                 const newTrolleys: TrolleySlotData[] = assignments.map(a => {
                   const stop = deliveryStops.find(s => s.id === a.orderId);

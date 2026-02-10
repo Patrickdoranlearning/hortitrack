@@ -160,8 +160,8 @@ export function CreateJobDialog({ open, onOpenChange, availableBatches, onSubmit
       form.reset();
       setSelectedIds(new Set());
       onOpenChange(false);
-    } catch (error) {
-      console.error("Failed to create job:", error);
+    } catch {
+      // Job creation failed silently
     } finally {
       setSubmitting(false);
     }

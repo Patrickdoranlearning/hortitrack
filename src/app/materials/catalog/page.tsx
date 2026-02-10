@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { fetchJson } from '@/lib/http/fetchJson';
 import { MaterialForm } from '@/components/materials/MaterialForm';
 import { StockAdjustDialog } from '@/components/materials/StockAdjustDialog';
@@ -59,7 +59,6 @@ type CategoriesResponse = {
 };
 
 export default function MaterialsCatalogPage() {
-  const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const showNewForm = searchParams.get('new') === 'true';
@@ -115,17 +114,13 @@ export default function MaterialsCatalogPage() {
         method: 'POST',
         body: JSON.stringify(data),
       });
-      toast({ title: 'Material created successfully' });
+      toast.success('Material created successfully');
       setIsFormOpen(false);
       setEditingMaterial(null);
       mutateMaterials();
       router.replace('/materials/catalog');
     } catch (error) {
-      toast({
-        title: 'Failed to create material',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     }
   };
 
@@ -136,16 +131,12 @@ export default function MaterialsCatalogPage() {
         method: 'PUT',
         body: JSON.stringify(data),
       });
-      toast({ title: 'Material updated successfully' });
+      toast.success('Material updated successfully');
       setIsFormOpen(false);
       setEditingMaterial(null);
       mutateMaterials();
     } catch (error) {
-      toast({
-        title: 'Failed to update material',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     }
   };
 
@@ -155,15 +146,11 @@ export default function MaterialsCatalogPage() {
       await fetchJson(`/api/materials/${deletingMaterial.id}`, {
         method: 'DELETE',
       });
-      toast({ title: 'Material deleted' });
+      toast.success('Material deleted');
       setDeletingMaterial(null);
       mutateMaterials();
     } catch (error) {
-      toast({
-        title: 'Failed to delete material',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     }
   };
 

@@ -3,14 +3,15 @@
 import { createPropagationBatch } from "@/server/batches/service";
 import { PropagationFormSchema } from "@/types/batch";
 import { z } from "zod";
-import { getUserIdAndOrgId } from "@/server/auth/getUser";
+import { getUserAndOrg } from "@/server/auth/org";
+import type { ActionResult } from "@/lib/errors";
+import { logError } from "@/lib/log";
 
-export async function createPropagationBatchAction(input: z.infer<typeof PropagationFormSchema>) {
+export async function createPropagationBatchAction(
+  input: z.infer<typeof PropagationFormSchema>
+): Promise<ActionResult<Record<string, unknown>>> {
   try {
-    const { userId } = await getUserIdAndOrgId();
-    if (!userId) {
-      return { success: false, error: "Unauthorized" };
-    }
+    const { user } = await getUserAndOrg();
 
     const batch = await createPropagationBatch({
       input: {
@@ -18,12 +19,13 @@ export async function createPropagationBatchAction(input: z.infer<typeof Propaga
         varietyId: input.varietyId ?? input.variety,
         plant_variety_id: input.varietyId ?? input.variety,
       },
-      userId,
+      userId: user.id,
     });
     return { success: true, data: batch };
-  } catch (e: any) {
-    console.error("createPropagationBatchAction error", e);
-    return { success: false, error: e.message };
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    logError("createPropagationBatchAction error", { error: message, raw: e instanceof Error ? e.stack : String(e) });
+    return { success: false, error: message };
   }
 }
 

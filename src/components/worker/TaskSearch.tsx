@@ -70,8 +70,7 @@ export function TaskSearch({ onScanInstead }: TaskSearchProps) {
         const data = await response.json();
         setResults(data.tasks ?? []);
         setSearched(true);
-      } catch (err) {
-        console.error("Search error:", err);
+      } catch {
         setResults([]);
         setSearched(true);
       } finally {
@@ -104,8 +103,7 @@ export function TaskSearch({ onScanInstead }: TaskSearchProps) {
 
       // Navigate to task detail
       router.push(`/worker/task/${task.id}`);
-    } catch (err) {
-      console.error("Failed to start task:", err);
+    } catch {
       router.push(`/worker/task/${task.id}`);
     } finally {
       setStartingTaskId(null);

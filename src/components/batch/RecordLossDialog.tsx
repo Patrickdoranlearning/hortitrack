@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Loader2, Trash2, AlertTriangle, Bug, Thermometer, Scissors, Cog } from "lucide-react";
 import { recordBatchLoss } from "@/app/actions/batch-stock";
 import { LOSS_REASON_LABELS, type LossReason } from "@/lib/shared/batch-stock-constants";
@@ -51,7 +51,6 @@ export function RecordLossDialog({
   currentQuantity = 0,
   onSuccess,
 }: RecordLossDialogProps) {
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [quantity, setQuantity] = React.useState("");
   const [reason, setReason] = React.useState<LossReason>("quality_cull");
@@ -66,16 +65,12 @@ export function RecordLossDialog({
   const handleSubmit = async () => {
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) {
-      toast({ variant: "destructive", title: "Invalid quantity", description: "Please enter a positive number" });
+      toast.error("Please enter a positive number");
       return;
     }
 
     if (qty > currentQuantity) {
-      toast({
-        variant: "destructive",
-        title: "Invalid quantity",
-        description: `Cannot record loss greater than current stock (${currentQuantity})`,
-      });
+      toast.error(`Cannot record loss greater than current stock (${currentQuantity})`);
       return;
     }
 
@@ -90,21 +85,18 @@ export function RecordLossDialog({
       });
 
       if (result.success) {
-        const wasArchived = result.newQuantity === 0;
-        toast({
-          title: wasArchived ? "Batch archived" : "Loss recorded",
-          description: wasArchived
+        const wasArchived = result.data.newQuantity === 0;
+        toast.success(wasArchived
             ? `Recorded ${qty} units lost. Batch has been archived (0 remaining).`
-            : `Recorded ${qty} units lost. ${result.newQuantity} remaining.`,
-        });
+            : `Recorded ${qty} units lost. ${result.data.newQuantity} remaining.`);
         resetForm();
         onOpenChange(false);
-        onSuccess?.(result.newQuantity ?? 0);
+        onSuccess?.(result.data.newQuantity ?? 0);
       } else {
-        toast({ variant: "destructive", title: "Recording failed", description: result.error });
+        toast.error(result.error || "Recording failed");
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: String(error) });
+      toast.error(String(error));
     } finally {
       setIsSubmitting(false);
     }

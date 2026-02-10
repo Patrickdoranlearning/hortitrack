@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, Pencil, Trash2, Tag, Truck, Package, Zap } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   type OrgFee,
   type FeeUnit,
@@ -156,8 +156,8 @@ export function FeeSettingsClient({ initialFees }: Props) {
           }
         } else {
           const result = await createOrgFee(data);
-          if (result.success && result.fee) {
-            setFees(prev => [...prev, result.fee!]);
+          if (result.success) {
+            setFees(prev => [...prev, result.data]);
             setIsCreateOpen(false);
             toast.success('Fee created');
           } else {

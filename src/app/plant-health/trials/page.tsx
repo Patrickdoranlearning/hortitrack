@@ -21,7 +21,7 @@ import {
   FileEdit,
   Loader2,
 } from 'lucide-react';
-import { listTrials, type TrialResult } from '@/app/actions/trials';
+import { listTrials } from '@/app/actions/trials';
 import type { TrialSummary, TrialStatus } from '@/types/trial';
 
 const STATUS_CONFIG: Record<TrialStatus, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive'; icon: React.ReactNode }> = {

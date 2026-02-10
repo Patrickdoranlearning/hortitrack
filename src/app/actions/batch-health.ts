@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 import { logError, logInfo } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
 
 // ============================================================================
 // Types
@@ -47,6 +48,7 @@ export type BatchHealthEventInput = {
   photoUrl?: string;
 };
 
+/** @deprecated Use ActionResult from '@/lib/errors' instead */
 export type BatchHealthResult<T = void> =
   | { success: true; data?: T; logId?: string }
   | { success: false; error: string };
@@ -93,7 +95,7 @@ function mapEventTypeToDbEnum(eventType: BatchHealthEventType): string {
  */
 export async function logBatchHealthEvent(
   input: BatchHealthEventInput
-): Promise<BatchHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -219,7 +221,7 @@ export async function logBatchHealthEvent(
     revalidatePath('/plant-health');
     revalidatePath('/production');
 
-    return { success: true, data: { logId: data.id }, logId: data.id };
+    return { success: true, data: { logId: data.id } };
   } catch (error) {
     logError('Error in logBatchHealthEvent', { error: String(error) });
     return { success: false, error: 'Failed to log health event' };
@@ -242,7 +244,7 @@ export async function logTreatment(
     reasonForUse?: string;
     notes?: string;
   }
-): Promise<BatchHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   return logBatchHealthEvent({
     batchId,
     eventType: 'treatment',
@@ -267,7 +269,7 @@ export async function logFertilizer(
     method?: string;
     notes?: string;
   }
-): Promise<BatchHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   return logBatchHealthEvent({
     batchId,
     eventType: 'fertilizer',
@@ -287,7 +289,7 @@ export async function logMeasurement(
   ec?: number,
   ph?: number,
   notes?: string
-): Promise<BatchHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   if (!ec && !ph) {
     return { success: false, error: 'At least one measurement (EC or pH) is required' };
   }
@@ -309,7 +311,7 @@ export async function logIrrigation(
   batchId: string,
   method: string,
   notes?: string
-): Promise<BatchHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   return logBatchHealthEvent({
     batchId,
     eventType: 'irrigation',
@@ -325,7 +327,7 @@ export async function logIrrigation(
 export async function logPruning(
   batchId: string,
   notes?: string
-): Promise<BatchHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   return logBatchHealthEvent({
     batchId,
     eventType: 'pruning',
@@ -340,7 +342,7 @@ export async function logPruning(
 export async function logGrading(
   batchId: string,
   notes?: string
-): Promise<BatchHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   return logBatchHealthEvent({
     batchId,
     eventType: 'grading',

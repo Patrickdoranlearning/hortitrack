@@ -64,8 +64,8 @@ export function MaterialSearchSheet({
           }))
         );
       }
-    } catch (error) {
-      console.error("Failed to search materials:", error);
+    } catch {
+      // Material search failed silently
     } finally {
       setIsLoading(false);
     }

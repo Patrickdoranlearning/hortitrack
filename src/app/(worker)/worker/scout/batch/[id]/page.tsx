@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { ScoutIssueSelector, type IssueType } from "@/components/worker/scout/ScoutIssueSelector";
 import { SeveritySlider, type Severity } from "@/components/worker/scout/SeveritySlider";
 import { PhotoCapture } from "@/components/worker/scout/PhotoCapture";
@@ -38,7 +38,6 @@ async function fetchBatch(url: string): Promise<WorkerBatchDetail> {
 export default function WorkerScoutBatchPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const batchId = params.id as string;
 
   // Form state
@@ -74,11 +73,7 @@ export default function WorkerScoutBatchPage() {
     // Validate
     if (!isAllClear && !issueType) {
       vibrateError();
-      toast({
-        variant: "destructive",
-        title: "Select an issue type",
-        description: "Choose an issue type or mark as all clear",
-      });
+      toast.error("Choose an issue type or mark as all clear");
       return;
     }
 
@@ -104,22 +99,15 @@ export default function WorkerScoutBatchPage() {
       }
 
       vibrateSuccess();
-      toast({
-        title: "Scout logged",
-        description: isAllClear
-          ? "Batch marked as all clear"
-          : `${issueType} issue recorded`,
-      });
+      toast.success(isAllClear
+        ? "Batch marked as all clear"
+        : `${issueType} issue recorded`);
 
       // Navigate back
       router.back();
     } catch (err) {
       vibrateError();
-      toast({
-        variant: "destructive",
-        title: "Failed to save",
-        description: err instanceof Error ? err.message : "Please try again",
-      });
+      toast.error(err instanceof Error ? err.message : "Please try again");
     } finally {
       setIsSubmitting(false);
     }

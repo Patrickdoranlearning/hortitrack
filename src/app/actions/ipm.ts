@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { requireOrgRole, isPermissionError } from '@/server/auth/permissions';
 import { revalidatePath } from 'next/cache';
+import { logError } from '@/lib/log';
+import { ActionResult } from '@/lib/errors';
 
 // ============================================================================
 // Types
@@ -147,6 +149,7 @@ export type IpmSpotTreatmentInput = {
   reason?: string;
 };
 
+/** @deprecated Use ActionResult from @/lib/errors instead */
 export type IpmResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string };
@@ -176,7 +179,7 @@ function normalizeProduct(row: any): IpmProduct {
   };
 }
 
-export async function listIpmProducts(): Promise<IpmResult<IpmProduct[]>> {
+export async function listIpmProducts(): Promise<ActionResult<IpmProduct[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -187,13 +190,13 @@ export async function listIpmProducts(): Promise<IpmResult<IpmProduct[]>> {
       .order('name');
 
     if (error) {
-      console.error('[listIpmProducts] query failed', error);
+      logError('listIpmProducts query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeProduct) };
   } catch (error) {
-    console.error('[listIpmProducts] error', error);
+    logError('listIpmProducts failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -201,7 +204,7 @@ export async function listIpmProducts(): Promise<IpmResult<IpmProduct[]>> {
   }
 }
 
-export async function getIpmProduct(id: string): Promise<IpmResult<IpmProduct>> {
+export async function getIpmProduct(id: string): Promise<ActionResult<IpmProduct>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -213,13 +216,13 @@ export async function getIpmProduct(id: string): Promise<IpmResult<IpmProduct>> 
       .single();
 
     if (error) {
-      console.error('[getIpmProduct] query failed', error);
+      logError('getIpmProduct query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: normalizeProduct(data) };
   } catch (error) {
-    console.error('[getIpmProduct] error', error);
+    logError('getIpmProduct failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -227,7 +230,7 @@ export async function getIpmProduct(id: string): Promise<IpmResult<IpmProduct>> 
   }
 }
 
-export async function createIpmProduct(input: IpmProductInput): Promise<IpmResult<IpmProduct>> {
+export async function createIpmProduct(input: IpmProductInput): Promise<ActionResult<IpmProduct>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -253,14 +256,14 @@ export async function createIpmProduct(input: IpmProductInput): Promise<IpmResul
       .single();
 
     if (error) {
-      console.error('[createIpmProduct] insert failed', error);
+      logError('createIpmProduct insert failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/products');
     return { success: true, data: normalizeProduct(data) };
   } catch (error) {
-    console.error('[createIpmProduct] error', error);
+    logError('createIpmProduct failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -271,7 +274,7 @@ export async function createIpmProduct(input: IpmProductInput): Promise<IpmResul
 export async function updateIpmProduct(
   id: string,
   input: Partial<IpmProductInput>
-): Promise<IpmResult<IpmProduct>> {
+): Promise<ActionResult<IpmProduct>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -299,14 +302,14 @@ export async function updateIpmProduct(
       .single();
 
     if (error) {
-      console.error('[updateIpmProduct] update failed', error);
+      logError('updateIpmProduct update failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/products');
     return { success: true, data: normalizeProduct(data) };
   } catch (error) {
-    console.error('[updateIpmProduct] error', error);
+    logError('updateIpmProduct failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -314,7 +317,7 @@ export async function updateIpmProduct(
   }
 }
 
-export async function deleteIpmProduct(id: string): Promise<IpmResult> {
+export async function deleteIpmProduct(id: string): Promise<ActionResult<null>> {
   try {
     // RBAC: Only admin or owner can delete products
     const { orgId } = await requireOrgRole(['admin', 'owner']);
@@ -327,14 +330,14 @@ export async function deleteIpmProduct(id: string): Promise<IpmResult> {
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[deleteIpmProduct] delete failed', error);
+      logError('deleteIpmProduct delete failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/products');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[deleteIpmProduct] error', error);
+    logError('deleteIpmProduct failed', { error });
     if (isPermissionError(error)) {
       return { success: false, error: 'You do not have permission to delete products' };
     }
@@ -378,7 +381,7 @@ function normalizeStep(row: any): IpmProgramStep {
   };
 }
 
-export async function listIpmPrograms(): Promise<IpmResult<IpmProgram[]>> {
+export async function listIpmPrograms(): Promise<ActionResult<IpmProgram[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -395,13 +398,13 @@ export async function listIpmPrograms(): Promise<IpmResult<IpmProgram[]>> {
       .order('name');
 
     if (error) {
-      console.error('[listIpmPrograms] query failed', error);
+      logError('listIpmPrograms query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeProgram) };
   } catch (error) {
-    console.error('[listIpmPrograms] error', error);
+    logError('listIpmPrograms failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -409,7 +412,7 @@ export async function listIpmPrograms(): Promise<IpmResult<IpmProgram[]>> {
   }
 }
 
-export async function getIpmProgram(id: string): Promise<IpmResult<IpmProgram>> {
+export async function getIpmProgram(id: string): Promise<ActionResult<IpmProgram>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -427,13 +430,13 @@ export async function getIpmProgram(id: string): Promise<IpmResult<IpmProgram>> 
       .single();
 
     if (error) {
-      console.error('[getIpmProgram] query failed', error);
+      logError('getIpmProgram query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: normalizeProgram(data) };
   } catch (error) {
-    console.error('[getIpmProgram] error', error);
+    logError('getIpmProgram failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -441,7 +444,7 @@ export async function getIpmProgram(id: string): Promise<IpmResult<IpmProgram>> 
   }
 }
 
-export async function createIpmProgram(input: IpmProgramInput): Promise<IpmResult<IpmProgram>> {
+export async function createIpmProgram(input: IpmProgramInput): Promise<ActionResult<IpmProgram>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -461,7 +464,7 @@ export async function createIpmProgram(input: IpmProgramInput): Promise<IpmResul
       .single();
 
     if (programError) {
-      console.error('[createIpmProgram] program insert failed', programError);
+      logError('createIpmProgram program insert failed', { error: programError });
       return { success: false, error: programError.message };
     }
 
@@ -483,7 +486,7 @@ export async function createIpmProgram(input: IpmProgramInput): Promise<IpmResul
         .insert(stepsToInsert);
 
       if (stepsError) {
-        console.error('[createIpmProgram] steps insert failed', stepsError);
+        logError('createIpmProgram steps insert failed', { error: stepsError });
         // Clean up the program
         await supabase.from('ipm_programs').delete().eq('id', program.id);
         return { success: false, error: stepsError.message };
@@ -495,7 +498,7 @@ export async function createIpmProgram(input: IpmProgramInput): Promise<IpmResul
     // Re-fetch the complete program with steps
     return getIpmProgram(program.id);
   } catch (error) {
-    console.error('[createIpmProgram] error', error);
+    logError('createIpmProgram failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -506,7 +509,7 @@ export async function createIpmProgram(input: IpmProgramInput): Promise<IpmResul
 export async function updateIpmProgram(
   id: string,
   input: Partial<IpmProgramInput>
-): Promise<IpmResult<IpmProgram>> {
+): Promise<ActionResult<IpmProgram>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -524,7 +527,7 @@ export async function updateIpmProgram(
       .eq('org_id', orgId);
 
     if (programError) {
-      console.error('[updateIpmProgram] update failed', programError);
+      logError('updateIpmProgram update failed', { error: programError });
       return { success: false, error: programError.message };
     }
 
@@ -551,7 +554,7 @@ export async function updateIpmProgram(
           .insert(stepsToInsert);
 
         if (stepsError) {
-          console.error('[updateIpmProgram] steps insert failed', stepsError);
+          logError('updateIpmProgram steps insert failed', { error: stepsError });
           return { success: false, error: stepsError.message };
         }
       }
@@ -560,7 +563,7 @@ export async function updateIpmProgram(
     revalidatePath('/plant-health/programs');
     return getIpmProgram(id);
   } catch (error) {
-    console.error('[updateIpmProgram] error', error);
+    logError('updateIpmProgram failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -568,7 +571,7 @@ export async function updateIpmProgram(
   }
 }
 
-export async function deleteIpmProgram(id: string): Promise<IpmResult> {
+export async function deleteIpmProgram(id: string): Promise<ActionResult<null>> {
   try {
     // RBAC: Only admin or owner can delete programs
     const { orgId } = await requireOrgRole(['admin', 'owner']);
@@ -581,14 +584,14 @@ export async function deleteIpmProgram(id: string): Promise<IpmResult> {
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[deleteIpmProgram] delete failed', error);
+      logError('deleteIpmProgram delete failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/programs');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[deleteIpmProgram] error', error);
+    logError('deleteIpmProgram failed', { error });
     if (isPermissionError(error)) {
       return { success: false, error: 'You do not have permission to delete programs' };
     }
@@ -625,7 +628,7 @@ export async function listIpmAssignments(filters?: {
   locationId?: string;
   family?: string;
   activeOnly?: boolean;
-}): Promise<IpmResult<IpmAssignment[]>> {
+}): Promise<ActionResult<IpmAssignment[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -647,13 +650,13 @@ export async function listIpmAssignments(filters?: {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[listIpmAssignments] query failed', error);
+      logError('listIpmAssignments query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeAssignment) };
   } catch (error) {
-    console.error('[listIpmAssignments] error', error);
+    logError('listIpmAssignments failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -661,7 +664,7 @@ export async function listIpmAssignments(filters?: {
   }
 }
 
-export async function createIpmAssignment(input: IpmAssignmentInput): Promise<IpmResult<IpmAssignment>> {
+export async function createIpmAssignment(input: IpmAssignmentInput): Promise<ActionResult<IpmAssignment>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -704,7 +707,7 @@ export async function createIpmAssignment(input: IpmAssignmentInput): Promise<Ip
       .single();
 
     if (error) {
-      console.error('[createIpmAssignment] insert failed', error);
+      logError('createIpmAssignment insert failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -712,7 +715,7 @@ export async function createIpmAssignment(input: IpmAssignmentInput): Promise<Ip
     revalidatePath('/plant-health');
     return { success: true, data: normalizeAssignment(data) };
   } catch (error) {
-    console.error('[createIpmAssignment] error', error);
+    logError('createIpmAssignment failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -720,7 +723,7 @@ export async function createIpmAssignment(input: IpmAssignmentInput): Promise<Ip
   }
 }
 
-export async function deactivateIpmAssignment(id: string): Promise<IpmResult> {
+export async function deactivateIpmAssignment(id: string): Promise<ActionResult<null>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -731,15 +734,15 @@ export async function deactivateIpmAssignment(id: string): Promise<IpmResult> {
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[deactivateIpmAssignment] update failed', error);
+      logError('deactivateIpmAssignment update failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health/programs');
     revalidatePath('/plant-health');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[deactivateIpmAssignment] error', error);
+    logError('deactivateIpmAssignment failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -780,7 +783,7 @@ export async function listIpmSpotTreatments(filters?: {
   locationId?: string;
   batchId?: string;
   status?: string;
-}): Promise<IpmResult<IpmSpotTreatment[]>> {
+}): Promise<ActionResult<IpmSpotTreatment[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -802,13 +805,13 @@ export async function listIpmSpotTreatments(filters?: {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[listIpmSpotTreatments] query failed', error);
+      logError('listIpmSpotTreatments query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeSpotTreatment) };
   } catch (error) {
-    console.error('[listIpmSpotTreatments] error', error);
+    logError('listIpmSpotTreatments failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -816,7 +819,7 @@ export async function listIpmSpotTreatments(filters?: {
   }
 }
 
-export async function createIpmSpotTreatment(input: IpmSpotTreatmentInput): Promise<IpmResult<IpmSpotTreatment>> {
+export async function createIpmSpotTreatment(input: IpmSpotTreatmentInput): Promise<ActionResult<IpmSpotTreatment>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -847,14 +850,14 @@ export async function createIpmSpotTreatment(input: IpmSpotTreatmentInput): Prom
       .single();
 
     if (error) {
-      console.error('[createIpmSpotTreatment] insert failed', error);
+      logError('createIpmSpotTreatment insert failed', { error });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health');
     return { success: true, data: normalizeSpotTreatment(data) };
   } catch (error) {
-    console.error('[createIpmSpotTreatment] error', error);
+    logError('createIpmSpotTreatment failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -865,7 +868,7 @@ export async function createIpmSpotTreatment(input: IpmSpotTreatmentInput): Prom
 export async function recordSpotTreatmentApplication(
   spotTreatmentId: string,
   notes?: string
-): Promise<IpmResult<IpmSpotTreatment>> {
+): Promise<ActionResult<IpmSpotTreatment>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -901,7 +904,7 @@ export async function recordSpotTreatmentApplication(
       .single();
 
     if (updateError) {
-      console.error('[recordSpotTreatmentApplication] update failed', updateError);
+      logError('recordSpotTreatmentApplication update failed', { error: updateError });
       return { success: false, error: updateError.message };
     }
 
@@ -926,7 +929,7 @@ export async function recordSpotTreatmentApplication(
     revalidatePath('/plant-health');
     return { success: true, data: normalizeSpotTreatment(updated) };
   } catch (error) {
-    console.error('[recordSpotTreatmentApplication] error', error);
+    logError('recordSpotTreatmentApplication failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -934,7 +937,7 @@ export async function recordSpotTreatmentApplication(
   }
 }
 
-export async function cancelSpotTreatment(id: string): Promise<IpmResult> {
+export async function cancelSpotTreatment(id: string): Promise<ActionResult<null>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -945,14 +948,14 @@ export async function cancelSpotTreatment(id: string): Promise<IpmResult> {
       .eq('org_id', orgId);
 
     if (error) {
-      console.error('[cancelSpotTreatment] update failed', error);
+      logError('cancelSpotTreatment update failed', { error: error.message });
       return { success: false, error: error.message };
     }
 
     revalidatePath('/plant-health');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
-    console.error('[cancelSpotTreatment] error', error);
+    logError('cancelSpotTreatment failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -964,7 +967,7 @@ export async function cancelSpotTreatment(id: string): Promise<IpmResult> {
 // Dashboard Queries
 // ============================================================================
 
-export async function getUpcomingTreatments(days: number = 7): Promise<IpmResult<IpmSpotTreatment[]>> {
+export async function getUpcomingTreatments(days: number = 7): Promise<ActionResult<IpmSpotTreatment[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -985,13 +988,13 @@ export async function getUpcomingTreatments(days: number = 7): Promise<IpmResult
       .order('next_application_date');
 
     if (error) {
-      console.error('[getUpcomingTreatments] query failed', error);
+      logError('getUpcomingTreatments query failed', { error });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: (data || []).map(normalizeSpotTreatment) };
   } catch (error) {
-    console.error('[getUpcomingTreatments] error', error);
+    logError('getUpcomingTreatments failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -999,7 +1002,7 @@ export async function getUpcomingTreatments(days: number = 7): Promise<IpmResult
   }
 }
 
-export async function getPlantFamilies(): Promise<IpmResult<string[]>> {
+export async function getPlantFamilies(): Promise<ActionResult<string[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -1010,7 +1013,7 @@ export async function getPlantFamilies(): Promise<IpmResult<string[]>> {
       .not('family', 'is', null);
 
     if (error) {
-      console.error('[getPlantFamilies] query failed', error);
+      logError('getPlantFamilies query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -1018,7 +1021,7 @@ export async function getPlantFamilies(): Promise<IpmResult<string[]>> {
     const families = [...new Set((data || []).map(d => d.family).filter(Boolean))].sort();
     return { success: true, data: families as string[] };
   } catch (error) {
-    console.error('[getPlantFamilies] error', error);
+    logError('getPlantFamilies failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1033,7 +1036,7 @@ export type LocationBasic = {
   restrictedUntil?: string;
 };
 
-export async function listLocations(): Promise<IpmResult<LocationBasic[]>> {
+export async function listLocations(): Promise<ActionResult<LocationBasic[]>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -1044,7 +1047,7 @@ export async function listLocations(): Promise<IpmResult<LocationBasic[]>> {
       .order('name');
 
     if (error) {
-      console.error('[listLocations] query failed', error);
+      logError('listLocations query failed', { error });
       return { success: false, error: error.message };
     }
 
@@ -1057,7 +1060,7 @@ export async function listLocations(): Promise<IpmResult<LocationBasic[]>> {
 
     return { success: true, data: locations };
   } catch (error) {
-    console.error('[listLocations] error', error);
+    logError('listLocations failed', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

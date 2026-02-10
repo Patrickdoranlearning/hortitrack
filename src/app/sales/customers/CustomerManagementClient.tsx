@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import type {
   CustomerManagementPayload,
   CustomerSummary,
@@ -40,7 +40,6 @@ import { CustomerSheet } from "./CustomerSheet";
 type Props = CustomerManagementPayload;
 
 export default function CustomerManagementClient({ customers, priceLists, products }: Props) {
-  const { toast } = useToast();
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("create");
@@ -404,11 +403,11 @@ export default function CustomerManagementClient({ customers, priceLists, produc
     if (contactsCreated > 0) parts.push(`${contactsCreated} contact${contactsCreated === 1 ? "" : "s"}`);
     if (failures.length > 0) parts.push(`${failures.length} failed`);
 
-    toast({
-      title: "Import complete",
-      description: parts.join(", ") + ".",
-      variant: failures.length ? "destructive" : "default",
-    });
+    if (failures.length) {
+      toast.error(parts.join(", ") + ".");
+    } else {
+      toast.success(parts.join(", ") + ".");
+    }
     emitMutation({ resource: 'customers', action: 'update' });
   };
 

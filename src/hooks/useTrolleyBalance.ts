@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { SWR_KEYS, onTrolleyMovement } from "@/lib/swr/keys";
+import { logError } from "@/lib/log";
 
 // ================================================
 // TYPES
@@ -195,7 +196,7 @@ export async function recordTrolleyMovement(
         : undefined,
     };
   } catch (error) {
-    console.error("Error recording trolley movement:", error);
+    logError("Error recording trolley movement", { error });
     return { success: false, error: "Network error" };
   }
 }

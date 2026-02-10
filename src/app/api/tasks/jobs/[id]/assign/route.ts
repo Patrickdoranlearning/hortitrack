@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { assignJob } from "@/server/production/jobs";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error("[api/tasks/jobs/[id]/assign] POST error:", error);
+    logger.api.error("Job assignment failed", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request", issues: error.issues },

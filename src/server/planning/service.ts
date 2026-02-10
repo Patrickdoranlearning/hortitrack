@@ -3,6 +3,7 @@ import { addMonths, format, startOfMonth } from "date-fns";
 import { getUserAndOrg } from "@/server/auth/org";
 import type { PlanningSnapshot, PlanningBatch, PlanningBucket, ProtocolSummary } from "@/lib/planning/types";
 import type { ProductionProtocolRoute } from "@/lib/protocol-types";
+import { logger } from "@/server/utils/logger";
 
 type BatchRow = {
   id: string;
@@ -107,10 +108,7 @@ export async function getPlanningSnapshot(horizonMonths = 12): Promise<PlanningS
         }));
 
   if (bucketsResult.error && batchData) {
-    console.warn(
-      "[planning] get_planning_buckets RPC unavailable; using JS fallback:",
-      bucketsResult.error.message
-    );
+    logger.planning.warn("get_planning_buckets RPC unavailable; using JS fallback", { error: bucketsResult.error.message });
   }
 
   if (bucketsResult.error && !batchData) {

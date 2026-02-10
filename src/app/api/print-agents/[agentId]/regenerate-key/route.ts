@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 import { createHash, randomBytes } from "crypto";
+import { logger } from "@/server/utils/logger";
 
 // Generate a secure API key with prefix
 function generateAgentKey(): { key: string; hash: string; prefix: string } {
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to regenerate API key";
-    console.error("[api/print-agents/[agentId]/regenerate-key] POST error:", e);
+    logger.api.error("POST /api/print-agents/[agentId]/regenerate-key failed", e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

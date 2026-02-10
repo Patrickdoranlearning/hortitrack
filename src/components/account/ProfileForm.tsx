@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { updateProfileAction } from "@/app/account/actions";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 interface ProfileFormProps {
   initialName: string | null;
@@ -15,7 +15,6 @@ interface ProfileFormProps {
 
 export function ProfileForm({ initialName, email }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true);
@@ -23,16 +22,9 @@ export function ProfileForm({ initialName, email }: ProfileFormProps) {
     setIsLoading(false);
 
     if (result.error) {
-      toast({
-        title: "Error",
-        description: result.error,
-        variant: "destructive",
-      });
+      toast.error(result.error);
     } else {
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
-      });
+      toast.success("Profile updated successfully");
     }
   }
 

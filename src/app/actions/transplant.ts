@@ -4,35 +4,33 @@ import { TransplantInputSchema, type TransplantInput } from "@/lib/domain/batch"
 import { getUserAndOrg } from "@/server/auth/org";
 import { revalidatePath } from "next/cache";
 import { consumeMaterialsForBatch, savePlannedMaterialsFromRules } from "@/server/materials/consumption";
+import { logError, logWarning } from "@/lib/log";
+import type { ActionResult } from "@/lib/errors";
 
-export type TransplantResult = {
-  success: true;
-  data: {
-    requestId: string;
-    childBatch: {
-      id: string;
-      batchNumber: string;
-      quantity: number;
-      phase: string;
-    };
-    parentNewQuantity: number;
+/** Data returned on a successful transplant */
+export type TransplantData = {
+  requestId: string;
+  childBatch: {
+    id: string;
+    batchNumber: string;
+    quantity: number;
+    phase: string;
   };
-} | {
-  success: false;
-  error: string;
+  parentNewQuantity: number;
 };
+
+/** @deprecated Use ActionResult<TransplantData> from @/lib/errors instead */
+export type TransplantResult = ActionResult<TransplantData>;
 
 /**
  * Transplant a batch - creates a new child batch from a parent batch
- * 
+ *
  * This uses a PostgreSQL RPC function to ensure transactional integrity.
  * All operations (create child, decrement parent, link ancestry, log events,
  * create passport) happen atomically - either all succeed or all fail.
  */
-export async function transplantBatchAction(input: TransplantInput): Promise<TransplantResult> {
+export async function transplantBatchAction(input: TransplantInput): Promise<ActionResult<TransplantData>> {
   try {
-    console.log("[transplantBatchAction] Input:", JSON.stringify(input, null, 2));
-
     // Validate input
     const validated = TransplantInputSchema.parse(input);
 
@@ -52,13 +50,11 @@ export async function transplantBatchAction(input: TransplantInput): Promise<Tra
       p_units: validated.units ?? null, // Pass units directly if provided
     };
 
-    console.log("[transplantBatchAction] RPC params:", JSON.stringify(rpcParams, null, 2));
-
     // Call the transactional RPC function
     const { data, error } = await supabase.rpc("perform_transplant", rpcParams);
 
     if (error) {
-      console.error("[transplantBatchAction] RPC error:", error.message, error.details, error.hint);
+      logError("[transplantBatchAction] RPC error", { error: error.message, details: error.details, hint: error.hint });
       
       // Parse specific error messages for better UX
       if (error.message.includes("Insufficient quantity")) {
@@ -97,7 +93,7 @@ export async function transplantBatchAction(input: TransplantInput): Promise<Tra
         result.child_batch.quantity
       );
     } catch (planErr) {
-      console.error("[transplantBatchAction] Planned materials save failed:", planErr);
+      logWarning("[transplantBatchAction] Planned materials save failed", { error: planErr instanceof Error ? planErr.message : String(planErr) });
     }
 
     // Consume materials for the new child batch
@@ -114,7 +110,7 @@ export async function transplantBatchAction(input: TransplantInput): Promise<Tra
         true // allowPartial
       );
     } catch (consumeErr) {
-      console.error("[transplantBatchAction] Material consumption failed:", consumeErr);
+      logWarning("[transplantBatchAction] Material consumption failed", { error: consumeErr instanceof Error ? consumeErr.message : String(consumeErr) });
     }
 
     return {
@@ -131,7 +127,7 @@ export async function transplantBatchAction(input: TransplantInput): Promise<Tra
       },
     };
   } catch (e: unknown) {
-    console.error("[transplantBatchAction] Error:", e);
+    logError("[transplantBatchAction] Error", { error: e instanceof Error ? e.message : String(e) });
     
     if (e instanceof Error) {
       // Zod validation errors

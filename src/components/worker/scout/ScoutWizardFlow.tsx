@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   ScanLine,
   ClipboardList,
@@ -170,7 +170,6 @@ export function ScoutWizardFlow({
       }
     } catch (error) {
       vibrateError();
-      console.error("Failed to save scout log", error);
       toast.error("Failed to save scout log");
     } finally {
       setIsSaving(false);
@@ -228,7 +227,6 @@ export function ScoutWizardFlow({
       handleComplete();
     } catch (error) {
       vibrateError();
-      console.error("Failed to schedule treatment", error);
       toast.error("Failed to schedule treatment");
     } finally {
       setIsSaving(false);

@@ -51,8 +51,7 @@ export function TrialCamera({ groupName, groupColor, onCapture, onClose }: Trial
         videoRef.current.srcObject = mediaStream;
       }
       setError(null);
-    } catch (err) {
-      console.error('Camera access error:', err);
+    } catch {
       setError('Unable to access camera. Please grant camera permissions.');
     }
   }, [facingMode]);

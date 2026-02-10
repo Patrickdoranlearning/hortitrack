@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { createMilestoneAction } from '@/app/sales/customers/actions';
 import { emitMutation } from '@/lib/events/mutation-events';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Calendar, Gift, Star, Repeat, FileText, Tag } from 'lucide-react';
 import type { MilestoneType } from '@/app/sales/customers/[customerId]/types';
 

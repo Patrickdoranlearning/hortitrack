@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp, getSupabaseAdmin } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
 import { sendRawToPrinter } from "@/server/labels/send-to-printer";
+import { logger } from "@/server/utils/logger";
 
 type RouteContext = {
   params: Promise<{ printerId: string }>;
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         });
 
       if (queueError) {
-        console.error("[api/printers/[id]/test] Queue error:", queueError);
+        logger.api.error("Printer test queue error", queueError);
         return NextResponse.json({
           error: "Failed to queue test print",
           success: false
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed to test printer";
-    console.error("[api/printers/[id]/test] error:", e);
+    logger.api.error("Printer test failed", e);
     return NextResponse.json({
       error: message,
       success: false

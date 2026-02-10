@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, Gauge, Syringe, Bug, Clock, FlaskConical, Zap, ChevronRight } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { createScoutLog, scheduleTreatment } from '@/app/actions/plant-health';
 import { listIpmProducts, type IpmProduct } from '@/app/actions/ipm';

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,6 @@ export default function PickingWorkflowClient({
   initialItems,
 }: PickingWorkflowClientProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [items, setItems] = useState<PickItem[]>(initialItems);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [substitutionDialogOpen, setSubstitutionDialogOpen] = useState(false);
@@ -79,8 +78,8 @@ export default function PickingWorkflowClient({
       if (data.items) {
         setItems(data.items);
       }
-    } catch (error) {
-      console.error('Error refreshing items:', error);
+    } catch {
+      // Item refresh failed silently
     }
   }, [pickList.id]);
 
@@ -100,11 +99,7 @@ export default function PickingWorkflowClient({
       const data = await res.json();
 
       if (data.error) {
-        toast({
-          title: 'Error',
-          description: data.error,
-          variant: 'destructive',
-        });
+        toast.error(data.error);
         return;
       }
 
@@ -112,17 +107,9 @@ export default function PickingWorkflowClient({
         setItems(data.items);
       }
 
-      toast({
-        title: 'Item picked',
-        description: `Picked ${pickedQty} units`,
-      });
-    } catch (error) {
-      console.error('Error picking item:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to pick item',
-        variant: 'destructive',
-      });
+      toast.success(`Picked ${pickedQty} units`);
+    } catch {
+      toast.error('Failed to pick item');
     } finally {
       setIsSubmitting(false);
     }
@@ -147,11 +134,7 @@ export default function PickingWorkflowClient({
       const data = await res.json();
 
       if (data.error) {
-        toast({
-          title: 'Error',
-          description: data.error,
-          variant: 'destructive',
-        });
+        toast.error(data.error);
         return;
       }
 
@@ -159,17 +142,9 @@ export default function PickingWorkflowClient({
       setSubstitutionDialogOpen(false);
       setSelectedItemId(null);
 
-      toast({
-        title: 'Batch substituted',
-        description: 'The batch has been changed',
-      });
-    } catch (error) {
-      console.error('Error substituting batch:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to substitute batch',
-        variant: 'destructive',
-      });
+      toast.success('The batch has been changed');
+    } catch {
+      toast.error('Failed to substitute batch');
     } finally {
       setIsSubmitting(false);
     }
@@ -192,28 +167,16 @@ export default function PickingWorkflowClient({
       const data = await res.json();
 
       if (data.error) {
-        toast({
-          title: 'Error',
-          description: data.error,
-          variant: 'destructive',
-        });
+        toast.error(data.error);
         return;
       }
 
       await refreshItems();
 
       const totalPicked = batches.reduce((sum, b) => sum + b.quantity, 0);
-      toast({
-        title: batches.length > 1 ? 'Picked from multiple batches' : 'Item picked',
-        description: `Picked ${totalPicked} units from ${batches.length} batch${batches.length > 1 ? 'es' : ''}`,
-      });
-    } catch (error) {
-      console.error('Error in multi-batch pick:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to pick item',
-        variant: 'destructive',
-      });
+      toast.success(`Picked ${totalPicked} units from ${batches.length} batch${batches.length > 1 ? 'es' : ''}`);
+    } catch {
+      toast.error('Failed to pick item');
     } finally {
       setIsSubmitting(false);
     }
@@ -231,27 +194,15 @@ export default function PickingWorkflowClient({
       const data = await res.json();
 
       if (data.error) {
-        toast({
-          title: 'Error',
-          description: data.error,
-          variant: 'destructive',
-        });
+        toast.error(data.error);
         return;
       }
 
-      toast({
-        title: 'Picking complete!',
-        description: 'Order is ready for dispatch',
-      });
+      toast.success('Picking complete! Order is ready for dispatch');
 
       router.push('/sales/picking');
-    } catch (error) {
-      console.error('Error completing pick list:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to complete picking',
-        variant: 'destructive',
-      });
+    } catch {
+      toast.error('Failed to complete picking');
     } finally {
       setIsSubmitting(false);
       setCompleteDialogOpen(false);

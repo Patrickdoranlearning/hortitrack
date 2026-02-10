@@ -3,6 +3,7 @@
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 import { logError } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
 
 interface QCChecklistState {
   qtyCorrect: boolean;
@@ -34,7 +35,7 @@ interface RejectForRepickInput {
   failureReason: string;
 }
 
-export async function submitQCCheck(input: SubmitQCCheckInput) {
+export async function submitQCCheck(input: SubmitQCCheckInput): Promise<ActionResult<null>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
 
@@ -45,32 +46,32 @@ export async function submitQCCheck(input: SubmitQCCheckInput) {
       p_pick_list_id: input.pickListId,
       p_user_id: user.id,
       p_passed: input.passed,
-      p_checklist: input.checklist as any,
-      p_failed_items: input.failedItems as any,
+      p_checklist: input.checklist as unknown,
+      p_failed_items: input.failedItems as unknown,
       p_failure_reason: input.failureReason
     });
 
     if (rpcError) {
       logError('Error in submit_qc_check RPC', { error: rpcError.message, input });
-      return { error: `Failed to save QC check: ${rpcError.message}` };
+      return { success: false, error: `Failed to save QC check: ${rpcError.message}` };
     }
 
     if (!rpcResult?.success) {
-      return { error: rpcResult?.error || 'Failed to submit QC check' };
+      return { success: false, error: rpcResult?.error || 'Failed to submit QC check' };
     }
 
     revalidatePath('/dispatch/qc');
     revalidatePath(`/dispatch/qc/${input.pickListId}`);
     revalidatePath(`/sales/orders/${input.orderId}`);
 
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
     logError('Error in submitQCCheck action', { error: String(error) });
-    return { error: 'An unexpected error occurred' };
+    return { success: false, error: 'An unexpected error occurred' };
   }
 }
 
-export async function rejectForRepick(input: RejectForRepickInput) {
+export async function rejectForRepick(input: RejectForRepickInput): Promise<ActionResult<null>> {
   try {
     const { user, orgId, supabase } = await getUserAndOrg();
     const userId = user.id;
@@ -81,17 +82,17 @@ export async function rejectForRepick(input: RejectForRepickInput) {
       p_pick_list_id: input.pickListId,
       p_user_id: userId,
       p_failure_reason: input.failureReason,
-      p_failed_items: input.failedItems as any,
+      p_failed_items: input.failedItems as unknown,
     });
 
     if (rpcError) {
       logError('Error in reject_pick_list_atomic RPC', { error: rpcError.message, input });
-      return { error: rpcError.message || 'Failed to reject pick list' };
+      return { success: false, error: rpcError.message || 'Failed to reject pick list' };
     }
 
     if (!rpcResult?.success) {
       logError('reject_pick_list_atomic RPC failed', { error: rpcResult?.error, input });
-      return { error: rpcResult?.error || 'Failed to reject pick list' };
+      return { success: false, error: rpcResult?.error || 'Failed to reject pick list' };
     }
 
     // Update pick list notes with rejection details (not part of RPC)
@@ -108,14 +109,14 @@ export async function rejectForRepick(input: RejectForRepickInput) {
     revalidatePath(`/dispatch/qc/${input.pickListId}`);
     revalidatePath(`/sales/orders/${input.orderId}`);
 
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
     logError('Error in rejectForRepick action', { error: String(error) });
-    return { error: 'An unexpected error occurred' };
+    return { success: false, error: 'An unexpected error occurred' };
   }
 }
 
-export async function getQCHistory(orderId: string) {
+export async function getQCHistory(orderId: string): Promise<ActionResult<{ checks: unknown[] }>> {
   try {
     const { orgId, supabase } = await getUserAndOrg();
 
@@ -131,12 +132,12 @@ export async function getQCHistory(orderId: string) {
 
     if (error) {
       logError('Error fetching QC history', { error: error.message, orderId });
-      return { error: 'Failed to fetch QC history' };
+      return { success: false, error: 'Failed to fetch QC history' };
     }
 
-    return { checks };
+    return { success: true, data: { checks: checks ?? [] } };
   } catch (error) {
     logError('Error in getQCHistory action', { error: String(error) });
-    return { error: 'An unexpected error occurred' };
+    return { success: false, error: 'An unexpected error occurred' };
   }
 }

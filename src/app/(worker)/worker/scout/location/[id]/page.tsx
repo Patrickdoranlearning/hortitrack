@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import type {
   WorkerLocationDetail,
   WorkerLocationBatch,
@@ -43,7 +43,6 @@ interface BatchWithStatus extends WorkerLocationBatch {
 export default function WorkerScoutLocationPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const locationId = params.id as string;
 
   // Track scout status for each batch
@@ -113,17 +112,10 @@ export default function WorkerScoutLocationPage() {
       setBatchStatuses(newStatuses);
 
       vibrateSuccess();
-      toast({
-        title: "Location scouted",
-        description: `All ${location.batches.length} batches marked as clear`,
-      });
+      toast.success(`All ${location.batches.length} batches marked as clear`);
     } catch (err) {
       vibrateError();
-      toast({
-        variant: "destructive",
-        title: "Failed to save",
-        description: err instanceof Error ? err.message : "Please try again",
-      });
+      toast.error(err instanceof Error ? err.message : "Please try again");
     } finally {
       setIsSubmitting(false);
     }
@@ -154,11 +146,7 @@ export default function WorkerScoutLocationPage() {
     const pendingCount = statusCounts.pending;
     if (pendingCount > 0) {
       vibrateError();
-      toast({
-        variant: "destructive",
-        title: "Incomplete",
-        description: `${pendingCount} batch${pendingCount > 1 ? "es" : ""} still need to be scouted`,
-      });
+      toast.error(`${pendingCount} batch${pendingCount > 1 ? "es" : ""} still need to be scouted`);
       return;
     }
 
@@ -185,19 +173,12 @@ export default function WorkerScoutLocationPage() {
       }
 
       vibrateSuccess();
-      toast({
-        title: "Scout complete",
-        description: `${clearedBatches.length} clear, ${issueBatches.length} issues`,
-      });
+      toast.success(`${clearedBatches.length} clear, ${issueBatches.length} issues`);
 
       router.back();
     } catch (err) {
       vibrateError();
-      toast({
-        variant: "destructive",
-        title: "Failed to save",
-        description: err instanceof Error ? err.message : "Please try again",
-      });
+      toast.error(err instanceof Error ? err.message : "Please try again");
     } finally {
       setIsSubmitting(false);
     }

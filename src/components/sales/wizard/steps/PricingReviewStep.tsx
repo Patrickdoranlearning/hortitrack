@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { FieldArrayWithId, UseFormReturn, useWatch } from 'react-hook-form';
 import type { CreateOrderInput, OrderFeeInput } from '@/lib/sales/types';
 import type { ProductWithBatches } from '@/server/sales/products-with-batches';
@@ -75,21 +75,27 @@ export function PricingReviewStep({
     return initial;
   });
 
-  // Auto-populate RRP values when pre-pricing defaults to on but rrp is not yet set
+  // Track which lines have had RRP auto-populated (prevents overwriting user edits)
+  const autoPopulatedRef = useRef<Set<number>>(new Set());
+
+  // Auto-populate RRP values when pre-pricing is enabled but rrp is not yet set.
+  // Watches watchedLines so it retries when unitPrice becomes available (fixes race
+  // condition where unitPrice isn't in the form yet on mount).
   useEffect(() => {
     lines.forEach((_, index) => {
+      if (autoPopulatedRef.current.has(index)) return;
       if (rrpEnabled[index] && watchedLines?.[index]?.rrp == null) {
         const price = typeof watchedLines?.[index]?.unitPrice === 'number'
           ? watchedLines[index].unitPrice
           : Number(watchedLines?.[index]?.unitPrice) || 0;
         if (price > 0) {
           form.setValue(`lines.${index}.rrp`, price);
+          autoPopulatedRef.current.add(index);
         }
       }
     });
-  // Run once on mount to auto-fill RRP for lines defaulted to on
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [watchedLines, rrpEnabled]);
 
   // Track selected delivery fee
   const [selectedDeliveryFeeId, setSelectedDeliveryFeeId] = useState<string>(() => {
@@ -98,13 +104,15 @@ export function PricingReviewStep({
   });
 
   // Calculate pre-pricing fee (considering customer-specific settings)
+  // Fee is charged when pre-pricing toggle is ON — the rrp value is the retail price
+  // for the label, but the fee applies regardless of whether a specific price is entered yet.
   const prePricingInfo = useMemo(() => {
     if (!prePricingFee) return { totalUnits: 0, fee: 0, vatAmount: 0, isFoc: false, ratePerUnit: 0 };
 
     let totalUnits = 0;
     watchedLines?.forEach((line, index) => {
-      if (rrpEnabled[index] && line?.rrp != null) {
-        const qty = typeof line.qty === 'number' ? line.qty : Number(line.qty) || 0;
+      if (rrpEnabled[index]) {
+        const qty = typeof line?.qty === 'number' ? line.qty : Number(line?.qty) || 0;
         totalUnits += qty;
       }
     });

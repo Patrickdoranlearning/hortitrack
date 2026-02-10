@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { revalidatePath } from 'next/cache';
 import { logError, logInfo } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
 import { z } from 'zod';
 
 // ============================================================================
@@ -247,9 +248,7 @@ export type ListScoutLogsInput = {
   logType?: 'issue' | 'reading';
 };
 
-export type PlantHealthResult<T = void> =
-  | { success: true; data?: T; count?: number }
-  | { success: false; error: string };
+// Using ActionResult<T> from @/lib/errors as the standard result type
 
 // ============================================================================
 // Treatment Actions (Atomic RPC)
@@ -260,7 +259,7 @@ export type PlantHealthResult<T = void> =
  */
 export async function applyLocationTreatment(
   input: TreatmentInput
-): Promise<PlantHealthResult<{ count: number }>> {
+): Promise<ActionResult<{ count: number }>> {
   // Validate input
   const validation = treatmentInputSchema.safeParse(input);
   if (!validation.success) {
@@ -307,7 +306,7 @@ export async function applyLocationTreatment(
 
 export async function logMeasurement(
   input: MeasurementInput
-): Promise<PlantHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   // Validate input
   const validation = measurementInputSchema.safeParse(input);
   if (!validation.success) {
@@ -350,7 +349,7 @@ export async function logMeasurement(
 
 export async function flagLocation(
   input: FlagLocationInput
-): Promise<PlantHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   // Validate input
   const validation = flagLocationInputSchema.safeParse(input);
   if (!validation.success) {
@@ -403,7 +402,7 @@ export async function flagLocation(
 
 export async function clearLocation(
   input: ClearLocationInput
-): Promise<PlantHealthResult> {
+): Promise<ActionResult<null>> {
   // Validate input
   const validation = clearLocationInputSchema.safeParse(input);
   if (!validation.success) {
@@ -427,7 +426,7 @@ export async function clearLocation(
 
     revalidatePath('/locations');
     revalidatePath('/plant-health');
-    return { success: true };
+    return { success: true, data: null };
   } catch (error) {
     logError('Error in clearLocation action', { error: String(error) });
     return { success: false, error: 'Failed to clear location' };
@@ -440,7 +439,7 @@ export async function clearLocation(
 
 export async function createScoutLog(
   input: ScoutLogInput
-): Promise<PlantHealthResult<{ logId: string }>> {
+): Promise<ActionResult<{ logId: string }>> {
   // Validate input
   const validation = scoutLogInputSchema.safeParse(input);
   if (!validation.success) {
@@ -499,7 +498,7 @@ export async function createScoutLog(
 
 export async function scheduleTreatment(
   input: ScheduleTreatmentInput
-): Promise<PlantHealthResult<{ treatmentId: string }>> {
+): Promise<ActionResult<{ treatmentId: string }>> {
   // Validate input
   const validation = scheduleTreatmentInputSchema.safeParse(input);
   if (!validation.success) {
@@ -568,7 +567,7 @@ export async function scheduleTreatment(
  */
 export async function listScoutLogs(
   input: ListScoutLogsInput = {}
-): Promise<PlantHealthResult<{ logs: ScoutLogEntry[]; total: number }>> {
+): Promise<ActionResult<{ logs: ScoutLogEntry[]; total: number }>> {
   // Validate input
   const validation = listScoutLogsInputSchema.safeParse(input);
   if (!validation.success) {
@@ -660,7 +659,7 @@ export async function listScoutLogs(
 export async function getLocationHealthLogs(
   locationId: string,
   limit: number = 20
-): Promise<PlantHealthResult<Array<{
+): Promise<ActionResult<Array<{
   id: string;
   event_type: string;
   event_at: string;

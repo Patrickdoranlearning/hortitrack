@@ -22,7 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 
 type Props = {
@@ -45,7 +45,6 @@ export function CreateWorksheetDialog({
   selectedBatchIds,
   onSuccess,
 }: Props) {
-  const { toast } = useToast();
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [scheduledDate, setScheduledDate] = React.useState<Date | undefined>();
@@ -65,20 +64,12 @@ export function CreateWorksheetDialog({
     e.preventDefault();
 
     if (!name.trim()) {
-      toast({
-        title: "Name required",
-        description: "Please enter a name for the worksheet.",
-        variant: "destructive",
-      });
+      toast.error("Please enter a name for the worksheet.");
       return;
     }
 
     if (selectedBatchIds.length === 0) {
-      toast({
-        title: "No batches selected",
-        description: "Please select at least one batch.",
-        variant: "destructive",
-      });
+      toast.error("Please select at least one batch.");
       return;
     }
 
@@ -98,19 +89,12 @@ export function CreateWorksheetDialog({
         }
       );
 
-      toast({
-        title: "Worksheet created",
-        description: `"${response.worksheet.name}" with ${selectedBatchIds.length} batches.`,
-      });
+      toast.success(`"${response.worksheet.name}" with ${selectedBatchIds.length} batches.`);
 
       onOpenChange(false);
       onSuccess();
     } catch (error) {
-      toast({
-        title: "Failed to create worksheet",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setIsSubmitting(false);
     }

@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { calculateTotalPlants, calculateRemainder } from "@/lib/shared";
@@ -82,7 +82,6 @@ export function TransplantWizard({
   onCancel,
 }: TransplantWizardProps) {
   const router = useRouter();
-  const { toast } = useToast();
 
   // State
   const [currentStep, setCurrentStep] = useState<Step>(
@@ -218,10 +217,7 @@ export function TransplantWizard({
       }
 
       vibrateSuccess();
-      toast({
-        title: "Transplant created",
-        description: `Batch ${result.childBatch.batchNumber} created with ${requiredUnits.toLocaleString()} plants`,
-      });
+      toast.success(`Batch ${result.childBatch.batchNumber} created with ${requiredUnits.toLocaleString()} plants`);
 
       if (onSuccess) {
         onSuccess(result.childBatch);
@@ -231,11 +227,7 @@ export function TransplantWizard({
     } catch (error) {
       vibrateError();
       const message = error instanceof Error ? error.message : "Failed to create transplant";
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -249,7 +241,6 @@ export function TransplantWizard({
     writeOffRemainder,
     remainderUnits,
     requiredUnits,
-    toast,
     router,
     onSuccess,
   ]);

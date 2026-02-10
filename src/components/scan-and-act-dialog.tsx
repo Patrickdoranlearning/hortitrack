@@ -4,7 +4,7 @@ import React, { useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 
 const ScannerClient = dynamic(() => import('@/components/Scanner/ScannerClient'), {
   ssr: false,
@@ -18,7 +18,6 @@ type Props = {
 };
 
 export default function ScannerDialog({ open, onOpenChange, onDetected }: Props) {
-  const { toast } = useToast();
   const lockedRef = useRef(false);
 
   const handleDecoded = useCallback(
@@ -29,17 +28,13 @@ export default function ScannerDialog({ open, onOpenChange, onDetected }: Props)
       try {
         onDetected(text);
       } catch (e: any) {
-        toast({
-          variant: 'destructive',
-          title: 'Scan error',
-          description: e?.message || 'Could not process the scanned code.',
-        });
+        toast.error(e?.message || 'Could not process the scanned code.');
       } finally {
         // small cooldown to prevent multi-fire on the same frame
         setTimeout(() => (lockedRef.current = false), 750);
       }
     },
-    [onDetected, toast]
+    [onDetected]
   );
 
   return (

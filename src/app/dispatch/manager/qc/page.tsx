@@ -76,9 +76,7 @@ export default async function DispatchQCPage() {
     .eq("status", "completed")
     .order("completed_at", { ascending: true });
 
-  if (plError) {
-    console.error("Error fetching pick lists:", plError.message || JSON.stringify(plError));
-  }
+  // plError is non-fatal - empty state will show if no data
 
   // Also try to get qc_status if column exists, but don't fail if it doesn't
   const pickListsWithQC = (pickLists || []).map((pl: any) => ({

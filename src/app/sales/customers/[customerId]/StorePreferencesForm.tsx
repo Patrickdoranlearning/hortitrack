@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createClient } from "@/lib/supabase/client";
 import { updateStorePreferences } from "./store-data";
 import type { StorePreferences } from "./types";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface StorePreferencesFormProps {
   addressId: string;

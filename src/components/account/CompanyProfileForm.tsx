@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateCompanyProfileAction } from "@/app/account/actions";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { supabaseClient } from "@/lib/supabase/client";
 import { Building2, Upload, X, Loader2, CreditCard, FileText, MapPin } from "lucide-react";
 import Image from "next/image";
@@ -65,28 +65,19 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
   const [latitude, setLatitude] = useState<string>(initialData.latitude?.toString() || "");
   const [longitude, setLongitude] = useState<string>(initialData.longitude?.toString() || "");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
 
   async function handleLogoUpload(file: File) {
     if (!file) return;
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload an image file (PNG, JPG, etc.)",
-        variant: "destructive",
-      });
+      toast.error("Please upload an image file (PNG, JPG, etc.)");
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please upload an image smaller than 2MB",
-        variant: "destructive",
-      });
+      toast.error("Please upload an image smaller than 2MB");
       return;
     }
 
@@ -107,17 +98,9 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
         .getPublicUrl(fileName);
 
       setLogoUrl(publicUrl);
-      toast({
-        title: "Logo uploaded",
-        description: "Your company logo has been uploaded. Don't forget to save your changes.",
-      });
+      toast.success("Your company logo has been uploaded. Don't forget to save your changes.");
     } catch (error: unknown) {
-      console.error("Logo upload failed:", error);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Could not upload logo",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Could not upload logo");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -146,16 +129,9 @@ export function CompanyProfileForm({ orgId, initialData }: CompanyProfileFormPro
     setIsLoading(false);
 
     if (result.error) {
-      toast({
-        title: "Error",
-        description: result.error,
-        variant: "destructive",
-      });
+      toast.error(result.error);
     } else {
-      toast({
-        title: "Success",
-        description: "Company profile updated successfully",
-      });
+      toast.success("Company profile updated successfully");
     }
   }
 

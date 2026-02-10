@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Variety } from "@/lib/types";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VarietyForm } from "@/components/variety-form";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,7 +89,6 @@ export default function VarietiesPage() {
   const [filterText, setFilterText] = useState("");
   const [formSaving, setFormSaving] = useState(false);
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
-  const { toast } = useToast();
   const [sortConfig, setSortConfig] = useState<{ key: SortableVarietyKey; direction: "asc" | "desc" }>({
     key: "name",
     direction: "asc",
@@ -156,11 +155,11 @@ export default function VarietiesPage() {
     const result = await deleteVarietyAction(varietyId);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: "Variety deleted", description: `Successfully removed "${varietyToDelete.name}".` });
+      toast.success(`Successfully removed "${varietyToDelete.name}".`);
     } else if ((result as any).canArchive) {
       setDeleteFailedVariety({ id: varietyId, name: varietyToDelete.name, error: result.error || "Cannot delete" });
     } else {
-      toast({ variant: "destructive", title: "Delete failed", description: result.error });
+      toast.error(result.error || "Delete failed");
     }
   };
 
@@ -171,10 +170,10 @@ export default function VarietiesPage() {
     const result = await archiveVarietyAction(varietyId);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: "Variety archived", description: `"${varietyToArchive.name}" has been archived.` });
+      toast.success(`"${varietyToArchive.name}" has been archived.`);
       setDeleteFailedVariety(null);
     } else {
-      toast({ variant: "destructive", title: "Archive failed", description: result.error });
+      toast.error(result.error || "Archive failed");
     }
   };
 
@@ -185,9 +184,9 @@ export default function VarietiesPage() {
     const result = await unarchiveVarietyAction(varietyId);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: "Variety restored", description: `"${varietyToRestore.name}" has been restored.` });
+      toast.success(`"${varietyToRestore.name}" has been restored.`);
     } else {
-      toast({ variant: "destructive", title: "Restore failed", description: result.error });
+      toast.error(result.error || "Restore failed");
     }
   };
 
@@ -202,18 +201,11 @@ export default function VarietiesPage() {
 
       if (result.success) {
         invalidateReferenceData();
-        toast({
-          title: isEditing ? "Variety updated" : "Variety added",
-          description: `Successfully ${isEditing ? "updated" : "added"} "${result.data?.name}".`,
-        });
+        toast.success(`Successfully ${isEditing ? "updated" : "added"} "${result.data?.name}".`);
         setIsFormOpen(false);
         setEditingVariety(null);
       } else {
-        toast({
-          variant: "destructive",
-          title: isEditing ? "Update failed" : "Add failed",
-          description: result.error,
-        });
+        toast.error(result.error || (isEditing ? "Update failed" : "Add failed"));
       }
     } finally {
       setFormSaving(false);
@@ -383,21 +375,17 @@ export default function VarietiesPage() {
       description += ` Failed to import ${failures.length} row${failures.length === 1 ? "" : "s"}.`;
     }
 
-    toast({
-      title: "Import complete",
-      description,
-      variant: failures.length ? "destructive" : "default",
-    });
+    if (failures.length) {
+      toast.error(description);
+    } else {
+      toast.success(description);
+    }
   };
 
   const handleQuickAdd = quickForm.handleSubmit(async (values) => {
     const normalizedName = values.name.trim().toLowerCase();
     if (varieties.some((v) => v.name?.trim().toLowerCase() === normalizedName)) {
-      toast({
-        variant: "destructive",
-        title: "Duplicate variety",
-        description: `"${values.name}" already exists. Edit the existing entry instead.`,
-      });
+      toast.error(`"${values.name}" already exists. Edit the existing entry instead.`);
       return;
     }
 
@@ -421,11 +409,11 @@ export default function VarietiesPage() {
     const result = await addVarietyAction(payload);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: "Variety added", description: `"${values.name}" is now available.` });
+      toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
       nameFieldRef.current?.focus();
     } else {
-      toast({ variant: "destructive", title: "Add failed", description: result.error });
+      toast.error(result.error || "Add failed");
     }
   });
 

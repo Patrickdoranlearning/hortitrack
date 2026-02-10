@@ -70,8 +70,8 @@ export function LotSelectionCombobox({
           setSelectedLot(found);
         }
       }
-    } catch (error) {
-      console.error('Error fetching lots:', error);
+    } catch {
+      // Lot fetch failed silently
     } finally {
       setLoading(false);
     }

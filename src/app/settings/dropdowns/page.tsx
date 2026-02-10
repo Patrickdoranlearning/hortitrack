@@ -26,7 +26,7 @@ import {
   normalizeSystemCode,
 } from "@/lib/attributeOptions";
 import { useAttributeOptions } from "@/hooks/useAttributeOptions";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type EditableOption = AttributeOptionInput & { attributeKey: AttributeKey; source?: "custom" | "default"; localId?: string; category?: string | null };
@@ -97,7 +97,6 @@ export default function DropdownManagerPage() {
   const [dragIndex, setDragIndex] = React.useState<number | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
-  const { toast } = useToast();
 
   // Sync local state when switching dropdown type or server data changes
   React.useEffect(() => {
@@ -191,9 +190,9 @@ export default function DropdownManagerPage() {
       }
       await refresh();
       setDirty(false);
-      toast({ title: "Saved", description: "Dropdown options updated." });
+      toast.success("Dropdown options updated.");
     } catch (err: any) {
-      toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+      toast.error(err?.message ?? "Unknown error");
     } finally {
       setSaving(false);
     }

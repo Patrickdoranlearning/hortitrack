@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import type { Site } from '@/lib/types';
 import { getSitesAction, addSiteAction, updateSiteAction, deleteSiteAction } from '@/app/actions';
 import {
@@ -31,7 +31,6 @@ type SiteWithCount = Site & { locationCount: number };
 type SortableKey = 'name' | 'locationCount' | 'createdAt';
 
 export default function SitesPage() {
-  const { toast } = useToast();
   const [filterText, setFilterText] = useState('');
   const [editingSite, setEditingSite] = useState<SiteWithCount | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -49,7 +48,7 @@ export default function SitesPage() {
     if (result.success) {
       setSites(result.data as SiteWithCount[]);
     } else {
-      toast({ variant: 'destructive', title: 'Error', description: result.error });
+      toast.error(result.error);
     }
     setLoading(false);
   };
@@ -90,9 +89,9 @@ export default function SitesPage() {
     const result = await deleteSiteAction(id);
     if (result.success) {
       setSites((prev) => prev.filter((s) => s.id !== id));
-      toast({ title: 'Site deleted', description: `"${name}" removed.` });
+      toast.success(`"${name}" removed.`);
     } else {
-      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+      toast.error(result.error);
     }
   };
 
@@ -105,15 +104,12 @@ export default function SitesPage() {
         : await addSiteAction(values as Omit<Site, 'id'>);
 
       if (result.success) {
-        toast({
-          title: isUpdate ? 'Site updated' : 'Site added',
-          description: `"${values.name}" saved successfully.`,
-        });
+        toast.success(`"${values.name}" saved successfully.`);
         setIsFormOpen(false);
         setEditingSite(null);
         fetchSites();
       } else {
-        toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+        toast.error(result.error);
       }
     } finally {
       setFormSaving(false);

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   Dialog,
   DialogContent,
@@ -160,8 +160,7 @@ export function SpotTreatmentDialog({
 
       setOpen(false);
       onSuccess?.();
-    } catch (error) {
-      console.error('Spot treatment creation failed', error);
+    } catch {
       toast.error('Failed to create spot treatment');
     }
   }

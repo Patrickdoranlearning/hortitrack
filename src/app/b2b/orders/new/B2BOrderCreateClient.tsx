@@ -108,8 +108,7 @@ export function B2BOrderCreateClient({
         if (cartItems.length > 0) {
           setTrolley(cartItems);
         }
-      } catch (err) {
-        console.error('Error parsing reorder items:', err);
+      } catch {
         sessionStorage.removeItem('b2b_reorder_items');
       }
     }
@@ -226,7 +225,6 @@ export function B2BOrderCreateClient({
       }
     } catch (err) {
       setError('Failed to create order. Please try again.');
-      console.error(err);
     }
   };
 

@@ -99,7 +99,6 @@ export function SelectPlannedBatchesStep({
 
         setBatches(mapped);
       } catch (err: any) {
-        console.error('Error fetching batches:', err);
         setError(err.message);
       } finally {
         setLoading(false);

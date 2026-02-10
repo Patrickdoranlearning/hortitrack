@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSmartGallery, galleryToProductFormat } from "@/server/media/gallery";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Get Smart Gallery images for a product/variety/batch combination
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ images });
   } catch (err) {
-    console.error("[media/gallery] error:", err);
+    logger.api.error("Media gallery fetch failed", err);
     return NextResponse.json(
       { error: "Failed to fetch gallery" },
       { status: 500 }

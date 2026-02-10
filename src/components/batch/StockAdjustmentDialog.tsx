@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Loader2, Plus, Minus, AlertTriangle } from "lucide-react";
 import { adjustBatchStock } from "@/app/actions/batch-stock";
 import { ADJUSTMENT_REASON_LABELS, type AdjustmentReason } from "@/lib/shared/batch-stock-constants";
@@ -42,7 +42,6 @@ export function StockAdjustmentDialog({
   currentQuantity = 0,
   onSuccess,
 }: StockAdjustmentDialogProps) {
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [direction, setDirection] = React.useState<"increase" | "decrease">("increase");
   const [quantity, setQuantity] = React.useState("");
@@ -59,7 +58,7 @@ export function StockAdjustmentDialog({
   const handleSubmit = async () => {
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) {
-      toast({ variant: "destructive", title: "Invalid quantity", description: "Please enter a positive number" });
+      toast.error("Please enter a positive number");
       return;
     }
 
@@ -67,11 +66,7 @@ export function StockAdjustmentDialog({
     const newQty = currentQuantity + adjustmentQty;
 
     if (newQty < 0) {
-      toast({
-        variant: "destructive",
-        title: "Invalid adjustment",
-        description: `Cannot reduce quantity below zero. Current: ${currentQuantity}`,
-      });
+      toast.error(`Cannot reduce quantity below zero. Current: ${currentQuantity}`);
       return;
     }
 
@@ -86,18 +81,15 @@ export function StockAdjustmentDialog({
       });
 
       if (result.success) {
-        toast({
-          title: "Stock adjusted",
-          description: `${direction === "increase" ? "Added" : "Removed"} ${qty} units. New total: ${result.newQuantity}`,
-        });
+        toast.success(`${direction === "increase" ? "Added" : "Removed"} ${qty} units. New total: ${result.data.newQuantity}`);
         resetForm();
         onOpenChange(false);
-        onSuccess?.(result.newQuantity ?? newQty);
+        onSuccess?.(result.data.newQuantity ?? newQty);
       } else {
-        toast({ variant: "destructive", title: "Adjustment failed", description: result.error });
+        toast.error(result.error || "Adjustment failed");
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: String(error) });
+      toast.error(String(error));
     } finally {
       setIsSubmitting(false);
     }

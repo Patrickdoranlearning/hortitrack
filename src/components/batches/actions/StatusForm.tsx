@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 
 const Schema = z.object({
   status: z.enum(["Growing","Ready","Archived","Sold"]),
@@ -17,7 +17,6 @@ const Schema = z.object({
 });
 
 export default function StatusForm({ batchId, current, onDone }: { batchId: string; current: string; onDone?: () => void }) {
-  const { toast } = useToast?.() ?? { toast: (x:any)=>alert(x?.title||x?.description||"OK") };
   const form = useForm<z.infer<typeof Schema>>({ resolver: zodResolver(Schema), defaultValues: { status: (["Growing","Ready","Archived","Sold"].includes(current) ? current as any : "Growing") } });
   const [loading, setLoading] = React.useState(false);
 
@@ -25,11 +24,11 @@ export default function StatusForm({ batchId, current, onDone }: { batchId: stri
     setLoading(true);
     try {
       await ProductionAPI.setStatus(batchId, values);
-      toast({ title: "Status updated", description: `Now ${values.status}` });
+      toast.success(`Status updated to ${values.status}`);
       onDone?.();
     } catch (e) {
       const er = e as HttpError;
-      toast({ title: "Update failed", description: er.message, variant: "destructive" });
+      toast.error(er.message);
     } finally { setLoading(false); }
   }
 

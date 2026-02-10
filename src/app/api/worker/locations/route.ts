@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import type { WorkerLocation, WorkerLocationsResponse } from "@/types/worker";
 
 /**
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     const { data: locations, error: locError } = await locationsQuery;
 
     if (locError) {
-      console.error("[api/worker/locations] Locations query error:", locError);
+      logger.worker.error("Worker locations query failed", locError);
       return NextResponse.json(
         { error: "Failed to fetch locations" },
         { status: 500 }
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest) {
       .gt("quantity", 0);
 
     if (batchError) {
-      console.error("[api/worker/locations] Batch stats query error:", batchError);
+      logger.worker.error("Worker locations batch stats query failed", batchError);
     }
 
     // Aggregate batch counts by location
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
       total: items.length,
     });
   } catch (error) {
-    console.error("[api/worker/locations] Error:", error);
+    logger.worker.error("Worker locations fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

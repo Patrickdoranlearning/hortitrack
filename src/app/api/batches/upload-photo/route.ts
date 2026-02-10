@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
       .upload(fileName, file, { upsert: true });
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError);
+      logger.api.error("Storage upload failed for batch photo", uploadError, { batchId });
       return bad(500, "UPLOAD_FAILED", uploadError.message);
     }
 
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
       .eq("id", batchId);
 
     if (updateError) {
-      console.error("Batch update error:", updateError);
+      logger.api.error("Batch photo URL update failed", updateError, { batchId });
       return bad(500, "UPDATE_FAILED", updateError.message);
     }
 
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
         },
       })
       .catch(() => {
-        console.warn("Failed to log photo upload event");
+        logger.api.warn("Failed to log photo upload event", { batchId });
       });
 
     return NextResponse.json(
@@ -108,7 +109,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (e: any) {
-    console.error("Upload error:", e);
+    logger.api.error("Batch photo upload failed", e);
     return bad(500, "UPLOAD_FAIL", e?.message ?? "Upload failed");
   }
 }

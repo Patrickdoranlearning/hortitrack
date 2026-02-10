@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabaseClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { logError } from '@/lib/log';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -14,13 +15,13 @@ export function useAuth() {
     supabase.auth.getSession()
       .then(({ data: { session }, error }) => {
         if (error) {
-          console.error('Error getting session:', error.message);
+          logError('Error getting session', { error: error.message });
         }
         setUser(session?.user ?? null);
         setLoading(false);
       })
       .catch((err) => {
-        console.error('Failed to get session:', err);
+        logError('Failed to get session', { error: err });
         setLoading(false);
       });
 

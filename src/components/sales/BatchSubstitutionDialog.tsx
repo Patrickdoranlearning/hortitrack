@@ -80,8 +80,8 @@ export default function BatchSubstitutionDialog({
             setBatches(data.batches);
           }
         })
-        .catch(err => {
-          console.error('Error fetching batches:', err);
+        .catch(() => {
+          // Fetch failed silently - UI will show empty state
         })
         .finally(() => {
           setIsLoading(false);

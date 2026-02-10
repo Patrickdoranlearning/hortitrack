@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { useCollection } from '@/hooks/use-collection';
 import type { NurseryLocation, Site } from '@/lib/types';
 import { addLocationAction, deleteLocationAction, updateLocationAction, getSitesAction } from '../actions';
@@ -50,7 +50,6 @@ const defaultQuickValues: QuickLocationFormValues = {
 };
 
 export default function LocationsPage() {
-  const { toast } = useToast();
   const [filterText, setFilterText] = useState('');
   const [editingLocation, setEditingLocation] = useState<NurseryLocation | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -125,7 +124,7 @@ export default function LocationsPage() {
   const handleQuickAdd = quickForm.handleSubmit(async (values) => {
     const duplicate = locations.find((loc) => loc.name.toLowerCase() === values.name.trim().toLowerCase());
     if (duplicate) {
-      toast({ variant: 'destructive', title: 'Duplicate name', description: 'A location with that name already exists.' });
+      toast.error('A location with that name already exists.');
       return;
     }
 
@@ -141,10 +140,10 @@ export default function LocationsPage() {
     const result = await addLocationAction(payload);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Location added', description: `"${values.name}" is now available.` });
+      toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
     } else {
-      toast({ variant: 'destructive', title: 'Add failed', description: result.error });
+      toast.error(result.error);
     }
   });
 
@@ -216,20 +215,20 @@ export default function LocationsPage() {
       invalidateReferenceData();
     }
 
-    toast({
-      title: 'Import complete',
-      description: `${created} location${created === 1 ? '' : 's'} imported. ${failures.length ? `${failures.length} failed.` : ''}`,
-      variant: failures.length ? 'destructive' : 'default',
-    });
+    if (failures.length) {
+      toast.error(`${created} location${created === 1 ? '' : 's'} imported. ${failures.length} failed.`);
+    } else {
+      toast.success(`${created} location${created === 1 ? '' : 's'} imported.`);
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
     const result = await deleteLocationAction(id);
     if (result.success) {
       invalidateReferenceData();
-      toast({ title: 'Location deleted', description: `"${name}" removed.` });
+      toast.success(`"${name}" removed.`);
     } else {
-      toast({ variant: 'destructive', title: 'Delete failed', description: result.error });
+      toast.error(result.error);
     }
   };
 
@@ -314,14 +313,11 @@ export default function LocationsPage() {
                     : addLocationAction(values as Omit<NurseryLocation, 'id'>);
                   if (result.success) {
                     invalidateReferenceData();
-                    toast({
-                      title: (values as any).id ? 'Location updated' : 'Location added',
-                      description: `"${result.data?.name ?? values.name}" saved successfully.`,
-                    });
+                    toast.success(`"${result.data?.name ?? values.name}" saved successfully.`);
                     setIsFormOpen(false);
                     setEditingLocation(null);
                   } else {
-                    toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+                    toast.error(result.error);
                   }
                 } finally {
                   setFormSaving(false);

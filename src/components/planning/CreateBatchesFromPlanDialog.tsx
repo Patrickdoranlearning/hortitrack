@@ -35,7 +35,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { fetchJson } from '@/lib/http/fetchJson';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Info, Package } from 'lucide-react';
 import type { BatchPlanWithProgress } from '@/lib/planning/guide-plan-types';
 import { useTodayDate, getTodayISO } from '@/lib/date-sync';
@@ -67,7 +67,6 @@ export function CreateBatchesFromPlanDialog({
   onSuccess,
 }: Props) {
   const { data: refData } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
   const [submitting, setSubmitting] = React.useState(false);
 
   // Use hydration-safe date to prevent server/client mismatch
@@ -143,19 +142,12 @@ export function CreateBatchesFromPlanDialog({
         }
       );
 
-      toast({
-        title: `Created ${result.created} batch${result.created !== 1 ? 'es' : ''}`,
-        description: result.jobId ? 'Production job also created' : undefined,
-      });
+      toast.success(`Created ${result.created} batch${result.created !== 1 ? 'es' : ''}${result.jobId ? ' - Production job also created' : ''}`);
 
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: 'Failed to create batches',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to create batches');
     } finally {
       setSubmitting(false);
     }

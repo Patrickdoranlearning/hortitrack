@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -202,7 +203,7 @@ export async function GET(req: Request) {
       matchType: "search",
     });
   } catch (error: unknown) {
-    console.error("[materials/search GET] Error:", error);
+    logger.materials.error("Materials search failed", error);
     const message = error instanceof Error ? error.message : "Search failed";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

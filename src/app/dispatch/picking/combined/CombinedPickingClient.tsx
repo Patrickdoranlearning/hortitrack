@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -62,7 +62,6 @@ export default function CombinedPickingClient({
   pickLists,
 }: CombinedPickingClientProps) {
   const router = useRouter();
-  const { toast } = useToast();
 
   const [items, setItems] = useState<ExtendedPickItem[]>(initialItems);
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
@@ -194,11 +193,7 @@ export default function CombinedPickingClient({
         const data = await res.json();
 
         if (data.error) {
-          toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: data.error,
-          });
+          toast.error(data.error);
           return;
         }
       }
@@ -221,19 +216,12 @@ export default function CombinedPickingClient({
         return next;
       });
 
-      toast({
-        title: 'Items Picked',
-        description: `Picked ${confirmQty} x ${selectedAggregation.plantVariety}`,
-      });
+      toast.success(`Picked ${confirmQty} x ${selectedAggregation.plantVariety}`);
 
       setConfirmDialogOpen(false);
       setSelectedAggregation(null);
     } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to confirm pick',
-      });
+      toast.error('Failed to confirm pick');
     } finally {
       setIsSubmitting(false);
     }

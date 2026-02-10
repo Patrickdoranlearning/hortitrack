@@ -9,7 +9,7 @@ import { PropagationStartSchema, PropagationStartInput } from "@/lib/validators/
 import { useActiveOrg } from "@/lib/org/context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 
 export function PropagationStartDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void; }) {
   const { orgId } = useActiveOrg();
@@ -29,20 +29,20 @@ export function PropagationStartDialog({ open, onOpenChange }: { open: boolean; 
     setSubmitting(true);
     try {
       const values = form.getValues();
-      const res = await fetch("/api/batches/propagation-start", {
+      const res = await fetch("/api/production/batches/propagate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...values, orgId }),
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ variant: "destructive", title: "Failed to create batch", description: data.error || "Unknown error" });
+        toast.error(data.error || "Failed to create batch");
         return;
       }
-      toast({ title: "Batch created", description: `#${data.newBatch.batch_number} (${data.newBatch.quantity} plants)` });
+      toast.success(`Batch #${data.batch.batch_number} created (${data.batch.quantity} plants)`);
       onOpenChange(false);
     } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to create batch" });
+      toast.error("Failed to create batch");
     } finally {
       setSubmitting(false);
     }

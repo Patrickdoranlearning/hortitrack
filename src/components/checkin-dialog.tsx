@@ -9,7 +9,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 
 type CheckinDialogProps = {
   trigger?: React.ReactNode;
@@ -20,13 +20,12 @@ export function CheckinDialog({ trigger }: CheckinDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { toast } = useToast();
 
   async function onSubmit(values: CheckinFormInput) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/batches/checkin", {
+      const res = await fetch("/api/batches/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -37,20 +36,13 @@ export function CheckinDialog({ trigger }: CheckinDialogProps) {
         throw new Error(j.error ?? "Failed to create batch.");
       }
 
-      const batch = await res.json();
-      toast({
-        title: "Batch Created",
-        description: `Batch #${batch.batchNumber} has been successfully checked in.`,
-      });
+      const { newBatch } = await res.json();
+      toast.success(`Batch #${newBatch.batch_number} has been successfully checked in.`);
       setOpen(false); // Close dialog on success
-      router.push(`/?batch=${batch.id}`); // Navigate to the new batch
+      router.push(`/?batch=${newBatch.id}`); // Navigate to the new batch
     } catch (err: any) {
       setError(err.message);
-      toast({
-        title: "Error",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast.error(err.message);
     } finally {
       setIsLoading(false);
     }

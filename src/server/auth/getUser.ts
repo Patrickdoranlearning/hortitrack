@@ -2,11 +2,16 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { UUID } from "crypto";
+import { logger } from "@/server/utils/logger";
 
 export type ServerUser = { uid: string; email?: string; orgId?: string };
 
 import { DEV_USER_ID, DEV_ORG_ID, IS_DEV } from "@/server/auth/dev-bypass";
 
+/**
+ * @deprecated Use `getUserAndOrg()` from `@/server/auth/org` instead.
+ * This function is kept only for internal compatibility within this file.
+ */
 export async function getUserIdAndOrgId(): Promise<{ userId: string | null; orgId: string | null; email: string | null }> {
   const supabase = await createClient();
 
@@ -30,7 +35,7 @@ export async function getUserIdAndOrgId(): Promise<{ userId: string | null; orgI
     .single();
 
   if (profileError) {
-    console.error("Error fetching user profile for org ID:", profileError.message);
+    logger.auth.error("Failed to fetch user profile for org ID", profileError);
     return { userId: user.id, orgId: null, email: user.email || null };
   }
 

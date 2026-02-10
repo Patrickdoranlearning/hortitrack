@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/collapsible';
 import { logInteraction } from '@/app/sales/actions';
 import { createFollowUpAction } from '@/app/sales/customers/actions';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Phone, Mail, MapPin, MessageCircle, MoreHorizontal, ChevronDown, CalendarClock } from 'lucide-react';
 
 interface LogInteractionDialogProps {

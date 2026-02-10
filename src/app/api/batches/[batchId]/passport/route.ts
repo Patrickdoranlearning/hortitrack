@@ -2,6 +2,7 @@
 // src/app/api/batches/[batchId]/passport/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 type ComputedPassport = {
   batchId: string;
@@ -28,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ bat
     }
 
     const { supabase, orgId } = await getUserAndOrg();
-    console.log("[passport] querying batch", { batchId, orgId });
+    logger.api.debug("Querying batch for passport", { batchId, orgId });
     
     const { data: batch, error: batchErr } = await supabase
       .from("batches")
@@ -47,15 +48,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ bat
       .eq("id", batchId)
       .maybeSingle();
 
-    console.log("[passport] query result", { batch: batch?.id, error: batchErr?.message });
+    logger.api.debug("Passport query result", { batchFound: !!batch?.id, error: batchErr?.message });
 
     if (batchErr) {
-      console.error("[passport] batch fetch failed", batchErr);
+      logger.api.error("Passport batch fetch failed", batchErr, { batchId });
       return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 
     if (!batch) {
-      console.warn("[passport] batch not found", { batchId, orgId });
+      logger.api.warn("Passport batch not found", { batchId, orgId });
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
@@ -99,7 +100,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ bat
       headers: { "Cache-Control": "no-store" },
     });
   } catch (e: any) {
-    console.error("passport_route_error", { message: e?.message });
+    logger.api.error("Passport route error", e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

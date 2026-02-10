@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildGrowerGuide } from "@/server/batches/grower-guide";
 import { renderGrowerGuidePdf } from "@/server/batches/grower-guide-pdf";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ export async function POST(
       },
     });
   } catch (e: unknown) {
-    console.error("[grower-guide/pdf] error", e);
+    logger.api.error("Grower guide PDF generation failed", e);
     const message = e instanceof Error ? e.message : "Failed to generate grower guide";
     return NextResponse.json({ error: message }, { status: 500 });
   }

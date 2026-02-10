@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -134,7 +134,6 @@ function formatDate(value: string | null | undefined) {
 }
 
 export default function TrolleyManagementClient() {
-  const { toast } = useToast();
   const [customerBalances, setCustomerBalances] = useState<CustomerBalance[]>([]);
   const [haulierBalances, setHaulierBalances] = useState<HaulierBalance[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<TrolleyTransaction[]>([]);
@@ -212,9 +211,8 @@ export default function TrolleyManagementClient() {
       if (customersData.data) {
         setCustomers(customersData.data.map((c: any) => ({ id: c.id, name: c.name })));
       }
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      toast({ variant: "destructive", title: "Failed to load data" });
+    } catch {
+      toast.error("Failed to load data");
     } finally {
       setIsLoading(false);
     }
@@ -242,24 +240,18 @@ export default function TrolleyManagementClient() {
         throw new Error(data.error || `Failed to ${transferAction} transfer`);
       }
 
-      toast({
-        title: transferAction === "approve" ? "Transfer Approved" : "Transfer Rejected",
-        description:
-          transferAction === "approve"
-            ? `${selectedTransfer.trolleys} trolleys transferred from ${selectedTransfer.fromHaulierName} to ${selectedTransfer.toCustomerName}`
-            : "Transfer request has been rejected",
-      });
+      toast.success(
+        transferAction === "approve"
+          ? `${selectedTransfer.trolleys} trolleys transferred from ${selectedTransfer.fromHaulierName} to ${selectedTransfer.toCustomerName}`
+          : "Transfer request has been rejected"
+      );
 
       setSelectedTransfer(null);
       setTransferAction(null);
       setTransferNotes("");
       fetchData();
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
+      toast.error(error.message);
     } finally {
       setIsProcessingTransfer(false);
     }
@@ -267,12 +259,12 @@ export default function TrolleyManagementClient() {
 
   const handleRecordMovement = async () => {
     if (!movementForm.customerId) {
-      toast({ variant: "destructive", title: "Please select a customer" });
+      toast.error("Please select a customer");
       return;
     }
 
     if (movementForm.trolleys === 0 && movementForm.shelves === 0) {
-      toast({ variant: "destructive", title: "Please enter trolley or shelf quantity" });
+      toast.error("Please enter trolley or shelf quantity");
       return;
     }
 
@@ -295,10 +287,7 @@ export default function TrolleyManagementClient() {
         not_returned: "Not Returned (logged)",
       };
 
-      toast({
-        title: "Movement Recorded",
-        description: `${typeLabels[movementForm.type]}: ${movementForm.trolleys} trolleys, ${movementForm.shelves} shelves`,
-      });
+      toast.success(`${typeLabels[movementForm.type]}: ${movementForm.trolleys} trolleys, ${movementForm.shelves} shelves`);
 
       setIsRecordDialogOpen(false);
       setMovementForm({
@@ -311,7 +300,7 @@ export default function TrolleyManagementClient() {
       });
       fetchData();
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Failed to record", description: error.message });
+      toast.error(error.message);
     } finally {
       setIsSaving(false);
     }
@@ -1171,10 +1160,7 @@ export default function TrolleyManagementClient() {
           shelvesNotReturned={signatureTarget.shelves}
           onComplete={() => {
             fetchData();
-            toast({
-              title: "Signed docket captured",
-              description: "The signature has been recorded.",
-            });
+            toast.success("The signature has been recorded.");
           }}
         />
       )}

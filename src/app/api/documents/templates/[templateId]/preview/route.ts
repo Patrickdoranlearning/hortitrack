@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { previewTemplate } from "@/server/documents";
+import { logger } from "@/server/utils/logger";
 import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function POST(
@@ -21,7 +22,7 @@ export async function POST(
     });
     return NextResponse.json({ html, dataUsed, layout, documentType });
   } catch (err: any) {
-    console.error("[documents] preview failed", err);
+    logger.documents.error("Document preview failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to preview template" }, { status });
   }

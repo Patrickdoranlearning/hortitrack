@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 // ============================================================
 // IN-MEMORY CACHE (works in development mode)
@@ -105,7 +106,7 @@ async function fetchReferenceDataViaRPC(orgId: string): Promise<CachedReferenceD
   });
 
   if (error || !data || data.length === 0) {
-    if (error) console.warn("[fetchReferenceDataViaRPC] RPC failed:", error.message);
+    if (error) logger.cache.warn("RPC get_reference_data failed", { error: error.message });
     return null;
   }
 
@@ -250,7 +251,7 @@ async function fetchLocationsForOrg(orgId: string) {
     .order("name");
 
   if (error) {
-    console.error("[fetchLocationsForOrg] error", error);
+    logger.cache.error("fetchLocationsForOrg failed", { error });
     return [];
   }
   return data ?? [];

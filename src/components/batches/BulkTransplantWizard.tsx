@@ -7,7 +7,7 @@ import { fetchJson } from "@/lib/http/fetchJson";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Plus, Trash2, Search, CheckCircle2, AlertCircle, Loader2, ScanLine, X } from "lucide-react";
@@ -80,8 +80,6 @@ type Props = {
 
 export default function BulkTransplantWizard({ onComplete }: Props) {
   const { data: referenceData, loading, error, reload } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
-
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
   // Use hydration-safe date to prevent server/client mismatch
@@ -255,26 +253,15 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
       } else if (items.length > 1) {
         // Update search results to let user pick
         setBatchSearchResults(items);
-        toast({
-          title: "Multiple matches found",
-          description: `Found ${items.length} batches matching "${scannedText}". Please select one from the dropdown.`,
-        });
+        toast.info(`Found ${items.length} batches matching "${scannedText}". Please select one from the dropdown.`);
       } else {
-        toast({
-          title: "No batch found",
-          description: `No growing batch found matching "${scannedText}"`,
-          variant: "destructive",
-        });
+        toast.error(`No growing batch found matching "${scannedText}"`);
       }
     } catch {
-      toast({
-        title: "Scan failed",
-        description: "Error searching for batch",
-        variant: "destructive",
-      });
+      toast.error("Error searching for batch");
     }
     setScanningRowId(null);
-  }, [updateRow, toast]);
+  }, [updateRow]);
 
   const addRow = React.useCallback(() => {
     const newRow: TransplantRow = {
@@ -358,13 +345,12 @@ export default function BulkTransplantWizard({ onComplete }: Props) {
       }
     }
 
-    toast({
-      title: "Bulk transplant finished",
-      description: `${created} batch${created === 1 ? "" : "es"} created${
-        failed ? `, ${failed} failed.` : "."
-      }`,
-      variant: failed ? "destructive" : "default",
-    });
+    const msg = `${created} batch${created === 1 ? "" : "es"} created${failed ? `, ${failed} failed.` : "."}`;
+    if (failed) {
+      toast.error(msg);
+    } else {
+      toast.success(msg);
+    }
 
     setBusy(null);
     if (created > 0) {

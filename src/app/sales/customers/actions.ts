@@ -6,6 +6,17 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { customerFormSchema, customerAddressSchema, customerContactSchema, deliveryPreferencesSchema } from "./types";
 import type { CustomerFollowUp, CustomerMilestone, MilestoneType } from "./[customerId]/types";
+import type { ActionResult } from "@/lib/errors";
+import { logError } from "@/lib/log";
+
+// Mutation metadata for SWR cache invalidation (via useMutation hook)
+type MutatedMeta = {
+  _mutated: {
+    resource: 'customers' | 'follow_ups' | 'milestones';
+    action: 'create' | 'update' | 'delete';
+    id?: string;
+  };
+};
 
 function cleanString(value?: string | null) {
   if (value === undefined || value === null) return null;
@@ -17,7 +28,9 @@ function cleanString(value?: string | null) {
 // CUSTOMER CRUD
 // =============================================================================
 
-export async function upsertCustomerAction(input: z.infer<typeof customerFormSchema>) {
+export async function upsertCustomerAction(
+  input: z.infer<typeof customerFormSchema>
+): Promise<(ActionResult<Record<string, unknown> | null> & MutatedMeta) | ActionResult<never>> {
   const validation = customerFormSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -68,7 +81,7 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
   }
 
   if (error) {
-    console.error("[upsertCustomerAction]", error);
+    logError("[upsertCustomerAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -87,7 +100,10 @@ export async function upsertCustomerAction(input: z.infer<typeof customerFormSch
   };
 }
 
-export async function updateCustomerDefaultPriceListAction(customerId: string, priceListId: string | null) {
+export async function updateCustomerDefaultPriceListAction(
+  customerId: string,
+  priceListId: string | null
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
 
   const { error } = await supabase
@@ -96,19 +112,22 @@ export async function updateCustomerDefaultPriceListAction(customerId: string, p
     .eq("id", customerId);
 
   if (error) {
-    console.error("[updateCustomerDefaultPriceListAction]", error);
+    logError("[updateCustomerDefaultPriceListAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
   revalidatePath("/sales/customers");
   revalidatePath(`/sales/customers/${customerId}`);
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'update' as const, id: customerId },
   };
 }
 
-export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typeof deliveryPreferencesSchema>) {
+export async function updateCustomerDeliveryPreferencesAction(
+  input: z.infer<typeof deliveryPreferencesSchema>
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const validation = deliveryPreferencesSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -129,28 +148,32 @@ export async function updateCustomerDeliveryPreferencesAction(input: z.infer<typ
     .eq("id", parsed.customerId);
 
   if (error) {
-    console.error("[updateCustomerDeliveryPreferencesAction]", error);
+    logError("[updateCustomerDeliveryPreferencesAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
   revalidatePath("/sales/customers");
   revalidatePath(`/sales/customers/${parsed.customerId}`);
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
   };
 }
 
-export async function deleteCustomerAction(customerId: string) {
+export async function deleteCustomerAction(
+  customerId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("customers").delete().eq("id", customerId);
   if (error) {
-    console.error("[deleteCustomerAction]", error);
+    logError("[deleteCustomerAction]", { error: error.message });
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'delete' as const, id: customerId },
   };
 }
@@ -166,7 +189,9 @@ const priceListAssignmentSchema = z.object({
   validTo: z.string().optional().nullable(),
 });
 
-export async function assignPriceListToCustomerAction(input: z.infer<typeof priceListAssignmentSchema>) {
+export async function assignPriceListToCustomerAction(
+  input: z.infer<typeof priceListAssignmentSchema>
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const validation = priceListAssignmentSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -185,27 +210,31 @@ export async function assignPriceListToCustomerAction(input: z.infer<typeof pric
   });
 
   if (error) {
-    console.error("[assignPriceListToCustomerAction]", error);
+    logError("[assignPriceListToCustomerAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
   revalidatePath("/sales/customers");
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
   };
 }
 
-export async function removePriceListAssignmentAction(assignmentId: string) {
+export async function removePriceListAssignmentAction(
+  assignmentId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("price_list_customers").delete().eq("id", assignmentId);
   if (error) {
-    console.error("[removePriceListAssignmentAction]", error);
+    logError("[removePriceListAssignmentAction]", { error: error.message });
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'update' as const },
   };
 }
@@ -214,7 +243,9 @@ export async function removePriceListAssignmentAction(assignmentId: string) {
 // CUSTOMER ADDRESSES CRUD
 // =============================================================================
 
-export async function upsertCustomerAddressAction(input: z.infer<typeof customerAddressSchema>) {
+export async function upsertCustomerAddressAction(
+  input: z.infer<typeof customerAddressSchema>
+): Promise<(ActionResult<Record<string, unknown> | null> & MutatedMeta) | ActionResult<never>> {
   const validation = customerAddressSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -277,7 +308,7 @@ export async function upsertCustomerAddressAction(input: z.infer<typeof customer
   }
 
   if (error) {
-    console.error("[upsertCustomerAddressAction]", error);
+    logError("[upsertCustomerAddressAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -290,16 +321,19 @@ export async function upsertCustomerAddressAction(input: z.infer<typeof customer
   };
 }
 
-export async function deleteCustomerAddressAction(addressId: string) {
+export async function deleteCustomerAddressAction(
+  addressId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("customer_addresses").delete().eq("id", addressId);
   if (error) {
-    console.error("[deleteCustomerAddressAction]", error);
+    logError("[deleteCustomerAddressAction]", { error: error.message });
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'update' as const },
   };
 }
@@ -308,7 +342,9 @@ export async function deleteCustomerAddressAction(addressId: string) {
 // CUSTOMER CONTACTS CRUD
 // =============================================================================
 
-export async function upsertCustomerContactAction(input: z.infer<typeof customerContactSchema>) {
+export async function upsertCustomerContactAction(
+  input: z.infer<typeof customerContactSchema>
+): Promise<(ActionResult<Record<string, unknown> | null> & MutatedMeta) | ActionResult<never>> {
   const validation = customerContactSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -355,7 +391,7 @@ export async function upsertCustomerContactAction(input: z.infer<typeof customer
   }
 
   if (error) {
-    console.error("[upsertCustomerContactAction]", error);
+    logError("[upsertCustomerContactAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -368,16 +404,19 @@ export async function upsertCustomerContactAction(input: z.infer<typeof customer
   };
 }
 
-export async function deleteCustomerContactAction(contactId: string) {
+export async function deleteCustomerContactAction(
+  contactId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("customer_contacts").delete().eq("id", contactId);
   if (error) {
-    console.error("[deleteCustomerContactAction]", error);
+    logError("[deleteCustomerContactAction]", { error: error.message });
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'update' as const },
   };
 }
@@ -397,7 +436,9 @@ const customerProductPricingSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-export async function upsertCustomerProductPricingAction(input: z.infer<typeof customerProductPricingSchema>) {
+export async function upsertCustomerProductPricingAction(
+  input: z.infer<typeof customerProductPricingSchema>
+): Promise<(ActionResult<Record<string, unknown> | null> & MutatedMeta) | ActionResult<never>> {
   const validation = customerProductPricingSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -466,7 +507,7 @@ export async function upsertCustomerProductPricingAction(input: z.infer<typeof c
   }
 
   if (error) {
-    console.error("[upsertCustomerProductPricingAction]", error);
+    logError("[upsertCustomerProductPricingAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -478,22 +519,39 @@ export async function upsertCustomerProductPricingAction(input: z.infer<typeof c
   };
 }
 
-export async function deleteCustomerProductPricingAction(aliasId: string) {
+export async function deleteCustomerProductPricingAction(
+  aliasId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase.from("product_aliases").delete().eq("id", aliasId);
   if (error) {
-    console.error("[deleteCustomerProductPricingAction]", error);
+    logError("[deleteCustomerProductPricingAction]", { error: error.message });
     return { success: false, error: error.message };
   }
   revalidatePath("/sales/customers");
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'customers' as const, action: 'update' as const },
   };
 }
 
 // Fetch customer product pricing
-export async function fetchCustomerProductPricingAction(customerId: string) {
+type CustomerProductPricing = {
+  aliasId: string;
+  productId: string;
+  productName: string;
+  skuCode: string | null;
+  aliasName: string | null;
+  customerSkuCode: string | null;
+  unitPriceExVat: number | null;
+  rrp: number | null;
+  notes: string | null;
+};
+
+export async function fetchCustomerProductPricingAction(
+  customerId: string
+): Promise<ActionResult<CustomerProductPricing[]>> {
   const supabase = await getSupabaseServerApp();
   
   const { data, error } = await supabase
@@ -517,11 +575,11 @@ export async function fetchCustomerProductPricingAction(customerId: string) {
     .order("alias_name", { ascending: true });
 
   if (error) {
-    console.error("[fetchCustomerProductPricingAction]", error);
-    return { success: false, error: error.message, data: [] };
+    logError("[fetchCustomerProductPricingAction]", { error: error.message });
+    return { success: false, error: error.message };
   }
 
-  const pricing = data.map((row) => ({
+  const pricing: CustomerProductPricing[] = data.map((row) => ({
     aliasId: row.id,
     productId: row.product_id,
     productName: (row.products as { name: string })?.name ?? "Unknown",
@@ -546,7 +604,9 @@ const portalPasswordSchema = z.object({
   password: z.string().min(6),
 });
 
-export async function setCustomerPortalPassword(input: z.infer<typeof portalPasswordSchema>) {
+export async function setCustomerPortalPassword(
+  input: z.infer<typeof portalPasswordSchema>
+): Promise<(ActionResult<{ userId: string }> & MutatedMeta) | ActionResult<never>> {
   const validation = portalPasswordSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -570,7 +630,7 @@ export async function setCustomerPortalPassword(input: z.infer<typeof portalPass
     });
 
     if (authError) {
-      console.error("[setCustomerPortalPassword] Auth error:", authError);
+      logError("[setCustomerPortalPassword] Auth error", { error: authError.message });
       return { success: false, error: authError.message };
     }
 
@@ -590,7 +650,7 @@ export async function setCustomerPortalPassword(input: z.infer<typeof portalPass
       });
 
     if (profileError) {
-      console.error("[setCustomerPortalPassword] Profile error:", profileError);
+      logError("[setCustomerPortalPassword] Profile error", { error: profileError.message });
       // Try to delete the auth user if profile creation failed
       await supabase.auth.admin.deleteUser(authData.user.id);
       return { success: false, error: profileError.message };
@@ -603,7 +663,7 @@ export async function setCustomerPortalPassword(input: z.infer<typeof portalPass
       _mutated: { resource: 'customers' as const, action: 'update' as const, id: parsed.customerId },
     };
   } catch (error) {
-    console.error("[setCustomerPortalPassword] Unexpected error:", error);
+    logError("[setCustomerPortalPassword] Unexpected error", { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : "An unexpected error occurred"
@@ -624,7 +684,9 @@ const createFollowUpSchema = z.object({
   assignedTo: z.string().uuid().optional().nullable(),
 });
 
-export async function createFollowUpAction(input: z.infer<typeof createFollowUpSchema>) {
+export async function createFollowUpAction(
+  input: z.infer<typeof createFollowUpSchema>
+): Promise<(ActionResult<Record<string, unknown>> & MutatedMeta) | ActionResult<never>> {
   const validation = createFollowUpSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -651,7 +713,7 @@ export async function createFollowUpAction(input: z.infer<typeof createFollowUpS
     .single();
 
   if (error) {
-    console.error("[createFollowUpAction]", error);
+    logError("[createFollowUpAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -664,7 +726,9 @@ export async function createFollowUpAction(input: z.infer<typeof createFollowUpS
   };
 }
 
-export async function completeFollowUpAction(followUpId: string) {
+export async function completeFollowUpAction(
+  followUpId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const { userId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -680,7 +744,7 @@ export async function completeFollowUpAction(followUpId: string) {
     .single();
 
   if (error) {
-    console.error("[completeFollowUpAction]", error);
+    logError("[completeFollowUpAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -689,12 +753,15 @@ export async function completeFollowUpAction(followUpId: string) {
     revalidatePath(`/sales/customers/${data.customer_id}`);
   }
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'follow_ups' as const, action: 'update' as const, id: followUpId },
   };
 }
 
-export async function cancelFollowUpAction(followUpId: string) {
+export async function cancelFollowUpAction(
+  followUpId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
 
   const { data, error } = await supabase
@@ -705,7 +772,7 @@ export async function cancelFollowUpAction(followUpId: string) {
     .single();
 
   if (error) {
-    console.error("[cancelFollowUpAction]", error);
+    logError("[cancelFollowUpAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -714,16 +781,16 @@ export async function cancelFollowUpAction(followUpId: string) {
     revalidatePath(`/sales/customers/${data.customer_id}`);
   }
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'follow_ups' as const, action: 'update' as const, id: followUpId },
   };
 }
 
-export async function getCustomerFollowUpsAction(customerId: string, includeCompleted = false): Promise<{
-  success: boolean;
-  followUps: CustomerFollowUp[];
-  error?: string;
-}> {
+export async function getCustomerFollowUpsAction(
+  customerId: string,
+  includeCompleted = false
+): Promise<ActionResult<CustomerFollowUp[]>> {
   const supabase = await getSupabaseServerApp();
 
   let query = supabase
@@ -753,33 +820,29 @@ export async function getCustomerFollowUpsAction(customerId: string, includeComp
   const { data, error } = await query;
 
   if (error) {
-    console.error("[getCustomerFollowUpsAction]", error);
-    return { success: false, followUps: [], error: error.message };
+    logError("[getCustomerFollowUpsAction]", { error: error.message });
+    return { success: false, error: error.message };
   }
 
-  const followUps: CustomerFollowUp[] = (data ?? []).map((row: any) => ({
-    id: row.id,
-    customerId: row.customer_id,
-    sourceInteractionId: row.source_interaction_id,
-    assignedToId: row.assigned_to,
-    assignedToName: row.assigned_user?.display_name ?? null,
-    dueDate: row.due_date,
-    title: row.title,
-    description: row.description,
-    status: row.status,
-    completedAt: row.completed_at,
-    completedByName: row.completed_user?.display_name ?? null,
-    createdAt: row.created_at,
+  const followUps: CustomerFollowUp[] = (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    customerId: row.customer_id as string,
+    sourceInteractionId: row.source_interaction_id as string | null,
+    assignedToId: row.assigned_to as string | null,
+    assignedToName: (row.assigned_user as { display_name?: string } | null)?.display_name ?? null,
+    dueDate: row.due_date as string,
+    title: row.title as string,
+    description: row.description as string | null,
+    status: row.status as 'pending' | 'completed' | 'cancelled',
+    completedAt: row.completed_at as string | null,
+    completedByName: (row.completed_user as { display_name?: string } | null)?.display_name ?? null,
+    createdAt: row.created_at as string,
   }));
 
-  return { success: true, followUps };
+  return { success: true, data: followUps };
 }
 
-export async function getMyFollowUpsAction(): Promise<{
-  success: boolean;
-  followUps: (CustomerFollowUp & { customerName: string })[];
-  error?: string;
-}> {
+export async function getMyFollowUpsAction(): Promise<ActionResult<(CustomerFollowUp & { customerName: string })[]>> {
   const { userId } = await getUserAndOrg();
   const supabase = await getSupabaseServerApp();
 
@@ -803,27 +866,27 @@ export async function getMyFollowUpsAction(): Promise<{
     .order("due_date", { ascending: true });
 
   if (error) {
-    console.error("[getMyFollowUpsAction]", error);
-    return { success: false, followUps: [], error: error.message };
+    logError("[getMyFollowUpsAction]", { error: error.message });
+    return { success: false, error: error.message };
   }
 
-  const followUps = (data ?? []).map((row: any) => ({
-    id: row.id,
-    customerId: row.customer_id,
-    sourceInteractionId: row.source_interaction_id,
-    assignedToId: row.assigned_to,
-    assignedToName: null,
-    dueDate: row.due_date,
-    title: row.title,
-    description: row.description,
+  const followUps = (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    customerId: row.customer_id as string,
+    sourceInteractionId: row.source_interaction_id as string | null,
+    assignedToId: row.assigned_to as string | null,
+    assignedToName: null as string | null,
+    dueDate: row.due_date as string,
+    title: row.title as string,
+    description: row.description as string | null,
     status: row.status as 'pending' | 'completed' | 'cancelled',
-    completedAt: row.completed_at,
-    completedByName: null,
-    createdAt: row.created_at,
-    customerName: row.customers?.name ?? 'Unknown Customer',
+    completedAt: row.completed_at as string | null,
+    completedByName: null as string | null,
+    createdAt: row.created_at as string,
+    customerName: (row.customers as { name?: string } | null)?.name ?? 'Unknown Customer',
   }));
 
-  return { success: true, followUps };
+  return { success: true, data: followUps };
 }
 
 // =============================================================================
@@ -839,7 +902,9 @@ const createMilestoneSchema = z.object({
   recurring: z.boolean().optional().default(false),
 });
 
-export async function createMilestoneAction(input: z.infer<typeof createMilestoneSchema>) {
+export async function createMilestoneAction(
+  input: z.infer<typeof createMilestoneSchema>
+): Promise<(ActionResult<Record<string, unknown>> & MutatedMeta) | ActionResult<never>> {
   const validation = createMilestoneSchema.safeParse(input);
   if (!validation.success) {
     const firstError = validation.error.errors[0]?.message ?? "Invalid input";
@@ -865,7 +930,7 @@ export async function createMilestoneAction(input: z.infer<typeof createMileston
     .single();
 
   if (error) {
-    console.error("[createMilestoneAction]", error);
+    logError("[createMilestoneAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -878,7 +943,9 @@ export async function createMilestoneAction(input: z.infer<typeof createMileston
   };
 }
 
-export async function deleteMilestoneAction(milestoneId: string) {
+export async function deleteMilestoneAction(
+  milestoneId: string
+): Promise<(ActionResult<null> & MutatedMeta) | ActionResult<never>> {
   const supabase = await getSupabaseServerApp();
 
   const { data, error } = await supabase
@@ -889,7 +956,7 @@ export async function deleteMilestoneAction(milestoneId: string) {
     .single();
 
   if (error) {
-    console.error("[deleteMilestoneAction]", error);
+    logError("[deleteMilestoneAction]", { error: error.message });
     return { success: false, error: error.message };
   }
 
@@ -898,16 +965,15 @@ export async function deleteMilestoneAction(milestoneId: string) {
     revalidatePath(`/sales/customers/${data.customer_id}`);
   }
   return {
-    success: true,
+    success: true as const,
+    data: null,
     _mutated: { resource: 'milestones' as const, action: 'delete' as const, id: milestoneId },
   };
 }
 
-export async function getCustomerMilestonesAction(customerId: string): Promise<{
-  success: boolean;
-  milestones: CustomerMilestone[];
-  error?: string;
-}> {
+export async function getCustomerMilestonesAction(
+  customerId: string
+): Promise<ActionResult<CustomerMilestone[]>> {
   const supabase = await getSupabaseServerApp();
 
   const { data, error } = await supabase
@@ -926,29 +992,28 @@ export async function getCustomerMilestonesAction(customerId: string): Promise<{
     .order("event_date", { ascending: true });
 
   if (error) {
-    console.error("[getCustomerMilestonesAction]", error);
-    return { success: false, milestones: [], error: error.message };
+    logError("[getCustomerMilestonesAction]", { error: error.message });
+    return { success: false, error: error.message };
   }
 
-  const milestones: CustomerMilestone[] = (data ?? []).map((row: any) => ({
-    id: row.id,
-    customerId: row.customer_id,
+  const milestones: CustomerMilestone[] = (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    customerId: row.customer_id as string,
     milestoneType: row.milestone_type as MilestoneType,
-    title: row.title,
-    description: row.description,
-    eventDate: row.event_date,
-    recurring: row.recurring,
-    createdAt: row.created_at,
+    title: row.title as string,
+    description: row.description as string | null,
+    eventDate: row.event_date as string,
+    recurring: row.recurring as boolean,
+    createdAt: row.created_at as string,
   }));
 
-  return { success: true, milestones };
+  return { success: true, data: milestones };
 }
 
-export async function getUpcomingMilestonesAction(customerId: string, days = 90): Promise<{
-  success: boolean;
-  milestones: CustomerMilestone[];
-  error?: string;
-}> {
+export async function getUpcomingMilestonesAction(
+  customerId: string,
+  days = 90
+): Promise<ActionResult<CustomerMilestone[]>> {
   const supabase = await getSupabaseServerApp();
 
   // Get all milestones for this customer
@@ -967,8 +1032,8 @@ export async function getUpcomingMilestonesAction(customerId: string, days = 90)
     .eq("customer_id", customerId);
 
   if (error) {
-    console.error("[getUpcomingMilestonesAction]", error);
-    return { success: false, milestones: [], error: error.message };
+    logError("[getUpcomingMilestonesAction]", { error: error.message });
+    return { success: false, error: error.message };
   }
 
   const today = new Date();
@@ -1021,5 +1086,5 @@ export async function getUpcomingMilestonesAction(customerId: string, days = 90)
   // Sort by upcoming date
   upcoming.sort((a, b) => a.eventDate.localeCompare(b.eventDate));
 
-  return { success: true, milestones: upcoming };
+  return { success: true, data: upcoming };
 }

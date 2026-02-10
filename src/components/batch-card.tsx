@@ -33,7 +33,6 @@ import type { HealthStatusLevel } from "@/components/batch/HealthIndicator";
 // --- runtime guard: logs undefined imports without crashing ---
 const _ensure = <T,>(x: T | undefined | null, name: string): T => {
   if (!x) {
-    console.error(`[BatchCard] ${name} is undefined (import/export mismatch)`);
     return (() => null) as unknown as T;
   }
   return x;
@@ -57,6 +56,7 @@ type BatchCardBatch = Batch & {
   supplier?: string;
   supplierName?: string;
   locationName?: string;
+  locationSite?: string | null;
   // Distribution data from v_batch_search view
   distribution?: SimpleDistribution;
   // Health status data (optional, from health status API)
@@ -152,12 +152,16 @@ export function BatchCard({
   };
 
   const phase = batch.phase;
-  const locationLabel =
+  const locationName =
     typeof batch.location === "string"
       ? batch.location
       : (batch.location as { name?: string })?.name ??
         batch.locationName ??
         "Unassigned";
+  const locationSite =
+    batch.locationSite ??
+    (typeof batch.location === "object" ? (batch.location as { nursery_site?: string })?.nursery_site : null);
+  const locationLabel = locationSite ? `${locationSite} · ${locationName}` : locationName;
   const supplierLabel =
     batch.supplier ??
     batch.supplierName ??

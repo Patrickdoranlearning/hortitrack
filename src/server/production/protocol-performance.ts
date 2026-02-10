@@ -1,4 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Captures protocol performance metrics when a batch is completed.
@@ -29,7 +30,7 @@ export async function captureProtocolPerformance(
       .single();
 
     if (batchError || !batch) {
-      console.error("[protocol-performance] Batch not found:", batchError);
+      logger.production.error("Batch not found for protocol performance capture", batchError, { batchId });
       return { success: false, error: "Batch not found" };
     }
 
@@ -57,7 +58,7 @@ export async function captureProtocolPerformance(
       .single();
 
     if (protocolError || !protocol) {
-      console.error("[protocol-performance] Protocol not found:", protocolError);
+      logger.production.error("Protocol not found for performance capture", protocolError, { protocolId: batch.protocol_id });
       return { success: false, error: "Protocol not found" };
     }
 
@@ -132,13 +133,13 @@ export async function captureProtocolPerformance(
       });
 
     if (insertError) {
-      console.error("[protocol-performance] Insert error:", insertError);
+      logger.production.error("Failed to insert protocol performance record", insertError, { batchId, protocolId: batch.protocol_id });
       return { success: false, error: insertError.message };
     }
 
     return { success: true };
   } catch (err) {
-    console.error("[protocol-performance] Unexpected error:", err);
+    logger.production.error("Unexpected error during protocol performance capture", err, { batchId });
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
@@ -182,7 +183,7 @@ export async function getProtocolPerformanceStats(
       .order("completed_at", { ascending: false });
 
     if (error || !data) {
-      console.error("[protocol-performance] Stats query error:", error);
+      logger.production.error("Protocol performance stats query failed", error, { protocolId });
       return null;
     }
 
@@ -244,7 +245,7 @@ export async function getProtocolPerformanceStats(
       })),
     };
   } catch (err) {
-    console.error("[protocol-performance] Stats error:", err);
+    logger.production.error("Unexpected error fetching protocol performance stats", err, { protocolId });
     return null;
   }
 }

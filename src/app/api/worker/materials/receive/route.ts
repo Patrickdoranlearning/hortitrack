@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { receiveMaterialLots } from "@/server/materials/lots";
 import { MaterialLotUnitTypeSchema } from "@/lib/schemas/material-lots";
 
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error("[api/worker/materials/receive] Error:", error);
+    logger.worker.error("Material receive failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

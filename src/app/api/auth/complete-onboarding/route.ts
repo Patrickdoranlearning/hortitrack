@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
+import { logger } from "@/server/utils/logger";
 
 export async function POST() {
   try {
@@ -46,7 +47,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true, orgId: defaultOrgId });
   } catch (error) {
-    console.error("Complete onboarding error:", error);
+    logger.auth.error("Complete onboarding failed", error);
     return NextResponse.json(
       { error: "Failed to complete onboarding" },
       { status: 500 }
@@ -76,7 +77,7 @@ async function createProfileAndMembership(
     );
 
   if (profileError) {
-    console.error("Profile upsert error:", profileError);
+    logger.auth.error("Profile upsert failed during onboarding", profileError, { userId });
     throw profileError;
   }
 
@@ -93,7 +94,7 @@ async function createProfileAndMembership(
     );
 
   if (membershipError) {
-    console.error("Membership upsert error:", membershipError);
+    logger.auth.error("Membership upsert failed during onboarding", membershipError, { userId, orgId });
     throw membershipError;
   }
 }

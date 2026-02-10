@@ -129,8 +129,8 @@ export function SaleLabelPrintSheet({
           setSelectedPrinter(json.data[0].id);
         }
       }
-    } catch (e) {
-      console.error("Failed to fetch printers:", e);
+    } catch {
+      // Printer fetch failed silently
     } finally {
       setIsLoadingPrinters(false);
     }
@@ -150,8 +150,8 @@ export function SaleLabelPrintSheet({
           setSelectedTemplate(json.data[0].id);
         }
       }
-    } catch (e) {
-      console.error("Failed to fetch templates:", e);
+    } catch {
+      // Template fetch failed silently
     }
   };
 
@@ -229,8 +229,7 @@ export function SaleLabelPrintSheet({
         vibrateSuccess();
         setPrintComplete(true);
       }
-    } catch (e) {
-      console.error("Print error:", e);
+    } catch {
       setError("Failed to print labels");
       vibrateWarning();
     } finally {
@@ -535,8 +534,8 @@ function SaleLabelPreviewMini({
         height: 6,
         includetext: false,
       });
-    } catch (e) {
-      console.error("Barcode render failed:", e);
+    } catch {
+      // Barcode render failed silently
     }
   }, [barcode]);
 

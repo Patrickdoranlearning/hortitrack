@@ -81,8 +81,8 @@ export function BatchSubstitutionSheet({
             setBatches(data.batches);
           }
         })
-        .catch((err) => {
-          console.error("Error fetching batches:", err);
+        .catch(() => {
+          // Batch fetch failed silently
         })
         .finally(() => {
           setIsLoading(false);

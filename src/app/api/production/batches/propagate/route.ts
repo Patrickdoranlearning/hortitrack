@@ -8,6 +8,7 @@ import { ensureInternalSupplierId } from "@/server/suppliers/getInternalSupplier
 import { resolveProductionStatus } from "@/server/batches/service";
 import { consumeMaterialsForBatch } from "@/server/materials/consumption";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
+import { logger } from "@/server/utils/logger";
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID();
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
         shortages: consumptionResult.shortages,
       };
     } catch (consumeErr) {
-      console.error("[propagate] Material consumption failed, rolling back batch creation:", consumeErr);
+      logger.production.error("Material consumption failed, rolling back batch creation", consumeErr);
       // ROLLBACK BATCH CREATION ON MATERIAL ERROR
       await Promise.all([
         supabase.from("batch_events").delete().eq("batch_id", batch.id),

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ATTRIBUTE_META, type AttributeKey, type AttributeBehavior } from "@/lib/attributeOptions";
 import { getUserAndOrg } from "@/server/auth/org";
 import { assertValidAttributeKey, listAttributeOptions, saveAttributeOptions } from "@/server/attributeOptions/service";
+import { logger } from "@/server/utils/logger";
 
 const OptionInputSchema = z.object({
   id: z.string().uuid().optional(),
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ attr
 
     return NextResponse.json({ options, source, meta: ATTRIBUTE_META[attributeKey] });
   } catch (e: any) {
-    console.error(`[OPTIONS API] Error for ${(await params).attributeKey}:`, e?.message, e?.stack);
+    logger.api.error("GET /api/options failed", e);
     const status = /Unauthenticated/i.test(e?.message) ? 401 : e?.message === "Unknown attribute key" ? 404 : 500;
     return NextResponse.json({ error: e?.message ?? "Server error" }, { status });
   }
@@ -46,13 +47,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ attr
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ attributeKey: string }> }) {
   try {
     const { attributeKey: rawKey } = await params;
-    console.log(`[OPTIONS API PUT] Starting for ${rawKey}`);
     const attributeKey = parseAttributeKey(rawKey);
     const body = BodySchema.parse(await req.json());
-    console.log(`[OPTIONS API PUT] Body parsed, ${body.options.length} options`);
 
     const { orgId, supabase } = await getUserAndOrg();
-    console.log(`[OPTIONS API PUT] Got orgId: ${orgId}`);
 
     const cleaned = body.options.map((opt) => {
       const behavior =
@@ -65,13 +63,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ attr
       };
     });
 
-    console.log(`[OPTIONS API PUT] Calling saveAttributeOptions`);
     const { options, source } = await saveAttributeOptions({ orgId, attributeKey, options: cleaned, supabase });
-    console.log(`[OPTIONS API PUT] Save successful, ${options.length} options returned`);
 
     return NextResponse.json({ options, source });
   } catch (e: any) {
-    console.error(`[OPTIONS API PUT] Error for ${(await params).attributeKey}:`, e?.message, e?.stack);
+    logger.api.error("PUT /api/options failed", e);
     if (e?.name === "ZodError") {
       return NextResponse.json({ error: "Invalid payload", issues: e.issues }, { status: 400 });
     }

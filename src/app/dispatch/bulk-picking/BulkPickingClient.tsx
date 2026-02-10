@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { format } from 'date-fns';
 import {
   Package,
@@ -76,7 +76,6 @@ export default function BulkPickingClient({
   ordersByDate,
 }: BulkPickingClientProps) {
   const router = useRouter();
-  const { toast } = useToast();
   
   const [batches] = useState<BulkBatch[]>(existingBatches);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -113,11 +112,7 @@ export default function BulkPickingClient({
   
   const handleCreateBatch = async () => {
     if (selectedOrders.size === 0 || !selectedDate) {
-      toast({
-        variant: 'destructive',
-        title: 'No orders selected',
-        description: 'Select at least one order to create a bulk pick batch',
-      });
+      toast.error('Select at least one order to create a bulk pick batch');
       return;
     }
     
@@ -135,27 +130,16 @@ export default function BulkPickingClient({
       const data = await res.json();
       
       if (data.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: data.error,
-        });
+        toast.error(data.error);
         return;
       }
       
-      toast({
-        title: 'Batch Created',
-        description: `Bulk pick batch ${data.batch.batchNumber} created with ${data.batch.orderCount} orders`,
-      });
+      toast.success(`Bulk pick batch ${data.batch.batchNumber} created with ${data.batch.orderCount} orders`);
       
       // Navigate to the batch
       router.push(`/dispatch/bulk-picking/${data.batch.id}`);
     } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to create bulk pick batch',
-      });
+      toast.error('Failed to create bulk pick batch');
     } finally {
       setIsCreating(false);
       setShowCreateDialog(false);

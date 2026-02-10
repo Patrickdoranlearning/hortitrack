@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { createSkuAction } from "./actions";
 import type { ProductSkuOption } from "./types";
 
@@ -25,14 +25,13 @@ const defaultForm = {
 };
 
 export default function ProductSkuSheet({ open, onOpenChange, onCreated }: Props) {
-  const { toast } = useToast();
   const [form, setForm] = useState(defaultForm);
   const [pending, startTransition] = useTransition();
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.barcode.trim()) {
-      toast({ variant: "destructive", title: "Barcode required" });
+      toast.error("Barcode required");
       return;
     }
     startTransition(async () => {
@@ -44,10 +43,10 @@ export default function ProductSkuSheet({ open, onOpenChange, onCreated }: Props
         vatRate: Number(form.vatRate),
       });
       if (!result.success) {
-        toast({ variant: "destructive", title: "Failed to create SKU", description: result.error });
+        toast.error(result.error);
         return;
       }
-      toast({ title: "SKU created" });
+      toast.success("SKU created");
       const displayName = result.data.display_name || result.data.code;
       onCreated({
         id: result.data.id,

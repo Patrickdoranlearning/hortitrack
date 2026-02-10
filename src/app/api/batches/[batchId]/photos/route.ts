@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 
@@ -135,7 +136,7 @@ export async function POST(
     return NextResponse.json({ ok: true, data: photoDoc }, { status: 201 });
 
   } catch (e: any) {
-    console.error("Upload error:", e);
+    logger.api.error("Batch photo upload failed", e);
     const message = e.message || "Upload failed";
     let status = 500;
     if (/not found/i.test(message)) status = 404;

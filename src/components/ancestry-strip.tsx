@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -110,7 +110,6 @@ export default function AncestryStrip({
 }) {
   const [data, setData] = useState<ResponseShape | null>(null);
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (!currentId) return;
@@ -128,16 +127,12 @@ export default function AncestryStrip({
           children: (j.children ?? []).map((c: Record<string, unknown>) => normalizeBatch(c)),
         });
       } catch (e: any) {
-        toast({
-          variant: "destructive",
-          title: "Failed to load ancestry",
-          description: e?.message ?? "Unknown error",
-        });
+        toast.error(e?.message ?? "Failed to load ancestry");
       } finally {
         setLoading(false);
       }
     })();
-  }, [currentId, toast]);
+  }, [currentId]);
 
   if (loading) {
     return (

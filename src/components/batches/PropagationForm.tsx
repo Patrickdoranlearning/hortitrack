@@ -23,7 +23,7 @@ import { SizeComboboxGrouped } from "../ui/size-combobox-grouped";
 import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
 import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -63,8 +63,6 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
   
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
-  const { toast } = useToast();
-
   // Use hydration-safe date to prevent server/client mismatch
   const today = useTodayDate();
 
@@ -172,10 +170,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
       // If onSubmitSuccess is provided (dialog context), use toast and let parent handle close
       // Otherwise show success modal for standalone page usage
       if (onSubmitSuccess) {
-        toast({
-          title: "Propagation Created!",
-          description: `Batch #${batch?.batch_number ?? ""} - ${totalUnits.toLocaleString()} plants`,
-        });
+        toast.success(`Batch #${batch?.batch_number ?? ""} - ${totalUnits.toLocaleString()} plants`);
         onSubmitSuccess(batch);
       } else {
         setSuccessData({
@@ -197,11 +192,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
       });
     } catch (err) {
       const e = err as HttpError;
-      toast({
-        title: e.status === 401 ? "Please sign in" : "Failed to create batch",
-        description: e.requestId ? `${e.message} (ref ${e.requestId})` : e.message,
-        variant: "destructive",
-      });
+      toast.error(e.requestId ? `${e.message} (ref ${e.requestId})` : e.message);
     } finally {
       setSubmitting(false);
       submittingRef.current = false;
@@ -441,7 +432,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
                     : "—"
                 }
               />
-              <SummaryRow label="Location" value={selectedLocation?.name ?? "—"} />
+              <SummaryRow label="Location" value={selectedLocation ? `${selectedLocation.nursery_site ? `${selectedLocation.nursery_site} · ` : ""}${selectedLocation.name}` : "—"} />
               <SummaryRow label="Planting date" value={watchDate || "—"} />
             </dl>
           </Card>

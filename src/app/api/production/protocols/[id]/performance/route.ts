@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getProtocolPerformanceStats } from "@/server/production/protocol-performance";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(
   req: NextRequest,
@@ -36,7 +37,7 @@ export async function GET(
 
     return NextResponse.json(stats);
   } catch (err) {
-    console.error("[protocol-performance-api] Error:", err);
+    logger.production.error("Protocol performance stats fetch failed", err);
     const message = err instanceof Error ? err.message : "Internal server error";
     const status = /Unauthenticated/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

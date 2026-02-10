@@ -6,6 +6,7 @@ import {
   assignCustomerToPriceList,
   removeCustomerFromPriceList,
 } from "@/server/sales/price-lists.server";
+import { logger } from "@/server/utils/logger";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -15,7 +16,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const customers = await listPriceListCustomers(id);
     return NextResponse.json({ ok: true, customers });
   } catch (error) {
-    console.error("[api:sales/price-lists/[id]/customers][GET]", error);
+    logger.sales.error("GET /api/sales/price-lists/[id]/customers failed", error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to fetch customers" },
       { status: 500 }
@@ -44,7 +45,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     
     return NextResponse.json({ ok: true, assignment }, { status: 201 });
   } catch (error) {
-    console.error("[api:sales/price-lists/[id]/customers][POST]", error);
+    logger.sales.error("POST /api/sales/price-lists/[id]/customers failed", error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to assign customer" },
       { status: 400 }
@@ -65,7 +66,7 @@ export async function DELETE(request: Request) {
     
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[api:sales/price-lists/[id]/customers][DELETE]", error);
+    logger.sales.error("DELETE /api/sales/price-lists/[id]/customers failed", error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to remove customer" },
       { status: 400 }

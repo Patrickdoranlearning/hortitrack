@@ -11,7 +11,7 @@ import {
   Loader2,
   Play,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { Button } from '@/components/ui/button';
 import { SelectPlannedBatchesStep, type SelectPlannedBatchesStepData, type PlannedBatch } from './SelectPlannedBatchesStep';
@@ -151,8 +151,6 @@ export function ActualizeWizard({
           consume_materials: true, // Enable material consumption
         };
 
-        console.log('[ActualizeWizard] Submitting payload:', JSON.stringify(payload, null, 2));
-
         const response = await fetch('/api/production/batches/actualize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -163,12 +161,10 @@ export function ActualizeWizard({
           let errData: any = {};
           try {
             const text = await response.text();
-            console.error('[ActualizeWizard] API error response text:', text);
             errData = text ? JSON.parse(text) : {};
-          } catch (parseErr) {
-            console.error('[ActualizeWizard] Failed to parse error response:', parseErr);
+          } catch {
+            // Failed to parse error response
           }
-          console.error('[ActualizeWizard] API error:', errData, 'status:', response.status);
           let errorMessage = errData.error ?? `Failed to actualize batches (${response.status})`;
           if (errData.errors?.length) {
             errorMessage += ': ' + errData.errors.join('; ');
@@ -185,7 +181,6 @@ export function ActualizeWizard({
         });
         onComplete?.(result);
       } catch (error: any) {
-        console.error('Actualization failed:', error);
         toast.error('Actualization failed', { description: error.message });
       } finally {
         setIsSaving(false);

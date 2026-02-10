@@ -2,8 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from 'next/cache';
+import type { ActionResult } from "@/lib/errors";
+import { logError } from "@/lib/log";
 
-export async function updateActiveOrgAction(orgId: string) {
+export async function updateActiveOrgAction(orgId: string): Promise<ActionResult<null>> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -30,9 +32,10 @@ export async function updateActiveOrgAction(orgId: string) {
         .eq('id', user.id);
 
     if (error) {
+        logError("updateActiveOrgAction: failed to update profile", { error: error.message, userId: user.id, orgId });
         return { success: false, error: error.message };
     }
 
     revalidatePath('/', 'layout'); // Revalidate everything to reflect new org
-    return { success: true };
+    return { success: true, data: null };
 }

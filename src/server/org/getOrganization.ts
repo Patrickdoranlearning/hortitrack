@@ -2,6 +2,7 @@ import "server-only";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "./getActiveOrg";
 import type { Organization, OrganizationSummary } from "@/types/organization";
+import { logger } from "@/server/utils/logger";
 
 const DEFAULT_COMPANY_NAME = "HortiTrack";
 
@@ -24,7 +25,7 @@ export async function getOrganization(): Promise<Organization | null> {
     .single();
 
   if (error || !org) {
-    console.error("Error fetching organization:", error?.message);
+    logger.org.error("Failed to fetch organization", error);
     return null;
   }
 
@@ -50,7 +51,7 @@ export async function getOrganizationSummary(): Promise<OrganizationSummary | nu
     .single();
 
   if (error || !org) {
-    console.error("Error fetching organization summary:", error?.message);
+    logger.org.error("Failed to fetch organization summary", error);
     return null;
   }
 

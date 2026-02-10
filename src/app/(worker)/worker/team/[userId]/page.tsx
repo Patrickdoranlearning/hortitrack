@@ -37,8 +37,8 @@ export default function WorkerTeamMemberPage({ params }: PageProps) {
         const json = await res.json();
         setMember(json);
       }
-    } catch (error) {
-      console.error("Failed to fetch team member:", error);
+    } catch {
+      // Error handled by empty state UI
     } finally {
       setLoading(false);
     }

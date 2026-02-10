@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ModulePageHeader } from '@/ui/templates';
 import { EmployeeSchedule } from "./components/EmployeeSchedule";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { fetchJson } from "@/lib/http/fetchJson";
 import type { Task, StaffMember } from "@/server/tasks/service";
 import type { ProductionJob } from "@/server/production/jobs";
@@ -43,8 +43,6 @@ export default function TasksOverviewClient({
   jobs,
   currentUserId,
 }: Props) {
-  const { toast } = useToast();
-
   // Calculate stats
   const stats = React.useMemo(() => {
     const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -97,14 +95,10 @@ export default function TasksOverviewClient({
   const handleStartTask = async (task: Task) => {
     try {
       await fetchJson(`/api/tasks/${task.id}/start`, { method: "POST" });
-      toast({ title: "Task started" });
+      toast.success("Task started");
       // In a real app, we'd refresh data here
     } catch (error) {
-      toast({
-        title: "Failed to start task",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to start task");
     }
   };
 

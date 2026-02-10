@@ -9,6 +9,7 @@ import {
   saveTemplateDraft,
 } from "@/server/documents";
 import { requireDocumentAccess } from "@/server/documents/access";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(
   _req: NextRequest,
@@ -23,7 +24,7 @@ export async function GET(
     }
     return NextResponse.json({ template });
   } catch (err: any) {
-    console.error("[documents] get failed", err);
+    logger.documents.error("Document template get failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to load template" }, { status });
   }
@@ -44,7 +45,7 @@ export async function PUT(
     const template = await saveTemplateDraft(parsed.data as any);
     return NextResponse.json({ template });
   } catch (err: any) {
-    console.error("[documents] update failed", err);
+    logger.documents.error("Document template update failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to update template" }, { status });
   }
@@ -60,7 +61,7 @@ export async function DELETE(
     await deleteTemplate(templateId);
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error("[documents] delete failed", err);
+    logger.documents.error("Document template delete failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to delete template" }, { status });
   }

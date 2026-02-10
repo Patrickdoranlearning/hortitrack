@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { getMaterialLot } from "@/server/materials/lots";
 import { buildLotLabelZpl, buildCompactLotLabelZpl } from "@/server/labels/build-lot-label";
 import { sendToPrinter } from "@/server/labels/send-to-printer";
@@ -88,7 +89,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       message: `Label sent to printer (${parsed.data.copies} copies)`,
     });
   } catch (error: unknown) {
-    console.error("[lot/print POST] Error:", error);
+    logger.materials.error("Lot label print failed", error);
     const message = error instanceof Error ? error.message : "Failed to print label";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

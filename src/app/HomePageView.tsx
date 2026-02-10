@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth'; 
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   ActionLogFormValues,
   Batch,
@@ -110,7 +110,6 @@ export default function HomePageView({
   actions,
 }: HomePageViewProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const { user, loading: authLoading } = useAuth(); 
   const searchParams = useSearchParams();
   const urlBatchId = searchParams.get("batch");
@@ -312,10 +311,7 @@ export default function HomePageView({
     const supabase = supabaseClient();
     await supabase.auth.signOut();
     router.push('/login');
-    toast({
-      title: 'Signed Out',
-      description: 'You have been successfully signed out.',
-    });
+    toast.success('You have been successfully signed out.');
   }; void _handleSignOut;  
 
   React.useEffect(() => {
@@ -476,42 +472,18 @@ export default function HomePageView({
             return [normalized, ...prev];
           });
         } else if (res.status === 404) {
-          toast({
-            variant: "destructive",
-            title: "Not found",
-            description: "No batch matched the scanned code.",
-          });
+          toast.error("No batch matched the scanned code.");
         } else if (res.status === 422) {
-          toast({
-            variant: "destructive",
-            title: "Unsupported code",
-            description: "This code format is not recognized.",
-          });
+          toast.error("This code format is not recognized.");
         } else if (res.status === 429) {
-          toast({
-            variant: "destructive",
-            title: "Slow down",
-            description: "Too many scans in a short period. Please wait a moment.",
-          });
+          toast.error("Too many scans in a short period. Please wait a moment.");
         } else if (res.status === 401) {
-          toast({
-            variant: "destructive",
-            title: "Unauthorized",
-            description: "Session expired. Please sign in again.",
-          });
+          toast.error("Session expired. Please sign in again.");
         } else {
-          toast({
-            variant: "destructive",
-            title: "Scan failed",
-            description: `Server responded with ${res.status}.`,
-          });
+          toast.error(`Server responded with ${res.status}.`);
         }
       } catch (err: any) {
-        toast({
-          variant: "destructive",
-          title: "Scan failed",
-          description: err?.message || "Could not look up that batch.",
-        });
+        toast.error(err?.message || "Could not look up that batch.");
       }
     },
     [normalizeBatchNode, router, toast]
@@ -541,11 +513,7 @@ export default function HomePageView({
           );
         }
       } catch (err: any) {
-        toast({
-          variant: "destructive",
-          title: "Unable to open batch",
-          description: err?.message ?? "Could not load that batch.",
-        });
+        toast.error(err?.message ?? "Could not load that batch.");
       }
     },
     [batches, fetchBatchNode, router, toast]
@@ -560,8 +528,8 @@ export default function HomePageView({
         return prev.map((b) => (b.id === updated.id ? updated : b));
       });
       setSelectedBatch(updated);
-    } catch (err) {
-      console.error("Failed to refresh batch:", err);
+    } catch {
+      // Batch refresh failed silently
     }
   }, [selectedBatch?.id, fetchBatchNode]);
   
@@ -1127,10 +1095,7 @@ export default function HomePageView({
             <EditBatchForm
               batch={editingBatch}
               onSubmitSuccess={(res) => {
-                toast({
-                  title: editingBatch ? 'Batch Updated' : 'Batch Created',
-                  description: `Batch #${res.batchNumber} has been saved.`,
-                });
+                toast.success(`Batch #${res.batchNumber} has been saved.`);
                 setIsFormOpen(false);
                 setEditingBatch(null);
                 // In a real app, you'd refetch or update the local state
@@ -1141,7 +1106,7 @@ export default function HomePageView({
               }}
               onArchive={async (batchId) => {
                 await actions.archiveBatch(batchId, 0); // Assuming 0 loss for now
-                toast({ title: 'Batch Archived' });
+                toast.success('Batch Archived');
                 setIsFormOpen(false);
                 setEditingBatch(null);
               }}
@@ -1283,7 +1248,7 @@ export default function HomePageView({
         onOpenChange={setIsCheckinFormOpen}
         onSuccess={(batch) => {
           const batchNumber = batch?.batch_number ?? batch?.batchNumber ?? "";
-          toast({ title: "Check-in Successful", description: batchNumber ? `Batch #${batchNumber} created.` : "Batch created." });
+          toast.success(batchNumber ? `Batch #${batchNumber} created.` : "Batch created.");
           forceRefresh();
         }}
       />
@@ -1293,10 +1258,7 @@ export default function HomePageView({
         open={isPlanIncomingOpen}
         onOpenChange={setIsPlanIncomingOpen}
         onSuccess={(result) => {
-          toast({
-            title: "Batches Planned",
-            description: `${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Incoming" status.`
-          });
+          toast.success(`${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Incoming" status.`);
           forceRefresh();
         }}
       />
@@ -1306,10 +1268,7 @@ export default function HomePageView({
         open={isPlanBatchesOpen}
         onOpenChange={setIsPlanBatchesOpen}
         onSuccess={(result) => {
-          toast({
-            title: "Batches Planned",
-            description: `${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Planned" status.`
-          });
+          toast.success(`${result.created} batch${result.created !== 1 ? 'es' : ''} created with "Planned" status.`);
           forceRefresh();
         }}
       />
@@ -1319,10 +1278,7 @@ export default function HomePageView({
         open={isActualizeOpen}
         onOpenChange={setIsActualizeOpen}
         onSuccess={(result) => {
-          toast({
-            title: "Batches Actualized",
-            description: `${result.actualized} batch${result.actualized !== 1 ? 'es' : ''} now active.`
-          });
+          toast.success(`${result.actualized} batch${result.actualized !== 1 ? 'es' : ''} now active.`);
           forceRefresh();
         }}
       />
@@ -1347,10 +1303,10 @@ export default function HomePageView({
                       name: data.name, genus: data.genus, species: data.species, family: data.family, notes: data.notes
                     });
                     if (error) {
-                      toast({ variant: 'destructive', title: 'Failed to create variety', description: error.message });
+                      toast.error(error.message);
                       return;
                     }
-                    toast({ title: 'Variety created', description: `"${data.name}" has been added.` });
+                    toast.success(`"${data.name}" has been added.`);
                     setIsVarietyFormOpen(false);
                     setNewVarietyName('');
                   } finally {

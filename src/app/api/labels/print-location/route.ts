@@ -5,6 +5,7 @@ import { buildLocationZpl } from '@/server/labels/build-location-label';
 import { getSupabaseServerApp } from '@/server/db/supabase';
 import { resolveActiveOrgId } from '@/server/org/getActiveOrg';
 import { sendToPrinter } from '@/server/labels/send-to-printer';
+import { logger } from '@/server/utils/logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, copies, jobId: result.jobId });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Print failed';
-    console.error('Print location label error:', e);
+    logger.api.error("Location label print failed", e);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

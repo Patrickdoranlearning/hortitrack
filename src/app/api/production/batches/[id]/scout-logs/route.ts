@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserAndOrg } from '@/server/auth/org';
 import { getFullBatchScoutHistory } from '@/server/batches/scout-history';
+import { logger } from '@/server/utils/logger';
 
 export async function GET(
   _req: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
 
     return NextResponse.json({ logs: scouts }, { status: 200 });
   } catch (error) {
-    console.error('[GET /scout-logs] error', error);
+    logger.production.error('Failed to fetch scout logs', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Server error' },
       { status: 500 }

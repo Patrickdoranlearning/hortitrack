@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormMessage, FormControl } from "@/components/ui/form";
 import { LocationComboboxGrouped, type LocationData } from "@/components/ui/location-combobox-grouped";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 
 const Schema = z.object({
   location_id: z.string().uuid(),
@@ -17,7 +17,6 @@ const Schema = z.object({
 });
 
 export default function MoveForm({ batchId, onDone }: { batchId: string; onDone?: () => void }) {
-  const { toast } = useToast?.() ?? { toast: (x:any)=>alert(x?.title||x?.description||"OK") };
   const form = useForm<z.infer<typeof Schema>>({ resolver: zodResolver(Schema) });
   const [locations, setLocations] = React.useState<LocationData[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -34,11 +33,11 @@ export default function MoveForm({ batchId, onDone }: { batchId: string; onDone?
     setLoading(true);
     try {
       await ProductionAPI.move(batchId, values);
-      toast({ title: "Moved", description: "Batch location updated." });
+      toast.success("Batch location updated.");
       onDone?.();
     } catch (e) {
       const er = e as HttpError;
-      toast({ title: "Move failed", description: er.message, variant: "destructive" });
+      toast.error(er.message);
     } finally { setLoading(false); }
   }
 

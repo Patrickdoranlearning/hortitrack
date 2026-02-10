@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { listPurchaseOrders, createPurchaseOrder } from "@/server/materials/purchase-orders";
 import { CreatePurchaseOrderSchema, PurchaseOrdersQuerySchema } from "@/lib/schemas/materials";
 
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error("[purchase-orders GET] Error:", error);
+    logger.materials.error("Purchase orders GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch purchase orders";
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ order }, { status: 201 });
   } catch (error: unknown) {
-    console.error("[purchase-orders POST] Error:", error);
+    logger.materials.error("Purchase order create failed", error);
     const message = error instanceof Error ? error.message : "Failed to create purchase order";
     return NextResponse.json({ error: message }, { status: 500 });
   }

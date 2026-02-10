@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseAdmin } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -179,7 +180,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       );
     }
     const message = error instanceof Error ? error.message : "Failed to import batches";
-    console.error("[guide-plan import-batches POST] error:", message);
+    logger.production.error("Guide plan import-batches failed", error);
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
   }

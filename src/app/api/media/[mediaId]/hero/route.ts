@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 type RouteParams = {
   params: Promise<{ mediaId: string }>;
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       .eq("id", attachment.id);
 
     if (updateError) {
-      console.error("[media/hero] update error:", updateError);
+      logger.api.error("Media hero update error", updateError);
       return NextResponse.json(
         { error: "Failed to set hero image" },
         { status: 500 }
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[media/hero] error:", err);
+    logger.api.error("Media hero set failed", err);
     return NextResponse.json(
       { error: "Unexpected error" },
       { status: 500 }

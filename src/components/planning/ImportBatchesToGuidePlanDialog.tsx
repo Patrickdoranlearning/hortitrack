@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/accordion';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchJson } from '@/lib/http/fetchJson';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Import, Info, Loader2, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import type { GuidePlanWithProgress } from '@/lib/planning/guide-plan-types';
@@ -86,7 +86,6 @@ export function ImportBatchesToGuidePlanDialog({
   guidePlan,
   onSuccess,
 }: Props) {
-  const { toast } = useToast();
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [data, setData] = React.useState<MatchingBatchesResponse | null>(null);
@@ -102,15 +101,11 @@ export function ImportBatchesToGuidePlanDialog({
       )
         .then(setData)
         .catch((err) => {
-          toast({
-            title: 'Failed to load batches',
-            description: err?.message ?? 'Unknown error',
-            variant: 'destructive',
-          });
+          toast.error(err?.message ?? 'Failed to load batches');
         })
         .finally(() => setLoading(false));
     }
-  }, [open, guidePlan.id, toast]);
+  }, [open, guidePlan.id]);
 
   // Group batches by variety
   const varietyGroups = React.useMemo((): VarietyGroup[] => {
@@ -215,26 +210,15 @@ export function ImportBatchesToGuidePlanDialog({
       });
 
       if (result.errors.length > 0) {
-        toast({
-          title: `Imported with warnings`,
-          description: result.errors.join(', '),
-          variant: 'destructive',
-        });
+        toast.warning(`Imported with warnings: ${result.errors.join(', ')}`);
       } else {
-        toast({
-          title: 'Batches imported successfully',
-          description: `Created ${result.batchPlansCreated} batch plan${result.batchPlansCreated !== 1 ? 's' : ''}, linked ${result.batchesLinked} batch${result.batchesLinked !== 1 ? 'es' : ''} (${result.totalQuantity.toLocaleString()} units)`,
-        });
+        toast.success(`Created ${result.batchPlansCreated} batch plan${result.batchPlansCreated !== 1 ? 's' : ''}, linked ${result.batchesLinked} batch${result.batchesLinked !== 1 ? 'es' : ''} (${result.totalQuantity.toLocaleString()} units)`);
       }
 
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: 'Failed to import batches',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to import batches');
     } finally {
       setSubmitting(false);
     }

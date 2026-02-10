@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { logBatchDump } from '@/app/actions/log-batch-action';
 import { DUMP_REASONS, type DumpReason } from '@/types/batch-actions';
 

@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { withApiGuard } from "@/server/http/guard";
 import { getSupabaseAdmin } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 function csvEscape(val: unknown): string {
   if (val === null || val === undefined) return "";
@@ -77,7 +78,7 @@ export const GET = withApiGuard({
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error("[varieties/export] error", message);
+      logger.api.error("Plant varieties export failed", message);
       return NextResponse.json(
         { error: "Failed to export plant varieties", details: message },
         { status: 500 }

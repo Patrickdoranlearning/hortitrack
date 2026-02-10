@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { publishTemplate } from "@/server/documents";
+import { logger } from "@/server/utils/logger";
 import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function POST(
@@ -17,7 +18,7 @@ export async function POST(
     const template = await publishTemplate(templateId, versionId);
     return NextResponse.json({ template });
   } catch (err: any) {
-    console.error("[documents] publish failed", err);
+    logger.documents.error("Document publish failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to publish template" }, { status });
   }

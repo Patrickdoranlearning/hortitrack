@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import type { WorkerBatchDetail } from "@/types/worker";
 
 /**
@@ -73,7 +74,7 @@ export async function GET(
 
     return NextResponse.json(batch);
   } catch (error) {
-    console.error("[api/worker/batches/[id]] Error:", error);
+    logger.worker.error("Batch detail fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

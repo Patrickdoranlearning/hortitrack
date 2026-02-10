@@ -72,8 +72,8 @@ export default function WorkerStockCheckPage() {
         setItems(data.items);
         setAllCategories(data.categories);
       }
-    } catch (error) {
-      console.error("Failed to fetch stock data:", error);
+    } catch {
+      // Error handled by empty state UI
     } finally {
       setLoading(false);
     }

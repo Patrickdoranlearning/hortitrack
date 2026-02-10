@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchJson } from '@/lib/http/fetchJson';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Link2, Unlink, Info, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { BatchPlanWithProgress } from '@/lib/planning/guide-plan-types';
@@ -60,7 +60,6 @@ type Props = {
 };
 
 export function LinkBatchesDialog({ open, onOpenChange, batchPlan, onSuccess }: Props) {
-  const { toast } = useToast();
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [data, setData] = React.useState<MatchingBatchesResponse | null>(null);
@@ -78,15 +77,11 @@ export function LinkBatchesDialog({ open, onOpenChange, batchPlan, onSuccess }: 
       )
         .then(setData)
         .catch((err) => {
-          toast({
-            title: 'Failed to load batches',
-            description: err?.message ?? 'Unknown error',
-            variant: 'destructive',
-          });
+          toast.error(err?.message ?? 'Failed to load batches');
         })
         .finally(() => setLoading(false));
     }
-  }, [open, batchPlan.id, toast]);
+  }, [open, batchPlan.id]);
 
   const toggleLinkSelection = (batchId: string) => {
     setSelectedToLink((prev) => {
@@ -120,7 +115,7 @@ export function LinkBatchesDialog({ open, onOpenChange, batchPlan, onSuccess }: 
         method: 'POST',
         body: JSON.stringify({ batchIds: Array.from(selectedToLink) }),
       });
-      toast({ title: `Linked ${selectedToLink.size} batch${selectedToLink.size !== 1 ? 'es' : ''}` });
+      toast.success(`Linked ${selectedToLink.size} batch${selectedToLink.size !== 1 ? 'es' : ''}`);
       setSelectedToLink(new Set());
       // Refresh data
       const refreshed = await fetchJson<MatchingBatchesResponse>(
@@ -129,11 +124,7 @@ export function LinkBatchesDialog({ open, onOpenChange, batchPlan, onSuccess }: 
       setData(refreshed);
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: 'Failed to link batches',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to link batches');
     } finally {
       setSubmitting(false);
     }
@@ -147,7 +138,7 @@ export function LinkBatchesDialog({ open, onOpenChange, batchPlan, onSuccess }: 
         method: 'DELETE',
         body: JSON.stringify({ batchIds: Array.from(selectedToUnlink) }),
       });
-      toast({ title: `Unlinked ${selectedToUnlink.size} batch${selectedToUnlink.size !== 1 ? 'es' : ''}` });
+      toast.success(`Unlinked ${selectedToUnlink.size} batch${selectedToUnlink.size !== 1 ? 'es' : ''}`);
       setSelectedToUnlink(new Set());
       // Refresh data
       const refreshed = await fetchJson<MatchingBatchesResponse>(
@@ -156,11 +147,7 @@ export function LinkBatchesDialog({ open, onOpenChange, batchPlan, onSuccess }: 
       setData(refreshed);
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: 'Failed to unlink batches',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to unlink batches');
     } finally {
       setSubmitting(false);
     }

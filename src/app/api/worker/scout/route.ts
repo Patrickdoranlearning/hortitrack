@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import type {
   WorkerScoutLog,
   WorkerScoutStats,
@@ -66,7 +67,7 @@ export async function GET(_req: NextRequest) {
       .limit(50);
 
     if (scoutError) {
-      console.error("[api/worker/scout] Scout query error:", scoutError);
+      logger.worker.error("Scout query failed", scoutError);
       return NextResponse.json(
         { error: "Failed to fetch scouts" },
         { status: 500 }
@@ -108,7 +109,7 @@ export async function GET(_req: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[api/worker/scout] Error:", error);
+    logger.worker.error("Scout operation failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {
@@ -169,7 +170,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("[api/worker/scout] Insert error:", insertError);
+      logger.worker.error("Scout log insert failed", insertError);
       return NextResponse.json(
         { error: "Failed to create scout log" },
         { status: 500 }
@@ -181,7 +182,7 @@ export async function POST(req: NextRequest) {
       id: data.id,
     });
   } catch (error) {
-    console.error("[api/worker/scout] Error:", error);
+    logger.worker.error("Scout operation failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

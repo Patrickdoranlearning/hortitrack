@@ -78,8 +78,8 @@ export default function MaterialLotsPage() {
         const data = await res.json();
         setLots(data.lots);
         setTotal(data.total);
-      } catch (error) {
-        console.error('Error fetching lots:', error);
+      } catch {
+        // Lot fetch failed silently
       } finally {
         setLoading(false);
       }

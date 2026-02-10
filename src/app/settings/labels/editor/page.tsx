@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { PageFrame } from "@/ui/templates";
 import LabelPreview from "@/components/LabelPreview";
 import {
@@ -110,7 +110,6 @@ export default function LabelTemplateEditorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const templateId = searchParams.get("id");
-  const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(!!templateId);
@@ -171,11 +170,7 @@ export default function LabelTemplateEditorPage() {
           getDefaultFields(template.label_type, template.width_mm, template.height_mm)
       );
     } catch (e) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load template",
-      });
+      toast.error("Failed to load template");
       router.push("/settings/labels");
     } finally {
       setLoading(false);
@@ -307,11 +302,7 @@ export default function LabelTemplateEditorPage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Template name is required",
-      });
+      toast.error("Template name is required");
       return;
     }
 
@@ -344,17 +335,10 @@ export default function LabelTemplateEditorPage() {
         throw new Error(json?.error || "Failed to save template");
       }
 
-      toast({
-        title: templateId ? "Template Updated" : "Template Created",
-        description: `"${name}" has been saved`,
-      });
+      toast.success(`"${name}" has been saved`);
       router.push("/settings/labels");
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: e.message,
-      });
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }

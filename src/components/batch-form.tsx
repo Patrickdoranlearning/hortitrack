@@ -275,7 +275,6 @@ export function BatchForm({
 
             await onSubmit(vals);
           } catch (e: any) {
-            console.error(e);
             form.setError("root.serverError", { type: "manual", message: e.message || "Save failed" });
           }
         })}

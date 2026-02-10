@@ -154,6 +154,16 @@ export const logger = {
   ai: createModuleLogger("ai"),
   cache: createModuleLogger("cache"),
   refdata: createModuleLogger("refdata"),
+  labels: createModuleLogger("labels"),
+  email: createModuleLogger("email"),
+  planning: createModuleLogger("planning"),
+  protocols: createModuleLogger("protocols"),
+  media: createModuleLogger("media"),
+  documents: createModuleLogger("documents"),
+  b2b: createModuleLogger("b2b"),
+  suppliers: createModuleLogger("suppliers"),
+  org: createModuleLogger("org"),
+  tasks: createModuleLogger("tasks"),
 } as const;
 
 /**

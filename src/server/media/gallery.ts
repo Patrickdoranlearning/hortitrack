@@ -1,4 +1,5 @@
 import { getSupabaseServerApp } from "@/server/db/supabase";
+import { logger } from "@/server/utils/logger";
 
 // Helper to extract joined record (Supabase may return array or object)
 type MediaLibraryJoin = { id: string; file_path: string; uploaded_at: string | null } | null;
@@ -86,7 +87,7 @@ export async function getSmartGallery(
   const { data: attachments, error } = await query;
 
   if (error) {
-    console.error("[getSmartGallery] query error:", error);
+    logger.media.error("Smart gallery query failed", error, { batchId, varietyId, productId });
     return [];
   }
 

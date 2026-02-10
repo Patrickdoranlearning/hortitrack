@@ -4,6 +4,7 @@ import { getUserAndOrg } from "@/server/auth/org";
 import { nextBatchNumber } from "@/server/numbering/batches";
 import { inferPhase } from "@/lib/production/phase";
 import { consumeMaterialsForBatch } from "@/server/materials/consumption";
+import { logger } from "@/server/utils/logger";
 
 const DateOnly = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -214,7 +215,7 @@ export async function POST(req: Request) {
               shortages: consumptionResult.shortages,
             };
           } catch (consumeErr) {
-            console.error("[check-in-multi] Material consumption failed for existing batch:", consumeErr);
+            logger.production.error("Material consumption failed for existing batch", consumeErr);
           }
 
           results.push({ ...updatedBatch, materialConsumption });
@@ -289,7 +290,7 @@ export async function POST(req: Request) {
               shortages: consumptionResult.shortages,
             };
           } catch (consumeErr) {
-            console.error("[check-in-multi] Material consumption failed for new batch:", consumeErr);
+            logger.production.error("Material consumption failed for new batch", consumeErr);
           }
 
           results.push({ ...batch, materialConsumption });

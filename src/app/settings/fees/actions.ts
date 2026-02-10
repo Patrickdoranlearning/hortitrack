@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { STANDARD_FEE_TYPES } from './constants';
 import type { Database } from '@/types/supabase';
 import { logError } from '@/lib/log';
+import type { ActionResult } from '@/lib/errors';
 
 export type FeeUnit = 'per_unit' | 'flat' | 'per_km' | 'percentage';
 
@@ -114,9 +115,9 @@ export async function getOrgFeeByType(feeType: string): Promise<OrgFee | null> {
 /**
  * Create a new fee configuration
  */
-export async function createOrgFee(input: CreateFeeInput): Promise<{ success: boolean; fee?: OrgFee; error?: string }> {
+export async function createOrgFee(input: CreateFeeInput): Promise<ActionResult<OrgFee>> {
   const supabase = await getSupabaseServerApp();
-  
+
   const { data: membership } = await supabase
     .from('org_memberships')
     .select('org_id')
@@ -155,13 +156,13 @@ export async function createOrgFee(input: CreateFeeInput): Promise<{ success: bo
   }
 
   revalidatePath('/settings/fees');
-  return { success: true, fee: mapFeeRow(data) };
+  return { success: true, data: mapFeeRow(data) };
 }
 
 /**
  * Update an existing fee configuration
  */
-export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promise<{ success: boolean; error?: string }> {
+export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promise<ActionResult<null>> {
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
@@ -176,7 +177,7 @@ export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promis
   if (input.minOrderValue !== undefined) updateData.min_order_value = input.minOrderValue;
   if (input.maxAmount !== undefined) updateData.max_amount = input.maxAmount;
   if (input.metadata !== undefined) updateData.metadata = input.metadata;
-  if ((input as any).currency !== undefined) updateData.currency = (input as any).currency;
+  if ((input as Record<string, unknown>).currency !== undefined) updateData.currency = (input as Record<string, unknown>).currency;
 
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase
@@ -190,13 +191,13 @@ export async function updateOrgFee(feeId: string, input: UpdateFeeInput): Promis
   }
 
   revalidatePath('/settings/fees');
-  return { success: true };
+  return { success: true, data: null };
 }
 
 /**
  * Delete a fee configuration
  */
-export async function deleteOrgFee(feeId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteOrgFee(feeId: string): Promise<ActionResult<null>> {
   const supabase = await getSupabaseServerApp();
   const { error } = await supabase
     .from('org_fees')
@@ -209,15 +210,15 @@ export async function deleteOrgFee(feeId: string): Promise<{ success: boolean; e
   }
 
   revalidatePath('/settings/fees');
-  return { success: true };
+  return { success: true, data: null };
 }
 
 /**
  * Initialize default fees for an organization (call on first setup)
  */
-export async function initializeDefaultFees(): Promise<{ success: boolean; error?: string }> {
+export async function initializeDefaultFees(): Promise<ActionResult<null>> {
   const supabase = await getSupabaseServerApp();
-  
+
   const { data: membership } = await supabase
     .from('org_memberships')
     .select('org_id')
@@ -235,7 +236,7 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
     .limit(1);
 
   if (existingFees && existingFees.length > 0) {
-    return { success: true }; // Already initialized
+    return { success: true, data: null }; // Already initialized
   }
 
   // Insert default fees
@@ -280,7 +281,7 @@ export async function initializeDefaultFees(): Promise<{ success: boolean; error
   }
 
   revalidatePath('/settings/fees');
-  return { success: true };
+  return { success: true, data: null };
 }
 
 // Helper to map database row to typed object

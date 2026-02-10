@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { listMaterialLots, receiveMaterialLots } from "@/server/materials/lots";
 import { MaterialLotsQuerySchema, ReceiveMaterialLotsSchema } from "@/lib/schemas/material-lots";
 import { checkRateLimit, requestKey } from "@/server/security/rateLimit";
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
       offset: params.data.offset,
     });
   } catch (error: unknown) {
-    console.error("[lots GET] Error:", error);
+    logger.materials.error("Lots GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch lots";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ lots }, { status: 201 });
   } catch (error: unknown) {
-    console.error("[lots POST] Error:", error);
+    logger.materials.error("Lots receive failed", error);
     const message = error instanceof Error ? error.message : "Failed to receive lots";
     const status = /unauth/i.test(message) ? 401 : 500;
     return NextResponse.json({ error: message }, { status });

@@ -11,7 +11,7 @@ import { hasPendingStart } from "@/offline/task-queue";
 import type { WorkerTask } from "@/lib/types/worker-tasks";
 import { getStatusLabel, getStatusBadgeVariant } from "@/lib/types/worker-tasks";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface TaskCardWrapperProps {
   task: WorkerTask;

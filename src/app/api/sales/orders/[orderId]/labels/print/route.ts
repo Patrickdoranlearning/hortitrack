@@ -5,6 +5,7 @@ import { ok, fail } from "@/server/utils/envelope";
 import { supabaseAdmin } from "@/server/db/supabaseAdmin";
 import { buildSaleLabelZpl } from "@/server/labels/build-sale-label";
 import { formatCurrency } from "@/lib/format-currency";
+import { logger } from "@/server/utils/logger";
 
 const PRINTER_HOST = process.env.PRINTER_HOST!;
 const PRINTER_PORT = Number(process.env.PRINTER_PORT || 9100);
@@ -106,7 +107,7 @@ export async function POST(
     await sendRawToPrinter(payload);
     return ok({ printed: zpls.length });
   } catch (err: any) {
-    console.error("[sales:labels:print] error", err);
+    logger.sales.error("Sales label print failed", err);
     return fail(500, "server_error", err?.message ?? "Printer error");
   }
 }

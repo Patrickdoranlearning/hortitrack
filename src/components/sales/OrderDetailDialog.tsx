@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { generateInvoice, getOrderDetails } from '@/app/sales/actions';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/lib/toast';
 import { SalesOrder, Invoice } from '@/lib/sales/types';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import { Printer, FileText, ExternalLink } from 'lucide-react';
@@ -36,7 +36,6 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
     const [activeTab, setActiveTab] = useState('order');
     const [order, setOrder] = useState<OrderWithItems | null>(null);
     const [loading, setLoading] = useState(false);
-    const { toast } = useToast();
 
     useEffect(() => {
         if (open && orderId) {
@@ -45,18 +44,14 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                 if (res.order) {
                     setOrder(res.order as OrderWithItems);
                 } else {
-                    toast({
-                        title: "Error",
-                        description: "Failed to load order details",
-                        variant: "destructive",
-                    });
+                    toast.error("Failed to load order details");
                 }
                 setLoading(false);
             });
         } else {
             setOrder(null);
         }
-    }, [open, orderId, toast]);
+    }, [open, orderId]);
 
     const handlePrintDocket = () => {
         if (orderId) {
@@ -247,27 +242,15 @@ export default function OrderDetailDialog({ orderId, open, onOpenChange }: Order
                                                         try {
                                                             const result = await generateInvoice(orderId);
                                                             if (result.error) {
-                                                                toast({
-                                                                    title: "Error",
-                                                                    description: result.error,
-                                                                    variant: "destructive",
-                                                                });
+                                                                toast.error(result.error);
                                                             } else {
-                                                                toast({
-                                                                    title: "Success",
-                                                                    description: "Invoice generated successfully!",
-                                                                });
+                                                                toast.success("Invoice generated successfully!");
                                                                 // Refresh details
                                                                 const updated = await getOrderDetails(orderId);
                                                                 if (updated.order) setOrder(updated.order as OrderWithItems);
                                                             }
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                            toast({
-                                                                title: "Error",
-                                                                description: "Failed to generate invoice",
-                                                                variant: "destructive",
-                                                            });
+                                                        } catch {
+                                                            toast.error("Failed to generate invoice");
                                                         }
                                                     }}
                                                 >

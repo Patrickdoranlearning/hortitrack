@@ -32,7 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, PlusCircle, Pencil, Trash2, Package, AlertCircle } from 'lucide-react';
 import { PageFrame } from '@/ui/templates';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { TROLLEY_CONSTANTS } from '@/lib/dispatch/trolley-calculation';
 
 // ================================================
@@ -87,7 +87,6 @@ export default function TrolleyCapacityPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
   const [isEditing, setIsEditing] = useState(false);
-  const { toast } = useToast();
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -103,17 +102,12 @@ export default function TrolleyCapacityPage() {
       } else {
         throw new Error(data.error || 'Failed to load');
       }
-    } catch (err) {
-      console.error('Error fetching trolley capacity data:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to load trolley capacity settings',
-        variant: 'destructive',
-      });
+    } catch {
+      toast.error('Failed to load trolley capacity settings');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -142,12 +136,9 @@ export default function TrolleyCapacityPage() {
       const data = await res.json();
 
       if (data.ok) {
-        toast({
-          title: 'Saved',
-          description: isEditing
+        toast.success(isEditing
             ? 'Trolley capacity updated'
-            : 'Trolley capacity configuration added',
-        });
+            : 'Trolley capacity configuration added');
         setDialogOpen(false);
         setFormData(EMPTY_FORM);
         setIsEditing(false);
@@ -156,11 +147,7 @@ export default function TrolleyCapacityPage() {
         throw new Error(data.error || 'Save failed');
       }
     } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err?.message || 'Failed to save',
-        variant: 'destructive',
-      });
+      toast.error(err?.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -176,21 +163,14 @@ export default function TrolleyCapacityPage() {
       const data = await res.json();
 
       if (data.ok) {
-        toast({
-          title: 'Deleted',
-          description: 'Configuration removed',
-        });
+        toast.success('Configuration removed');
         setDeleteConfirmId(null);
         fetchData();
       } else {
         throw new Error(data.error || 'Delete failed');
       }
     } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err?.message || 'Failed to delete',
-        variant: 'destructive',
-      });
+      toast.error(err?.message || 'Failed to delete');
     }
   };
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import type { IpmTask } from "@/app/actions/ipm-tasks";
 
 /**
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("[api/worker/scout/treatments] Query error:", error);
+      logger.worker.error("Scout treatments query failed", error);
       return NextResponse.json(
         { error: "Failed to load treatments" },
         { status: 500 }
@@ -114,7 +115,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ tasks });
   } catch (error) {
-    console.error("[api/worker/scout/treatments] Error:", error);
+    logger.worker.error("Scout treatments fetch failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

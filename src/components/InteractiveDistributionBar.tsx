@@ -67,8 +67,8 @@ export function InteractiveDistributionBar({
       try {
         const data = await onFetchDetails(batchId);
         setDetailedData(data);
-      } catch (error) {
-        console.error('Failed to fetch distribution details:', error);
+      } catch {
+        // Distribution details fetch failed silently
       } finally {
         setLoading(false);
       }

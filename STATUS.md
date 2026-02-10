@@ -14,13 +14,50 @@
 ## Last Session Summary
 _Update this section at the end of each working session_
 
-**Date**: 2026-02-01
-**Focus**: Multi-Batch Picking Implementation (PLAN-multi-batch-picking.md)
+**Date**: 2026-02-10
+**Focus**: Codebase Consistency Remediation (happy-marinating-globe.md)
 **Mode**: Standard
 
 **Work Completed:**
 
-### Multi-Batch Picking as DEFAULT (COMPLETE)
+### Codebase Consistency Remediation — 4-Phase Plan (Phases 1-3 COMPLETE, Phase 4 partial)
+
+**Phase 1: Quick Wins** (COMPLETE)
+- Toast imports consolidated to `@/lib/toast` across 80+ files
+- Response helpers merged — `src/server/http/responses.ts` deleted, all using `@/server/utils/envelope`
+- Legacy duplicate routes deleted: `api/batches/checkin` and `api/batches/propagation-start`
+- Loading state names standardized
+
+**Phase 2: Error Handling & Logging** (COMPLETE)
+- `ActionResult<T>` pattern adopted across all server action files
+- console.* calls reduced from **864 → ~55** (target was <50). Remaining ~20 are legitimate (logger.ts itself, log.ts, dev-bypass, commented-out)
+- 10 new logger modules added: labels, email, planning, protocols, media, documents, b2b, suppliers, org, tasks
+- `src/server/observability/logger.ts` deleted (consolidated into `src/server/utils/logger.ts`)
+- 4 parallel agents cleaned 150+ files across server, API routes, components, pages
+
+**Phase 3: Auth & Security** (COMPLETE)
+- `getUserAndOrg()` now returns **regular** Supabase client (RLS-enforced) instead of admin
+- New `getUserAndOrgAdmin()` for explicit admin access (documented when to use)
+- `getUserIdAndOrgId()` deprecated with `@deprecated` JSDoc tag
+- `src/app/api/org/members/[userId]/route.ts` migrated to `getUserAndOrgAdmin` (modifies other users)
+- `withApiGuard` pattern documented for incremental adoption (6 routes already using it, 245 candidates)
+
+**Phase 4: Architecture** (partial)
+- SaleableBatchesClient.tsx pre-existing syntax error fixed (stray `});`)
+- TypeScript build verified: only 1 pre-existing error (supabase.ts generated types)
+
+**Key Metrics:**
+| Metric | Before | After |
+|--------|--------|-------|
+| console.* calls | 864 | ~55 (20 legitimate) |
+| Logger modules | 14 | 24 |
+| Files using ActionResult | ~60% | ~95% |
+| TypeScript errors | 3 | 1 (generated types only) |
+| getUserAndOrg returns admin client | Yes | No (security fix) |
+
+---
+
+### Previous Session: Multi-Batch Picking as DEFAULT (COMPLETE)
 
 Per user requirement: **"Picking from multiple batches should be the standard, not the exception."**
 
@@ -160,18 +197,20 @@ _Issues preventing progress_
 ## Technical Debt
 _Known issues to address_
 
-- Pre-existing TypeScript errors in various API routes (100+ errors from Supabase type inference issues)
-- Some console.log statements remain in client components (acceptable for dev-only logging)
-- Supabase types may need regeneration when database schema changes
+- `src/types/supabase.ts` generated types has a syntax error — regenerate with `supabase gen types`
+- ~35 non-legitimate console.* calls remain in client-side code (lib/, hooks/, stores/, offline/)
+- `withApiGuard` only used in 6/251 API routes — adopt incrementally for new routes
+- `getUserIdAndOrgId` deprecated but still used internally in `getUser.ts` — consider full removal
+- Worker API consolidation (multiple similar patterns) — see Phase 4 of remediation plan
 
 ## Next Steps
 _Priority order for next session_
 
-1. **Apply migration** - Run `20260201100000_multi_batch_picking.sql` on Supabase
-2. Run `supabase gen types` to regenerate TypeScript types (includes new `pick_item_batches` table)
-3. Manual testing of multi-batch picking flow (desktop and worker app)
-4. Test QC rejection with multi-batch picked items
-5. Address pre-existing TypeScript errors in bulk-picking and sales routes
+1. Remaining console.* cleanup in client-side code (~35 calls in lib/, hooks/, stores/, offline/)
+2. `withApiGuard` adoption for new API routes going forward
+3. Regenerate Supabase types (`supabase gen types`) to fix types/supabase.ts error
+4. Manual testing of multi-batch picking flow
+5. Worker API pattern consolidation
 
 ## Recent Decisions
 _Important architectural or design decisions made_
@@ -186,6 +225,9 @@ _Important architectural or design decisions made_
 | 2026-02-01 | `withWorkerGuard` wrapper for worker APIs | Consistent auth, rate limiting, logging without code duplication |
 | 2026-02-01 | Validate x-org-id header against org_memberships | Prevents header spoofing to access other orgs' data |
 | 2026-02-01 | Runtime assertion in dev-bypass | Fail-fast if misconfigured in production |
+| 2026-02-10 | getUserAndOrg returns regular client, not admin | RLS enforcement by default; explicit getUserAndOrgAdmin for admin ops |
+| 2026-02-10 | 24 logger modules (was 14) | Module-scoped structured logging for all domains |
+| 2026-02-10 | withApiGuard incremental adoption | Don't migrate 245 routes at once; use for new routes |
 | 2026-01-31 | Worker App as route group `/worker` not separate app | Shared auth, DB, faster delivery, no deploy pipeline overhead |
 
 ## Files Recently Modified

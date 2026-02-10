@@ -1,5 +1,6 @@
 import "server-only";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 // =============================================================================
 // TYPES
@@ -140,7 +141,7 @@ export async function getChecklistTemplates(filter?: {
   const { data, error } = await query;
 
   if (error) {
-    console.error("[checklist-service] Error fetching templates:", error);
+    logger.tasks.error("Failed to fetch checklist templates", error);
     throw new Error(error.message);
   }
 
@@ -164,7 +165,7 @@ export async function getChecklistTemplateById(
 
   if (error) {
     if (error.code === "PGRST116") return null;
-    console.error("[checklist-service] Error fetching template:", error);
+    logger.tasks.error("Failed to fetch checklist template", error, { templateId });
     throw new Error(error.message);
   }
 
@@ -222,7 +223,7 @@ export async function createChecklistTemplate(
     .single();
 
   if (error) {
-    console.error("[checklist-service] Error creating template:", error);
+    logger.tasks.error("Failed to create checklist template", error);
     throw new Error(error.message);
   }
 
@@ -269,7 +270,7 @@ export async function updateChecklistTemplate(
     .single();
 
   if (error) {
-    console.error("[checklist-service] Error updating template:", error);
+    logger.tasks.error("Failed to update checklist template", error, { templateId });
     throw new Error(error.message);
   }
 
@@ -292,7 +293,7 @@ export async function deleteChecklistTemplate(templateId: string): Promise<void>
     .eq("org_id", orgId);
 
   if (error) {
-    console.error("[checklist-service] Error deleting template:", error);
+    logger.tasks.error("Failed to delete checklist template", error, { templateId });
     throw new Error(error.message);
   }
 }

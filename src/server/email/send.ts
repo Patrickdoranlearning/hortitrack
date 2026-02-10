@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { logger } from "@/server/utils/logger";
 
 // Initialize Resend with API key from environment
 // Falls back to null if not configured (emails will fail gracefully)
@@ -53,7 +54,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     });
 
     if (error) {
-      console.error('[email/send] Resend error:', error);
+      logger.email.error("Resend API error", error);
       return {
         success: false,
         error: error.message,
@@ -65,7 +66,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
       messageId: data?.id,
     };
   } catch (err) {
-    console.error('[email/send] Unexpected error:', err);
+    logger.email.error("Unexpected email send error", err);
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Failed to send email',

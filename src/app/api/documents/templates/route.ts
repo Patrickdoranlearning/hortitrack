@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { TemplateInputSchema, listDocumentTemplates, saveTemplateDraft } from "@/server/documents";
+import { logger } from "@/server/utils/logger";
 import { requireDocumentAccess } from "@/server/documents/access";
 
 export async function GET() {
@@ -11,7 +12,7 @@ export async function GET() {
     const templates = await listDocumentTemplates();
     return NextResponse.json({ templates });
   } catch (err: any) {
-    console.error("[documents] list failed", err);
+    logger.documents.error("Document templates list failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to list templates" }, { status });
   }
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     const template = await saveTemplateDraft(parsed.data as any);
     return NextResponse.json({ template });
   } catch (err: any) {
-    console.error("[documents] create failed", err);
+    logger.documents.error("Document template create failed", err);
     const status = err?.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: err?.message ?? "Failed to create template" }, { status });
   }

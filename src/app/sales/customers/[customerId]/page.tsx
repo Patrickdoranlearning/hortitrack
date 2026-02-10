@@ -28,7 +28,6 @@ export default async function CustomerDetailPage({ params }: CustomerDetailPageP
   // Validate customerId format (should be UUID)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(customerId)) {
-    console.error("Invalid customer ID format:", customerId);
     notFound();
   }
 

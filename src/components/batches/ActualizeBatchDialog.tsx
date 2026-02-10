@@ -36,7 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ReferenceDataContext } from "@/contexts/ReferenceDataContext";
 import { fetchJson } from "@/lib/http/fetchJson";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import { invalidateBatches } from "@/lib/swr/keys";
 import type { Batch } from "@/lib/types";
 import { Info, AlertTriangle } from "lucide-react";
@@ -64,7 +64,6 @@ type Props = {
 
 export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: Props) {
   const { data: refData, reload } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
 
   // Auto-refresh reference data when user returns from creating a new entity in another tab
   useRefreshOnFocus(reload);
@@ -153,20 +152,13 @@ export function ActualizeBatchDialog({ open, onOpenChange, batch, onSuccess }: P
         }),
       });
 
-      toast({
-        title: isIncoming ? "Stock received" : "Batch actualized",
-        description: `${batch.batchNumber} is now in active production.`,
-      });
+      toast.success(`${batch.batchNumber} is now in active production.`);
       // Invalidate batch caches to trigger refresh across all components
       invalidateBatches();
       onSuccess?.();
       onOpenChange(false);
     } catch (error: any) {
-      toast({
-        title: "Failed to actualize batch",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
+      toast.error(error?.message ?? "Unknown error");
     } finally {
       setSubmitting(false);
     }

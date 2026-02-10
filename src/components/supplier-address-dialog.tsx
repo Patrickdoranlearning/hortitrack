@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { upsertSupplierAddressAction } from '@/app/actions';
 import type { SupplierAddressSummary } from '@/lib/types';
 
@@ -52,7 +52,6 @@ export function SupplierAddressDialog({
   address,
   onSaved,
 }: SupplierAddressDialogProps) {
-  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     label: '',
@@ -105,11 +104,11 @@ export function SupplierAddressDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.label.trim()) {
-      toast({ variant: 'destructive', title: 'Address label is required' });
+      toast.error('Address label is required');
       return;
     }
     if (!form.line1.trim()) {
-      toast({ variant: 'destructive', title: 'Address line 1 is required' });
+      toast.error('Address line 1 is required');
       return;
     }
     startTransition(async () => {
@@ -129,10 +128,10 @@ export function SupplierAddressDialog({
         contactPhone: form.contactPhone || null,
       });
       if (!result.success) {
-        toast({ variant: 'destructive', title: 'Save failed', description: result.error });
+        toast.error(result.error || 'Save failed');
         return;
       }
-      toast({ title: address ? 'Address updated' : 'Address added' });
+      toast.success(address ? 'Address updated' : 'Address added');
       onOpenChange(false);
       onSaved();
     });

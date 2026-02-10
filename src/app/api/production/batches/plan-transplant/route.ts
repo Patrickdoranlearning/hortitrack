@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { nextBatchNumber } from "@/server/numbering/batches";
 import { inferPhase } from "@/lib/production/phase";
+import { logger } from "@/server/utils/logger";
 
 const ISOWeek = /^\d{4}-W\d{2}$/i;
 
@@ -279,7 +280,7 @@ export async function POST(req: Request) {
             .insert(materialInserts);
 
           if (matError) {
-            console.warn(`[plan-transplant] Failed to save materials for batch ${batch.id}:`, matError.message);
+            logger.production.warn(`Failed to save materials for planned transplant batch`, { batchId: batch.id, error: matError.message });
             // Don't fail the batch creation, just log the warning
           }
         }

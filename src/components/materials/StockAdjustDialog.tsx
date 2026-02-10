@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchJson } from '@/lib/http/fetchJson';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Material, MaterialStock } from '@/lib/types/materials';
 
@@ -51,7 +51,6 @@ export function StockAdjustDialog({
     if (!stockData?.stock) return 0;
     return stockData.stock.reduce((sum, s) => sum + (s.quantityOnHand || 0), 0);
   }, [stockData]);
-  const { toast } = useToast();
   const [mode, setMode] = useState<'add' | 'count'>('add');
   const [quantity, setQuantity] = useState<number>(0);
   const [reason, setReason] = useState<string>('received');
@@ -66,7 +65,7 @@ export function StockAdjustDialog({
       if (mode === 'add') {
         // Simple add stock
         if (quantity === 0) {
-          toast({ title: 'Quantity must be non-zero', variant: 'destructive' });
+          toast.error('Quantity must be non-zero');
           return;
         }
         await fetchJson(`/api/materials/${material.id}/stock/adjust`, {
@@ -78,7 +77,7 @@ export function StockAdjustDialog({
             isCount: false,
           }),
         });
-        toast({ title: `Stock ${quantity > 0 ? 'added' : 'removed'} successfully` });
+        toast.success(`Stock ${quantity > 0 ? 'added' : 'removed'} successfully`);
       } else {
         // Physical count
         await fetchJson(`/api/materials/${material.id}/stock/adjust`, {
@@ -89,7 +88,7 @@ export function StockAdjustDialog({
             isCount: true,
           }),
         });
-        toast({ title: 'Physical count recorded' });
+        toast.success('Physical count recorded');
       }
 
       // Reset form and close
@@ -100,15 +99,11 @@ export function StockAdjustDialog({
       mutateStock();
       onSuccess?.();
     } catch (error) {
-      toast({
-        title: 'Failed to adjust stock',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSubmitting(false);
     }
-  }, [material, mode, quantity, reason, notes, toast, onOpenChange, onSuccess, mutateStock]);
+  }, [material, mode, quantity, reason, notes, onOpenChange, onSuccess, mutateStock]);
 
   const handleOpenChange = useCallback((newOpen: boolean) => {
     if (!newOpen) {

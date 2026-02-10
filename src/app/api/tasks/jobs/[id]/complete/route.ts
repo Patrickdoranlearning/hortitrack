@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { completeJob } from "@/server/production/jobs";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     return NextResponse.json({ job });
   } catch (error: unknown) {
-    console.error("[api/tasks/jobs/[id]/complete] POST error:", error);
+    logger.api.error("Job completion failed", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid request", issues: error.issues },

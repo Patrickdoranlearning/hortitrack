@@ -47,7 +47,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { fetchJson } from '@/lib/http/fetchJson';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { GuidePlanWithProgress, BatchPlanWithProgress } from '@/lib/planning/guide-plan-types';
@@ -97,7 +97,6 @@ export function BatchPlanDialog({
   onSuccess,
 }: Props) {
   const { data: refData } = React.useContext(ReferenceDataContext);
-  const { toast } = useToast();
   const [submitting, setSubmitting] = React.useState(false);
   const [varietyOpen, setVarietyOpen] = React.useState(false);
   const [protocols, setProtocols] = React.useState<Array<{ id: string; name: string }>>([]);
@@ -210,23 +209,19 @@ export function BatchPlanDialog({
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
-        toast({ title: 'Batch plan updated' });
+        toast.success('Batch plan updated');
       } else {
         await fetchJson('/api/production/batch-plans', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        toast({ title: 'Batch plan created' });
+        toast.success('Batch plan created');
       }
 
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: 'Failed to save batch plan',
-        description: error?.message ?? 'Unknown error',
-        variant: 'destructive',
-      });
+      toast.error(error?.message ?? 'Failed to save batch plan');
     } finally {
       setSubmitting(false);
     }

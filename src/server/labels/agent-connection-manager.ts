@@ -1,4 +1,5 @@
 import type { WebSocket } from "ws";
+import { logger } from "@/server/utils/logger";
 
 export interface PrintJob {
   jobId: string;
@@ -45,7 +46,7 @@ class AgentConnectionManager {
       lastHeartbeat: new Date(),
     });
 
-    console.log(`[AgentConnectionManager] Agent ${agentId} connected`);
+    logger.labels.info("Print agent connected", { agentId });
   }
 
   /**
@@ -53,7 +54,7 @@ class AgentConnectionManager {
    */
   removeAgent(agentId: string): void {
     this.connections.delete(agentId);
-    console.log(`[AgentConnectionManager] Agent ${agentId} disconnected`);
+    logger.labels.info("Print agent disconnected", { agentId });
   }
 
   /**
@@ -85,7 +86,7 @@ class AgentConnectionManager {
   pushJob(agentId: string, job: PrintJob): boolean {
     const agent = this.connections.get(agentId);
     if (!agent) {
-      console.log(`[AgentConnectionManager] Cannot push job - agent ${agentId} not connected`);
+      logger.labels.warn("Cannot push job - agent not connected", { agentId });
       return false;
     }
 
@@ -100,10 +101,10 @@ class AgentConnectionManager {
       });
 
       agent.ws.send(message);
-      console.log(`[AgentConnectionManager] Pushed job ${job.jobId} to agent ${agentId}`);
+      logger.labels.info("Pushed print job to agent", { jobId: job.jobId, agentId });
       return true;
     } catch (e) {
-      console.error(`[AgentConnectionManager] Failed to push job to agent ${agentId}:`, e);
+      logger.labels.error("Failed to push job to agent", e, { agentId, jobId: job.jobId });
       // Remove the broken connection
       this.removeAgent(agentId);
       return false;

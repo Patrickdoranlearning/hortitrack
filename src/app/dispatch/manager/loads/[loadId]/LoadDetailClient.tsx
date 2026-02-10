@@ -47,7 +47,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
 import type { DeliveryRunWithItems } from '@/lib/dispatch/types';
 import { dispatchLoad, recallLoad, deleteLoad } from '@/server/dispatch/board-actions';

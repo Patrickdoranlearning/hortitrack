@@ -12,7 +12,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { Button } from '@/components/ui/button';
 import { SupplierDeliveryStep, type SupplierDeliveryData } from './SupplierDeliveryStep';
@@ -116,8 +116,8 @@ export function CheckInWizard({ incomingBatch, onComplete, onCancel }: CheckInWi
             }));
           setIncomingBatches(incoming);
         }
-      } catch (err) {
-        console.error('Failed to fetch incoming batches:', err);
+      } catch {
+        // Incoming batch fetch failed silently
       }
     }
     fetchIncoming();
@@ -247,8 +247,6 @@ export function CheckInWizard({ incomingBatch, onComplete, onCancel }: CheckInWi
         photo_count: finalState.photos?.photos.length ?? 0,
       };
 
-      console.log('[CheckInWizard] Submitting payload:', JSON.stringify(payload, null, 2));
-
       const response = await fetch('/api/production/batches/check-in-multi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -257,7 +255,6 @@ export function CheckInWizard({ incomingBatch, onComplete, onCancel }: CheckInWi
 
       if (!response.ok) {
         const errData = await response.json();
-        console.error('[CheckInWizard] API error response:', errData);
         // Build detailed error message including individual batch errors
         let errorMessage = errData.error ?? 'Failed to check in batches';
         if (errData.errors && Array.isArray(errData.errors) && errData.errors.length > 0) {
@@ -274,7 +271,6 @@ export function CheckInWizard({ incomingBatch, onComplete, onCancel }: CheckInWi
 
       onComplete?.(result);
     } catch (error: any) {
-      console.error('Check-in failed:', error);
       toast.error('Check-in failed', { description: error.message });
     } finally {
       setIsSaving(false);

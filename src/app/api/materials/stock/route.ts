@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 import { getStockSummary } from "@/server/materials/stock";
 
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ export async function GET() {
 
     return NextResponse.json({ stock: summary });
   } catch (error: unknown) {
-    console.error("[materials/stock GET] Error:", error);
+    logger.materials.error("Stock summary GET failed", error);
     const message = error instanceof Error ? error.message : "Failed to fetch stock summary";
     return NextResponse.json({ error: message }, { status: 500 });
   }

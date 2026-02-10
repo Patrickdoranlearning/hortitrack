@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { createPropagationBatchAction } from "@/app/actions/production";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast";
 import type { NurseryLocation, PlantSize, Variety } from "@/lib/types";
 import { propagationFormSchema, type PropagationFormValues } from "@/app/production/forms/propagation-schema";
 import {
@@ -54,7 +54,6 @@ export default function PropagationClient({
   varieties,
 }: PropagationClientProps) {
     const router = useRouter();
-    const { toast } = useToast();
 
   const varietyOptions = React.useMemo<NormalizedVariety[]>(
     () =>
@@ -142,18 +141,11 @@ export default function PropagationClient({
     const result = await createPropagationBatchAction(payload);
 
         if (result.success) {
-      toast({
-        title: "Batch Created",
-        description: `Batch ${result.data?.batch_number ?? result.data?.id ?? ""} started.`,
-      });
+      toast.success(`Batch ${result.data?.batch_number ?? result.data?.id ?? ""} started.`);
       form.reset(defaultValues);
       router.push("/production/batches");
         } else {
-      toast({
-        title: "Error",
-        description: result.error || "Failed to create batch",
-        variant: "destructive",
-      });
+      toast.error(result.error || "Failed to create batch");
         }
     };
 

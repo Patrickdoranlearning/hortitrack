@@ -24,7 +24,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ViewToggle, useViewToggle } from '@/components/ui/view-toggle';
 import InvoiceDetailDialog from '@/components/sales/InvoiceDetailDialog';
 import { formatCurrency, type CurrencyCode } from '@/lib/format-currency';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   MoreHorizontal,
   Printer,
@@ -91,7 +91,6 @@ function InvoiceStatusBadge({ status }: { status: string }) {
 
 export default function InvoicesClient({ initialInvoices }: InvoicesClientProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithCustomer | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
@@ -114,11 +113,7 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
     e.stopPropagation();
 
     if (!invoice.customer?.email) {
-      toast({
-        variant: 'destructive',
-        title: 'No email address',
-        description: 'Please add an email address for this customer first.',
-      });
+      toast.error('Please add an email address for this customer first.');
       return;
     }
 
@@ -134,17 +129,9 @@ export default function InvoicesClient({ initialInvoices }: InvoicesClientProps)
         throw new Error(data.error || 'Failed to send email');
       }
 
-      toast({
-        title: 'Invoice sent',
-        description: `Invoice emailed to ${invoice.customer.email}`,
-      });
+      toast.success(`Invoice emailed to ${invoice.customer.email}`);
     } catch (err) {
-      console.error('Failed to send invoice email:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Failed to send email',
-        description: err instanceof Error ? err.message : 'An error occurred',
-      });
+      toast.error(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setSendingEmailId(null);
     }

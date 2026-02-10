@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/lib/toast';
 import {
   Package,
   Camera,
@@ -49,7 +49,6 @@ interface SubstituteBatch {
 }
 
 export default function PickingStepPick() {
-  const { toast } = useToast();
   const {
     pickList,
     items,
@@ -87,18 +86,11 @@ export default function PickingStepPick() {
 
     if (matchingBatch) {
       setSelectedSubstituteBatch(matchingBatch.id);
-      toast({
-        title: 'Batch Found',
-        description: `Selected ${matchingBatch.batchNumber} (${matchingBatch.availableQty} available)`,
-      });
+      toast.success(`Selected ${matchingBatch.batchNumber} (${matchingBatch.availableQty} available)`);
     } else {
-      toast({
-        variant: 'destructive',
-        title: 'Batch Not Found',
-        description: `"${batchCode}" is not available for substitution`,
-      });
+      toast.error(`"${batchCode}" is not available for substitution`);
     }
-  }, [substituteBatches, toast]);
+  }, [substituteBatches]);
 
   // Derived values
   const progress = getProgress();
@@ -130,11 +122,7 @@ export default function PickingStepPick() {
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: data.error || 'Failed to save picks',
-        });
+        toast.error(data.error || 'Failed to save picks');
         return;
       }
 
@@ -145,18 +133,11 @@ export default function PickingStepPick() {
         pickedQty: data.pickedQty || totalPicked,
       });
 
-      toast({
-        title: 'Item Picked',
-        description: `${item.productName || item.plantVariety} picked from ${batches.length} batch(es)`,
-      });
+      toast.success(`${item.productName || item.plantVariety} picked from ${batches.length} batch(es)`);
 
       setPickingItem(null);
     } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to save picks',
-      });
+      toast.error('Failed to save picks');
     } finally {
       setLoading(false);
     }
@@ -178,18 +159,14 @@ export default function PickingStepPick() {
       const data = await res.json();
 
       if (data.error) {
-        toast({ variant: 'destructive', title: 'Error', description: data.error });
+        toast.error(data.error);
         return;
       }
 
       updateItem(item.id, { status: 'short', pickedQty: 0 });
-      toast({
-        title: 'Marked Short',
-        description: `${item.productName || item.plantVariety} marked as unavailable`,
-        variant: 'destructive',
-      });
+      toast.error(`${item.productName || item.plantVariety} marked as unavailable`);
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to mark short' });
+      toast.error('Failed to mark short');
     } finally {
       setLoading(false);
     }
@@ -209,7 +186,7 @@ export default function PickingStepPick() {
         setSubstituteBatches(data.batches);
       }
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load batches' });
+      toast.error('Failed to load batches');
     } finally {
       setLoadingBatches(false);
     }
@@ -234,7 +211,7 @@ export default function PickingStepPick() {
 
       const data = await res.json();
       if (data.error) {
-        toast({ variant: 'destructive', title: 'Error', description: data.error });
+        toast.error(data.error);
         return;
       }
 
@@ -247,15 +224,12 @@ export default function PickingStepPick() {
         substitutionReason,
       });
 
-      toast({
-        title: 'Substitution Confirmed',
-        description: `Batch substituted for ${substitutionItem.productName || substitutionItem.plantVariety}`,
-      });
+      toast.success(`Batch substituted for ${substitutionItem.productName || substitutionItem.plantVariety}`);
 
       setShowSubstitutionDialog(false);
       setSubstitutionItem(null);
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to substitute' });
+      toast.error('Failed to substitute');
     } finally {
       setLoading(false);
     }

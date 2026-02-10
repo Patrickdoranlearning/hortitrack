@@ -10,6 +10,7 @@ import React, {
   useRef,
 } from 'react';
 import type { WorkerTask, TaskStats } from '@/lib/types/worker-tasks';
+import { logWarning } from '@/lib/log';
 import {
   syncPendingActions,
   getPendingCount,
@@ -236,7 +237,7 @@ export function WorkerOfflineProvider({
       if (!response.ok) {
         // Handle 404 gracefully - endpoint may not exist in some deployments
         if (response.status === 404) {
-          console.warn('[WorkerOfflineProvider] plant-health-tasks endpoint not found, returning empty');
+          logWarning('plant-health-tasks endpoint not found, returning empty');
           if (!isMountedRef.current) return;
           setTasks([]);
           setStats(defaultStats);

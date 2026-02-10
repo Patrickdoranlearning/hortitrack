@@ -4,6 +4,8 @@
  * independent of the organization-wide default.
  */
 
+import { logWarning } from "@/lib/log";
+
 const STORAGE_KEY = "hortitrack_printer_prefs";
 
 export type LabelType = "batch" | "sale" | "location" | "trolley";
@@ -27,7 +29,7 @@ export function getPrinterPreferences(): PrinterPreferences {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? JSON.parse(stored) : {};
   } catch (e) {
-    console.warn("[printer-preferences] Failed to read preferences:", e);
+    logWarning("Failed to read printer preferences", { error: e });
     return {};
   }
 }
@@ -42,7 +44,7 @@ function savePrinterPreferences(prefs: PrinterPreferences): void {
     prefs.updatedAt = new Date().toISOString();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch (e) {
-    console.warn("[printer-preferences] Failed to save preferences:", e);
+    logWarning("Failed to save printer preferences", { error: e });
   }
 }
 
@@ -95,7 +97,7 @@ export function clearAllPrinterPreferences(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (e) {
-    console.warn("[printer-preferences] Failed to clear preferences:", e);
+    logWarning("Failed to clear printer preferences", { error: e });
   }
 }
 

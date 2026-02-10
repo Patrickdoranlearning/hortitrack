@@ -69,9 +69,7 @@ export default async function DispatchLoadsPage() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) {
-    console.error("Error fetching delivery runs:", error.message || JSON.stringify(error));
-  }
+  // error is non-fatal - empty state will show
 
   // Calculate stats
   const plannedCount = (deliveryRuns || []).filter((r: any) => r.status === "planned").length;

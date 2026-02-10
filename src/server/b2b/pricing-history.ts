@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
+import { logger } from "@/server/utils/logger";
 
 export type PricingHistoryHint = {
   rrp?: number | null;
@@ -31,7 +32,7 @@ export async function getLastUsedPricing(
     .order("created_at", { ascending: false });
 
   if (error || !data) {
-    console.error("[getLastUsedPricing]", error);
+    logger.b2b.error("Failed to fetch last used pricing", error, { customerId });
     return {};
   }
 

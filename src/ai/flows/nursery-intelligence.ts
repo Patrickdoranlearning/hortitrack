@@ -9,6 +9,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getUserAndOrg } from '@/server/auth/org';
 import { getSaleableProducts } from '@/server/sales/queries.server';
+import { logError } from '@/lib/log';
 
 // Define tools for the AI
 
@@ -58,7 +59,7 @@ const searchAllBatches = ai.defineTool(
       const { data, error } = await query;
       
       if (error) {
-        console.error('searchAllBatches error:', error);
+        logError('searchAllBatches error', { error });
         return [];
       }
 
@@ -71,7 +72,7 @@ const searchAllBatches = ai.defineTool(
         locationName: b.location_name || null,
       }));
     } catch (error) {
-      console.error('searchAllBatches error:', error);
+      logError('searchAllBatches error', { error });
       return [];
     }
   }
@@ -117,7 +118,7 @@ const getStockSummary = ai.defineTool(
         .sort((a, b) => b.totalQuantity - a.totalQuantity)
         .slice(0, 20);
     } catch (error) {
-      console.error('getStockSummary error:', error);
+      logError('getStockSummary error', { error });
       return [];
     }
   }
@@ -155,7 +156,7 @@ const getCustomerOrders = ai.defineTool(
         .limit(input.limit || 5);
 
       if (error) {
-        console.error('getCustomerOrders error:', error);
+        logError('getCustomerOrders error', { error });
         return { customerName: null, orders: [] };
       }
 
@@ -186,7 +187,7 @@ const getCustomerOrders = ai.defineTool(
         })),
       };
     } catch (error) {
-      console.error('getCustomerOrders error:', error);
+      logError('getCustomerOrders error', { error });
       return { customerName: null, orders: [] };
     }
   }
@@ -220,7 +221,7 @@ Look up the relevant data and provide a helpful, concise answer:`,
 
     return { response: text || "I couldn't generate a response. Please try again." };
   } catch (error: any) {
-    console.error('askNurseryIntelligence error:', error);
+    logError('askNurseryIntelligence error', { error });
     throw error;
   }
 }

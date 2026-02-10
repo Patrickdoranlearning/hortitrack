@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/lib/toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { MaterialsNeededCard } from "./MaterialsNeededCard";
@@ -74,8 +74,6 @@ export function ActualizeSheet({
   onOpenChange,
   onSuccess,
 }: ActualizeSheetProps) {
-  const { toast } = useToast();
-
   // Form state
   const [actualQuantity, setActualQuantity] = useState(batch.plannedQuantity);
   const [actualLocationId, setActualLocationId] = useState(batch.locationId || "");
@@ -115,11 +113,7 @@ export function ActualizeSheet({
   // Submit
   const handleSubmit = useCallback(async () => {
     if (actualQuantity <= 0) {
-      toast({
-        title: "Invalid quantity",
-        description: "Actual quantity must be greater than 0",
-        variant: "destructive",
-      });
+      toast.error("Actual quantity must be greater than 0");
       return;
     }
 
@@ -152,10 +146,7 @@ export function ActualizeSheet({
       }
 
       vibrateSuccess();
-      toast({
-        title: "Batch actualized",
-        description: `${batch.batchNumber} is now active with ${actualQuantity.toLocaleString()} plants`,
-      });
+      toast.success(`${batch.batchNumber} is now active with ${actualQuantity.toLocaleString()} plants`);
 
       onOpenChange(false);
       onSuccess?.();
@@ -163,11 +154,7 @@ export function ActualizeSheet({
       vibrateError();
       const message =
         error instanceof Error ? error.message : "Failed to actualize batch";
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +163,6 @@ export function ActualizeSheet({
     actualQuantity,
     actualLocationId,
     notes,
-    toast,
     onOpenChange,
     onSuccess,
   ]);

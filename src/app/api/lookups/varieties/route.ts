@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/server/utils/logger";
 
 export async function GET() {
   const supabase = await createClient();
@@ -16,7 +17,7 @@ export async function GET() {
     .order("name");
 
   if (error) {
-    console.error("[lookups/varieties] error", error);
+    logger.api.error("Varieties lookup failed", error);
     return NextResponse.json({ error: "Failed to fetch varieties" }, { status: 500 });
   }
   return NextResponse.json({ items: data ?? [] });

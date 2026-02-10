@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 /**
  * Worker Batch Print Data API
@@ -73,7 +74,7 @@ export async function GET(
           { status: 404 }
         );
       }
-      console.error("[api/worker/print/batch/[id]] Query error:", error);
+      logger.worker.error("Batch print data query failed", error);
       return NextResponse.json(
         { error: "Failed to fetch batch" },
         { status: 500 }
@@ -97,7 +98,7 @@ export async function GET(
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[api/worker/print/batch/[id]] Error:", error);
+    logger.worker.error("Batch print failed", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
     if (/Unauthenticated/i.test(message)) {

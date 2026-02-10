@@ -65,12 +65,10 @@ export async function fetchCustomerDetail(
     .maybeSingle();
 
   if (error) {
-    console.error("Error fetching customer:", error.message, error.code, error.details);
     return null;
   }
 
   if (!customer) {
-    console.error("Customer not found:", customerId);
     return null;
   }
 
@@ -193,7 +191,6 @@ export async function fetchCustomerOrders(
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching customer orders:", error);
     return [];
   }
 
@@ -473,7 +470,6 @@ export async function fetchCustomerInteractions(
     .range(offset, offset + limit);
 
   if (error) {
-    console.error("Error fetching customer interactions:", error.message);
     return { interactions: [], hasMore: false };
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
+import { logger } from "@/server/utils/logger";
 
 const bulkSchema = z.object({
   batchIds: z.array(z.string().uuid()).min(1, "Select at least one batch."),
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
       .eq("org_id", orgId);
 
     if (error) {
-      console.error("[bulk-status] update failed", error);
+      logger.api.error("Bulk status update failed", error);
       return NextResponse.json({ error: "Failed to update batches." }, { status: 500 });
     }
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
       try {
         await autoLinkBatchesToProducts(supabase, orgId, payload.batchIds);
       } catch (linkError) {
-        console.warn("[bulk-status] auto-link failed:", linkError);
+        logger.api.warn("Bulk status auto-link failed", { error: linkError instanceof Error ? linkError.message : String(linkError) });
         // Don't fail the status update if auto-link fails
       }
     }
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     const { error: eventError } = await supabase.from("batch_events").insert(events);
     if (eventError) {
-      console.warn("[bulk-status] events insert failed", eventError);
+      logger.api.warn("Bulk status events insert failed", { error: eventError.message });
     }
 
     return NextResponse.json({
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest) {
       behavior,
     });
   } catch (error) {
-    console.error("[bulk-status] unexpected", error);
+    logger.api.error("Bulk status unexpected error", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors[0]?.message ?? "Invalid request." }, { status: 400 });
     }
@@ -156,7 +157,7 @@ async function autoLinkBatchesToProducts(
     .eq("org_id", orgId);
 
   if (batchError || !batches?.length) {
-    console.warn("[autoLinkBatchesToProducts] Could not fetch batches:", batchError);
+    logger.api.warn("Auto-link could not fetch batches", { error: batchError?.message });
     return;
   }
 
@@ -281,9 +282,9 @@ async function autoLinkBatchesToProducts(
       .insert(linksToCreate);
 
     if (insertError) {
-      console.warn("[autoLinkBatchesToProducts] Failed to create links:", insertError);
+      logger.api.warn("Auto-link failed to create product-batch links", { error: insertError.message });
     } else {
-      console.log(`[autoLinkBatchesToProducts] Created ${linksToCreate.length} product-batch links`);
+      logger.api.info("Auto-linked batches to products", { count: linksToCreate.length });
     }
   }
 }

@@ -87,8 +87,8 @@ export default function LotDetailPage() {
         const data = await res.json();
         setLot(data.lot);
         setTransactions(data.transactions || []);
-      } catch (error) {
-        console.error('Error fetching lot:', error);
+      } catch {
+        // Lot fetch failed silently
       } finally {
         setLoading(false);
       }
@@ -138,8 +138,8 @@ export default function LotDetailPage() {
         const txnData = await txnRes.json();
         setTransactions(txnData.transactions || []);
       }
-    } catch (error) {
-      console.error('Error adjusting lot:', error);
+    } catch {
+      // Lot adjustment failed silently
     } finally {
       setAdjusting(false);
     }

@@ -8,6 +8,7 @@ import {
   addEmployeeToTeam,
   removeEmployeeFromTeam,
 } from "@/server/sales/picking";
+import { logger } from "@/server/utils/logger";
 
 // GET /api/picking/employees - List employees
 export async function GET(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     const employees = await getEmployees(orgId);
     return NextResponse.json({ employees });
   } catch (error: unknown) {
-    console.error("Error fetching employees:", error);
+    logger.picking.error("Error fetching employees", error);
     return NextResponse.json(
       { error: "Failed to fetch employees" },
       { status: 500 }
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ employee: result.employee }, { status: 201 });
   } catch (error: unknown) {
-    console.error("Error with employee operation:", error);
+    logger.picking.error("Employee operation failed", error);
     return NextResponse.json(
       { error: "Failed to perform operation" },
       { status: 500 }
@@ -112,7 +113,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error("Error updating employee:", error);
+    logger.picking.error("Error updating employee", error);
     return NextResponse.json(
       { error: "Failed to update employee" },
       { status: 500 }

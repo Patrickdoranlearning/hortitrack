@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createProtocolFromBatch } from "@/server/protocols/service";
 import { renderProtocolPdf } from "@/server/protocols/pdf";
 import { isValidDocId } from "@/server/utils/ids";
+import { logger } from "@/server/utils/logger";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     const msg = String(err?.message || err);
-    console.error("[protocols/generate] error:", { batchId, msg, stack: err?.stack });
+    logger.production.error("Protocol generation failed", err, { batchId });
     return NextResponse.json({ error: "Failed to generate protocol", phase: "unknown", detail: process.env.NODE_ENV !== "production" ? msg : undefined }, { status: 500 });
   }
 }

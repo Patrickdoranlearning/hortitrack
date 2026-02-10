@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerApp } from "@/server/db/supabase";
 import { resolveActiveOrgId } from "@/server/org/getActiveOrg";
+import { logger } from "@/server/utils/logger";
 
 export async function GET(
   _req: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error("[api/label-templates/[id]] GET error:", e);
+    logger.api.error("GET /api/label-templates/[id] failed", e);
     return NextResponse.json({ error: e?.message || "Failed to fetch template" }, { status: 500 });
   }
 }
@@ -84,7 +85,7 @@ export async function PUT(
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error("[api/label-templates/[id]] PUT error:", e);
+    logger.api.error("PUT /api/label-templates/[id] failed", e);
     return NextResponse.json({ error: e?.message || "Failed to update template" }, { status: 500 });
   }
 }
@@ -112,7 +113,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (e: any) {
-    console.error("[api/label-templates/[id]] DELETE error:", e);
+    logger.api.error("DELETE /api/label-templates/[id] failed", e);
     return NextResponse.json({ error: e?.message || "Failed to delete template" }, { status: 500 });
   }
 }
