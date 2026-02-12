@@ -10,6 +10,7 @@ import {
   Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isEnabled } from "@/config/features";
 
 // =============================================================================
 // TYPES
@@ -29,7 +30,7 @@ interface NavItem {
 // NAV ITEMS
 // =============================================================================
 
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   {
     name: "Production",
     href: "/worker/production",
@@ -54,11 +55,9 @@ const navItems: NavItem[] = [
     icon: HeartPulse,
     additionalMatches: ["/worker/scout"],
   },
-  {
-    name: "Materials",
-    href: "/worker/materials",
-    icon: Package,
-  },
+  ...(isEnabled("materials")
+    ? [{ name: "Materials" as const, href: "/worker/materials", icon: Package }]
+    : []),
 ];
 
 // =============================================================================
@@ -90,7 +89,7 @@ export function WorkerNav() {
       }}
     >
       <div className="flex items-center justify-around">
-        {navItems.map((item) => {
+        {allNavItems.map((item) => {
           const active = isActive(item);
 
           // Render scan button with special FAB styling

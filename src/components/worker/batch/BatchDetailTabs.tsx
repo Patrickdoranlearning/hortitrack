@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Package, Heart, Search, History, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { vibrateTap } from "@/lib/haptics";
+import { isEnabled } from "@/config/features";
 import { StockLedgerView } from "./StockLedgerView";
 import { BatchHealthView } from "./BatchHealthView";
 import { BatchScoutHistory } from "./BatchScoutHistory";
@@ -25,13 +26,14 @@ interface TabConfig {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const tabs: TabConfig[] = [
+const allTabs: TabConfig[] = [
   { key: "summary", label: "Summary", icon: History },
   { key: "stock", label: "Stock", icon: Package },
-  { key: "materials", label: "Materials", icon: Boxes },
+  ...(isEnabled("materials") ? [{ key: "materials" as const, label: "Materials", icon: Boxes }] : []),
   { key: "health", label: "Health", icon: Heart },
   { key: "scout", label: "Scout", icon: Search },
 ];
+const tabs = allTabs;
 
 /**
  * Mobile-optimized tabs for batch detail view.
@@ -109,7 +111,7 @@ export function BatchDetailTabs({
           </div>
         )}
 
-        {activeTab === "materials" && (
+        {isEnabled("materials") && activeTab === "materials" && (
           <div className="p-4 animate-in fade-in duration-200">
             <BatchMaterialsView
               key={materialsKey}
@@ -127,15 +129,17 @@ export function BatchDetailTabs({
       </div>
 
       {/* Material Confirmation Dialog */}
-      <MaterialConfirmDialog
-        open={!!confirmItem}
-        onOpenChange={(open) => {
-          if (!open) setConfirmItem(null);
-        }}
-        batchId={batchId}
-        material={confirmItem}
-        onSuccess={handleConfirmSuccess}
-      />
+      {isEnabled("materials") && (
+        <MaterialConfirmDialog
+          open={!!confirmItem}
+          onOpenChange={(open) => {
+            if (!open) setConfirmItem(null);
+          }}
+          batchId={batchId}
+          material={confirmItem}
+          onSuccess={handleConfirmSuccess}
+        />
+      )}
     </div>
   );
 }

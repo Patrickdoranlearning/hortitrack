@@ -51,12 +51,16 @@ export default async function BulkPickingBatchPage({ params }: PageProps) {
         substitute_batch_id,
         substitution_reason,
         location_hint,
+        assigned_to,
+        size_category_id,
         sku:skus(
           id,
           sku_code,
           plant_variety:plant_varieties(name),
           plant_size:plant_sizes(name)
-        )
+        ),
+        assigned_profile:profiles!bulk_pick_items_assigned_to_fkey(id, full_name, display_name),
+        size_category:picking_size_categories(id, name, color)
       )
     `)
     .eq('id', batchId)
@@ -101,6 +105,11 @@ export default async function BulkPickingBatchPage({ params }: PageProps) {
       substituteBatchId: item.substitute_batch_id,
       substitutionReason: item.substitution_reason,
       locationHint: item.location_hint,
+      assignedTo: item.assigned_to,
+      assignedName: item.assigned_profile?.full_name || item.assigned_profile?.display_name || null,
+      sizeCategoryId: item.size_category_id,
+      sizeCategoryName: item.size_category?.name || null,
+      sizeCategoryColor: item.size_category?.color || null,
     })),
   };
   

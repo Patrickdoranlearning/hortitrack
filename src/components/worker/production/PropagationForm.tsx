@@ -33,6 +33,7 @@ import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { calculateTotalPlants } from "@/lib/shared";
 import { MaterialsNeededCard } from "./MaterialsNeededCard";
+import { isEnabled } from "@/config/features";
 
 interface Variety {
   id: string;
@@ -424,7 +425,7 @@ export function PropagationForm({
         </Card>
 
         {/* Materials preview */}
-        {sizeId && totalUnits > 0 && (
+        {isEnabled('materials') && sizeId && totalUnits > 0 && (
           <MaterialsNeededCard sizeId={sizeId} quantity={totalUnits} />
         )}
       </div>

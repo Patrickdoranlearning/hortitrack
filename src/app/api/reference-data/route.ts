@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLightweightAuth } from "@/lib/auth/lightweight";
 import { type CachedReferenceData } from "@/lib/cache/reference-data";
 import { logger } from "@/server/utils/logger";
+import { isEnabled } from "@/config/features";
 
 /**
  * Returns reference data for the UI.
@@ -59,7 +60,7 @@ async function fetchReferenceDataWithUserSession(
   orgId: string
 ): Promise<CachedReferenceData> {
   // Run all queries in parallel using user's session
-  const [varietiesRes, sizesRes, locationsRes, suppliersRes, materialsRes] = await Promise.all([
+  const queries: Promise<any>[] = [
     supabase
       .from("plant_varieties")
       .select("id, name, family, genus, species, category")
@@ -78,48 +79,58 @@ async function fetchReferenceDataWithUserSession(
       .select("id, name, producer_code, country_code")
       .eq("org_id", orgId)
       .order("name"),
-    supabase
-      .from("materials")
-      .select(`
-        id,
-        name,
-        part_number,
-        category_id,
-        base_uom,
-        linked_size_id,
-        is_active,
-        category:material_categories(name, code, parent_group)
-      `)
-      .eq("org_id", orgId)
-      .eq("is_active", true)
-      .order("name"),
-  ]);
+  ];
+
+  // Only fetch materials if the feature is enabled
+  if (isEnabled("materials")) {
+    queries.push(
+      supabase
+        .from("materials")
+        .select(`
+          id,
+          name,
+          part_number,
+          category_id,
+          base_uom,
+          linked_size_id,
+          is_active,
+          category:material_categories(name, code, parent_group)
+        `)
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .order("name")
+    );
+  }
+
+  const [varietiesRes, sizesRes, locationsRes, suppliersRes, materialsRes] = await Promise.all(queries);
 
   // Log any errors for debugging
   if (varietiesRes.error) logger.refdata.warn("Varieties fetch error", { error: varietiesRes.error.message });
   if (sizesRes.error) logger.refdata.warn("Sizes fetch error", { error: sizesRes.error.message });
   if (locationsRes.error) logger.refdata.warn("Locations fetch error", { error: locationsRes.error.message });
   if (suppliersRes.error) logger.refdata.warn("Suppliers fetch error", { error: suppliersRes.error.message });
-  if (materialsRes.error) logger.refdata.warn("Materials fetch error", { error: materialsRes.error.message });
+  if (materialsRes?.error) logger.refdata.warn("Materials fetch error", { error: materialsRes.error.message });
 
   // Transform materials to flatten category info and filter to Containers + Growing Media
-  const materials = (materialsRes.data ?? [])
-    .filter((m: any) => {
-      const parentGroup = m.category?.parent_group;
-      return parentGroup === "Containers" || parentGroup === "Growing Media";
-    })
-    .map((m: any) => ({
-      id: m.id,
-      name: m.name,
-      part_number: m.part_number,
-      category_id: m.category_id,
-      category_name: m.category?.name ?? null,
-      category_code: m.category?.code ?? null,
-      parent_group: m.category?.parent_group ?? null,
-      base_uom: m.base_uom,
-      linked_size_id: m.linked_size_id ?? null,
-      is_active: m.is_active,
-    }));
+  const materials = !isEnabled("materials")
+    ? []
+    : (materialsRes?.data ?? [])
+        .filter((m: any) => {
+          const parentGroup = m.category?.parent_group;
+          return parentGroup === "Containers" || parentGroup === "Growing Media";
+        })
+        .map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          part_number: m.part_number,
+          category_id: m.category_id,
+          category_name: m.category?.name ?? null,
+          category_code: m.category?.code ?? null,
+          parent_group: m.category?.parent_group ?? null,
+          base_uom: m.base_uom,
+          linked_size_id: m.linked_size_id ?? null,
+          is_active: m.is_active,
+        }));
 
   return {
     varieties: varietiesRes.data ?? [],

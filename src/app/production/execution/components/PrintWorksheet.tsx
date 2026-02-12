@@ -218,11 +218,18 @@ export function PrintWorksheet({ groups, groupedBatches, onClose }: Props) {
                       <tr key={batch.id}>
                         <td>{index + 1}</td>
                         <td>
-                          <strong>{batch.varietyName ?? "Unknown"}</strong>
-                          {batch.batchNumber && (
-                            <span style={{ color: "#666", marginLeft: "8px" }}>
-                              #{batch.batchNumber}
-                            </span>
+                          <div>
+                            <strong>{batch.varietyName ?? "Unknown"}</strong>
+                            {batch.batchNumber && (
+                              <span style={{ color: "#666", marginLeft: "8px" }}>
+                                #{batch.batchNumber}
+                              </span>
+                            )}
+                          </div>
+                          {batch.parentBatchNumber && (
+                            <div style={{ fontSize: "8pt", color: "#888" }}>
+                              Source: #{batch.parentBatchNumber}
+                            </div>
                           )}
                         </td>
                         <td>{batch.sizeName ?? "-"}</td>

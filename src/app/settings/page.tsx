@@ -209,6 +209,34 @@ export default function DataManagementPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Boxes /> Picking Categories</CardTitle>
+              <CardDescription>Group plant sizes into picking categories for bulk picking workflows.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/size-categories">
+                  Manage Categories
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Users /> Picker Specializations</CardTitle>
+              <CardDescription>Assign pickers to size categories with proficiency levels for smart task assignment.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/picker-specializations">
+                  Manage Specializations
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center gap-2"><ListChecks /> Dropdown Manager</CardTitle>
               <CardDescription>Rename, reorder, or hide system dropdowns per organisation.</CardDescription>
             </CardHeader>

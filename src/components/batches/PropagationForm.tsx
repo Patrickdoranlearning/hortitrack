@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
+import { isEnabled } from "@/config/features";
 import { invalidateBatches } from "@/lib/swr/keys";
 import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 import { CheckCircle2, Plus, Eye } from "lucide-react";
@@ -436,7 +437,7 @@ export default function PropagationForm({ defaultLocationId, onSubmitSuccess }: 
               <SummaryRow label="Planting date" value={watchDate || "—"} />
             </dl>
           </Card>
-          {consumptionBatches.length > 0 && (
+          {isEnabled('materials') && consumptionBatches.length > 0 && (
             <MaterialConsumptionPreview batches={consumptionBatches} />
           )}
           {refError && (

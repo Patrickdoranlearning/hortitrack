@@ -18,6 +18,7 @@ export type PlanningBatch = {
   locationId: string | null;
   locationName: string | null;
   parentBatchId: string | null;
+  parentBatchNumber: string | null;
   protocolId: string | null;
   isGhost: boolean;
 };

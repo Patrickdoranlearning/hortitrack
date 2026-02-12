@@ -14,6 +14,7 @@ import {
   Boxes,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { isEnabled } from '@/config/features';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { Button } from '@/components/ui/button';
 import { PlanTypeStep, type PlanType } from './PlanTypeStep';
@@ -36,21 +37,29 @@ export type PlanBatchesWizardState = {
   review: ReviewStepData | null;
 };
 
-// Dynamic steps based on plan type
-const PROPAGATION_STEPS = [
+// Dynamic steps based on plan type (materials step excluded when feature disabled)
+type WizardStep = { id: string; label: string; icon: typeof LayoutList };
+
+const ALL_PROPAGATION_STEPS: WizardStep[] = [
   { id: 'type', label: 'Plan Type', icon: LayoutList },
   { id: 'propagation', label: 'Add Batches', icon: Sprout },
   { id: 'materials', label: 'Materials', icon: Boxes },
   { id: 'review', label: 'Review', icon: ClipboardCheck },
-] as const;
+];
 
-const TRANSPLANT_STEPS = [
+const ALL_TRANSPLANT_STEPS: WizardStep[] = [
   { id: 'type', label: 'Plan Type', icon: LayoutList },
   { id: 'select', label: 'Select Batches', icon: Package },
   { id: 'configure', label: 'Configure', icon: ArrowRightLeft },
   { id: 'materials', label: 'Materials', icon: Boxes },
   { id: 'review', label: 'Review', icon: ClipboardCheck },
-] as const;
+];
+
+const filterSteps = (steps: WizardStep[]) =>
+  isEnabled('materials') ? steps : steps.filter((s) => s.id !== 'materials');
+
+const PROPAGATION_STEPS = filterSteps(ALL_PROPAGATION_STEPS);
+const TRANSPLANT_STEPS = filterSteps(ALL_TRANSPLANT_STEPS);
 
 type StepId = 'type' | 'propagation' | 'select' | 'configure' | 'materials' | 'review';
 
@@ -435,7 +444,7 @@ export function PlanBatchesWizard({ onComplete, onCancel }: PlanBatchesWizardPro
           />
         )}
 
-        {currentStep === 'materials' && refData && (
+        {isEnabled('materials') && currentStep === 'materials' && refData && (
           <ConfigureMaterialsStep
             referenceData={refData}
             propagationBatches={wizardState.propagation?.batches}

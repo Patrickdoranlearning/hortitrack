@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireCustomerAuth } from '@/lib/auth/b2b-guard';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import type { CartItem } from '@/lib/b2b/types';
 import { createPickListFromOrder } from '@/server/sales/picking';
 import { calculateTrolleysNeeded, type OrderLineForCalculation } from '@/lib/dispatch/trolley-calculation';
@@ -148,5 +149,7 @@ export async function createB2BOrder(input: CreateB2BOrderInput) {
   revalidatePath('/b2b/dashboard');
   revalidatePath('/dispatch/picker');
 
-  return { orderId };
+  // Server-side redirect to order detail — more reliable than client-side router.push()
+  // which can hit cookie/auth timing issues after server action completion
+  redirect(`/b2b/orders/${orderId}`);
 }

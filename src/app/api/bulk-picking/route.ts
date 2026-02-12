@@ -3,6 +3,8 @@ import { getSupabaseServerApp } from '@/server/db/supabaseServerApp';
 import { getUserAndOrg } from '@/server/auth/org';
 import { nanoid } from 'nanoid';
 import { logger } from '@/server/utils/logger';
+import { autoAssignBatchItems } from '@/lib/picking/auto-assign';
+import type { AssignmentResult } from '@/lib/picking/auto-assign';
 
 // GET /api/bulk-picking - List bulk pick batches
 export async function GET(req: NextRequest) {
@@ -83,8 +85,8 @@ export async function POST(req: NextRequest) {
     const supabase = await getSupabaseServerApp();
     const body = await req.json();
     
-    const { date, orderIds, notes } = body;
-    
+    const { date, orderIds, notes, autoAssign } = body;
+
     if (!date || !orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json(
         { error: 'Date and at least one order ID are required' },
@@ -160,11 +162,11 @@ export async function POST(req: NextRequest) {
     
     // Aggregate by SKU
     const skuTotals = new Map<string, { skuId: string; totalQty: number; locationHint?: string }>();
-    
+
     for (const item of pickItems || []) {
       const skuId = item.sku_id?.sku_id || item.order_item?.sku?.id;
       if (!skuId) continue;
-      
+
       const existing = skuTotals.get(skuId);
       if (existing) {
         existing.totalQty += item.target_qty;
@@ -175,27 +177,83 @@ export async function POST(req: NextRequest) {
         });
       }
     }
-    
+
+    // Resolve size_category_id for each SKU via plant_size → picking_size_category_sizes
+    const skuIds = Array.from(skuTotals.keys());
+    const skuCategoryMap = new Map<string, string>();
+
+    if (skuIds.length > 0) {
+      const { data: skuSizes } = await supabase
+        .from('skus')
+        .select('id, plant_size_id')
+        .in('id', skuIds);
+
+      const plantSizeIds = [...new Set((skuSizes || []).map((s: { id: string; plant_size_id: string | null }) => s.plant_size_id).filter(Boolean))] as string[];
+
+      if (plantSizeIds.length > 0) {
+        const { data: categoryMappings } = await supabase
+          .from('picking_size_category_sizes')
+          .select('size_id, category_id')
+          .in('size_id', plantSizeIds);
+
+        const sizeToCategoryMap = new Map<string, string>();
+        for (const mapping of categoryMappings || []) {
+          sizeToCategoryMap.set(mapping.size_id, mapping.category_id);
+        }
+
+        for (const sku of skuSizes || []) {
+          if (sku.plant_size_id) {
+            const categoryId = sizeToCategoryMap.get(sku.plant_size_id);
+            if (categoryId) {
+              skuCategoryMap.set(sku.id, categoryId);
+            }
+          }
+        }
+      }
+    }
+
     // Insert bulk pick items
+    let itemsInserted = false;
     if (skuTotals.size > 0) {
       const bulkItems = Array.from(skuTotals.values()).map((sku) => ({
         bulk_batch_id: batch.id,
         sku_id: sku.skuId,
         total_qty: sku.totalQty,
         location_hint: sku.locationHint,
+        size_category_id: skuCategoryMap.get(sku.skuId) || null,
       }));
-      
+
       const { error: itemsError } = await supabase
         .from('bulk_pick_items')
         .insert(bulkItems);
-      
+
       if (itemsError) {
         logger.picking.error("Error creating bulk pick items", itemsError);
         // Non-fatal, batch is still created
+      } else {
+        itemsInserted = true;
       }
     }
-    
-    return NextResponse.json({
+
+    // Optionally run auto-assignment after item creation
+    let assignmentResults: AssignmentResult[] | undefined;
+    if (autoAssign && itemsInserted) {
+      try {
+        assignmentResults = await autoAssignBatchItems(supabase, batch.id, orgId);
+        logger.picking.info("Auto-assignment ran during batch creation", {
+          batchId: batch.id,
+          assignedCount: assignmentResults.filter((r) => r.assignedTo !== null).length,
+          totalItems: assignmentResults.length,
+        });
+      } catch (assignError) {
+        // Non-fatal: batch is created, assignment can be retried via the assign endpoint
+        logger.picking.error("Auto-assignment failed during batch creation", assignError, {
+          batchId: batch.id,
+        });
+      }
+    }
+
+    const response: Record<string, unknown> = {
       batch: {
         id: batch.id,
         batchNumber: batch.batch_number,
@@ -203,7 +261,18 @@ export async function POST(req: NextRequest) {
         status: batch.status,
         orderCount: orderIds.length,
       },
-    });
+    };
+
+    if (assignmentResults) {
+      response.assignments = {
+        total: assignmentResults.length,
+        assigned: assignmentResults.filter((r) => r.assignedTo !== null).length,
+        unassigned: assignmentResults.filter((r) => r.assignedTo === null).length,
+        details: assignmentResults,
+      };
+    }
+
+    return NextResponse.json(response);
   } catch (error: any) {
     logger.picking.error("Bulk picking POST failed", error);
     return NextResponse.json(

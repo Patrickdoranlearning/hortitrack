@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getUserAndOrg } from "@/server/auth/org";
 import { consumeMaterialsForBatch } from "@/server/materials/consumption";
+import { isEnabled } from "@/config/features";
 
 const ActualizeBatchSchema = z.object({
   batch_id: z.string().uuid(),
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
         // Consume materials if enabled and size_id is provided
         // This is kept separate as it has its own partial success logic
         let materialConsumption = null;
-        if (payload.consume_materials && item.size_id && updatedBatch) {
+        if (isEnabled('materials') && payload.consume_materials && item.size_id && updatedBatch) {
           try {
             const consumptionResult = await consumeMaterialsForBatch(
               supabase,

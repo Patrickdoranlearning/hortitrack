@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +49,7 @@ import {
   Plus,
   Minus,
   PartyPopper,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ScannerClient from '@/components/Scanner/ScannerClient';
@@ -65,6 +67,11 @@ interface BulkPickItem {
   substituteBatchId?: string;
   substitutionReason?: string;
   locationHint?: string;
+  assignedTo?: string | null;
+  assignedName?: string | null;
+  sizeCategoryId?: string | null;
+  sizeCategoryName?: string | null;
+  sizeCategoryColor?: string | null;
 }
 
 interface BulkOrder {
@@ -98,6 +105,7 @@ interface BulkPickingWorkflowClientProps {
 
 type WorkflowPhase = 'picking' | 'packing';
 type PackingStep = 'items' | 'qc' | 'trolley' | 'complete';
+type PickingView = 'all' | 'by-product' | 'by-picker';
 
 const TROLLEY_TYPES = [
   { value: 'tag6', label: 'Tag 6 (Yellow)' },
@@ -125,6 +133,7 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
   const [showScanner, setShowScanner] = useState(false);
   const [selectedItem, setSelectedItem] = useState<BulkPickItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pickingView, setPickingView] = useState<PickingView>('all');
   
   // Packing workflow state
   const [packingOrder, setPackingOrder] = useState<BulkOrder | null>(null);
@@ -374,7 +383,114 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
   };
   
   const canCompletePicking = pendingItems.length === 0;
-  
+
+  // Group items by size category
+  const itemsByCategory = items.reduce<Record<string, { name: string; color: string; items: BulkPickItem[] }>>((acc, item) => {
+    const key = item.sizeCategoryName || 'Uncategorized';
+    if (!acc[key]) {
+      acc[key] = { name: key, color: item.sizeCategoryColor || '#6b7280', items: [] };
+    }
+    acc[key].items.push(item);
+    return acc;
+  }, {});
+
+  // Group items by assigned picker
+  const itemsByPicker = items.reduce<Record<string, { name: string; items: BulkPickItem[] }>>((acc, item) => {
+    const key = item.assignedName || 'Unassigned';
+    if (!acc[key]) {
+      acc[key] = { name: key, items: [] };
+    }
+    acc[key].items.push(item);
+    return acc;
+  }, {});
+
+  // Render a single item card (reusable across views)
+  const renderItemCard = (item: BulkPickItem) => {
+    if (item.status !== 'pending') {
+      return (
+        <Card
+          key={item.id}
+          className={cn(
+            'opacity-75',
+            item.status === 'short' && 'border-red-200 bg-red-50'
+          )}
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {item.status === 'short' ? (
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                )}
+                <div>
+                  <p className="font-medium text-sm">{item.productName}</p>
+                  <p className="text-xs text-muted-foreground">{item.size}</p>
+                </div>
+              </div>
+              <Badge variant={item.status === 'short' ? 'destructive' : 'secondary'}>
+                {item.pickedQty}/{item.totalQty}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+    return (
+      <Card key={item.id}>
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium">{item.productName}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-sm text-muted-foreground">{item.size}</p>
+                {item.sizeCategoryName && (
+                  <Badge variant="outline" className="text-xs" style={{ borderColor: item.sizeCategoryColor || undefined }}>
+                    {item.sizeCategoryName}
+                  </Badge>
+                )}
+              </div>
+              {item.assignedName && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <User className="h-3 w-3" />
+                  {item.assignedName}
+                </p>
+              )}
+              {item.locationHint && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <MapPin className="h-3 w-3" />
+                  {item.locationHint}
+                </p>
+              )}
+            </div>
+            <Badge variant="outline" className="text-lg px-3 py-1">
+              ×{item.totalQty}
+            </Badge>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={() => handlePickItem(item)}
+              disabled={isLoading}
+              className="flex-1"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Pick All
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleShortItem(item, 0)}
+              disabled={isLoading}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-4 pb-24">
       {/* Header */}
@@ -396,6 +512,24 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
         )}>
           {batch.status.replace('_', ' ')}
         </Badge>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/dispatch/bulk-picking/${batch.id}/worker`}>
+            <ClipboardList className="h-4 w-4 mr-1.5" />
+            My Picks
+          </Link>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(`/dispatch/bulk-picking/${batch.id}/print`, '_blank')}
+        >
+          <Printer className="h-4 w-4 mr-1.5" />
+          Print List
+        </Button>
       </div>
       
       {/* Stats */}
@@ -470,97 +604,130 @@ export default function BulkPickingWorkflowClient({ batch: initialBatch }: BulkP
           {/* Items List */}
           {(batch.status === 'in_progress' || batch.status === 'picked') && (
             <>
-              {/* Pending Items */}
-              {pendingItems.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Items to Pick
-                    <Badge variant="secondary">{pendingItems.length}</Badge>
-                  </h3>
-                  
-                  {pendingItems.map((item) => (
-                    <Card key={item.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium">{item.productName}</p>
-                            <p className="text-sm text-muted-foreground">{item.size}</p>
-                            {item.locationHint && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                <MapPin className="h-3 w-3" />
-                                {item.locationHint}
-                              </p>
-                            )}
-                          </div>
-                          <Badge variant="outline" className="text-lg px-3 py-1">
-                            ×{item.totalQty}
-                          </Badge>
-                        </div>
-                        <div className="flex gap-2 mt-3">
-                          <Button
-                            size="sm"
-                            onClick={() => handlePickItem(item)}
-                            disabled={isLoading}
-                            className="flex-1"
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                            Pick All
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleShortItem(item, 0)}
-                            disabled={isLoading}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+              {/* View Switcher */}
+              <div className="flex gap-1 bg-muted p-1 rounded-lg">
+                {(['all', 'by-product', 'by-picker'] as PickingView[]).map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setPickingView(view)}
+                    className={cn(
+                      'flex-1 text-xs font-medium py-2 px-3 rounded-md transition-colors',
+                      pickingView === view
+                        ? 'bg-background shadow-sm text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {view === 'all' ? 'All Items' : view === 'by-product' ? 'By Product' : 'By Picker'}
+                  </button>
+                ))}
+              </div>
+
+              {/* All Items View */}
+              {pickingView === 'all' && (
+                <>
+                  {pendingItems.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Items to Pick
+                        <Badge variant="secondary">{pendingItems.length}</Badge>
+                      </h3>
+                      {pendingItems.map(renderItemCard)}
+                    </div>
+                  )}
+                  {completedItems.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold flex items-center gap-2 text-green-600">
+                        <CheckCircle2 className="h-5 w-5" />
+                        Picked
+                        <Badge variant="outline" className="text-green-600">{completedItems.length}</Badge>
+                      </h3>
+                      {completedItems.map(renderItemCard)}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* By Product View */}
+              {pickingView === 'by-product' && (
+                <div className="space-y-4">
+                  {Object.entries(itemsByCategory)
+                    .sort(([, a], [, b]) => {
+                      const aPending = a.items.filter(i => i.status === 'pending').length;
+                      const bPending = b.items.filter(i => i.status === 'pending').length;
+                      return bPending - aPending;
+                    })
+                    .map(([key, group]) => {
+                      const groupPending = group.items.filter(i => i.status === 'pending');
+                      const groupDone = group.items.filter(i => i.status !== 'pending');
+                      const groupTotal = group.items.reduce((s, i) => s + i.totalQty, 0);
+                      const groupPicked = group.items.reduce((s, i) => s + i.pickedQty, 0);
+                      const groupProgress = groupTotal > 0 ? Math.round((groupPicked / groupTotal) * 100) : 0;
+
+                      return (
+                        <Card key={key}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color }} />
+                                {group.name}
+                              </CardTitle>
+                              <Badge variant="secondary">
+                                {groupDone.length}/{group.items.length} picked
+                              </Badge>
+                            </div>
+                            <Progress value={groupProgress} className="h-1.5" />
+                            <p className="text-xs text-muted-foreground">
+                              {groupTotal} units total
+                            </p>
+                          </CardHeader>
+                          <CardContent className="space-y-2 pt-0">
+                            {groupPending.map(renderItemCard)}
+                            {groupDone.map(renderItemCard)}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                 </div>
               )}
-              
-              {/* Completed Items */}
-              {completedItems.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="h-5 w-5" />
-                    Picked
-                    <Badge variant="outline" className="text-green-600">
-                      {completedItems.length}
-                    </Badge>
-                  </h3>
-                  
-                  {completedItems.map((item) => (
-                    <Card
-                      key={item.id}
-                      className={cn(
-                        'opacity-75',
-                        item.status === 'short' && 'border-red-200 bg-red-50'
-                      )}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {item.status === 'short' ? (
-                              <AlertTriangle className="h-4 w-4 text-red-500" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4 text-green-500" />
-                            )}
-                            <div>
-                              <p className="font-medium text-sm">{item.productName}</p>
-                              <p className="text-xs text-muted-foreground">{item.size}</p>
+
+              {/* By Picker View */}
+              {pickingView === 'by-picker' && (
+                <div className="space-y-4">
+                  {Object.entries(itemsByPicker)
+                    .sort(([a], [b]) => {
+                      if (a === 'Unassigned') return 1;
+                      if (b === 'Unassigned') return -1;
+                      return a.localeCompare(b);
+                    })
+                    .map(([key, group]) => {
+                      const groupPending = group.items.filter(i => i.status === 'pending');
+                      const groupDone = group.items.filter(i => i.status !== 'pending');
+                      const groupProgress = group.items.length > 0
+                        ? Math.round((groupDone.length / group.items.length) * 100)
+                        : 0;
+
+                      return (
+                        <Card key={key} className={key === 'Unassigned' ? 'border-dashed' : ''}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                {group.name}
+                              </CardTitle>
+                              <Badge variant="secondary">
+                                {groupDone.length}/{group.items.length} picked
+                              </Badge>
                             </div>
-                          </div>
-                          <Badge variant={item.status === 'short' ? 'destructive' : 'secondary'}>
-                            {item.pickedQty}/{item.totalQty}
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                            <Progress value={groupProgress} className="h-1.5" />
+                          </CardHeader>
+                          <CardContent className="space-y-2 pt-0">
+                            {groupPending.map(renderItemCard)}
+                            {groupDone.map(renderItemCard)}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                 </div>
               )}
             </>

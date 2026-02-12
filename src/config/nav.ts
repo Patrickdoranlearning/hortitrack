@@ -1,5 +1,6 @@
 
 import { type LucideIcon, ShoppingCart, Users, PackageSearch, LayoutDashboard, Sprout, ShieldCheck, Truck, Store, Target, Package } from "lucide-react";
+import { isEnabled } from "@/config/features";
 
 export type NavItem = {
   key: string;
@@ -15,7 +16,7 @@ export type NavSubItem = {
   description?: string;
 }
 
-export const APP_NAV: NavItem[] = [
+const ALL_NAV: NavItem[] = [
   {
     key: "production",
     label: "Production",
@@ -94,6 +95,10 @@ export const APP_NAV: NavItem[] = [
     ]
   },
 ];
+
+export const APP_NAV: NavItem[] = ALL_NAV.filter(
+  (item) => item.key !== "materials" || isEnabled("materials")
+);
 
 export const NAV_SALES = [
   { label: "Orders", href: "/sales/orders", icon: ShoppingCart, requiredRoles: [] },

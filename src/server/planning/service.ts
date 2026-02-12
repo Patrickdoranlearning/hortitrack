@@ -116,7 +116,21 @@ export async function getPlanningSnapshot(horizonMonths = 12): Promise<PlanningS
     throw new Error(bucketsResult.error.message);
   }
 
-  const batches = (batchData ?? []).map(mapBatchRow).sort(sortByReadyDate);
+  // Build lookup of id → batch_number so we can resolve parent batch numbers
+  const batchNumberMap = new Map<string, string>();
+  for (const row of batchData ?? []) {
+    if (row.id && row.batch_number) {
+      batchNumberMap.set(row.id, row.batch_number);
+    }
+  }
+
+  const batches = (batchData ?? []).map((row) => {
+    const batch = mapBatchRow(row);
+    batch.parentBatchNumber = batch.parentBatchId
+      ? batchNumberMap.get(batch.parentBatchId) ?? null
+      : null;
+    return batch;
+  }).sort(sortByReadyDate);
 
   return {
     buckets,
@@ -176,6 +190,7 @@ function mapBatchRow(row: BatchRow): PlanningBatch {
     locationId: row.location_id,
     locationName: row.nursery_locations?.name ?? null,
     parentBatchId: row.parent_batch_id,
+    parentBatchNumber: null, // Populated after mapping via batchNumberMap
     protocolId: row.protocol_id,
     isGhost: GHOST_STATUSES.has(row.status ?? ""),
   };

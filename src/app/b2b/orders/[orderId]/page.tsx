@@ -3,6 +3,7 @@ import { B2BPortalLayout } from '@/components/b2b/B2BPortalLayout';
 import { B2BOrderDetailClient } from './B2BOrderDetailClient';
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
+import { logError } from '@/lib/log';
 
 type PageProps = {
   params: Promise<{ orderId: string }>;
@@ -14,7 +15,7 @@ export default async function B2BOrderDetailPage({ params }: PageProps) {
   const supabase = await createClient();
 
   // Fetch order with items and pick list info for trolley reconciliation
-  const { data: order } = await supabase
+  const { data: order, error: orderError } = await supabase
     .from('orders')
     .select(`
       id,
@@ -48,6 +49,16 @@ export default async function B2BOrderDetailPage({ params }: PageProps) {
     .eq('id', orderId)
     .eq('customer_id', authContext.customerId)
     .single();
+
+  if (orderError) {
+    logError('B2B order detail query failed', {
+      orderId,
+      customerId: authContext.customerId,
+      isImpersonating: authContext.isImpersonating,
+      error: orderError.message,
+      code: orderError.code,
+    });
+  }
 
   if (!order) {
     notFound();

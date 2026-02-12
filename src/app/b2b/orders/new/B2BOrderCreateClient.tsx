@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { B2BProductAccordionCard } from '@/components/b2b/B2BProductAccordionCard';
 import { B2BProductFilters, type ProductFilters } from '@/components/b2b/B2BProductFilters';
 import { B2BCheckoutWizard } from '@/components/b2b/checkout/B2BCheckoutWizard';
@@ -36,7 +35,6 @@ export function B2BOrderCreateClient({
   pricingHints,
   isAddressRestricted = false,
 }: B2BOrderCreateClientProps) {
-  const router = useRouter();
   const [trolley, setTrolley] = useState<CartItem[]>([]);
   const [filters, setFilters] = useState<ProductFilters>({
     category: null,
@@ -214,16 +212,16 @@ export function B2BOrderCreateClient({
         notes,
       });
 
-      if (result.error) {
+      // On success, the server action redirects via redirect() — we won't reach here.
+      // We only reach here if the action returned an error.
+      if (result?.error) {
         setError(result.error);
-        return;
-      }
-
-      if (result.orderId) {
-        // Success - redirect to order detail
-        router.push(`/b2b/orders/${result.orderId}`);
       }
     } catch (err) {
+      // redirect() from server action throws NEXT_REDIRECT which Next.js handles.
+      // Only show error for genuine failures.
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('NEXT_REDIRECT')) return;
       setError('Failed to create order. Please try again.');
     }
   };

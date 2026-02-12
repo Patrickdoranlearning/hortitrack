@@ -4,6 +4,7 @@ import { TransplantInputSchema, type TransplantInput } from "@/lib/domain/batch"
 import { getUserAndOrg } from "@/server/auth/org";
 import { revalidatePath } from "next/cache";
 import { consumeMaterialsForBatch, savePlannedMaterialsFromRules } from "@/server/materials/consumption";
+import { isEnabled } from "@/config/features";
 import { logError, logWarning } from "@/lib/log";
 import type { ActionResult } from "@/lib/errors";
 
@@ -84,33 +85,35 @@ export async function transplantBatchAction(input: TransplantInput): Promise<Act
     };
 
     // Save planned materials so workers see them in the materials checklist
-    try {
-      await savePlannedMaterialsFromRules(
-        supabase,
-        orgId,
-        result.child_batch.id,
-        validated.size_id,
-        result.child_batch.quantity
-      );
-    } catch (planErr) {
-      logWarning("[transplantBatchAction] Planned materials save failed", { error: planErr instanceof Error ? planErr.message : String(planErr) });
-    }
+    if (isEnabled('materials')) {
+      try {
+        await savePlannedMaterialsFromRules(
+          supabase,
+          orgId,
+          result.child_batch.id,
+          validated.size_id,
+          result.child_batch.quantity
+        );
+      } catch (planErr) {
+        logWarning("[transplantBatchAction] Planned materials save failed", { error: planErr instanceof Error ? planErr.message : String(planErr) });
+      }
 
-    // Consume materials for the new child batch
-    try {
-      await consumeMaterialsForBatch(
-        supabase,
-        orgId,
-        user.id,
-        result.child_batch.id,
-        result.child_batch.batch_number,
-        validated.size_id,
-        result.child_batch.quantity,
-        validated.location_id,
-        true // allowPartial
-      );
-    } catch (consumeErr) {
-      logWarning("[transplantBatchAction] Material consumption failed", { error: consumeErr instanceof Error ? consumeErr.message : String(consumeErr) });
+      // Consume materials for the new child batch
+      try {
+        await consumeMaterialsForBatch(
+          supabase,
+          orgId,
+          user.id,
+          result.child_batch.id,
+          result.child_batch.batch_number,
+          validated.size_id,
+          result.child_batch.quantity,
+          validated.location_id,
+          true // allowPartial
+        );
+      } catch (consumeErr) {
+        logWarning("[transplantBatchAction] Material consumption failed", { error: consumeErr instanceof Error ? consumeErr.message : String(consumeErr) });
+      }
     }
 
     return {

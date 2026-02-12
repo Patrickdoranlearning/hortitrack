@@ -44,16 +44,23 @@ export function BatchListItem({ batch, index, selectable = false, selected = fal
       )}
       <td className="px-3 py-2 text-muted-foreground">{index}</td>
       <td className="px-3 py-2">
-        <Link
-          href={`/production/batches/${batch.id}`}
-          className="font-medium hover:underline"
-        >
-          {batch.varietyName ?? "Unknown variety"}
-        </Link>
-        {batch.batchNumber && (
-          <span className="ml-2 text-xs text-muted-foreground">
-            #{batch.batchNumber}
-          </span>
+        <div>
+          <Link
+            href={`/production/batches/${batch.id}`}
+            className="font-medium hover:underline"
+          >
+            {batch.varietyName ?? "Unknown variety"}
+          </Link>
+          {batch.batchNumber && (
+            <span className="ml-2 text-xs text-muted-foreground">
+              #{batch.batchNumber}
+            </span>
+          )}
+        </div>
+        {batch.parentBatchNumber && (
+          <div className="text-xs text-muted-foreground">
+            Source: #{batch.parentBatchNumber}
+          </div>
         )}
       </td>
       <td className="px-3 py-2 text-muted-foreground">

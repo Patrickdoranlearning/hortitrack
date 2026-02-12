@@ -2,6 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "@/server/db/supabase";
 import { logger } from "@/server/utils/logger";
+import { isEnabled } from "@/config/features";
 
 // ============================================================
 // IN-MEMORY CACHE (works in development mode)
@@ -116,7 +117,7 @@ async function fetchReferenceDataViaRPC(orgId: string): Promise<CachedReferenceD
     sizes: row.sizes ?? [],
     locations: row.locations ?? [],
     suppliers: row.suppliers ?? [],
-    materials: row.materials ?? [],
+    materials: isEnabled("materials") ? (row.materials ?? []) : [],
   };
 }
 
@@ -128,7 +129,7 @@ async function fetchReferenceDataDirect(orgId: string): Promise<CachedReferenceD
   const supabase = getSupabaseAdmin();
 
   // Run all queries in parallel
-  const [varietiesRes, sizesRes, locationsRes, suppliersRes, materialsRes] = await Promise.all([
+  const queries: Promise<any>[] = [
     supabase
       .from("plant_varieties")
       .select("id, name, family, genus, species, category")
@@ -147,42 +148,51 @@ async function fetchReferenceDataDirect(orgId: string): Promise<CachedReferenceD
       .select("id, name, producer_code, country_code")
       .eq("org_id", orgId)
       .order("name"),
-    // Fetch materials for containers and growing media only (for planning wizard)
-    supabase
-      .from("materials")
-      .select(`
-        id,
-        name,
-        part_number,
-        category_id,
-        base_uom,
-        linked_size_id,
-        is_active,
-        category:material_categories(name, code, parent_group)
-      `)
-      .eq("org_id", orgId)
-      .eq("is_active", true)
-      .order("name"),
-  ]);
+  ];
+
+  // Only fetch materials if the feature is enabled
+  if (isEnabled("materials")) {
+    queries.push(
+      supabase
+        .from("materials")
+        .select(`
+          id,
+          name,
+          part_number,
+          category_id,
+          base_uom,
+          linked_size_id,
+          is_active,
+          category:material_categories(name, code, parent_group)
+        `)
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .order("name")
+    );
+  }
+
+  const [varietiesRes, sizesRes, locationsRes, suppliersRes, materialsRes] = await Promise.all(queries);
 
   // Transform materials to flatten category info and filter to Containers + Growing Media
-  const materials = (materialsRes.data ?? [])
-    .filter((m: any) => {
-      const parentGroup = m.category?.parent_group;
-      return parentGroup === "Containers" || parentGroup === "Growing Media";
-    })
-    .map((m: any) => ({
-      id: m.id,
-      name: m.name,
-      part_number: m.part_number,
-      category_id: m.category_id,
-      category_name: m.category?.name ?? null,
-      category_code: m.category?.code ?? null,
-      parent_group: m.category?.parent_group ?? null,
-      base_uom: m.base_uom,
-      linked_size_id: m.linked_size_id ?? null,
-      is_active: m.is_active,
-    }));
+  const materials = !isEnabled("materials")
+    ? []
+    : (materialsRes?.data ?? [])
+        .filter((m: any) => {
+          const parentGroup = m.category?.parent_group;
+          return parentGroup === "Containers" || parentGroup === "Growing Media";
+        })
+        .map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          part_number: m.part_number,
+          category_id: m.category_id,
+          category_name: m.category?.name ?? null,
+          category_code: m.category?.code ?? null,
+          parent_group: m.category?.parent_group ?? null,
+          base_uom: m.base_uom,
+          linked_size_id: m.linked_size_id ?? null,
+          is_active: m.is_active,
+        }));
 
   return {
     varieties: varietiesRes.data ?? [],

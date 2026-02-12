@@ -37,6 +37,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
+import { isEnabled } from "@/config/features";
 import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 
 const DateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
@@ -580,7 +581,7 @@ export default function CheckInForm({ onSubmitSuccess, onCancel }: Props) {
               <SummaryRow label="Est. ready" value={readyDate} />
             </dl>
           </Card>
-          {consumptionBatches.length > 0 && (
+          {isEnabled('materials') && consumptionBatches.length > 0 && (
             <MaterialConsumptionPreview batches={consumptionBatches} />
           )}
           {refError && (

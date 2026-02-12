@@ -36,6 +36,7 @@ import { toast } from "@/lib/toast";
 import { vibrateTap, vibrateSuccess, vibrateError } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { MaterialsNeededCard } from "./MaterialsNeededCard";
+import { isEnabled } from "@/config/features";
 
 interface GhostBatch {
   id: string;
@@ -135,7 +136,7 @@ export function ActualizeSheet({
               size_id: batch.sizeId || undefined,
             },
           ],
-          consume_materials: true,
+          consume_materials: isEnabled('materials'),
         }),
       });
 
@@ -314,7 +315,7 @@ export function ActualizeSheet({
           </Card>
 
           {/* Materials preview */}
-          {batch.sizeId && actualQuantity > 0 && (
+          {isEnabled('materials') && batch.sizeId && actualQuantity > 0 && (
             <MaterialsNeededCard
               sizeId={batch.sizeId}
               quantity={actualQuantity}

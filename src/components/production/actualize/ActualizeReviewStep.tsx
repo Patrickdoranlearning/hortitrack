@@ -24,6 +24,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { MaterialConsumptionPreview } from '@/components/materials/MaterialConsumptionPreview';
+import { isEnabled } from '@/config/features';
 import type { ActualizedBatchEntry } from './ActualizeByLocationStep';
 
 export type ActualizeReviewStepData = {
@@ -222,7 +223,7 @@ export function ActualizeReviewStep({
       </Card>
 
       {/* Material Consumption Preview */}
-      <MaterialConsumptionPreview batches={consumptionBatches} />
+      {isEnabled('materials') && <MaterialConsumptionPreview batches={consumptionBatches} />}
 
       {/* Quantity Changes Alert */}
       {entriesWithChanges.length > 0 && (

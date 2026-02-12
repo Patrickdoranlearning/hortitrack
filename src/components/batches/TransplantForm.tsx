@@ -30,6 +30,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "@/lib/toast";
 import { SearchableSelect } from "../ui/searchable-select";
 import { MaterialConsumptionPreview } from "@/components/materials/MaterialConsumptionPreview";
+import { isEnabled } from "@/config/features";
 import { invalidateBatches } from "@/lib/swr/keys";
 import { useTodayDate, getTodayISO } from "@/lib/date-sync";
 
@@ -224,6 +225,7 @@ export default function TransplantForm({
         size_id: values.size_id,
         location_id: values.location_id,
         containers: values.containers,
+        units: requiredUnits,
         planted_at: values.planted_at,
         notes: values.notes,
         archive_parent_if_empty: values.archive_parent_if_empty ?? true,
@@ -566,7 +568,7 @@ export default function TransplantForm({
             </div>
           </Card>
 
-          {consumptionBatches.length > 0 && (
+          {isEnabled('materials') && consumptionBatches.length > 0 && (
             <MaterialConsumptionPreview batches={consumptionBatches} />
           )}
         </aside>

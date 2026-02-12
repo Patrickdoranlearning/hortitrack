@@ -50,10 +50,31 @@ interface BulkBatch {
   itemCount: number;
 }
 
+interface ProductGroup {
+  skuId: string;
+  productName: string;
+  size: string;
+  sizeCategoryName: string | null;
+  sizeCategoryColor: string | null;
+  totalUnits: number;
+  orderCount: number;
+  orderIds: string[];
+}
+
+interface SizeCategory {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface BulkPickingClientProps {
   existingBatches: BulkBatch[];
   ordersByDate: Record<string, OrderForBulk[]>;
+  productGroups: ProductGroup[];
+  sizeCategories: SizeCategory[];
 }
+
+type CreationView = 'by-date' | 'by-product';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-700',
@@ -74,14 +95,17 @@ const STATUS_LABELS: Record<string, string> = {
 export default function BulkPickingClient({
   existingBatches,
   ordersByDate,
+  productGroups,
+  sizeCategories,
 }: BulkPickingClientProps) {
   const router = useRouter();
-  
+
   const [batches] = useState<BulkBatch[]>(existingBatches);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [creationView, setCreationView] = useState<CreationView>('by-date');
   
   const dates = Object.keys(ordersByDate).sort();
   
@@ -234,11 +258,118 @@ export default function BulkPickingClient({
             Create New Bulk Pick
           </CardTitle>
           <CardDescription>
-            Select orders by delivery date to create a bulk picking batch
+            Select orders to create a bulk picking batch
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {dates.length === 0 ? (
+          {/* View Switcher */}
+          <div className="flex gap-1 bg-muted p-1 rounded-lg mb-4">
+            <button
+              onClick={() => setCreationView('by-date')}
+              className={cn(
+                'flex-1 text-sm font-medium py-2 px-3 rounded-md transition-colors',
+                creationView === 'by-date'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              By Delivery Date
+            </button>
+            <button
+              onClick={() => setCreationView('by-product')}
+              className={cn(
+                'flex-1 text-sm font-medium py-2 px-3 rounded-md transition-colors',
+                creationView === 'by-product'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              By Product
+            </button>
+          </div>
+
+          {/* By Product View */}
+          {creationView === 'by-product' && (
+            productGroups.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No products available for bulk picking</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Group products by size category */}
+                {(() => {
+                  const grouped = new Map<string, { name: string; color: string; products: ProductGroup[] }>();
+                  for (const pg of productGroups) {
+                    const catName = pg.sizeCategoryName || 'Uncategorized';
+                    if (!grouped.has(catName)) {
+                      grouped.set(catName, {
+                        name: catName,
+                        color: pg.sizeCategoryColor || '#6b7280',
+                        products: [],
+                      });
+                    }
+                    grouped.get(catName)!.products.push(pg);
+                  }
+                  return Array.from(grouped.values()).map((group) => {
+                    const groupUnits = group.products.reduce((s, p) => s + p.totalUnits, 0);
+                    const groupOrders = new Set(group.products.flatMap(p => p.orderIds)).size;
+                    return (
+                      <div key={group.name} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color }} />
+                            {group.name}
+                          </h4>
+                          <span className="text-sm text-muted-foreground">
+                            {groupUnits} units across {groupOrders} orders
+                          </span>
+                        </div>
+                        {group.products.map((pg) => {
+                          const allOrdersSelected = pg.orderIds.every(id => selectedOrders.has(id));
+                          return (
+                            <div
+                              key={pg.skuId}
+                              className={cn(
+                                'flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer',
+                                allOrdersSelected && 'bg-primary/5 border-primary/30'
+                              )}
+                              onClick={() => {
+                                const newSelected = new Set(selectedOrders);
+                                if (allOrdersSelected) {
+                                  pg.orderIds.forEach(id => newSelected.delete(id));
+                                } else {
+                                  pg.orderIds.forEach(id => newSelected.add(id));
+                                }
+                                setSelectedOrders(newSelected);
+                                if (!selectedDate && pg.orderIds.length > 0) {
+                                  setSelectedDate(new Date().toISOString().split('T')[0]);
+                                }
+                              }}
+                            >
+                              <Checkbox checked={allOrdersSelected} />
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium">{pg.productName}</span>
+                                <span className="text-sm text-muted-foreground ml-2">{pg.size}</span>
+                              </div>
+                              <div className="text-right text-sm">
+                                <p className="font-medium">{pg.totalUnits} units</p>
+                                <p className="text-muted-foreground">{pg.orderCount} orders</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )
+          )}
+
+          {/* By Date View */}
+          {creationView === 'by-date' && (
+          dates.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p>No orders available for bulk picking</p>
@@ -314,7 +445,7 @@ export default function BulkPickingClient({
                 );
               })}
             </Tabs>
-          )}
+          ))}
         </CardContent>
       </Card>
       
