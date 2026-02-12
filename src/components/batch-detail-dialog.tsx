@@ -21,6 +21,7 @@ import {
   ImageIcon,
   ExternalLink,
   ClipboardList,
+  Printer,
 } from "lucide-react";
 import Link from "next/link";
 import type { Batch } from '@/lib/types';
@@ -32,6 +33,7 @@ import { BatchChatDialog } from "./batch-chat-dialog";
 import { InteractiveDistributionBar } from "./InteractiveDistributionBar";
 import AncestryStrip from "./ancestry-strip";
 import { PlantPassportCard } from "./batches/PlantPassportCard";
+import BatchLabelPreview from "./BatchLabelPreview";
 // ActionMenuButton removed - using LogActionWizard directly
 import type { ActionMode } from "@/components/actions/types";
 import { StockMovementLog } from "@/components/history/StockMovementLog";
@@ -84,6 +86,7 @@ export function BatchDetailDialog({
 
   const [isChatOpen, setIsChatOpen] = React.useState(false);
   const [isWizardOpen, setIsWizardOpen] = React.useState(false);
+  const [isPrintLabelOpen, setIsPrintLabelOpen] = React.useState(false);
 
   // Dialog states for actions
   const [adjustDialogOpen, setAdjustDialogOpen] = React.useState(false);
@@ -550,6 +553,7 @@ export function BatchDetailDialog({
             <div className="space-y-3 flex flex-col">
               <h4 className="font-semibold text-lg">Actions</h4>
               <Button onClick={() => onEdit(batch)} variant="outline"><Pencil /> Edit Batch</Button>
+              <Button onClick={() => setIsPrintLabelOpen(true)} variant="outline"><Printer /> Print Label</Button>
               <Button onClick={() => onTransplant(batch)} variant="outline" disabled={(batch.quantity ?? 0) === 0}><Sprout /> Transplant</Button>
               <Button onClick={() => setIsWizardOpen(true)} variant="outline"><ClipboardList /> Log Action</Button>
               <Button onClick={() => setIsChatOpen(true)} variant="outline"><Share2 /> Chat about Batch</Button>
@@ -606,6 +610,22 @@ export function BatchDetailDialog({
         batchId={batch?.id || ''}
         batchNumber={batch?.batchNumber}
         onSuccess={() => refreshHealthLogs()}
+      />
+
+      {/* Print Label Dialog */}
+      <BatchLabelPreview
+        open={isPrintLabelOpen}
+        onOpenChange={setIsPrintLabelOpen}
+        batch={{
+          id: batch?.id || '',
+          batchNumber: batch?.batchNumber || '',
+          plantVariety: batch?.plantVariety?.toString() || '',
+          plantFamily: batch?.plantFamily || '',
+          size: batch?.size || '',
+          location: batch?.location,
+          initialQuantity: batch?.initialQuantity ?? batch?.quantity ?? 0,
+          quantity: batch?.quantity ?? 0,
+        }}
       />
 
       {/* Log Action Wizard */}

@@ -8,7 +8,7 @@ import { toast } from '@/lib/toast';
 import { ReferenceDataContext } from '@/contexts/ReferenceDataContext';
 import { Button } from '@/components/ui/button';
 import { SupplierExpectedDateStep, type SupplierExpectedDateData } from './SupplierExpectedDateStep';
-import { PlanBatchesStep, type PlanBatchesStepData } from './PlanBatchesStep';
+import { PlanBatchesStep, type PlanBatchesStepData, type PlannedBatchEntry } from './PlanBatchesStep';
 import { ReviewStep, type ReviewStepData } from './ReviewStep';
 
 export type PlanIncomingWizardState = {
@@ -87,6 +87,20 @@ export function PlanIncomingWizard({ onComplete, onCancel }: PlanIncomingWizardP
       goNext();
     },
     [goNext]
+  );
+
+  // Handler for order upload extraction (auto-populates both steps)
+  const handleExtractionConfirmed = useCallback(
+    (supplierData: SupplierExpectedDateData, batches: PlannedBatchEntry[]) => {
+      setWizardState((prev) => ({
+        ...prev,
+        supplierExpectedDate: supplierData,
+        batches: { batches },
+      }));
+      // Navigate to batches step so user can review/edit the pre-populated data
+      setCurrentStep('batches');
+    },
+    []
   );
 
   const handleBatchesComplete = useCallback(
@@ -237,6 +251,7 @@ export function PlanIncomingWizard({ onComplete, onCancel }: PlanIncomingWizardP
             referenceData={refData}
             initialData={wizardState.supplierExpectedDate}
             onComplete={handleSupplierComplete}
+            onExtractionConfirmed={handleExtractionConfirmed}
             onCancel={onCancel}
           />
         )}

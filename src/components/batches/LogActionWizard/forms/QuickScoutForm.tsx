@@ -128,6 +128,7 @@ export function QuickScoutForm({
   const [remedialPrograms, setRemedialPrograms] = React.useState<IpmRemedialProgram[]>([]);
   const [loadingPrograms, setLoadingPrograms] = React.useState(false);
   const [applyingProgram, setApplyingProgram] = React.useState<string | null>(null);
+  const productsLoadAttempted = React.useRef(false);
 
   const form = useForm<QuickScoutFormInput>({
     resolver: zodResolver(QuickScoutFormSchema),
@@ -170,7 +171,8 @@ export function QuickScoutForm({
 
   // Load IPM products when schedule treatment checkbox is enabled
   React.useEffect(() => {
-    if (scheduleTreatmentValue && products.length === 0 && !loadingProducts) {
+    if (scheduleTreatmentValue && !productsLoadAttempted.current) {
+      productsLoadAttempted.current = true;
       setLoadingProducts(true);
       listIpmProducts().then((result) => {
         if (result.success && result.data) {
@@ -179,7 +181,7 @@ export function QuickScoutForm({
         setLoadingProducts(false);
       });
     }
-  }, [scheduleTreatmentValue, products.length, loadingProducts]);
+  }, [scheduleTreatmentValue]);
 
   // Auto-fill rate when product is selected
   React.useEffect(() => {

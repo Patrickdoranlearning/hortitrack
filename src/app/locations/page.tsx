@@ -312,9 +312,9 @@ export default function LocationsPage() {
               onSubmit={async (values) => {
                 setFormSaving(true);
                 try {
-                  const result = await (values as any).id
+                  const result = await ((values as any).id
                     ? updateLocationAction(values as NurseryLocation)
-                    : addLocationAction(values as Omit<NurseryLocation, 'id'>);
+                    : addLocationAction(values as Omit<NurseryLocation, 'id'>));
                   if (result.success) {
                     invalidateReferenceData();
                     await forceRefresh();

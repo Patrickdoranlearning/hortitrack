@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LocationComboboxGrouped } from "../ui/location-combobox-grouped";
+import { SearchableSelect } from "../ui/searchable-select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/lib/toast";
 import { useCollection } from "@/hooks/useCollection";
@@ -93,9 +94,14 @@ export default function EditBatchForm({
     defaultValues,
   });
 
+  // Only reset the form when switching to a genuinely different batch.
+  // Using batch?.id (a stable primitive) prevents resets caused by
+  // object-reference changes while the user is actively editing.
+  const batchId = batch?.id;
   React.useEffect(() => {
     form.reset(defaultValues);
-  }, [defaultValues, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchId]);
 
   const [saving, setSaving] = React.useState(false);
 

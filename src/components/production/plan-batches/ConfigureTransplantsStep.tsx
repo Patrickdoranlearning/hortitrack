@@ -94,10 +94,10 @@ export function ConfigureTransplantsStep({
     }));
   });
 
-  // Pot sizes for transplanting (filter out tray sizes)
+  // Target sizes for transplanting: pots and plug trays (exclude propagation trays)
   const potSizes = useMemo(() => {
     return (referenceData.sizes ?? []).filter(
-      (s) => s.container_type === 'pot' || (!s.cell_multiple || s.cell_multiple === 1)
+      (s) => s.container_type !== 'prop_tray'
     );
   }, [referenceData.sizes]);
 

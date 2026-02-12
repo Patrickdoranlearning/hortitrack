@@ -1,25 +1,14 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { VarietyComboboxGrouped } from '@/components/ui/variety-combobox-grouped';
+import { SizeComboboxGrouped } from '@/components/ui/size-combobox-grouped';
 import {
   Select,
   SelectContent,
@@ -39,8 +28,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Check,
-  ChevronsUpDown,
   ChevronRight,
   ChevronLeft,
   Plus,
@@ -48,7 +35,6 @@ import {
   Sprout,
   Package,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { ReferenceData } from '@/contexts/ReferenceDataContext';
 import type { SupplierExpectedDateData } from './SupplierExpectedDateStep';
 
@@ -91,23 +77,37 @@ export function PlanBatchesStep({
   const [newVarietyId, setNewVarietyId] = useState('');
   const [newSizeId, setNewSizeId] = useState('');
   const [newQuantity, setNewQuantity] = useState<number>(0);
+  const [newTrays, setNewTrays] = useState<number>(0);
   const [newLocationId, setNewLocationId] = useState('');
   const [newNotes, setNewNotes] = useState('');
-  const [varietyOpen, setVarietyOpen] = useState(false);
-  const [sizeOpen, setSizeOpen] = useState(false);
 
   const varieties = referenceData.varieties ?? [];
   const sizes = referenceData.sizes ?? [];
   const locations = referenceData.locations ?? [];
 
-  const selectedVariety = useMemo(
-    () => varieties.find((v) => v.id === newVarietyId),
-    [varieties, newVarietyId]
-  );
+  // Find the "Virtual / Transit – Incoming" location (handles en-dash, em-dash, or hyphen)
+  const defaultIncomingLocationId = useMemo(() => {
+    const loc = locations.find(
+      (l) =>
+        l.nursery_site === 'Virtual' &&
+        /^transit\s*[\u2013\u2014\-–—]\s*incoming$/i.test(l.name)
+    );
+    return loc?.id ?? '';
+  }, [locations]);
+
+  // Set default location when locations become available
+  useEffect(() => {
+    if (!newLocationId && defaultIncomingLocationId) {
+      setNewLocationId(defaultIncomingLocationId);
+    }
+  }, [defaultIncomingLocationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectedSize = useMemo(
     () => sizes.find((s) => s.id === newSizeId),
     [sizes, newSizeId]
   );
+  const cellMultiple = selectedSize?.cell_multiple ?? 1;
+  const isTraySize = cellMultiple > 1;
   // Group locations by site for the table Select dropdown
   const groupedLocations = useMemo(() => {
     const groups = new Map<string, typeof locations>();
@@ -132,9 +132,12 @@ export function PlanBatchesStep({
       : location.name;
   }, []);
 
+  // Compute total from trays for tray sizes
+  const computedTotal = isTraySize ? newTrays * cellMultiple : newQuantity;
+
   // Add planned batch
   const handleAddBatch = useCallback(() => {
-    if (!newVarietyId || !newSizeId || !newQuantity) return;
+    if (!newVarietyId || !newSizeId || !computedTotal) return;
 
     const variety = varieties.find((v) => v.id === newVarietyId);
     const size = sizes.find((s) => s.id === newSizeId);
@@ -147,7 +150,7 @@ export function PlanBatchesStep({
       varietyFamily: variety?.family ?? null,
       sizeId: newSizeId,
       sizeName: size?.name ?? 'Unknown',
-      expectedQuantity: newQuantity,
+      expectedQuantity: computedTotal,
       locationId: newLocationId || undefined,
       locationName: formatLocationName(location),
       notes: newNotes || undefined,
@@ -158,9 +161,10 @@ export function PlanBatchesStep({
     setNewVarietyId('');
     setNewSizeId('');
     setNewQuantity(0);
-    setNewLocationId('');
+    setNewTrays(0);
+    setNewLocationId(defaultIncomingLocationId);
     setNewNotes('');
-  }, [newVarietyId, newSizeId, newQuantity, newLocationId, newNotes, varieties, sizes, locations, formatLocationName]);
+  }, [newVarietyId, newSizeId, computedTotal, newLocationId, newNotes, varieties, sizes, locations, formatLocationName, defaultIncomingLocationId]);
 
   // Remove batch
   const removeBatch = useCallback((batchId: string) => {
@@ -189,7 +193,7 @@ export function PlanBatchesStep({
   }, [locations, formatLocationName]);
 
   const isValid = batches.length > 0;
-  const canAddBatch = newVarietyId && newSizeId && newQuantity > 0;
+  const canAddBatch = newVarietyId && newSizeId && computedTotal > 0;
 
   const handleSubmit = () => {
     if (!isValid) return;
@@ -320,117 +324,64 @@ export function PlanBatchesStep({
               {/* Variety */}
               <div className="space-y-2">
                 <Label>Variety *</Label>
-                <Popover open={varietyOpen} onOpenChange={setVarietyOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {selectedVariety ? (
-                        <span>
-                          {selectedVariety.name}
-                          {selectedVariety.family && ` (${selectedVariety.family})`}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">Select variety...</span>
-                      )}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search varieties..." />
-                      <CommandList>
-                        <CommandEmpty>No variety found.</CommandEmpty>
-                        <CommandGroup>
-                          {varieties.map((v) => (
-                            <CommandItem
-                              key={v.id}
-                              value={v.name}
-                              onSelect={() => {
-                                setNewVarietyId(v.id);
-                                setVarietyOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  newVarietyId === v.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              {v.name}
-                              {v.family && (
-                                <span className="text-muted-foreground ml-1">({v.family})</span>
-                              )}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <VarietyComboboxGrouped
+                  varieties={varieties}
+                  value={newVarietyId}
+                  onSelect={(id) => setNewVarietyId(id)}
+                  placeholder="Select variety..."
+                  createHref="/varieties"
+                  createLabel="Add new variety"
+                />
               </div>
 
               {/* Size */}
               <div className="space-y-2">
                 <Label>Size *</Label>
-                <Popover open={sizeOpen} onOpenChange={setSizeOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {selectedSize ? (
-                        <span>{selectedSize.name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Select size...</span>
-                      )}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search sizes..." />
-                      <CommandList>
-                        <CommandEmpty>No size found.</CommandEmpty>
-                        <CommandGroup>
-                          {sizes.map((s) => (
-                            <CommandItem
-                              key={s.id}
-                              value={s.name}
-                              onSelect={() => {
-                                setNewSizeId(s.id);
-                                setSizeOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  newSizeId === s.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              {s.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <SizeComboboxGrouped
+                  sizes={sizes}
+                  value={newSizeId}
+                  onSelect={(id) => {
+                    setNewSizeId(id);
+                    // Reset quantity inputs when size changes
+                    setNewQuantity(0);
+                    setNewTrays(0);
+                  }}
+                  placeholder="Select size..."
+                  createHref="/sizes"
+                  createLabel="Add new size"
+                />
               </div>
 
               {/* Quantity */}
               <div className="space-y-2">
-                <Label>Expected Quantity *</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={newQuantity || ''}
-                  onChange={(e) => setNewQuantity(parseInt(e.target.value) || 0)}
-                  placeholder="Enter expected quantity"
-                />
+                {isTraySize ? (
+                  <>
+                    <Label>Number of Trays *</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={newTrays || ''}
+                      onChange={(e) => setNewTrays(parseInt(e.target.value) || 0)}
+                      placeholder={`How many trays of ${cellMultiple}?`}
+                    />
+                    {newTrays > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        = <span className="font-medium text-foreground">{(newTrays * cellMultiple).toLocaleString()}</span> total units ({newTrays} × {cellMultiple} cells)
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Label>Expected Quantity *</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={newQuantity || ''}
+                      onChange={(e) => setNewQuantity(parseInt(e.target.value) || 0)}
+                      placeholder="Enter expected quantity"
+                    />
+                  </>
+                )}
               </div>
 
               {/* Location (Optional) */}
@@ -446,6 +397,8 @@ export function PlanBatchesStep({
                   placeholder="Select location (or leave TBD)..."
                   emptyLabel="TBD (decide at check-in)"
                   emptyValue=""
+                  createHref="/locations"
+                  createLabel="Add new location"
                   triggerClassName="w-full"
                 />
               </div>

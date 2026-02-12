@@ -1,27 +1,20 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Check, ChevronsUpDown, ChevronRight, Truck, Calendar, FileText, AlertCircle } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Check, ChevronRight, Truck, Calendar, FileText, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReferenceData } from '@/contexts/ReferenceDataContext';
 import { useTodayDate } from '@/lib/date-sync';
+import { toast } from '@/lib/toast';
+import { OrderUploadZone } from './OrderUploadZone';
+import { OrderExtractionReview } from './OrderExtractionReview';
+import type { MatchedExtraction } from '@/lib/ai/match-extraction';
+import type { PlannedBatchEntry } from './PlanBatchesStep';
 
 export type SupplierExpectedDateData = {
   supplierId: string;
@@ -36,6 +29,7 @@ type SupplierExpectedDateStepProps = {
   referenceData: ReferenceData;
   initialData: SupplierExpectedDateData | null;
   onComplete: (data: SupplierExpectedDateData) => void;
+  onExtractionConfirmed?: (supplierData: SupplierExpectedDateData, batches: PlannedBatchEntry[]) => void;
   onCancel?: () => void;
 };
 
@@ -43,6 +37,7 @@ export function SupplierExpectedDateStep({
   referenceData,
   initialData,
   onComplete,
+  onExtractionConfirmed,
   onCancel,
 }: SupplierExpectedDateStepProps) {
   // Use hydration-safe date to prevent server/client mismatch
@@ -50,7 +45,36 @@ export function SupplierExpectedDateStep({
   const [supplierId, setSupplierId] = useState(initialData?.supplierId ?? '');
   const [expectedDate, setExpectedDate] = useState(initialData?.expectedDate ?? '');
   const [supplierReference, setSupplierReference] = useState(initialData?.supplierReference ?? '');
-  const [supplierOpen, setSupplierOpen] = useState(false);
+
+  // Order upload extraction state
+  const [extraction, setExtraction] = useState<MatchedExtraction | null>(null);
+  const [extractionFormat, setExtractionFormat] = useState<'pdf' | 'csv'>('pdf');
+
+  const handleExtractionComplete = useCallback(
+    (result: MatchedExtraction, format: 'pdf' | 'csv') => {
+      setExtraction(result);
+      setExtractionFormat(format);
+    },
+    []
+  );
+
+  const handleExtractionError = useCallback((message: string) => {
+    toast.error('Extraction failed', { description: message });
+  }, []);
+
+  const handleExtractionCancel = useCallback(() => {
+    setExtraction(null);
+  }, []);
+
+  const handleExtractionConfirm = useCallback(
+    (supplierData: SupplierExpectedDateData, batches: PlannedBatchEntry[]) => {
+      setExtraction(null);
+      if (onExtractionConfirmed) {
+        onExtractionConfirmed(supplierData, batches);
+      }
+    },
+    [onExtractionConfirmed]
+  );
 
   // Set date after hydration if not provided
   useEffect(() => {
@@ -111,6 +135,25 @@ export function SupplierExpectedDateStep({
         </Card>
       )}
 
+      {/* Order Upload Zone */}
+      {!extraction && onExtractionConfirmed && (
+        <OrderUploadZone
+          onExtractionComplete={handleExtractionComplete}
+          onError={handleExtractionError}
+        />
+      )}
+
+      {/* Extraction Review */}
+      {extraction && (
+        <OrderExtractionReview
+          extraction={extraction}
+          format={extractionFormat}
+          referenceData={referenceData}
+          onConfirm={handleExtractionConfirm}
+          onCancel={handleExtractionCancel}
+        />
+      )}
+
       {/* Completion Status */}
       <div className="flex flex-wrap gap-2">
         {readiness.map((item) => (
@@ -138,79 +181,20 @@ export function SupplierExpectedDateStep({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={supplierOpen}
-                className="w-full justify-between h-12"
-              >
-                {selectedSupplier ? (
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{selectedSupplier.name}</span>
-                    {selectedSupplier.producer_code && (
-                      <span className="text-muted-foreground">
-                        · {selectedSupplier.producer_code}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Select supplier...</span>
-                )}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Search suppliers..." />
-                <CommandList>
-                  <CommandEmpty>
-                    {suppliers.length === 0 ? (
-                      <div className="py-6 text-center">
-                        <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm font-medium">No suppliers configured</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          <a href="/suppliers" className="underline hover:text-primary">
-                            Add your first supplier
-                          </a>
-                        </p>
-                      </div>
-                    ) : (
-                      'No matching supplier found.'
-                    )}
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {suppliers.map((supplier) => (
-                      <CommandItem
-                        key={supplier.id}
-                        value={supplier.name}
-                        onSelect={() => {
-                          setSupplierId(supplier.id);
-                          setSupplierOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            supplierId === supplier.id ? 'opacity-100' : 'opacity-0'
-                          )}
-                        />
-                        <div>
-                          <span className="font-medium">{supplier.name}</span>
-                          {supplier.producer_code && (
-                            <span className="text-muted-foreground ml-2">
-                              · {supplier.producer_code}
-                            </span>
-                          )}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <SearchableSelect
+            options={suppliers.map((s) => ({
+              value: s.id,
+              label: s.name,
+              description: s.producer_code ? `· ${s.producer_code}` : undefined,
+            }))}
+            value={supplierId}
+            onValueChange={(value) => setSupplierId(value)}
+            placeholder="Select supplier..."
+            searchPlaceholder="Search suppliers..."
+            createHref="/suppliers"
+            createLabel="Add new supplier"
+            className="h-12"
+          />
         </CardContent>
       </Card>
 
