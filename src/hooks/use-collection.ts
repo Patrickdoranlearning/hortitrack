@@ -121,6 +121,7 @@ export function useCollection<T = unknown>(collectionName: string, initialData?:
         const token = await getSessionToken(supabase);
         const res = await fetch(url, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          cache: "no-store",
         });
         if (!res.ok) throw new Error(await res.text());
         const json = await res.json();

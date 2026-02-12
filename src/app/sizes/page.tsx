@@ -97,7 +97,7 @@ export default function SizesPage() {
   // Fetch container types from dropdown manager (configurable per tenant)
   const { options: containerTypeOptions, isLoading: containerTypesLoading } = useAttributeOptions('size_container_type');
 
-  const { data: sizesData, loading: sizesLoading } = useCollection<any>('plant_sizes', INITIAL_PLANT_SIZES);
+  const { data: sizesData, loading: sizesLoading, forceRefresh } = useCollection<any>('plant_sizes', INITIAL_PLANT_SIZES);
   const sizes = useMemo<PlantSize[]>(() => {
     return (sizesData || []).map(normalizeSizeRow);
   }, [sizesData]);
@@ -193,6 +193,7 @@ export default function SizesPage() {
     const result = await deleteSizeAction(sizeId);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`Removed "${sizeToDelete.name}".`);
     } else {
       toast.error(result.error);
@@ -209,6 +210,7 @@ export default function SizesPage() {
 
       if (result.success) {
         invalidateReferenceData();
+        await forceRefresh();
         toast.success(`Successfully ${isEditing ? 'updated' : 'added'} "${result.data?.name}".`);
         setIsFormOpen(false);
         setEditingSize(null);
@@ -248,6 +250,7 @@ export default function SizesPage() {
     const result = await addSizeAction(payload);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
       nameFieldRef.current?.focus();
@@ -372,6 +375,7 @@ export default function SizesPage() {
 
     if (created > 0) {
       invalidateReferenceData();
+      await forceRefresh();
     }
 
     let description = `${created} new size${created === 1 ? '' : 's'} added.`;

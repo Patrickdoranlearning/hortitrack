@@ -97,7 +97,7 @@ export default function VarietiesPage() {
   const [deleteFailedVariety, setDeleteFailedVariety] = useState<{ id: string; name: string; error: string } | null>(null);
   const { value: viewMode, setValue: setViewMode } = useViewToggle('varieties-view', 'table');
 
-  const { data: varietiesData, loading: varietiesLoading } = useCollection<any>("plant_varieties");
+  const { data: varietiesData, loading: varietiesLoading, forceRefresh } = useCollection<any>("plant_varieties");
   const allVarieties = useMemo<Variety[]>(() => (varietiesData || []).map(normalizeVariety), [varietiesData]);
   const varieties = useMemo(() => allVarieties.filter(v => showArchived ? (v as any).isArchived : !(v as any).isArchived), [allVarieties, showArchived]);
   const isLoading = authLoading || varietiesLoading;
@@ -155,6 +155,7 @@ export default function VarietiesPage() {
     const result = await deleteVarietyAction(varietyId);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`Successfully removed "${varietyToDelete.name}".`);
     } else if ((result as any).canArchive) {
       setDeleteFailedVariety({ id: varietyId, name: varietyToDelete.name, error: result.error || "Cannot delete" });
@@ -170,6 +171,7 @@ export default function VarietiesPage() {
     const result = await archiveVarietyAction(varietyId);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${varietyToArchive.name}" has been archived.`);
       setDeleteFailedVariety(null);
     } else {
@@ -184,6 +186,7 @@ export default function VarietiesPage() {
     const result = await unarchiveVarietyAction(varietyId);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${varietyToRestore.name}" has been restored.`);
     } else {
       toast.error(result.error || "Restore failed");
@@ -201,6 +204,7 @@ export default function VarietiesPage() {
 
       if (result.success) {
         invalidateReferenceData();
+        await forceRefresh();
         toast.success(`Successfully ${isEditing ? "updated" : "added"} "${result.data?.name}".`);
         setIsFormOpen(false);
         setEditingVariety(null);
@@ -363,6 +367,7 @@ export default function VarietiesPage() {
     // Invalidate cache if any varieties were created
     if (created > 0) {
       invalidateReferenceData();
+      await forceRefresh();
     }
 
     let description = `${created} new variet${created === 1 ? "y" : "ies"} added.`;
@@ -409,6 +414,7 @@ export default function VarietiesPage() {
     const result = await addVarietyAction(payload);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
       nameFieldRef.current?.focus();

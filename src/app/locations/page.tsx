@@ -25,7 +25,6 @@ import { PageFrame } from '@/ui/templates';
 
 const quickLocationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  nurserySite: z.string().min(1, 'Nursery site is required'),
   type: z.string().min(1, 'Type is required'),
   covered: z.boolean().optional(),
   area: z.preprocess((val) => {
@@ -42,7 +41,6 @@ type SortableLocationKey = 'name' | 'nurserySite' | 'type' | 'area' | 'covered' 
 
 const defaultQuickValues: QuickLocationFormValues = {
   name: '',
-  nurserySite: '',
   type: '',
   covered: false,
   area: undefined,
@@ -60,7 +58,7 @@ export default function LocationsPage() {
     direction: 'asc',
   });
 
-  const { data: rawLocations, loading } = useCollection<any>('nursery_locations');
+  const { data: rawLocations, loading, forceRefresh } = useCollection<any>('nursery_locations');
   const locations = useMemo<NurseryLocation[]>(() => (rawLocations || []).map(normalizeLocation).filter(Boolean) as NurseryLocation[], [rawLocations]);
 
   // Fetch sites for the site dropdown and display
@@ -128,9 +126,12 @@ export default function LocationsPage() {
       return;
     }
 
+    // Derive nurserySite name from the selected site
+    const selectedSiteName = values.siteId ? siteNameMap.get(values.siteId) ?? '' : '';
+
     const payload: Omit<NurseryLocation, 'id'> = {
       name: values.name.trim(),
-      nurserySite: values.nurserySite.trim(),
+      nurserySite: selectedSiteName,
       type: values.type.trim(),
       covered: values.covered ?? false,
       area: values.area,
@@ -140,6 +141,7 @@ export default function LocationsPage() {
     const result = await addLocationAction(payload);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
     } else {
@@ -213,6 +215,7 @@ export default function LocationsPage() {
 
     if (created > 0) {
       invalidateReferenceData();
+      await forceRefresh();
     }
 
     if (failures.length) {
@@ -226,6 +229,7 @@ export default function LocationsPage() {
     const result = await deleteLocationAction(id);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${name}" removed.`);
     } else {
       toast.error(result.error);
@@ -313,6 +317,7 @@ export default function LocationsPage() {
                     : addLocationAction(values as Omit<NurseryLocation, 'id'>);
                   if (result.success) {
                     invalidateReferenceData();
+                    await forceRefresh();
                     toast.success(`"${result.data?.name ?? values.name}" saved successfully.`);
                     setIsFormOpen(false);
                     setEditingLocation(null);
@@ -380,7 +385,6 @@ function CardWithTable({
                 <TableHead className="px-4 py-2 w-[160px]">{renderSortHeader('Type', 'type')}</TableHead>
                 <TableHead className="px-4 py-2 w-[140px] hidden md:table-cell">{renderSortHeader('Covered', 'covered')}</TableHead>
                 <TableHead className="px-4 py-2 w-[140px] hidden lg:table-cell">{renderSortHeader('Area (m²)', 'area')}</TableHead>
-                <TableHead className="px-4 py-2 w-[200px] hidden lg:table-cell">{renderSortHeader('Site', 'siteId')}</TableHead>
                 <TableHead className="text-right px-4 py-2">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -405,13 +409,28 @@ function CardWithTable({
                   <TableCell className="px-4 py-2 hidden md:table-cell">
                     <FormField
                       control={quickForm.control}
-                      name="nurserySite"
+                      name="siteId"
                       render={({ field }) => (
                         <FormItem className="space-y-1">
                           <FormLabel className="sr-only">Nursery site</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Main / Alberts…" {...field} />
-                          </FormControl>
+                          <Select
+                            value={field.value ?? '__none__'}
+                            onValueChange={(value) => field.onChange(value === '__none__' ? undefined : value)}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select site..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="__none__">None</SelectItem>
+                              {sites.filter(site => site.id).map((site) => (
+                                <SelectItem key={site.id} value={site.id!}>
+                                  {site.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
@@ -483,36 +502,6 @@ function CardWithTable({
                       )}
                     />
                   </TableCell>
-                  <TableCell className="px-4 py-2 hidden lg:table-cell">
-                    <FormField
-                      control={quickForm.control}
-                      name="siteId"
-                      render={({ field }) => (
-                        <FormItem className="space-y-1">
-                          <FormLabel className="sr-only">Site</FormLabel>
-                          <Select
-                            value={field.value ?? '__none__'}
-                            onValueChange={(value) => field.onChange(value === '__none__' ? undefined : value)}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select site..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="__none__">None</SelectItem>
-                              {sites.filter(site => site.id).map((site) => (
-                                <SelectItem key={site.id} value={site.id!}>
-                                  {site.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                  </TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <Button
                       type="button"
@@ -530,11 +519,10 @@ function CardWithTable({
               {locations.map((location) => (
                 <TableRow key={location.id}>
                   <TableCell className="px-4 py-2 font-medium">{location.name}</TableCell>
-                  <TableCell className="px-4 py-2 hidden md:table-cell">{location.nurserySite || '—'}</TableCell>
+                  <TableCell className="px-4 py-2 hidden md:table-cell">{location.siteId ? siteNameMap.get(location.siteId) || location.nurserySite : location.nurserySite || '—'}</TableCell>
                   <TableCell className="px-4 py-2">{location.type || '—'}</TableCell>
                   <TableCell className="px-4 py-2 hidden md:table-cell">{location.covered ? 'Covered' : 'Uncovered'}</TableCell>
                   <TableCell className="px-4 py-2 hidden lg:table-cell">{location.area ? `${location.area.toLocaleString()} m²` : '—'}</TableCell>
-                  <TableCell className="px-4 py-2 hidden lg:table-cell">{location.siteId ? siteNameMap.get(location.siteId) || location.siteId : '—'}</TableCell>
                   <TableCell className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-2">
                       <Button

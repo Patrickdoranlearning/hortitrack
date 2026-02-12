@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Plus, Sprout, ShoppingCart, Truck, ShieldCheck, Package, FileText, Users, MapPin, Ruler, X } from "lucide-react"
+import { Plus, Sprout, ShoppingCart, Truck, ShieldCheck, FileText, Users, MapPin, Ruler, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type CreateAction = {
@@ -62,16 +62,7 @@ const CREATE_MENU: CreateCategory[] = [
       { label: "New IPM Program", href: "/plant-health/programs?action=new" },
     ],
   },
-  {
-    label: "Materials",
-    icon: Package,
-    actions: [
-      { label: "New Purchase Order", href: "/materials/purchase-orders/new" },
-      { label: "Add Material", href: "/materials/catalog?action=new" },
-      { label: "Stock Adjustment", href: "/materials/stock?action=adjust" },
-    ],
-  },
-  {
+{
     label: "Data Management",
     icon: FileText,
     actions: [

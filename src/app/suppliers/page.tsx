@@ -80,7 +80,7 @@ export default function SuppliersPage() {
   const [editingAddress, setEditingAddress] = useState<SupplierAddressSummary | null>(null);
   const [addressPending, startAddressTransition] = useTransition();
 
-  const { data: rawSuppliers, loading } = useCollection<any>('suppliers');
+  const { data: rawSuppliers, loading, forceRefresh } = useCollection<any>('suppliers');
   const suppliers = useMemo<Supplier[]>(() => (rawSuppliers || []).map(normalizeSupplier).filter(Boolean) as Supplier[], [rawSuppliers]);
   
   // Fetch addresses when sheet opens
@@ -190,6 +190,7 @@ export default function SuppliersPage() {
     const result = await addSupplierAction(payload);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
     } else {
@@ -266,6 +267,7 @@ export default function SuppliersPage() {
 
     if (created > 0) {
       invalidateReferenceData();
+      await forceRefresh();
     }
 
     if (failures.length) {
@@ -279,6 +281,7 @@ export default function SuppliersPage() {
     const result = await deleteSupplierAction(id);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${name}" removed.`);
     } else {
       toast.error(result.error);
@@ -364,6 +367,7 @@ export default function SuppliersPage() {
                     : addSupplierAction(values as Omit<Supplier, 'id'>));
                   if (result.success) {
                     invalidateReferenceData();
+                    await forceRefresh();
                     toast.success(`"${result.data?.name ?? values.name}" saved successfully.`);
                     setIsFormOpen(false);
                     setEditingSupplier(null);

@@ -208,6 +208,14 @@ async function resolveActiveOrgId({
       logError("[getUserAndOrg] membership lookup failed", { error: membershipResult.error });
     }
     activeOrgId = membershipResult.data?.[0]?.org_id ?? null;
+
+    // Write back to profile so RLS current_org_id() works on future queries
+    if (activeOrgId) {
+      await admin
+        .from("profiles")
+        .update({ active_org_id: activeOrgId })
+        .eq("id", user.id);
+    }
   }
 
   if (!activeOrgId) {

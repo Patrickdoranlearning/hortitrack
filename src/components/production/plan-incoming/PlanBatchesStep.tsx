@@ -23,10 +23,13 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { LocationComboboxGrouped } from '@/components/ui/location-combobox-grouped';
 import {
   Table,
   TableBody,
@@ -92,7 +95,6 @@ export function PlanBatchesStep({
   const [newNotes, setNewNotes] = useState('');
   const [varietyOpen, setVarietyOpen] = useState(false);
   const [sizeOpen, setSizeOpen] = useState(false);
-  const [locationOpen, setLocationOpen] = useState(false);
 
   const varieties = referenceData.varieties ?? [];
   const sizes = referenceData.sizes ?? [];
@@ -106,10 +108,29 @@ export function PlanBatchesStep({
     () => sizes.find((s) => s.id === newSizeId),
     [sizes, newSizeId]
   );
-  const selectedLocation = useMemo(
-    () => locations.find((l) => l.id === newLocationId),
-    [locations, newLocationId]
-  );
+  // Group locations by site for the table Select dropdown
+  const groupedLocations = useMemo(() => {
+    const groups = new Map<string, typeof locations>();
+    for (const loc of locations) {
+      const site = loc.nursery_site || 'Other';
+      if (!groups.has(site)) groups.set(site, []);
+      groups.get(site)!.push(loc);
+    }
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([site, locs]) => ({
+        site,
+        locs: locs.slice().sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }, [locations]);
+
+  // Format location name with site for disambiguation (e.g. "Main Nursery · Tunnel 1")
+  const formatLocationName = useCallback((location: (typeof locations)[number] | null | undefined) => {
+    if (!location) return undefined;
+    return location.nursery_site
+      ? `${location.nursery_site} · ${location.name}`
+      : location.name;
+  }, []);
 
   // Add planned batch
   const handleAddBatch = useCallback(() => {
@@ -128,7 +149,7 @@ export function PlanBatchesStep({
       sizeName: size?.name ?? 'Unknown',
       expectedQuantity: newQuantity,
       locationId: newLocationId || undefined,
-      locationName: location?.name,
+      locationName: formatLocationName(location),
       notes: newNotes || undefined,
     };
 
@@ -139,7 +160,7 @@ export function PlanBatchesStep({
     setNewQuantity(0);
     setNewLocationId('');
     setNewNotes('');
-  }, [newVarietyId, newSizeId, newQuantity, newLocationId, newNotes, varieties, sizes, locations]);
+  }, [newVarietyId, newSizeId, newQuantity, newLocationId, newNotes, varieties, sizes, locations, formatLocationName]);
 
   // Remove batch
   const removeBatch = useCallback((batchId: string) => {
@@ -161,11 +182,11 @@ export function PlanBatchesStep({
     setBatches((b) =>
       b.map((batch) =>
         batch.id === batchId
-          ? { ...batch, locationId: locationId || undefined, locationName: location?.name }
+          ? { ...batch, locationId: locationId || undefined, locationName: formatLocationName(location) }
           : batch
       )
     );
-  }, [locations]);
+  }, [locations, formatLocationName]);
 
   const isValid = batches.length > 0;
   const canAddBatch = newVarietyId && newSizeId && newQuantity > 0;
@@ -245,10 +266,15 @@ export function PlanBatchesStep({
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px]">
                           <SelectItem value="__tbd__">TBD</SelectItem>
-                          {locations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
-                            </SelectItem>
+                          {groupedLocations.map(({ site, locs }) => (
+                            <SelectGroup key={site}>
+                              <SelectLabel className="text-xs font-semibold text-muted-foreground">{site}</SelectLabel>
+                              {locs.map((loc) => (
+                                <SelectItem key={loc.id} value={loc.id}>
+                                  {loc.name}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           ))}
                         </SelectContent>
                       </Select>
@@ -413,65 +439,15 @@ export function PlanBatchesStep({
                   Location
                   <Badge variant="outline" className="ml-2 font-normal text-xs">Optional</Badge>
                 </Label>
-                <Popover open={locationOpen} onOpenChange={setLocationOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {selectedLocation ? (
-                        <span>{selectedLocation.name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Select location (or leave TBD)...</span>
-                      )}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search locations..." />
-                      <CommandList>
-                        <CommandEmpty>No location found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="none"
-                            onSelect={() => {
-                              setNewLocationId('');
-                              setLocationOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                !newLocationId ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                            <span className="text-muted-foreground">TBD (decide at check-in)</span>
-                          </CommandItem>
-                          {locations.map((l) => (
-                            <CommandItem
-                              key={l.id}
-                              value={l.name}
-                              onSelect={() => {
-                                setNewLocationId(l.id);
-                                setLocationOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  newLocationId === l.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              {l.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <LocationComboboxGrouped
+                  locations={locations}
+                  value={newLocationId}
+                  onSelect={(id) => setNewLocationId(id)}
+                  placeholder="Select location (or leave TBD)..."
+                  emptyLabel="TBD (decide at check-in)"
+                  emptyValue=""
+                  triggerClassName="w-full"
+                />
               </div>
             </div>
 

@@ -48,7 +48,7 @@ export default function HauliersPage() {
     direction: 'asc',
   });
 
-  const { data: rawHauliers, loading } = useCollection<any>('hauliers');
+  const { data: rawHauliers, loading, forceRefresh } = useCollection<any>('hauliers');
   const hauliers = useMemo<Haulier[]>(() => (rawHauliers || []).map(normalizeHaulier).filter(Boolean) as Haulier[], [rawHauliers]);
 
   const quickForm = useForm<QuickHaulierValues>({
@@ -103,6 +103,7 @@ export default function HauliersPage() {
     const result = await addHaulierAction(payload);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${values.name}" is now available.`);
       quickForm.reset(defaultQuickValues);
     } else {
@@ -171,6 +172,7 @@ export default function HauliersPage() {
 
     if (created > 0) {
       invalidateReferenceData();
+      await forceRefresh();
     }
 
     if (failures.length) {
@@ -184,6 +186,7 @@ export default function HauliersPage() {
     const result = await deleteHaulierAction(id);
     if (result.success) {
       invalidateReferenceData();
+      await forceRefresh();
       toast.success(`"${name}" removed.`);
     } else {
       toast.error(result.error);
@@ -258,6 +261,7 @@ export default function HauliersPage() {
                     : addHaulierAction(values as Omit<Haulier, 'id'>));
                   if (result.success) {
                     invalidateReferenceData();
+                    await forceRefresh();
                     toast.success(`"${result.data?.name ?? values.name}" saved successfully.`);
                     setIsFormOpen(false);
                     setEditingHaulier(null);

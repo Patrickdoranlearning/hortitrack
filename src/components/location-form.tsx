@@ -28,7 +28,7 @@ const LocationFormSchema = NurseryLocationSchema.omit({
   updatedAt: true,
 }).extend({
   name: z.string().min(1, 'Name is required'),
-  nurserySite: z.string().min(1, 'Nursery site is required'),
+  nurserySite: z.string().optional(),
   type: z.string().min(1, 'Type is required'),
   area: z.number().nonnegative().optional(),
 });
@@ -85,10 +85,13 @@ export function LocationForm({ location, sites = [], onSubmit, onCancel, saving 
   }, [location, form]);
 
   const handleSubmit = (values: LocationFormValues) => {
+    // Derive nurserySite name from the selected site
+    const selectedSite = sites.find(s => s.id === values.siteId);
+    const payload = { ...values, nurserySite: selectedSite?.name ?? '' };
     if (isEditing && location) {
-      onSubmit({ ...values, id: location.id });
+      onSubmit({ ...payload, id: location.id });
     } else {
-      onSubmit(values);
+      onSubmit(payload);
     }
   };
 
@@ -122,38 +125,10 @@ export function LocationForm({ location, sites = [], onSubmit, onCancel, saving 
 
               <FormField
                 control={form.control}
-                name="nurserySite"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nursery site</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Main" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Structure type</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Tunnel, Glasshouse, Section…" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="siteId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Site (optional)</FormLabel>
+                    <FormLabel>Nursery site</FormLabel>
                     <Select
                       value={field.value ?? '__none__'}
                       onValueChange={(value) => field.onChange(value === '__none__' ? undefined : value)}
@@ -172,6 +147,20 @@ export function LocationForm({ location, sites = [], onSubmit, onCancel, saving 
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Structure type</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Tunnel, Glasshouse, Section…" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
